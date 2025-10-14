@@ -54,7 +54,7 @@ const mockAchievements = [
   },
   {
     id: 4,
-    name: "Aeroschool Master",
+    name: "LabTwin Master",
     description: "Complete 10 math courses",
     icon: "🧮",
     category: "Expertise",

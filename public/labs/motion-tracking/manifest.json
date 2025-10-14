@@ -1,0 +1,37 @@
+{
+  "id": "motion-tracking",
+  "name": "Motion Tracking với Camera",
+  "description": "Theo dõi chuyển động vật thể trong không gian 3D và ước lượng khoảng cách từ camera. Mô phỏng pinhole camera model và projection từ 3D sang 2D.",
+  "category": "Thị giác máy tính",
+  "level": "Lớp 11-12",
+  "duration": "50 phút",
+  "xp": 100,
+  "version": "1.0.0",
+  "author": "LabTwin Team",
+  "tags": ["computer vision", "camera", "3D tracking", "projection", "distance estimation"],
+  "features": [
+    "Pinhole Camera Model",
+    "3D → 2D Projection",
+    "Distance Estimation",
+    "Multiple Object Presets",
+    "Different Motion Types",
+    "Real-time Visualization"
+  ],
+  "learning_objectives": [
+    "Hiểu mô hình camera lỗ nhỏ (pinhole camera)",
+    "Học cách chiếu tọa độ 3D sang 2D",
+    "Ước lượng khoảng cách từ kích thước vật trong ảnh",
+    "Hiệu chỉnh camera (camera calibration)",
+    "Phân tích quỹ đạo chuyển động 3D"
+  ],
+  "prerequisites": [
+    "Hình học không gian",
+    "Tỉ lệ và phép đo",
+    "Khái niệm vector 3D"
+  ],
+  "difficulty": "Nâng cao",
+  "icon": "Camera",
+  "color": "#10B981"
+}
+
+

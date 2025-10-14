@@ -5,13 +5,12 @@ import { AuthSessionProvider } from '@/components/providers/session-provider'
 import { ToastProvider } from '@/components/providers/toaster-provider'
 import { ConfettiProvider } from '@/components/providers/confetti-provider'
 import { LanguageProvider } from '@/contexts/LanguageContext'
-import { XPProvider } from '@/contexts/XPContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Aeroschool - Learning Management System',
-  description: 'A comprehensive learning management system for mathematics education',
+  title: 'LabTwin - Interactive Learning Platform',
+  description: 'An innovative learning platform with virtual labs and AI-powered content generation',
 }
 
 export default function RootLayout({
@@ -20,15 +19,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthSessionProvider>
           <LanguageProvider>
-            <XPProvider>
-              <ConfettiProvider />
-              <ToastProvider />
-              {children}
-            </XPProvider>
+            <ConfettiProvider />
+            <ToastProvider />
+            {children}
           </LanguageProvider>
         </AuthSessionProvider>
       </body>

@@ -277,7 +277,7 @@ export default function SinhHocLearningPathPage() {
                               </Badge>
                             )}
                             {!chapter.isLocked && !chapter.isCompleted && (
-                              <Link href="/learning-paths-demo/sinh-hoc/learn">
+                              <Link href={`/learning-paths-demo/sinh-hoc/learn/${chapter.id}`}>
                                 <Button size="sm" className="bg-pink-600 hover:bg-pink-700">
                                   Bắt đầu
                                 </Button>

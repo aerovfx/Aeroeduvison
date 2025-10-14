@@ -22,6 +22,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+// Disable static generation
+export const dynamic = 'force-dynamic'
+
 const AdminCompetitionPage = () => {
   const { data: session } = useSession();
   const router = useRouter();

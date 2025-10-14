@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Zap, BookOpen, CheckCircle, Clock, PlayCircle, Star, Target } from "lucide-react";
 
+// Disable static generation
+export const dynamic = 'force-dynamic'
+
 export default function VatLyLearningPathPage() {
   const learningPath = {
     id: "vat-ly",
@@ -307,7 +310,7 @@ export default function VatLyLearningPathPage() {
                               </Badge>
                             )}
                             {!chapter.isLocked && !chapter.isCompleted && (
-                              <Link href="/learning-paths-demo/vat-ly/learn">
+                              <Link href={`/learning-paths-demo/vat-ly/learn/${chapter.id}`}>
                                 <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
                                   Bắt đầu
                                 </Button>

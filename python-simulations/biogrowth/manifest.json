@@ -1,0 +1,14 @@
+{
+  "id": "biogrowth",
+  "name": "BioGrowth - Sinh học Tăng trưởng",
+  "description": "Mô phỏng tăng trưởng sinh học: exponential, logistic, vi khuẩn, tế bào. Giải phương trình với SciPy. AI dự đoán biến thể gen.",
+  "category": "Sinh học",
+  "level": "Lớp 10-12",
+  "xp": 130,
+  "version": "1.0.0",
+  "tags": ["sinh học", "tăng trưởng", "vi khuẩn", "tế bào", "gen", "AI", "SciPy"],
+  "api": {"enabled": true, "port": 8005}
+}
+
+
+

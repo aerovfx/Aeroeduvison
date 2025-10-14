@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 
 import { CourseSidebar } from "./_components/course-sidebar";
 import { CourseNavbar } from "./_components/course-navbar";
+import { CourseLayoutWrapper } from "./_components/course-layout-wrapper";
 
 const CourseLayout = async ({
   children,
@@ -52,23 +53,25 @@ const CourseLayout = async ({
   const progressCount = await getProgress(session.user.id, course.id);
 
   return (
-    <div className="h-full">
-      <div className="h-[80px] md:pl-80 fixed inset-y-0 w-full z-50">
-        <CourseNavbar
-          course={course}
-          progressCount={progressCount}
-        />
+    <CourseLayoutWrapper>
+      <div className="h-full">
+        <div className="h-[80px] md:pl-80 fixed inset-y-0 w-full z-50">
+          <CourseNavbar
+            course={course}
+            progressCount={progressCount}
+          />
+        </div>
+        <div className="hidden md:flex h-full w-80 flex-col fixed inset-y-0 z-50">
+          <CourseSidebar
+            course={course}
+            progressCount={progressCount}
+          />
+        </div>
+        <main className="md:pl-80 pt-[80px] h-full">
+          {children}
+        </main>
       </div>
-      <div className="hidden md:flex h-full w-80 flex-col fixed inset-y-0 z-50">
-        <CourseSidebar
-          course={course}
-          progressCount={progressCount}
-        />
-      </div>
-      <main className="md:pl-80 pt-[80px] h-full">
-        {children}
-      </main>
-    </div>
+    </CourseLayoutWrapper>
   )
 }
 

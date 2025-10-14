@@ -22,33 +22,56 @@ export default function SignInPage() {
     setError("")
 
     try {
+      console.log("🔐 [CLIENT] Attempting login...", { email })
+      
       const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
       })
 
-      if (result?.error) {
-        setError("Invalid credentials")
-      } else {
+      console.log("🔐 [CLIENT] SignIn result:", result)
+
+      // Check OK first! NextAuth sometimes returns both ok:true AND error
+      if (result?.ok) {
+        console.log("✅ [CLIENT] Login successful, waiting for session...")
+        
         // Wait a bit for session to be created
         await new Promise(resolve => setTimeout(resolve, 1000))
         const session = await getSession()
         
-        console.log("Session after login:", session)
+        console.log("📊 [CLIENT] Session after login:", session)
         
-        if (session?.user?.role === "ADMIN") {
+        if (!session?.user) {
+          console.warn("⚠️ [CLIENT] Session not found, forcing reload...")
+          // Session not ready, force a hard reload
+          window.location.href = "/dashboard"
+          return
+        }
+        
+        console.log("✅ [CLIENT] Session valid, redirecting by role:", session.user.role)
+        
+        if (session.user.role === "ADMIN") {
           router.push("/admin/dashboard")
-        } else if (session?.user?.role === "TEACHER") {
+        } else if (session.user.role === "TEACHER") {
           router.push("/teacher/courses")
-        } else if (session?.user?.role === "STUDENT") {
+        } else if (session.user.role === "STUDENT") {
           router.push("/dashboard")
         } else {
           router.push("/")
         }
+        
+        router.refresh() // Force page refresh to load session
+      } else if (result?.error) {
+        console.error("❌ [CLIENT] Login error:", result.error)
+        setError("Email hoặc mật khẩu không đúng")
+      } else {
+        console.error("❌ [CLIENT] Unexpected result:", result)
+        setError("Có lỗi xảy ra. Vui lòng thử lại.")
       }
     } catch (error) {
-      setError("Something went wrong")
+      console.error("❌ [CLIENT] Exception:", error)
+      setError("Không thể kết nối đến server")
     } finally {
       setIsLoading(false)
     }
@@ -92,7 +115,12 @@ export default function SignInPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

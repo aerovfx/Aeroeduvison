@@ -1,0 +1,50 @@
+{
+  "id": "wfc-builder",
+  "name": "WFC Builder - 3D Procedural Generation",
+  "nameVi": "WFC Builder - Sinh cấu trúc 3D tự động",
+  "version": "1.0.0",
+  "description": "Wave Function Collapse algorithm for 3D procedural generation of modular structures",
+  "descriptionVi": "Thuật toán Wave Function Collapse để sinh cấu trúc 3D modular tự động với constraints",
+  "category": "procedural-generation",
+  "difficulty": "advanced",
+  "port": 8008,
+  "apiEndpoint": "http://localhost:8008",
+  "features": [
+    "Wave Function Collapse algorithm",
+    "3D voxel generation",
+    "Multiple tilesets (buildings, dungeons, nature)",
+    "AI pattern generation",
+    "Constraint satisfaction",
+    "Three.js 3D visualization",
+    "Export to JSON",
+    "Procedural architecture"
+  ],
+  "featuresVi": [
+    "Thuật toán Wave Function Collapse",
+    "Tạo voxel 3D",
+    "Nhiều tileset (tòa nhà, hầm ngục, thiên nhiên)",
+    "Sinh pattern bằng AI",
+    "Thỏa mãn ràng buộc",
+    "Trực quan hóa 3D với Three.js",
+    "Xuất ra JSON",
+    "Kiến trúc procedural"
+  ],
+  "tags": ["procedural-generation", "WFC", "3D", "voxel", "architecture", "AI"],
+  "requirements": {
+    "python": ">=3.8",
+    "memory": "512MB",
+    "cpu": "2 cores recommended"
+  },
+  "endpoints": {
+    "generate": "/generate",
+    "patterns": "/patterns/generate",
+    "styles": "/patterns/styles",
+    "tilesets": "/tilesets",
+    "presets": "/presets",
+    "health": "/health"
+  },
+  "author": "LMS Math Team",
+  "license": "MIT"
+}
+
+

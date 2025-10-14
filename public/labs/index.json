@@ -1,0 +1,489 @@
+{
+  "simulations": [
+    {
+      "id": "refraction",
+      "name": "Khúc xạ ánh sáng",
+      "description": "Mô phỏng khúc xạ ánh sáng khi đi qua các môi trường khác nhau. Thí nghiệm minh họa định luật Snell và hiện tượng phản xạ toàn phần.",
+      "category": "Quang học",
+      "level": "Lớp 11",
+      "duration": "45 phút",
+      "xp": 80,
+      "version": "1.0.0",
+      "author": "LabTwin Team",
+      "tags": [
+        "quang học",
+        "khúc xạ",
+        "định luật Snell",
+        "vật lý"
+      ],
+      "features": [
+        "Định luật Snell",
+        "Thay đổi góc tới",
+        "Nhiều môi trường",
+        "Phản xạ toàn phần",
+        "Đồ thị tương tác"
+      ],
+      "learning_objectives": [
+        "Hiểu định luật Snell về khúc xạ ánh sáng",
+        "Quan sát sự thay đổi góc khúc xạ khi thay đổi môi trường",
+        "Nhận biết hiện tượng phản xạ toàn phần",
+        "Tính toán góc tới hạn"
+      ],
+      "prerequisites": [
+        "Khái niệm về ánh sáng",
+        "Chiết suất của môi trường"
+      ],
+      "difficulty": "Trung bình",
+      "icon": "Settings",
+      "color": "#8B5CF6"
+    },
+    {
+      "id": "projectile",
+      "name": "Chuyển động ném xiên",
+      "description": "Mô phỏng chuyển động của vật được ném với vận tốc ban đầu và góc ném. Khám phá ảnh hưởng của góc ném, vận tốc và trọng lực đến quỹ đạo.",
+      "category": "Cơ học",
+      "level": "Lớp 10",
+      "duration": "40 phút",
+      "xp": 75,
+      "version": "1.0.0",
+      "author": "LabTwin Team",
+      "tags": [
+        "cơ học",
+        "ném xiên",
+        "quỹ đạo",
+        "vật lý"
+      ],
+      "features": [
+        "Thay đổi góc ném",
+        "Thay đổi vận tốc ban đầu",
+        "Thay đổi trọng lực (các hành tinh)",
+        "Đồ thị quỹ đạo",
+        "So sánh nhiều góc ném",
+        "Hiển thị công thức"
+      ],
+      "learning_objectives": [
+        "Hiểu chuyển động ném xiên và các đặc điểm",
+        "Phân tích thành phần vận tốc theo phương ngang và thẳng đứng",
+        "Tính toán tầm xa, độ cao tối đa, thời gian bay",
+        "So sánh quỹ đạo với các góc ném khác nhau",
+        "Nhận biết ảnh hưởng của trọng lực"
+      ],
+      "prerequisites": [
+        "Chuyển động thẳng đều",
+        "Chuyển động rơi tự do",
+        "Phân tích vector"
+      ],
+      "difficulty": "Trung bình",
+      "icon": "Zap",
+      "color": "#EF4444"
+    },
+    {
+      "id": "motion-tracking",
+      "name": "Motion Tracking với Camera",
+      "description": "Theo dõi chuyển động vật thể trong không gian 3D và ước lượng khoảng cách từ camera. Mô phỏng pinhole camera model và projection từ 3D sang 2D.",
+      "category": "Thị giác máy tính",
+      "level": "Lớp 11-12",
+      "duration": "50 phút",
+      "xp": 100,
+      "version": "1.0.0",
+      "author": "LabTwin Team",
+      "tags": [
+        "computer vision",
+        "camera",
+        "3D tracking",
+        "projection",
+        "distance estimation"
+      ],
+      "features": [
+        "Pinhole Camera Model",
+        "3D → 2D Projection",
+        "Distance Estimation",
+        "Multiple Object Presets",
+        "Different Motion Types",
+        "Real-time Visualization"
+      ],
+      "learning_objectives": [
+        "Hiểu mô hình camera lỗ nhỏ (pinhole camera)",
+        "Học cách chiếu tọa độ 3D sang 2D",
+        "Ước lượng khoảng cách từ kích thước vật trong ảnh",
+        "Hiệu chỉnh camera (camera calibration)",
+        "Phân tích quỹ đạo chuyển động 3D"
+      ],
+      "prerequisites": [
+        "Hình học không gian",
+        "Tỉ lệ và phép đo",
+        "Khái niệm vector 3D"
+      ],
+      "difficulty": "Nâng cao",
+      "icon": "Camera",
+      "color": "#10B981"
+    },
+    {
+      "id": "harmonic-motion",
+      "name": "Dao động điều hòa",
+      "description": "Vẽ đồ thị chuyển động dựa vào hàm số x = A×cos(ωt + φ). Nghiên cứu các đặc trưng của dao động điều hòa: biên độ, tần số, chu kỳ, pha ban đầu.",
+      "category": "Cơ học",
+      "level": "Lớp 11-12",
+      "duration": "45 phút",
+      "xp": 85,
+      "version": "1.0.0",
+      "author": "LabTwin Team",
+      "tags": [
+        "dao động",
+        "điều hòa",
+        "đồ thị",
+        "hàm số",
+        "vật lý"
+      ],
+      "features": [
+        "Đồ thị x(t), v(t), a(t)",
+        "Thay đổi biên độ A",
+        "Thay đổi tần số f",
+        "Thay đổi pha ban đầu φ",
+        "Biểu diễn năng lượng",
+        "Presets thực tế"
+      ],
+      "learning_objectives": [
+        "Hiểu khái niệm dao động điều hòa",
+        "Nhận biết đồ thị hàm cos",
+        "Phân tích ảnh hưởng của các tham số",
+        "Tính toán chu kỳ, tần số",
+        "Áp dụng vào các hiện tượng thực tế"
+      ],
+      "prerequisites": [
+        "Hàm lượng giác (sin, cos)",
+        "Đạo hàm cơ bản",
+        "Khái niệm lực và gia tốc"
+      ],
+      "difficulty": "Trung bình",
+      "icon": "Activity",
+      "color": "#F59E0B"
+    },
+    {
+      "id": "ocr-simulation",
+      "name": "OCR Pipeline - Nhận diện chữ viết",
+      "description": "Hệ thống OCR hoàn chỉnh với pipeline: Image Pre-processing → Text Detection → Text Recognition → Restructuring → JSON Output",
+      "version": "1.0.0",
+      "category": "Computer Vision",
+      "subcategory": "OCR & Text Recognition",
+      "icon": "FileText",
+      "level": "Advanced",
+      "duration": "45 minutes",
+      "xp_reward": 150,
+      "difficulty": "Advanced",
+      "tags": [
+        "OCR",
+        "Computer Vision",
+        "OpenCV",
+        "Text Recognition",
+        "AI"
+      ],
+      "features": [
+        "Image Pre-processing với OpenCV",
+        "Text Detection sử dụng EAST algorithm simulation",
+        "Text Recognition với CRNN simulation",
+        "Pattern matching và ID data extraction",
+        "JSON output với structured data",
+        "Multiple document types support",
+        "Confidence scoring",
+        "Real image upload support",
+        "File validation (JPEG, PNG, WebP)",
+        "Live OCR processing"
+      ],
+      "technologies": [
+        "OpenCV",
+        "EAST Text Detection",
+        "CRNN Text Recognition",
+        "Python",
+        "Computer Vision",
+        "Pattern Matching"
+      ],
+      "learning_objectives": [
+        "Hiểu pipeline OCR hoàn chỉnh",
+        "Áp dụng OpenCV cho image pre-processing",
+        "Thực hành text detection với EAST algorithm",
+        "Nhận diện text với CRNN model",
+        "Trích xuất structured data từ text",
+        "Tạo JSON output cho ứng dụng thực tế"
+      ],
+      "prerequisites": [
+        "Kiến thức cơ bản về Computer Vision",
+        "Hiểu biết về OpenCV",
+        "Kinh nghiệm với Python"
+      ],
+      "scenarios": [
+        {
+          "id": "student_id_card",
+          "name": "Thẻ sinh viên",
+          "description": "Nhận diện thông tin từ thẻ sinh viên",
+          "difficulty": "Medium"
+        },
+        {
+          "id": "academic_transcript",
+          "name": "Bảng điểm học tập",
+          "description": "Trích xuất thông tin từ bảng điểm",
+          "difficulty": "Advanced"
+        },
+        {
+          "id": "official_document",
+          "name": "Tài liệu chính thức",
+          "description": "Nhận diện văn bản từ tài liệu chính thức",
+          "difficulty": "Easy"
+        }
+      ],
+      "pipeline_steps": [
+        {
+          "step": 1,
+          "name": "Pre-processing",
+          "description": "Image enhancement & noise reduction",
+          "technologies": [
+            "OpenCV",
+            "PIL",
+            "OTSU"
+          ]
+        },
+        {
+          "step": 2,
+          "name": "Text Detection",
+          "description": "Locate text regions in image",
+          "technologies": [
+            "EAST",
+            "MSER",
+            "Contours"
+          ]
+        },
+        {
+          "step": 3,
+          "name": "Text Recognition",
+          "description": "Convert image text to string",
+          "technologies": [
+            "Tesseract",
+            "CRNN",
+            "OCR"
+          ]
+        },
+        {
+          "step": 4,
+          "name": "Data Extraction",
+          "description": "Extract structured information",
+          "technologies": [
+            "Regex",
+            "NLP",
+            "Pattern Matching"
+          ]
+        },
+        {
+          "step": 5,
+          "name": "JSON Output",
+          "description": "Format results as JSON",
+          "technologies": [
+            "JSON",
+            "Schema"
+          ]
+        },
+        {
+          "step": 6,
+          "name": "Complete",
+          "description": "Processing finished successfully",
+          "technologies": [
+            "Result",
+            "Validation"
+          ]
+        }
+      ],
+      "author": "LabTwin AI Team",
+      "created_date": "2024-10-11",
+      "status": "Active"
+    },
+    {
+      "id": "aerodynamics",
+      "name": "Động lực học không khí",
+      "description": "Mô phỏng dòng khí 2D/3D quanh vật thể sử dụng giải thuật Navier-Stokes. Tính toán lực cản, lực nâng và tối ưu hóa hình dạng với AI.",
+      "category": "Cơ học",
+      "level": "Lớp 11-12",
+      "duration": "60 phút",
+      "xp": 150,
+      "version": "1.0.0",
+      "author": "LMS Math Team",
+      "tags": [
+        "fluid dynamics",
+        "aerodynamics",
+        "navier-stokes",
+        "CFD",
+        "AI optimization"
+      ],
+      "features": [
+        "Navier-Stokes solver",
+        "Dòng khí quanh vật thể 2D",
+        "Tính toán lực cản & lực nâng",
+        "WebGL visualization",
+        "AI tối ưu hóa hình dạng",
+        "Multiple presets",
+        "Streamline visualization"
+      ],
+      "learning_objectives": [
+        "Hiểu phương trình Navier-Stokes",
+        "Phân tích dòng khí quanh vật thể",
+        "Tính toán lực cản và lực nâng",
+        "Tối ưu hóa hình dạng aerodynamic",
+        "Ứng dụng CFD trong thực tế"
+      ],
+      "prerequisites": [
+        "Động lực học chất lỏng cơ bản",
+        "Vector và đạo hàm",
+        "Khái niệm áp suất và lực"
+      ],
+      "difficulty": "Nâng cao",
+      "icon": "Wind",
+      "color": "#3B82F6"
+    },
+    {
+      "id": "wfc-builder",
+      "name": "WFC Builder - Procedural 3D",
+      "description": "Wave Function Collapse algorithm để sinh cấu trúc 3D modular tự động. Tạo buildings, dungeons, terrain với constraints.",
+      "category": "Procedural Generation",
+      "level": "Lớp 11-12",
+      "duration": "60 phút",
+      "xp": 180,
+      "version": "1.0.0",
+      "author": "LMS Math Team",
+      "tags": [
+        "procedural-generation",
+        "WFC",
+        "3D",
+        "voxel",
+        "architecture",
+        "AI"
+      ],
+      "features": [
+        "Wave Function Collapse algorithm",
+        "3D voxel generation",
+        "Multiple tilesets",
+        "AI pattern generation",
+        "Constraint satisfaction",
+        "Isometric 3D viewer"
+      ],
+      "difficulty": "Nâng cao",
+      "icon": "Box",
+      "color": "#6366F1"
+    },
+    {
+      "id": "datasim-ai",
+      "name": "DataSim.AI - ML Training",
+      "description": "Xem trực tiếp AI học từ dữ liệu! Train models với scikit-learn & PyTorch. Decision boundaries, loss curves, và metrics real-time.",
+      "category": "Machine Learning",
+      "level": "Lớp 11-12",
+      "duration": "50 phút",
+      "xp": 200,
+      "version": "1.0.0",
+      "author": "LMS Math Team",
+      "tags": [
+        "machine-learning",
+        "AI",
+        "scikit-learn",
+        "pytorch",
+        "visualization"
+      ],
+      "features": [
+        "6 ML models thật",
+        "Linear Regression, KNN, SVM",
+        "Neural Networks (PyTorch)",
+        "Decision boundary visualization",
+        "Loss curves",
+        "5 datasets khác nhau"
+      ],
+      "learning_objectives": [
+        "Hiểu cách AI học từ dữ liệu",
+        "Phân biệt classification và regression",
+        "Đọc decision boundaries",
+        "Phân tích loss curves",
+        "So sánh các models"
+      ],
+      "difficulty": "Trung bình",
+      "icon": "Brain",
+      "color": "#8B5CF6"
+    },
+    {
+      "id": "thermoflow",
+      "name": "ThermoFlow - Truyền nhiệt",
+      "description": "Mô phỏng phân bố nhiệt độ và dòng nhiệt. Giải phương trình truyền nhiệt (Heat Equation) với heatmap động và AI dự đoán vùng nhiệt cao.",
+      "category": "Nhiệt học",
+      "level": "Lớp 10-11",
+      "duration": "45 phút",
+      "xp": 120,
+      "version": "1.0.0",
+      "author": "LMS Math Team",
+      "tags": [
+        "nhiệt học",
+        "truyền nhiệt",
+        "PDE",
+        "heatmap",
+        "thermal"
+      ],
+      "features": [
+        "Phương trình truyền nhiệt (PDE)",
+        "Heatmap động màu sắc",
+        "Nguồn nhiệt và heat sink",
+        "Vật liệu cách nhiệt",
+        "AI dự đoán vùng nhiệt",
+        "Thống kê nhiệt độ real-time"
+      ],
+      "learning_objectives": [
+        "Hiểu phương trình truyền nhiệt",
+        "Quan sát quá trình lan truyền nhiệt",
+        "Phân tích tác dụng cách nhiệt",
+        "Tính toán độ khuếch tán nhiệt",
+        "Ứng dụng trong thực tế"
+      ],
+      "prerequisites": [
+        "Nhiệt độ và nhiệt lượng",
+        "Truyền nhiệt cơ bản"
+      ],
+      "difficulty": "Trung bình",
+      "icon": "Flame",
+      "color": "#F97316"
+    },
+    {
+      "id": "motionsim",
+      "name": "MotionSim - Chuyển động Vật lý",
+      "description": "Mô phỏng tổng hợp: Rơi tự do, ném xiên, dao động điều hòa. Đồ thị vị trí, vận tốc, gia tốc. AI dự đoán tham số chuyển động.",
+      "category": "Cơ học",
+      "level": "Lớp 10",
+      "duration": "40 phút",
+      "xp": 100,
+      "version": "1.0.0",
+      "author": "LMS Math Team",
+      "tags": [
+        "cơ học",
+        "chuyển động",
+        "ném xiên",
+        "dao động",
+        "kinematic"
+      ],
+      "features": [
+        "Rơi tự do",
+        "Ném xiên với quỹ đạo",
+        "Dao động điều hòa",
+        "Đồ thị v, a, E",
+        "AI dự đoán parameters",
+        "Canvas animation"
+      ],
+      "learning_objectives": [
+        "Hiểu các loại chuyển động cơ bản",
+        "Phân tích quỹ đạo ném xiên",
+        "Tính toán vận tốc, gia tốc",
+        "Bảo toàn năng lượng",
+        "Dao động điều hòa x = A×cos(ωt)"
+      ],
+      "prerequisites": [
+        "Chuyển động thẳng",
+        "Lực và gia tốc"
+      ],
+      "difficulty": "Dễ",
+      "icon": "Zap",
+      "color": "#EC4899"
+    }
+  ],
+  "total": 10,
+  "last_updated": "2025-10-12T16:00:00.000000"
+}

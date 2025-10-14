@@ -7,5 +7,14 @@ export function AuthSessionProvider({
 }: {
   children: React.ReactNode
 }) {
-  return <SessionProvider>{children}</SessionProvider>
+  return (
+    <SessionProvider 
+      basePath="/api/auth"
+      refetchInterval={5}
+      refetchOnWindowFocus={true}
+      refetchWhenOffline={false}
+    >
+      {children}
+    </SessionProvider>
+  )
 }

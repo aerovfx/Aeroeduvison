@@ -1,178 +1,80 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import toast from "react-hot-toast";
-import { Upload, Loader2 } from "lucide-react";
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function TestGCSSimplePage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string>("");
+  const [result, setResult] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setFile(event.target.files[0]);
-    } else {
-      setFile(null);
-    }
-  };
-
-  const testDirectUpload = async () => {
-    if (!file) {
-      toast.error("Please select a file first.");
-      return;
-    }
-
-    setLoading(true);
-    setResult("");
-
+  const testGCS = async () => {
+    setLoading(true)
+    setResult(null)
+    
     try {
-      // Test direct upload to GCS (without authentication)
-      const bucketName = "mathvideostore";
-      const fileName = `test-uploads/${Date.now()}-${file.name}`;
-      const url = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-      
-      console.log("Attempting direct upload to:", url);
-      
-      const response = await fetch(url, {
-        method: "PUT",
+      const response = await fetch('/api/upload/gcs-presigned-url', {
+        method: 'POST',
         headers: {
-          "Content-Type": file.type,
-        },
-        body: file,
-      });
-
-      console.log("Upload response:", response.status, response.statusText);
-
-      if (response.ok) {
-        const publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-        setResult(`✅ Upload successful! URL: ${publicUrl}`);
-        toast.success("Direct upload successful!");
-      } else {
-        const errorText = await response.text();
-        setResult(`❌ Upload failed: ${response.status} ${response.statusText}\n${errorText}`);
-        toast.error(`Upload failed: ${response.status}`);
-      }
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      setResult(`❌ Error: ${error.message}`);
-      toast.error(`Upload error: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testPresignedUpload = async () => {
-    if (!file) {
-      toast.error("Please select a file first.");
-      return;
-    }
-
-    setLoading(true);
-    setResult("");
-
-    try {
-      // 1. Get presigned URL (this will fail without auth)
-      const presignedResponse = await fetch("/api/upload/gcs-presigned-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          uploadType: "attachment",
+          filename: 'test.mp4',
+          contentType: 'video/mp4',
+          uploadType: 'chapter-video'
         }),
-      });
+      })
 
-      console.log("Presigned URL response:", presignedResponse.status);
-
-      if (!presignedResponse.ok) {
-        setResult(`❌ Presigned URL failed: ${presignedResponse.status} ${presignedResponse.statusText}\n\nThis is expected - the API requires authentication.`);
-        toast.error("Presigned URL failed (expected - needs auth)");
-        return;
-      }
-
-      const { url: signedUrl, key } = await presignedResponse.json();
-      setResult(`✅ Got presigned URL: ${key}`);
-
-      // 2. Upload to GCS
-      const uploadResponse = await fetch(signedUrl, {
-        method: "PUT",
-        headers: {
-          "Content-Type": file.type,
-        },
-        body: file,
-      });
-
-      if (uploadResponse.ok) {
-        const publicUrl = `https://storage.googleapis.com/mathvideostore/${key}`;
-        setResult(`✅ Upload successful! URL: ${publicUrl}`);
-        toast.success("Presigned upload successful!");
-      } else {
-        const errorText = await uploadResponse.text();
-        setResult(`❌ Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}\n${errorText}`);
-        toast.error(`Upload failed: ${uploadResponse.status}`);
-      }
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      setResult(`❌ Error: ${error.message}`);
-      toast.error(`Upload error: ${error.message}`);
+      const data = await response.text()
+      setResult({
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+    } catch (error) {
+      setResult({ error: error.toString() })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
-      <h1 className="text-3xl font-bold mb-6">🧪 Simple GCS Upload Test</h1>
+    <div className="p-8 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-bold mb-6">GCS Upload Test</h1>
       
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Select File:</label>
-          <Input
-            type="file"
-            onChange={handleFileChange}
-            accept="image/*,video/*,.pdf,.txt"
-          />
-          {file && (
-            <p className="text-sm text-muted-foreground">
-              Selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-            </p>
-          )}
-        </div>
-
-        <div className="flex gap-4">
-          <Button onClick={testDirectUpload} disabled={!file || loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Test Direct Upload
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Test GCS Upload API</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={testGCS} disabled={loading} className="w-full">
+            {loading ? "Testing..." : "Test GCS Upload API"}
           </Button>
-          
-          <Button onClick={testPresignedUpload} disabled={!file || loading} variant="outline">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Test Presigned Upload
-          </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-        {result && (
-          <div className="p-4 bg-muted rounded-lg">
-            <h3 className="font-medium mb-2">Result:</h3>
-            <pre className="text-sm whitespace-pre-wrap">{result}</pre>
-          </div>
-        )}
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>API Result</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-xs overflow-auto bg-gray-100 p-3 rounded border">
+              {JSON.stringify(result, null, 2)}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
 
-        <div className="p-4 bg-blue-50 rounded-lg">
-          <h3 className="font-medium mb-2">📋 Test Instructions:</h3>
-          <ul className="text-sm space-y-1">
-            <li>• <strong>Direct Upload:</strong> Tests if bucket allows public uploads (usually fails)</li>
-            <li>• <strong>Presigned Upload:</strong> Tests the proper flow (needs authentication)</li>
-            <li>• Check browser console for detailed error messages</li>
-            <li>• If CORS errors, run: <code>gsutil cors set cors.json gs://mathvideostore</code></li>
-          </ul>
+      <div className="mt-6 p-4 bg-blue-100 rounded-lg">
+        <h3 className="font-semibold mb-2">Expected Results:</h3>
+        <div className="text-sm space-y-1">
+          <div>✅ <strong>Status 200:</strong> GCS upload working correctly</div>
+          <div>⚠️ <strong>Status 401:</strong> Authentication required (normal behavior)</div>
+          <div>❌ <strong>Status 500:</strong> Server error - needs fixing</div>
         </div>
       </div>
     </div>
-  );
+  )
 }

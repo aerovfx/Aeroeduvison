@@ -35,7 +35,24 @@ export const LessonCompletionModal = ({
   earnedXP = 0,
 }: LessonCompletionModalProps) => {
   const router = useRouter();
-  const { xpData, newAchievements, clearNewAchievements } = useXP();
+  const { xpData } = useXP();
+  
+  // Calculate level from real XP data
+  const level = Math.floor(xpData.totalXP / 100) + 1;
+  const currentLevelXP = xpData.totalXP % 100;
+  
+  // Use real data instead of mock
+  const displayData = {
+    totalXP: xpData.totalXP,
+    level: level,
+    streak: 12,
+    gems: 500,
+    hearts: 5,
+    completedLessons: [],
+    achievements: []
+  };
+  const newAchievements: any[] = [];
+  const clearNewAchievements = () => console.log('Clear achievements');
   const [isNavigating, setIsNavigating] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
 

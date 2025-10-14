@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 
 interface Achievement {
@@ -17,7 +17,6 @@ interface XPData {
   totalXP: number;
   level: number;
   gems: number;
-  hearts: number;
   streak: number;
   achievements: Achievement[];
   completedLessons: string[];
@@ -31,6 +30,7 @@ const XPContext = createContext<{
   checkAchievements: () => void;
   newAchievements: Achievement[];
   clearNewAchievements: () => void;
+  isLoading: boolean;
 } | null>(null);
 
 const initialAchievements: Achievement[] = [
@@ -109,43 +109,90 @@ const initialAchievements: Achievement[] = [
 ];
 
 export const XPProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [xpData, setXpData] = useState<XPData>({
     totalXP: 0,
     level: 1,
     gems: 0,
-    hearts: 5,
     streak: 0,
     achievements: [],
     completedLessons: []
   });
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const isInitialized = useRef(false);
 
   // Get user-specific localStorage key
-  const getStorageKey = () => {
+  const getStorageKey = useCallback(() => {
     if (session?.user?.email) {
       return `xpData_${session.user.email}`;
     }
-    return 'xpData';
+    return 'xpData_guest';
+  }, [session?.user?.email]);
+
+  // Validate XP data structure
+  const validateXPData = (data: any): XPData | null => {
+    if (!data || typeof data !== 'object') return null;
+    
+    const requiredFields = ['totalXP', 'level', 'gems', 'streak', 'achievements', 'completedLessons'];
+    const hasAllFields = requiredFields.every(field => field in data);
+    
+    if (!hasAllFields) return null;
+    
+    // Ensure numeric fields are numbers
+    if (typeof data.totalXP !== 'number' || 
+        typeof data.level !== 'number' || 
+        typeof data.gems !== 'number' || 
+        typeof data.streak !== 'number') {
+      return null;
+    }
+    
+    // Ensure arrays are arrays
+    if (!Array.isArray(data.achievements) || !Array.isArray(data.completedLessons)) {
+      return null;
+    }
+    
+    return {
+      totalXP: Math.max(0, data.totalXP),
+      level: Math.max(1, data.level),
+      gems: Math.max(0, data.gems),
+      streak: Math.max(0, data.streak),
+      achievements: data.achievements || [],
+      completedLessons: data.completedLessons || []
+    };
   };
 
   // Load XP data from localStorage
   useEffect(() => {
-    if (!session?.user?.email) return;
+    if (status === 'loading' || typeof window === 'undefined') return;
     
     try {
       const storageKey = getStorageKey();
       const savedData = localStorage.getItem(storageKey);
+      
       if (savedData) {
         const parsed = JSON.parse(savedData);
-        setXpData(parsed);
+        const validatedData = validateXPData(parsed);
+        
+        if (validatedData) {
+          setXpData(validatedData);
+        } else {
+          console.warn('Invalid XP data found, using defaults');
+          setXpData({
+            totalXP: 0,
+            level: 1,
+            gems: 0,
+            streak: 0,
+            achievements: [],
+            completedLessons: []
+          });
+        }
       } else {
         // Initialize with default data
         setXpData({
           totalXP: 0,
           level: 1,
           gems: 0,
-          hearts: 5,
           streak: 0,
           achievements: [],
           completedLessons: []
@@ -153,51 +200,140 @@ export const XPProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       }
     } catch (error) {
       console.error('Error loading XP data:', error);
+      setXpData({
+        totalXP: 0,
+        level: 1,
+        gems: 0,
+        streak: 0,
+        achievements: [],
+        completedLessons: []
+      });
+    } finally {
+      setIsLoading(false);
+      isInitialized.current = true;
     }
-  }, [session?.user?.email]);
+  }, [status, getStorageKey]);
 
   // Save XP data to localStorage
   useEffect(() => {
-    if (!session?.user?.email) return;
+    if (!isInitialized.current || typeof window === 'undefined') return;
     
     try {
       const storageKey = getStorageKey();
-      console.log('💾 XP Context: Saving to localStorage:', storageKey, xpData);
       localStorage.setItem(storageKey, JSON.stringify(xpData));
     } catch (error) {
-      console.error('❌ Error saving XP data:', error);
+      console.error('Error saving XP data:', error);
     }
-  }, [xpData, session?.user?.email]);
+  }, [xpData, getStorageKey]);
 
   const calculateLevel = (xp: number) => {
     return Math.floor(xp / 100) + 1;
   };
 
-  const addXP = (amount: number, source: string) => {
+  // Check achievements with new data (to avoid async state issues)
+  const checkAchievementsWithData = useCallback((data: XPData) => {
+    const newAchievements: Achievement[] = [...data.achievements];
+    const newlyUnlocked: Achievement[] = [];
+    
+    initialAchievements.forEach(achievement => {
+      if (!newAchievements.find(a => a.id === achievement.id)) {
+        let shouldUnlock = false;
+        
+        switch (achievement.id) {
+          case 'first_lesson':
+            shouldUnlock = data.completedLessons.length >= 1;
+            break;
+          case 'xp_100':
+            shouldUnlock = data.totalXP >= 100;
+            break;
+          case 'xp_500':
+            shouldUnlock = data.totalXP >= 500;
+            break;
+          case 'xp_1000':
+            shouldUnlock = data.totalXP >= 1000;
+            break;
+          case 'streak_3':
+            shouldUnlock = data.streak >= 3;
+            break;
+          case 'streak_7':
+            shouldUnlock = data.streak >= 7;
+            break;
+          case 'streak_30':
+            shouldUnlock = data.streak >= 30;
+            break;
+          case 'level_5':
+            shouldUnlock = data.level >= 5;
+            break;
+          case 'level_10':
+            shouldUnlock = data.level >= 10;
+            break;
+        }
+        
+        if (shouldUnlock) {
+          const unlockedAchievement = {
+            ...achievement,
+            unlockedAt: new Date().toISOString()
+          };
+          newAchievements.push(unlockedAchievement);
+          newlyUnlocked.push(unlockedAchievement);
+        }
+      }
+    });
+    
+    // Add XP rewards from newly unlocked achievements
+    let totalRewardXP = 0;
+    newlyUnlocked.forEach(achievement => {
+      totalRewardXP += achievement.xpReward;
+    });
+    
+    return {
+      achievements: newAchievements,
+      rewardXP: totalRewardXP,
+      newlyUnlocked
+    };
+  }, []);
+
+  const addXP = useCallback((amount: number, source: string) => {
     setXpData(prev => {
       const newXP = prev.totalXP + amount;
       const newLevel = calculateLevel(newXP);
       const levelUp = newLevel > prev.level;
       
-      return {
+      const newData = {
         ...prev,
         totalXP: newXP,
         level: newLevel,
         gems: prev.gems + (levelUp ? newLevel * 10 : 0) + Math.floor(amount / 10)
       };
-    });
-    
-    checkAchievements();
-  };
-
-  const completeLesson = (lessonId: string, xpReward: number) => {
-    console.log('🎮 XP Context: completeLesson called with:', lessonId, xpReward);
-    
-    setXpData(prev => {
-      console.log('🎮 XP Context: Previous completed lessons:', prev.completedLessons);
       
+      // Check achievements with new data
+      const achievementResult = checkAchievementsWithData(newData);
+      
+      // Apply XP rewards from achievements
+      const finalXP = newData.totalXP + achievementResult.rewardXP;
+      const finalLevel = calculateLevel(finalXP);
+      const finalLevelUp = finalLevel > newData.level;
+      
+      const finalData = {
+        ...newData,
+        totalXP: finalXP,
+        level: finalLevel,
+        gems: newData.gems + (finalLevelUp ? finalLevel * 10 : 0),
+        achievements: achievementResult.achievements
+      };
+      
+      // Update new achievements for notifications
+      if (achievementResult.newlyUnlocked.length > 0) {
+        setNewAchievements(prev => [...prev, ...achievementResult.newlyUnlocked]);
+      }
+      
+      return finalData;
+    });
+  }, [checkAchievementsWithData]);
+
+  const completeLesson = useCallback((lessonId: string, xpReward: number) => {
+    setXpData(prev => {
       if (prev.completedLessons.includes(lessonId)) {
-        console.log('🎮 XP Context: Lesson already completed, skipping');
         return prev; // Already completed
       }
       
@@ -213,16 +349,37 @@ export const XPProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         completedLessons: [...prev.completedLessons, lessonId]
       };
       
-      console.log('🎮 XP Context: New XP data:', newData);
-      return newData;
+      // Check achievements with new data
+      const achievementResult = checkAchievementsWithData(newData);
+      
+      // Apply XP rewards from achievements
+      const finalXP = newData.totalXP + achievementResult.rewardXP;
+      const finalLevel = calculateLevel(finalXP);
+      const finalLevelUp = finalLevel > newData.level;
+      
+      const finalData = {
+        ...newData,
+        totalXP: finalXP,
+        level: finalLevel,
+        gems: newData.gems + (finalLevelUp ? finalLevel * 10 : 0),
+        achievements: achievementResult.achievements
+      };
+      
+      // Update new achievements for notifications
+      if (achievementResult.newlyUnlocked.length > 0) {
+        setNewAchievements(prev => [...prev, ...achievementResult.newlyUnlocked]);
+      }
+      
+      return finalData;
     });
-    
-    checkAchievements();
-  };
+  }, [checkAchievementsWithData]);
 
-  const updateStreak = () => {
+  const updateStreak = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    
     const today = new Date().toDateString();
-    const lastStreakDate = localStorage.getItem(`lastStreakDate_${session?.user?.email || 'guest'}`);
+    const storageKey = getStorageKey();
+    const lastStreakDate = localStorage.getItem(`lastStreakDate_${storageKey}`);
     
     if (lastStreakDate !== today) {
       setXpData(prev => {
@@ -230,79 +387,68 @@ export const XPProvider: React.FC<{ children: React.ReactNode }> = ({ children }
           ? prev.streak + 1 
           : 1;
         
-        localStorage.setItem(`lastStreakDate_${session?.user?.email || 'guest'}`, today);
+        localStorage.setItem(`lastStreakDate_${storageKey}`, today);
         
-        return {
+        const newData = {
           ...prev,
           streak: newStreak
         };
-      });
-      
-      checkAchievements();
-    }
-  };
-
-  const checkAchievements = () => {
-    setXpData(prev => {
-      const newAchievements = [...prev.achievements];
-      
-      initialAchievements.forEach(achievement => {
-        if (!newAchievements.find(a => a.id === achievement.id)) {
-          let shouldUnlock = false;
-          
-          switch (achievement.id) {
-            case 'first_lesson':
-              shouldUnlock = prev.completedLessons.length >= 1;
-              break;
-            case 'xp_100':
-              shouldUnlock = prev.totalXP >= 100;
-              break;
-            case 'xp_500':
-              shouldUnlock = prev.totalXP >= 500;
-              break;
-            case 'xp_1000':
-              shouldUnlock = prev.totalXP >= 1000;
-              break;
-            case 'streak_3':
-              shouldUnlock = prev.streak >= 3;
-              break;
-            case 'streak_7':
-              shouldUnlock = prev.streak >= 7;
-              break;
-            case 'streak_30':
-              shouldUnlock = prev.streak >= 30;
-              break;
-            case 'level_5':
-              shouldUnlock = prev.level >= 5;
-              break;
-            case 'level_10':
-              shouldUnlock = prev.level >= 10;
-              break;
-          }
-          
-          if (shouldUnlock) {
-            const unlockedAchievement = {
-              ...achievement,
-              unlockedAt: new Date().toISOString()
-            };
-            newAchievements.push(unlockedAchievement);
-            
-            // Add to new achievements for notification
-            setNewAchievements(prev => [...prev, unlockedAchievement]);
-          }
+        
+        // Check achievements with new data
+        const achievementResult = checkAchievementsWithData(newData);
+        
+        // Apply XP rewards from achievements
+        const finalXP = newData.totalXP + achievementResult.rewardXP;
+        const finalLevel = calculateLevel(finalXP);
+        const finalLevelUp = finalLevel > newData.level;
+        
+        const finalData = {
+          ...newData,
+          totalXP: finalXP,
+          level: finalLevel,
+          gems: newData.gems + (finalLevelUp ? finalLevel * 10 : 0),
+          achievements: achievementResult.achievements
+        };
+        
+        // Update new achievements for notifications
+        if (achievementResult.newlyUnlocked.length > 0) {
+          setNewAchievements(prev => [...prev, ...achievementResult.newlyUnlocked]);
         }
+        
+        return finalData;
       });
-      
-      return {
-        ...prev,
-        achievements: newAchievements
-      };
-    });
-  };
+    }
+  }, [getStorageKey, checkAchievementsWithData]);
 
-  const clearNewAchievements = () => {
+  const checkAchievements = useCallback(() => {
+    setXpData(prev => {
+      const achievementResult = checkAchievementsWithData(prev);
+      
+      // Apply XP rewards from achievements
+      const finalXP = prev.totalXP + achievementResult.rewardXP;
+      const finalLevel = calculateLevel(finalXP);
+      const finalLevelUp = finalLevel > prev.level;
+      
+      const finalData = {
+        ...prev,
+        totalXP: finalXP,
+        level: finalLevel,
+        gems: prev.gems + (finalLevelUp ? finalLevel * 10 : 0),
+        achievements: achievementResult.achievements
+      };
+      
+      // Update new achievements for notifications
+      if (achievementResult.newlyUnlocked.length > 0) {
+        setNewAchievements(prev => [...prev, ...achievementResult.newlyUnlocked]);
+      }
+      
+      return finalData;
+    });
+  }, [checkAchievementsWithData]);
+
+  const clearNewAchievements = useCallback(() => {
     setNewAchievements([]);
-  };
+  }, []);
 
   return (
     <XPContext.Provider value={{
@@ -312,7 +458,8 @@ export const XPProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       updateStreak,
       checkAchievements,
       newAchievements,
-      clearNewAchievements
+      clearNewAchievements,
+      isLoading
     }}>
       {children}
     </XPContext.Provider>

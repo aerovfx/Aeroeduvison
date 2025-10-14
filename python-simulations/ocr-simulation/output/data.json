@@ -1,0 +1,116 @@
+[
+  {
+    "scenario_id": "student_id_card",
+    "scenario_name": "Thẻ sinh viên",
+    "data": {
+      "metadata": {
+        "filename": "sample_student_id.png",
+        "processing_time": "2025-10-12T12:34:25.269551",
+        "pipeline_version": "2.0.0",
+        "image_dimensions": {
+          "width": 600,
+          "height": 800
+        },
+        "config": {
+          "preprocessing": true,
+          "rotation_correction": true,
+          "noise_removal": true,
+          "language": "vi+en"
+        }
+      },
+      "detection_results": {
+        "total_regions": 0,
+        "text_regions": [],
+        "average_confidence": 0.0
+      },
+      "extracted_data": {
+        "document_type": "official_document",
+        "fields": {},
+        "total_fields": 0,
+        "confidence_score": 0.0
+      },
+      "quality_metrics": {
+        "overall_confidence": 0.0,
+        "completeness_score": 0.0,
+        "document_type": "official_document",
+        "processing_success": true
+      }
+    }
+  },
+  {
+    "scenario_id": "academic_transcript",
+    "scenario_name": "Bảng điểm học tập",
+    "data": {
+      "metadata": {
+        "filename": "sample_transcript.png",
+        "processing_time": "2025-10-12T12:34:25.529957",
+        "pipeline_version": "2.0.0",
+        "image_dimensions": {
+          "width": 700,
+          "height": 900
+        },
+        "config": {
+          "preprocessing": true,
+          "rotation_correction": true,
+          "noise_removal": true,
+          "language": "vi+en"
+        }
+      },
+      "detection_results": {
+        "total_regions": 0,
+        "text_regions": [],
+        "average_confidence": 0.0
+      },
+      "extracted_data": {
+        "document_type": "official_document",
+        "fields": {},
+        "total_fields": 0,
+        "confidence_score": 0.0
+      },
+      "quality_metrics": {
+        "overall_confidence": 0.0,
+        "completeness_score": 0.0,
+        "document_type": "official_document",
+        "processing_success": true
+      }
+    }
+  },
+  {
+    "scenario_id": "official_document",
+    "scenario_name": "Tài liệu chính thức",
+    "data": {
+      "metadata": {
+        "filename": "sample_official_doc.png",
+        "processing_time": "2025-10-12T12:34:25.643827",
+        "pipeline_version": "2.0.0",
+        "image_dimensions": {
+          "width": 600,
+          "height": 800
+        },
+        "config": {
+          "preprocessing": true,
+          "rotation_correction": true,
+          "noise_removal": true,
+          "language": "vi+en"
+        }
+      },
+      "detection_results": {
+        "total_regions": 0,
+        "text_regions": [],
+        "average_confidence": 0.0
+      },
+      "extracted_data": {
+        "document_type": "official_document",
+        "fields": {},
+        "total_fields": 0,
+        "confidence_score": 0.0
+      },
+      "quality_metrics": {
+        "overall_confidence": 0.0,
+        "completeness_score": 0.0,
+        "document_type": "official_document",
+        "processing_success": true
+      }
+    }
+  }
+]

@@ -111,6 +111,9 @@ const mockUsers = [
   { id: "4", name: "Phạm Thị Dung", avatar: "" }
 ];
 
+// Disable static generation
+export const dynamic = 'force-dynamic'
+
 export default function ScrumboardModule() {
   const { data: session, status } = useSession();
   const router = useRouter();

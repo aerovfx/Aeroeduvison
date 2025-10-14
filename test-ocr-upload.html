@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test OCR Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .upload-box {
+            border: 2px dashed #ccc;
+            padding: 30px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .result-box {
+            background: #f0f0f0;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        pre {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #efe;
+            color: #060;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔬 OCR Upload Test</h1>
+    <p>Direct test of Next.js API endpoint: <code>/api/ocr/upload</code></p>
+
+    <div class="upload-box">
+        <input type="file" id="fileInput" accept="image/*">
+        <br><br>
+        <button onclick="uploadFile()">Upload & Test OCR</button>
+    </div>
+
+    <div id="status"></div>
+    <div id="results"></div>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file first');
+                return;
+            }
+
+            const statusDiv = document.getElementById('status');
+            const resultsDiv = document.getElementById('results');
+            
+            statusDiv.innerHTML = '<p>⏳ Uploading and processing...</p>';
+            resultsDiv.innerHTML = '';
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                console.log('📤 Uploading file:', file.name);
+
+                const response = await fetch('/api/ocr/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                console.log('📥 Response:', data);
+                console.log('📊 Has result?', !!data.result);
+                console.log('📊 Has detection?', !!data.result?.detection_results);
+                console.log('📊 Total regions:', data.result?.detection_results?.total_regions);
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Upload failed');
+                }
+
+                // Display success
+                statusDiv.innerHTML = '<div class="success">✅ Processing completed successfully!</div>';
+
+                // Display statistics
+                let html = '';
+                
+                if (data.result) {
+                    const detection = data.result.detection_results || {};
+                    const recognition = data.result.recognition_results || {};
+                    const extracted = data.result.extracted_data || {};
+                    
+                    html += '<div class="stats">';
+                    html += `
+                        <div class="stat-card">
+                            <div class="stat-value">${detection.total_regions || 0}</div>
+                            <div class="stat-label">Text Regions</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${recognition.total_texts || 0}</div>
+                            <div class="stat-label">Recognized Texts</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">${extracted.fields ? Object.keys(extracted.fields).length : 0}</div>
+                            <div class="stat-label">Extracted Fields</div>
+                        </div>
+                    `;
+                    html += '</div>';
+
+                    // Show extracted data
+                    if (extracted.fields && Object.keys(extracted.fields).length > 0) {
+                        html += '<div class="result-box">';
+                        html += '<h3>Extracted Information:</h3>';
+                        html += '<ul>';
+                        for (const [key, field] of Object.entries(extracted.fields)) {
+                            html += `<li><strong>${key}:</strong> ${field.value} (${(field.confidence * 100).toFixed(1)}%)</li>`;
+                        }
+                        html += '</ul>';
+                        html += '</div>';
+                    }
+
+                    // Show detected text
+                    if (detection.text_regions && detection.text_regions.length > 0) {
+                        html += '<div class="result-box">';
+                        html += '<h3>Detected Text:</h3>';
+                        html += '<ul>';
+                        for (const region of detection.text_regions) {
+                            html += `<li>${region.text} (${(region.confidence * 100).toFixed(1)}%)</li>`;
+                        }
+                        html += '</ul>';
+                        html += '</div>';
+                    }
+                } else {
+                    html += '<div class="error">⚠️ No OCR result data found in response</div>';
+                }
+
+                // Show raw JSON
+                html += '<details>';
+                html += '<summary><strong>View Raw JSON Response</strong></summary>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                html += '</details>';
+
+                resultsDiv.innerHTML = html;
+
+            } catch (error) {
+                console.error('❌ Error:', error);
+                statusDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+                resultsDiv.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
+

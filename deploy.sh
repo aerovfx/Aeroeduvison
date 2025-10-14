@@ -114,7 +114,6 @@ echo -e "${YELLOW}Setting up Cloud Build...${NC}"
 echo -e "${YELLOW}Submitting build to Cloud Build...${NC}"
 gcloud builds submit \
     --config cloudbuild.yaml \
-    --substitutions=_GCS_BUCKET_NAME=$BUCKET_NAME \
     --region=asia-southeast1
 
 echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"

@@ -41,7 +41,19 @@ interface ThemeCustomizerProps {
 }
 
 export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
-  const { settings, updateSettings, toggleMode, resetToDefault } = useTheme();
+  const theme = useTheme();
+  
+  // Fallback if theme context is not available
+  if (!theme) {
+    return (
+      <Button variant="outline" size="sm" className={className}>
+        <Settings className="mr-2 h-4 w-4" />
+        Theme
+      </Button>
+    );
+  }
+  
+  const { settings, updateSettings, toggleMode, resetToDefault } = theme;
   const [isOpen, setIsOpen] = useState(false);
 
   const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [

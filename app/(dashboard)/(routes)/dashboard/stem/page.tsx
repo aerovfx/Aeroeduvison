@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSTEM } from "@/contexts/STEMContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,8 +95,23 @@ const StudentSTEMDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
   
-  const { projects } = useSTEM();
+  const { projects, loadProjects } = useSTEM();
+
+  useEffect(() => {
+    // Show loading for a brief moment to simulate data fetch
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
+    
+    // Try to load from API in background (optional)
+    loadProjects().catch(err => {
+      console.log('API load attempt failed, using mock data:', err);
+    });
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -175,6 +190,17 @@ const StudentSTEMDashboard = () => {
     draft: projects.filter(p => p.status === "draft").length,
     review: projects.filter(p => p.status === "review").length
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải dự án STEM...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">

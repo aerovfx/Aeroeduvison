@@ -1,7 +1,7 @@
 steps:
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'Dockerfile.minimal', '-t', 'gcr.io/$PROJECT_ID/lmsmath:latest', '.']
+    args: ['build', '-f', 'Dockerfile', '-t', 'gcr.io/$PROJECT_ID/lmsmath:latest', '.']
 
   # Push the container image to Container Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -36,9 +36,9 @@ steps:
       - '--timeout'
       - '300'
       - '--set-env-vars'
-      - 'NODE_ENV=production,GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,NEXT_PUBLIC_GCS_BUCKET_NAME=gen-lang-client-0712182643-lmsmath-storage'
+      - 'NODE_ENV=production,GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,NEXT_PUBLIC_GCS_BUCKET_NAME=gen-lang-client-0712182643-lmsmath-storage,NEXTAUTH_URL=https://lmsmath-442514522574.asia-southeast1.run.app'
       - '--set-secrets'
-      - 'DATABASE_URL=DATABASE_URL:latest,NEXTAUTH_SECRET=NEXTAUTH_SECRET:latest,NEXTAUTH_URL=NEXTAUTH_URL:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,SUPABASE_URL=SUPABASE_URL:latest,SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest,MUX_TOKEN_ID=MUX_TOKEN_ID:latest,MUX_TOKEN_SECRET=MUX_TOKEN_SECRET:latest,UPLOADTHING_SECRET=UPLOADTHING_SECRET:latest,UPLOADTHING_APP_ID=UPLOADTHING_APP_ID:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest'
+      - 'DATABASE_URL=DATABASE_URL:latest,NEXTAUTH_SECRET=NEXTAUTH_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,MUX_TOKEN_ID=MUX_TOKEN_ID:latest,MUX_TOKEN_SECRET=MUX_TOKEN_SECRET:latest,UPLOADTHING_SECRET=UPLOADTHING_SECRET:latest,UPLOADTHING_APP_ID=UPLOADTHING_APP_ID:latest,STRIPE_API_KEY=STRIPE_API_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest'
 
 # Store images in Google Container Registry
 images:

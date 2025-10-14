@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR Test Results</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .upload-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .upload-zone {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+        }
+        
+        .upload-zone:hover {
+            border-color: #764ba2;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+            transform: scale(1.02);
+        }
+        
+        .upload-zone.dragging {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+            transform: scale(1.05);
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.6);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .results {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .stat-card.green {
+            border-left: 5px solid #10b981;
+        }
+        
+        .stat-card.blue {
+            border-left: 5px solid #3b82f6;
+        }
+        
+        .stat-card.purple {
+            border-left: 5px solid #8b5cf6;
+        }
+        
+        .stat-value {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        .stat-card.green .stat-value { color: #10b981; }
+        .stat-card.blue .stat-value { color: #3b82f6; }
+        .stat-card.purple .stat-value { color: #8b5cf6; }
+        
+        .regions-section {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .region-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 4px solid #667eea;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+        
+        .region-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .region-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .badge.green {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge.blue {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .badge.gray {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .region-text {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        
+        .region-details {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            font-size: 0.9em;
+            color: #6b7280;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 OCR Test Results</h1>
+            <p>Upload ảnh thẻ sinh viên, bảng điểm, hoặc tài liệu để test OCR</p>
+        </div>
+        
+        <div class="upload-section">
+            <div class="upload-zone" id="uploadZone">
+                <h2>📤 Drag & Drop ảnh vào đây</h2>
+                <p>hoặc click để chọn file</p>
+                <p style="margin-top: 20px; color: #6b7280;">Hỗ trợ: JPEG, PNG, WebP (max 10MB)</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="uploadBtn" disabled>🚀 Process OCR</button>
+            </div>
+        </div>
+        
+        <div id="loadingSection" class="upload-section hidden">
+            <div class="loading">
+                <div class="spinner"></div>
+                <h2>⚡ Processing OCR...</h2>
+                <p>Đang phân tích ảnh, vui lòng đợi...</p>
+            </div>
+        </div>
+        
+        <div id="resultsSection" class="hidden">
+            <div class="results" id="statsGrid"></div>
+            <div class="regions-section">
+                <h2 style="margin-bottom: 20px;">📄 Detected Text Regions</h2>
+                <div id="regionsList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedFile = null;
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const loadingSection = document.getElementById('loadingSection');
+        const resultsSection = document.getElementById('resultsSection');
+        
+        // Drag & Drop handlers
+        uploadZone.addEventListener('click', () => fileInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragging');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragging');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragging');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFileSelect(file);
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFileSelect(file);
+        });
+        
+        function handleFileSelect(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('❌ Vui lòng chọn file ảnh');
+                return;
+            }
+            
+            if (file.size > 10 * 1024 * 1024) {
+                alert('❌ File quá lớn. Maximum 10MB');
+                return;
+            }
+            
+            selectedFile = file;
+            uploadZone.innerHTML = `
+                <h2>✓ ${file.name}</h2>
+                <p>${(file.size / 1024).toFixed(1)} KB</p>
+                <p style="margin-top: 10px; color: #10b981;">Click button để process OCR</p>
+            `;
+            uploadBtn.disabled = false;
+        }
+        
+        uploadBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+            
+            loadingSection.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/ocr/process-sync', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    displayResults(data.result);
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Network error: ' + error.message);
+            } finally {
+                loadingSection.classList.add('hidden');
+            }
+        });
+        
+        function displayResults(result) {
+            const detection = result.detection_results;
+            const recognition = result.recognition_results;
+            
+            // Display stats
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card green">
+                    <div>📍 Total Regions</div>
+                    <div class="stat-value">${detection.total_regions}</div>
+                    <div>text regions detected</div>
+                </div>
+                <div class="stat-card blue">
+                    <div>🎯 Avg Confidence</div>
+                    <div class="stat-value">${(detection.average_confidence * 100).toFixed(1)}%</div>
+                    <div>detection confidence</div>
+                </div>
+                <div class="stat-card purple">
+                    <div>📝 Total Characters</div>
+                    <div class="stat-value">${recognition?.total_chars || 0}</div>
+                    <div>characters recognized</div>
+                </div>
+            `;
+            
+            // Display regions
+            const regionsList = document.getElementById('regionsList');
+            regionsList.innerHTML = detection.text_regions.map((region, idx) => `
+                <div class="region-card">
+                    <div class="region-header">
+                        <div>
+                            <span class="badge green">Region #${region.region_id}</span>
+                            <span class="badge gray">${region.language || 'unknown'}</span>
+                        </div>
+                        <span class="badge blue">${(region.confidence * 100).toFixed(1)}%</span>
+                    </div>
+                    <div class="region-text">"${region.text || 'N/A'}"</div>
+                    <div class="region-details">
+                        <div><strong>Position:</strong> x:${region.bbox.x}, y:${region.bbox.y}</div>
+                        <div><strong>Size:</strong> ${region.bbox.width}×${region.bbox.height}px</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            resultsSection.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
+

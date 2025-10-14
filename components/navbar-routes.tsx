@@ -72,7 +72,7 @@ export const NavbarRoutes = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Link href="/sign-in">
+          <Link href="/">
             <Button size="sm" variant="ghost">
               Sign in
             </Button>

@@ -34,6 +34,8 @@ export default function SignUpPage() {
     }
 
     try {
+      console.log("🔄 Starting registration...", { email: formData.email, name: formData.name })
+      
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -47,14 +49,71 @@ export default function SignUpPage() {
         }),
       })
 
-      if (response.ok) {
-        router.push("/sign-in")
+      const data = await response.json()
+      console.log("📬 Registration response:", { status: response.status, data })
+
+      if (response.ok && data.userId) {
+        console.log("✅ Registration successful, starting auto-login...")
+        
+        // Auto-login after successful registration
+        const loginResult = await signIn("credentials", {
+          email: formData.email,
+          password: formData.password,
+          redirect: false,
+        })
+
+        console.log("🔐 Login result:", loginResult)
+
+        if (loginResult?.error) {
+          console.error("❌ Auto-login failed:", loginResult.error)
+          // If auto-login fails, redirect to sign-in page
+          setError("Tài khoản đã được tạo. Vui lòng đăng nhập.")
+          setTimeout(() => {
+            router.push("/sign-in?message=Account created. Please sign in.")
+          }, 2000)
+        } else if (loginResult?.ok) {
+          console.log("✅ Auto-login successful, checking session...")
+          
+          // Wait for session to be created
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
+          // Verify session
+          const sessionResponse = await fetch("/api/auth/session")
+          const session = await sessionResponse.json()
+          console.log("📊 Session after login:", session)
+          
+          if (session?.user) {
+            console.log("✅ Session valid, redirecting to dashboard...")
+            // Login successful, redirect to dashboard
+            router.push("/dashboard")
+            router.refresh() // Force refresh to load new session
+          } else {
+            console.warn("⚠️ Session not created, redirecting to sign-in...")
+            setError("Vui lòng đăng nhập để tiếp tục.")
+            setTimeout(() => {
+              router.push("/sign-in")
+            }, 1500)
+          }
+        } else {
+          console.error("❌ Unexpected login result:", loginResult)
+          setError("Tài khoản đã được tạo. Vui lòng đăng nhập.")
+          setTimeout(() => {
+            router.push("/sign-in")
+          }, 2000)
+        }
       } else {
-        const data = await response.json()
-        setError(data.error || "Something went wrong")
+        console.error("❌ Registration failed:", data)
+        
+        // Show specific error message
+        if (data.error === "User already exists") {
+          setError("Email này đã được đăng ký. Vui lòng đăng nhập hoặc sử dụng email khác.")
+        } else {
+          setError(data.error || data.details || "Có lỗi xảy ra. Vui lòng thử lại.")
+        }
       }
     } catch (error) {
-      setError("Something went wrong")
+      console.error("❌ Registration exception:", error)
+      setError("Không thể kết nối đến server. Vui lòng thử lại.")
     } finally {
       setIsLoading(false)
     }
@@ -114,7 +173,9 @@ export default function SignUpPage() {
               <Label htmlFor="role">Role</Label>
               <Select value={formData.role} onValueChange={(value) => handleChange("role", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select your role" />
+                  <SelectValue placeholder="Select your role">
+                    {formData.role === "STUDENT" ? "Student" : formData.role === "TEACHER" ? "Teacher" : "Select your role"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="STUDENT">Student</SelectItem>

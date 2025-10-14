@@ -1,14 +1,13 @@
-# Simple Dockerfile for Cloud Run
-FROM node:20-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
@@ -21,10 +20,6 @@ RUN npm run build
 
 # Expose port
 EXPOSE 3000
-
-# Set environment
-ENV NODE_ENV=production
-ENV PORT=3000
 
 # Start the application
 CMD ["npm", "start"]

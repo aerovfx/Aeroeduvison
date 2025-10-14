@@ -1,0 +1,45 @@
+{
+  "id": "aerodynamics",
+  "name": "Aerodynamics Simulation",
+  "nameVi": "Giả Lập Động Lực Học Không Khí",
+  "version": "1.0.0",
+  "description": "2D/3D airflow simulation around objects using Navier-Stokes solver with WebGL visualization",
+  "descriptionVi": "Mô phỏng dòng khí 2D/3D quanh vật thể sử dụng giải thuật Navier-Stokes với trực quan hóa WebGL",
+  "category": "physics",
+  "difficulty": "advanced",
+  "port": 8007,
+  "apiEndpoint": "http://localhost:8007",
+  "features": [
+    "Navier-Stokes fluid dynamics solver",
+    "Real-time airflow visualization",
+    "Multiple obstacle shapes (circle, rectangle, airfoil)",
+    "Drag and lift force calculations",
+    "AI-based shape optimization",
+    "Streamline visualization",
+    "Pressure and velocity fields"
+  ],
+  "featuresVi": [
+    "Giải thuật động lực học chất lỏng Navier-Stokes",
+    "Trực quan hóa dòng khí thời gian thực",
+    "Nhiều hình dạng vật cản (hình trụ, hình vuông, cánh máy bay)",
+    "Tính toán lực cản và lực nâng",
+    "Tối ưu hóa hình dạng bằng AI",
+    "Trực quan hóa đường dòng",
+    "Trường áp suất và vận tốc"
+  ],
+  "tags": ["physics", "fluid-dynamics", "aerodynamics", "navier-stokes", "webgl", "ai-optimization"],
+  "requirements": {
+    "python": ">=3.8",
+    "memory": "512MB",
+    "cpu": "2 cores recommended"
+  },
+  "endpoints": {
+    "simulate": "/simulate",
+    "optimize": "/optimize",
+    "presets": "/presets",
+    "health": "/health"
+  },
+  "author": "LMS Math Team",
+  "license": "MIT"
+}
+

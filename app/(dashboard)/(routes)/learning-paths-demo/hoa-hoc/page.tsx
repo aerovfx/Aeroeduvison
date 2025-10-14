@@ -307,7 +307,7 @@ export default function HoaHocLearningPathPage() {
                               </Badge>
                             )}
                             {!chapter.isLocked && !chapter.isCompleted && (
-                              <Link href="/learning-paths-demo/hoa-hoc/learn">
+                              <Link href={`/learning-paths-demo/hoa-hoc/learn/${chapter.id}`}>
                                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
                                   Bắt đầu
                                 </Button>

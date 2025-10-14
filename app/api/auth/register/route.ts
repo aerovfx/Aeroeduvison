@@ -1,57 +1,76 @@
-import { NextRequest, NextResponse } from "next/server"
-import { hash } from "bcryptjs"
-import { db } from "@/lib/db"
+import { NextRequest, NextResponse } from 'next/server'
+import { hash } from 'bcryptjs'
+import { db } from '@/lib/db'
+import { z } from 'zod'
 
-export async function POST(request: NextRequest) {
+// Validation schema
+const registerSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.enum(['STUDENT', 'TEACHER']).default('STUDENT')
+})
+
+export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role } = await request.json()
-
-    console.log("Registration attempt:", { name, email, role })
-
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      )
-    }
-
+    const body = await req.json()
+    
+    // Validate input
+    const validatedData = registerSchema.parse(body)
+    
+    const { name, email, password, role } = validatedData
+    
+    // Normalize email
+    const normalizedEmail = email.toLowerCase().trim()
+    
     // Check if user already exists
     const existingUser = await db.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     })
-
+    
     if (existingUser) {
       return NextResponse.json(
-        { error: "User already exists" },
+        { message: 'User with this email already exists' },
         { status: 400 }
       )
     }
-
+    
     // Hash password
-    console.log("Hashing password...")
     const hashedPassword = await hash(password, 12)
-    console.log("Password hashed successfully")
-
+    
     // Create user
-    console.log("Creating user...")
     const user = await db.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
-        role: role || "STUDENT"
+        role,
+        emailVerified: new Date(),
+        isActive: true,
+        loginAttempts: 0,
       }
     })
-    console.log("User created:", user.id)
-
-    return NextResponse.json(
-      { message: "User created successfully", userId: user.id },
-      { status: 201 }
-    )
+    
+    // Return success (without password)
+    const { password: _, ...userWithoutPassword } = user
+    
+    return NextResponse.json({
+      message: 'User created successfully',
+      user: userWithoutPassword
+    }, { status: 201 })
+    
   } catch (error) {
-    console.error("Registration error:", error)
+    console.error('Registration error:', error)
+    
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { message: 'Validation error', errors: error.errors },
+        { status: 400 }
+      )
+    }
+    
     return NextResponse.json(
-      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      { message: 'Internal server error' },
       { status: 500 }
     )
   }

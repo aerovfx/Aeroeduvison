@@ -25,7 +25,7 @@ export default function StartLessonPage() {
 
   const steps = [
     {
-      title: "Chào mừng đến với Aeroschool!",
+      title: "Chào mừng đến với LabTwin!",
       content: "Hệ thống học tập thông minh giúp bạn học toán hiệu quả hơn.",
       icon: "🎉"
     },
@@ -41,7 +41,7 @@ export default function StartLessonPage() {
     },
     {
       title: "Sẵn sàng bắt đầu?",
-      content: "Bạn đã hiểu rõ cách sử dụng Aeroschool. Hãy bắt đầu hành trình học tập của mình!",
+      content: "Bạn đã hiểu rõ cách sử dụng LabTwin. Hãy bắt đầu hành trình học tập của mình!",
       icon: "🚀"
     }
   ];

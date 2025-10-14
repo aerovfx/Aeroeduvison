@@ -51,10 +51,11 @@ interface STEMProject {
 
 interface STEMContextType {
   projects: STEMProject[];
-  addProject: (project: Omit<STEMProject, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateProject: (id: string, project: Partial<STEMProject>) => void;
-  deleteProject: (id: string) => void;
-  getProject: (id: string) => STEMProject | undefined;
+  addProject: (project: Omit<STEMProject, 'id' | 'createdAt' | 'updatedAt'>) => Promise<STEMProject>;
+  updateProject: (id: string, project: Partial<STEMProject>) => Promise<STEMProject | undefined>;
+  deleteProject: (id: string) => Promise<boolean>;
+  getProject: (id: string) => Promise<STEMProject | undefined>;
+  loadProjects: () => Promise<void>;
 }
 
 const STEMContext = createContext<STEMContextType | undefined>(undefined);
@@ -498,7 +499,30 @@ export const STEMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('stem-projects', JSON.stringify(projects));
   }, [projects]);
 
-  const addProject = (projectData: Omit<STEMProject, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const addProject = async (projectData: Omit<STEMProject, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      // Save to API first
+      const response = await fetch('/api/stem/projects', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.project) {
+          // Add to local state
+          setProjects(prev => [data.project, ...prev]);
+          return data.project;
+        }
+      }
+    } catch (error) {
+      console.error('Error saving project to API:', error);
+    }
+
+    // Fallback to local storage if API fails
     const newProject: STEMProject = {
       ...projectData,
       id: `project_${Date.now()}`,
@@ -509,20 +533,112 @@ export const STEMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return newProject;
   };
 
-  const updateProject = (id: string, projectData: Partial<STEMProject>) => {
-    setProjects(prev => prev.map(project => 
-      project.id === id 
-        ? { ...project, ...projectData, updatedAt: new Date().toISOString() }
-        : project
-    ));
+  const updateProject = async (id: string, projectData: Partial<STEMProject>) => {
+    try {
+      // Update via API first
+      const response = await fetch(`/api/stem/projects/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(projectData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.project) {
+          // Update local state
+          setProjects(prev => prev.map(project => 
+            project.id === id ? data.project : project
+          ));
+          return data.project;
+        }
+      }
+    } catch (error) {
+      console.error('Error updating project via API:', error);
+    }
+
+    // Fallback to local update
+    const updatedProject = projects.find(p => p.id === id);
+    if (updatedProject) {
+      const newProject = { ...updatedProject, ...projectData, updatedAt: new Date().toISOString() };
+      setProjects(prev => prev.map(project => 
+        project.id === id ? newProject : project
+      ));
+      return newProject;
+    }
+    return undefined;
   };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
+    try {
+      // Delete via API first
+      const response = await fetch(`/api/stem/projects/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Remove from local state
+          setProjects(prev => prev.filter(project => project.id !== id));
+          return true;
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting project via API:', error);
+    }
+
+    // Fallback to local deletion
     setProjects(prev => prev.filter(project => project.id !== id));
+    return true;
   };
 
-  const getProject = (id: string) => {
-    return projects.find(project => project.id === id);
+  const getProject = async (id: string) => {
+    // First check local projects
+    let project = projects.find(project => project.id === id);
+    
+    // If not found locally, try to fetch from API
+    if (!project) {
+      try {
+        const response = await fetch(`/api/stem/projects/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.project) {
+            // Add project to local state
+            setProjects(prev => [data.project, ...prev]);
+            project = data.project;
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching project from API:', error);
+      }
+    }
+    
+    return project;
+  };
+
+  const loadProjects = async () => {
+    try {
+      const response = await fetch('/api/stem/projects');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.projects) {
+          setProjects(data.projects);
+          localStorage.setItem('stem-projects', JSON.stringify(data.projects));
+          localStorage.setItem('stem-projects-version', '3.0'); // API version
+          return; // Success, exit early
+        }
+      }
+      
+      // If API fails or returns no data, use initial mock projects
+      console.log('Using mock projects from Context (API unavailable or returned no data)');
+      // Projects already set from localStorage or initialProjects in useEffect
+    } catch (error) {
+      console.error('Error loading projects from API:', error);
+      // Fallback to initial projects already loaded
+      console.log('Using mock projects from Context (API error)');
+    }
   };
 
   const value: STEMContextType = {
@@ -531,6 +647,7 @@ export const STEMProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updateProject,
     deleteProject,
     getProject,
+    loadProjects,
   };
 
   return (

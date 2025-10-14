@@ -27,7 +27,24 @@ const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
 ];
 
 export function ThemeSelector({ className }: ThemeSelectorProps) {
-  const { settings, updateSettings } = useTheme();
+  const theme = useTheme();
+  
+  // Fallback if theme context is not available
+  if (!theme) {
+    return (
+      <Select>
+        <SelectTrigger className={className}>
+          <Palette className="mr-2 h-4 w-4" />
+          <SelectValue placeholder="Chọn màu sắc" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="blue">Xanh dương</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+  
+  const { settings, updateSettings } = theme;
 
   const currentScheme = colorSchemes.find(scheme => scheme.value === settings.colorScheme);
 

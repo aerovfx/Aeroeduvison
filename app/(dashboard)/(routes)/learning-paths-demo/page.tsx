@@ -116,11 +116,6 @@ export default function LearningPathsDemoPage() {
         <p className="text-gray-600 text-sm">
           Chọn một lộ trình học tập để bắt đầu hành trình học tập của bạn
         </p>
-        <div className="mt-4">
-          <Link href="/sign-in" className="text-blue-600 hover:underline">
-            Đăng nhập để truy cập đầy đủ nội dung
-          </Link>
-        </div>
       </div>
     </div>
   );

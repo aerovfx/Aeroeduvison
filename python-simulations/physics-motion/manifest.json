@@ -1,0 +1,45 @@
+{
+  "id": "physics-motion",
+  "name": "Chuyển động Vật lý",
+  "description": "Mô phỏng chuyển động vật lý: rơi tự do, ném xiên, dao động điều hòa với tính toán vị trí/vận tốc/gia tốc theo thời gian, hiển thị quỹ đạo trên Canvas, và AI model dự đoán chuyển động.",
+  "category": "Vật lý",
+  "level": "Lớp 10-12",
+  "duration": "60 phút",
+  "xp": 120,
+  "version": "1.0.0",
+  "author": "LabTwin Team",
+  "tags": [
+    "vật lý",
+    "chuyển động",
+    "rơi tự do",
+    "ném xiên",
+    "dao động điều hòa",
+    "AI prediction",
+    "Canvas animation"
+  ],
+  "features": [
+    "Rơi tự do với mọi điều kiện ban đầu",
+    "Ném xiên (projectile motion)",
+    "Dao động điều hòa (SHM)",
+    "Tính toán: vị trí, vận tốc, gia tốc",
+    "Biểu đồ thời gian thực",
+    "Canvas animation quỹ đạo",
+    "AI Linear Regression dự đoán",
+    "So sánh nhiều góc ném",
+    "10+ scenarios có sẵn"
+  ],
+  "api": {
+    "enabled": true,
+    "port": 8004,
+    "endpoints": [
+      "/api/free-fall",
+      "/api/projectile",
+      "/api/harmonic",
+      "/api/predict",
+      "/api/compare"
+    ]
+  }
+}
+
+
+

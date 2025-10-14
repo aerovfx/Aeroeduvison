@@ -77,10 +77,11 @@ const QuizzesPage = async () => {
     return redirect("/");
   }
 
-  // Check if user is student
-  if (session.user.role !== "STUDENT") {
-    return redirect("/teacher");
-  }
+  // Allow both STUDENT and TEACHER to view quizzes
+  // Teachers can see student view for testing
+  // if (session.user.role !== "STUDENT") {
+  //   return redirect("/teacher");
+  // }
 
   const quizzes = await getStudentQuizzes();
 
@@ -238,5 +239,8 @@ const QuizzesPage = async () => {
     </div>
   );
 };
+
+// Disable static generation
+export const dynamic = 'force-dynamic'
 
 export default QuizzesPage;

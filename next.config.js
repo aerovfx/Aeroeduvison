@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Output configuration - use 'export' for static hosting, 'standalone' for server-side
-  output: process.env.NODE_ENV === 'production' && process.env.NEXT_OUTPUT ? process.env.NEXT_OUTPUT : 'standalone',
+  output: 'standalone',
+  
   
   // Asset prefix for custom domain (only enable for specific deployment platforms)
   // For Vercel, Netlify, etc. - keep this commented out

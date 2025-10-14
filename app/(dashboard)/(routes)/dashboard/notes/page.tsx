@@ -73,6 +73,9 @@ const noteColors = [
   { name: "Xám", value: "bg-gray-100 border-gray-300 text-gray-900" }
 ];
 
+// Disable static generation
+export const dynamic = 'force-dynamic'
+
 export default function NotesModule() {
   const { data: session, status } = useSession();
   const router = useRouter();

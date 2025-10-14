@@ -1,0 +1,49 @@
+{
+  "id": "datasim-ai",
+  "name": "DataSim.AI - ML Training Visualization",
+  "nameVi": "DataSim.AI - Trực quan hóa Học máy",
+  "version": "1.0.0",
+  "description": "Interactive machine learning training visualization. See how AI learns from data in real-time with scikit-learn and PyTorch.",
+  "descriptionVi": "Trực quan hóa quá trình training machine learning. Xem AI học từ dữ liệu như thế nào với scikit-learn và PyTorch.",
+  "category": "machine-learning",
+  "difficulty": "intermediate",
+  "port": 8009,
+  "apiEndpoint": "http://localhost:8009",
+  "features": [
+    "Real ML models (scikit-learn & PyTorch)",
+    "Linear Regression, KNN, Decision Trees, SVM",
+    "Neural Networks with PyTorch",
+    "Decision boundary visualization",
+    "Loss curves and metrics",
+    "Multiple datasets (linear, circles, moons)",
+    "Interactive parameter tuning",
+    "Real-time training progress"
+  ],
+  "featuresVi": [
+    "Model ML thật (scikit-learn & PyTorch)",
+    "Linear Regression, KNN, Decision Trees, SVM",
+    "Neural Networks với PyTorch",
+    "Trực quan hóa decision boundary",
+    "Đồ thị loss và metrics",
+    "Nhiều datasets (linear, circles, moons)",
+    "Điều chỉnh parameters tương tác",
+    "Theo dõi training real-time"
+  ],
+  "tags": ["machine-learning", "AI", "scikit-learn", "pytorch", "classification", "regression", "neural-networks"],
+  "requirements": {
+    "python": ">=3.8",
+    "memory": "1GB",
+    "cpu": "2 cores recommended"
+  },
+  "endpoints": {
+    "train": "/train",
+    "train_nn": "/train-neural-network",
+    "train_stream": "/train-stream",
+    "datasets": "/datasets",
+    "models": "/models",
+    "health": "/health"
+  },
+  "author": "LMS Math Team",
+  "license": "MIT"
+}
+

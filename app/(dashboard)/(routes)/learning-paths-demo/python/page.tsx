@@ -467,7 +467,7 @@ export default function PythonLearningPathPage() {
                               </Badge>
                             )}
                             {!chapter.isLocked && !chapter.isCompleted && (
-                              <Link href="/learning-paths-demo/python/learn">
+                              <Link href={`/learning-paths-demo/python/learn/${chapter.id}`}>
                                 <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
                                   Bắt đầu
                                 </Button>

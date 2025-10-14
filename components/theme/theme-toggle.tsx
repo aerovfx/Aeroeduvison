@@ -19,7 +19,7 @@ export function ThemeToggle({ className, showLabel = false }: ThemeToggleProps) 
         return <Moon className="w-4 h-4" />;
       case 'dark':
         return <Monitor className="w-4 h-4" />;
-      case 'auto':
+      case 'system':
         return <Sun className="w-4 h-4" />;
       default:
         return <Sun className="w-4 h-4" />;
@@ -31,8 +31,8 @@ export function ThemeToggle({ className, showLabel = false }: ThemeToggleProps) 
       case 'light':
         return 'Chuyển sang tối';
       case 'dark':
-        return 'Chuyển sang tự động';
-      case 'auto':
+        return 'Chuyển sang hệ thống';
+      case 'system':
         return 'Chuyển sang sáng';
       default:
         return 'Chuyển chế độ';
