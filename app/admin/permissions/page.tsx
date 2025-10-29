@@ -1,11 +1,17 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { PermissionMatrix } from "@/components/admin/permission-matrix";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 export default function AdminPermissionsPage() {
+  const { t } = useLanguage();
+
   const { data: session, status } = useSession();
   const router = useRouter();
 
@@ -24,7 +30,7 @@ export default function AdminPermissionsPage() {
   }, [session, status, router]);
 
   if (status === "loading") {
-    return <div className="p-6">Loading...</div>;
+    return <div className="p-6">{t('common.loading')}</div>;
   }
 
   if (!session) {

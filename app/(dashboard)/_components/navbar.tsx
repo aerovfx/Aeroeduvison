@@ -55,7 +55,7 @@ export const Navbar = () => {
             </button>
           </div>
         ) : (
-          <Link href="/sign-in">
+          <Link href="/auth/login">
             <button className="text-sm px-3 py-1 border rounded hover:bg-gray-100">
               Sign In
             </button>

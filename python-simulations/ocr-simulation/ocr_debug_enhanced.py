@@ -301,3 +301,4 @@ def process_uploaded_image(
     pipeline = OCRDebugPipeline(debug_mode=True)
     return pipeline.process_image(image_data, filename)
 
+

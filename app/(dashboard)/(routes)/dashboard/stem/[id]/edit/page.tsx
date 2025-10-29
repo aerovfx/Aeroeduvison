@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import LinkIcon from "next/link";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft,
   Save,
@@ -220,6 +223,7 @@ const STEMProjectEditor = ({ params }: { params: Promise<{ id: string }> }) => {
   };
 
   const addTag = () => {
+  const { t } = useLanguage();
     if (newTag.trim() && !project.tags.includes(newTag.trim())) {
       setProject({
         ...project,
@@ -323,6 +327,7 @@ const STEMProjectEditor = ({ params }: { params: Promise<{ id: string }> }) => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Chỉnh sửa dự án STEM</h1>
                 <p className="text-gray-600">Biên tập và cập nhật thông tin dự án</p>
+              
               </div>
             </div>
             <div className="flex items-center gap-3">

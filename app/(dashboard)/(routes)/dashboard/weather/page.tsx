@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState } from "react";
@@ -8,8 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RealWorldMap } from "@/components/weather/real-world-map";
 import { WindyStyleMap } from "@/components/weather/windy-style-map";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function WeatherPage() {
+  const { t } = useLanguage();
+  
   const API_ENDPOINT = "http://localhost:8013";
 
   return (
@@ -28,7 +33,8 @@ export default function WeatherPage() {
           <div className="flex items-start gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-blue-400 via-cyan-400 to-sky-400 rounded-2xl text-white shadow-lg">
               <Cloud className="h-12 w-12" />
-            </div>
+            
+              </div>
             <div className="flex-1">
               <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-sky-600 bg-clip-text text-transparent mb-2">
                 🌍 World Weather

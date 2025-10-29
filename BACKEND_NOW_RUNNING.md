@@ -253,3 +253,14 @@ python3 main.py
 👉 Upload `thesinhvien.jpg` and see OCR magic! ✨
 
 
+
+
+
+
+
+
+
+
+
+
+

@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -5,8 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Award, Users, Calendar, Clock } from "lucide-react";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 export default function CompetitionPage() {
+  const { t } = useLanguage();
+
   const [selectedCompetition, setSelectedCompetition] = useState<string | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
@@ -136,7 +142,8 @@ export default function CompetitionPage() {
             <p className="text-muted-foreground">
               Tham gia các cuộc thi lập trình và toán học
             </p>
-          </div>
+          
+              <LanguageSwitcherCompact /></div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleShowLeaderboard}>
               <Trophy className="h-4 w-4 mr-2" />

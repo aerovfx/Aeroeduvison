@@ -2,210 +2,172 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-:root {
-  height: 100%;
-}
- 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
- 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
- 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
- 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
- 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
- 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
- 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
- 
-    --radius: 0.5rem;
+/* Custom animations for study components */
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
   }
- 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
- 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
- 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
- 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
- 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
- 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
- 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
- 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+  
+  .backface-hidden {
+    backface-visibility: hidden;
   }
-}
- 
-@layer base {
-  * {
-    @apply border-border;
+  
+  .rotate-y-180 {
+    transform: rotateY(180deg);
   }
-  body {
-    @apply bg-background text-foreground;
+  
+  /* Smooth transitions for card flips */
+  .card-flip {
+    transform-style: preserve-3d;
+    transition: transform 0.6s;
+  }
+  
+  .card-flip.flipped {
+    transform: rotateY(180deg);
+  }
+  
+  /* Gradient animations */
+  .gradient-bg {
+    background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+    background-size: 400% 400%;
+    animation: gradient 15s ease infinite;
+  }
+  
+  @keyframes gradient {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
+  }
+  
+  /* Pulse animation for progress bars */
+  .progress-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  /* Hover effects */
+  .hover-lift {
+    transition: transform 0.2s ease-in-out;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+  
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
   }
 }
 
-/* Custom animations for XP and achievements */
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
+/* Study dashboard specific styles */
+@layer components {
+  .study-card {
+    @apply bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover-lift;
   }
-  to {
-    transform: translateX(0);
-    opacity: 1;
+  
+  .study-header {
+    @apply px-4 py-3 text-lg font-semibold text-white;
   }
-}
-
-@keyframes float-up {
-  from {
-    transform: translateY(0) scale(1);
-    opacity: 1;
+  
+  .study-content {
+    @apply p-6;
   }
-  to {
-    transform: translateY(-100px) scale(1.2);
-    opacity: 0;
+  
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden;
   }
-}
-
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 5px rgba(168, 85, 247, 0.4);
+  
+  .progress-fill {
+    @apply h-2 rounded-full transition-all duration-300;
   }
-  50% {
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8);
+  
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors;
   }
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.5s ease-out;
-}
-
-.animate-float-up {
-  animation: float-up 2s ease-out forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s infinite;
-}
-
-.ql-container {
-  font-size: 16px !important;
-}
-
-@import "~@uploadthing/react/styles.css";
-
-/* Custom scrollbar styles */
-.scrollbar-thin {
-  scrollbar-width: thin;
-}
-
-.scrollbar-thumb-gray-400 {
-  scrollbar-color: #9ca3af #e5e7eb;
-}
-
-.scrollbar-track-gray-200 {
-  scrollbar-color: #9ca3af #e5e7eb;
-}
-
-/* Webkit scrollbar styles */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: #e5e7eb;
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #9ca3af;
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
-
-/* OCR Pipeline Animations */
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors;
   }
-  100% {
-    transform: translateX(100%);
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+  
+  .tag {
+    @apply text-xs px-2 py-1 rounded-full font-medium;
+  }
+  
+  .tag-blue {
+    @apply tag bg-blue-100 text-blue-800;
+  }
+  
+  .tag-green {
+    @apply tag bg-green-100 text-green-800;
+  }
+  
+  .tag-yellow {
+    @apply tag bg-yellow-100 text-yellow-800;
+  }
+  
+  .tag-red {
+    @apply tag bg-red-100 text-red-800;
+  }
+  
+  .tag-purple {
+    @apply tag bg-purple-100 text-purple-800;
   }
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
+/* Responsive design utilities */
+@media (max-width: 768px) {
+  .study-card {
+    @apply mx-2;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes bounce-in {
-  0% {
-    transform: scale(0.8);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
+  
+  .study-content {
+    @apply p-4;
   }
 }
 
-.animate-shimmer {
-  animation: shimmer 2s infinite;
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .study-card {
+    @apply bg-gray-800 border-gray-700;
+  }
+  
+  .study-content {
+    @apply text-gray-100;
+  }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out;
-}
-
-.animate-bounce-in {
-  animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+/* Print styles */
+@media print {
+  .study-card {
+    @apply shadow-none border border-gray-300;
+  }
+  
+  .btn-primary,
+  .btn-secondary {
+    @apply hidden;
+  }
 }

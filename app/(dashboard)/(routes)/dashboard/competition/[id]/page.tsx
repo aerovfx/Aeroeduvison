@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, use, useEffect } from "react";
@@ -11,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLanguage } from '@/contexts/LanguageContext';
 import {
   ArrowLeft, Calendar, Clock, Users, Trophy, Award, 
   Code, Calculator, Eye, Play, Pause, Square, Star, Target,
@@ -188,6 +191,7 @@ const StudentCompetitionDetailPage = ({ params }: CompetitionDetailProps) => {
   };
 
   const canSubmit = () => {
+  const { t } = useLanguage();
     return competition.status === "active" && 
            new Date() >= new Date(competition.startDate) && 
            new Date() <= new Date(competition.endDate);
@@ -454,7 +458,8 @@ const StudentCompetitionDetailPage = ({ params }: CompetitionDetailProps) => {
                   <div className="flex items-center gap-4">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
                       {index + 1}
-                    </div>
+                    
+              </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium">{problem.title}</h3>

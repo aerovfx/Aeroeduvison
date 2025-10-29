@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
@@ -8,6 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 function ResetPasswordForm() {
   const [password, setPassword] = useState("")
@@ -86,7 +90,8 @@ function ResetPasswordForm() {
             </Link>
           </CardContent>
         </Card>
-      </div>
+      
+              <LanguageSwitcherCompact /></div>
     )
   }
 
@@ -157,8 +162,10 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useLanguage();
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>{t('common.loading')}</div>}>
       <ResetPasswordForm />
     </Suspense>
   )

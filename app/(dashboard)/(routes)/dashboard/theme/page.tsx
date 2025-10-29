@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import React, { useState } from 'react';
@@ -30,8 +32,11 @@ import {
   Check
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ThemePage() {
+  const { t } = useLanguage();
+  
   const [selectedTheme, setSelectedTheme] = useState('rainbow');
 
   // Theme definitions for kids
@@ -174,7 +179,8 @@ export default function ThemePage() {
       {/* Header */}
       <div className="text-center mb-8">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="text-4xl">🎨</div>
+          <div className="text-4xl">🎨
+              </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Chọn Giao Diện Yêu Thích
           </h1>

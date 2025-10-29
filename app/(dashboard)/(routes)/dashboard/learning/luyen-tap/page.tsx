@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Play, 
   CheckCircle, 
@@ -23,6 +26,8 @@ import {
 } from "lucide-react";
 
 export default function LuyenTapPage() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>(new Array(5).fill(""));
@@ -135,7 +140,8 @@ export default function LuyenTapPage() {
               </div>
             </div>
           </div>
-        </div>
+        
+              </div>
 
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Card className="text-center">
@@ -338,7 +344,7 @@ export default function LuyenTapPage() {
                       variant="outline"
                       onClick={() => {
                         localStorage.removeItem('completedLessons');
-                        window.location.reload();
+                        typeof window !== 'undefined' && location.reload();
                       }}
                     >
                       Reset All Progress

@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -62,7 +64,7 @@ export default function PhuongTrinhBacNhatPage() {
 
   // Play celebration sound
   const playCelebrationSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = new (typeof window !== 'undefined' && window.AudioContext || (window as any).webkitAudioContext)();
     
     const playNote = (frequency: number, startTime: number, duration: number) => {
       const oscillator = audioContext.createOscillator();
@@ -209,7 +211,7 @@ export default function PhuongTrinhBacNhatPage() {
           <LanguageToggle />
           <div className="flex items-center gap-1 text-yellow-400">
             <Star className="h-4 w-4" />
-            <span className="text-sm">+20 {t('student.xp')}</span>
+            <span className="text-sm">+20 t('student.xp')</span>
           </div>
         </div>
       </div>
@@ -248,7 +250,7 @@ export default function PhuongTrinhBacNhatPage() {
               <p className="text-lg mb-2">{t('student.lesson-completed')}</p>
               <div className="flex items-center justify-center gap-2 text-yellow-200 mb-3">
                 <Star className="h-5 w-5" />
-                <span className="text-xl font-bold">+20 {t('student.xp')}</span>
+                <span className="text-xl font-bold">+20 t('student.xp')</span>
                 <Star className="h-5 w-5" />
               </div>
               <div className="text-sm text-yellow-200">
@@ -276,14 +278,14 @@ export default function PhuongTrinhBacNhatPage() {
                 
                 {/* Example */}
                 <div className="bg-slate-700 p-6 rounded-xl mb-6">
-                  <h3 className="font-semibold mb-3 text-gray-300">{t('student.example')}:</h3>
+                  <h3 className="font-semibold mb-3 text-gray-300">t('student.example'):</h3>
                   <p className="text-white font-mono text-lg">{steps[currentStep].example}</p>
                 </div>
 
                 {/* Interactive Exercise */}
                 {currentStep === 3 && (
                   <div className="bg-blue-900/30 p-6 rounded-xl mb-6 border border-blue-500/30">
-                    <h3 className="font-semibold mb-4 text-blue-300">{t('linear.practice')}: {t('linear.practice-content')}</h3>
+                    <h3 className="font-semibold mb-4 text-blue-300">t('linear.practice'): t('linear.practice-content')</h3>
                     <div className="flex items-center justify-center gap-4 mb-4">
                       <span className="text-xl text-white">x =</span>
                       <Input
@@ -299,9 +301,7 @@ export default function PhuongTrinhBacNhatPage() {
                       disabled={showResult || !userAnswer.trim()}
                       className="mb-4 bg-blue-600 hover:bg-blue-700"
                     >
-                      <Play className="h-4 w-4 mr-2" />
-                      {t('student.check')}
-                    </Button>
+                      <Play className="h-4 w-4 mr-2" />{t('student.check')}</Button>
                     
                     {showResult && (
                       <div className={`p-4 rounded-lg border ${
@@ -321,11 +321,9 @@ export default function PhuongTrinhBacNhatPage() {
                           )}
                         </div>
                         <p className="text-sm text-gray-300">
-                          {t('student.answer')}: x = 2
+                          t('student.answer'): x = 2
                         </p>
-                        <p className="text-sm text-gray-400 mt-1">
-                          {t('linear.practice-solution')}
-                        </p>
+                        <p className="text-sm text-gray-400 mt-1">{t('linear.practice-solution')}</p>
                       </div>
                     )}
                   </div>
@@ -341,9 +339,7 @@ export default function PhuongTrinhBacNhatPage() {
                 disabled={currentStep === 0}
                 className="text-gray-400 hover:text-white disabled:opacity-50"
               >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                {t('student.previous')}
-              </Button>
+                <ChevronLeft className="h-4 w-4 mr-2" />{t('student.previous')}</Button>
               
               <Button 
                 onClick={handleNext} 
@@ -352,13 +348,9 @@ export default function PhuongTrinhBacNhatPage() {
               >
                 {currentStep === steps.length - 1 ? (
                   <>
-                    <Trophy className="h-4 w-4 mr-2" />
-                    {t('student.finish')}
-                  </>
+                    <Trophy className="h-4 w-4 mr-2" />{t('student.finish')}</>
                 ) : (
-                  <>
-                    {t('student.next')}
-                    <ChevronRight className="h-4 w-4 ml-2" />
+                  <>{t('student.next')}<ChevronRight className="h-4 w-4 ml-2" />
                   </>
                 )}
               </Button>
@@ -378,9 +370,10 @@ export default function PhuongTrinhBacNhatPage() {
               <div>
                 <h3 className="font-semibold text-yellow-400 mb-2">{t('student.key-points')}</h3>
                 <ul className="text-sm text-gray-300 space-y-1">
-                  {t('linear.key-points').map((point: string, index: number) => (
-                    <li key={index}>• {point}</li>
-                  ))}
+                  <li>• Phương trình bậc nhất có dạng ax + b = 0</li>
+                  <li>• Nghiệm của phương trình là x = -b/a</li>
+                  <li>• Khi a = 0 và b ≠ 0: phương trình vô nghiệm</li>
+                  <li>• Khi a = 0 và b = 0: phương trình có vô số nghiệm</li>
                 </ul>
               </div>
             </div>
@@ -391,7 +384,7 @@ export default function PhuongTrinhBacNhatPage() {
       {/* Footer */}
       <div className="absolute bottom-6 left-6 right-6">
         <div className="text-center text-gray-500 text-sm">
-          {t('student.subject')} • {t('student.lesson-of', { current: currentStep + 1, total: steps.length })}
+          t('student.subject') • {t('student.lesson-of', { current: currentStep + 1, total: steps.length })}
         </div>
       </div>
     </div>

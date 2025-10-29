@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import Link from "next/link";
@@ -6,8 +8,11 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Calculator, BookOpen, CheckCircle, Clock, PlayCircle, Star, Target } from "lucide-react";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ToanHocLearningPathPage() {
+  const { t } = useLanguage();
+  
   const learningPath = {
     id: "toan-hoc",
     title: "Toán học cơ bản",
@@ -212,7 +217,8 @@ export default function ToanHocLearningPathPage() {
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-blue-500 rounded-xl text-white">
               <Calculator className="h-8 w-8" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">{learningPath.title}</h1>
               <p className="text-gray-600 mt-1">{learningPath.description}</p>

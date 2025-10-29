@@ -17,14 +17,9 @@ export async function GET() {
       { 
         status: 'error', 
         message: 'Health check failed',
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       }, 
       { status: 500 }
     );
   }
-}
-
-// Support for HEAD requests (common for health checks)
-export async function HEAD() {
-  return new NextResponse(null, { status: 200 });
 }

@@ -1,37 +1,47 @@
 {
   "id": "projectile",
-  "name": "Chuyển động ném xiên",
-  "description": "Mô phỏng chuyển động của vật được ném với vận tốc ban đầu và góc ném. Khám phá ảnh hưởng của góc ném, vận tốc và trọng lực đến quỹ đạo.",
-  "category": "Cơ học",
-  "level": "Lớp 10",
-  "duration": "40 phút",
-  "xp": 75,
+  "name": "Projectile Motion",
+  "title": "Chuyển động ném xiên",
+  "description": "Mô phỏng chuyển động ném xiên và quỹ đạo",
   "version": "1.0.0",
-  "author": "LabTwin Team",
-  "tags": ["cơ học", "ném xiên", "quỹ đạo", "vật lý"],
+  "category": "Cơ học",
+  "level": "Dễ",
+  "difficulty": "Dễ",
+  "duration": "15-30 phút",
+  "xp": 120,
+  "icon": "Activity",
+  "tags": [
+    "projectile",
+    "cơ học",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Thay đổi góc ném",
-    "Thay đổi vận tốc ban đầu",
-    "Thay đổi trọng lực (các hành tinh)",
-    "Đồ thị quỹ đạo",
-    "So sánh nhiều góc ném",
-    "Hiển thị công thức"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
   "learning_objectives": [
-    "Hiểu chuyển động ném xiên và các đặc điểm",
-    "Phân tích thành phần vận tốc theo phương ngang và thẳng đứng",
-    "Tính toán tầm xa, độ cao tối đa, thời gian bay",
-    "So sánh quỹ đạo với các góc ném khác nhau",
-    "Nhận biết ảnh hưởng của trọng lực"
+    "Hiểu chuyển động ném xiên",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "prerequisites": [
-    "Chuyển động thẳng đều",
-    "Chuyển động rơi tự do",
-    "Phân tích vector"
-  ],
-  "difficulty": "Trung bình",
-  "icon": "Zap",
-  "color": "#EF4444"
+  "backend": {
+    "port": 8016,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }
-
-

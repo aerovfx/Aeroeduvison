@@ -537,3 +537,4 @@ curl -X POST http://localhost:8000/api/ocr/advanced \
 **Endpoint:** `POST /api/ocr/advanced`  
 **Ready for:** Production use with further tuning
 
+

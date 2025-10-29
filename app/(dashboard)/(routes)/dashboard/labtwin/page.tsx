@@ -1,6 +1,9 @@
+'use client';
+
 "use client"
 
 import { useState, useEffect } from "react";
+import { useLanguage } from '@/contexts/LanguageContext';
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -9,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, FlaskConical, Star, Clock, ArrowRight, Sparkles, Target, Info, TrendingUp, Award, Zap } from "lucide-react";
 
 export default function LabTwinPage() {
+  const { t } = useLanguage();
+  
   const [pythonLabs, setPythonLabs] = useState<any>({ simulations: [], total: 0 });
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [localWeather, setLocalWeather] = useState<any>(null);
@@ -35,7 +40,7 @@ export default function LabTwinPage() {
     setLoadingLocation(true);
     try {
       if ('geolocation' in navigator) {
-        navigator.geolocation.getCurrentPosition(
+        navigator.geolocation && typeof window !== 'undefined' && location.getCurrentPosition(
           async (position) => {
             const { latitude, longitude } = position.coords;
             setUserLocation({ lat: latitude, lon: longitude });
@@ -134,7 +139,7 @@ export default function LabTwinPage() {
 
   // Group Python simulations by category
   const categorizedSims = pythonLabs.simulations.reduce((acc: any, sim: any) => {
-    const category = sim.category || 'Other';
+    const category = sim.category || t('form.other');
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -196,7 +201,8 @@ export default function LabTwinPage() {
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-purple-400 via-pink-400 to-orange-400 rounded-2xl text-white shadow-xl transform hover:scale-105 transition-transform">
               <FlaskConical className="h-12 w-12" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 bg-clip-text text-transparent">
                 🧪 LabTwin

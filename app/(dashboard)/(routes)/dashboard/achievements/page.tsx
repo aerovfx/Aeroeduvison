@@ -1,337 +1,417 @@
-"use client";
+'use client';
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Trophy, Star, Award, Target, Clock, BookOpen, Zap, Brain, Users, TrendingUp } from "lucide-react";
-
-// Mock data - replace with real API calls
-const mockAchievements = [
-  {
-    id: 1,
-    name: "First Steps",
-    description: "Complete your first course",
-    icon: "🎓",
-    category: "Learning",
-    points: 100,
-    earned: true,
-    date: "2024-01-15",
-    progress: 100,
-    requirement: "Complete 1 course",
-    current: 1,
-    total: 1,
-  },
-  {
-    id: 2,
-    name: "Perfect Score",
-    description: "Get 100% on any quiz",
-    icon: "⭐",
-    category: "Excellence",
-    points: 150,
-    earned: true,
-    date: "2024-01-20",
-    progress: 100,
-    requirement: "Score 100% on any quiz",
-    current: 1,
-    total: 1,
-  },
-  {
-    id: 3,
-    name: "Week Warrior",
-    description: "Study for 7 consecutive days",
-    icon: "🔥",
-    category: "Consistency",
-    points: 200,
-    earned: true,
-    date: "2024-01-25",
-    progress: 100,
-    requirement: "Study 7 days in a row",
-    current: 7,
-    total: 7,
-  },
-  {
-    id: 4,
-    name: "LabTwin Master",
-    description: "Complete 10 math courses",
-    icon: "🧮",
-    category: "Expertise",
-    points: 500,
-    earned: false,
-    date: null,
-    progress: 30,
-    requirement: "Complete 10 math courses",
-    current: 3,
-    total: 10,
-  },
-  {
-    id: 5,
-    name: "Speed Learner",
-    description: "Complete a course in under 3 days",
-    icon: "⚡",
-    category: "Speed",
-    points: 300,
-    earned: false,
-    date: null,
-    progress: 0,
-    requirement: "Complete any course in 3 days",
-    current: 0,
-    total: 1,
-  },
-  {
-    id: 6,
-    name: "Quiz Champion",
-    description: "Complete 50 quizzes",
-    icon: "🏆",
-    category: "Practice",
-    points: 400,
-    earned: false,
-    date: null,
-    progress: 24,
-    requirement: "Complete 50 quizzes",
-    current: 12,
-    total: 50,
-  },
-  {
-    id: 7,
-    name: "Early Bird",
-    description: "Study before 8 AM for 5 days",
-    icon: "🌅",
-    category: "Habits",
-    points: 250,
-    earned: false,
-    date: null,
-    progress: 60,
-    requirement: "Study before 8 AM for 5 days",
-    current: 3,
-    total: 5,
-  },
-  {
-    id: 8,
-    name: "Social Learner",
-    description: "Help 10 other students",
-    icon: "🤝",
-    category: "Community",
-    points: 350,
-    earned: false,
-    date: null,
-    progress: 20,
-    requirement: "Help 10 other students",
-    current: 2,
-    total: 10,
-  },
-];
-
-const categoryIcons = {
-  Learning: BookOpen,
-  Excellence: Star,
-  Consistency: Clock,
-  Expertise: Brain,
-  Speed: Zap,
-  Practice: Target,
-  Habits: TrendingUp,
-  Community: Users,
-};
-
-const categoryColors = {
-  Learning: "bg-blue-100 text-blue-800 border-blue-200",
-  Excellence: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  Consistency: "bg-green-100 text-green-800 border-green-200",
-  Expertise: "bg-purple-100 text-purple-800 border-purple-200",
-  Speed: "bg-orange-100 text-orange-800 border-orange-200",
-  Practice: "bg-red-100 text-red-800 border-red-200",
-  Habits: "bg-indigo-100 text-indigo-800 border-indigo-200",
-  Community: "bg-pink-100 text-pink-800 border-pink-200",
-};
+import React, { useState } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { 
+  Trophy, Award, Star, Target, Zap, Brain, Heart, 
+  BookOpen, Clock, TrendingUp, Crown, Medal, Shield
+} from 'lucide-react';
 
 export default function AchievementsPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+  const { t } = useLanguage();
+  
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
-  useEffect(() => {
-    if (status === "loading") return;
-    
-    if (!session) {
-      router.push("/sign-in");
-      return;
+  const categories = [
+    { id: 'all', name: 'Tất cả', icon: '🏆' },
+    { id: 'learning', name: 'Học tập', icon: '📚' },
+    { id: 'streak', name: 'Chuỗi', icon: '🔥' },
+    { id: 'skill', name: 'Kỹ năng', icon: '⚡' },
+    { id: 'social', name: 'Xã hội', icon: '👥' },
+    { id: 'special', name: 'Đặc biệt', icon: '💎' }
+  ];
+
+  const achievements = [
+    // Learning Achievements
+    {
+      id: 1,
+      title: 'First Steps',
+      description: 'Hoàn thành bài học đầu tiên',
+      icon: '👶',
+      category: 'learning',
+      earned: true,
+      earnedDate: '2025-01-10',
+      xp: 50,
+      rarity: 'common'
+    },
+    {
+      id: 2,
+      title: 'Math Master',
+      description: 'Hoàn thành 50 bài học Toán',
+      icon: '🧮',
+      category: 'learning',
+      earned: true,
+      earnedDate: '2025-01-15',
+      xp: 200,
+      rarity: 'rare'
+    },
+    {
+      id: 3,
+      title: 'Physics Explorer',
+      description: 'Hoàn thành 25 bài học Vật lý',
+      icon: '⚛️',
+      category: 'learning',
+      earned: true,
+      earnedDate: '2025-01-12',
+      xp: 150,
+      rarity: 'uncommon'
+    },
+    {
+      id: 4,
+      title: 'Chemistry Wizard',
+      description: 'Hoàn thành 100 bài học Hóa học',
+      icon: '🧪',
+      category: 'learning',
+      earned: false,
+      progress: 75,
+      xp: 500,
+      rarity: 'epic'
+    },
+
+    // Streak Achievements
+    {
+      id: 5,
+      title: 'Week Warrior',
+      description: 'Học liên tục 7 ngày',
+      icon: '🔥',
+      category: 'streak',
+      earned: true,
+      earnedDate: '2025-01-16',
+      xp: 100,
+      rarity: 'uncommon'
+    },
+    {
+      id: 6,
+      title: 'Month Master',
+      description: 'Học liên tục 30 ngày',
+      icon: '📅',
+      category: 'streak',
+      earned: false,
+      progress: 23,
+      xp: 1000,
+      rarity: 'legendary'
+    },
+
+    // Skill Achievements
+    {
+      id: 7,
+      title: 'Speed Demon',
+      description: 'Hoàn thành 10 bài học trong 1 ngày',
+      icon: '⚡',
+      category: 'skill',
+      earned: true,
+      earnedDate: '2025-01-14',
+      xp: 300,
+      rarity: 'rare'
+    },
+    {
+      id: 8,
+      title: 'Perfectionist',
+      description: 'Đạt 100% accuracy cho 5 bài học liên tiếp',
+      icon: '🎯',
+      category: 'skill',
+      earned: false,
+      progress: 3,
+      xp: 400,
+      rarity: 'epic'
+    },
+    {
+      id: 9,
+      title: 'AI Explorer',
+      description: 'Hoàn thành bài học AI/ML đầu tiên',
+      icon: '🤖',
+      category: 'skill',
+      earned: true,
+      earnedDate: '2025-01-11',
+      xp: 100,
+      rarity: 'uncommon'
+    },
+
+    // Social Achievements
+    {
+      id: 10,
+      title: 'Helper',
+      description: 'Giúp đỡ 5 bạn học khác',
+      icon: '🤝',
+      category: 'social',
+      earned: false,
+      progress: 2,
+      xp: 250,
+      rarity: 'rare'
+    },
+    {
+      id: 11,
+      title: 'Mentor',
+      description: 'Hướng dẫn 10 bạn học mới',
+      icon: '👨‍🏫',
+      category: 'social',
+      earned: false,
+      progress: 0,
+      xp: 500,
+      rarity: 'epic'
+    },
+
+    // Special Achievements
+    {
+      id: 12,
+      title: 'Night Owl',
+      description: 'Học sau 10 giờ tối',
+      icon: '🦉',
+      category: 'special',
+      earned: true,
+      earnedDate: '2025-01-13',
+      xp: 75,
+      rarity: 'uncommon'
+    },
+    {
+      id: 13,
+      title: 'Early Bird',
+      description: 'Học trước 6 giờ sáng',
+      icon: '🐦',
+      category: 'special',
+      earned: false,
+      progress: 0,
+      xp: 100,
+      rarity: 'rare'
+    },
+    {
+      id: 14,
+      title: 'Century Club',
+      description: 'Đạt 1000 XP trong 1 ngày',
+      icon: '💯',
+      category: 'special',
+      earned: false,
+      progress: 0,
+      xp: 1000,
+      rarity: 'legendary'
     }
+  ];
 
-    if (session.user.role !== "STUDENT") {
-      router.push("/teacher/courses");
-      return;
+  const getRarityColor = (rarity: string) => {
+    switch (rarity) {
+      case 'common': return 'border-gray-300 bg-gray-50';
+      case 'uncommon': return 'border-green-300 bg-green-50';
+      case 'rare': return 'border-blue-300 bg-blue-50';
+      case 'epic': return 'border-purple-300 bg-purple-50';
+      case 'legendary': return 'border-yellow-300 bg-yellow-50';
+      default: return 'border-gray-300 bg-gray-50';
     }
-  }, [session, status, router]);
+  };
 
-  if (status === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
+  const getRarityText = (rarity: string) => {
+    switch (rarity) {
+      case 'common': return 'Common';
+      case 'uncommon': return 'Uncommon';
+      case 'rare': return 'Rare';
+      case 'epic': return 'Epic';
+      case 'legendary': return 'Legendary';
+      default: return 'Common';
+    }
+  };
 
-  if (!session || session.user.role !== "STUDENT") {
-    return null;
-  }
+  const filteredAchievements = selectedCategory === 'all' 
+    ? achievements 
+    : achievements.filter(achievement => achievement.category === selectedCategory);
 
-  const earnedAchievements = mockAchievements.filter(a => a.earned);
-  const totalPoints = earnedAchievements.reduce((sum, a) => sum + a.points, 0);
-  const earnedCount = earnedAchievements.length;
-  const totalCount = mockAchievements.length;
+  const earnedCount = achievements.filter(a => a.earned).length;
+  const totalCount = achievements.length;
+  const completionRate = Math.round((earnedCount / totalCount) * 100);
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Achievements</h1>
-          <p className="text-muted-foreground">Track your learning milestones</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{totalPoints}</div>
-            <div className="text-sm text-muted-foreground">Total Points</div>
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl shadow-xl p-6 mb-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">🏆 Achievements & Gamification</h1>
+              <p className="text-yellow-100">Thành tích, huy hiệu và milestone của bạn</p>
+            
+              </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-purple-600">{earnedCount}/{totalCount}</div>
+              <div className="text-sm text-gray-600">{t('achievements.title')}</div>
+              <div className="text-xs text-green-600">{completionRate}% Complete</div>
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">{earnedCount}/{totalCount}</div>
-            <div className="text-sm text-muted-foreground">Achievements</div>
-          </div>
         </div>
-      </div>
 
-      {/* Progress Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Achievement Progress</CardTitle>
-          <CardDescription>Your overall achievement completion</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg p-6 text-white">
             <div className="flex items-center justify-between">
-              <span>Overall Progress</span>
-              <span className="font-medium">{Math.round((earnedCount / totalCount) * 100)}%</span>
-            </div>
-            <Progress value={(earnedCount / totalCount) * 100} className="h-3" />
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-green-600">{earnedCount}</div>
-                <div className="text-sm text-muted-foreground">Earned</div>
+                <p className="text-sm text-purple-100">Total XP</p>
+                <p className="text-2xl font-bold">2,450</p>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-orange-600">{totalCount - earnedCount}</div>
-                <div className="text-sm text-muted-foreground">In Progress</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-blue-600">{totalPoints}</div>
-                <div className="text-sm text-muted-foreground">Points</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-purple-600">{Math.round((earnedCount / totalCount) * 100)}%</div>
-                <div className="text-sm text-muted-foreground">Complete</div>
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Zap className="w-6 h-6" />
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Achievements Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {mockAchievements.map((achievement) => {
-          const CategoryIcon = categoryIcons[achievement.category as keyof typeof categoryIcons];
-          const categoryColorClass = categoryColors[achievement.category as keyof typeof categoryColors];
-          
-          return (
-            <Card 
-              key={achievement.id} 
-              className={`transition-all duration-200 hover:shadow-lg ${
+          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-orange-100">Current Streak</p>
+                <p className="text-2xl font-bold">7 days</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Target className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-blue-100">Rank</p>
+                <p className="text-2xl font-bold">#15</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Crown className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl shadow-lg p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-100">{t('achievements.level')}</p>
+                <p className="text-2xl font-bold">12</p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <Star className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Category Filter */}
+        <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 mb-6 border border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <span className="text-2xl mr-2">🎯</span>
+            Filter by Category
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedCategory === category.id
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <span className="mr-2">{category.icon}</span>
+                {category.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Achievements Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredAchievements.map((achievement) => (
+            <div
+              key={achievement.id}
+              className={`bg-white rounded-xl shadow-lg p-6 border-2 transition-all duration-300 ${
                 achievement.earned 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-white border-gray-200 hover:border-gray-300'
+                  ? getRarityColor(achievement.rarity)
+                  : 'border-gray-200 bg-gray-50 opacity-75'
               }`}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`text-3xl ${achievement.earned ? '' : 'grayscale opacity-60'}`}>
-                      {achievement.icon}
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{achievement.name}</CardTitle>
-                      <Badge className={`mt-1 ${categoryColorClass}`}>
-                        <CategoryIcon className="h-3 w-3 mr-1" />
-                        {achievement.category}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-yellow-600">{achievement.points}</div>
-                    <div className="text-xs text-muted-foreground">points</div>
+              <div className="flex items-start justify-between mb-4">
+                <div className="text-4xl">{achievement.icon}</div>
+                <div className="text-right">
+                  <div className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    achievement.rarity === 'legendary' ? 'bg-yellow-100 text-yellow-800' :
+                    achievement.rarity === 'epic' ? 'bg-purple-100 text-purple-800' :
+                    achievement.rarity === 'rare' ? 'bg-blue-100 text-blue-800' :
+                    achievement.rarity === 'uncommon' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {getRarityText(achievement.rarity)}
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground">{achievement.description}</p>
-                
+              </div>
+
+              <h3 className={`text-lg font-semibold mb-2 ${
+                achievement.earned ? 'text-gray-900' : 'text-gray-600'
+              }`}>
+                {achievement.title}
+              </h3>
+
+              <p className={`text-sm mb-4 ${
+                achievement.earned ? 'text-gray-700' : 'text-gray-500'
+              }`}>
+                {achievement.description}
+              </p>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <span className="text-sm font-medium text-gray-700">{achievement.xp} XP</span>
+                </div>
+
                 {achievement.earned ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-green-600">
-                      <Star className="h-4 w-4" />
-                      <span className="text-sm font-medium">Earned on {achievement.date}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Award className="h-4 w-4 text-yellow-500" />
-                      <span className="text-sm font-medium">Completed!</span>
-                    </div>
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <Star className="w-4 h-4 fill-current" />
+                    <span className="text-xs font-medium">Earned</span>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Progress</span>
-                      <span>{achievement.current}/{achievement.total}</span>
-                    </div>
-                    <Progress value={achievement.progress} className="h-2" />
-                    <p className="text-xs text-muted-foreground">{achievement.requirement}</p>
+                  <div className="text-xs text-gray-500">
+                    {achievement.progress !== undefined ? `${achievement.progress}%` : 'Not started'}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              </div>
 
-      {/* Recent Achievements */}
-      {earnedAchievements.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Achievements</CardTitle>
-            <CardDescription>Your latest accomplishments</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {earnedAchievements
-                .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime())
-                .slice(0, 3)
-                .map((achievement) => (
-                  <div key={achievement.id} className="flex items-center gap-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="text-2xl">{achievement.icon}</div>
-                    <div className="flex-1">
-                      <p className="font-medium">{achievement.name}</p>
-                      <p className="text-sm text-muted-foreground">Earned on {achievement.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-yellow-600">+{achievement.points}</div>
-                      <div className="text-xs text-muted-foreground">points</div>
-                    </div>
+              {achievement.earned && achievement.earnedDate && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Earned on {new Date(achievement.earnedDate).toLocaleDateString('vi-VN')}
+                  </p>
+                </div>
+              )}
+
+              {!achievement.earned && achievement.progress !== undefined && (
+                <div className="mt-3">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${achievement.progress}%` }}
+                    ></div>
                   </div>
-                ))}
+                  <p className="text-xs text-gray-500 mt-1">
+                    Progress: {achievement.progress}%
+                  </p>
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ))}
+        </div>
+
+        {/* AI Motivation */}
+        <div className="mt-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-start space-x-4">
+            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+              <Brain className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold mb-2">🤖 AI Motivation</h3>
+              <p className="text-sm mb-3">
+                Bạn đang làm rất tốt! Với {earnedCount} achievements đã đạt được, bạn đang trên con đường trở thành một học sinh xuất sắc.
+              </p>
+              <div className="space-y-1 text-sm">
+                <p>• <strong>Next Goal:</strong> Hoàn thành "Chemistry Wizard" (75% done)</p>
+                <p>• <strong>Tip:</strong> Học đều đặn mỗi ngày để duy trì streak!</p>
+                <p>• <strong>Challenge:</strong> Thử đạt "Perfectionist" bằng cách làm chính xác 100%</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
-
-

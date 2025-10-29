@@ -1,6 +1,7 @@
 #!/bin/bash
 
-echo "🚀 Khởi động Chuyển động Vật lý API..."
+echo "🚀 Khởi động Chuyển động Vật lý API v2.0..."
+echo "✨ 7 loại chuyển động"
 cd "$(dirname "$0")"
 
 if [ ! -f "output/data.json" ]; then
@@ -9,11 +10,13 @@ if [ ! -f "output/data.json" ]; then
 fi
 
 echo ""
-echo "✅ Starting API..."
-echo "📡 http://localhost:8004/docs"
+echo "✅ Starting API on port 8007..."
+echo "📡 Swagger docs: http://localhost:8007/docs"
+echo "🌐 API: http://localhost:8007"
 echo ""
 
 python3 api.py
+
 
 
 

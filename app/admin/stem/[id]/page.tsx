@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -16,6 +18,8 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useDataSync } from "@/contexts/DataSyncContext";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 interface STEMProjectDetailProps {
   params: Promise<{ id: string }>;
@@ -58,7 +62,8 @@ const STEMProjectDetail = ({ params }: STEMProjectDetailProps) => {
   if (status === "loading" || !project) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900">
+              <LanguageSwitcherCompact /></div>
       </div>
     );
   }
@@ -104,6 +109,7 @@ const STEMProjectDetail = ({ params }: STEMProjectDetailProps) => {
   };
 
   const handleAddFeedback = () => {
+  const { t } = useLanguage();
     if (!feedbackText.trim()) return;
 
     // In a real app, this would save to backend

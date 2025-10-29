@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useSession } from "next-auth/react"
@@ -5,8 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Settings, Key, Bell, Eye, Shield, ChevronRight } from "lucide-react"
 import Link from "next/link"
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SettingsPage() {
+  const { t } = useLanguage();
+  
   const { data: session } = useSession()
 
   if (!session?.user) {
@@ -77,7 +82,8 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-lg ${section.bgColor} flex items-center justify-center`}>
                       <Icon className={`w-6 h-6 ${section.iconColor}`} />
-                    </div>
+                    
+              </div>
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{section.title}</h3>
                       <p className="text-sm text-gray-600">{section.description}</p>
@@ -102,7 +108,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gray-600">Email</p>
+              <p className="text-gray-600">{t('form.email')}</p>
               <p className="font-medium">{session.user.email}</p>
             </div>
             <div>
@@ -124,5 +130,4 @@ export default function SettingsPage() {
     </div>
   )
 }
-
 

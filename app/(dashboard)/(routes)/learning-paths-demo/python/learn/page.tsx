@@ -1,4 +1,11 @@
+'use client';
+
+import { useLanguage } from '@/contexts/LanguageContext';
+
 export default function PythonLearnPage() {
+  const { t } = useLanguage();
+
+  
   const lessons = [
     { id: "python-10-1", title: "Python cơ bản - Cài đặt và Hello World", description: "Tìm hiểu về Python và viết chương trình đầu tiên", icon: "🐍", difficulty: "Dễ", duration: "30 phút" },
     { id: "python-10-2", title: "Biến và kiểu dữ liệu - String, int, float, bool", description: "Học về các kiểu dữ liệu cơ bản trong Python", icon: "📊", difficulty: "Dễ", duration: "45 phút" },
@@ -89,6 +96,7 @@ export default function PythonLearnPage() {
           </a>
         </div>
       </div>
-    </div>
+    
+              </div>
   );
 }

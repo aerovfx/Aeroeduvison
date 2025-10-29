@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -436,7 +436,7 @@ export default function AdminDashboard() {
     ...mockAdminData.overview,
     activeModules: activeModulesCount,
     totalModules: modules.length,
-    systemStatus: activeModulesCount > 5 ? "Healthy" : "Warning",
+    systemStatus: activeModulesCount > 5 ? "Healthy" : t('common.warning'),
     systemUptime: activeModulesCount > 7 ? 99.9 : activeModulesCount > 5 ? 98.5 : 95.2,
     totalUsers: stats.users.total || 0,
     totalCourses: stats.courses.total || 0,
@@ -562,7 +562,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{syncData.users.length.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {syncData.users.filter(u => u.role === 'STUDENT').length} {t('common.students')} • {syncData.users.filter(u => u.role === 'TEACHER').length} {t('common.teachers')}
+              {syncData.users.filter(u => u.role === 'STUDENT').length} t('common.students') • {syncData.users.filter(u => u.role === 'TEACHER').length} t('common.teachers')
             </p>
           </CardContent>
         </Card>
@@ -575,7 +575,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{syncData.courses.length}</div>
             <p className="text-xs text-muted-foreground">
-              {syncData.courses.filter(c => c.status === 'published').length} {t('admin.published')} • {syncData.courses.filter(c => c.status === 'draft').length} {t('admin.draft')}
+              {syncData.courses.filter(c => c.status === 'published').length} t('admin.published') • {syncData.courses.filter(c => c.status === 'draft').length} t('admin.draft')
             </p>
           </CardContent>
         </Card>
@@ -588,7 +588,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{overview.totalRevenue.toLocaleString()} VND</div>
             <p className="text-xs text-muted-foreground">
-              {stats.courses.totalPurchases} {t('admin.courses-sold')}
+              {stats.courses.totalPurchases} t('admin.courses-sold')
             </p>
           </CardContent>
         </Card>
@@ -603,12 +603,12 @@ export default function AdminDashboard() {
             <p className={`text-xs ${
               overview.systemStatus === "Healthy" 
                 ? "text-green-600" 
-                : overview.systemStatus === "Warning"
+                : overview.systemStatus === t('common.warning')
                 ? "text-yellow-600"
                 : "text-red-600"
             }`}>
               {overview.systemStatus === "Healthy" ? t('admin.system-healthy') : 
-               overview.systemStatus === "Warning" ? t('admin.system-warning') : 
+               overview.systemStatus === t('common.warning') ? t('admin.system-warning') : 
                t('admin.system-critical')}
             </p>
             </CardContent>
@@ -631,11 +631,11 @@ export default function AdminDashboard() {
       {/* Main Dashboard Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-3">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="overview">{t('dashboard.overview')}</TabsTrigger>
           <TabsTrigger value="modules">Modules</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings">{t('settings.title')}</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -646,7 +646,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
+                <CardTitle>{t('dashboard.quick-actions')}</CardTitle>
                 <CardDescription>Common admin tasks and shortcuts</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">

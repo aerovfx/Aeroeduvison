@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import Link from "next/link";
@@ -6,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   Calendar,
   Users,
@@ -87,6 +91,7 @@ interface Task {
 }
 
 const CalendarManagement = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -464,7 +469,8 @@ const CalendarManagement = () => {
                 Permissions
               </Link>
             </Button>
-          </div>
+          
+              <LanguageSwitcherCompact /></div>
         </div>
 
         {/* Header */}

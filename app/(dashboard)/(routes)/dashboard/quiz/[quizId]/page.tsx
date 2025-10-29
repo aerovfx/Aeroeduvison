@@ -1,274 +1,56 @@
-"use client";
+'use client';
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, use } from "react";
-import { StudentQuizInterface } from "@/components/student-quiz-interface";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-// Mock quiz data - replace with real API call
-const getQuizData = async (quizId: string) => {
-  return {
-    id: quizId,
-    title: "Đề thi Hóa học - Chuyên đề Este",
-    description: "Kiểm tra kiến thức về este, axit cacboxylic và các hợp chất liên quan",
-    timeLimit: 60, // 60 minutes
-    totalQuestions: 18,
-    questions: [
-      {
-        id: 1,
-        question: "Este X được tạo thành từ ancol etylic và axit fomic có công thức là:",
-        options: [
-          "HCOOCH₃",
-          "CH₃COOCH₃", 
-          "HCOOCH₂CH₃",
-          "CH₃COOCH₂CH₃"
-        ],
-        points: 2
-      },
-      {
-        id: 2,
-        question: "Este X có tỉ khối hơi so với không khí bằng 2,07. Este X là:",
-        options: [
-          "HCOOCH₃",
-          "CH₃COOCH₃",
-          "HCOOCH₂CH₃", 
-          "CH₃COOCH₂CH₃"
-        ],
-        points: 2
-      },
-      {
-        id: 3,
-        question: "Chất nào sau đây có nhiệt độ sôi thấp nhất?",
-        options: [
-          "CH₃COOH",
-          "CH₃COOCH₃",
-          "CH₃CH₂OH",
-          "CH₃CH₂CH₂OH"
-        ],
-        points: 2
-      },
-      {
-        id: 4,
-        question: "Chất nào sau đây là axit béo không no?",
-        options: [
-          "Axit stearic",
-          "Axit oleic", 
-          "Axit palmitic",
-          "Axit lauric"
-        ],
-        points: 2
-      },
-      {
-        id: 5,
-        question: "Số đồng phân este ứng với công thức phân tử C₄H₈O₂ là:",
-        options: ["2", "3", "4", "5"],
-        points: 2
-      },
-      {
-        id: 6,
-        question: "Loại dầu nào sau đây không phải là este của axit béo và glixerol?",
-        options: [
-          "Dầu dừa",
-          "Dầu đậu nành",
-          "Dầu mỡ động vật",
-          "Dầu ô liu"
-        ],
-        points: 2
-      },
-      {
-        id: 7,
-        question: "Chất nào sau đây ở điều kiện thường là chất lỏng?",
-        options: [
-          "CH₃(CH₂)₁₆COOH",
-          "CH₃(CH₂)₁₄COOH",
-          "CH₃(CH₂)₁₂COOH", 
-          "CH₃(CH₂)₁₀COOH"
-        ],
-        points: 2
-      },
-      {
-        id: 8,
-        question: "Este nào sau đây khi thủy phân trong môi trường kiềm cho sản phẩm có khả năng tham gia phản ứng tráng bạc?",
-        options: [
-          "CH₃COOCH₃",
-          "HCOOCH₃",
-          "CH₃COOCH₂CH₃",
-          "C₂H₅COOCH₃"
-        ],
-        points: 2
-      },
-      {
-        id: 9,
-        question: "Nhóm chức được khoanh tròn trong công thức sau là:",
-        options: [
-          "Nhóm este",
-          "Nhóm axit",
-          "Nhóm muối",
-          "Nhóm ancol"
-        ],
-        points: 2
-      },
-      {
-        id: 10,
-        question: "Phản ứng este hóa giữa axit và ancol là phản ứng:",
-        options: [
-          "Thuận nghịch",
-          "Một chiều",
-          "Oxi hóa khử",
-          "Thế"
-        ],
-        points: 2
-      },
-      {
-        id: 11,
-        question: "Để điều chế este từ axit cacboxylic, người ta thường dùng:",
-        options: [
-          "Ancol và xúc tác H₂SO₄ đặc",
-          "Ancol và xúc tác NaOH",
-          "Ancol và xúc tác HCl",
-          "Ancol và xúc tác KOH"
-        ],
-        points: 2
-      },
-      {
-        id: 12,
-        question: "Este không tan trong nước vì:",
-        options: [
-          "Không có liên kết hidro với nước",
-          "Có phân tử khối lớn",
-          "Có cấu trúc phân cực",
-          "Có nhóm chức ưa nước"
-        ],
-        points: 2
-      },
-      {
-        id: 13,
-        question: "Phản ứng thủy phân este trong môi trường axit là phản ứng:",
-        options: [
-          "Thuận nghịch",
-          "Một chiều", 
-          "Oxi hóa",
-          "Khử"
-        ],
-        points: 2
-      },
-      {
-        id: 14,
-        question: "Chất nào sau đây có thể tham gia phản ứng tráng bạc?",
-        options: [
-          "CH₃COOCH₃",
-          "HCOOCH₃",
-          "CH₃COOCH₂CH₃",
-          "C₂H₅COOCH₃"
-        ],
-        points: 2
-      },
-      {
-        id: 15,
-        question: "Este của axit fomic có đặc điểm:",
-        options: [
-          "Có thể tham gia phản ứng tráng bạc",
-          "Không tan trong nước",
-          "Có mùi thơm",
-          "Có tính axit"
-        ],
-        points: 2
-      },
-      {
-        id: 16,
-        question: "Số mol NaOH cần để thủy phân hoàn toàn 1 mol este đơn chức là:",
-        options: ["0.5 mol", "1 mol", "1.5 mol", "2 mol"],
-        points: 2
-      },
-      {
-        id: 17,
-        question: "Este nào sau đây có mùi chuối chín?",
-        options: [
-          "CH₃COOCH₃",
-          "CH₃COOCH₂CH₃",
-          "CH₃COOCH₂CH₂CH₃",
-          "CH₃COOCH₂CH₂CH₂CH₃"
-        ],
-        points: 2
-      },
-      {
-        id: 18,
-        question: "Phản ứng xà phòng hóa là phản ứng thủy phân este trong:",
-        options: [
-          "Môi trường axit",
-          "Môi trường kiềm",
-          "Môi trường trung tính",
-          "Môi trường nước"
-        ],
-        points: 2
-      }
-    ]
-  };
-};
-
-interface QuizPageProps {
-  params: Promise<{ quizId: string }>;
-}
-
-const QuizPage = ({ params }: QuizPageProps) => {
-  const resolvedParams = use(params);
-  const { data: session, status } = useSession();
+// This module has been integrated into AI Tutor
+export default function QuizPageRedirect() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
-  const [quizData, setQuizData] = useState<any>(null);
+  const { data: session } = useSession();
 
   useEffect(() => {
-    if (status === "loading") return;
-    
-    if (!session) {
-      router.push("/sign-in");
-      return;
+    if (session?.user?.role === 'STUDENT') {
+      // Redirect students to AI Tutor
+      router.replace('/ai-tutor');
+    } else {
+      // Teachers can access teacher quizzes
+      router.replace('/teacher/quizzes');
     }
-
-    if (session.user.role !== "STUDENT") {
-      router.push("/teacher/dashboard");
-      return;
-    }
-
-    // Load quiz data
-    const loadQuizData = async () => {
-      const data = await getQuizData(resolvedParams.quizId);
-      setQuizData(data);
-    };
-    
-    loadQuizData();
-  }, [session, status, router, resolvedParams.quizId]);
-
-  const handleQuizSubmit = (answers: Record<number, number>) => {
-    // Handle quiz submission
-    console.log("Quiz submitted with answers:", answers);
-    // Redirect to results page or show success message
-    router.push("/dashboard/quizzes");
-  };
-
-  const handleBack = () => {
-    // Navigate back to course or dashboard
-    router.back();
-  };
-
-  if (status === "loading" || !quizData) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
-    );
-  }
-
-  if (!session || session.user.role !== "STUDENT") {
-    return null;
-  }
+  }, [session, router]);
 
   return (
-    <StudentQuizInterface
-      quizData={quizData}
-      onSubmit={handleQuizSubmit}
-      onBack={handleBack}
-    />
-  );
-};
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Quiz đã được tích hợp! 🎯
+        </h1>
+        
+        <p className="text-gray-600 mb-6">
+          Quiz và bài tập giờ đã được tích hợp vào <strong>AI Tutor</strong>.
+          AI sẽ tự động tạo quiz phù hợp với năng lực và tiến độ học tập của bạn!
+        </p>
+        
+        <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-4 mb-6">
+          <p className="text-sm text-purple-900">
+            <strong>💡 Mẹo:</strong> AI Tutor phân tích năng lực của bạn và tạo quiz 
+            với độ khó phù hợp, giúp bạn học hiệu quả hơn!
+          </p>
+        </div>
 
-export default QuizPage;
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+        <p className="text-sm text-gray-500">Đang chuyển đến AI Tutor...</p>
+      </div>
+    
+              </div>
+  );
+}

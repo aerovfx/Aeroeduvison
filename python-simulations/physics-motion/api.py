@@ -1,6 +1,7 @@
 """
 FastAPI Backend cho Phòng thí nghiệm Chuyển động Vật lý
-Endpoints: /free-fall, /projectile, /harmonic, /predict
+7 loại chuyển động: Free Fall, Projectile, Harmonic, Uniform, Accelerated, Circular, Pendulum
+Endpoints: /free-fall, /projectile, /harmonic, /uniform, /accelerated, /circular, /pendulum, /predict
 """
 
 from fastapi import FastAPI, HTTPException
@@ -13,13 +14,17 @@ from main import (
     FreeFallSimulation,
     ProjectileMotion,
     HarmonicMotion,
+    UniformMotion,
+    AcceleratedMotion,
+    CircularMotion,
+    SimplePendulum,
     MotionPredictor
 )
 
 app = FastAPI(
     title="Phòng thí nghiệm Chuyển động Vật lý API",
-    description="API mô phỏng chuyển động: rơi tự do, ném xiên, dao động điều hòa, với AI prediction",
-    version="1.0.0"
+    description="API mô phỏng 7 loại chuyển động: Rơi tự do, Ném xiên, Dao động điều hòa, Thẳng đều, Nhanh dần đều, Tròn đều, Con lắc đơn - với AI prediction",
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -55,6 +60,32 @@ class HarmonicRequest(BaseModel):
     t_max: Optional[float] = Field(None, description="Thời gian mô phỏng (s)")
     num_points: int = Field(200, ge=10, le=1000, description="Số điểm")
 
+class UniformRequest(BaseModel):
+    v: float = Field(10, description="Vận tốc (m/s)")
+    x0: float = Field(0, description="Vị trí ban đầu (m)")
+    duration: float = Field(10, gt=0, description="Thời gian chuyển động (s)")
+    num_points: int = Field(100, ge=10, le=500, description="Số điểm quỹ đạo")
+
+class AcceleratedRequest(BaseModel):
+    v0: float = Field(0, description="Vận tốc ban đầu (m/s)")
+    a: float = Field(2, description="Gia tốc (m/s²)")
+    x0: float = Field(0, description="Vị trí ban đầu (m)")
+    duration: float = Field(10, gt=0, description="Thời gian chuyển động (s)")
+    num_points: int = Field(100, ge=10, le=500, description="Số điểm quỹ đạo")
+
+class CircularRequest(BaseModel):
+    r: float = Field(5, gt=0, description="Bán kính (m)")
+    omega: float = Field(1, gt=0, description="Tốc độ góc (rad/s)")
+    duration: float = Field(10, gt=0, description="Thời gian chuyển động (s)")
+    num_points: int = Field(200, ge=10, le=1000, description="Số điểm quỹ đạo")
+
+class PendulumRequest(BaseModel):
+    L: float = Field(1, gt=0, description="Chiều dài dây (m)")
+    theta0_deg: float = Field(30, gt=0, lt=90, description="Góc ban đầu (độ)")
+    duration: float = Field(10, gt=0, description="Thời gian dao động (s)")
+    g: float = Field(9.8, gt=0, description="Gia tốc trọng trường (m/s²)")
+    num_points: int = Field(200, ge=10, le=1000, description="Số điểm quỹ đạo")
+
 class PredictionRequest(BaseModel):
     motion_type: str = Field(..., description="Loại chuyển động: free_fall, projectile")
     training_data: List[Dict] = Field(..., description="Dữ liệu training")
@@ -69,11 +100,20 @@ async def root():
     """Endpoint gốc"""
     return {
         "name": "Phòng thí nghiệm Chuyển động Vật lý API",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "description": "7 loại chuyển động vật lý",
+        "motions": [
+            "Rơi tự do", "Ném xiên", "Dao động điều hòa",
+            "Thẳng đều", "Nhanh dần đều", "Tròn đều", "Con lắc đơn"
+        ],
         "endpoints": {
             "free_fall": "/api/free-fall",
             "projectile": "/api/projectile",
             "harmonic": "/api/harmonic",
+            "uniform": "/api/uniform",
+            "accelerated": "/api/accelerated",
+            "circular": "/api/circular",
+            "pendulum": "/api/pendulum",
             "predict": "/api/predict",
             "compare": "/api/compare"
         }
@@ -148,6 +188,110 @@ async def simulate_harmonic(request: HarmonicRequest):
             t_max=request.t_max,
             num_points=request.num_points
         )
+        result = sim.to_dict()
+        result['trajectory'] = [state.to_dict() for state in trajectory]
+        
+        return {
+            "status": "success",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/uniform")
+async def simulate_uniform(request: UniformRequest):
+    """
+    Mô phỏng chuyển động thẳng đều
+    
+    - **v**: Vận tốc không đổi (m/s)
+    - **x0**: Vị trí ban đầu (m)
+    - **duration**: Thời gian chuyển động (s)
+    """
+    try:
+        sim = UniformMotion(v=request.v, x0=request.x0, duration=request.duration)
+        
+        trajectory = sim.generate_trajectory(num_points=request.num_points)
+        result = sim.to_dict()
+        result['trajectory'] = [state.to_dict() for state in trajectory]
+        
+        return {
+            "status": "success",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/accelerated")
+async def simulate_accelerated(request: AcceleratedRequest):
+    """
+    Mô phỏng chuyển động thẳng nhanh dần đều
+    
+    - **v0**: Vận tốc ban đầu (m/s)
+    - **a**: Gia tốc (m/s²)
+    - **x0**: Vị trí ban đầu (m)
+    - **duration**: Thời gian chuyển động (s)
+    """
+    try:
+        sim = AcceleratedMotion(
+            v0=request.v0,
+            a=request.a,
+            x0=request.x0,
+            duration=request.duration
+        )
+        
+        trajectory = sim.generate_trajectory(num_points=request.num_points)
+        result = sim.to_dict()
+        result['trajectory'] = [state.to_dict() for state in trajectory]
+        
+        return {
+            "status": "success",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/circular")
+async def simulate_circular(request: CircularRequest):
+    """
+    Mô phỏng chuyển động tròn đều
+    
+    - **r**: Bán kính (m)
+    - **omega**: Tốc độ góc (rad/s)
+    - **duration**: Thời gian chuyển động (s)
+    """
+    try:
+        sim = CircularMotion(r=request.r, omega=request.omega, duration=request.duration)
+        
+        trajectory = sim.generate_trajectory(num_points=request.num_points)
+        result = sim.to_dict()
+        result['trajectory'] = [state.to_dict() for state in trajectory]
+        
+        return {
+            "status": "success",
+            "data": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/pendulum")
+async def simulate_pendulum(request: PendulumRequest):
+    """
+    Mô phỏng con lắc đơn
+    
+    - **L**: Chiều dài dây (m)
+    - **theta0_deg**: Góc ban đầu (độ)
+    - **duration**: Thời gian dao động (s)
+    - **g**: Gia tốc trọng trường (m/s²)
+    """
+    try:
+        sim = SimplePendulum(
+            L=request.L,
+            theta0_deg=request.theta0_deg,
+            duration=request.duration,
+            g=request.g
+        )
+        
+        trajectory = sim.generate_trajectory(num_points=request.num_points)
         result = sim.to_dict()
         result['trajectory'] = [state.to_dict() for state in trajectory]
         
@@ -321,17 +465,26 @@ async def health_check():
     }
 
 if __name__ == "__main__":
-    print("🚀 Khởi động Phòng thí nghiệm Chuyển động Vật lý API")
-    print("📡 Swagger docs: http://localhost:8004/docs")
-    print("🌐 API: http://localhost:8004")
+    print("🚀 Khởi động Phòng thí nghiệm Chuyển động Vật lý API v2.0")
+    print("✨ 7 loại chuyển động:")
+    print("   1. Rơi tự do")
+    print("   2. Ném xiên") 
+    print("   3. Dao động điều hòa")
+    print("   4. Thẳng đều")
+    print("   5. Nhanh dần đều")
+    print("   6. Tròn đều")
+    print("   7. Con lắc đơn")
+    print("📡 Swagger docs: http://localhost:8007/docs")
+    print("🌐 API: http://localhost:8007")
     
     uvicorn.run(
         "api:app",
         host="0.0.0.0",
-        port=8004,
+        port=8007,
         reload=True,
         log_level="info"
     )
+
 
 
 

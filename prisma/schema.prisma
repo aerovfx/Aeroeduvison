@@ -13,99 +13,34 @@ datasource db {
   directUrl = env("DATABASE_URL")
 }
 
-model Course {
-  id          String       @id @default(uuid())
-  userId      String
-  schoolId    String       @default("default-school")
-  title       String
-  description String?
-  imageUrl    String?
-  price       Float?
-  isPublished Boolean      @default(false)
-  categoryId  String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  attachments Attachment[]
-  chapters    Chapter[]
-  category    Category?    @relation(fields: [categoryId], references: [id])
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  purchases   Purchase[]
+model AIGeneratedContent {
+  id                String   @id
+  userId            String
+  type              String
+  title             String
+  content           String
+  subject           String
+  grade             String
+  topic             String
+  curriculum        String?
+  difficulty        String   @default("medium")
+  estimatedDuration Int      @default(45)
+  status            String   @default("draft")
+  usageCount        Int      @default(0)
+  rating            Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime
 
-  @@index([categoryId])
-  @@index([schoolId])
-}
-
-model Category {
-  id      String   @id @default(uuid())
-  name    String   @unique
-  courses Course[]
-}
-
-model Attachment {
-  id        String   @id @default(uuid())
-  name      String
-  url       String
-  courseId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@index([courseId])
-}
-
-model Chapter {
-  id           String         @id @default(uuid())
-  title        String
-  description  String?
-  videoUrl     String?
-  position     Int
-  isPublished  Boolean        @default(false)
-  isFree       Boolean        @default(false)
-  courseId     String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  muxData      MuxData?
-  userProgress UserProgress[]
-
-  @@index([courseId])
-}
-
-model MuxData {
-  id         String  @id @default(uuid())
-  assetId    String
-  playbackId String?
-  chapterId  String  @unique
-  chapter    Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-}
-
-model UserProgress {
-  id          String   @id @default(uuid())
-  userId      String
-  chapterId   String
-  isCompleted Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, chapterId])
-  @@index([chapterId])
-}
-
-model Purchase {
-  id        String   @id @default(uuid())
-  userId    String
-  courseId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, courseId])
-  @@index([courseId])
+  @@index([createdAt])
+  @@index([grade])
+  @@index([status])
+  @@index([subject])
+  @@index([type])
+  @@index([userId])
 }
 
 model Account {
-  id                String  @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
@@ -117,140 +52,179 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model Attachment {
+  id        String   @id
+  name      String
+  url       String
+  courseId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
 }
 
-model User {
-  id               String            @id @default(cuid())
-  name             String?
-  email            String            @unique
-  emailVerified    DateTime?
-  image            String?
-  password         String?
-  role             String            @default("STUDENT")
-  schoolId         String            @default("default-school")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  accounts         Account[]
-  chatMessages     ChatMessage[]
-  chatParticipants ChatParticipant[]
-  courses          Course[]
-  debateVotes      DebateVote[]
-  sessions         Session[]
-  stemProjects     STEMProject[]
+model Category {
+  id     String   @id
+  name   String   @unique
+  Course Course[]
+}
 
+model Chapter {
+  id           String         @id
+  title        String
+  description  String?
+  videoUrl     String?
+  position     Int
+  isPublished  Boolean        @default(false)
+  isFree       Boolean        @default(false)
+  courseId     String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  Course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  MuxData      MuxData?
+  UserProgress UserProgress[]
+
+  @@index([courseId])
+}
+
+model ChatMessage {
+  id                String        @id
+  roomId            String
+  senderId          String
+  content           String
+  type              String        @default("text")
+  replyToId         String?
+  isDeleted         Boolean       @default(false)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime
+  ChatMessage       ChatMessage?  @relation("ChatMessageToChatMessage", fields: [replyToId], references: [id])
+  other_ChatMessage ChatMessage[] @relation("ChatMessageToChatMessage")
+  ChatRoom          ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  User              User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model ChatParticipant {
+  id       String    @id
+  roomId   String
+  userId   String
+  role     String    @default("participant")
+  isActive Boolean   @default(true)
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+  ChatRoom ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  User     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model ChatRoom {
+  id              String            @id
+  name            String
+  description     String?
+  type            String            @default("1-1")
+  status          String            @default("active")
+  maxParticipants Int               @default(2)
+  schoolId        String?
+  createdBy       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  ChatMessage     ChatMessage[]
+  ChatParticipant ChatParticipant[]
+  DebateTopic     DebateTopic?
+}
+
+model Course {
+  id          String       @id
+  userId      String
+  schoolId    String       @default("default-school")
+  title       String
+  description String?
+  imageUrl    String?
+  price       Float?
+  isPublished Boolean      @default(false)
+  categoryId  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+  Attachment  Attachment[]
+  Chapter     Chapter[]
+  Category    Category?    @relation(fields: [categoryId], references: [id])
+  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Purchase    Purchase[]
+
+  @@index([categoryId])
   @@index([schoolId])
 }
 
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
+model DebateResult {
+  id            String      @id
+  topicId       String
+  participantId String
+  totalScore    Float
+  averageScore  Float
+  voteCount     Int
+  rank          Int
+  createdAt     DateTime    @default(now())
+  DebateTopic   DebateTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 }
 
-model STEMProject {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  category    String // Science, Technology, Engineering, Math
-  status      String // draft, in-progress, review, completed, published
-  difficulty  String // beginner, intermediate, advanced
-  progress    Int       @default(0)
-  isPublic    Boolean   @default(false)
-  thumbnail   String?
-  dueDate     DateTime?
-  userId      String // Creator/owner
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  // Relations
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  teamMembers STEMTeamMember[]
-  milestones  STEMMilestone[]
-  feedback    STEMFeedback[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([category])
+model DebateTopic {
+  id              String         @id
+  title           String
+  description     String?
+  category        String?
+  difficulty      String         @default("medium")
+  timeLimit       Int            @default(300)
+  maxParticipants Int            @default(2)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime
+  DebateResult    DebateResult[]
+  ChatRoom        ChatRoom       @relation(fields: [id], references: [id])
+  DebateVote      DebateVote[]
 }
 
-model STEMTeamMember {
-  id        String   @id @default(cuid())
-  name      String
-  role      String
-  email     String
-  avatar    String?
-  projectId String
+model DebateVote {
+  id            String      @id
+  topicId       String
+  voterId       String
+  participantId String
+  score         Int
+  comment       String?
+  createdAt     DateTime    @default(now())
+  DebateTopic   DebateTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  User          User        @relation(fields: [voterId], references: [id], onDelete: Cascade)
+
+  @@unique([topicId, voterId, participantId])
+}
+
+model MuxData {
+  id         String  @id
+  assetId    String
+  playbackId String?
+  chapterId  String  @unique
+  Chapter    Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+}
+
+model Purchase {
+  id        String   @id
+  userId    String
+  courseId  String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime
+  Course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
-  project STEMProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-}
-
-model STEMMilestone {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  status      String // pending, in-progress, completed
-  dueDate     DateTime?
-  completedAt DateTime?
-  projectId   String
-  position    Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  project      STEMProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  deliverables STEMDeliverable[]
-
-  @@index([projectId])
-}
-
-model STEMDeliverable {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  type        String // image, video, document, code, presentation
-  url         String?
-  milestoneId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  milestone STEMMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
-
-  @@index([milestoneId])
-}
-
-model STEMFeedback {
-  id         String   @id @default(cuid())
-  author     String
-  content    String
-  type       String // suggestion, approval, revision, question
-  isResolved Boolean  @default(false)
-  projectId  String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  project STEMProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
+  @@unique([userId, courseId])
+  @@index([courseId])
 }
 
 model ResetToken {
-  id        String   @id @default(uuid())
+  id        String   @id
   email     String
   token     String   @unique
   expires   DateTime
@@ -261,124 +235,195 @@ model ResetToken {
   @@index([token])
 }
 
+model STEMDeliverable {
+  id            String        @id
+  title         String
+  description   String?
+  type          String
+  url           String?
+  milestoneId   String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime
+  STEMMilestone STEMMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([milestoneId])
+}
+
+model STEMFeedback {
+  id          String      @id
+  author      String
+  content     String
+  type        String
+  isResolved  Boolean     @default(false)
+  projectId   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  STEMProject STEMProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model STEMMilestone {
+  id              String            @id
+  title           String
+  description     String?
+  status          String
+  dueDate         DateTime?
+  completedAt     DateTime?
+  projectId       String
+  position        Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime
+  STEMDeliverable STEMDeliverable[]
+  STEMProject     STEMProject       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model STEMProject {
+  id             String           @id
+  title          String
+  description    String?
+  category       String
+  status         String
+  difficulty     String
+  progress       Int              @default(0)
+  isPublic       Boolean          @default(false)
+  thumbnail      String?
+  dueDate        DateTime?
+  userId         String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  STEMFeedback   STEMFeedback[]
+  STEMMilestone  STEMMilestone[]
+  User           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  STEMTeamMember STEMTeamMember[]
+
+  @@index([category])
+  @@index([status])
+  @@index([userId])
+}
+
+model STEMTeamMember {
+  id          String      @id
+  name        String
+  role        String
+  email       String
+  avatar      String?
+  projectId   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  STEMProject STEMProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model StripeCustomer {
-  id               String   @id @default(uuid())
+  id               String   @id
   userId           String   @unique
   stripeCustomerId String   @unique
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  updatedAt        DateTime
 }
 
-model ChatRoom {
-  id              String            @id @default(uuid())
-  name            String
-  description     String?
-  type            String            @default("1-1")
-  status          String            @default("active")
-  maxParticipants Int               @default(2)
-  schoolId        String?
-  createdBy       String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  messages        ChatMessage[]
-  participants    ChatParticipant[]
-  debateTopic     DebateTopic?
+model User {
+  id                    String            @id
+  name                  String?
+  email                 String            @unique
+  emailVerified         DateTime?
+  image                 String?
+  password              String?
+  role                  String            @default("STUDENT")
+  schoolId              String            @default("default-school")
+  xp                    Int               @default(0)
+  
+  // Account Security
+  failedLoginAttempts   Int               @default(0)
+  lockedUntil           DateTime?
+  lastLoginAt           DateTime?
+  lastLoginIp           String?
+  
+  // Two-Factor Authentication
+  twoFactorEnabled      Boolean           @default(false)
+  twoFactorSecret       String?
+  twoFactorBackupCodes  String[]          @default([])
+  
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime
+  
+  Account               Account[]
+  ChatMessage           ChatMessage[]
+  ChatParticipant       ChatParticipant[]
+  Course                Course[]
+  DebateVote            DebateVote[]
+  STEMProject           STEMProject[]
+  Session               Session[]
+  AuthLog               AuthLog[]
+  LabCompletion         LabCompletion[]
+
+  @@index([schoolId])
+  @@index([email])
 }
 
-model ChatParticipant {
-  id       String    @id @default(uuid())
-  roomId   String
-  userId   String
-  role     String    @default("participant")
-  isActive Boolean   @default(true)
-  joinedAt DateTime  @default(now())
-  leftAt   DateTime?
-  room     ChatRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model UserProgress {
+  id          String   @id
+  userId      String
+  chapterId   String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
-  @@unique([roomId, userId])
+  @@unique([userId, chapterId])
+  @@index([chapterId])
 }
 
-model ChatMessage {
-  id        String        @id @default(uuid())
-  roomId    String
-  senderId  String
-  content   String
-  type      String        @default("text")
-  replyToId String?
-  isDeleted Boolean       @default(false)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  replyTo   ChatMessage?  @relation("MessageReply", fields: [replyToId], references: [id])
-  replies   ChatMessage[] @relation("MessageReply")
-  room      ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  sender    User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
-model DebateTopic {
-  id              String         @id @default(uuid())
-  title           String
-  description     String?
-  category        String?
-  difficulty      String         @default("medium")
-  timeLimit       Int            @default(300)
-  maxParticipants Int            @default(2)
-  isActive        Boolean        @default(true)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  results         DebateResult[]
-  room            ChatRoom       @relation(fields: [id], references: [id])
-  votes           DebateVote[]
-}
-
-model DebateVote {
-  id            String      @id @default(uuid())
-  topicId       String
-  voterId       String
-  participantId String
-  score         Int
-  comment       String?
-  createdAt     DateTime    @default(now())
-  topic         DebateTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-  voter         User        @relation(fields: [voterId], references: [id], onDelete: Cascade)
-
-  @@unique([topicId, voterId, participantId])
-}
-
-model DebateResult {
-  id            String      @id @default(uuid())
-  topicId       String
-  participantId String
-  totalScore    Float
-  averageScore  Float
-  voteCount     Int
-  rank          Int
-  createdAt     DateTime    @default(now())
-  topic         DebateTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
-}
-
-model AIGeneratedContent {
-  id                String   @id @default(uuid())
-  userId            String // Teacher who generated this content
-  type              String // lesson, quiz, slides, video-script
-  title             String
-  content           String // JSON string of full content
-  subject           String
-  grade             String
-  topic             String
-  curriculum        String?
-  difficulty        String   @default("medium")
-  estimatedDuration Int      @default(45)
-  status            String   @default("draft") // draft, published, archived
-  usageCount        Int      @default(0)
-  rating            Float? // Optional rating by teacher
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+model AuthLog {
+  id          String   @id
+  userId      String?
+  email       String
+  action      String   // 'login', 'logout', 'register', 'password_reset', 'failed_login', '2fa_enabled', '2fa_verified'
+  status      String   // 'success', 'failed', 'blocked'
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?    // Additional context (e.g., failure reason, device info)
+  createdAt   DateTime @default(now())
+  User        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([type])
-  @@index([subject])
-  @@index([grade])
-  @@index([status])
+  @@index([email])
+  @@index([action])
   @@index([createdAt])
+}
+
+model LabCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  labId       String   // e.g., 'refraction', 'light-propagation', 'light-shadows'
+  labName     String
+  xpEarned    Int
+  parameters  Json?    // Store parameters used in the experiment
+  completedAt DateTime @default(now())
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, labId])
+  @@index([userId])
+  @@index([labId])
+  @@index([completedAt])
 }

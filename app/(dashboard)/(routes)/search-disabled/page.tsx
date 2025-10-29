@@ -1,3 +1,5 @@
+'use client';
+
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -6,9 +8,10 @@ import dynamic from "next/dynamic";
 import { db } from "@/lib/db";
 import { getCourses } from "@/actions/get-courses";
 import { CoursesList } from "@/components/courses-list";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const SearchPageClient = dynamic(() => import("./_components/search-page-client").then(mod => ({ default: mod.SearchPageClient })), {
-  loading: () => <div>Loading...</div>
+  loading: () => <div>{t('common.loading')}</div>
 });
 
 interface SearchPageProps {

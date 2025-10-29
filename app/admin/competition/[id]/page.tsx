@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, use, useEffect } from "react";
@@ -9,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import {
   ArrowLeft, Calendar, Clock, Users, Trophy, Award, 
   Code, Calculator, Eye, Edit, Trash2, Play, Pause, Square,
@@ -193,6 +197,7 @@ const AdminCompetitionDetailPage = ({ params }: CompetitionDetailProps) => {
   };
 
   const handleDeleteCompetition = () => {
+  const { t } = useLanguage();
     if (confirm("Bạn có chắc chắn muốn xóa cuộc thi này?")) {
       deleteCompetition(competition.id);
       router.push("/admin/competition");
@@ -546,7 +551,8 @@ const AdminCompetitionDetailPage = ({ params }: CompetitionDetailProps) => {
                 <div className="flex items-center gap-4">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold">
                     {user.rank}
-                  </div>
+                  
+              <LanguageSwitcherCompact /></div>
                   <div>
                     <p className="font-medium">{user.userName}</p>
                     <p className="text-sm text-muted-foreground">

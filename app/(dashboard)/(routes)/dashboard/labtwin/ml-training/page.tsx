@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -27,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Types
 interface TrainingConfig {
@@ -70,6 +73,8 @@ interface Model {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function MLTrainingPage() {
+  const { t } = useLanguage();
+  
   // State
   const [selectedDataset, setSelectedDataset] = useState('mnist');
   const [customHfDataset, setCustomHfDataset] = useState('');
@@ -250,7 +255,7 @@ export default function MLTrainingPage() {
   };
 
   const downloadModel = async (modelId: string, format: string = 'h5') => {
-    window.open(`${API_URL}/api/ml/models/${modelId}/download?format=${format}`, '_blank');
+    typeof window !== 'undefined' && window.open(`${API_URL}/api/ml/models/${modelId}/download?format=${format}`, '_blank');
   };
 
   const deleteModel = async (modelId: string) => {
@@ -317,7 +322,8 @@ export default function MLTrainingPage() {
               <Brain className="h-8 w-8 text-white" />
             </div>
             ML Model Training
-          </h1>
+          
+              </h1>
           <p className="text-muted-foreground mt-2">
             Train handwriting recognition models with real-time visualization
           </p>

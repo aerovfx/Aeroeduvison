@@ -295,3 +295,4 @@ function getSimEmoji(category: string): string {
 }
 
 
+

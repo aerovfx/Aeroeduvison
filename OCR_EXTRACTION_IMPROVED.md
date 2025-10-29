@@ -625,3 +625,4 @@ Document type detection: 95% accuracy
 
 **Test at:** http://localhost:3000/dashboard/labtwin/labs/ocr-simulation
 
+

@@ -1,5 +1,9 @@
+'use client';
+
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 const CourseIdPage = async ({
   params

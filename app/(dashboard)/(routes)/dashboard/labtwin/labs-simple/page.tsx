@@ -1,9 +1,14 @@
+'use client';
+
 "use client"
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function LabsSimplePage() {
+  const { t } = useLanguage();
+  
   const [labsData, setLabsData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +26,7 @@ export default function LabsSimplePage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return <div className="p-8">{t('common.loading')}</div>;
   }
 
   if (!labsData) {
@@ -45,7 +50,8 @@ export default function LabsSimplePage() {
               <span className="text-xs bg-blue-100 px-2 py-1 rounded">{sim.category}</span>
               <span className="text-xs bg-gray-100 px-2 py-1 rounded">{sim.level}</span>
               <span className="text-xs bg-yellow-100 px-2 py-1 rounded">+{sim.xp} XP</span>
-            </div>
+            
+              </div>
             <Link 
               href={`/dashboard/labtwin/labs/${sim.id}`}
               className="inline-block bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -58,5 +64,4 @@ export default function LabsSimplePage() {
     </div>
   );
 }
-
 

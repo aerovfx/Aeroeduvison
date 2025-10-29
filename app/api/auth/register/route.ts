@@ -1,77 +1,123 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { hash } from 'bcryptjs'
-import { db } from '@/lib/db'
-import { z } from 'zod'
+import { NextResponse } from 'next/server';
+import { hash } from 'bcryptjs';
+import { db } from '@/lib/db';
+import { sendVerificationEmail } from '@/lib/email/verification-email';
+import { validatePassword } from '@/lib/password-validation';
+import { logAuthEvent } from '@/lib/auth-logger';
+import crypto from 'crypto';
 
-// Validation schema
-const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['STUDENT', 'TEACHER']).default('STUDENT')
-})
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    
+    const body = await req.json();
+    const { email, password, name, role } = body;
+
     // Validate input
-    const validatedData = registerSchema.parse(body)
-    
-    const { name, email, password, role } = validatedData
-    
-    // Normalize email
-    const normalizedEmail = email.toLowerCase().trim()
-    
+    if (!email || !password || !name) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Validate password strength
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      return NextResponse.json(
+        { 
+          error: 'Password does not meet requirements',
+          errors: passwordValidation.errors
+        },
+        { status: 400 }
+      );
+    }
+
     // Check if user already exists
     const existingUser = await db.user.findUnique({
-      where: { email: normalizedEmail }
-    })
-    
+      where: { email }
+    });
+
     if (existingUser) {
       return NextResponse.json(
-        { message: 'User with this email already exists' },
+        { error: 'User with this email already exists' },
         { status: 400 }
-      )
+      );
     }
-    
+
+    console.log('[REGISTER] Creating new user:', email);
+
     // Hash password
-    const hashedPassword = await hash(password, 12)
+    const hashedPassword = await hash(password, 10);
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const tokenExpiry = new Date();
+    tokenExpiry.setHours(tokenExpiry.getHours() + 24); // 24 hours
+
+    // Create user with pending status
+    const userId = `user_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     
-    // Create user
     const user = await db.user.create({
       data: {
+        id: userId,
+        email,
         name,
-        email: normalizedEmail,
         password: hashedPassword,
-        role,
-        emailVerified: new Date(),
-        isActive: true,
-        loginAttempts: 0,
+        role: role || 'STUDENT',
+        emailVerified: null, // Not verified yet
+        updatedAt: new Date()
       }
-    })
-    
-    // Return success (without password)
-    const { password: _, ...userWithoutPassword } = user
-    
+    });
+
+    console.log('[REGISTER] User created:', user.email, '(ID:', user.id, ')');
+
+    // Create verification token in database
+    await db.verificationToken.create({
+      data: {
+        identifier: user.email,
+        token: verificationToken,
+        expires: tokenExpiry
+      }
+    });
+
+    console.log('[REGISTER] Verification token created');
+
+    // Send verification email
+    await sendVerificationEmail({
+      email: user.email,
+      name: user.name || 'User',
+      verificationToken
+    });
+
+    console.log('[REGISTER] Verification email sent');
+
+    // Log registration event
+    await logAuthEvent({
+      userId: user.id,
+      email: user.email,
+      action: 'register',
+      status: 'success',
+      metadata: { role: user.role }
+    });
+
     return NextResponse.json({
-      message: 'User created successfully',
-      user: userWithoutPassword
-    }, { status: 201 })
-    
-  } catch (error) {
-    console.error('Registration error:', error)
-    
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { message: 'Validation error', errors: error.errors },
-        { status: 400 }
-      )
-    }
-    
+      success: true,
+      message: 'Account created successfully. Please check your email to verify your account.',
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    }, { status: 201 });
+
+  } catch (error: any) {
+    console.error('[REGISTER] Error:', error);
     return NextResponse.json(
-      { message: 'Internal server error' },
+      { 
+        error: 'Failed to create account',
+        message: error.message 
+      },
       { status: 500 }
-    )
+    );
   }
 }

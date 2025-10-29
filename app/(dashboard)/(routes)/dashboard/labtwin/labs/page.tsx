@@ -1,6 +1,9 @@
+'use client';
+
 "use client"
 
 import { useState, useEffect } from "react";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +27,8 @@ const iconMap: { [key: string]: any } = {
 };
 
 export default function LabsIndexPage() {
+  const { t } = useLanguage();
+  
   const searchParams = useSearchParams();
   const categoryFilter = searchParams.get('category');
   
@@ -63,7 +68,7 @@ export default function LabsIndexPage() {
 
   // Group by category for stats
   const categorizedSims = labsData.simulations.reduce((acc: any, sim: any) => {
-    const category = sim.category || 'Other';
+    const category = sim.category || t('form.other');
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -99,8 +104,7 @@ export default function LabsIndexPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <div className="text-lg text-gray-700">Đang tải...</div>
+                    <div className="text-lg text-gray-700">Đang tải...</div>
         </div>
       </div>
     );
@@ -158,20 +162,20 @@ export default function LabsIndexPage() {
                     </h3>
                     <p className="text-purple-700 text-sm mb-3">
                       Mỗi thí nghiệm là một trò chơi khoa học! Tương tác, thử nghiệm, và khám phá cách mọi thứ hoạt động. 
-                      Code Python thật + Giao diện siêu đẹp = Học vừa vui vừa hiểu! 🎉
+                      Python simulations thật + WebGL visualization + AI integration = Học vừa vui vừa hiểu! 🎉
                     </p>
                     <div className="flex flex-wrap gap-2 text-sm">
                       <Badge className="bg-white/80 text-purple-700 border border-purple-200">
-                        ✨ Python Magic
+                        🐍 Python Simulations
                       </Badge>
                       <Badge className="bg-white/80 text-pink-700 border border-pink-200">
-                        🎨 Beautiful UI
+                        🎮 WebGL Visualization
                       </Badge>
                       <Badge className="bg-white/80 text-orange-700 border border-orange-200">
-                        🚀 Real Science
+                        🤖 AI Integration
                       </Badge>
                       <Badge className="bg-white/80 text-blue-700 border border-blue-200">
-                        🎯 Super Fun
+                        🎯 Real Science
                       </Badge>
                     </div>
                   </div>
@@ -388,7 +392,7 @@ export default function LabsIndexPage() {
                         <Card className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100">
                           <div className="text-2xl mb-1">📚</div>
                           <div className="font-bold text-blue-700">{sim.level}</div>
-                          <div className="text-xs text-blue-600">Level</div>
+                          <div className="text-xs text-blue-600">{t('achievements.level')}</div>
                         </Card>
                         <Card className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100">
                           <div className="text-2xl mb-1">⏱️</div>
@@ -526,9 +530,27 @@ export default function LabsIndexPage() {
 
             <div className="mt-6 p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-700 mb-2">
-                <strong>Lệnh build:</strong>
+                <strong>Python Simulations đã chạy:</strong>
               </p>
-              <code className="block bg-gray-900 text-green-400 p-3 rounded font-mono text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-white p-3 rounded border">
+                  <div className="font-semibold text-purple-700">🧠 WFC Builder 3D</div>
+                  <div className="text-gray-600">Wave Function Collapse + WebGL</div>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                  <div className="font-semibold text-blue-700">🔧 Physics Engine 2D</div>
+                  <div className="text-gray-600">Collision detection + Dynamics</div>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                  <div className="font-semibold text-green-700">🧬 Neural Network</div>
+                  <div className="text-gray-600">Training + Visualization</div>
+                </div>
+                <div className="bg-white p-3 rounded border">
+                  <div className="font-semibold text-orange-700">🌊 Fluid Dynamics</div>
+                  <div className="text-gray-600">Navier-Stokes + WebGL</div>
+                </div>
+              </div>
+              <code className="block bg-gray-900 text-green-400 p-3 rounded font-mono text-sm mt-3">
                 cd python-simulations && python build-all.py
               </code>
             </div>
@@ -538,6 +560,9 @@ export default function LabsIndexPage() {
         {/* Footer */}
         <div className="mt-8 text-center text-sm text-gray-500">
           <p>🧪 Python Simulations System • Tích hợp với LabTwin</p>
+          <p className="mt-1">
+            <strong>Đã chạy:</strong> WFC Builder 3D, Physics Engine 2D, Neural Network, Fluid Dynamics, Genetic Algorithm, Ray Tracing 3D
+          </p>
           <p className="mt-1">
             Xem hướng dẫn tại: <code className="bg-gray-100 px-2 py-1 rounded">/python-simulations/README.md</code>
           </p>

@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -115,10 +117,10 @@ const mockUsers = [
 export const dynamic = 'force-dynamic'
 
 export default function ScrumboardModule() {
+  const { t } = useLanguage();
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { t } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
   const [boardData, setBoardData] = useState<Column[]>(columns);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -400,7 +402,7 @@ export default function ScrumboardModule() {
   }));
 
   if (status === "loading") {
-    return <div>Loading...</div>;
+    return <div>{t('common.loading')}</div>;
   }
 
   if (!session) {
@@ -598,7 +600,6 @@ export default function ScrumboardModule() {
           </DropdownMenu>
         </div>
       </div>
-
 
       {/* Kanban Board */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

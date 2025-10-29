@@ -1,3 +1,5 @@
+'use client';
+
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -5,6 +7,8 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   BookOpen, 
   Users, 
@@ -34,6 +38,7 @@ import {
  */
 
 export default async function BlockingPage() {
+  const { t } = useLanguage();
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.email) {
@@ -178,7 +183,8 @@ export default async function BlockingPage() {
           <p className="text-muted-foreground">
             Welcome back! Here&apos;s what&apos;s happening in your LMS.
           </p>
-        </div>
+        
+              <LanguageSwitcherCompact /></div>
         <div className="flex items-center space-x-2">
           <Badge variant={user.role === 'ADMIN' ? 'destructive' : 'secondary'}>
             {user.role}

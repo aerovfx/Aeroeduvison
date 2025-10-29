@@ -1,9 +1,14 @@
+'use client';
+
 "use client"
 
 import { useState } from "react";
 import Link from "next/link";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SimulationsSimplePage() {
+  const { t } = useLanguage();
+  
   const simulations = [
     {
       id: "refraction",
@@ -72,7 +77,8 @@ export default function SimulationsSimplePage() {
         >
           Mở Video Tracking Tool →
         </Link>
-      </div>
+      
+              </div>
 
       {/* How it works */}
       <div className="mt-12 bg-white border rounded-lg p-8">
@@ -103,5 +109,4 @@ export default function SimulationsSimplePage() {
     </div>
   );
 }
-
 

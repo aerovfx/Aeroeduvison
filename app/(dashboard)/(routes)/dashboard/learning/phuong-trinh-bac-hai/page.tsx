@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Play, 
   CheckCircle, 
@@ -22,6 +25,8 @@ import {
 } from "lucide-react";
 
 export default function PhuongTrinhBacHaiPage() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [userAnswer1, setUserAnswer1] = useState("");
@@ -115,7 +120,8 @@ export default function PhuongTrinhBacHaiPage() {
             </div>
           </div>
         </div>
-      </div>
+      
+              </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Progress */}

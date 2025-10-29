@@ -1,10 +1,16 @@
+'use client';
+
 "use client"
 
 import { useEffect, useState } from "react"
 import { signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 export default function ClearSessionPage() {
+  const { t } = useLanguage();
+
   const router = useRouter()
   const [status, setStatus] = useState("Clearing all session data...")
   const [steps, setSteps] = useState<string[]>([])
@@ -60,7 +66,9 @@ export default function ClearSessionPage() {
 
         // Redirect after 3 seconds
         setTimeout(() => {
-          window.location.href = "/sign-in"
+          if (typeof window !== 'undefined') {
+            location.href = "/sign-in";
+          }
         }, 3000)
 
       } catch (error) {
@@ -105,14 +113,19 @@ export default function ClearSessionPage() {
 
         <div className="mt-4 text-center">
           <button
-            onClick={() => window.location.href = "/sign-in"}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                location.href = "/sign-in";
+              }
+            }}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             Go to Sign In
           </button>
         </div>
       </div>
-    </div>
+    
+              <LanguageSwitcherCompact /></div>
   )
 }
 

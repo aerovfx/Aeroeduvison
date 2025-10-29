@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import LinkIcon from "next/link";
 import { useState, useEffect, Suspense } from "react";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft,
   Save,
@@ -89,6 +90,7 @@ interface STEMProject {
 }
 
 const CreateSTEMProject = () => {
+  const { t } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [newMilestone, setNewMilestone] = useState({ title: "", description: "", dueDate: "" });
@@ -187,7 +189,7 @@ const CreateSTEMProject = () => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Redirect to project detail
-      window.location.href = `/dashboard/stem/1`;
+      if (typeof window !== 'undefined') { location.href = `/dashboard/stem/1`; }
     } catch (error) {
       console.error("Error saving project:", error);
       alert("Có lỗi xảy ra khi lưu dự án. Vui lòng thử lại.");
@@ -315,13 +317,18 @@ const CreateSTEMProject = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Tạo dự án STEM mới</h1>
                 <p className="text-gray-600">Bắt đầu một dự án STEM sáng tạo và thú vị</p>
+              
               </div>
             </div>
             <div className="flex items-center gap-3">
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => window.location.href = "/dashboard/stem"}
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    location.href = "/dashboard/stem";
+                  }
+                }}
               >
                 Hủy
               </Button>
@@ -786,7 +793,11 @@ const CreateSTEMProject = () => {
                   variant="outline" 
                   size="sm" 
                   className="w-full"
-                  onClick={() => window.location.href = "/dashboard/stem"}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      location.href = "/dashboard/stem";
+                    }
+                  }}
                 >
                   Hủy bỏ
                 </Button>
@@ -801,8 +812,10 @@ const CreateSTEMProject = () => {
 
 // Component wrapper với Suspense boundary
 const CreateSTEMProjectWithSuspense = () => {
+  const { t } = useLanguage();
+  
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div>{t('common.loading')}</div>}>
       <CreateSTEMProject />
     </Suspense>
   );

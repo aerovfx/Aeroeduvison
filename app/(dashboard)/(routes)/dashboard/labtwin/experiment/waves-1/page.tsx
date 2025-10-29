@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState, useRef, useEffect } from "react";
@@ -7,8 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Play, Pause, RotateCcw, Waves, Clock, Target, BarChart3 } from "lucide-react";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function MechanicalWaveExperiment() {
+  const { t } = useLanguage();
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [isRunning, setIsRunning] = useState(false);
@@ -230,7 +235,8 @@ export default function MechanicalWaveExperiment() {
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-green-500 rounded-xl text-white">
               <Waves className="h-8 w-8" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Sóng cơ học</h1>
               <p className="text-gray-600 mt-1">Mô phỏng sóng dọc và sóng ngang</p>

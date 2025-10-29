@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -5,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   Kanban, 
   Plus, 
@@ -57,6 +61,7 @@ interface Sprint {
 }
 
 const AgileManagement = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -128,7 +133,7 @@ const AgileManagement = () => {
         status: "todo",
         dueDate: "2024-12-30",
         estimatedHours: 25,
-        tags: ["Performance", "Database"],
+        tags: [t('analytics.performance'), "Database"],
         createdAt: "2024-12-10"
       }
     ]
@@ -236,7 +241,8 @@ const AgileManagement = () => {
               <p className="text-gray-600">
                 Quản lý kế hoạch, giao bài tập và theo dõi tiến độ dự án
               </p>
-            </div>
+            
+              <LanguageSwitcherCompact /></div>
             <div className="flex gap-3">
               <Button variant="outline">
                 <Calendar className="h-4 w-4 mr-2" />

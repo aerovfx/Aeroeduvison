@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import Link from "next/link";
@@ -5,6 +7,8 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   Target,
   Users,
@@ -80,6 +84,7 @@ interface LearningPathAnalytics {
 }
 
 const LearningPathAnalyticsPage = () => {
+  const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState("30d");
 
   const analytics: LearningPathAnalytics = {
@@ -256,7 +261,7 @@ const LearningPathAnalyticsPage = () => {
             <span>/</span>
             <Link href="/admin/learning-path" className="hover:text-blue-600">Learning Path</Link>
             <span>/</span>
-            <span className="text-gray-900 font-medium">Analytics</span>
+            <span className="text-gray-900 font-medium">{t('analytics.title')}</span>
           </nav>
         </div>
 
@@ -315,7 +320,8 @@ const LearningPathAnalyticsPage = () => {
                 Permissions
               </Link>
             </Button>
-          </div>
+          
+              <LanguageSwitcherCompact /></div>
         </div>
 
         {/* Header */}

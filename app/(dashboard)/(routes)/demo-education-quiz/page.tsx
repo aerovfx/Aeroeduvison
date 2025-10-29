@@ -1,6 +1,9 @@
+'use client';
+
 "use client";
 
 import { EducationQuizInterface } from "@/components/education-quiz-interface";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Mock quiz data for demo - Chuẩn Bộ Giáo dục
 const educationQuizData = {
@@ -221,13 +224,15 @@ const educationQuizData = {
 };
 
 export default function DemoEducationQuizPage() {
+  const { t } = useLanguage();
+  
   const handleQuizSubmit = (answers: Record<number, number | boolean>) => {
     console.log("Quiz submitted with answers:", answers);
     alert(`Bài thi đã được nộp thành công! Bạn đã trả lời ${Object.keys(answers).length}/40 câu hỏi.`);
   };
 
   const handleBack = () => {
-    window.history.back();
+    typeof window !== 'undefined' && window.history.back();
   };
 
   return (

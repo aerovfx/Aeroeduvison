@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState } from "react"
@@ -7,8 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { toast } from "react-hot-toast"
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage();
+
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -74,7 +80,8 @@ export default function ForgotPasswordPage() {
                   Back to Sign In
                 </Button>
               </Link>
-            </div>
+            
+              <LanguageSwitcherCompact /></div>
           </CardContent>
         </Card>
       </div>
@@ -93,7 +100,7 @@ export default function ForgotPasswordPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('form.email')}</Label>
               <Input
                 id="email"
                 type="email"

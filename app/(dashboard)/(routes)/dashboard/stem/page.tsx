@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -7,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Plus,
   Search,
@@ -92,6 +95,7 @@ interface STEMProject {
 }
 
 const StudentSTEMDashboard = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -195,8 +199,7 @@ const StudentSTEMDashboard = () => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải dự án STEM...</p>
+                    <p className="text-gray-600">Đang tải dự án STEM...</p>
         </div>
       </div>
     );

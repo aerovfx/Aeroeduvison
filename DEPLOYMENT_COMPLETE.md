@@ -1,124 +1,185 @@
-# 🎉 Deployment Setup Complete!
+# 🚀 Deployment Complete - Ready for Testing
 
-## ✅ Đã hoàn thành
+## ✅ Deployment Status
 
-### 1. Sửa lỗi Production
-- ✅ **Lỗi 404 static assets** đã được khắc phục hoàn toàn
-- ✅ **next.config.js** đã được cấu hình linh hoạt cho nhiều platform
-- ✅ **Production build** hoạt động tốt
+**Date:** October 27, 2025  
+**Service Revision:** lmsmath-app-00020-dbq  
+**Status:** ✅ SUCCESS
 
-### 2. Scripts Deployment
-- ✅ `scripts/deploy-production.sh` - Test production build locally
-- ✅ `scripts/deploy-vercel.sh` - Deploy lên Vercel
-- ✅ `scripts/setup-oauth.ts` - Kiểm tra OAuth setup
-- ✅ `scripts/test-auth.ts` - Test authentication
+### Environment Variables
+- ✅ `DATABASE_URL` - Prisma Accelerate (valid API key)
+- ✅ `NEXTAUTH_URL` - https://inphysic.com
+- ✅ `NEXTAUTH_SECRET` - Generated and set
+- ✅ `NODE_ENV` - production
 
-### 3. Documentation
-- ✅ `PRODUCTION_DEPLOYMENT_GUIDE.md` - Hướng dẫn chi tiết
-- ✅ `AUTH_STATUS_SUMMARY.md` - Tóm tắt trạng thái auth
+### Build Status
+- ✅ Build completed successfully
+- ✅ Docker image pushed to gcr.io
+- ✅ Cloud Run service deployed
+- ✅ Traffic routed to new revision
 
-## 🚀 Cách deploy
+### Health Checks
+- ✅ Database Connection: **Working** (50 users)
+- ✅ Health Endpoint: **OK**
+- ✅ Service URL: https://inphysic.com
 
-### Option 1: Vercel (Khuyến nghị)
+## 🔧 Fixes Applied
+
+### 1. Database Connection (Fixed)
+- **Issue:** Invalid Prisma Accelerate API key
+- **Solution:** Updated with valid API key
+- **Status:** ✅ Connected to database with 50 users
+
+### 2. Authentication Redirect (Fixed)
+- **Issue:** Missing redirect callback in NextAuth
+- **Solution:** Added redirect callback to handle `callbackUrl`
+- **Status:** ✅ Callback implemented in `lib/auth.ts`
+
+### 3. Environment Variables (Fixed)
+- **Issue:** Missing NEXTAUTH_URL and NEXTAUTH_SECRET
+- **Solution:** Set all required environment variables
+- **Status:** ✅ All variables configured correctly
+
+## 🧪 How to Test
+
+### Test Login Flow
+
+1. **Clear Browser Data:**
+   - Open DevTools (F12)
+   - Application → Storage → Clear site data
+   - Or use Incognito/Private window
+
+2. **Visit Login Page:**
+   ```
+   https://inphysic.com/auth/login
+   ```
+
+3. **Login Credentials:**
+   - Email: `teacher@example.com`
+   - Password: `teacher123`
+   
+   OR
+   
+   - Email: `student@example.com`
+   - Password: `student123`
+
+4. **Expected Behavior:**
+   - ✅ Login successful (toast message)
+   - ✅ Automatic redirect to `/dashboard`
+   - ✅ Session cookie set (`next-auth.session-token`)
+   - ✅ User data visible on dashboard
+
+### Check Network Tab
+
+1. Open DevTools → Network
+2. Login with credentials
+3. Look for:
+   - ✅ POST `/api/auth/callback/credentials` → 200 OK
+   - ✅ Header: `Set-Cookie: next-auth.session-token`
+   - ✅ Response: `{ ok: true }`
+
+### Check Application Tab
+
+1. Open DevTools → Application → Cookies
+2. Should see:
+   - ✅ `next-auth.session-token` cookie
+   - ✅ Domain: `inphysic.com`
+   - ✅ Secure: true (HTTPS only)
+
+## 📊 Verification Steps
+
+### 1. Test Database Connection
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Login to Vercel
-vercel login
-
-# Deploy
-bash scripts/deploy-vercel.sh
+curl https://inphysic.com/api/test-db
 ```
+Expected: `{"success":true,"userCount":50}`
 
-### Option 2: Test Production Build
+### 2. Test Health Check
 ```bash
-# Test production build locally
-bash scripts/deploy-production.sh
+curl https://inphysic.com/api/health
 ```
+Expected: `{"status":"ok","environment":"production"}`
 
-### Option 3: Manual Deploy
+### 3. Test Session Endpoint
 ```bash
-# Build
-npm run build
+curl https://inphysic.com/api/auth/session
+```
+Expected: `{}` (no session before login) or `{user: {...}}` (after login)
 
-# Deploy to your preferred platform
-# - Vercel: vercel --prod
-# - Netlify: Connect GitHub repo
-# - Railway: Connect GitHub repo
-# - Google Cloud Run: gcloud run deploy
+### 4. Check Logs
+```bash
+gcloud run services logs read lmsmath-app --region asia-east1 --limit 50
 ```
 
-## 🔑 Environment Variables cần thiết
+## 🎯 What Should Happen Now
 
-### Production (Bắt buộc)
-```env
-DATABASE_URL=postgresql://user:password@host:port/database
-NEXTAUTH_URL=https://your-domain.com
-NEXTAUTH_SECRET=your-secret-key-here
-```
+1. **User logs in** → `signIn()` called with credentials
+2. **Server validates** → Checks database for user
+3. **Session created** → JWT token generated
+4. **Cookie set** → `next-auth.session-token` set in browser
+5. **Client redirects** → Navigates to `/dashboard`
+6. **Dashboard loads** → Shows user data from session
 
-### Tùy chọn
-```env
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-supabase-anon-key
-```
+## ⚠️ If Still Not Working
 
-## 📋 Test Accounts
+Check these in order:
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@example.com | admin123 |
-| Teacher | teacher@example.com | teacher123 |
-| Student | student@example.com | student123 |
+### 1. Cookie Issues
+- **Symptom:** Login succeeds but redirects back to login
+- **Check:** DevTools → Application → Cookies
+- **Fix:** Ensure cookie `next-auth.session-token` exists
 
-## 🌐 URLs Test
+### 2. Session Not Persisting
+- **Symptom:** Session exists but disappears after redirect
+- **Check:** Network tab for session cookie header
+- **Fix:** Verify `useSecureCookies: true` in production
 
-- **Local Development**: http://localhost:3000
-- **Production**: https://your-domain.com
-- **Sign In**: https://your-domain.com/sign-in
-- **Dashboard**: https://your-domain.com/dashboard
+### 3. NEXTAUTH_URL Mismatch
+- **Symptom:** Redirects to wrong domain
+- **Check:** `gcloud run services describe lmsmath-app --format=...`
+- **Fix:** Ensure NEXTAUTH_URL matches your domain
 
-## ✅ Trạng thái hiện tại
+### 4. Callback URL Mismatch
+- **Symptom:** Shows error after login
+- **Check:** URL parameter `callbackUrl=/dashboard`
+- **Fix:** Verify redirect callback handles relative URLs
 
-### Hoạt động tốt:
-- ✅ Authentication system (email/password)
-- ✅ Database connection
-- ✅ User management
-- ✅ Role-based access
-- ✅ Production build
-- ✅ Static assets
-- ✅ UI/UX đầy đủ
+## 📝 Summary
 
-### Cần cấu hình (tùy chọn):
-- ⚠️ Google OAuth (cần keys)
-- ⚠️ Supabase (không bắt buộc)
-- ⚠️ Production database
+### ✅ Fixed Issues:
+1. Database connection (Prisma Accelerate API key)
+2. Added redirect callback to NextAuth
+3. Set all required environment variables
+4. Deployed to Cloud Run successfully
 
-## 🎯 Kết luận
+### 🚀 Ready for Testing:
+- ✅ Service running on https://inphysic.com
+- ✅ Database connected (50 users)
+- ✅ Authentication configured
+- ✅ Redirect callback implemented
 
-**Hệ thống đã sẵn sàng deploy!**
+### 🎯 Next Steps:
+1. Test login flow manually
+2. Verify redirect to /dashboard
+3. Check session persistence
+4. Test with multiple users
 
-- ✅ Lỗi 404 static assets đã được sửa
-- ✅ Production build hoạt động tốt
-- ✅ Authentication system hoàn chỉnh
-- ✅ Scripts deployment tự động
-- ✅ Documentation đầy đủ
+## 🔗 Useful Links
 
-**Bạn có thể deploy ngay bây giờ và trang [https://inphysic.com/sign-in](https://inphysic.com/sign-in) sẽ hoạt động bình thường!**
+- Service URL: https://inphysic.com
+- Health Check: https://inphysic.com/api/health
+- Database Test: https://inphysic.com/api/test-db
+- Login Page: https://inphysic.com/auth/login
+- Dashboard: https://inphysic.com/dashboard
+
+## 📞 Support
+
+If issues persist:
+1. Check Cloud Run logs
+2. Verify environment variables
+3. Test database connection
+4. Check browser DevTools for errors
 
 ---
 
-## 📞 Hỗ trợ
-
-Nếu gặp vấn đề:
-1. Chạy `bash scripts/deploy-production.sh` để test local
-2. Kiểm tra environment variables
-3. Xem `PRODUCTION_DEPLOYMENT_GUIDE.md` để biết thêm chi tiết
-4. Check logs trong hosting platform
-
-**Happy deploying! 🚀**
-
-
+**Status: READY FOR TESTING** ✅

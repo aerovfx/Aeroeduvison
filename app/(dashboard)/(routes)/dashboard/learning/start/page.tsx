@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Play, 
   CheckCircle, 
@@ -18,6 +21,8 @@ import {
 } from "lucide-react";
 
 export default function StartLessonPage() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
 
@@ -86,7 +91,8 @@ export default function StartLessonPage() {
               <Badge className="bg-green-100 text-green-700">Bắt đầu</Badge>
             </div>
           </div>
-        </div>
+        
+              </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -184,7 +190,7 @@ export default function StartLessonPage() {
                       variant="outline"
                       onClick={() => {
                         localStorage.removeItem('completedLessons');
-                        window.location.reload();
+                        typeof window !== 'undefined' && location.reload();
                       }}
                     >
                       Reset All Progress

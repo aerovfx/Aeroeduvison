@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Sparkles, 
   BookOpen, 
@@ -48,6 +49,8 @@ interface GeneratedContent {
 }
 
 export default function AIContentGeneratorPage() {
+  const { t } = useLanguage();
+  
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -375,7 +378,7 @@ export default function AIContentGeneratorPage() {
               <a href="/teacher/quizzes/${saveData.contentId}" class="px-3 py-1 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
                 👁️ Xem Quiz
               </a>
-              <button onclick="window.location.href='/dashboard/ai-content-generator'" class="px-3 py-1 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600">
+              <button onclick="typeof window !== 'undefined' && location.href='/dashboard/ai-content-generator'" class="px-3 py-1 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600">
                 ✨ Tạo Quiz mới
               </button>
             </div>
@@ -427,7 +430,8 @@ export default function AIContentGeneratorPage() {
           <div className="flex items-center gap-4">
             <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
               <Sparkles className="h-8 w-8 text-white" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
                 AI Content Generator

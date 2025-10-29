@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useSession } from "next-auth/react";
@@ -8,8 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MessageCircle, Search, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ChatPage() {
+  const { t } = useLanguage();
+  
   const { data: session } = useSession();
   const [users, setUsers] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,7 +69,7 @@ export default function ChatPage() {
       if (response.ok) {
         const data = await response.json();
         // Refresh chat rooms or navigate to the new room
-        window.location.reload();
+        typeof window !== 'undefined' && location.reload();
       }
     } catch (error) {
       console.error('Error starting chat:', error);
@@ -88,7 +93,8 @@ export default function ChatPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Chat</h1>
           <p className="text-gray-600">Trò chuyện với bạn bè và giáo viên</p>
-        </div>
+        
+              </div>
         <Button 
           onClick={() => setShowUserList(!showUserList)}
           className="flex items-center gap-2"

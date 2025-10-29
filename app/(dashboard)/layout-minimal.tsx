@@ -44,21 +44,19 @@ const DashboardLayout = ({
       <div className="flex h-[calc(100vh-4rem)]">
         <div className="w-64 bg-white border-r">
           <div className="p-4 space-y-2">
-            <a href="/dashboard" className="block p-2 rounded hover:bg-gray-100">🏠 Dashboard</a>
-            <a href="/student-dashboard" className="block p-2 rounded hover:bg-gray-100">🏆 Bảng điều khiển</a>
-            <a href="/learning-paths-demo" className="block p-2 rounded hover:bg-gray-100">🗺️ Lộ trình học tập</a>
-            <a href="/dashboard/labtwin" className="block p-2 rounded bg-blue-100 text-blue-700 font-medium">🧪 LabTwin - Phòng thí nghiệm ảo</a>
-            <a href="/dashboard/learning" className="block p-2 rounded hover:bg-gray-100">🎓 Học tập</a>
-            <a href="/dashboard/courses" className="block p-2 rounded hover:bg-gray-100">📚 My Courses</a>
+            <a href="/dashboard" className="block p-2 rounded hover:bg-gray-100">📊 Dashboard</a>
+            <a href="/learning-paths" className="block p-2 rounded hover:bg-gray-100">🗺️ Learning Path</a>
+            <a href="/dashboard/analytics" className="block p-2 rounded hover:bg-gray-100">📈 Analytics</a>
+            <a href="/ai-tutor" className="block p-2 rounded bg-purple-100 text-purple-700 font-medium">🤖 AI Tutor</a>
+            <a href="/dashboard/emotion" className="block p-2 rounded hover:bg-gray-100">💝 Emotion Tracker</a>
             <a href="/dashboard/assignments" className="block p-2 rounded hover:bg-gray-100">📝 Assignments</a>
-            <a href="/dashboard/quizzes" className="block p-2 rounded hover:bg-gray-100">❓ Quizzes</a>
-            <a href="/dashboard/competition" className="block p-2 rounded hover:bg-gray-100">🏅 Cuộc thi</a>
-            <a href="/dashboard/stem" className="block p-2 rounded hover:bg-gray-100">⚡ STEM Projects</a>
-            <a href="/dashboard/notes" className="block p-2 rounded hover:bg-gray-100">📝 Ghi chú</a>
+            <a href="/dashboard/achievements" className="block p-2 rounded hover:bg-gray-100">🏆 Achievements</a>
+            <a href="/dashboard/notifications" className="block p-2 rounded hover:bg-gray-100">🔔 Notifications</a>
+            <a href="/dashboard/labtwin" className="block p-2 rounded hover:bg-gray-100">🧪 LabTwin</a>
+            <a href="/dashboard/stem" className="block p-2 rounded hover:bg-gray-100">🚀 STEM</a>
+            <a href="/dashboard/notes" className="block p-2 rounded hover:bg-gray-100">📝 Notes</a>
             <a href="/dashboard/scrumboard" className="block p-2 rounded hover:bg-gray-100">📋 Scrum Board</a>
             <a href="/dashboard/contacts" className="block p-2 rounded hover:bg-gray-100">👥 Danh bạ</a>
-            <a href="/dashboard/theme" className="block p-2 rounded hover:bg-gray-100">🎨 Theme Demo</a>
-            <a href="/search" className="block p-2 rounded hover:bg-gray-100">🔍 Browse</a>
           </div>
         </div>
 

@@ -534,3 +534,4 @@ GET  http://localhost:8013/ai/earthquake-alert/{id}
 Created: 2025-10-13
 
 
+

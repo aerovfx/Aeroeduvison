@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState, useRef, useCallback } from "react";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft, Upload, Play, Pause, SkipBack, SkipForward, 
   RotateCcw, Download, Camera, Target, Activity 
@@ -20,6 +23,8 @@ interface TrajectoryPoint {
 }
 
 export default function VideoTrackingPage() {
+  const { t } = useLanguage();
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,7 +217,8 @@ export default function VideoTrackingPage() {
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl text-white">
               <Camera className="h-8 w-8" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
                 🎬 Video Trajectory Tracking
@@ -315,7 +321,7 @@ export default function VideoTrackingPage() {
                 {/* Settings */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Settings</CardTitle>
+                    <CardTitle className="text-lg">{t('settings.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -374,7 +380,7 @@ export default function VideoTrackingPage() {
                 {/* Stats */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Statistics</CardTitle>
+                    <CardTitle className="text-lg">{t('dashboard.stats')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex justify-between">
@@ -454,5 +460,4 @@ export default function VideoTrackingPage() {
     </div>
   );
 }
-
 

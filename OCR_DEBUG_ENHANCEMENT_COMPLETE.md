@@ -333,3 +333,4 @@ White Ratio: 45% (Balanced)
 - Debug: `POST /api/ocr/debug` ⭐
 - Health: `GET /api/health`
 
+

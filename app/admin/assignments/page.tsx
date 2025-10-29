@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -5,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   FileText, 
   Plus, 
@@ -48,6 +52,7 @@ interface Assignment {
 }
 
 const AssignmentsManagement = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -169,7 +174,8 @@ const AssignmentsManagement = () => {
               <p className="text-gray-600">
                 Phân công và theo dõi bài tập về nhà
               </p>
-            </div>
+            
+              <LanguageSwitcherCompact /></div>
             <Button className="bg-blue-600 hover:bg-blue-700">
               <Plus className="h-4 w-4 mr-2" />
               Tạo bài tập mới

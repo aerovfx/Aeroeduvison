@@ -1,12 +1,12 @@
 {
   "id": "physics-motion",
   "name": "Chuyển động Vật lý",
-  "description": "Mô phỏng chuyển động vật lý: rơi tự do, ném xiên, dao động điều hòa với tính toán vị trí/vận tốc/gia tốc theo thời gian, hiển thị quỹ đạo trên Canvas, và AI model dự đoán chuyển động.",
+  "description": "Mô phỏng đầy đủ 7 loại chuyển động vật lý: rơi tự do, ném xiên, dao động điều hòa, thẳng đều, nhanh dần đều, tròn đều, con lắc đơn. Tính toán vị trí/vận tốc/gia tốc theo thời gian, visualization với vectors, real-time graphs, và AI prediction.",
   "category": "Vật lý",
   "level": "Lớp 10-12",
-  "duration": "60 phút",
-  "xp": 120,
-  "version": "1.0.0",
+  "duration": "90 phút",
+  "xp": 150,
+  "version": "2.0.0",
   "author": "LabTwin Team",
   "tags": [
     "vật lý",
@@ -14,32 +14,90 @@
     "rơi tự do",
     "ném xiên",
     "dao động điều hòa",
+    "chuyển động tròn",
+    "con lắc",
     "AI prediction",
-    "Canvas animation"
+    "Canvas animation",
+    "vectors",
+    "graphs"
   ],
   "features": [
-    "Rơi tự do với mọi điều kiện ban đầu",
-    "Ném xiên (projectile motion)",
-    "Dao động điều hòa (SHM)",
-    "Tính toán: vị trí, vận tốc, gia tốc",
-    "Biểu đồ thời gian thực",
-    "Canvas animation quỹ đạo",
-    "AI Linear Regression dự đoán",
-    "So sánh nhiều góc ném",
-    "10+ scenarios có sẵn"
+    "🔻 Rơi tự do với mọi điều kiện ban đầu",
+    "🎯 Ném xiên (projectile motion)",
+    "〰️ Dao động điều hòa (SHM)",
+    "➡️ Chuyển động thẳng đều",
+    "🚀 Chuyển động nhanh dần đều",
+    "⭕ Chuyển động tròn đều",
+    "🔶 Con lắc đơn",
+    "📊 Tính toán: vị trí, vận tốc, gia tốc, năng lượng",
+    "📈 Real-time graphs (position, velocity, acceleration)",
+    "🎨 Canvas animation với vector visualization",
+    "🤖 AI Linear Regression prediction",
+    "⚙️ Interactive parameter controls",
+    "🎬 Animation controls (play, pause, reset, speed)",
+    "21+ scenarios có sẵn"
   ],
   "api": {
     "enabled": true,
-    "port": 8004,
+    "port": 8007,
     "endpoints": [
       "/api/free-fall",
       "/api/projectile",
       "/api/harmonic",
+      "/api/uniform",
+      "/api/accelerated",
+      "/api/circular",
+      "/api/pendulum",
       "/api/predict",
       "/api/compare"
     ]
-  }
+  },
+  "motionTypes": [
+    {
+      "id": "free-fall",
+      "name": "Rơi tự do",
+      "icon": "🔻",
+      "equation": "h(t) = h₀ + v₀t - ½gt²"
+    },
+    {
+      "id": "projectile",
+      "name": "Ném xiên",
+      "icon": "🎯",
+      "equation": "x = v₀ₓt, y = h₀ + v₀ᵧt - ½gt²"
+    },
+    {
+      "id": "harmonic",
+      "name": "Dao động điều hòa",
+      "icon": "〰️",
+      "equation": "x = A cos(ωt + φ)"
+    },
+    {
+      "id": "uniform",
+      "name": "Thẳng đều",
+      "icon": "➡️",
+      "equation": "x = x₀ + vt"
+    },
+    {
+      "id": "accelerated",
+      "name": "Nhanh dần đều",
+      "icon": "🚀",
+      "equation": "x = x₀ + v₀t + ½at²"
+    },
+    {
+      "id": "circular",
+      "name": "Tròn đều",
+      "icon": "⭕",
+      "equation": "x = r cos(ωt), y = r sin(ωt)"
+    },
+    {
+      "id": "pendulum",
+      "name": "Con lắc đơn",
+      "icon": "🔶",
+      "equation": "θ = θ₀ cos(ω₀t), T = 2π√(L/g)"
+    }
+  ]
 }
+
 
 
 

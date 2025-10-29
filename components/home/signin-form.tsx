@@ -42,7 +42,7 @@ export const SignInForm = ({ authMethod }: SignInFormProps) => {
       const result = await signIn("credentials", {
         email: values.email,
         password: values.password,
-        redirect: false,
+        redirect: true,
         callbackUrl: "/dashboard",
       });
 
@@ -50,7 +50,7 @@ export const SignInForm = ({ authMethod }: SignInFormProps) => {
         toast.error("Invalid email or password");
       } else if (result?.ok) {
         toast.success("Signed in successfully!");
-        window.location.href = "/dashboard";
+        // NextAuth will handle redirect automatically with redirect: true
       }
     } catch (error) {
       console.error("Sign in error:", error);

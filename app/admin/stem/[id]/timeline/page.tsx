@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, use } from "react";
@@ -5,6 +7,8 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   ArrowLeft,
   Lightbulb,
@@ -506,7 +510,8 @@ const STEMProjectTimeline = ({ params }: { params: Promise<{ id: string }> }) =>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{project.title}</h1>
                 <p className="text-gray-600">Timeline dự án • {project.category}</p>
-              </div>
+              
+              <LanguageSwitcherCompact /></div>
             </div>
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" asChild>

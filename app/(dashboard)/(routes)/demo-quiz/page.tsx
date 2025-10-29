@@ -1,6 +1,9 @@
+'use client';
+
 "use client";
 
 import { StudentQuizInterface } from "@/components/student-quiz-interface";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Mock quiz data for demo - Chuẩn Bộ Giáo dục
 const demoQuizData = {
@@ -222,13 +225,15 @@ const demoQuizData = {
 };
 
 export default function DemoQuizPage() {
+  const { t } = useLanguage();
+  
   const handleQuizSubmit = (answers: Record<number, number>) => {
     console.log("Quiz submitted with answers:", answers);
     alert(`Quiz submitted! You answered ${Object.keys(answers).length} questions.`);
   };
 
   const handleBack = () => {
-    window.history.back();
+    typeof window !== 'undefined' && window.history.back();
   };
 
   return (
@@ -237,7 +242,8 @@ export default function DemoQuizPage() {
         <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold">Demo Quiz Interface - Chuẩn Bộ Giáo dục</h1>
           <p className="text-blue-100">Giao diện trắc nghiệm theo chuẩn THPT Quốc gia Việt Nam</p>
-        </div>
+        
+              </div>
       </div>
       
       <StudentQuizInterface

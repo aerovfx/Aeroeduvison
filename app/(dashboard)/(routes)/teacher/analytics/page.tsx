@@ -1,344 +1,333 @@
-"use client";
+'use client';
 
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line, PieChart, Pie, Cell, AreaChart, Area
-} from "recharts";
-import { 
-  Users, 
-  BookOpen, 
-  TrendingUp, 
-  DollarSign, 
-  Clock, 
-  Award, 
-  Star,
-  Target,
-  CheckCircle,
-  AlertCircle,
-  Download
-} from "lucide-react";
+import { useState, useEffect } from 'react';
+import { BarChart, TrendingUp, Users, Target, Calendar, Award, Brain, Zap } from 'lucide-react';
+import { updateButtonHandlers } from '../update-event-handlers';
+import { useLanguage } from '@/contexts/LanguageContext';
 
-// Mock data - replace with real API calls
-const mockAnalytics = {
-  totalStudents: 1250,
-  totalCourses: 8,
-  totalRevenue: 45231.89,
-  averageRating: 4.8,
-  completionRate: 78,
-  activeStudents: 573,
-  newEnrollments: 234,
-  totalHours: 2450,
-  studentGrowth: [
-    { month: "Jan", students: 800, revenue: 12000 },
-    { month: "Feb", students: 920, revenue: 15000 },
-    { month: "Mar", students: 1050, revenue: 18000 },
-    { month: "Apr", students: 1120, revenue: 20000 },
-    { month: "May", students: 1180, revenue: 22000 },
-    { month: "Jun", students: 1250, revenue: 25000 },
-  ],
-  coursePerformance: [
-    { name: "Algebra Basics", students: 450, revenue: 13500, completion: 85, rating: 4.9 },
-    { name: "Calculus Fundamentals", students: 320, revenue: 16000, completion: 78, rating: 4.7 },
-    { name: "Geometry Advanced", students: 280, revenue: 8400, completion: 72, rating: 4.6 },
-    { name: "Statistics Intro", students: 200, revenue: 7300, completion: 68, rating: 4.5 },
-  ],
-  studentProgress: [
-    { name: "Week 1", completed: 85, inProgress: 15 },
-    { name: "Week 2", completed: 78, inProgress: 22 },
-    { name: "Week 3", completed: 82, inProgress: 18 },
-    { name: "Week 4", completed: 88, inProgress: 12 },
-    { name: "Week 5", completed: 75, inProgress: 25 },
-    { name: "Week 6", completed: 90, inProgress: 10 },
-  ],
-  topStudents: [
-    { name: "Alice Johnson", courses: 5, progress: 95, score: 98, lastActive: "2 hours ago" },
-    { name: "Bob Smith", courses: 4, progress: 88, score: 94, lastActive: "1 day ago" },
-    { name: "Carol Davis", courses: 3, progress: 92, score: 96, lastActive: "3 hours ago" },
-    { name: "David Wilson", courses: 6, progress: 85, score: 91, lastActive: "5 hours ago" },
-    { name: "Emma Brown", courses: 2, progress: 78, score: 89, lastActive: "1 day ago" },
-  ],
-  assignments: [
-    { title: "Linear Equations Quiz", submissions: 234, averageScore: 87, dueDate: "2024-02-01" },
-    { title: "Calculus Derivatives", submissions: 189, averageScore: 82, dueDate: "2024-02-05" },
-    { title: "Geometry Proofs", submissions: 156, averageScore: 79, dueDate: "2024-02-08" },
-    { title: "Statistics Project", submissions: 98, averageScore: 91, dueDate: "2024-02-10" },
-  ],
-};
+interface AnalyticsData {
+  totalStudents: number;
+  averageScore: number;
+  completionRate: number;
+  engagementScore: number;
+  topPerformingStudents: Array<{
+    name: string;
+    score: number;
+    improvement: number;
+  }>;
+  strugglingStudents: Array<{
+    name: string;
+    score: number;
+    issues: string[];
+  }>;
+  subjectPerformance: Array<{
+    subject: string;
+    averageScore: number;
+    trend: 'up' | 'down' | 'stable';
+  }>;
+  weeklyProgress: Array<{
+    week: string;
+    completion: number;
+    averageScore: number;
+  }>;
+}
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
-export default function AnalyticsPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+export default function TeacherAnalyticsPage() {
+  const { t } = useLanguage();
+  
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'semester'>('month');
 
   useEffect(() => {
-    if (status === "loading") return;
-    
-    if (!session) {
-      router.push("/sign-in");
-      return;
-    }
+    // Simulate loading analytics data
+    const loadAnalytics = async () => {
+      setLoading(true);
+      
+      try {
+        console.log('📊 [Analytics] Loading teacher analytics...');
+        
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        const mockData: AnalyticsData = {
+          totalStudents: 25,
+          averageScore: 78.5,
+          completionRate: 85.2,
+          engagementScore: 72.8,
+          topPerformingStudents: [
+            { name: 'Nguyễn Văn A', score: 95, improvement: 12 },
+            { name: 'Trần Thị B', score: 92, improvement: 8 },
+            { name: 'Lê Văn C', score: 89, improvement: 15 }
+          ],
+          strugglingStudents: [
+            { name: 'Phạm Thị D', score: 45, issues: ['Đạo hàm', 'Tích phân'] },
+            { name: 'Hoàng Văn E', score: 52, issues: ['Cơ học', 'Động lực học'] }
+          ],
+          subjectPerformance: [
+            { subject: 'Toán học', averageScore: 82.3, trend: 'up' },
+            { subject: 'Vật lý', averageScore: 75.1, trend: 'stable' },
+            { subject: 'Hóa học', averageScore: 78.9, trend: 'up' }
+          ],
+          weeklyProgress: [
+            { week: 'Tuần 1', completion: 78, averageScore: 72 },
+            { week: 'Tuần 2', completion: 82, averageScore: 75 },
+            { week: 'Tuần 3', completion: 85, averageScore: 78 },
+            { week: 'Tuần 4', completion: 88, averageScore: 81 }
+          ]
+        };
+        
+        setAnalytics(mockData);
+        console.log('✅ [Analytics] Analytics loaded successfully');
+        
+      } catch (error) {
+        console.error('❌ [Analytics] Error loading analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (session.user.role !== "TEACHER") {
-      router.push("/dashboard");
-      return;
-    }
-  }, [session, status, router]);
+    loadAnalytics();
+  }, [selectedPeriod]);
 
-  if (status === "loading") {
+  const handlePeriodChange = (period: 'week' | 'month' | 'semester') => {
+    setSelectedPeriod(period);
+    updateButtonHandlers.handlePeriodChange(period);
+  };
+
+  const handleExportReport = () => {
+    updateButtonHandlers.handleExportReport('analytics');
+  };
+
+  const handleViewStudentDetail = (studentName: string) => {
+    updateButtonHandlers.handleViewStudent(`student_${studentName.toLowerCase().replace(/\s+/g, '_')}`, studentName);
+  };
+
+  if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">Đang tải dữ liệu phân tích...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      
+              </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-white rounded-xl shadow-lg p-8">
+            <div className="text-center">
+              <p className="text-gray-600">Không thể tải dữ liệu phân tích</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  if (!session || session.user.role !== "TEACHER") {
-    return null;
-  }
-
-  const {
-    totalStudents, 
-    totalCourses, 
-    totalRevenue,
-    averageRating, 
-    completionRate, 
-    activeStudents, 
-    newEnrollments,
-    studentGrowth,
-    coursePerformance,
-    studentProgress,
-    topStudents,
-    assignments
-  } = mockAnalytics;
-
-  return ( 
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Track your teaching performance and student progress</p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-white/20 rounded-xl">
+                <BarChart className="w-8 h-8" />
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold mb-2">📊 Phân tích Chi tiết</h1>
+                <p className="text-purple-100">Thống kê và phân tích hiệu suất học tập của lớp</p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              {/* Period Selector */}
+              <div className="flex bg-white/20 rounded-lg p-1">
+                {(['week', 'month', 'semester'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => handlePeriodChange(period)}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                      selectedPeriod === period
+                        ? 'bg-white text-purple-600'
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    {period === 'week' ? 'Tuần' : period === 'month' ? 'Tháng' : 'Học kỳ'}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={handleExportReport}
+                className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-colors"
+              >
+                Xuất báo cáo
+              </button>
+            </div>
+          </div>
         </div>
-        <Button>
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
-      </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalStudents.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              +{newEnrollments} new this month
-            </p>
-          </CardContent>
-        </Card>
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Tổng học sinh</p>
+                <p className="text-3xl font-bold text-blue-600">{analytics.totalStudents}</p>
+              </div>
+              <Users className="w-12 h-12 text-blue-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Điểm trung bình</p>
+                <p className="text-3xl font-bold text-green-600">{analytics.averageScore}%</p>
+              </div>
+              <TrendingUp className="w-12 h-12 text-green-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Tỷ lệ hoàn thành</p>
+                <p className="text-3xl font-bold text-purple-600">{analytics.completionRate}%</p>
+              </div>
+              <Target className="w-12 h-12 text-purple-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm">Mức độ tương tác</p>
+                <p className="text-3xl font-bold text-orange-600">{analytics.engagementScore}%</p>
+              </div>
+              <Zap className="w-12 h-12 text-orange-500" />
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              +12.5% from last month
-            </p>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Top Performing Students */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+              <Award className="w-6 h-6 mr-3 text-yellow-500" />
+              Học sinh xuất sắc
+            </h2>
+            <div className="space-y-4">
+              {analytics.topPerformingStudents.map((student, index) => (
+                <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                      <span className="text-yellow-600 font-bold">#{index + 1}</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{student.name}</h3>
+                      <p className="text-sm text-gray-600">Điểm: {student.score}%</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-green-600 font-semibold">+{student.improvement}%</p>
+                    <p className="text-xs text-gray-500">Cải thiện</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Rating</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{averageRating}/5.0</div>
-            <p className="text-xs text-muted-foreground">
-              Across {totalCourses} courses
-            </p>
-          </CardContent>
-        </Card>
+          {/* Struggling Students */}
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+              <Brain className="w-6 h-6 mr-3 text-red-500" />
+              Học sinh cần hỗ trợ
+            </h2>
+            <div className="space-y-4">
+              {analytics.strugglingStudents.map((student, index) => (
+                <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                      <span className="text-red-600 font-bold">!</span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{student.name}</h3>
+                      <p className="text-sm text-gray-600">Điểm: {student.score}%</p>
+                      <p className="text-xs text-red-600">Khó khăn: {student.issues.join(', ')}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleViewStudentDetail(student.name)}
+                    className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600 transition-colors"
+                  >
+                    Hỗ trợ
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{completionRate}%</div>
-            <p className="text-xs text-muted-foreground">
-              Course completion rate
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* Subject Performance */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Hiệu suất theo môn học</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {analytics.subjectPerformance.map((subject, index) => (
+              <div key={index} className="p-6 border border-gray-200 rounded-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{subject.subject}</h3>
+                  <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    subject.trend === 'up' ? 'bg-green-100 text-green-800' :
+                    subject.trend === 'down' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {subject.trend === 'up' ? '↗ Tăng' : subject.trend === 'down' ? '↘ Giảm' : '→ Ổn định'}
+                  </div>
+                </div>
+                <div className="text-3xl font-bold text-blue-600 mb-2">{subject.averageScore}%</div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-1000"
+                    style={{ width: `${subject.averageScore}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Student Growth Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Student Growth & Revenue</CardTitle>
-            <CardDescription>Monthly student enrollment and revenue trends</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={studentGrowth}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Area 
-                  yAxisId="left"
-                  type="monotone" 
-                  dataKey="students" 
-                  stackId="1" 
-                  stroke="#8884d8" 
-                  fill="#8884d8" 
-                />
-                <Area 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="revenue" 
-                  stackId="2" 
-                  stroke="#82ca9d" 
-                  fill="#82ca9d" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Course Performance */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Course Performance</CardTitle>
-            <CardDescription>Student enrollment and completion rates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={coursePerformance}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="students" fill="#8884d8" name="Students" />
-                <Bar dataKey="completion" fill="#82ca9d" name="Completion %" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top Students */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Performing Students</CardTitle>
-            <CardDescription>Students with highest scores and progress</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {topStudents.map((student, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-blue-600">
-                      {student.name.split(' ').map(n => n[0]).join('')}
-                    </span>
+        {/* Weekly Progress */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Tiến độ theo tuần</h2>
+          <div className="space-y-4">
+            {analytics.weeklyProgress.map((week, index) => (
+              <div key={index} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Calendar className="w-6 h-6 text-blue-600" />
                   </div>
                   <div>
-                    <p className="font-medium">{student.name}</p>
-                    <p className="text-sm text-muted-foreground">{student.courses} courses</p>
+                    <h3 className="font-semibold text-gray-900">{week.week}</h3>
+                    <p className="text-sm text-gray-600">Hoàn thành: {week.completion}%</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-green-600">{student.score}%</div>
-                  <Progress value={student.progress} className="w-16 h-2 mt-1" />
+                  <p className="text-2xl font-bold text-green-600">{week.averageScore}%</p>
+                  <p className="text-xs text-gray-500">Điểm TB</p>
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
-
-        {/* Assignment Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Assignments</CardTitle>
-            <CardDescription>Assignment submissions and performance</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {assignments.map((assignment, index) => (
-              <div key={index} className="p-3 border rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">{assignment.title}</h4>
-                  <Badge variant="outline">{assignment.submissions} submissions</Badge>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span>Avg Score: {assignment.averageScore}%</span>
-                  <span className="text-muted-foreground">Due: {assignment.dueDate}</span>
-                </div>
-                <Progress value={assignment.averageScore} className="h-2 mt-2" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Stats</CardTitle>
-            <CardDescription>Key performance indicators</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-600" />
-                <span className="text-sm">Active Students</span>
-              </div>
-              <span className="font-bold">{activeStudents}</span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-green-600" />
-                <span className="text-sm">Total Courses</span>
-              </div>
-              <span className="font-bold">{totalCourses}</span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm">Completion Rate</span>
-              </div>
-              <span className="font-bold">{completionRate}%</span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Award className="h-4 w-4 text-purple-600" />
-                <span className="text-sm">Avg Rating</span>
-              </div>
-              <span className="font-bold">{averageRating}/5</span>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
-   );
+  );
 }

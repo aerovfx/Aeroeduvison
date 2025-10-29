@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -170,10 +172,10 @@ const mockStudents = [
 ];
 
 export default function ContactsModule() {
+  const { t } = useLanguage();
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { t } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
   const [selectedTab, setSelectedTab] = useState("teachers");
   const [filterStatus, setFilterStatus] = useState("all");
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -194,7 +196,7 @@ export default function ContactsModule() {
   }, [session, status, router]);
 
   if (status === "loading") {
-    return <div>Loading...</div>;
+    return <div>{t('common.loading')}</div>;
   }
 
   if (!session) {

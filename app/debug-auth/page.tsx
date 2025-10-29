@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState } from "react"
@@ -6,8 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 export default function DebugAuthPage() {
+  const { t } = useLanguage();
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -125,7 +131,7 @@ export default function DebugAuthPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('form.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -135,7 +141,7 @@ export default function DebugAuthPage() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('form.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -172,7 +178,8 @@ export default function DebugAuthPage() {
         <Button onClick={testDatabase} variant="outline">
           Test Database Connection
         </Button>
-      </div>
+      
+              <LanguageSwitcherCompact /></div>
 
       {/* Error Display */}
       {error && (

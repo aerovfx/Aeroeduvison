@@ -1,9 +1,13 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -61,6 +65,7 @@ interface QuizAnalytics {
 }
 
 const QuizAnalyticsPage = () => {
+  const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState("7d");
 
   const analytics: QuizAnalytics = {
@@ -176,7 +181,7 @@ const QuizAnalyticsPage = () => {
             <span>/</span>
             <a href="/admin/quiz" className="hover:text-blue-600">Quiz Management</a>
             <span>/</span>
-            <span className="text-gray-900 font-medium">Analytics</span>
+            <span className="text-gray-900 font-medium">{t('analytics.title')}</span>
           </nav>
         </div>
 
@@ -229,7 +234,8 @@ const QuizAnalyticsPage = () => {
                 Permissions
               </a>
             </Button>
-          </div>
+          
+              <LanguageSwitcherCompact /></div>
         </div>
 
         {/* Header */}

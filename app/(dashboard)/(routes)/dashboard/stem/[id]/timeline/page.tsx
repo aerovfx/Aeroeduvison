@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -8,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft,
   Calendar,
@@ -148,8 +151,7 @@ const STEMProjectTimeline = ({ params }: { params: Promise<{ id: string }> }) =>
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-      </div>
+              </div>
     );
   }
 

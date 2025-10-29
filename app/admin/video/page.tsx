@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -5,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   Video, 
   Plus, 
@@ -48,6 +52,7 @@ interface VideoLesson {
 }
 
 const VideoManagement = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [courseFilter, setCourseFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -182,7 +187,8 @@ const VideoManagement = () => {
               <p className="text-gray-600">
                 Quản lý thư viện video bài giảng
               </p>
-            </div>
+            
+              <LanguageSwitcherCompact /></div>
             <div className="flex gap-3">
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />

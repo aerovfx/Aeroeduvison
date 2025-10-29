@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState } from "react";
 import { useSession } from "next-auth/react";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import {
   Plus, Search, Filter, Calendar, Clock, Users, Trophy, Award, 
   Code, Calculator, Eye, Edit, Trash2, Play, Pause, Square,
@@ -26,6 +28,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 const AdminCompetitionPage = () => {
+  const { t } = useLanguage();
   const { data: session } = useSession();
   const router = useRouter();
   const { competitions, deleteCompetition, updateCompetition } = useCompetition();
@@ -505,7 +508,8 @@ const AdminCompetitionPage = () => {
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold">
                             {user.rank}
-                          </div>
+                          
+              <LanguageSwitcherCompact /></div>
                           <div>
                             <p className="font-medium">{user.userName}</p>
                             <p className="text-sm text-muted-foreground">

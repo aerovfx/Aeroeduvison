@@ -1,47 +1,47 @@
 {
   "id": "motionsim",
-  "name": "MotionSim - Physics Motion",
-  "nameVi": "MotionSim - Chuyển động Vật lý",
+  "name": "MotionSim Pro",
+  "title": "Mô phỏng chuyển động nâng cao",
+  "description": "Chuyển động phức tạp với va chạm và tương tác",
   "version": "1.0.0",
-  "description": "Comprehensive physics motion simulation: free fall, projectile, harmonic oscillation with AI prediction",
-  "descriptionVi": "Mô phỏng chuyển động vật lý tổng hợp: rơi tự do, ném xiên, dao động điều hòa với AI dự đoán",
-  "category": "mechanics",
-  "difficulty": "easy",
-  "port": 8012,
-  "apiEndpoint": "http://localhost:8012",
+  "category": "Cơ học",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 250,
+  "icon": "Activity",
+  "tags": [
+    "motionsim",
+    "cơ học",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Free fall motion simulation",
-    "Projectile motion with trajectory",
-    "Simple harmonic oscillation",
-    "Position, velocity, acceleration graphs",
-    "Energy analysis (kinetic + potential)",
-    "AI parameter prediction",
-    "Interactive canvas visualization",
-    "Real-time calculations"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
-  "featuresVi": [
-    "Mô phỏng rơi tự do",
-    "Chuyển động ném xiên với quỹ đạo",
-    "Dao động điều hòa",
-    "Đồ thị vị trí, vận tốc, gia tốc",
-    "Phân tích năng lượng",
-    "AI dự đoán tham số",
-    "Trực quan hóa canvas tương tác",
-    "Tính toán real-time"
+  "learning_objectives": [
+    "Hiểu mô phỏng chuyển động nâng cao",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "tags": ["physics", "mechanics", "kinematics", "projectile", "harmonic", "motion"],
-  "requirements": {
-    "python": ">=3.8",
-    "memory": "128MB",
-    "cpu": "1 core"
+  "backend": {
+    "port": 8005,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
   },
-  "endpoints": {
-    "simulate": "/simulate",
-    "predict": "/predict",
-    "presets": "/presets",
-    "health": "/health"
-  },
-  "author": "LMS Math Team",
-  "license": "MIT"
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }
-

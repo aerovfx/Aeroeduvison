@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import LinkIcon from "next/link";
@@ -6,6 +8,7 @@ import { useSTEM } from "@/contexts/STEMContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft,
   Edit,
@@ -159,8 +162,7 @@ const STEMProjectDetail = ({ params }: { params: Promise<{ id: string }> }) => {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang tải dự án...</p>
+                    <p className="text-gray-600">Đang tải dự án...</p>
         </div>
       </div>
     );
@@ -194,7 +196,6 @@ const STEMProjectDetail = ({ params }: { params: Promise<{ id: string }> }) => {
       </div>
     );
   }
-
 
   const getStatusBadge = (status: string) => {
     switch (status) {

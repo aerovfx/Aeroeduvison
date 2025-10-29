@@ -706,7 +706,7 @@ const AeroschoolLearning: React.FC = () => {
                   <Button 
                     variant="outline" 
                     className="w-full border-white text-white hover:bg-white/10"
-                    onClick={() => window.location.href = '/sign-in'}
+                    onClick={() => window.location.href = '/auth/login'}
                   >
                     ĐĂNG NHẬP
                   </Button>

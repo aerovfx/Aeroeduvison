@@ -9,6 +9,7 @@ async function main() {
     where: { name: 'Algebra' },
     update: {},
     create: {
+      id: 'algebra-category',
       name: 'Algebra',
     },
   })
@@ -17,6 +18,7 @@ async function main() {
     where: { name: 'Geometry' },
     update: {},
     create: {
+      id: 'geometry-category',
       name: 'Geometry',
     },
   })
@@ -25,6 +27,7 @@ async function main() {
     where: { name: 'Calculus' },
     update: {},
     create: {
+      id: 'calculus-category',
       name: 'Calculus',
     },
   })
@@ -32,42 +35,49 @@ async function main() {
   // Create multiple test users
   const users = [
     {
+      id: 'admin-user',
       email: 'admin@example.com',
       name: 'Admin User',
       password: 'admin123',
       role: 'ADMIN' as const,
     },
     {
+      id: 'teacher-user',
       email: 'teacher@example.com',
       name: 'John Teacher',
       password: 'teacher123',
       role: 'TEACHER' as const,
     },
     {
+      id: 'teacher2-user',
       email: 'teacher2@example.com',
       name: 'Sarah Teacher',
       password: 'teacher123',
       role: 'TEACHER' as const,
     },
     {
+      id: 'student-user',
       email: 'student@example.com',
       name: 'Alice Student',
       password: 'student123',
       role: 'STUDENT' as const,
     },
     {
+      id: 'student2-user',
       email: 'student2@example.com',
       name: 'Bob Student',
       password: 'student123',
       role: 'STUDENT' as const,
     },
     {
+      id: 'student3-user',
       email: 'student3@example.com',
       name: 'Charlie Student',
       password: 'student123',
       role: 'STUDENT' as const,
     },
     {
+      id: 'student4-user',
       email: 'student4@example.com',
       name: 'Diana Student',
       password: 'student123',
@@ -82,10 +92,12 @@ async function main() {
       where: { email: user.email },
       update: {},
       create: {
+        id: user.id,
         name: user.name,
         email: user.email,
         password: hashedPassword,
         role: user.role,
+        updatedAt: new Date(),
       },
     })
     createdUsers.push(createdUser)
@@ -107,6 +119,7 @@ async function main() {
       isPublished: true,
       userId: teacher.id,
       categoryId: algebraCategory.id,
+      updatedAt: new Date(),
     },
   })
 
@@ -121,6 +134,7 @@ async function main() {
       isPublished: true,
       userId: teacher.id,
       categoryId: geometryCategory.id,
+      updatedAt: new Date(),
     },
   })
 
@@ -136,6 +150,7 @@ async function main() {
       isPublished: true,
       isFree: true,
       courseId: course1.id,
+      updatedAt: new Date(),
     },
   })
 
@@ -150,6 +165,7 @@ async function main() {
       isPublished: true,
       isFree: false,
       courseId: course1.id,
+      updatedAt: new Date(),
     },
   })
 
@@ -164,6 +180,7 @@ async function main() {
       isPublished: true,
       isFree: true,
       courseId: course2.id,
+      updatedAt: new Date(),
     },
   })
 

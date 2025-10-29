@@ -1,9 +1,14 @@
+'use client';
+
 "use client"
 
 import { useState } from "react";
 import { QuizletStyleLearning } from "@/components/quizlet-style-learning";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SinhHocLearnPage() {
+  const { t } = useLanguage();
+  
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [showResult, setShowResult] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -111,7 +116,7 @@ export default function SinhHocLearnPage() {
     } else {
       // Quiz completed - redirect to learning path page
       setTimeout(() => {
-        window.location.href = '/learning-paths-demo/sinh-hoc';
+        if (typeof window !== 'undefined') { location.href = '/learning-paths-demo/sinh-hoc'; }
       }, 3000); // Wait 3 seconds to show celebration
     }
   };

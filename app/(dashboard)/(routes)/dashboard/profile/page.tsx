@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useSession } from "next-auth/react"
@@ -9,8 +11,11 @@ import { Label } from "@/components/ui/label"
 import { User, Mail, Shield, Calendar } from "lucide-react"
 import { useState } from "react"
 import Link from "next/link"
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ProfilePage() {
+  const { t } = useLanguage();
+  
   const { data: session } = useSession()
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(session?.user?.name || "")
@@ -66,7 +71,8 @@ export default function ProfilePage() {
               {user.name
                 ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
                 : user.email?.[0]?.toUpperCase() || "U"}
-            </div>
+            
+              </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold">{user.name}</h2>
               <p className="text-gray-600">{user.email}</p>

@@ -9,7 +9,7 @@ import { LanguageProvider } from '@/contexts/LanguageContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'LabTwin - Interactive Learning Platform',
+  title: 'AeroEdu - Interactive Learning Platform',
   description: 'An innovative learning platform with virtual labs and AI-powered content generation',
 }
 

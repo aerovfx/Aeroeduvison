@@ -1,49 +1,47 @@
 {
   "id": "wfc-builder",
-  "name": "WFC Builder - 3D Procedural Generation",
-  "nameVi": "WFC Builder - Sinh cấu trúc 3D tự động",
+  "name": "WFC Builder",
+  "title": "Wave Function Collapse",
+  "description": "Tạo nội dung procedural với thuật toán WFC",
   "version": "1.0.0",
-  "description": "Wave Function Collapse algorithm for 3D procedural generation of modular structures",
-  "descriptionVi": "Thuật toán Wave Function Collapse để sinh cấu trúc 3D modular tự động với constraints",
-  "category": "procedural-generation",
-  "difficulty": "advanced",
-  "port": 8008,
-  "apiEndpoint": "http://localhost:8008",
+  "category": "Procedural Generation",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 300,
+  "icon": "Box",
+  "tags": [
+    "wfc-builder",
+    "procedural generation",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Wave Function Collapse algorithm",
-    "3D voxel generation",
-    "Multiple tilesets (buildings, dungeons, nature)",
-    "AI pattern generation",
-    "Constraint satisfaction",
-    "Three.js 3D visualization",
-    "Export to JSON",
-    "Procedural architecture"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
-  "featuresVi": [
-    "Thuật toán Wave Function Collapse",
-    "Tạo voxel 3D",
-    "Nhiều tileset (tòa nhà, hầm ngục, thiên nhiên)",
-    "Sinh pattern bằng AI",
-    "Thỏa mãn ràng buộc",
-    "Trực quan hóa 3D với Three.js",
-    "Xuất ra JSON",
-    "Kiến trúc procedural"
+  "learning_objectives": [
+    "Hiểu wave function collapse",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "tags": ["procedural-generation", "WFC", "3D", "voxel", "architecture", "AI"],
-  "requirements": {
-    "python": ">=3.8",
-    "memory": "512MB",
-    "cpu": "2 cores recommended"
+  "backend": {
+    "port": 8019,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
   },
-  "endpoints": {
-    "generate": "/generate",
-    "patterns": "/patterns/generate",
-    "styles": "/patterns/styles",
-    "tilesets": "/tilesets",
-    "presets": "/presets",
-    "health": "/health"
-  },
-  "author": "LMS Math Team",
-  "license": "MIT"
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }
-

@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState, useRef, useEffect } from "react";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Play, Pause, RotateCcw, Atom, Clock, Target, BarChart3, Plus, Minus } from "lucide-react";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Charge {
   id: number;
@@ -17,6 +20,8 @@ interface Charge {
 }
 
 export default function ElectricFieldExperiment() {
+  const { t } = useLanguage();
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const [isRunning, setIsRunning] = useState(false);
@@ -296,7 +301,8 @@ export default function ElectricFieldExperiment() {
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-blue-500 rounded-xl text-white">
               <Atom className="h-8 w-8" />
-            </div>
+            
+              </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Điện trường</h1>
               <p className="text-gray-600 mt-1">Mô phỏng điện trường của các điện tích điểm</p>

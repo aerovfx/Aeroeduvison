@@ -1,489 +1,748 @@
 {
   "simulations": [
     {
-      "id": "refraction",
-      "name": "Khúc xạ ánh sáng",
-      "description": "Mô phỏng khúc xạ ánh sáng khi đi qua các môi trường khác nhau. Thí nghiệm minh họa định luật Snell và hiện tượng phản xạ toàn phần.",
-      "category": "Quang học",
-      "level": "Lớp 11",
-      "duration": "45 phút",
-      "xp": 80,
-      "version": "1.0.0",
-      "author": "LabTwin Team",
-      "tags": [
-        "quang học",
-        "khúc xạ",
-        "định luật Snell",
-        "vật lý"
-      ],
-      "features": [
-        "Định luật Snell",
-        "Thay đổi góc tới",
-        "Nhiều môi trường",
-        "Phản xạ toàn phần",
-        "Đồ thị tương tác"
-      ],
-      "learning_objectives": [
-        "Hiểu định luật Snell về khúc xạ ánh sáng",
-        "Quan sát sự thay đổi góc khúc xạ khi thay đổi môi trường",
-        "Nhận biết hiện tượng phản xạ toàn phần",
-        "Tính toán góc tới hạn"
-      ],
-      "prerequisites": [
-        "Khái niệm về ánh sáng",
-        "Chiết suất của môi trường"
-      ],
-      "difficulty": "Trung bình",
-      "icon": "Settings",
-      "color": "#8B5CF6"
-    },
-    {
-      "id": "projectile",
-      "name": "Chuyển động ném xiên",
-      "description": "Mô phỏng chuyển động của vật được ném với vận tốc ban đầu và góc ném. Khám phá ảnh hưởng của góc ném, vận tốc và trọng lực đến quỹ đạo.",
-      "category": "Cơ học",
-      "level": "Lớp 10",
-      "duration": "40 phút",
-      "xp": 75,
-      "version": "1.0.0",
-      "author": "LabTwin Team",
-      "tags": [
-        "cơ học",
-        "ném xiên",
-        "quỹ đạo",
-        "vật lý"
-      ],
-      "features": [
-        "Thay đổi góc ném",
-        "Thay đổi vận tốc ban đầu",
-        "Thay đổi trọng lực (các hành tinh)",
-        "Đồ thị quỹ đạo",
-        "So sánh nhiều góc ném",
-        "Hiển thị công thức"
-      ],
-      "learning_objectives": [
-        "Hiểu chuyển động ném xiên và các đặc điểm",
-        "Phân tích thành phần vận tốc theo phương ngang và thẳng đứng",
-        "Tính toán tầm xa, độ cao tối đa, thời gian bay",
-        "So sánh quỹ đạo với các góc ném khác nhau",
-        "Nhận biết ảnh hưởng của trọng lực"
-      ],
-      "prerequisites": [
-        "Chuyển động thẳng đều",
-        "Chuyển động rơi tự do",
-        "Phân tích vector"
-      ],
-      "difficulty": "Trung bình",
-      "icon": "Zap",
-      "color": "#EF4444"
-    },
-    {
-      "id": "motion-tracking",
-      "name": "Motion Tracking với Camera",
-      "description": "Theo dõi chuyển động vật thể trong không gian 3D và ước lượng khoảng cách từ camera. Mô phỏng pinhole camera model và projection từ 3D sang 2D.",
-      "category": "Thị giác máy tính",
-      "level": "Lớp 11-12",
-      "duration": "50 phút",
-      "xp": 100,
-      "version": "1.0.0",
-      "author": "LabTwin Team",
-      "tags": [
-        "computer vision",
-        "camera",
-        "3D tracking",
-        "projection",
-        "distance estimation"
-      ],
-      "features": [
-        "Pinhole Camera Model",
-        "3D → 2D Projection",
-        "Distance Estimation",
-        "Multiple Object Presets",
-        "Different Motion Types",
-        "Real-time Visualization"
-      ],
-      "learning_objectives": [
-        "Hiểu mô hình camera lỗ nhỏ (pinhole camera)",
-        "Học cách chiếu tọa độ 3D sang 2D",
-        "Ước lượng khoảng cách từ kích thước vật trong ảnh",
-        "Hiệu chỉnh camera (camera calibration)",
-        "Phân tích quỹ đạo chuyển động 3D"
-      ],
-      "prerequisites": [
-        "Hình học không gian",
-        "Tỉ lệ và phép đo",
-        "Khái niệm vector 3D"
-      ],
-      "difficulty": "Nâng cao",
-      "icon": "Camera",
-      "color": "#10B981"
-    },
-    {
-      "id": "harmonic-motion",
-      "name": "Dao động điều hòa",
-      "description": "Vẽ đồ thị chuyển động dựa vào hàm số x = A×cos(ωt + φ). Nghiên cứu các đặc trưng của dao động điều hòa: biên độ, tần số, chu kỳ, pha ban đầu.",
-      "category": "Cơ học",
-      "level": "Lớp 11-12",
-      "duration": "45 phút",
-      "xp": 85,
-      "version": "1.0.0",
-      "author": "LabTwin Team",
-      "tags": [
-        "dao động",
-        "điều hòa",
-        "đồ thị",
-        "hàm số",
-        "vật lý"
-      ],
-      "features": [
-        "Đồ thị x(t), v(t), a(t)",
-        "Thay đổi biên độ A",
-        "Thay đổi tần số f",
-        "Thay đổi pha ban đầu φ",
-        "Biểu diễn năng lượng",
-        "Presets thực tế"
-      ],
-      "learning_objectives": [
-        "Hiểu khái niệm dao động điều hòa",
-        "Nhận biết đồ thị hàm cos",
-        "Phân tích ảnh hưởng của các tham số",
-        "Tính toán chu kỳ, tần số",
-        "Áp dụng vào các hiện tượng thực tế"
-      ],
-      "prerequisites": [
-        "Hàm lượng giác (sin, cos)",
-        "Đạo hàm cơ bản",
-        "Khái niệm lực và gia tốc"
-      ],
-      "difficulty": "Trung bình",
-      "icon": "Activity",
-      "color": "#F59E0B"
-    },
-    {
-      "id": "ocr-simulation",
-      "name": "OCR Pipeline - Nhận diện chữ viết",
-      "description": "Hệ thống OCR hoàn chỉnh với pipeline: Image Pre-processing → Text Detection → Text Recognition → Restructuring → JSON Output",
-      "version": "1.0.0",
-      "category": "Computer Vision",
-      "subcategory": "OCR & Text Recognition",
-      "icon": "FileText",
-      "level": "Advanced",
-      "duration": "45 minutes",
-      "xp_reward": 150,
-      "difficulty": "Advanced",
-      "tags": [
-        "OCR",
-        "Computer Vision",
-        "OpenCV",
-        "Text Recognition",
-        "AI"
-      ],
-      "features": [
-        "Image Pre-processing với OpenCV",
-        "Text Detection sử dụng EAST algorithm simulation",
-        "Text Recognition với CRNN simulation",
-        "Pattern matching và ID data extraction",
-        "JSON output với structured data",
-        "Multiple document types support",
-        "Confidence scoring",
-        "Real image upload support",
-        "File validation (JPEG, PNG, WebP)",
-        "Live OCR processing"
-      ],
-      "technologies": [
-        "OpenCV",
-        "EAST Text Detection",
-        "CRNN Text Recognition",
-        "Python",
-        "Computer Vision",
-        "Pattern Matching"
-      ],
-      "learning_objectives": [
-        "Hiểu pipeline OCR hoàn chỉnh",
-        "Áp dụng OpenCV cho image pre-processing",
-        "Thực hành text detection với EAST algorithm",
-        "Nhận diện text với CRNN model",
-        "Trích xuất structured data từ text",
-        "Tạo JSON output cho ứng dụng thực tế"
-      ],
-      "prerequisites": [
-        "Kiến thức cơ bản về Computer Vision",
-        "Hiểu biết về OpenCV",
-        "Kinh nghiệm với Python"
-      ],
-      "scenarios": [
-        {
-          "id": "student_id_card",
-          "name": "Thẻ sinh viên",
-          "description": "Nhận diện thông tin từ thẻ sinh viên",
-          "difficulty": "Medium"
-        },
-        {
-          "id": "academic_transcript",
-          "name": "Bảng điểm học tập",
-          "description": "Trích xuất thông tin từ bảng điểm",
-          "difficulty": "Advanced"
-        },
-        {
-          "id": "official_document",
-          "name": "Tài liệu chính thức",
-          "description": "Nhận diện văn bản từ tài liệu chính thức",
-          "difficulty": "Easy"
-        }
-      ],
-      "pipeline_steps": [
-        {
-          "step": 1,
-          "name": "Pre-processing",
-          "description": "Image enhancement & noise reduction",
-          "technologies": [
-            "OpenCV",
-            "PIL",
-            "OTSU"
-          ]
-        },
-        {
-          "step": 2,
-          "name": "Text Detection",
-          "description": "Locate text regions in image",
-          "technologies": [
-            "EAST",
-            "MSER",
-            "Contours"
-          ]
-        },
-        {
-          "step": 3,
-          "name": "Text Recognition",
-          "description": "Convert image text to string",
-          "technologies": [
-            "Tesseract",
-            "CRNN",
-            "OCR"
-          ]
-        },
-        {
-          "step": 4,
-          "name": "Data Extraction",
-          "description": "Extract structured information",
-          "technologies": [
-            "Regex",
-            "NLP",
-            "Pattern Matching"
-          ]
-        },
-        {
-          "step": 5,
-          "name": "JSON Output",
-          "description": "Format results as JSON",
-          "technologies": [
-            "JSON",
-            "Schema"
-          ]
-        },
-        {
-          "step": 6,
-          "name": "Complete",
-          "description": "Processing finished successfully",
-          "technologies": [
-            "Result",
-            "Validation"
-          ]
-        }
-      ],
-      "author": "LabTwin AI Team",
-      "created_date": "2024-10-11",
-      "status": "Active"
-    },
-    {
       "id": "aerodynamics",
-      "name": "Động lực học không khí",
-      "description": "Mô phỏng dòng khí 2D/3D quanh vật thể sử dụng giải thuật Navier-Stokes. Tính toán lực cản, lực nâng và tối ưu hóa hình dạng với AI.",
+      "name": "Aerodynamics Simulation",
+      "description": "Khám phá lực khí động học và dòng chảy không khí quanh các vật thể khác nhau. Tương tác với các tham số để hiểu cách máy bay bay!",
       "category": "Cơ học",
-      "level": "Lớp 11-12",
-      "duration": "60 phút",
-      "xp": 150,
-      "version": "1.0.0",
-      "author": "LMS Math Team",
-      "tags": [
-        "fluid dynamics",
-        "aerodynamics",
-        "navier-stokes",
-        "CFD",
-        "AI optimization"
-      ],
-      "features": [
-        "Navier-Stokes solver",
-        "Dòng khí quanh vật thể 2D",
-        "Tính toán lực cản & lực nâng",
-        "WebGL visualization",
-        "AI tối ưu hóa hình dạng",
-        "Multiple presets",
-        "Streamline visualization"
-      ],
-      "learning_objectives": [
-        "Hiểu phương trình Navier-Stokes",
-        "Phân tích dòng khí quanh vật thể",
-        "Tính toán lực cản và lực nâng",
-        "Tối ưu hóa hình dạng aerodynamic",
-        "Ứng dụng CFD trong thực tế"
-      ],
-      "prerequisites": [
-        "Động lực học chất lỏng cơ bản",
-        "Vector và đạo hàm",
-        "Khái niệm áp suất và lực"
-      ],
+      "level": "Nâng cao",
       "difficulty": "Nâng cao",
-      "icon": "Wind",
-      "color": "#3B82F6"
-    },
-    {
-      "id": "wfc-builder",
-      "name": "WFC Builder - Procedural 3D",
-      "description": "Wave Function Collapse algorithm để sinh cấu trúc 3D modular tự động. Tạo buildings, dungeons, terrain với constraints.",
-      "category": "Procedural Generation",
-      "level": "Lớp 11-12",
-      "duration": "60 phút",
-      "xp": 180,
-      "version": "1.0.0",
-      "author": "LMS Math Team",
-      "tags": [
-        "procedural-generation",
-        "WFC",
-        "3D",
-        "voxel",
-        "architecture",
-        "AI"
-      ],
-      "features": [
-        "Wave Function Collapse algorithm",
-        "3D voxel generation",
-        "Multiple tilesets",
-        "AI pattern generation",
-        "Constraint satisfaction",
-        "Isometric 3D viewer"
-      ],
-      "difficulty": "Nâng cao",
-      "icon": "Box",
-      "color": "#6366F1"
-    },
-    {
-      "id": "datasim-ai",
-      "name": "DataSim.AI - ML Training",
-      "description": "Xem trực tiếp AI học từ dữ liệu! Train models với scikit-learn & PyTorch. Decision boundaries, loss curves, và metrics real-time.",
-      "category": "Machine Learning",
-      "level": "Lớp 11-12",
-      "duration": "50 phút",
-      "xp": 200,
-      "version": "1.0.0",
-      "author": "LMS Math Team",
-      "tags": [
-        "machine-learning",
-        "AI",
-        "scikit-learn",
-        "pytorch",
-        "visualization"
-      ],
-      "features": [
-        "6 ML models thật",
-        "Linear Regression, KNN, SVM",
-        "Neural Networks (PyTorch)",
-        "Decision boundary visualization",
-        "Loss curves",
-        "5 datasets khác nhau"
-      ],
-      "learning_objectives": [
-        "Hiểu cách AI học từ dữ liệu",
-        "Phân biệt classification và regression",
-        "Đọc decision boundaries",
-        "Phân tích loss curves",
-        "So sánh các models"
-      ],
-      "difficulty": "Trung bình",
-      "icon": "Brain",
-      "color": "#8B5CF6"
-    },
-    {
-      "id": "thermoflow",
-      "name": "ThermoFlow - Truyền nhiệt",
-      "description": "Mô phỏng phân bố nhiệt độ và dòng nhiệt. Giải phương trình truyền nhiệt (Heat Equation) với heatmap động và AI dự đoán vùng nhiệt cao.",
-      "category": "Nhiệt học",
-      "level": "Lớp 10-11",
+      "xp": 250,
       "duration": "45 phút",
-      "xp": 120,
-      "version": "1.0.0",
-      "author": "LMS Math Team",
-      "tags": [
-        "nhiệt học",
-        "truyền nhiệt",
-        "PDE",
-        "heatmap",
-        "thermal"
-      ],
+      "port": 8008,
+      "icon": "Wind",
       "features": [
-        "Phương trình truyền nhiệt (PDE)",
-        "Heatmap động màu sắc",
-        "Nguồn nhiệt và heat sink",
-        "Vật liệu cách nhiệt",
-        "AI dự đoán vùng nhiệt",
-        "Thống kê nhiệt độ real-time"
+        "Mô phỏng dòng chảy 3D thời gian thực",
+        "Điều chỉnh góc tấn và tốc độ",
+        "Hiển thị vector lực và áp suất",
+        "So sánh các hình dạng khác nhau"
       ],
       "learning_objectives": [
-        "Hiểu phương trình truyền nhiệt",
-        "Quan sát quá trình lan truyền nhiệt",
-        "Phân tích tác dụng cách nhiệt",
-        "Tính toán độ khuếch tán nhiệt",
-        "Ứng dụng trong thực tế"
+        "Hiểu nguyên lý Bernoulli và lực nâng",
+        "Phân tích ảnh hưởng của hình dạng đến lực cản",
+        "Tính toán hiệu suất khí động học",
+        "Áp dụng kiến thức vào thiết kế máy bay"
       ],
-      "prerequisites": [
-        "Nhiệt độ và nhiệt lượng",
-        "Truyền nhiệt cơ bản"
+      "tags": ["khí động học", "dòng chảy", "lực nâng", "Bernoulli"]
+    },
+    {
+      "id": "aeroflow-3d",
+      "name": "AeroFlow 3D Advanced",
+      "description": "Mô phỏng khí động học 3D tiên tiến với visualization đẹp mắt. Khám phá dòng chảy phức tạp và hiệu ứng xoáy!",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 300,
+      "duration": "60 phút",
+      "port": 8009,
+      "icon": "Wind",
+      "features": [
+        "Visualization 3D với particle system",
+        "Mô phỏng xoáy và turbulence",
+        "Điều khiển thời gian thực",
+        "Export dữ liệu và hình ảnh"
       ],
+      "learning_objectives": [
+        "Hiểu turbulence và xoáy trong dòng chảy",
+        "Phân tích dòng chảy 3D phức tạp",
+        "Sử dụng CFD cơ bản",
+        "Thiết kế tối ưu khí động học"
+      ],
+      "tags": ["CFD", "turbulence", "3D", "visualization"]
+    },
+    {
+      "id": "mechaforce",
+      "name": "MechaForce Dynamics",
+      "description": "Khám phá các lực cơ học cơ bản: ma sát, lực đàn hồi, và chuyển động. Tương tác với các vật thể để hiểu định luật Newton!",
+      "category": "Cơ học",
+      "level": "Trung bình",
       "difficulty": "Trung bình",
-      "icon": "Flame",
-      "color": "#F97316"
+      "xp": 180,
+      "duration": "30 phút",
+      "port": 8004,
+      "icon": "Settings",
+      "features": [
+        "Mô phỏng lực ma sát và đàn hồi",
+        "Điều chỉnh khối lượng và hệ số ma sát",
+        "Hiển thị vector lực thời gian thực",
+        "Thí nghiệm với các bề mặt khác nhau"
+      ],
+      "learning_objectives": [
+        "Hiểu định luật Newton thứ nhất và thứ hai",
+        "Phân tích ảnh hưởng của ma sát",
+        "Tính toán lực đàn hồi theo định luật Hooke",
+        "Áp dụng cân bằng lực trong thực tế"
+      ],
+      "tags": ["Newton", "ma sát", "đàn hồi", "cân bằng lực"]
+    },
+    {
+      "id": "motion-sim",
+      "name": "MotionSim Basic",
+      "description": "Học chuyển động cơ bản: thẳng đều, biến đổi đều, và rơi tự do. Điều chỉnh các tham số để thấy sự khác biệt!",
+      "category": "Cơ học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 200,
+      "duration": "35 phút",
+      "port": 8014,
+      "icon": "Activity",
+      "features": [
+        "Mô phỏng chuyển động 1D và 2D",
+        "Đồ thị vận tốc và gia tốc",
+        "Điều chỉnh vận tốc ban đầu và gia tốc",
+        "So sánh các loại chuyển động"
+      ],
+      "learning_objectives": [
+        "Hiểu chuyển động thẳng đều và biến đổi đều",
+        "Phân tích đồ thị vận tốc-thời gian",
+        "Tính toán quãng đường và vận tốc",
+        "Áp dụng vào bài toán rơi tự do"
+      ],
+      "tags": ["chuyển động", "vận tốc", "gia tốc", "rơi tự do"]
     },
     {
       "id": "motionsim",
-      "name": "MotionSim - Chuyển động Vật lý",
-      "description": "Mô phỏng tổng hợp: Rơi tự do, ném xiên, dao động điều hòa. Đồ thị vị trí, vận tốc, gia tốc. AI dự đoán tham số chuyển động.",
+      "name": "MotionSim Pro",
+      "description": "Mô phỏng chuyển động nâng cao với nhiều lực tác dụng. Khám phá chuyển động phức tạp và va chạm!",
       "category": "Cơ học",
-      "level": "Lớp 10",
-      "duration": "40 phút",
-      "xp": 100,
-      "version": "1.0.0",
-      "author": "LMS Math Team",
-      "tags": [
-        "cơ học",
-        "chuyển động",
-        "ném xiên",
-        "dao động",
-        "kinematic"
-      ],
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 250,
+      "duration": "50 phút",
+      "port": 8005,
+      "icon": "Activity",
       "features": [
-        "Rơi tự do",
-        "Ném xiên với quỹ đạo",
-        "Dao động điều hòa",
-        "Đồ thị v, a, E",
-        "AI dự đoán parameters",
-        "Canvas animation"
+        "Mô phỏng nhiều lực đồng thời",
+        "Va chạm đàn hồi và không đàn hồi",
+        "Hệ thống nhiều vật thể",
+        "Phân tích năng lượng và động lượng"
       ],
       "learning_objectives": [
-        "Hiểu các loại chuyển động cơ bản",
-        "Phân tích quỹ đạo ném xiên",
-        "Tính toán vận tốc, gia tốc",
-        "Bảo toàn năng lượng",
-        "Dao động điều hòa x = A×cos(ωt)"
+        "Hiểu bảo toàn động lượng và năng lượng",
+        "Phân tích va chạm đàn hồi",
+        "Tính toán hệ thống nhiều vật thể",
+        "Áp dụng định luật bảo toàn"
       ],
-      "prerequisites": [
-        "Chuyển động thẳng",
-        "Lực và gia tốc"
-      ],
+      "tags": ["động lượng", "va chạm", "bảo toàn", "năng lượng"]
+    },
+    {
+      "id": "physics-motion",
+      "name": "Physics Motion Fundamentals",
+      "description": "Học những khái niệm cơ bản nhất về chuyển động. Hoàn hảo cho người mới bắt đầu!",
+      "category": "Cơ học",
+      "level": "Dễ",
       "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "20 phút",
+      "port": 8007,
+      "icon": "Activity",
+      "features": [
+        "Giao diện đơn giản, dễ hiểu",
+        "Hướng dẫn từng bước",
+        "Minh họa trực quan",
+        "Bài tập thực hành cơ bản"
+      ],
+      "learning_objectives": [
+        "Hiểu khái niệm vị trí, vận tốc, gia tốc",
+        "Phân biệt chuyển động thẳng và cong",
+        "Đọc và hiểu đồ thị chuyển động",
+        "Áp dụng công thức cơ bản"
+      ],
+      "tags": ["cơ bản", "vị trí", "vận tốc", "gia tốc"]
+    },
+    {
+      "id": "projectile",
+      "name": "Projectile Motion Lab",
+      "description": "Khám phá chuyển động ném xiên và ném ngang. Điều chỉnh góc và vận tốc để đạt mục tiêu!",
+      "category": "Cơ học",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "25 phút",
+      "port": 8016,
+      "icon": "Target",
+      "features": [
+        "Mô phỏng ném xiên và ném ngang",
+        "Điều chỉnh góc ném và vận tốc ban đầu",
+        "Hiển thị quỹ đạo parabol",
+        "Tính toán tầm xa và độ cao cực đại"
+      ],
+      "learning_objectives": [
+        "Hiểu chuyển động ném xiên",
+        "Tính toán tầm xa và thời gian bay",
+        "Phân tích thành phần vận tốc",
+        "Áp dụng vào bài toán thực tế"
+      ],
+      "tags": ["ném xiên", "quỹ đạo", "parabol", "tầm xa"]
+    },
+    {
+      "id": "circular-motion",
+      "name": "Circular Motion Explorer",
+      "description": "Khám phá chuyển động tròn đều và lực hướng tâm. Điều chỉnh bán kính và vận tốc góc!",
+      "category": "Cơ học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "30 phút",
+      "port": 8020,
+      "icon": "Activity",
+      "features": [
+        "Mô phỏng chuyển động tròn đều",
+        "Hiển thị vector vận tốc và gia tốc",
+        "Điều chỉnh bán kính và vận tốc góc",
+        "Tính toán lực hướng tâm"
+      ],
+      "learning_objectives": [
+        "Hiểu chuyển động tròn đều",
+        "Phân tích lực hướng tâm",
+        "Tính toán vận tốc góc và tuyến tính",
+        "Áp dụng vào chuyển động hành tinh"
+      ],
+      "tags": ["tròn đều", "hướng tâm", "vận tốc góc", "gia tốc"]
+    },
+    {
+      "id": "momentum-collision",
+      "name": "Momentum & Collision Lab",
+      "description": "Khám phá va chạm và bảo toàn động lượng. Thí nghiệm với các loại va chạm khác nhau!",
+      "category": "Cơ học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 200,
+      "duration": "40 phút",
+      "port": 8021,
+      "icon": "Activity",
+      "features": [
+        "Mô phỏng va chạm 1D và 2D",
+        "Va chạm đàn hồi và không đàn hồi",
+        "Hiển thị vector động lượng",
+        "Tính toán hệ số hoàn nguyên"
+      ],
+      "learning_objectives": [
+        "Hiểu khái niệm động lượng",
+        "Áp dụng định luật bảo toàn động lượng",
+        "Phân tích va chạm đàn hồi",
+        "Tính toán năng lượng mất mát"
+      ],
+      "tags": ["động lượng", "va chạm", "bảo toàn", "đàn hồi"]
+    },
+    {
+      "id": "rotational-dynamics",
+      "name": "Rotational Dynamics",
+      "description": "Khám phá chuyển động quay và mômen quán tính. Thí nghiệm với các hình dạng khác nhau!",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 250,
+      "duration": "45 phút",
+      "port": 8022,
+      "icon": "Settings",
+      "features": [
+        "Mô phỏng chuyển động quay",
+        "Tính toán mômen quán tính",
+        "Điều chỉnh mômen lực",
+        "So sánh các hình dạng khác nhau"
+      ],
+      "learning_objectives": [
+        "Hiểu chuyển động quay và mômen quán tính",
+        "Áp dụng định luật Newton cho chuyển động quay",
+        "Tính toán mômen động lượng",
+        "Phân tích chuyển động lăn"
+      ],
+      "tags": ["quay", "mômen", "quán tính", "động lượng"]
+    },
+    {
+      "id": "biogrowth",
+      "name": "BioGrowth Simulation",
+      "description": "Mô phỏng sự phát triển của quần thể sinh vật. Khám phá các yếu tố ảnh hưởng đến tăng trưởng!",
+      "category": "Sinh học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "35 phút",
+      "port": 8001,
+      "icon": "Activity",
+      "features": [
+        "Mô phỏng tăng trưởng quần thể",
+        "Điều chỉnh tỷ lệ sinh và tử",
+        "Hiển thị đồ thị tăng trưởng",
+        "Mô hình logistic và exponential"
+      ],
+      "learning_objectives": [
+        "Hiểu mô hình tăng trưởng quần thể",
+        "Phân tích các yếu tố hạn chế",
+        "So sánh tăng trưởng exponential và logistic",
+        "Áp dụng vào bảo tồn sinh học"
+      ],
+      "tags": ["sinh học", "tăng trưởng", "quần thể", "logistic"]
+    },
+    {
+      "id": "chemistry-lab",
+      "name": "Chemistry Lab Basic",
+      "description": "Phòng thí nghiệm hóa học ảo cơ bản. Thực hiện các phản ứng hóa học an toàn!",
+      "category": "Hóa học",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "25 phút",
+      "port": 8002,
+      "icon": "FlaskConical",
+      "features": [
+        "Phòng thí nghiệm ảo an toàn",
+        "Các phản ứng hóa học cơ bản",
+        "Tính toán mol và nồng độ",
+        "Hiển thị phương trình hóa học"
+      ],
+      "learning_objectives": [
+        "Hiểu các phản ứng hóa học cơ bản",
+        "Tính toán mol và nồng độ",
+        "Cân bằng phương trình hóa học",
+        "Áp dụng định luật bảo toàn khối lượng"
+      ],
+      "tags": ["hóa học", "phản ứng", "mol", "nồng độ"]
+    },
+    {
+      "id": "chemlab-3d",
+      "name": "ChemLab 3D Advanced",
+      "description": "Phòng thí nghiệm hóa học 3D tiên tiến với mô phỏng phân tử và liên kết hóa học!",
+      "category": "Hóa học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 200,
+      "duration": "40 phút",
+      "port": 8015,
+      "icon": "FlaskConical",
+      "features": [
+        "Mô phỏng phân tử 3D",
+        "Hiển thị liên kết hóa học",
+        "Phản ứng hóa học phức tạp",
+        "Tính toán năng lượng phản ứng"
+      ],
+      "learning_objectives": [
+        "Hiểu cấu trúc phân tử 3D",
+        "Phân tích liên kết hóa học",
+        "Tính toán năng lượng phản ứng",
+        "Áp dụng vào thiết kế thuốc"
+      ],
+      "tags": ["phân tử", "3D", "liên kết", "năng lượng"]
+    },
+    {
+      "id": "datasim-ai",
+      "name": "DataSim AI",
+      "description": "Mô phỏng dữ liệu và machine learning. Tạo dataset ảo và huấn luyện mô hình AI!",
+      "category": "Machine Learning",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 300,
+      "duration": "60 phút",
+      "port": 8003,
+      "icon": "Brain",
+      "features": [
+        "Tạo dataset ảo với nhiều loại dữ liệu",
+        "Huấn luyện mô hình machine learning",
+        "Visualization dữ liệu và kết quả",
+        "So sánh các thuật toán khác nhau"
+      ],
+      "learning_objectives": [
+        "Hiểu quy trình machine learning",
+        "Tạo và xử lý dataset",
+        "Huấn luyện và đánh giá mô hình",
+        "Áp dụng vào bài toán thực tế"
+      ],
+      "tags": ["AI", "machine learning", "dataset", "mô hình"]
+    },
+    {
+      "id": "harmonic-motion",
+      "name": "Dao động điều hòa - Con lắc lò xo",
+      "description": "Khám phá dao động điều hòa của con lắc lò xo với animation và đồ thị chi tiết",
+      "category": "Sóng",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "30 phút",
+      "port": 8010,
+      "icon": "Waves",
+      "features": [
+        "Animation lò xo dao động thực tế",
+        "Đồ thị x(t), v(t), a(t), E(t)",
+        "Điều chỉnh biên độ, tần số, pha ban đầu",
+        "Bảng dữ liệu chi tiết"
+      ],
+      "learning_objectives": [
+        "Hiểu dao động điều hòa của lò xo",
+        "Tính toán chu kỳ và tần số góc",
+        "Phân tích năng lượng bảo toàn",
+        "Áp dụng công thức x = A·cos(ωt + φ)"
+      ],
+      "tags": ["dao động", "điều hòa", "lò xo", "chu kỳ", "năng lượng"]
+    },
+    {
+      "id": "simple-pendulum",
+      "name": "Con lắc đơn",
+      "description": "Khám phá dao động điều hòa của con lắc đơn với các thông số điều chỉnh được",
+      "category": "Sóng",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 150,
+      "duration": "30 phút",
+      "port": 8025,
+      "icon": "Clock",
+      "features": [
+        "Animation con lắc đơn dao động",
+        "Đồ thị θ(t), ω(t), α(t), E(t)",
+        "Điều chỉnh chiều dài dây và góc lệch",
+        "Quan sát tính độc lập với khối lượng"
+      ],
+      "learning_objectives": [
+        "Hiểu dao động của con lắc đơn",
+        "Tính chu kỳ T = 2π√(L/g)",
+        "Nhận biết tính độc lập với m và θ₀",
+        "Phân tích chuyển đổi năng lượng"
+      ],
+      "tags": ["con lắc", "dao động", "trọng lực", "chu kỳ", "góc nhỏ"]
+    },
+    {
+      "id": "standing-waves",
+      "name": "Sóng dừng",
+      "description": "Khám phá sóng dừng trên dây và trong ống sáo với các ứng dụng thực tế",
+      "category": "Sóng",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 200,
+      "duration": "35 phút",
+      "port": 8026,
+      "icon": "Radio",
+      "features": [
+        "Sóng dừng 2 đầu cố định (guitar)",
+        "Sóng dừng 1 đầu mở (sáo, tiêu)",
+        "Chọn bậc sóng từ 1-8",
+        "Ứng dụng: đàn, sáo, ống nghiệm"
+      ],
+      "learning_objectives": [
+        "Hiểu điều kiện tạo sóng dừng",
+        "Phân biệt nút sóng và bụng sóng",
+        "Tính λ = 2L/n và λ = 4L/(2n-1)",
+        "Áp dụng vào nhạc cụ thực tế"
+      ],
+      "tags": ["sóng dừng", "nút sóng", "bụng sóng", "họa âm", "nhạc cụ"]
+    },
+    {
+      "id": "motion-tracking",
+      "name": "Motion Tracking CV",
+      "description": "Sử dụng computer vision để theo dõi chuyển động. Phát hiện và phân tích chuyển động trong video!",
+      "category": "Computer Vision",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 250,
+      "duration": "50 phút",
+      "port": 8011,
+      "icon": "Camera",
+      "features": [
+        "Theo dõi chuyển động thời gian thực",
+        "Phát hiện đối tượng trong video",
+        "Tính toán vận tốc và gia tốc",
+        "Export dữ liệu chuyển động"
+      ],
+      "learning_objectives": [
+        "Hiểu computer vision cơ bản",
+        "Áp dụng thuật toán tracking",
+        "Phân tích chuyển động từ video",
+        "Tích hợp CV với vật lý"
+      ],
+      "tags": ["computer vision", "tracking", "video", "phân tích"]
+    },
+    {
+      "id": "ocr-grading",
+      "name": "OCR Grading System",
+      "description": "Hệ thống chấm điểm tự động bằng OCR. Nhận diện và đánh giá bài làm của học sinh!",
+      "category": "Computer Vision",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 300,
+      "duration": "55 phút",
+      "port": 8012,
+      "icon": "Camera",
+      "features": [
+        "Nhận diện chữ viết tay",
+        "Chấm điểm tự động",
+        "Phân tích lỗi và gợi ý",
+        "Báo cáo chi tiết"
+      ],
+      "learning_objectives": [
+        "Hiểu OCR và text recognition",
+        "Áp dụng machine learning cho giáo dục",
+        "Phát triển hệ thống chấm điểm",
+        "Tối ưu hóa accuracy"
+      ],
+      "tags": ["OCR", "chấm điểm", "AI", "giáo dục"]
+    },
+    {
+      "id": "optics-lab",
+      "name": "Optics Lab",
+      "description": "Phòng thí nghiệm quang học ảo. Khám phá phản xạ, khúc xạ và giao thoa ánh sáng!",
+      "category": "Quang học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "35 phút",
+      "port": 8013,
       "icon": "Zap",
-      "color": "#EC4899"
+      "features": [
+        "Mô phỏng phản xạ và khúc xạ",
+        "Giao thoa và nhiễu xạ",
+        "Điều chỉnh góc và chiết suất",
+        "Hiển thị tia sáng và sóng"
+      ],
+      "learning_objectives": [
+        "Hiểu định luật phản xạ và khúc xạ",
+        "Phân tích giao thoa ánh sáng",
+        "Tính toán chiết suất",
+        "Áp dụng vào thiết kế quang học"
+      ],
+      "tags": ["quang học", "phản xạ", "khúc xạ", "giao thoa"]
+    },
+    {
+      "id": "refraction",
+      "name": "Refraction Explorer",
+      "description": "Khám phá hiện tượng khúc xạ ánh sáng. Thí nghiệm với các môi trường khác nhau!",
+      "category": "Quang học",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "20 phút",
+      "port": 8017,
+      "icon": "Zap",
+      "features": [
+        "Mô phỏng khúc xạ cơ bản",
+        "Điều chỉnh chiết suất",
+        "Hiển thị tia sáng",
+        "Tính toán góc khúc xạ"
+      ],
+      "learning_objectives": [
+        "Hiểu định luật Snell",
+        "Tính toán góc khúc xạ",
+        "Phân tích ảnh hưởng của chiết suất",
+        "Áp dụng vào thấu kính"
+      ],
+      "tags": ["khúc xạ", "Snell", "chiết suất", "thấu kính"]
+    },
+    {
+      "id": "thermoflow",
+      "name": "ThermoFlow Simulation",
+      "description": "Mô phỏng dòng nhiệt và truyền nhiệt. Khám phá các cơ chế truyền nhiệt khác nhau!",
+      "category": "Nhiệt học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 250,
+      "duration": "45 phút",
+      "port": 8006,
+      "icon": "Flame",
+      "features": [
+        "Mô phỏng dẫn nhiệt, đối lưu, bức xạ",
+        "Hiển thị gradient nhiệt độ",
+        "Điều chỉnh vật liệu và điều kiện",
+        "Tính toán hiệu suất truyền nhiệt"
+      ],
+      "learning_objectives": [
+        "Hiểu các cơ chế truyền nhiệt",
+        "Tính toán dẫn nhiệt",
+        "Phân tích đối lưu và bức xạ",
+        "Áp dụng vào thiết kế hệ thống"
+      ],
+      "tags": ["nhiệt học", "dẫn nhiệt", "đối lưu", "bức xạ"]
+    },
+    {
+      "id": "weather-sim",
+      "name": "Theo dõi thời tiết",
+      "description": "Mô phỏng và phân tích các yếu tố khí tượng với biểu đồ thời gian thực",
+      "category": "Khí tượng",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "25 phút",
+      "port": 8027,
+      "icon": "Cloud",
+      "features": [
+        "Theo dõi nhiệt độ, độ ẩm, áp suất",
+        "Biểu đồ thời tiết 24 giờ",
+        "Dự báo thời tiết theo giờ",
+        "Điều chỉnh mùa và thời gian trong ngày"
+      ],
+      "learning_objectives": [
+        "Hiểu các yếu tố khí tượng cơ bản",
+        "Phân tích mối quan hệ nhiệt độ-độ ẩm",
+        "Nhận biết ảnh hưởng của áp suất",
+        "Dự đoán thời tiết dựa trên dữ liệu"
+      ],
+      "tags": ["thời tiết", "nhiệt độ", "độ ẩm", "áp suất", "dự báo"]
+    },
+    {
+      "id": "wfc-builder",
+      "name": "WFC Builder – Mô phỏng thuật toán Wave Function Collapse 3D",
+      "description": "Tạo cấu trúc modular procedural với thuật toán Wave Function Collapse 3D. Python chạy thuật toán WFC 3D, export JSON, WebGL dựng kiến trúc modular, AI tự sinh pattern từ ảnh hoặc scan.",
+      "category": "Procedural Generation",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 350,
+      "duration": "75 phút",
+      "port": 8019,
+      "icon": "Box",
+      "features": [
+        "🧠 Thuật toán Wave Function Collapse 3D",
+        "🏗️ Tạo cấu trúc modular procedural",
+        "🐍 Python chạy thuật toán WFC 3D, export JSON",
+        "🎮 WebGL dựng kiến trúc modular",
+        "🤖 AI tự sinh pattern từ ảnh hoặc scan",
+        "📊 Visualization 3D real-time",
+        "⚙️ Điều chỉnh rules và constraints",
+        "💾 Export kết quả và dữ liệu"
+      ],
+      "learning_objectives": [
+        "Hiểu thuật toán Wave Function Collapse 3D",
+        "Thiết kế rules cho procedural generation",
+        "Tích hợp Python backend với WebGL frontend",
+        "Áp dụng AI để sinh pattern từ ảnh",
+        "Tối ưu hóa thuật toán cho kiến trúc 3D",
+        "Áp dụng vào game development và kiến trúc"
+      ],
+      "tags": ["procedural", "WFC", "3D", "modular", "AI", "WebGL", "Python"]
+    },
+    {
+      "id": "physics-engine-2d",
+      "name": "Physics Engine 2D – Mô phỏng động lực học 2D",
+      "description": "Engine vật lý 2D hoàn chỉnh với collision detection, rigid body dynamics, và particle system. Python xử lý physics simulation, export data cho visualization.",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 320,
+      "duration": "70 phút",
+      "port": 8023,
+      "icon": "Settings",
+      "features": [
+        "🔧 Physics engine 2D hoàn chỉnh",
+        "💥 Collision detection và response",
+        "⚖️ Rigid body dynamics",
+        "✨ Particle system và effects",
+        "🐍 Python physics simulation",
+        "📊 Real-time data export",
+        "🎮 Interactive controls",
+        "📈 Performance monitoring"
+      ],
+      "learning_objectives": [
+        "Hiểu nguyên lý physics engine",
+        "Implement collision detection algorithms",
+        "Tính toán rigid body dynamics",
+        "Tối ưu hóa performance",
+        "Tích hợp với game engine",
+        "Áp dụng vào simulation thực tế"
+      ],
+      "tags": ["physics", "engine", "2D", "collision", "dynamics", "Python"]
+    },
+    {
+      "id": "neural-network-sim",
+      "name": "Neural Network Simulator – Mô phỏng mạng nơ-ron",
+      "description": "Mô phỏng mạng nơ-ron từ cơ bản đến nâng cao. Python implement neural network, training algorithms, và visualization real-time.",
+      "category": "Machine Learning",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 300,
+      "duration": "65 phút",
+      "port": 8024,
+      "icon": "Brain",
+      "features": [
+        "🧠 Neural network architecture builder",
+        "📚 Multiple activation functions",
+        "🎯 Training algorithms (SGD, Adam, etc.)",
+        "📊 Real-time loss visualization",
+        "🐍 Python implementation",
+        "🎨 Interactive network visualization",
+        "📈 Performance metrics",
+        "💾 Model export/import"
+      ],
+      "learning_objectives": [
+        "Hiểu cấu trúc mạng nơ-ron",
+        "Implement training algorithms",
+        "Visualize learning process",
+        "Tối ưu hóa hyperparameters",
+        "Áp dụng vào bài toán thực tế",
+        "So sánh các architecture khác nhau"
+      ],
+      "tags": ["neural", "network", "AI", "machine learning", "Python", "training"]
+    },
+    {
+      "id": "fluid-dynamics-2d",
+      "name": "Fluid Dynamics 2D – Mô phỏng dòng chảy chất lỏng",
+      "description": "Mô phỏng dòng chảy chất lỏng 2D với Navier-Stokes equations. Python solve PDE, WebGL render fluid visualization.",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 350,
+      "duration": "80 phút",
+      "port": 8025,
+      "icon": "Waves",
+      "features": [
+        "🌊 2D fluid dynamics simulation",
+        "📐 Navier-Stokes equations solver",
+        "🎨 Real-time fluid visualization",
+        "🐍 Python numerical methods",
+        "🎮 Interactive flow control",
+        "📊 Pressure và velocity fields",
+        "⚡ GPU acceleration support",
+        "💾 Export simulation data"
+      ],
+      "learning_objectives": [
+        "Hiểu Navier-Stokes equations",
+        "Implement numerical methods",
+        "Visualize fluid flow",
+        "Tối ưu hóa computation",
+        "Áp dụng vào engineering",
+        "So sánh với experimental data"
+      ],
+      "tags": ["fluid", "dynamics", "Navier-Stokes", "PDE", "Python", "visualization"]
+    },
+    {
+      "id": "genetic-algorithm",
+      "name": "Genetic Algorithm Simulator – Mô phỏng thuật toán di truyền",
+      "description": "Mô phỏng thuật toán di truyền để giải quyết optimization problems. Python implement GA, visualization evolution process.",
+      "category": "Machine Learning",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 280,
+      "duration": "60 phút",
+      "port": 8026,
+      "icon": "Activity",
+      "features": [
+        "🧬 Genetic algorithm implementation",
+        "🎯 Multiple optimization problems",
+        "📊 Evolution process visualization",
+        "🐍 Python GA framework",
+        "⚙️ Customizable parameters",
+        "📈 Fitness tracking",
+        "🎮 Interactive controls",
+        "💾 Results export"
+      ],
+      "learning_objectives": [
+        "Hiểu thuật toán di truyền",
+        "Implement selection, crossover, mutation",
+        "Visualize evolution process",
+        "Tối ưu hóa parameters",
+        "Áp dụng vào optimization",
+        "So sánh với other algorithms"
+      ],
+      "tags": ["genetic", "algorithm", "optimization", "evolution", "Python", "AI"]
     }
   ],
-  "total": 10,
-  "last_updated": "2025-10-12T16:00:00.000000"
+  "total": 30,
+  "last_updated": "2024-12-19T12:00:00Z",
+  "categories": [
+    "Cơ học",
+    "Quang học",
+    "Machine Learning",
+    "Procedural Generation",
+    "Hóa học",
+    "Nhiệt học",
+    "Sinh học",
+    "Khí tượng",
+    "Computer Vision",
+    "Sóng"
+  ]
 }

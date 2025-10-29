@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Play, 
   CheckCircle, 
@@ -24,6 +27,8 @@ import {
 } from "lucide-react";
 
 export default function ThuThachPage() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
   const [currentChallenge, setCurrentChallenge] = useState(0);
   const [userAnswers, setUserAnswers] = useState<string[]>(new Array(5).fill(""));
@@ -141,7 +146,8 @@ export default function ThuThachPage() {
               </div>
             </div>
           </div>
-        </div>
+        
+              </div>
 
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Card className="text-center">

@@ -39,3 +39,19 @@ pnpm-debug.log*
 ehthumbs.db
 Icon?
 Thumbs.db
+
+# Python virtual environments
+**/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Large model files
+**/*.pb
+**/*.dylib
+**/*.so
+**/models/
+python-simulations/**/venv/
+python-simulations/**/__pycache__/

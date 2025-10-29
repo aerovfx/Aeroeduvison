@@ -1,108 +1,47 @@
 {
   "id": "ocr-simulation",
-  "name": "OCR Pipeline - Nhận diện chữ viết",
-  "description": "Hệ thống OCR hoàn chỉnh với pipeline: Image Pre-processing → Text Detection → Text Recognition → Restructuring → JSON Output",
+  "name": "OCR Simulation",
+  "title": "Mô phỏng nhận diện văn bản",
+  "description": "Nhận diện văn bản từ hình ảnh với AI",
   "version": "1.0.0",
   "category": "Computer Vision",
-  "subcategory": "OCR & Text Recognition",
-  "icon": "FileText",
-  "level": "Advanced",
-  "duration": "45 minutes",
-  "xp_reward": 150,
-  "difficulty": "Advanced",
-  "tags": ["OCR", "Computer Vision", "OpenCV", "Text Recognition", "AI"],
-  "features": [
-    "Image Pre-processing với OpenCV",
-    "Text Detection sử dụng EAST algorithm simulation", 
-    "Text Recognition với CRNN simulation",
-    "Pattern matching và ID data extraction",
-    "JSON output với structured data",
-    "Multiple document types support",
-    "Confidence scoring",
-    "Real image upload support",
-    "File validation (JPEG, PNG, WebP)",
-    "Live OCR processing"
+  "level": "Trung bình",
+  "difficulty": "Trung bình",
+  "duration": "15-30 phút",
+  "xp": 200,
+  "icon": "Camera",
+  "tags": [
+    "ocr-simulation",
+    "computer vision",
+    "simulation",
+    "interactive"
   ],
-  "technologies": [
-    "OpenCV",
-    "EAST Text Detection",
-    "CRNN Text Recognition", 
-    "Python",
-    "Computer Vision",
-    "Pattern Matching"
+  "features": [
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
   "learning_objectives": [
-    "Hiểu pipeline OCR hoàn chỉnh",
-    "Áp dụng OpenCV cho image pre-processing",
-    "Thực hành text detection với EAST algorithm",
-    "Nhận diện text với CRNN model",
-    "Trích xuất structured data từ text",
-    "Tạo JSON output cho ứng dụng thực tế"
+    "Hiểu mô phỏng nhận diện văn bản",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "prerequisites": [
-    "Kiến thức cơ bản về Computer Vision",
-    "Hiểu biết về OpenCV",
-    "Kinh nghiệm với Python"
-  ],
-  "scenarios": [
-    {
-      "id": "student_id_card",
-      "name": "Thẻ sinh viên",
-      "description": "Nhận diện thông tin từ thẻ sinh viên",
-      "difficulty": "Medium"
-    },
-    {
-      "id": "academic_transcript",
-      "name": "Bảng điểm học tập", 
-      "description": "Trích xuất thông tin từ bảng điểm",
-      "difficulty": "Advanced"
-    },
-    {
-      "id": "official_document",
-      "name": "Tài liệu chính thức",
-      "description": "Nhận diện văn bản từ tài liệu chính thức", 
-      "difficulty": "Easy"
-    }
-  ],
-  "pipeline_steps": [
-    {
-      "step": 1,
-      "name": "Pre-processing",
-      "description": "Image enhancement & noise reduction",
-      "technologies": ["OpenCV", "PIL", "OTSU"]
-    },
-    {
-      "step": 2,
-      "name": "Text Detection", 
-      "description": "Locate text regions in image",
-      "technologies": ["EAST", "MSER", "Contours"]
-    },
-    {
-      "step": 3,
-      "name": "Text Recognition",
-      "description": "Convert image text to string", 
-      "technologies": ["Tesseract", "CRNN", "OCR"]
-    },
-    {
-      "step": 4,
-      "name": "Data Extraction",
-      "description": "Extract structured information",
-      "technologies": ["Regex", "NLP", "Pattern Matching"]
-    },
-    {
-      "step": 5,
-      "name": "JSON Output",
-      "description": "Format results as JSON",
-      "technologies": ["JSON", "Schema"]
-    },
-    {
-      "step": 6,
-      "name": "Complete",
-      "description": "Processing finished successfully",
-      "technologies": ["Result", "Validation"]
-    }
-  ],
-  "author": "LabTwin AI Team",
-  "created_date": "2024-10-11",
-  "status": "Active"
+  "backend": {
+    "port": 8000,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }

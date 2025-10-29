@@ -13,7 +13,7 @@ interface GenerateContentRequest {
   difficulty?: 'easy' | 'medium' | 'hard';
   additionalContext?: string;
   freeformPrompt?: string; // Prompt tự do, ưu tiên hơn các trường khác
-  aiModel?: 'auto' | 'grok' | 'openai' | 'cursor' | 'ollama' | 'demo'; // AI model selection
+  aiModel?: 'auto' | 'grok' | 'openrouter' | 'openai' | 'cursor' | 'ollama' | 'demo'; // AI model selection
 }
 
 // Interface cho response
@@ -44,10 +44,10 @@ interface GeneratedContent {
   }>;
 }
 
-// Hàm sinh nội dung bằng AI (hỗ trợ Grok, OpenAI, Cursor, Ollama)
+// Hàm sinh nội dung bằng AI (hỗ trợ Grok, OpenRouter, OpenAI, Cursor, Ollama)
 async function generateWithAI(request: GenerateContentRequest): Promise<GeneratedContent> {
   // Use aiModel from request if provided, otherwise fallback to environment variable
-  const aiProvider = request.aiModel || process.env.AI_PROVIDER || 'auto'; // auto, grok, openai, cursor, ollama, demo
+  const aiProvider = request.aiModel || process.env.AI_PROVIDER || 'auto'; // auto, grok, openrouter, openai, cursor, ollama, demo
   const prompt = createPrompt(request);
 
   try {
@@ -57,47 +57,56 @@ async function generateWithAI(request: GenerateContentRequest): Promise<Generate
     if (aiProvider === 'auto' || aiProvider === 'grok') {
       const grokKey = process.env.GROK_API_KEY;
       if (grokKey && grokKey.startsWith('xai-')) {
-        console.log('Using Grok API (X.AI)...');
+        console.log('🔥 Using Grok API (X.AI)...');
         return await generateWithGrok(prompt, request, grokKey);
       }
     }
     
-    // Priority 2: Cursor API
+    // Priority 2: OpenRouter - Unified interface for all LLMs
+    if (aiProvider === 'auto' || aiProvider === 'openrouter') {
+      const openrouterKey = process.env.OPENROUTER_API_KEY;
+      if (openrouterKey && openrouterKey.startsWith('sk-or-')) {
+        console.log('🌐 Using OpenRouter (Unified LLM API)...');
+        return await generateWithOpenRouter(prompt, request, openrouterKey);
+      }
+    }
+    
+    // Priority 3: OpenAI
+    if (aiProvider === 'auto' || aiProvider === 'openai') {
+      const openaiKey = process.env.OPENAI_API_KEY;
+      if (openaiKey && openaiKey.startsWith('sk-')) {
+        console.log('🤖 Using OpenAI...');
+        return await generateWithOpenAI(prompt, request, openaiKey);
+      }
+    }
+    
+    // Priority 4: Cursor API
     if (aiProvider === 'auto' || aiProvider === 'cursor') {
       const cursorKey = process.env.CURSOR_API_KEY;
       if (cursorKey) {
-        console.log('Using Cursor API...');
+        console.log('💻 Using Cursor API...');
         return await generateWithCursor(prompt, request, cursorKey);
       }
     }
 
-    // Priority 3: Ollama (Local)
+    // Priority 5: Ollama (Local)
     if (aiProvider === 'auto' || aiProvider === 'ollama') {
       const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
       // Try Ollama if available
       try {
-        console.log('Trying Ollama...');
+        console.log('🏠 Trying Ollama (Local)...');
         return await generateWithOllama(prompt, request, ollamaUrl);
       } catch (ollamaError) {
-        console.log('Ollama not available, trying other providers...');
-      }
-    }
-
-    // Priority 4: OpenAI
-    if (aiProvider === 'auto' || aiProvider === 'openai') {
-      const openaiKey = process.env.OPENAI_API_KEY;
-      if (openaiKey && openaiKey.startsWith('sk-')) {
-        console.log('Using OpenAI...');
-        return await generateWithOpenAI(prompt, request, openaiKey);
+        console.log('⚠️  Ollama not available, trying other providers...');
       }
     }
 
     // Fallback to demo mode
-    console.log('Using Demo Mode...');
+    console.log('🎭 Using Demo Mode...');
     return generateMockContent(request);
     
   } catch (error) {
-    console.error('AI Generation error:', error);
+    console.error('❌ AI Generation error:', error);
     return generateMockContent(request);
   }
 }
@@ -135,6 +144,49 @@ async function generateWithGrok(prompt: string, request: GenerateContentRequest,
 
   const data = await response.json();
   const aiResponse = data.choices[0].message.content;
+  
+  return parseAIResponse(aiResponse, request);
+}
+
+// Generate with OpenRouter - Unified interface for all LLMs
+async function generateWithOpenRouter(prompt: string, request: GenerateContentRequest, apiKey: string): Promise<GeneratedContent> {
+  // OpenRouter supports many models, choosing the best ones
+  const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3.5-sonnet'; // or 'openai/gpt-4-turbo', 'google/gemini-pro', etc.
+  
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000',
+      'X-Title': 'LMS Math - AI Content Generator',
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: [
+        {
+          role: 'system',
+          content: 'Bạn là một chuyên gia giáo dục Việt Nam, có kinh nghiệm thiết kế bài giảng và tài liệu học tập chất lượng cao. Hãy tạo nội dung chi tiết, dễ hiểu và phù hợp với học sinh Việt Nam.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`OpenRouter API error: ${error}`);
+  }
+
+  const data = await response.json();
+  const aiResponse = data.choices[0].message.content;
+  
+  console.log('✅ OpenRouter response received, model used:', data.model);
   
   return parseAIResponse(aiResponse, request);
 }

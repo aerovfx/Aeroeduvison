@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, ArrowLeft, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 const errorMessages: Record<string, string> = {
   'Configuration': 'There is a problem with the server configuration.',
@@ -28,6 +30,9 @@ function AuthErrorPageContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="absolute top-4 right-4">
+          <LanguageSwitcherCompact />
+        </div>
       <div className="max-w-md w-full space-y-8">
         {/* Error Icon */}
         <div className="text-center">
@@ -61,7 +66,7 @@ function AuthErrorPageContent() {
               </Link>
 
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => typeof window !== 'undefined' && location.reload()}
                 className="w-full flex justify-center items-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
@@ -88,12 +93,14 @@ function AuthErrorPageContent() {
 }
 
 export default function AuthErrorPage() {
+  const { t } = useLanguage();
+
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+          <p className="mt-2 text-sm text-gray-600">{t('common.loading')}</p>
         </div>
       </div>
     }>

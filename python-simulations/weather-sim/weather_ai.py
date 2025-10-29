@@ -496,3 +496,4 @@ def generate_earthquake_response(magnitude: float, depth: float, tsunami: bool) 
     return actions
 
 
+

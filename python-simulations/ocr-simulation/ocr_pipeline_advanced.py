@@ -670,3 +670,4 @@ def process_uploaded_image(image_data: bytes, filename: str, config=None, progre
     pipeline = AdvancedOCRPipeline(config, east_model_path=east_path if os.path.exists(east_path) else None)
     return pipeline.process_image(image_data, filename, progress_callback)
 
+

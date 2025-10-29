@@ -1,45 +1,47 @@
 {
   "id": "thermoflow",
-  "name": "ThermoFlow - Heat Transfer Simulation",
-  "nameVi": "ThermoFlow - Mô phỏng Truyền nhiệt",
+  "name": "ThermoFlow",
+  "title": "Nhiệt động lực học",
+  "description": "Dòng nhiệt, truyền nhiệt, chu trình nhiệt động",
   "version": "1.0.0",
-  "description": "Heat transfer and thermal flow simulation using heat equation PDE solver",
-  "descriptionVi": "Mô phỏng truyền nhiệt và dòng nhiệt sử dụng phương trình nhiệt (PDE)",
-  "category": "thermodynamics",
-  "difficulty": "intermediate",
-  "port": 8010,
-  "apiEndpoint": "http://localhost:8010",
+  "category": "Nhiệt học",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 250,
+  "icon": "Flame",
+  "tags": [
+    "thermoflow",
+    "nhiệt học",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Heat equation PDE solver",
-    "2D temperature field simulation",
-    "Heat sources and sinks",
-    "Thermal conductivity obstacles",
-    "Dynamic heatmap visualization",
-    "AI hot zone prediction",
-    "Real-time temperature statistics",
-    "Multiple presets"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
-  "featuresVi": [
-    "Giải phương trình nhiệt (PDE)",
-    "Mô phỏng trường nhiệt độ 2D",
-    "Nguồn nhiệt và vùng làm mát",
-    "Vật liệu cách nhiệt",
-    "Heatmap động",
-    "AI dự đoán vùng nhiệt cao",
-    "Thống kê nhiệt độ real-time",
-    "Nhiều kịch bản mẫu"
+  "learning_objectives": [
+    "Hiểu nhiệt động lực học",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "tags": ["thermodynamics", "heat-transfer", "PDE", "thermal", "physics"],
-  "requirements": {
-    "python": ">=3.8",
-    "memory": "256MB",
-    "cpu": "1 core"
+  "backend": {
+    "port": 8006,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
   },
-  "endpoints": {
-    "simulate": "/simulate",
-    "presets": "/presets",
-    "health": "/health"
-  },
-  "author": "LMS Math Team",
-  "license": "MIT"
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }

@@ -1,49 +1,47 @@
 {
   "id": "datasim-ai",
-  "name": "DataSim.AI - ML Training Visualization",
-  "nameVi": "DataSim.AI - Trực quan hóa Học máy",
+  "name": "DataSim AI",
+  "title": "Mô phỏng dữ liệu và AI",
+  "description": "Tạo dữ liệu, huấn luyện AI, phân tích kết quả",
   "version": "1.0.0",
-  "description": "Interactive machine learning training visualization. See how AI learns from data in real-time with scikit-learn and PyTorch.",
-  "descriptionVi": "Trực quan hóa quá trình training machine learning. Xem AI học từ dữ liệu như thế nào với scikit-learn và PyTorch.",
-  "category": "machine-learning",
-  "difficulty": "intermediate",
-  "port": 8009,
-  "apiEndpoint": "http://localhost:8009",
+  "category": "Machine Learning",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 300,
+  "icon": "Brain",
+  "tags": [
+    "datasim-ai",
+    "machine learning",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Real ML models (scikit-learn & PyTorch)",
-    "Linear Regression, KNN, Decision Trees, SVM",
-    "Neural Networks with PyTorch",
-    "Decision boundary visualization",
-    "Loss curves and metrics",
-    "Multiple datasets (linear, circles, moons)",
-    "Interactive parameter tuning",
-    "Real-time training progress"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
-  "featuresVi": [
-    "Model ML thật (scikit-learn & PyTorch)",
-    "Linear Regression, KNN, Decision Trees, SVM",
-    "Neural Networks với PyTorch",
-    "Trực quan hóa decision boundary",
-    "Đồ thị loss và metrics",
-    "Nhiều datasets (linear, circles, moons)",
-    "Điều chỉnh parameters tương tác",
-    "Theo dõi training real-time"
+  "learning_objectives": [
+    "Hiểu mô phỏng dữ liệu và ai",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "tags": ["machine-learning", "AI", "scikit-learn", "pytorch", "classification", "regression", "neural-networks"],
-  "requirements": {
-    "python": ">=3.8",
-    "memory": "1GB",
-    "cpu": "2 cores recommended"
+  "backend": {
+    "port": 8003,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
   },
-  "endpoints": {
-    "train": "/train",
-    "train_nn": "/train-neural-network",
-    "train_stream": "/train-stream",
-    "datasets": "/datasets",
-    "models": "/models",
-    "health": "/health"
-  },
-  "author": "LMS Math Team",
-  "license": "MIT"
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }
-

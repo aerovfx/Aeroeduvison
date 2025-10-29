@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState } from "react";
@@ -5,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   ArrowLeft,
   Gift,
@@ -18,6 +21,8 @@ import {
 } from "lucide-react";
 
 export default function KhoBauPage() {
+  const { t } = useLanguage();
+  
   const router = useRouter();
   const [selectedTreasure, setSelectedTreasure] = useState<number | null>(null);
   const [openedTreasures, setOpenedTreasures] = useState<number[]>([]);
@@ -103,7 +108,8 @@ export default function KhoBauPage() {
             </div>
           </div>
         </div>
-      </div>
+      
+              </div>
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Welcome Section */}

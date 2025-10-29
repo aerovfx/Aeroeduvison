@@ -1,3 +1,5 @@
+'use client';
+
 "use client"
 
 import { useState } from "react"
@@ -9,8 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Key, CheckCircle, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function ChangePasswordPage() {
+  const { t } = useLanguage();
+  
   const { data: session } = useSession()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -126,6 +131,7 @@ export default function ChangePasswordPage() {
               <div>
                 <p className="font-medium">Đổi mật khẩu thành công!</p>
                 <p className="text-sm text-green-700">Đang chuyển về trang hồ sơ...</p>
+              
               </div>
             </div>
           </CardContent>
@@ -229,5 +235,4 @@ export default function ChangePasswordPage() {
     </div>
   )
 }
-
 

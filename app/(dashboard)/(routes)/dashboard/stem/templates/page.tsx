@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import Link from "next/link";
@@ -26,6 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from '@/contexts/LanguageContext';
 import { 
   Search,
   Filter,
@@ -292,6 +295,7 @@ const templateProjects: TemplateProject[] = [
 ];
 
 const STEMTemplatesPage = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
@@ -359,7 +363,7 @@ const STEMTemplatesPage = () => {
       tags: project.tags,
     }));
     
-    window.location.href = `/dashboard/stem/create?template=${templateData}`;
+    if (typeof window !== 'undefined') { location.href = `/dashboard/stem/create?template=${templateData}`; }
   };
 
   const getDifficultyBadge = (difficulty: string) => {
@@ -432,7 +436,8 @@ const STEMTemplatesPage = () => {
               <p className="text-gray-600 mt-2">
                 Khám phá các dự án mẫu để lấy cảm hứng và học hỏi kinh nghiệm
               </p>
-            </div>
+            
+              </div>
           </div>
         </div>
 

@@ -1,6 +1,10 @@
+'use client';
+
 "use client";
 
 import { EducationQuizInterface } from '@/components/hybrid-bubble-sheet';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 const mockQuizData = {
   id: "test-quiz",
@@ -19,6 +23,8 @@ const mockQuizData = {
 };
 
 export default function HybridTestPage() {
+  const { t } = useLanguage();
+
   const handleSubmit = (answers: Record<number, number>) => {
     console.log('Answers:', answers);
   };

@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import Link from "next/link";
@@ -6,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   Target,
   Users,
@@ -74,6 +78,7 @@ interface LearningPath {
 }
 
 const LearningPathManagement = () => {
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -314,7 +319,8 @@ const LearningPathManagement = () => {
                 Permissions
               </Link>
             </Button>
-          </div>
+          
+              <LanguageSwitcherCompact /></div>
         </div>
 
         {/* Header */}

@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -5,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { 
   LayoutDashboard,
   Users, 
@@ -41,6 +45,7 @@ interface AdminModule {
 }
 
 const AdminPage = () => {
+  const { t } = useLanguage();
   const router = useRouter();
 
   // Redirect to dashboard on load
@@ -51,7 +56,7 @@ const AdminPage = () => {
     // Fixed modules (cannot be disabled)
     {
       id: "dashboard",
-      name: "Dashboard",
+      name: t('dashboard.title'),
       description: "Tổng quan hệ thống và thống kê",
       icon: LayoutDashboard,
       href: "/admin/dashboard",
@@ -182,7 +187,8 @@ const AdminPage = () => {
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-600">Redirecting to admin dashboard...</p>
       </div>
-    </div>
+    
+              <LanguageSwitcherCompact /></div>
   );
 
   // This code below will never be reached due to redirect
@@ -283,7 +289,7 @@ const AdminPage = () => {
                 onClick={() => router.push('/admin/dashboard')}
               >
                 <LayoutDashboard className="h-6 w-6 mb-2" />
-                <span>Dashboard</span>
+                <span>{t('dashboard.title')}</span>
               </Button>
               <Button 
                 className="h-20 flex-col bg-green-600 hover:bg-green-700"

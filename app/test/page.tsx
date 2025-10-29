@@ -1,4 +1,10 @@
+'use client';
+
+import { useLanguage } from '@/contexts/LanguageContext';
+
 export default function TestPage() {
+  const { t } = useLanguage();
+
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold">Test Page</h1>

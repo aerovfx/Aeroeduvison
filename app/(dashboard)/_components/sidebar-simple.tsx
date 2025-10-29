@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Brain } from "lucide-react";
 
 export const Sidebar = () => {
   const [mounted, setMounted] = useState(false);
@@ -16,9 +17,13 @@ export const Sidebar = () => {
     return (
       <div className="h-full border-r flex flex-col overflow-y-auto bg-white shadow-sm">
         <div className="p-6">
-          <div className="flex items-center space-x-2">
-            <span className="text-2xl">⚛️</span>
-            <h1 className="text-2xl font-bold text-primary">LabTwin</h1>
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 flex items-center justify-center">
+              <Brain className="w-6 h-6 text-gray-700" />
+            </div>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 via-teal-400 to-green-400 bg-[length:300%_300%] animate-gradient-x bg-clip-text text-transparent">
+              AeroEdu
+            </h1>
           </div>
         </div>
         <div className="flex flex-col w-full">
@@ -28,30 +33,48 @@ export const Sidebar = () => {
     );
   }
 
+  // AI-Driven Routes - aligned with sidebar-routes.tsx
   const routes = [
-    { href: "/dashboard", label: "Dashboard", icon: "🏠" },
-    { href: "/student-dashboard", label: "Bảng điều khiển", icon: "🏆" },
-    { href: "/learning-paths-demo", label: "Lộ trình học tập", icon: "🗺️" },
-    { href: "/dashboard/labtwin", label: "LabTwin - Phòng thí nghiệm ảo", icon: "🧪" },
-    { href: "/dashboard/learning", label: "Học tập", icon: "🎓" },
-    { href: "/dashboard/courses", label: "My Courses", icon: "📚" },
-    { href: "/dashboard/assignments", label: "Assignments", icon: "📝" },
-    { href: "/dashboard/quizzes", label: "Quizzes", icon: "❓" },
-    { href: "/dashboard/competition", label: "Cuộc thi", icon: "🏅" },
-    { href: "/dashboard/stem", label: "STEM Projects", icon: "⚡" },
-    { href: "/dashboard/notes", label: "Ghi chú", icon: "📝" },
-    { href: "/dashboard/scrumboard", label: "Scrum Board", icon: "📋" },
-    { href: "/dashboard/contacts", label: "Danh bạ", icon: "👥" },
-    { href: "/dashboard/theme", label: "Theme Demo", icon: "🎨" },
-    { href: "/search", label: "Browse", icon: "🔍" }
+    { href: "/dashboard", label: "📊 Dashboard", icon: "🏠" },
+    { href: "/learning-paths", label: "🗺️ Learning Path", icon: "🗺️" },
+    { href: "/dashboard/analytics", label: "📈 Analytics", icon: "📊" },
+    { href: "/ai-tutor", label: "🤖 AI Tutor", icon: "🤖" },
+    { href: "/dashboard/emotion", label: "💝 Emotion Tracker", icon: "💝" },
+    { href: "/dashboard/assignments", label: "📝 Assignments", icon: "📝" },
+    { href: "/dashboard/achievements", label: "🏆 Achievements", icon: "🏆" },
+    { href: "/dashboard/notifications", label: "🔔 Notifications", icon: "🔔" },
+    { href: "/dashboard/labtwin", label: "🧪 LabTwin", icon: "🧪" },
+    { href: "/dashboard/stem", label: "🚀 STEM", icon: "⚡" },
+    { href: "/dashboard/notes", label: "📝 Notes", icon: "📝" },
+    { href: "/dashboard/scrumboard", label: "📋 Scrum Board", icon: "📋" },
+    { href: "/dashboard/contacts", label: "👥 Danh bạ", icon: "👥" },
   ];
 
   return (
-    <div className="h-full border-r flex flex-col overflow-y-auto bg-white shadow-sm">
+    <>
+      <style jsx>{`
+        @keyframes gradient-x {
+          0%, 100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+        }
+        
+        .animate-gradient-x {
+          animation: gradient-x 4s ease infinite;
+        }
+      `}</style>
+      <div className="h-full border-r flex flex-col overflow-y-auto bg-white shadow-sm">
       <div className="p-6">
-        <div className="flex items-center space-x-2">
-          <span className="text-2xl">✈️</span>
-          <h1 className="text-2xl font-bold text-primary">inPhysic</h1>
+        <div className="flex items-center space-x-3">
+          <div className="w-8 h-8 flex items-center justify-center">
+            <Brain className="w-6 h-6 text-gray-700" />
+          </div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-red-400 via-teal-400 to-green-400 bg-[length:300%_300%] animate-gradient-x bg-clip-text text-transparent">
+            AeroEdu
+          </h1>
         </div>
       </div>
       <div className="flex flex-col w-full">
@@ -70,6 +93,7 @@ export const Sidebar = () => {
         ))}
       </div>
     </div>
+    </>
   );
 };
 

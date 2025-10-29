@@ -870,3 +870,4 @@ Accuracy: ~70-80%
 
 **Test at:** http://localhost:3000/dashboard/labtwin/labs/ocr-simulation
 
+

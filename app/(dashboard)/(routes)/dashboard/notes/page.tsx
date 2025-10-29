@@ -1,3 +1,5 @@
+'use client';
+
 "use client";
 
 import { useSession } from "next-auth/react";
@@ -77,10 +79,10 @@ const noteColors = [
 export const dynamic = 'force-dynamic'
 
 export default function NotesModule() {
+  const { t } = useLanguage();
   const { data: session, status } = useSession();
   const router = useRouter();
-  const { t } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState("");
+    const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [sortBy, setSortBy] = useState<"date" | "title" | "updated">("updated");
@@ -274,7 +276,7 @@ export default function NotesModule() {
   };
 
   if (status === "loading") {
-    return <div>Loading...</div>;
+    return <div>{t('common.loading')}</div>;
   }
 
   if (!session) {

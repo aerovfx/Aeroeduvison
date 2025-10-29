@@ -1,9 +1,12 @@
+'use client';
+
 "use client"
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { QuizletStyleLearning } from "@/components/quizlet-style-learning";
 import { getQuestionsForLesson } from "@/lib/learning-questions";
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // Mapping từ lesson ID sang tên bài học
 const lessonTitles: { [key: string]: { vi: string; en: string } } = {
@@ -151,6 +154,8 @@ const lessonTitles: { [key: string]: { vi: string; en: string } } = {
 };
 
 export default function DynamicLearnPage() {
+  const { t } = useLanguage();
+  
   const params = useParams();
   const router = useRouter();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -189,7 +194,8 @@ export default function DynamicLearnPage() {
             Quay lại
           </button>
         </div>
-      </div>
+      
+              </div>
     );
   }
 

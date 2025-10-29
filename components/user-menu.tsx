@@ -21,15 +21,15 @@ function UserMenuComponent() {
     setMounted(true)
   }, [])
 
-  // Debug logging only in development and only on status change
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("🔍 [USERMENU] Status:", status)
-      if (session) {
-        console.log("🔍 [USERMENU] User:", session.user?.name, session.user?.role)
-      }
-    }
-  }, [status]) // Only log when status changes, not on every session update
+  // Debug logging disabled for cleaner console
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     console.log("🔍 [USERMENU] Status:", status)
+  //     if (session) {
+  //       console.log("🔍 [USERMENU] User:", session.user?.name, session.user?.role)
+  //     }
+  //   }
+  // }, [status])
 
   // Get user reference - hooks must be called unconditionally
   const user = session?.user
@@ -82,7 +82,7 @@ function UserMenuComponent() {
     try {
       // Clear NextAuth cookies and session
       await signOut({ 
-        callbackUrl: "/sign-in",
+        callbackUrl: "/auth/login",
         redirect: false // Prevent automatic redirect
       })
       
@@ -103,13 +103,13 @@ function UserMenuComponent() {
         }
         
         // Force reload to clear any remaining cache
-        window.location.href = "/sign-in"
+        window.location.href = "/auth/login"
       }
     } catch (error) {
       console.error("❌ [LOGOUT] Error during sign out:", error)
       // Force redirect even if signOut fails
       if (typeof window !== 'undefined') {
-        window.location.href = "/sign-in"
+        window.location.href = "/auth/login"
       }
     }
   }, [])
@@ -128,11 +128,9 @@ function UserMenuComponent() {
   }
 
   if (!user) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log("❌ [USERMENU] No session user")
-    }
+    // No user logged in, show sign in button
     return (
-      <a href="/">
+      <a href="/auth/login">
         <Button variant="outline" size="sm">
           Sign In
         </Button>

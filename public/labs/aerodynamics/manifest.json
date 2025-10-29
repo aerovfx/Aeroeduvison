@@ -1,45 +1,47 @@
 {
   "id": "aerodynamics",
-  "name": "Aerodynamics Simulation",
-  "nameVi": "Giả Lập Động Lực Học Không Khí",
+  "name": "Aerodynamics",
+  "title": "Khí động lực học",
+  "description": "Mô phỏng dòng chảy không khí và lực khí động",
   "version": "1.0.0",
-  "description": "2D/3D airflow simulation around objects using Navier-Stokes solver with WebGL visualization",
-  "descriptionVi": "Mô phỏng dòng khí 2D/3D quanh vật thể sử dụng giải thuật Navier-Stokes với trực quan hóa WebGL",
-  "category": "physics",
-  "difficulty": "advanced",
-  "port": 8007,
-  "apiEndpoint": "http://localhost:8007",
+  "category": "Cơ học",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 250,
+  "icon": "Wind",
+  "tags": [
+    "aerodynamics",
+    "cơ học",
+    "simulation",
+    "interactive"
+  ],
   "features": [
-    "Navier-Stokes fluid dynamics solver",
-    "Real-time airflow visualization",
-    "Multiple obstacle shapes (circle, rectangle, airfoil)",
-    "Drag and lift force calculations",
-    "AI-based shape optimization",
-    "Streamline visualization",
-    "Pressure and velocity fields"
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
   ],
-  "featuresVi": [
-    "Giải thuật động lực học chất lỏng Navier-Stokes",
-    "Trực quan hóa dòng khí thời gian thực",
-    "Nhiều hình dạng vật cản (hình trụ, hình vuông, cánh máy bay)",
-    "Tính toán lực cản và lực nâng",
-    "Tối ưu hóa hình dạng bằng AI",
-    "Trực quan hóa đường dòng",
-    "Trường áp suất và vận tốc"
+  "learning_objectives": [
+    "Hiểu khí động lực học",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
   ],
-  "tags": ["physics", "fluid-dynamics", "aerodynamics", "navier-stokes", "webgl", "ai-optimization"],
-  "requirements": {
-    "python": ">=3.8",
-    "memory": "512MB",
-    "cpu": "2 cores recommended"
+  "backend": {
+    "port": 8008,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
   },
-  "endpoints": {
-    "simulate": "/simulate",
-    "optimize": "/optimize",
-    "presets": "/presets",
-    "health": "/health"
-  },
-  "author": "LMS Math Team",
-  "license": "MIT"
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
 }
-

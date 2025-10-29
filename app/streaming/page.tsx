@@ -1,3 +1,5 @@
+'use client';
+
 import { Suspense } from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -23,6 +25,8 @@ import {
 } from "lucide-react";
 import InstantComponent from "@/components/InstantComponent";
 import SlowComponent from "@/components/SlowComponent";
+import { useLanguage } from '@/contexts/LanguageContext';
+import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 /**
  * Streaming Page: /streaming
@@ -40,6 +44,7 @@ import SlowComponent from "@/components/SlowComponent";
  */
 
 export default async function StreamingPage() {
+  const { t } = useLanguage();
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.email) {
@@ -73,7 +78,8 @@ export default async function StreamingPage() {
           <p className="text-muted-foreground">
             Real-time data with progressive loading
           </p>
-        </div>
+        
+              <LanguageSwitcherCompact /></div>
         <div className="flex items-center space-x-2">
           <Badge variant={user.role === 'ADMIN' ? 'destructive' : 'secondary'}>
             {user.role}
@@ -98,12 +104,12 @@ export default async function StreamingPage() {
           user={user}
         />
         <InstantComponent 
-          title="Notifications"
+          title={t('dashboard.notifications')}
           description="System alerts"
           user={user}
         />
         <InstantComponent 
-          title="Quick Actions"
+          title={t('dashboard.quick-actions')}
           description="Common tasks"
           user={user}
         />
