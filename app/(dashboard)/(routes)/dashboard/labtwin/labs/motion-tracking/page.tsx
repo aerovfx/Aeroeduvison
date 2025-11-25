@@ -1025,10 +1025,10 @@ export default function MotionTrackingPage() {
                     <div className="text-xs text-purple-800 space-y-2">
                       <p className="font-bold">Cách sử dụng:</p>
                       <ol className="list-decimal list-inside space-y-1 ml-2">
-                        <li>Click "Chọn Object"</li>
+                        <li>Click &quot;Chọn Object&quot;</li>
                         <li>Click 2 góc đối diện để tạo bounding box</li>
                         <li>Bounding box tím sẽ hiện ngay</li>
-                        <li>Click "Chạy Auto Tracking"</li>
+                        <li>Click &quot;Chạy Auto Tracking&quot;</li>
                         <li>AI tự động track qua tất cả frames</li>
                       </ol>
                       
@@ -1247,7 +1247,7 @@ export default function MotionTrackingPage() {
                 <div className="text-center py-12 text-gray-400">
                   <Info className="h-12 w-12 mx-auto mb-4" />
                   <p>Chưa có dữ liệu tracking</p>
-                  <p className="text-sm mt-2">Bắt đầu tracking trong tab "Phân tích Video"</p>
+                  <p className="text-sm mt-2">Bắt đầu tracking trong tab &quot;Phân tích Video&quot;</p>
                 </div>
               )}
               
@@ -1263,7 +1263,7 @@ export default function MotionTrackingPage() {
                     <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 my-3">
                       <p className="font-bold text-amber-900 mb-2">📏 Sử dụng thước đo (Scale):</p>
                       <p><strong>3a.</strong> Nhập chiều dài thực (vd: 1.0m)</p>
-                      <p><strong>3b.</strong> Click "Sử dụng thước đo"</p>
+                      <p><strong>3b.</strong> Click &quot;Sử dụng thước đo&quot;</p>
                       <p><strong>3c.</strong> Click 2 điểm trên video có chiều dài đã biết</p>
                       <p className="text-xs text-amber-700 mt-1">
                         → Hệ thống tự tính scale (px/m) để chuyển đổi pixel sang mét
@@ -1272,9 +1272,9 @@ export default function MotionTrackingPage() {
                     
                     <div className="bg-purple-50 p-3 rounded-lg border border-purple-200 my-3">
                       <p className="font-bold text-purple-900 mb-2">🤖 Auto Tracking (AI):</p>
-                      <p><strong>4a.</strong> Chọn chế độ "Auto (AI tracking)"</p>
-                      <p><strong>4b.</strong> Click "Chọn Object" và vẽ bounding box (2 góc đối diện)</p>
-                      <p><strong>4c.</strong> Click "Chạy Auto Tracking"</p>
+                      <p><strong>4a.</strong> Chọn chế độ &quot;Auto (AI tracking)&quot;</p>
+                      <p><strong>4b.</strong> Click &quot;Chọn Object&quot; và vẽ bounding box (2 góc đối diện)</p>
+                      <p><strong>4c.</strong> Click &quot;Chạy Auto Tracking&quot;</p>
                       <p className="text-xs text-purple-700 mt-1">
                         → AI tự động track object qua tất cả frames
                       </p>
@@ -1282,15 +1282,15 @@ export default function MotionTrackingPage() {
                     
                     <div className="bg-green-50 p-3 rounded-lg border border-green-200 my-3">
                       <p className="font-bold text-green-900 mb-2">✋ Manual Tracking:</p>
-                      <p><strong>4a.</strong> Chọn chế độ "Manual"</p>
-                      <p><strong>4b.</strong> Click "Manual Tracking"</p>
+                      <p><strong>4a.</strong> Chọn chế độ &quot;Manual&quot;</p>
+                      <p><strong>4b.</strong> Click &quot;Manual Tracking&quot;</p>
                       <p><strong>4c.</strong> Click 2 lần trên mỗi frame (trung tâm + rìa)</p>
                       <p className="text-xs text-green-700 mt-1">
                         → Điểm đỏ hiện ngay tại tọa độ chính xác
                       </p>
                     </div>
                     
-                    <p><strong>5.</strong> Xem biểu đồ trong tab "Trực quan hóa"</p>
+                    <p><strong>5.</strong> Xem biểu đồ trong tab &quot;Trực quan hóa&quot;</p>
                     <p><strong>6.</strong> Xuất dữ liệu CSV khi hoàn tất</p>
                   </CardContent>
                 </Card>

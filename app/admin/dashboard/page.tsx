@@ -562,7 +562,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{syncData.users.length.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              {syncData.users.filter(u => u.role === 'STUDENT').length} t('common.students') • {syncData.users.filter(u => u.role === 'TEACHER').length} t('common.teachers')
+              {syncData.users.filter(u => u.role === 'STUDENT').length} {t('common.students')} • {syncData.users.filter(u => u.role === 'TEACHER').length} {t('common.teachers')}
             </p>
           </CardContent>
         </Card>
@@ -575,7 +575,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{syncData.courses.length}</div>
             <p className="text-xs text-muted-foreground">
-              {syncData.courses.filter(c => c.status === 'published').length} t('admin.published') • {syncData.courses.filter(c => c.status === 'draft').length} t('admin.draft')
+              {syncData.courses.filter(c => c.status === 'published').length} {t('admin.published')} • {syncData.courses.filter(c => c.status === 'draft').length} {t('admin.draft')}
             </p>
           </CardContent>
         </Card>
@@ -588,7 +588,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{overview.totalRevenue.toLocaleString()} VND</div>
             <p className="text-xs text-muted-foreground">
-              {stats.courses.totalPurchases} t('admin.courses-sold')
+              {stats.courses.totalPurchases} {t('admin.courses-sold')}
             </p>
           </CardContent>
         </Card>
