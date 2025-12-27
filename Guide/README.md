@@ -1,6 +1,6 @@
 # 📚 Guide Directory
 
-This directory contains all documentation files and shell scripts for the AeroVFX MathLMS project.
+This directory contains all documentation files and shell scripts for the AeroEduVision project.
 
 ## 📊 Contents
 
@@ -171,7 +171,7 @@ This directory was organized on **2025-12-28** as part of the repository cleanup
 
 ## 🎯 Project Overview
 
-This is the documentation hub for the **AeroVFX MathLMS** project - an AI-powered Learning Management System with interactive simulations, advanced OCR grading, and comprehensive student tracking.
+This is the documentation hub for the **AeroEduVision** project - an AI-powered Learning Management System with interactive simulations, advanced OCR grading, and comprehensive student tracking.
 
 **Key Features Documented:**
 - ✅ NextAuth v5 authentication
@@ -186,4 +186,4 @@ This is the documentation hub for the **AeroVFX MathLMS** project - an AI-powere
 
 **Last Updated:** 2025-12-28  
 **Total Documentation Files:** 299  
-**Project:** https://github.com/aerovfx/mathlms
+**Project:** https://github.com/aerovfx/aeroeduvision

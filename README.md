@@ -126,9 +126,9 @@ This project is proprietary and confidential.
 
 ## 🔗 Links
 
-- **Repository:** https://github.com/aerovfx/mathlms
+- **Repository:** https://github.com/aerovfx/aeroeduvision
 - **Documentation:** [Guide Directory](./Guide)
-- **Production:** https://mathlms.aerovfx.com
+- **Production:** https://aeroeduvision.com
 
 ---
 
