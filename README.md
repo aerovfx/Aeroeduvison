@@ -1,117 +1,137 @@
-# LMS Platform with Next.js 15, Prisma, Google Cloud
+# 🎓 AeroVFX MathLMS
 
-## 🚀 Tech Stack
-- **Frontend & API**: Next.js 15 (App Router, React, TailwindCSS, shadcn/ui)
-- **Auth**: NextAuth.js
-- **Database**: Cloud SQL (Postgres/MySQL) + Prisma ORM
-- **Storage**: Google Cloud Storage (file/video upload, streaming)
-- **Deployment**: Google Cloud Run (containerized)
-- **Optional**: Stripe for payments, Cloud CDN for faster video delivery
+An AI-powered Learning Management System with interactive simulations, advanced OCR grading, and comprehensive student tracking.
 
----
+## 🚀 Quick Start
 
-## ✨ Key Features
-- Browse & Filter Courses
-- Purchase Courses (Stripe integration optional)
-- Mark Chapters as Completed/Uncompleted
-- Progress Tracking for each Course
-- Student Dashboard & Teacher Dashboard
-- Create & Manage Courses and Chapters
-- Drag & Drop reordering of chapters
-- Upload thumbnails, attachments & videos → **GCS**
-- Stream videos from **GCS + HLS**
-- Rich text editor (TipTap) for content
-- Authentication with **NextAuth**
-- Deployment on **Google Cloud Run**
-
----
-
-## ⚙️ Prerequisites
-- Node.js **18+**
-- Google Cloud SDK (`gcloud`) installed & authenticated
-- Google Cloud Project with:
-  - Cloud Run
-  - Cloud SQL Admin
-  - Cloud Storage
-  - Cloud Build
-
----
-
-## 🛠️ Setup
-
-### Clone repository
 ```bash
-git clone https://github.com/your-username/next15-lms-platform.git
-cd next15-lms-platform
-```
-
-### Install dependencies
-```bash
+# Install dependencies
 npm install
-```
 
-### Environment variables
-Create a `.env` file:
-```env
-# NextAuth
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-secret-key
+# Setup local database
+npm run db:push
 
-# Database
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DB_NAME
-
-# Google Cloud
-GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-GOOGLE_CLOUD_BUCKET=your-gcs-bucket-name
-GOOGLE_CLOUD_KEY_FILE=./service-account-key.json
-
-# Stripe (optional)
-STRIPE_API_KEY=
-STRIPE_WEBHOOK_SECRET=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-### Prisma setup
-```bash
-npx prisma generate
-npx prisma migrate dev --name init
-```
-
-### Run locally
-```bash
+# Start development server
 npm run dev
 ```
-Visit → [http://localhost:3000](http://localhost:3000)
 
----
+Visit `http://localhost:3000`
 
-## ☁️ Deployment on Google Cloud
+## 📚 Documentation
 
-### Build Docker image
-```bash
-docker build -t gcr.io/PROJECT_ID/next15-lms .
-docker push gcr.io/PROJECT_ID/next15-lms
+All documentation has been organized in the **[Guide/](./Guide)** directory.
+
+### Quick Links:
+- 📖 [Complete Setup Guide](./Guide/SETUP.md)
+- 🚀 [Quick Start Guide](./Guide/QUICK_START.md)
+- 🧪 [Testing Guide](./Guide/TESTING_QUICK_REFERENCE.md)
+- 🔧 [Troubleshooting](./Guide/TROUBLESHOOTING.md)
+- 📊 [Project Summary](./Guide/SUMMARY_ALL_WORK_DONE.md)
+
+## 🎯 Features
+
+- ✅ **NextAuth v5** - Advanced authentication with 2FA
+- ✅ **20+ Python Simulations** - Physics, Chemistry, Biology labs
+- ✅ **Advanced OCR** - Automatic grading with ML
+- ✅ **AI Content Generation** - Automated lesson creation
+- ✅ **Cloud Run Deployment** - Production-ready infrastructure
+- ✅ **Vision Tracking** - Real-time student monitoring
+- ✅ **Multi-language Support** - Vietnamese & English
+
+## 🛠️ Tech Stack
+
+- **Frontend:** Next.js 15, React 19, TailwindCSS
+- **Backend:** NextAuth v5, Prisma, PostgreSQL
+- **AI/ML:** Google Gemini, Ollama, PaddleOCR
+- **Cloud:** Google Cloud Run, Cloud Storage
+- **Simulations:** Python (FastAPI), Taichi, OpenCV
+
+## 📁 Project Structure
+
+```
+├── app/                    # Next.js app directory
+├── components/             # React components
+├── lib/                    # Utilities and services
+├── prisma/                # Database schema
+├── python-simulations/    # Python simulation servers
+├── python-ocr/            # OCR grading service
+├── Guide/                 # 📚 All documentation (299 files)
+└── public/                # Static assets
 ```
 
-### Deploy to Cloud Run
+## 🔧 Development
+
 ```bash
-gcloud run deploy next15-lms   --image gcr.io/PROJECT_ID/next15-lms   --platform managed   --region asia-southeast1   --allow-unauthenticated   --set-env-vars NEXTAUTH_URL=$NEXTAUTH_URL,NEXTAUTH_SECRET=$NEXTAUTH_SECRET,DATABASE_URL=$DATABASE_URL,GOOGLE_CLOUD_BUCKET=$GOOGLE_CLOUD_BUCKET
+# Install dependencies
+npm install
+
+# Setup environment variables
+cp .env.example .env.local
+
+# Run database migrations
+npm run db:push
+
+# Start dev server
+npm run dev
+
+# Start all Python labs
+./Guide/START_ALL_LABS.sh
 ```
 
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm test
+
+# Test specific feature
+npm run test:auth
+npm run test:simulations
+
+# Quick health check
+./Guide/quick-health-check.sh
+```
+
+## 🚀 Deployment
+
+See [Cloud Run Deployment Guide](./Guide/CLOUD_RUN_DEPLOYMENT_GUIDE.md)
+
+```bash
+# Deploy to Cloud Run
+./Guide/deploy-to-cloud-run.sh
+
+# Verify deployment
+./Guide/verify-cloud-run-deployment.sh
+```
+
+## 📊 Statistics
+
+- **Total Code Files:** 2,000+
+- **Documentation Files:** 299
+- **Python Simulations:** 20+
+- **API Endpoints:** 100+
+- **Components:** 300+
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## 📝 License
+
+This project is proprietary and confidential.
+
+## 🔗 Links
+
+- **Repository:** https://github.com/aerovfx/mathlms
+- **Documentation:** [Guide Directory](./Guide)
+- **Production:** https://mathlms.aerovfx.com
+
 ---
 
-## 📌 Available Commands
-| Command   | Description                           |
-|-----------|---------------------------------------|
-| `dev`     | Run app in development mode           |
-| `build`   | Build app for production              |
-| `start`   | Start production server               |
-| `lint`    | Run ESLint to check code style        |
-
----
-
-## 📂 Notes
-- **Video storage**: handled via GCS (configure CORS for upload).
-- **Database**: Cloud SQL with Prisma migration.
-- **Deployment**: Cloud Run auto-scales by traffic.
-- **Optional**: Stripe for payments, Cloud CDN for optimized video streaming.
+**Last Updated:** 2025-12-28  
+**Version:** 2.0  
+**Developer:** AeroVFX Team
