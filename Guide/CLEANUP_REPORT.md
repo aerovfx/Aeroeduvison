@@ -1,6 +1,6 @@
 # 🎉 Git Repository Cleanup Report
 **Date:** 2025-12-28  
-**Project:** aerovfx/aeroeduvision  
+**Project:** aerovfx/Aeroeduvison  
 
 ---
 

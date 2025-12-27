@@ -126,9 +126,9 @@ This project is proprietary and confidential.
 
 ## 🔗 Links
 
-- **Repository:** https://github.com/aerovfx/aeroeduvision
+- **Repository:** https://github.com/aerovfx/Aeroeduvison
 - **Documentation:** [Guide Directory](./Guide)
-- **Production:** https://aeroeduvision.com
+- **Production:** https://aeroeduvison.com
 
 ---
 

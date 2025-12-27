@@ -186,4 +186,4 @@ This is the documentation hub for the **AeroEduVision** project - an AI-powered 
 
 **Last Updated:** 2025-12-28  
 **Total Documentation Files:** 299  
-**Project:** https://github.com/aerovfx/aeroeduvision
+**Project:** https://github.com/aerovfx/Aeroeduvison
