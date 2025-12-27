@@ -1,0 +1,354 @@
+.piston-assembly-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  padding: 10px;
+  color: #fff;
+}
+
+.assembly-header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.assembly-header h1 {
+  font-size: 1.5rem;
+}
+
+.assembly-header p {
+  font-size: 0.9rem;
+}
+
+.assembly-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #a855f7 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.assembly-header p {
+  font-size: 1.1rem;
+  color: #cbd5e0;
+}
+
+.assembly-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.left-panel {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  width: 100%;
+}
+
+.camera-section {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 12px;
+  grid-column: 1;
+}
+
+.section-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.video-container {
+  position: relative;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  margin-bottom: 10px;
+  min-height: calc(100vh - 150px);
+  height: calc(100vh - 150px);
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-container canvas {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(15, 12, 41, 0.95) 0%, rgba(48, 43, 99, 0.95) 100%);
+}
+
+.placeholder-content {
+  text-align: center;
+  padding: 40px;
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.placeholder-content h3 {
+  font-size: 1.3rem;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.placeholder-content p {
+  font-size: 1rem;
+  color: #a0aec0;
+}
+
+.error-message {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background: rgba(245, 101, 101, 0.1);
+  border: 1px solid rgba(245, 101, 101, 0.3);
+  border-radius: 8px;
+  color: #fc8181;
+  font-size: 0.9rem;
+}
+
+.controls {
+  margin-bottom: 10px;
+}
+
+.btn-start,
+.btn-stop {
+  width: 100%;
+  padding: 14px 24px;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-start {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.btn-stop:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6);
+}
+
+.instructions {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 0.85rem;
+}
+
+.instructions h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.instructions ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.instructions li {
+  font-size: 0.9rem;
+  color: #e2e8f0;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.instructions li:last-child {
+  border-bottom: none;
+}
+
+.parts-list {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 12px;
+  grid-column: 2;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.parts-list h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.parts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.part-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.part-card.assembled {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.part-color {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.part-info {
+  flex: 1;
+}
+
+.part-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.part-desc {
+  font-size: 0.8rem;
+  color: #a0aec0;
+  margin-bottom: 4px;
+}
+
+.part-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.part-card.assembled .part-status {
+  color: #10b981;
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.three-container {
+  width: 100%;
+  height: 600px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.assembly-progress {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.assembly-progress h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 16px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.progress-text {
+  font-size: 0.9rem;
+  color: #cbd5e0;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.completion-message {
+  padding: 16px;
+  background: rgba(16, 185, 129, 0.2);
+  border: 2px solid rgba(16, 185, 129, 0.4);
+  border-radius: 12px;
+  color: #10b981;
+  font-weight: 600;
+  text-align: center;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@media (max-width: 1200px) {
+  .assembly-layout {
+    grid-template-columns: 1fr;
+  }
+}
+

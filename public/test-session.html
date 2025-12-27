@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NextAuth Session Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 16px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .session-info {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn.secondary {
+            background: #6b7280;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .test-item {
+            background: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .test-item.success {
+            border-left-color: #10b981;
+        }
+        
+        .test-item.error {
+            border-left-color: #ef4444;
+        }
+        
+        .test-item h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+        
+        .test-item p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f4f6;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        pre {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 NextAuth Session Tester</h1>
+            <p>Real-time authentication & session testing</p>
+        </div>
+
+        <!-- Current Session -->
+        <div class="card">
+            <h2>
+                📊 Current Session Status
+                <span id="sessionBadge" class="badge warning">Checking...</span>
+            </h2>
+            <div class="session-info">
+                <pre id="sessionData">Loading session data...</pre>
+            </div>
+            <div style="margin-top: 16px;">
+                <button class="btn" onclick="checkSession()">🔄 Refresh Session</button>
+                <button class="btn secondary" onclick="window.location.href='/auth/login'">🔑 Login</button>
+                <button class="btn secondary" onclick="logout()">🚪 Logout</button>
+            </div>
+        </div>
+
+        <!-- Route Tests -->
+        <div class="card">
+            <h2>🧪 Route Access Tests</h2>
+            <div class="test-grid" id="routeTests">
+                <div class="test-item">
+                    <h3><span class="loading"></span> Running tests...</h3>
+                </div>
+            </div>
+            <div style="margin-top: 16px;">
+                <button class="btn" onclick="runRouteTests()">▶️ Run All Tests</button>
+            </div>
+        </div>
+
+        <!-- Cookies -->
+        <div class="card">
+            <h2>🍪 Cookies Status</h2>
+            <div id="cookieInfo" class="session-info">
+                <pre id="cookieData">Loading cookies...</pre>
+            </div>
+        </div>
+
+        <!-- Test Accounts -->
+        <div class="card">
+            <h2>👥 Test Accounts</h2>
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #e5e7eb;">
+                        <th style="text-align: left; padding: 12px;">Email</th>
+                        <th style="text-align: left; padding: 12px;">Password</th>
+                        <th style="text-align: left; padding: 12px;">Role</th>
+                        <th style="text-align: left; padding: 12px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 12px;">student@example.com</td>
+                        <td style="padding: 12px;">password123</td>
+                        <td style="padding: 12px;"><span class="badge success">STUDENT</span></td>
+                        <td style="padding: 12px;">
+                            <button class="btn" style="margin: 0; padding: 8px 16px;" onclick="quickLogin('student')">Quick Login</button>
+                        </td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #e5e7eb;">
+                        <td style="padding: 12px;">teacher@example.com</td>
+                        <td style="padding: 12px;">password123</td>
+                        <td style="padding: 12px;"><span class="badge" style="background: #dbeafe; color: #1e40af;">TEACHER</span></td>
+                        <td style="padding: 12px;">
+                            <button class="btn" style="margin: 0; padding: 8px 16px;" onclick="quickLogin('teacher')">Quick Login</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 12px;">admin@example.com</td>
+                        <td style="padding: 12px;">password123</td>
+                        <td style="padding: 12px;"><span class="badge error">ADMIN</span></td>
+                        <td style="padding: 12px;">
+                            <button class="btn" style="margin: 0; padding: 8px 16px;" onclick="quickLogin('admin')">Quick Login</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Check session on load
+        window.addEventListener('load', () => {
+            checkSession();
+            checkCookies();
+            runRouteTests();
+        });
+
+        async function checkSession() {
+            try {
+                const response = await fetch('/api/auth/session');
+                const data = await response.json();
+                
+                const badge = document.getElementById('sessionBadge');
+                const sessionData = document.getElementById('sessionData');
+                
+                if (data && data.user) {
+                    badge.textContent = '✅ Active';
+                    badge.className = 'badge success';
+                    sessionData.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    badge.textContent = '❌ Not Logged In';
+                    badge.className = 'badge error';
+                    sessionData.textContent = '{}';
+                }
+            } catch (error) {
+                console.error('Session check failed:', error);
+                document.getElementById('sessionBadge').textContent = '⚠️ Error';
+                document.getElementById('sessionBadge').className = 'badge warning';
+            }
+        }
+
+        function checkCookies() {
+            const cookies = document.cookie.split(';').map(c => c.trim());
+            const authCookies = cookies.filter(c => c.includes('next-auth'));
+            
+            const cookieData = document.getElementById('cookieData');
+            if (authCookies.length > 0) {
+                cookieData.textContent = authCookies.map(c => {
+                    const [name, value] = c.split('=');
+                    return `${name} = ${value.substring(0, 50)}...`;
+                }).join('\n');
+            } else {
+                cookieData.textContent = 'No NextAuth cookies found';
+            }
+        }
+
+        async function runRouteTests() {
+            const routes = [
+                { path: '/', name: 'Homepage', expectedGuest: 200, expectedAuth: 307 },
+                { path: '/pricing', name: 'Pricing', expectedGuest: 200, expectedAuth: 307 },
+                { path: '/auth/login', name: 'Login Page', expectedGuest: 200, expectedAuth: 307 },
+                { path: '/dashboard', name: 'Dashboard', expectedGuest: 307, expectedAuth: 200 },
+                { path: '/learning-paths', name: 'Learning Paths', expectedGuest: 307, expectedAuth: 200 },
+                { path: '/teacher/courses', name: 'Teacher Routes', expectedGuest: 307, expectedAuth: 'role-based' },
+            ];
+
+            const container = document.getElementById('routeTests');
+            container.innerHTML = '';
+
+            // Check if logged in
+            const sessionResponse = await fetch('/api/auth/session');
+            const session = await sessionResponse.json();
+            const isLoggedIn = session && session.user;
+            const userRole = session?.user?.role || 'GUEST';
+
+            for (const route of routes) {
+                const testItem = document.createElement('div');
+                testItem.className = 'test-item';
+                
+                try {
+                    const response = await fetch(route.path, { redirect: 'manual' });
+                    const status = response.status;
+                    
+                    const expected = isLoggedIn ? route.expectedAuth : route.expectedGuest;
+                    let passed = false;
+                    
+                    if (expected === 'role-based') {
+                        // Special handling for role-based routes
+                        if (userRole === 'TEACHER' || userRole === 'ADMIN') {
+                            passed = status === 200;
+                        } else {
+                            passed = status === 307; // Should redirect
+                        }
+                    } else {
+                        passed = status === expected;
+                    }
+                    
+                    testItem.className = `test-item ${passed ? 'success' : 'error'}`;
+                    testItem.innerHTML = `
+                        <h3>${passed ? '✅' : '❌'} ${route.name}</h3>
+                        <p>Path: ${route.path}</p>
+                        <p>Status: ${status} (Expected: ${expected})</p>
+                        <p>User: ${userRole}</p>
+                    `;
+                } catch (error) {
+                    testItem.className = 'test-item error';
+                    testItem.innerHTML = `
+                        <h3>❌ ${route.name}</h3>
+                        <p>Error: ${error.message}</p>
+                    `;
+                }
+                
+                container.appendChild(testItem);
+            }
+        }
+
+        async function quickLogin(role) {
+            const accounts = {
+                student: { email: 'student@example.com', password: 'password123' },
+                teacher: { email: 'teacher@example.com', password: 'password123' },
+                admin: { email: 'admin@example.com', password: 'password123' }
+            };
+
+            const account = accounts[role];
+            
+            alert(`Redirecting to login page.\n\nUse these credentials:\nEmail: ${account.email}\nPassword: ${account.password}`);
+            
+            window.location.href = '/auth/login';
+        }
+
+        async function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/api/auth/signout';
+            }
+        }
+
+        // Auto-refresh every 10 seconds
+        setInterval(() => {
+            checkSession();
+            checkCookies();
+        }, 10000);
+    </script>
+</body>
+</html>
+

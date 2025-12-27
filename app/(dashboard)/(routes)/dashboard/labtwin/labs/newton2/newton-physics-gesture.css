@@ -1,0 +1,632 @@
+/* Newton Physics Gesture Control CSS */
+
+.newton-physics-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  padding: 20px;
+  color: #fff;
+}
+
+.physics-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.physics-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #a855f7 0%, #667eea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.physics-subtitle {
+  font-size: 1.1rem;
+  color: #cbd5e0;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* Main Layout */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr 450px;
+  gap: 20px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Left Panel - Camera */
+.left-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.camera-section {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+}
+
+.section-header {
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.video-canvas-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 20px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-canvas-container canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.camera-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(15, 12, 41, 0.95) 0%, rgba(48, 43, 99, 0.95) 100%);
+}
+
+.placeholder-content {
+  text-align: center;
+  padding: 40px;
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 20px;
+  opacity: 0.6;
+}
+
+.placeholder-content h3 {
+  font-size: 1.3rem;
+  color: #fff;
+  margin-bottom: 12px;
+}
+
+.placeholder-content p {
+  font-size: 1rem;
+  color: #a0aec0;
+}
+
+.error-message {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background: rgba(245, 101, 101, 0.1);
+  border: 1px solid rgba(245, 101, 101, 0.3);
+  border-radius: 8px;
+  color: #fc8181;
+  font-size: 0.9rem;
+}
+
+/* Gesture Guide */
+.gesture-guide {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.gesture-guide-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.gesture-guide-section.left-hand {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.gesture-guide-section.right-hand {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.gesture-guide-section h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #fff;
+}
+
+.gesture-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gesture-item {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
+/* AR Panel */
+.ar-selector-panel {
+  margin-top: 20px;
+}
+
+.ar-toggle-btn {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
+}
+
+.ar-toggle-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(240, 147, 251, 0.6);
+}
+
+.ar-panel {
+  margin-top: 16px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ar-categories {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.category-btn {
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  color: #cbd5e0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.category-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.category-btn.active {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  border-color: #a855f7;
+  color: white;
+}
+
+.ar-assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
+}
+
+.ar-asset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.ar-asset-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.ar-asset-btn.selected {
+  background: rgba(168, 85, 247, 0.2);
+  border-color: #a855f7;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
+}
+
+.ar-emoji {
+  font-size: 2rem;
+}
+
+.ar-name {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-align: center;
+}
+
+/* Right Panel */
+.right-panel {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 24px;
+  height: fit-content;
+}
+
+.right-panel h2 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #fff;
+}
+
+/* Formula Card */
+.formula-card {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(102, 126, 234, 0.2) 100%);
+  border: 2px solid rgba(168, 85, 247, 0.4);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.formula-title {
+  font-size: 0.9rem;
+  color: #cbd5e0;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+
+.formula-equation {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.formula-f {
+  color: #f97316;
+}
+
+.formula-equals {
+  color: #fff;
+}
+
+.formula-m {
+  color: #10b981;
+}
+
+.formula-times {
+  color: #fff;
+}
+
+.formula-a {
+  color: #3b82f6;
+}
+
+/* Gesture Controls */
+.gesture-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.gesture-control-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 100px;
+}
+
+.gesture-control-card.left {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.gesture-control-card.right {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.control-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.control-icon {
+  font-size: 1.2rem;
+}
+
+.control-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #cbd5e0;
+}
+
+.control-value {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.gesture-emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.gesture-desc {
+  font-size: 0.75rem;
+  color: #e2e8f0;
+  text-align: center;
+  font-weight: 600;
+}
+
+.no-gesture {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.force-card {
+  border-left: 3px solid #f97316;
+}
+
+.mass-card {
+  border-left: 3px solid #10b981;
+}
+
+.accel-card {
+  border-left: 3px solid #3b82f6;
+}
+
+.velocity-card {
+  border-left: 3px solid #a855f7;
+}
+
+.stat-icon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #a0aec0;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.stat-vector {
+  font-size: 0.75rem;
+  color: #cbd5e0;
+  font-family: monospace;
+}
+
+.stat-mult {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Status Group */
+.status-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.status-label {
+  font-size: 0.85rem;
+  color: #a0aec0;
+  font-weight: 500;
+}
+
+.status-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #cbd5e0;
+}
+
+.status-value.active {
+  color: #10b981;
+}
+
+/* Controls */
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Buttons */
+.control-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-start,
+.btn-stop,
+.btn-reset,
+.btn-ar {
+  width: 100%;
+  padding: 14px 24px;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-start {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.btn-stop:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6);
+}
+
+.btn-reset {
+  background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.btn-reset:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.6);
+}
+
+.btn-ar {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
+}
+
+.btn-ar:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(240, 147, 251, 0.6);
+}
+
+.btn-start:active,
+.btn-stop:active,
+.btn-reset:active,
+.btn-ar:active {
+  transform: translateY(0);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .gesture-guide {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .physics-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .physics-subtitle {
+    font-size: 0.9rem;
+    flex-direction: column;
+  }
+
+  .gesture-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .formula-equation {
+    font-size: 2rem;
+  }
+}
+

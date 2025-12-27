@@ -1,0 +1,60 @@
+═══════════════════════════════════════════════════════════════
+  ✅ DEPLOYMENT ERROR FIXED
+═══════════════════════════════════════════════════════════════
+
+LỖI BẠN GẶP:
+  ❌ Cannot update environment variable [NEXTAUTH_SECRET]
+     to string literal because it has already been set 
+     with a different type.
+
+ĐÃ FIX:
+  ✅ Script deploy-local-amd64.sh đã được update
+  ✅ Tự động clear conflicts trước khi deploy
+  ✅ Thêm script fix-env-conflict.sh để manual fix
+
+═══════════════════════════════════════════════════════════════
+
+CHẠY NGAY:
+───────────────────────────────────────────────────────────────
+
+Script đã fix, chỉ cần chạy lại:
+
+  ./deploy-local-amd64.sh
+
+Script sẽ tự động:
+  1. Clear env vars cũ
+  2. Clear secrets cũ
+  3. Deploy với config sạch
+
+═══════════════════════════════════════════════════════════════
+
+NẾU VẪN LỖI:
+───────────────────────────────────────────────────────────────
+
+Chạy script fix conflict trước:
+
+  ./fix-env-conflict.sh
+
+Sau đó deploy lại:
+
+  ./deploy-local-amd64.sh
+
+═══════════════════════════════════════════════════════════════
+
+ĐÃ CẬP NHẬT:
+───────────────────────────────────────────────────────────────
+
+✅ deploy-local-amd64.sh    - Auto clear conflicts
+✅ fix-env-conflict.sh      - Manual fix tool
+✅ FIX_ENV_CONFLICT_ERROR.txt - Hướng dẫn
+
+═══════════════════════════════════════════════════════════════
+
+🚀 DEPLOY NGAY:
+
+  ./deploy-local-amd64.sh
+
+Script đã fix, sẽ tự động xử lý conflicts!
+
+═══════════════════════════════════════════════════════════════
+

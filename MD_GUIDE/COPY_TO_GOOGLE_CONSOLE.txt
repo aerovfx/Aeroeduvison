@@ -1,0 +1,80 @@
+═══════════════════════════════════════════════════════════════════
+    COPY CÁC URL NÀY VÀO GOOGLE CLOUD CONSOLE
+═══════════════════════════════════════════════════════════════════
+
+🔗 Google Cloud Console Link:
+https://console.cloud.google.com/apis/credentials
+
+📋 Project: lànglow
+📋 Client ID: 442514522574-m19vtt3lptt2m00mk86u3a9lcos95989.apps.googleusercontent.com
+
+───────────────────────────────────────────────────────────────────
+
+📍 SECTION A: Authorized JavaScript origins
+
+Copy URL này vào ô "URIs 1":
+
+http://localhost:3000
+
+
+───────────────────────────────────────────────────────────────────
+
+📍 SECTION B: Authorized redirect URIs
+
+Copy URL này vào ô "URIs 1":
+
+http://localhost:3000/api/auth/callback/google
+
+
+───────────────────────────────────────────────────────────────────
+
+✅ SAU KHI THÊM:
+
+1. Click nút "SAVE" ở cuối trang
+2. Đợi 1-2 phút để Google cập nhật
+3. Clear browser cache HOẶC dùng Incognito window
+4. Test lại: http://localhost:3000/auth/login
+
+───────────────────────────────────────────────────────────────────
+
+⚠️  LƯU Ý:
+
+❌ KHÔNG thêm dấu / ở cuối:
+   Sai: http://localhost:3000/
+   Đúng: http://localhost:3000
+
+❌ KHÔNG thiếu /google ở cuối callback:
+   Sai: http://localhost:3000/api/auth/callback
+   Đúng: http://localhost:3000/api/auth/callback/google
+
+❌ KHÔNG dùng https cho localhost:
+   Sai: https://localhost:3000
+   Đúng: http://localhost:3000
+
+───────────────────────────────────────────────────────────────────
+
+🎯 PRODUCTION (Khi deploy)
+
+Nếu bạn có domain production, thêm thêm 2 URLs này:
+
+JavaScript origins:
+https://inphysic.com
+
+Redirect URIs:
+https://inphysic.com/api/auth/callback/google
+
+(Thay inphysic.com bằng domain của bạn)
+
+───────────────────────────────────────────────────────────────────
+
+🆘 NẾU VẪN LỖI:
+
+1. Kiểm tra đúng project "lànglow" trong dropdown
+2. Kiểm tra đúng Client ID trong danh sách
+3. Đảm bảo đã click SAVE
+4. Đợi đủ 1-2 phút
+5. Clear browser cache hoặc dùng Incognito
+6. Restart Next.js server: npm run dev
+
+═══════════════════════════════════════════════════════════════════
+

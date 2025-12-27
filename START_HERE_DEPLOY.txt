@@ -1,0 +1,129 @@
+═══════════════════════════════════════════════════════════════
+  🚀 START HERE - Deploy to Cloud Run
+═══════════════════════════════════════════════════════════════
+
+BẠN GẶP LỖI:
+  ❌ NOT_FOUND: Requested entity was not found
+  ❌ Cloud Build không hoạt động
+
+GIẢI PHÁP:
+  ✅ Dùng local build + Artifact Registry
+
+═══════════════════════════════════════════════════════════════
+
+CHỈ CẦN 2 BƯỚC:
+───────────────────────────────────────────────────────────────
+
+1️⃣ Setup (CHỈ CHẠY LẦN ĐẦU)
+   
+   ./setup-cloud-build.sh
+   
+   ⏱️  Thời gian: 2-3 phút
+   📝 Làm gì: Enable APIs và grant permissions
+
+2️⃣ Deploy (MỖI LẦN DEPLOY)
+   
+   ./deploy-local-amd64.sh
+   
+   ⏱️  Thời gian: 5-10 phút
+   📝 Làm gì: Build AMD64 image và deploy
+
+═══════════════════════════════════════════════════════════════
+
+COMMANDS ĐẦY ĐỦ:
+───────────────────────────────────────────────────────────────
+
+# Lần đầu tiên
+cd /Users/vietchung/lmsmath
+./setup-cloud-build.sh
+./deploy-local-amd64.sh
+
+# Các lần sau
+./deploy-local-amd64.sh
+
+═══════════════════════════════════════════════════════════════
+
+SAU KHI DEPLOY XONG:
+───────────────────────────────────────────────────────────────
+
+1. Xóa cookies:
+   🌐 https://inphysic.com/clear-cookies.html
+
+2. Hard refresh:
+   ⌨️  Cmd+Shift+R (Mac)
+   ⌨️  Ctrl+Shift+R (Windows)
+
+3. Test login:
+   🌐 https://inphysic.com/auth/login
+   📧 student@example.com
+   🔑 student123
+
+═══════════════════════════════════════════════════════════════
+
+NẾU GẶP LỖI:
+───────────────────────────────────────────────────────────────
+
+"buildx not found":
+  docker buildx create --name multiplatform --use
+
+"permission denied":
+  gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+"repository not found":
+  gcloud artifacts repositories create lmsmath \
+    --repository-format=docker \
+    --location=asia-east1 \
+    --project=gen-lang-client-0712182643
+
+═══════════════════════════════════════════════════════════════
+
+ĐỌC THÊM:
+───────────────────────────────────────────────────────────────
+
+Quick guide:
+  📄 DEPLOY_FIX_QUICK.txt
+
+Chi tiết:
+  📄 FIX_CLOUD_BUILD_ERROR.md
+
+Tất cả fixes:
+  📄 ALL_FIXES_INDEX.txt
+
+═══════════════════════════════════════════════════════════════
+
+TẤT CẢ ĐÃ FIX:
+───────────────────────────────────────────────────────────────
+
+✅ Environment variables synced
+✅ Infinite loop fixed (7/7 tests passed)
+✅ Docker platform fixed (AMD64)
+✅ Cloud Build error fixed (Artifact Registry)
+
+═══════════════════════════════════════════════════════════════
+
+🎯 KHUYẾN NGHỊ:
+
+Method #1 (MỚI NHẤT):
+  ./deploy-local-amd64.sh    ⭐ BEST
+
+Method #2 (Cũng OK):
+  ./DEPLOY_AMD64_FIX.sh
+
+Method #3 (Không dùng):
+  ./deploy-cloudbuild.sh     ❌ May fail
+
+═══════════════════════════════════════════════════════════════
+
+🚀 DEPLOY NGAY:
+
+Chạy 2 lệnh này:
+
+1. ./setup-cloud-build.sh      (lần đầu)
+2. ./deploy-local-amd64.sh     (mỗi lần)
+
+═══════════════════════════════════════════════════════════════
+
+🎉 Sẵn sàng deploy!
+
+═══════════════════════════════════════════════════════════════
+

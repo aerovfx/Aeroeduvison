@@ -1,0 +1,36 @@
+# Advanced OCR Requirements
+# CRNN + EAST + PaddleOCR
+
+# Core dependencies
+paddleocr>=3.0.0
+paddlepaddle>=3.0.0
+opencv-python>=4.8.0
+opencv-contrib-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+
+# FastAPI Server
+fastapi>=0.100.0
+uvicorn>=0.23.0
+python-multipart>=0.0.6
+
+# Image processing
+scikit-image>=0.21.0
+imgaug>=1.2.0
+
+# Text processing
+python-Levenshtein>=0.21.0
+fuzzywuzzy>=0.18.0
+
+# Vietnamese support
+underthesea>=1.3.0  # Vietnamese NLP
+pyvi>=0.1.0         # Vietnamese word segmentation
+
+# Utilities
+tqdm>=4.65.0
+pyyaml>=6.0
+
