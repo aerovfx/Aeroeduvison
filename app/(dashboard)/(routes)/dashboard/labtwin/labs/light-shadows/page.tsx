@@ -332,14 +332,14 @@ export default function LightShadowsPage() {
 
   if (!isMounted) {
     return (
-
-      <VisionThemeWrapper title="Light Shadows" subtitle="Hệ thống học tập thông minh">
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="text-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading simulation...</p>
+      <VisionThemeWrapper>
+        <div className="container mx-auto p-6 space-y-6">
+          <div className="text-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading simulation...</p>
+          </div>
         </div>
-      </div>
+      </VisionThemeWrapper>
     );
   }
 

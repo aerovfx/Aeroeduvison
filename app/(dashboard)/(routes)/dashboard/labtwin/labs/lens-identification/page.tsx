@@ -2,8 +2,6 @@
 
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -392,7 +390,8 @@ export default function LensIdentificationPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <VisionThemeWrapper>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="text-center space-y-4">
         <div className="flex items-center justify-center space-x-3">

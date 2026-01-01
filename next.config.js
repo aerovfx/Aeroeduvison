@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const { withContentlayer } = require("next-contentlayer")
+
 const nextConfig = {
   // Output configuration for Cloud Run
   output: 'standalone',
@@ -47,4 +49,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+module.exports = withContentlayer(nextConfig)

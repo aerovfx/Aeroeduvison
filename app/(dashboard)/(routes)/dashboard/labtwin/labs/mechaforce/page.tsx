@@ -277,9 +277,7 @@ function ForceGraphCanvas({
   }, [data, currentTime, graphType, activeTab]);
   
   return (
-
-  
-    <VisionThemeWrapper title="Mechaforce" subtitle="Hệ thống học tập thông minh">
+    <VisionThemeWrapper>
     <canvas
       ref={canvasRef}
       width={900}

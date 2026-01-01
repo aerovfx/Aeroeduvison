@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { Brain } from "lucide-react";
 import { XPProvider } from "@/contexts/XPContext";
 import { STEMProvider } from "@/contexts/STEMContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import { UserMenu } from "@/components/user-menu";
 import { Sidebar } from "./_components/sidebar";
 import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
@@ -33,9 +34,10 @@ const DashboardLayout = ({
 }) => {
   return (
     <Suspense fallback={<DashboardLoading />}>
-      <XPProvider>
-        <STEMProvider>
-          <div className="h-full">
+      <LanguageProvider>
+        <XPProvider>
+          <STEMProvider>
+            <div className="h-full">
             <style jsx>{`
               @keyframes gradient-x {
                 0%, 100% {
@@ -81,9 +83,10 @@ const DashboardLayout = ({
 
             {/* Chatbot Widget */}
             <ChatbotWidget />
-          </div>
-        </STEMProvider>
-      </XPProvider>
+            </div>
+          </STEMProvider>
+        </XPProvider>
+      </LanguageProvider>
     </Suspense>
   );
 }

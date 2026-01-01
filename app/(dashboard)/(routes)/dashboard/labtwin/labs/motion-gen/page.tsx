@@ -357,7 +357,8 @@ export default function MotionGenSimulator() {
   };
 
   return (
-    <div className="vision-container">
+    <VisionThemeWrapper>
+      <div className="vision-container">
       {/* Header */}
       <div className="vision-header">
         <h1>🤖 MotionGen - Robot Arm Simulator</h1>

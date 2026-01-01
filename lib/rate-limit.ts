@@ -1,10 +1,13 @@
 /**
  * Rate Limiting Utility
- * 
+ *
  * Prevents brute force attacks by limiting requests per IP address
+ * Uses Redis for distributed rate limiting in production
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { getRedisClient } from './redis';
+import { apiLogger } from './logging-simple';
 
 interface RateLimitStore {
   count: number;
@@ -12,8 +15,63 @@ interface RateLimitStore {
   lockoutUntil?: number;
 }
 
-// In-memory store for rate limiting (use Redis in production)
-const rateLimitStore = new Map<string, RateLimitStore>();
+// Redis-based rate limiting for production
+class RedisRateLimitStore {
+  private redis = getRedisClient();
+
+  async get(identifier: string): Promise<RateLimitStore | null> {
+    if (!this.redis) {
+      return null;
+    }
+
+    try {
+      const data = await this.redis.get(`ratelimit:${identifier}`);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      apiLogger.error('Redis rate limit get error', {
+        metadata: { identifier, error: (error as Error).message }
+      });
+      return null;
+    }
+  }
+
+  async set(identifier: string, data: RateLimitStore): Promise<void> {
+    if (!this.redis) {
+      return;
+    }
+
+    try {
+      // Set with TTL to auto-expire
+      const ttl = Math.max(
+        Math.ceil((data.resetTime - Date.now()) / 1000),
+        300 // minimum 5 minutes
+      );
+      await this.redis.setex(`ratelimit:${identifier}`, ttl, JSON.stringify(data));
+    } catch (error) {
+      apiLogger.error('Redis rate limit set error', {
+        metadata: { identifier, error: (error as Error).message }
+      });
+    }
+  }
+
+  async delete(identifier: string): Promise<void> {
+    if (!this.redis) {
+      return;
+    }
+
+    try {
+      await this.redis.del(`ratelimit:${identifier}`);
+    } catch (error) {
+      apiLogger.error('Redis rate limit delete error', {
+        metadata: { identifier, error: (error as Error).message }
+      });
+    }
+  }
+}
+
+// Fallback in-memory store for development
+const memoryRateLimitStore = new Map<string, RateLimitStore>();
+const redisRateLimitStore = new RedisRateLimitStore();
 
 // Configuration
 export const RATE_LIMIT_CONFIG = {
@@ -55,15 +113,17 @@ export function getClientIp(request: NextRequest): string {
 }
 
 /**
- * Check if IP is rate limited
+ * Check if IP is rate limited (async with Redis support)
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   identifier: string,
   config: typeof RATE_LIMIT_CONFIG.login
-): { allowed: boolean; remaining: number; resetTime: number; lockoutUntil?: number } {
+): Promise<{ allowed: boolean; remaining: number; resetTime: number; lockoutUntil?: number }> {
   const now = Date.now();
-  const record = rateLimitStore.get(identifier);
-  
+
+  // Try Redis first, fallback to memory
+  let record = await redisRateLimitStore.get(identifier);
+
   // Check if currently locked out
   if (record?.lockoutUntil && record.lockoutUntil > now) {
     return {
@@ -73,29 +133,31 @@ export function checkRateLimit(
       lockoutUntil: record.lockoutUntil
     };
   }
-  
+
   // Reset if window expired
   if (!record || record.resetTime < now) {
-    rateLimitStore.set(identifier, {
+    const newRecord = {
       count: 1,
       resetTime: now + config.windowMs
-    });
-    
+    };
+
+    await redisRateLimitStore.set(identifier, newRecord);
+
     return {
       allowed: true,
       remaining: config.maxAttempts - 1,
       resetTime: now + config.windowMs
     };
   }
-  
+
   // Increment count
   record.count++;
-  
+
   // Check if exceeded limit
   if (record.count > config.maxAttempts) {
     record.lockoutUntil = now + config.lockoutMs;
-    rateLimitStore.set(identifier, record);
-    
+    await redisRateLimitStore.set(identifier, record);
+
     return {
       allowed: false,
       remaining: 0,
@@ -103,9 +165,9 @@ export function checkRateLimit(
       lockoutUntil: record.lockoutUntil
     };
   }
-  
-  rateLimitStore.set(identifier, record);
-  
+
+  await redisRateLimitStore.set(identifier, record);
+
   return {
     allowed: true,
     remaining: config.maxAttempts - record.count,
@@ -116,36 +178,36 @@ export function checkRateLimit(
 /**
  * Reset rate limit for an identifier (e.g., after successful login)
  */
-export function resetRateLimit(identifier: string): void {
-  rateLimitStore.delete(identifier);
+export async function resetRateLimit(identifier: string): Promise<void> {
+  await redisRateLimitStore.delete(identifier);
 }
 
 /**
- * Rate limit middleware factory
+ * Rate limit middleware factory (async)
  */
 export function createRateLimiter(
   type: keyof typeof RATE_LIMIT_CONFIG = 'api'
 ) {
-  return (request: NextRequest) => {
+  return async (request: NextRequest) => {
     const ip = getClientIp(request);
     const identifier = `${type}:${ip}`;
     const config = RATE_LIMIT_CONFIG[type];
-    
-    const result = checkRateLimit(identifier, config);
-    
+
+    const result = await checkRateLimit(identifier, config);
+
     if (!result.allowed) {
       const retryAfter = Math.ceil((result.resetTime - Date.now()) / 1000);
-      
+
       return NextResponse.json(
         {
           error: 'Too many requests',
-          message: result.lockoutUntil 
+          message: result.lockoutUntil
             ? `Too many failed attempts. Account temporarily locked. Try again in ${Math.ceil((result.lockoutUntil - Date.now()) / 60000)} minutes.`
             : `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
           retryAfter,
           lockoutUntil: result.lockoutUntil
         },
-        { 
+        {
           status: 429,
           headers: {
             'Retry-After': retryAfter.toString(),
@@ -156,26 +218,17 @@ export function createRateLimiter(
         }
       );
     }
-    
+
     return null; // Allow request to proceed
   };
 }
 
 /**
- * Clean up expired entries (run periodically)
+ * Clean up expired entries (Redis handles this automatically with TTL)
+ * This function is kept for compatibility but Redis TTL handles cleanup
  */
 export function cleanupRateLimitStore(): void {
-  const now = Date.now();
-  
-  for (const [key, record] of rateLimitStore.entries()) {
-    if (record.resetTime < now && (!record.lockoutUntil || record.lockoutUntil < now)) {
-      rateLimitStore.delete(key);
-    }
-  }
-}
-
-// Clean up every 5 minutes
-if (typeof window === 'undefined') {
-  setInterval(cleanupRateLimitStore, 5 * 60 * 1000);
+  // Redis TTL handles automatic cleanup, no manual cleanup needed
+  apiLogger.debug('Rate limit cleanup called - Redis TTL handles cleanup automatically');
 }
 

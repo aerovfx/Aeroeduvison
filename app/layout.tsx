@@ -11,6 +11,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'AeroEdu - Interactive Learning Platform',
   description: 'An innovative learning platform with virtual labs and AI-powered content generation',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

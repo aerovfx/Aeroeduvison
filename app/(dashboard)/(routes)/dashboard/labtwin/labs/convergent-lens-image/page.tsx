@@ -1,8 +1,8 @@
 'use client';
 
-import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
-
 "use client";
+
+import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

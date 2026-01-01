@@ -8,7 +8,7 @@ import { isAccountLocked, recordFailedLogin, resetFailedAttempts } from "./accou
 import { logAuthEvent } from "./auth-logger"
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db), // Sử dụng PrismaAdapter để lưu sessions vào database
+  adapter: PrismaAdapter(db), // Keep adapter for Account/User management
   secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development",
   debug: true, // Enable debug to see NextAuth logs
   useSecureCookies: process.env.NODE_ENV === "production", // Use secure cookies in production only
@@ -35,7 +35,7 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         try {
           console.log('[AUTHORIZE] called with:', credentials && { email: credentials.email });
-          
+
           if (!credentials?.email || !credentials?.password) {
             console.log('[AUTHORIZE] missing email/password');
             await logAuthEvent({
@@ -59,7 +59,7 @@ export const authOptions: NextAuthOptions = {
               email: normalizedEmail,
               action: 'failed_login',
               status: 'blocked',
-              metadata: { 
+              metadata: {
                 reason: 'Account locked',
                 lockedUntil: lockStatus.lockedUntil?.toISOString(),
                 remainingMinutes: lockStatus.remainingMinutes
@@ -89,60 +89,60 @@ export const authOptions: NextAuthOptions = {
             console.log('[AUTHORIZE] user not found');
             await recordFailedLogin(normalizedEmail, undefined, 'User not found');
             return null
-        }
-
-        if (!user.password) {
-          console.log('[AUTHORIZE] no password set (OAuth account)');
-          await recordFailedLogin(normalizedEmail, undefined, 'No password set (OAuth account)');
-          return null
-        }
-
-        console.log('[AUTHORIZE] checking password...');
-        const isPasswordValid = await compare(credentials.password, user.password)
-        console.log('[AUTHORIZE] password valid?', isPasswordValid);
-
-        if (!isPasswordValid) {
-          console.log('[AUTHORIZE] invalid password');
-          await recordFailedLogin(normalizedEmail, undefined, 'Invalid password');
-          return null
-        }
-
-        // Check 2FA if enabled
-        if (user.twoFactorEnabled && user.twoFactorSecret) {
-          // 2FA is enabled but no code provided
-          if (!credentials.twoFactorCode) {
-            return {
-              id: user.id,
-              email: user.email,
-              name: user.name,
-              image: user.image,
-              role: user.role,
-              requires2FA: true as any
-            }
           }
 
-          // Verify 2FA code (handled in separate route for better UX)
-          // This is a simplified check - full implementation in separate API route
-        }
+          if (!user.password) {
+            console.log('[AUTHORIZE] no password set (OAuth account)');
+            await recordFailedLogin(normalizedEmail, undefined, 'No password set (OAuth account)');
+            return null
+          }
 
-        // Success - reset failed attempts
-        await resetFailedAttempts(normalizedEmail);
-        
-        console.log('[AUTHORIZE] login successful for:', normalizedEmail);
-        await logAuthEvent({
-          userId: user.id,
-          email: normalizedEmail,
-          action: 'login',
-          status: 'success'
-        });
-        
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role,
-        }
+          console.log('[AUTHORIZE] checking password...');
+          const isPasswordValid = await compare(credentials.password, user.password)
+          console.log('[AUTHORIZE] password valid?', isPasswordValid);
+
+          if (!isPasswordValid) {
+            console.log('[AUTHORIZE] invalid password');
+            await recordFailedLogin(normalizedEmail, undefined, 'Invalid password');
+            return null
+          }
+
+          // Check 2FA if enabled
+          if (user.twoFactorEnabled && user.twoFactorSecret) {
+            // 2FA is enabled but no code provided
+            if (!credentials.twoFactorCode) {
+              return {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+                image: user.image,
+                role: user.role,
+                requires2FA: true as any
+              }
+            }
+
+            // Verify 2FA code (handled in separate route for better UX)
+            // This is a simplified check - full implementation in separate API route
+          }
+
+          // Success - reset failed attempts
+          await resetFailedAttempts(normalizedEmail);
+
+          console.log('[AUTHORIZE] login successful for:', normalizedEmail);
+          await logAuthEvent({
+            userId: user.id,
+            email: normalizedEmail,
+            action: 'login',
+            status: 'success'
+          });
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role,
+          }
         } catch (err) {
           console.error('[AUTHORIZE] authorize error:', err);
           return null; // tránh throw nếu muốn chỉ báo login fail
@@ -151,51 +151,19 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   session: {
-    strategy: "database" as const, // Sử dụng database sessions với PrismaAdapter
+    strategy: "jwt", // Use JWT instead of database sessions
     maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // Update session every 24 hours
-  },
-  jwt: {
-    secret: process.env.NEXTAUTH_SECRET,
   },
   cookies: {
     sessionToken: {
-      name: "__Secure-next-auth.session-token",
+      name: process.env.NODE_ENV === "production"
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
         secure: process.env.NODE_ENV === "production",
-        // Không set domain để tránh vấn đề với __Host- cookies
-      },
-    },
-    csrfToken: {
-      name: "__Host-next-auth.csrf-token",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        // __Host- cookies không được có Domain attribute
-      },
-    },
-    callbackUrl: {
-      name: "__Secure-next-auth.callback-url",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-    state: {
-      name: "__Secure-next-auth.state",
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 900, // 15 minutes
       },
     },
   },
@@ -207,7 +175,7 @@ export const authOptions: NextAuthOptions = {
         try {
           // Normalize email to lowercase
           const normalizedEmail = user.email!.toLowerCase().trim()
-          
+
           // Kiểm tra xem user đã tồn tại chưa
           const existingUser = await db.user.findUnique({
             where: { email: normalizedEmail }
@@ -246,17 +214,17 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       // console.log("🔄 [REDIRECT] Redirect callback", { url, baseUrl })
-      
+
       // If url is a relative path, make it absolute
       if (url.startsWith("/")) {
         return `${baseUrl}${url}`
       }
-      
+
       // If url is on the same origin, allow it
       if (url.startsWith(baseUrl)) {
         return url
       }
-      
+
       // Default redirect to dashboard (middleware will handle role-based routing)
       return `${baseUrl}/dashboard`
     },
@@ -268,7 +236,7 @@ export const authOptions: NextAuthOptions = {
       //   tokenKeys: token ? Object.keys(token) : [],
       //   userData: user ? { id: user.id, email: user.email, role: user.role } : null
       // })
-      
+
       // Initial sign in
       if (user) {
         token.role = user.role
@@ -279,7 +247,7 @@ export const authOptions: NextAuthOptions = {
         token.lastUpdated = Date.now()
         // console.log("🔑 [JWT] Updated token with user data:", { id: token.id, email: token.email, role: token.role })
       }
-      
+
       // Update token with fresh data from database
       if (trigger === "update" || (token.email && Date.now() - (token.lastUpdated as number) > 5 * 60 * 1000)) {
         // console.log("🔄 [JWT] Refreshing token data from database")
@@ -288,7 +256,7 @@ export const authOptions: NextAuthOptions = {
           where: { email: normalizedEmail },
           select: { id: true, email: true, role: true, name: true, image: true }
         })
-        
+
         if (dbUser) {
           token.role = dbUser.role
           token.id = dbUser.id
@@ -302,7 +270,7 @@ export const authOptions: NextAuthOptions = {
           return null
         }
       }
-      
+
       // Đảm bảo role được cập nhật từ database cho Google OAuth
       if (account?.provider === "google" && token.email) {
         const normalizedEmail = token.email.toLowerCase().trim()
@@ -318,59 +286,59 @@ export const authOptions: NextAuthOptions = {
           // console.log("✅ [JWT] Updated token for Google OAuth user:", { id: token.id, email: token.email, role: token.role })
         }
       }
-      
+
       // console.log("🔑 [JWT] Returning token:", { id: token.id, email: token.email, role: token.role })
       return token
     },
-    async session({ session, user }) {
-      // Với database sessions, user object được truyền trực tiếp từ database
+    async session({ session, token }) {
+      // With JWT strategy, token is passed (not user)
       // console.log("📊 [SESSION] Session callback called", { 
       //   hasSession: !!session, 
-      //   hasUser: !!user,
-      //   userData: user ? { 
-      //     id: user.id, 
-      //     email: user.email, 
-      //     role: user.role 
+      //   hasToken: !!token,
+      //   tokenData: token ? { 
+      //     id: token.id, 
+      //     email: token.email, 
+      //     role: token.role 
       //   } : null
       // })
-      
-      if (user) {
-        // Với database sessions, user object chứa đầy đủ thông tin từ database
-        session.user.id = user.id
-        session.user.role = user.role
-        session.user.email = user.email
-        session.user.name = user.name
-        session.user.image = user.image
-        
-        // console.log("📊 [SESSION] Updated session with user data:", { 
+
+      if (token) {
+        // Update session with data from JWT token
+        session.user.id = token.id as string
+        session.user.role = token.role as string
+        session.user.email = token.email as string
+        session.user.name = token.name as string
+        session.user.image = token.image as string
+
+        // console.log("📊 [SESSION] Updated session with token data:", { 
         //   id: session.user.id, 
         //   email: session.user.email, 
         //   role: session.user.role 
         // })
       }
-      
+
       // Validate session by checking if user still exists in database
       if (session?.user?.email) {
         try {
           const normalizedEmail = session.user.email.toLowerCase().trim()
           // console.log("📊 [SESSION] Validating user in database:", normalizedEmail)
-          
+
           const dbUser = await db.user.findUnique({
             where: { email: normalizedEmail },
             select: { id: true, email: true, role: true, name: true, image: true }
           })
-          
+
           if (!dbUser) {
             // console.log("❌ [SESSION] User not found in database, invalidating session")
             return null
           }
-          
+
           // console.log("✅ [SESSION] User validated in database:", { 
           //   id: dbUser.id, 
           //   email: dbUser.email, 
           //   role: dbUser.role 
           // })
-          
+
           // Update session with latest user data
           session.user.id = dbUser.id
           session.user.role = dbUser.role
@@ -382,34 +350,26 @@ export const authOptions: NextAuthOptions = {
           return null
         }
       }
-      
+
       // console.log("📊 [SESSION] Returning session:", { id: session?.user?.id, email: session?.user?.email, role: session?.user?.role })
       return session
     },
-    async redirect({ url, baseUrl }) {
-      // If url is relative, append to baseUrl
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      // If url is on same origin, allow it
-      if (new URL(url).origin === baseUrl) return url
-      // Otherwise redirect to baseUrl
-      return baseUrl
-    }
   },
-  
+
   events: {
     async signIn({ user, account, profile, isNewUser }) {
       // console.log("🎉 [EVENT] User signed in:", { email: user.email, provider: account?.provider, isNewUser })
     },
-    
+
     async signOut({ session, token }) {
       // console.log("👋 [EVENT] User signed out:", { email: session?.user?.email || token?.email })
     },
-    
+
     async session({ session, token }) {
       // console.log("📊 [EVENT] Session accessed:", { email: session?.user?.email })
     }
   },
-  
+
   pages: {
     signIn: "/auth/login",
     signOut: "/auth/login",

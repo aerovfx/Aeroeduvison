@@ -1,9 +1,8 @@
 'use client';
 
-import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
-
 "use client";
 
+import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1511,12 +1510,13 @@ function PhysicsGraphCanvas({
   }, [data, currentTime, graphType]);
   
   return (
-    <canvas
-      ref={canvasRef}
-      width={1000}
-      height={350}
-      className="border-2 border-blue-200 rounded-lg shadow-lg w-full"
-    />
+    <VisionThemeWrapper>
+      <canvas
+        ref={canvasRef}
+        width={1000}
+        height={350}
+        className="border-2 border-blue-200 rounded-lg shadow-lg w-full"
+      />
     </VisionThemeWrapper>
   );
 }

@@ -1488,12 +1488,13 @@ function ConservationGraphCanvas({
   }, [data, currentTime, graphType]);
   
   return (
-    <canvas
-      ref={canvasRef}
-      width={900}
-      height={300}
-      className="border-2 border-orange-200 rounded-lg shadow-lg w-full"
-    />
+    <VisionThemeWrapper>
+      <canvas
+        ref={canvasRef}
+        width={900}
+        height={300}
+        className="border-2 border-orange-200 rounded-lg shadow-lg w-full"
+      />
     </VisionThemeWrapper>
   );
 }

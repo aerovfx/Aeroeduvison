@@ -28,10 +28,10 @@ const iconMap: { [key: string]: any } = {
 
 export default function LabsIndexPage() {
   const { t } = useLanguage();
-  
+
   const searchParams = useSearchParams();
   const categoryFilter = searchParams.get('category');
-  
+
   const [labsData, setLabsData] = useState<any>({ simulations: [], total: 0, last_updated: null });
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(categoryFilter);
@@ -39,10 +39,17 @@ export default function LabsIndexPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const response = await fetch('/labs/index.json');
+        const response = await fetch('/api/labtwin');
         if (response.ok) {
-          const data = await response.json();
-          setLabsData(data);
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            setLabsData(data);
+          } else {
+            console.error('Received non-JSON response from API');
+          }
+        } else {
+          console.error('Failed to fetch labs data:', response.status);
         }
       } catch (error) {
         console.error('Error loading labs:', error);
@@ -50,7 +57,7 @@ export default function LabsIndexPage() {
         setLoading(false);
       }
     };
-    
+
     loadData();
   }, []);
 
@@ -104,7 +111,7 @@ export default function LabsIndexPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
         <div className="text-center">
-                    <div className="text-lg text-gray-700">Đang tải...</div>
+          <div className="text-lg text-gray-700">Đang tải...</div>
         </div>
       </div>
     );
@@ -115,14 +122,14 @@ export default function LabsIndexPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            href="/dashboard/labtwin" 
+          <Link
+            href="/dashboard/labtwin"
             className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-4 font-medium"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Quay lại LabTwin
           </Link>
-          
+
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-purple-400 via-pink-400 to-orange-400 rounded-2xl text-white shadow-lg transform hover:scale-105 transition-transform">
               <FlaskConical className="h-10 w-10" />
@@ -161,7 +168,7 @@ export default function LabsIndexPage() {
                       🎮 Học bằng cách chơi!
                     </h3>
                     <p className="text-purple-700 text-sm mb-3">
-                      Mỗi thí nghiệm là một trò chơi khoa học! Tương tác, thử nghiệm, và khám phá cách mọi thứ hoạt động. 
+                      Mỗi thí nghiệm là một trò chơi khoa học! Tương tác, thử nghiệm, và khám phá cách mọi thứ hoạt động.
                       Python simulations thật + WebGL visualization + AI integration = Học vừa vui vừa hiểu! 🎉
                     </p>
                     <div className="flex flex-wrap gap-2 text-sm">
@@ -232,7 +239,7 @@ export default function LabsIndexPage() {
                   const emoji = categoryIcons[category] || '🔬';
                   const count = categorizedSims[category].length;
                   const colors = categoryColors[category] || categoryColors['Cơ học'];
-                  
+
                   return (
                     <Link key={category} href={`/dashboard/labtwin/labs?category=${encodeURIComponent(category)}`}>
                       <Button
@@ -290,190 +297,190 @@ export default function LabsIndexPage() {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSimulations
-              .sort((a: any, b: any) => {
-                // Sort by difficulty, then by XP
-                const difficultyOrder: { [key: string]: number } = {
-                  'Dễ': 1,
-                  'Trung bình': 2,
-                  'Nâng cao': 3,
-                  'Khó': 4
-                };
-                
-                const aDiff = difficultyOrder[a.difficulty] || 2;
-                const bDiff = difficultyOrder[b.difficulty] || 2;
-                
-                if (aDiff !== bDiff) return aDiff - bDiff;
-                return (b.xp || 0) - (a.xp || 0);
-              })
-              .map((sim: any) => {
-              const Icon = iconMap[sim.icon] || FlaskConical;
-              const categoryStyle = categoryColors[sim.category] || categoryColors['Cơ học'];
-              
-              return (
-                <Dialog key={sim.id}>
-                  <Card 
-                    className={`group hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-2 ${categoryStyle.border} ${categoryStyle.bg} backdrop-blur overflow-hidden relative`}
-                  >
-                    {/* Decorative elements */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16"></div>
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12"></div>
-                    
-                    <CardHeader className="relative z-10">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className={`p-4 bg-white rounded-2xl shadow-lg ${categoryStyle.text} transform group-hover:rotate-12 transition-transform`}>
-                          <Icon className="h-8 w-8" />
-                        </div>
-                        <Badge className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0 shadow-md">
-                          <Star className="h-3 w-3 mr-1 fill-white" />
-                          +{sim.xp} XP
-                        </Badge>
-                      </div>
-                      <CardTitle className={`text-xl font-bold ${categoryStyle.text}`}>
-                        {sim.name}
-                      </CardTitle>
-                      <CardDescription className="line-clamp-2 text-gray-700">
-                        {sim.description}
-                      </CardDescription>
-                    </CardHeader>
-                    
-                    <CardContent className="relative z-10">
-                      {/* Quick Info */}
-                      <div className="flex flex-wrap items-center gap-2 mb-4">
-                        <Badge className="bg-white/80 text-gray-700 border border-gray-200">
-                          📚 {sim.level}
-                        </Badge>
-                        <Badge className="bg-white/80 text-gray-700 border border-gray-200">
-                          <Clock className="h-3 w-3 mr-1" />
-                          {sim.duration}
-                        </Badge>
-                      </div>
+              {filteredSimulations
+                .sort((a: any, b: any) => {
+                  // Sort by difficulty, then by XP
+                  const difficultyOrder: { [key: string]: number } = {
+                    'Dễ': 1,
+                    'Trung bình': 2,
+                    'Nâng cao': 3,
+                    'Khó': 4
+                  };
 
-                      {/* CTA Buttons */}
-                      <div className="flex gap-2">
-                        <Link href={`/dashboard/labtwin/labs/${sim.id}`} className="flex-1">
-                          <Button className={`w-full bg-gradient-to-r ${categoryStyle.text.replace('text-', 'from-').replace('-700', '-400')} ${categoryStyle.text.replace('text-', 'to-').replace('-700', '-500')} text-white border-0 shadow-md hover:shadow-lg transform hover:scale-105 transition-all`}>
-                            🚀 Bắt đầu
-                          </Button>
-                        </Link>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="icon" className="bg-white/80 hover:bg-white border-2">
-                            <Info className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  const aDiff = difficultyOrder[a.difficulty] || 2;
+                  const bDiff = difficultyOrder[b.difficulty] || 2;
 
-                  {/* Detail Modal */}
-                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                      <div className="flex items-center gap-4 mb-4">
-                        <div className={`p-4 ${categoryStyle.bg} rounded-2xl ${categoryStyle.text}`}>
-                          <Icon className="h-10 w-10" />
-                        </div>
-                        <div>
-                          <DialogTitle className="text-2xl">{sim.name}</DialogTitle>
-                          <DialogDescription className="text-base mt-1">
+                  if (aDiff !== bDiff) return aDiff - bDiff;
+                  return (b.xp || 0) - (a.xp || 0);
+                })
+                .map((sim: any) => {
+                  const Icon = iconMap[sim.icon] || FlaskConical;
+                  const categoryStyle = categoryColors[sim.category] || categoryColors['Cơ học'];
+
+                  return (
+                    <Dialog key={sim.id}>
+                      <Card
+                        className={`group hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 border-2 ${categoryStyle.border} ${categoryStyle.bg} backdrop-blur overflow-hidden relative`}
+                      >
+                        {/* Decorative elements */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16"></div>
+                        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/20 rounded-full -ml-12 -mb-12"></div>
+
+                        <CardHeader className="relative z-10">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className={`p-4 bg-white rounded-2xl shadow-lg ${categoryStyle.text} transform group-hover:rotate-12 transition-transform`}>
+                              <Icon className="h-8 w-8" />
+                            </div>
+                            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white border-0 shadow-md">
+                              <Star className="h-3 w-3 mr-1 fill-white" />
+                              +{sim.xp} XP
+                            </Badge>
+                          </div>
+                          <CardTitle className={`text-xl font-bold ${categoryStyle.text}`}>
+                            {sim.name}
+                          </CardTitle>
+                          <CardDescription className="line-clamp-2 text-gray-700">
                             {sim.description}
-                          </DialogDescription>
-                        </div>
-                      </div>
-                    </DialogHeader>
+                          </CardDescription>
+                        </CardHeader>
 
-                    <div className="space-y-6">
-                      {/* Stats */}
-                      <div className="grid grid-cols-3 gap-4">
-                        <Card className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100">
-                          <div className="text-2xl mb-1">⭐</div>
-                          <div className="font-bold text-purple-700">{sim.xp} XP</div>
-                          <div className="text-xs text-purple-600">Reward</div>
-                        </Card>
-                        <Card className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100">
-                          <div className="text-2xl mb-1">📚</div>
-                          <div className="font-bold text-blue-700">{sim.level}</div>
-                          <div className="text-xs text-blue-600">{t('achievements.level')}</div>
-                        </Card>
-                        <Card className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100">
-                          <div className="text-2xl mb-1">⏱️</div>
-                          <div className="font-bold text-green-700">{sim.duration}</div>
-                          <div className="text-xs text-green-600">Duration</div>
-                        </Card>
-                      </div>
+                        <CardContent className="relative z-10">
+                          {/* Quick Info */}
+                          <div className="flex flex-wrap items-center gap-2 mb-4">
+                            <Badge className="bg-white/80 text-gray-700 border border-gray-200">
+                              📚 {sim.level}
+                            </Badge>
+                            <Badge className="bg-white/80 text-gray-700 border border-gray-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {sim.duration}
+                            </Badge>
+                          </div>
 
-                      {/* Features */}
-                      {sim.features && sim.features.length > 0 && (
-                        <div>
-                          <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                            <Sparkles className="h-5 w-5 text-yellow-500" />
-                            Tính năng cool
-                          </h3>
-                          <div className="grid grid-cols-1 gap-2">
-                            {sim.features.map((feature: string, index: number) => (
-                              <div 
-                                key={index}
-                                className="flex items-center gap-2 p-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg"
-                              >
-                                <div className="text-lg">✨</div>
-                                <span className="text-sm text-gray-700">{feature}</span>
+                          {/* CTA Buttons */}
+                          <div className="flex gap-2">
+                            <Link href={sim.internal_link || `/dashboard/labtwin/labs/${sim.id}`} className="flex-1">
+                              <Button className={`w-full bg-gradient-to-r ${categoryStyle.text.replace('text-', 'from-').replace('-700', '-400')} ${categoryStyle.text.replace('text-', 'to-').replace('-700', '-500')} text-white border-0 shadow-md hover:shadow-lg transform hover:scale-105 transition-all`}>
+                                🚀 Bắt đầu
+                              </Button>
+                            </Link>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="icon" className="bg-white/80 hover:bg-white border-2">
+                                <Info className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Detail Modal */}
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <div className="flex items-center gap-4 mb-4">
+                            <div className={`p-4 ${categoryStyle.bg} rounded-2xl ${categoryStyle.text}`}>
+                              <Icon className="h-10 w-10" />
+                            </div>
+                            <div>
+                              <DialogTitle className="text-2xl">{sim.name}</DialogTitle>
+                              <DialogDescription className="text-base mt-1">
+                                {sim.description}
+                              </DialogDescription>
+                            </div>
+                          </div>
+                        </DialogHeader>
+
+                        <div className="space-y-6">
+                          {/* Stats */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <Card className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100">
+                              <div className="text-2xl mb-1">⭐</div>
+                              <div className="font-bold text-purple-700">{sim.xp} XP</div>
+                              <div className="text-xs text-purple-600">Reward</div>
+                            </Card>
+                            <Card className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100">
+                              <div className="text-2xl mb-1">📚</div>
+                              <div className="font-bold text-blue-700">{sim.level}</div>
+                              <div className="text-xs text-blue-600">{t('achievements.level')}</div>
+                            </Card>
+                            <Card className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100">
+                              <div className="text-2xl mb-1">⏱️</div>
+                              <div className="font-bold text-green-700">{sim.duration}</div>
+                              <div className="text-xs text-green-600">Duration</div>
+                            </Card>
+                          </div>
+
+                          {/* Features */}
+                          {sim.features && sim.features.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                                <Sparkles className="h-5 w-5 text-yellow-500" />
+                                Tính năng cool
+                              </h3>
+                              <div className="grid grid-cols-1 gap-2">
+                                {sim.features.map((feature: string, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-2 p-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg"
+                                  >
+                                    <div className="text-lg">✨</div>
+                                    <span className="text-sm text-gray-700">{feature}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            </div>
+                          )}
 
-                      {/* Learning Objectives */}
-                      {sim.learning_objectives && sim.learning_objectives.length > 0 && (
-                        <div>
-                          <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
-                            <Target className="h-5 w-5 text-green-500" />
-                            Bạn sẽ học được gì?
-                          </h3>
-                          <div className="space-y-2">
-                            {sim.learning_objectives.map((obj: string, index: number) => (
-                              <div 
-                                key={index}
-                                className="flex items-start gap-2 p-3 bg-green-50 rounded-lg"
-                              >
-                                <div className="text-green-500 font-bold">{index + 1}.</div>
-                                <span className="text-sm text-gray-700">{obj}</span>
+                          {/* Learning Objectives */}
+                          {sim.learning_objectives && sim.learning_objectives.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                                <Target className="h-5 w-5 text-green-500" />
+                                Bạn sẽ học được gì?
+                              </h3>
+                              <div className="space-y-2">
+                                {sim.learning_objectives.map((obj: string, index: number) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-start gap-2 p-3 bg-green-50 rounded-lg"
+                                  >
+                                    <div className="text-green-500 font-bold">{index + 1}.</div>
+                                    <span className="text-sm text-gray-700">{obj}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                            </div>
+                          )}
 
-                      {/* Tags */}
-                      {sim.tags && sim.tags.length > 0 && (
-                        <div>
-                          <h3 className="font-semibold text-sm mb-2 text-gray-600">Tags:</h3>
-                          <div className="flex flex-wrap gap-2">
-                            {sim.tags.map((tag: string, index: number) => (
-                              <Badge 
-                                key={index}
-                                variant="secondary"
-                                className="bg-gradient-to-r from-pink-100 to-purple-100 text-purple-700 border-0"
-                              >
-                                #{tag}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                          {/* Tags */}
+                          {sim.tags && sim.tags.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-sm mb-2 text-gray-600">Tags:</h3>
+                              <div className="flex flex-wrap gap-2">
+                                {sim.tags.map((tag: string, index: number) => (
+                                  <Badge
+                                    key={index}
+                                    variant="secondary"
+                                    className="bg-gradient-to-r from-pink-100 to-purple-100 text-purple-700 border-0"
+                                  >
+                                    #{tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                      {/* Action */}
-                      <Link href={`/dashboard/labtwin/labs/${sim.id}`}>
-                        <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-lg py-6">
-                          🚀 Bắt đầu thí nghiệm ngay!
-                          <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              );
-            })}
-          </div>
+                          {/* Action */}
+                          <Link href={sim.internal_link || `/dashboard/labtwin/labs/${sim.id}`}>
+                            <Button className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-lg py-6">
+                              🚀 Bắt đầu thí nghiệm ngay!
+                              <ArrowRight className="ml-2 h-5 w-5" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  );
+                })}
+            </div>
           </>
         )}
 

@@ -13,25 +13,39 @@ import { ArrowLeft, FlaskConical, Star, Clock, ArrowRight, Sparkles, Target, Inf
 
 export default function LabTwinPage() {
   const { t } = useLanguage();
-  
+
   const [pythonLabs, setPythonLabs] = useState<any>({ simulations: [], total: 0 });
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [localWeather, setLocalWeather] = useState<any>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
-  
+
   useEffect(() => {
     const loadPythonSimulations = async () => {
       try {
-        const response = await fetch('/labs/index.json');
-        if (response.ok) {
-          const data = await response.json();
-          setPythonLabs(data);
+        // Use the new API route
+        const response = await fetch('/api/labtwin');
+
+        // Safety checks as requested
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('API Error:', text);
+          throw new Error(`HTTP ${response.status}`);
         }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType?.includes('application/json')) {
+          const text = await response.text();
+          console.error('Receive non-JSON response:', text.substring(0, 100));
+          throw new Error('Expected JSON, got HTML/Text');
+        }
+
+        const data = await response.json();
+        setPythonLabs(data);
       } catch (error) {
         console.error('Error loading Python simulations:', error);
       }
     };
-    
+
     loadPythonSimulations();
   }, []);
 
@@ -44,7 +58,7 @@ export default function LabTwinPage() {
           async (position) => {
             const { latitude, longitude } = position.coords;
             setUserLocation({ lat: latitude, lon: longitude });
-            
+
             // Fetch weather for user's location
             try {
               const response = await fetch(`http://localhost:8013/weather/current?lat=${latitude}&lon=${longitude}`, {
@@ -76,13 +90,13 @@ export default function LabTwinPage() {
   // Generate weather-based suggestions
   const getWeatherSuggestions = (weather: any) => {
     if (!weather) return [];
-    
+
     const suggestions: { icon: string; text: string; type: string }[] = [];
     const temp = weather.temperature?.current || 0;
     const rain = weather.rain?.['1h'] || 0;
     const wind = weather.wind?.speed || 0;
     const humidity = weather.humidity || 0;
-    
+
     // Temperature suggestions
     if (temp < 15) {
       suggestions.push({ icon: '🧥', text: 'Mặc áo ấm, trời se lạnh!', type: 'warning' });
@@ -91,7 +105,7 @@ export default function LabTwinPage() {
     } else if (temp >= 20 && temp <= 28) {
       suggestions.push({ icon: '😊', text: 'Thời tiết tuyệt vời!', type: 'success' });
     }
-    
+
     // Rain suggestions
     if (rain > 0.5) {
       suggestions.push({ icon: '☔', text: 'Mang dù đi! Sắp có mưa!', type: 'warning' });
@@ -99,24 +113,24 @@ export default function LabTwinPage() {
     if (rain > 5) {
       suggestions.push({ icon: '⛈️', text: 'Mưa lớn! Hạn chế ra ngoài!', type: 'danger' });
     }
-    
+
     // Wind suggestions
     if (wind > 10) {
       suggestions.push({ icon: '💨', text: 'Gió mạnh! Cẩn thận khi di chuyển!', type: 'warning' });
     }
-    
+
     // Humidity suggestions
     if (humidity > 80) {
       suggestions.push({ icon: '💧', text: 'Độ ẩm cao, cảm giác oi bức', type: 'info' });
     } else if (humidity < 30) {
       suggestions.push({ icon: '🌵', text: 'Không khí khô, dưỡng ẩm da', type: 'info' });
     }
-    
+
     // Activity suggestions
     if (temp >= 18 && temp <= 28 && rain === 0 && wind < 8) {
       suggestions.push({ icon: '🏃', text: 'Thời tiết hoàn hảo cho hoạt động ngoài trời!', type: 'success' });
     }
-    
+
     return suggestions;
   };
 
@@ -190,19 +204,19 @@ export default function LabTwinPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            href="/dashboard" 
+          <Link
+            href="/dashboard"
             className="inline-flex items-center text-purple-600 hover:text-purple-700 mb-4 font-medium"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Quay lại Dashboard
           </Link>
-          
+
           <div className="flex items-center gap-4 mb-6">
             <div className="p-4 bg-gradient-to-br from-purple-400 via-pink-400 to-orange-400 rounded-2xl text-white shadow-xl transform hover:scale-105 transition-transform">
               <FlaskConical className="h-12 w-12" />
-            
-              </div>
+
+            </div>
             <div>
               <h1 className="text-5xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 bg-clip-text text-transparent">
                 🧪 LabTwin
@@ -222,7 +236,7 @@ export default function LabTwinPage() {
                 <div className="text-sm text-purple-600">Thí nghiệm</div>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 hover:shadow-lg transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl mb-2">✅</div>
@@ -230,7 +244,7 @@ export default function LabTwinPage() {
                 <div className="text-sm text-green-600">Hoàn thành</div>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 hover:shadow-lg transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl mb-2">⭐</div>
@@ -238,7 +252,7 @@ export default function LabTwinPage() {
                 <div className="text-sm text-yellow-600">XP Points</div>
               </CardContent>
             </Card>
-            
+
             <Card className="bg-gradient-to-br from-pink-50 to-pink-100 border-2 border-pink-200 hover:shadow-lg transition-shadow">
               <CardContent className="p-4 text-center">
                 <div className="text-3xl mb-2">📊</div>
@@ -281,7 +295,7 @@ export default function LabTwinPage() {
                         <p className="text-sm text-purple-700">Nhận cảnh báo và gợi ý cá nhân hóa</p>
                       </div>
                     </div>
-                    <Button 
+                    <Button
                       onClick={getUserLocationWeather}
                       className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
                     >
@@ -369,7 +383,7 @@ export default function LabTwinPage() {
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {getWeatherSuggestions(localWeather).map((suggestion, idx) => (
-                          <div 
+                          <div
                             key={idx}
                             className={`p-4 bg-gradient-to-r ${getSuggestionColor(suggestion.type)} text-white rounded-xl shadow-md flex items-center gap-3 animate-pulse`}
                           >
@@ -393,7 +407,7 @@ export default function LabTwinPage() {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {weatherModule.features.map((feature, idx) => (
-                      <div 
+                      <div
                         key={idx}
                         className="bg-white/70 backdrop-blur rounded-xl p-4 border-2 border-sky-200 hover:border-sky-400 transition-all hover:-translate-y-1 hover:shadow-lg"
                       >
@@ -417,15 +431,15 @@ export default function LabTwinPage() {
                     Xem thời tiết toàn cầu & cảnh báo thiên tai
                   </p>
                   <Link href={weatherModule.link} className="w-full">
-                    <Button 
-                      size="lg" 
+                    <Button
+                      size="lg"
                       className="w-full bg-gradient-to-r from-sky-500 via-blue-500 to-cyan-500 hover:from-sky-600 hover:via-blue-600 hover:to-cyan-600 text-white shadow-xl transform hover:scale-105 transition-all"
                     >
                       Mở Weather Map
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
-                  
+
                   <div className="mt-4 flex items-center gap-2 text-xs text-sky-600">
                     <Info className="h-4 w-4" />
                     <span>Powered by Windy.com & USGS</span>
@@ -462,8 +476,8 @@ export default function LabTwinPage() {
                   </CardDescription>
                 </div>
                 <Link href="/dashboard/labtwin/labs">
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-lg"
                   >
                     Xem tất cả
@@ -480,16 +494,16 @@ export default function LabTwinPage() {
                   const colorGradient = categoryColors[category] || 'from-gray-100 to-gray-200';
                   const simCount = sims.length;
                   const totalXP = sims.reduce((sum: number, sim: any) => sum + (sim.xp || 0), 0);
-                  
+
                   return (
-                    <Card 
+                    <Card
                       key={category}
                       className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${colorGradient} border-2 border-gray-200 overflow-hidden relative`}
                     >
                       {/* Decorative circles */}
                       <div className="absolute top-0 right-0 w-20 h-20 bg-white/30 rounded-full -mr-10 -mt-10"></div>
                       <div className="absolute bottom-0 left-0 w-16 h-16 bg-white/30 rounded-full -ml-8 -mb-8"></div>
-                      
+
                       <CardContent className="p-5 relative z-10">
                         <div className="text-center mb-4">
                           <div className="text-6xl mb-3 transform group-hover:scale-125 transition-transform">
@@ -506,11 +520,11 @@ export default function LabTwinPage() {
                             </Badge>
                           </div>
                         </div>
-                        
+
                         {/* Preview of first 2 labs */}
                         <div className="space-y-2 mb-4">
                           {sims.slice(0, 2).map((sim: any) => (
-                            <div 
+                            <div
                               key={sim.id}
                               className="text-xs bg-white/60 backdrop-blur rounded-lg p-2 border border-white/50"
                             >
@@ -535,8 +549,8 @@ export default function LabTwinPage() {
                         </div>
 
                         <Link href={`/dashboard/labtwin/labs?category=${encodeURIComponent(category)}`}>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md"
                           >
                             Khám phá {category}
@@ -587,7 +601,7 @@ export default function LabTwinPage() {
                   { icon: '⚡', title: 'Chuyên gia vật lý', desc: 'Hoàn thành tất cả thí nghiệm', xp: 500, locked: true },
                   { icon: '🌟', title: 'Bậc thầy Python', desc: 'Xem code của 5 simulations', xp: 200, locked: true }
                 ].map((ach, idx) => (
-                  <div 
+                  <div
                     key={idx}
                     className={`p-3 rounded-xl flex items-center gap-3 ${ach.locked ? 'bg-white/50' : 'bg-white border-2 border-amber-300'}`}
                   >

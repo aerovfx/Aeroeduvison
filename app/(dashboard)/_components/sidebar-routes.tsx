@@ -19,6 +19,12 @@ const guestRoutes = [
     href: "/search",
     isHighlighted: false,
   },
+  {
+    icon: BookOpen,
+    label: "📚 Documentation",
+    href: "/docs",
+    isHighlighted: false,
+  },
 ];
 
 // AI-Driven Student Routes - Organized by Categories
@@ -113,6 +119,12 @@ const studentRoutes = [
     href: "/dashboard/contacts",
     isHighlighted: false,
   },
+  {
+    icon: BookOpen,
+    label: "📚 Documentation",
+    href: "/docs",
+    isHighlighted: false,
+  },
 ];
 
 // AI-Driven Teacher Routes - Focused on Teaching & AI Assistance
@@ -180,6 +192,12 @@ const teacherRoutes = [
     icon: Sparkles,
     label: "🎨 Logo Design",
     href: "/dashboard/logo-design",
+    isHighlighted: false,
+  },
+  {
+    icon: BookOpen,
+    label: "📚 Documentation",
+    href: "/docs",
     isHighlighted: false,
   },
 ]
@@ -251,7 +269,13 @@ const adminRoutes = [
     href: "/admin/settings",
     isHighlighted: false,
   },
-];
+  {
+    icon: BookOpen,
+    label: "📚 Documentation",
+    href: "/docs",
+    isHighlighted: false,
+  },
+]
 
 export const SidebarRoutes = () => {
   const pathname = usePathname();
