@@ -357,7 +357,7 @@ model User {
   twoFactorBackupCodes  String[]          @default([])
   
   createdAt             DateTime          @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime          @updatedAt
   
   Account               Account[]
   ChatMessage           ChatMessage[]

@@ -403,14 +403,14 @@ export default function StandingWavesPage() {
   // Loading state
   if (!isMounted) {
     return (
-
       <VisionThemeWrapper title="Standing Waves" subtitle="Hệ thống học tập thông minh">
-      <div className="container mx-auto p-6">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-          <p className="text-muted-foreground">Đang tải...</p>
+        <div className="container mx-auto p-6">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+            <p className="text-muted-foreground">Đang tải...</p>
+          </div>
         </div>
-      </div>
+      </VisionThemeWrapper>
     );
   }
 
@@ -443,9 +443,10 @@ export default function StandingWavesPage() {
   ];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Back Button */}
-      <Button
+    <VisionThemeWrapper title="Standing Waves" subtitle="Hệ thống học tập thông minh">
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Back Button */}
+        <Button
         onClick={() => router.push('/dashboard/labtwin/labs')}
         variant="outline"
         className="mb-4"
@@ -909,7 +910,6 @@ export default function StandingWavesPage() {
           </Card>
         </div>
       </div>
-    </div>
     </VisionThemeWrapper>
   );
 }

@@ -95,6 +95,29 @@ export class AIModelSelector {
   private initializeModels(): ModelCapability[] {
     return [
       {
+        name: 'nemotron-orchestrator',
+        provider: 'OpenAI', // Using OpenAI provider structure for Ollama
+        apiKey: 'OPENAI_API_KEY',
+        costPer1kTokens: 0.0,
+        avgResponseTime: 5.0,
+        qualityScore: 8.5,
+        contextWindow: 32768,
+        supportsVietnamese: true,
+        privacyLevel: 5,
+        reliabilityScore: 8.0,
+        strengths: [
+          TaskType.CHAT_SUPPORT,
+          TaskType.CONTENT_GENERATION,
+          TaskType.EXPLANATION,
+          TaskType.LESSON_PLANNING,
+          TaskType.CODE_TEACHING
+        ],
+        weaknesses: [],
+        requiresInternet: false,
+        maxTokensOutput: 4096,
+        endpoint: process.env.OPENAI_BASE_URL || 'http://localhost:11434/v1/chat/completions',
+      },
+      {
         name: 'grok-beta',
         provider: 'X.AI',
         apiKey: 'GROK_API_KEY',
