@@ -11,6 +11,7 @@ interface SidebarItemProps {
   label: string;
   href: string;
   isHighlighted?: boolean;
+  badge?: string; // e.g., "AI"
 };
 
 export const SidebarItem = ({
@@ -18,6 +19,7 @@ export const SidebarItem = ({
   label,
   href,
   isHighlighted = false,
+  badge,
 }: SidebarItemProps) => {
   const pathname = usePathname();
   const router = useRouter();
@@ -101,6 +103,11 @@ export const SidebarItem = ({
           )}
         />
         <span className="truncate">{label}</span>
+        {badge && (
+          <span className="ml-auto mr-2 rounded-md bg-[#adfa1d] px-1.5 py-0.5 text-xs leading-none text-[#000000] font-medium">
+            {badge}
+          </span>
+        )}
         {isLoading && (
           <div className="ml-auto">
             <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />

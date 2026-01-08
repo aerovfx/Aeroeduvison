@@ -174,40 +174,51 @@ export function getStudentDataForTeacher(studentId: string): TeacherStudentView 
 /**
  * Get data for all students in the class
  * @returns Array of student data
+ * 
+ * NOTE: This function now fetches from API instead of using mock data
+ * Make sure to call this from a client component that can make API calls
  */
 export function getAllStudentsDataForTeacher(): TeacherStudentView[] {
-  const studentIds = ['student-1', 'student-2', 'student-3', 'student-4'];
-  
-  // For now, only student-1 has real data, others are mock
-  const students: TeacherStudentView[] = [];
-  
-  studentIds.forEach(id => {
-    if (id === 'student-1') {
-      const realData = getStudentDataForTeacher(id);
-      if (realData) students.push(realData);
-    } else {
-      // Mock data for other students
-      students.push({
-        id: id,
-        name: id === 'student-2' ? 'Trần Thị B' : id === 'student-3' ? 'Lê Văn C' : 'Phạm Thị D',
-        email: `${id}@example.com`,
-        avatar: id === 'student-3' ? '👨‍🎓' : '👩‍🎓',
-        totalXP: id === 'student-2' ? 890 : id === 'student-3' ? 450 : 1100,
-        progress: id === 'student-2' ? 60 : id === 'student-3' ? 35 : 80,
-        averageScore: id === 'student-2' ? 78 : id === 'student-3' ? 62 : 88,
-        lessonsCompleted: id === 'student-2' ? 8 : id === 'student-3' ? 4 : 14,
-        lastActive: id === 'student-2' ? '1 day ago' : id === 'student-3' ? '5 days ago' : '3 hours ago',
-        emotion: id === 'student-2' ? 'neutral' : id === 'student-3' ? 'sad' : 'happy',
-        atRisk: id === 'student-3',
-        engagement: id === 'student-2' ? 75 : id === 'student-3' ? 42 : 95,
-        streak: id === 'student-2' ? 3 : id === 'student-3' ? 0 : 10,
-        recentLessons: [],
-        emotionHistory: []
-      });
+  // This is a client-side function, so we'll return empty array here
+  // The actual data fetching should be done in the component using useEffect
+  // For backward compatibility, return empty array
+  return [];
+}
+
+/**
+ * Get students data from API (for use in client components)
+ * @returns Promise<TeacherStudentView[]>
+ */
+export async function fetchAllStudentsDataForTeacher(): Promise<TeacherStudentView[]> {
+  try {
+    const response = await fetch('/api/teacher/students')
+    if (!response.ok) {
+      console.error('Failed to fetch students')
+      return []
     }
-  });
-  
-  return students;
+    
+    const data = await response.json()
+    return (data.students || []).map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      email: s.email,
+      avatar: s.avatar,
+      totalXP: s.totalXP,
+      progress: s.progress,
+      averageScore: s.averageScore,
+      lessonsCompleted: s.lessonsCompleted,
+      lastActive: s.lastActive,
+      emotion: s.emotion,
+      atRisk: s.atRisk,
+      engagement: s.engagement,
+      streak: s.streak,
+      recentLessons: [],
+      emotionHistory: [],
+    }))
+  } catch (error) {
+    console.error('Error fetching students:', error)
+    return []
+  }
 }
 
 /**

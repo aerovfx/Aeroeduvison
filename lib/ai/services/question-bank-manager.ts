@@ -11,7 +11,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { Redis } from 'ioredis';
+import Redis from 'ioredis';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -127,14 +127,16 @@ export class QuestionBankManager {
           options: question.options || [],
           correctAnswer: question.correctAnswer?.toString(),
           explanation: question.explanation,
-          learningObjectives: question.learningObjectives,
-          keywords: question.keywords,
+          learningObjectives: question.learningObjectives || [],
+          keywords: question.keywords || [],
           qualityScore,
           usageCount: 0,
-          aiGenerated: question.aiGenerated,
+          aiGenerated: question.aiGenerated || false,
           aiModel: question.aiModel,
           humanReviewed: question.humanReviewed || false,
           reviewedBy: question.reviewedBy,
+          status: "Nháp", // Default status
+          tags: question.keywords || [], // Use keywords as tags
           createdBy: question.createdBy,
         },
       });
@@ -480,11 +482,18 @@ export class QuestionBankManager {
    */
   async getStatistics(): Promise<QuestionBankStats> {
     try {
-      // Try cache first
-      const cacheKey = 'question-bank:stats';
-      const cached = await this.redis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
+      // Try cache first (if Redis is available)
+      if (this.redis && this.redis.status === 'ready') {
+        try {
+          const cacheKey = 'question-bank:stats';
+          const cached = await this.redis.get(cacheKey);
+          if (cached) {
+            return JSON.parse(cached);
+          }
+        } catch (error) {
+          // Redis error, continue without cache
+          console.warn('Redis cache read failed, continuing without cache');
+        }
       }
 
       // Calculate stats
@@ -630,19 +639,19 @@ export class QuestionBankManager {
       questionType: record.questionType,
       difficulty: record.difficulty,
       content: record.content,
-      options: record.options,
-      correctAnswer: record.correctAnswer,
+      options: record.options || [],
+      correctAnswer: record.correctAnswer ? (record.questionType === 'MCQ' ? parseInt(record.correctAnswer) : record.correctAnswer) : undefined,
       explanation: record.explanation,
-      learningObjectives: record.learningObjectives,
-      keywords: record.keywords,
+      learningObjectives: record.learningObjectives || [],
+      keywords: record.keywords || [],
       qualityScore: record.qualityScore,
       discriminationIndex: record.discriminationIndex,
-      usageCount: record.usageCount,
+      usageCount: record.usageCount || 0,
       averageScore: record.averageScore,
       averageTimeSeconds: record.averageTimeSeconds,
-      aiGenerated: record.aiGenerated,
+      aiGenerated: record.aiGenerated || false,
       aiModel: record.aiModel,
-      humanReviewed: record.humanReviewed,
+      humanReviewed: record.humanReviewed || false,
       reviewedBy: record.reviewedBy,
       reviewedAt: record.reviewedAt,
       createdAt: record.createdAt,
@@ -656,9 +665,12 @@ export class QuestionBankManager {
    */
   private async invalidateStatsCache(): Promise<void> {
     try {
-      await this.redis.del('question-bank:stats');
+      if (this.redis && this.redis.status === 'ready') {
+        await this.redis.del('question-bank:stats');
+      }
     } catch (error) {
-      console.error('Failed to invalidate stats cache:', error);
+      // Redis might not be available, ignore error
+      console.warn('Failed to invalidate stats cache (Redis may not be available):', error);
     }
   }
 
@@ -696,14 +708,21 @@ export class QuestionBankManager {
 let questionBankInstance: QuestionBankManager | null = null;
 
 export function getQuestionBankManager(
-  prisma?: PrismaClient,
-  redis?: Redis
+  prisma: PrismaClient,
+  redis: Redis | null
 ): QuestionBankManager {
   if (!questionBankInstance) {
-    if (!prisma || !redis) {
-      throw new Error('Prisma and Redis instances required for first initialization');
+    if (!prisma) {
+      throw new Error('Prisma instance required for initialization');
     }
-    questionBankInstance = new QuestionBankManager(prisma, redis);
+    // Create a dummy Redis instance if not provided (for development)
+    const redisInstance = redis || new Redis({
+      host: 'localhost',
+      port: 6379,
+      retryStrategy: () => null, // Don't retry if Redis is not available
+      enableOfflineQueue: false,
+    });
+    questionBankInstance = new QuestionBankManager(prisma, redisInstance);
   }
   return questionBankInstance;
 }

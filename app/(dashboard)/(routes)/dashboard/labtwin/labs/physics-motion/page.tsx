@@ -1,9 +1,6 @@
 'use client';
 
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
-
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1716,12 +1713,13 @@ function GraphCanvas({
   }, [data, currentTime, graphType]);
   
   return (
-    <canvas
-      ref={canvasRef}
-      width={800}
-      height={300}
-      className="border rounded shadow-md w-full"
-    />
+    <VisionThemeWrapper>
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={300}
+        className="border rounded shadow-md w-full"
+      />
     </VisionThemeWrapper>
   );
 }

@@ -20,6 +20,9 @@ export default function StudentInsightPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'strengths' | 'velocity' | 'ai-feedback' | 'notes' | 'assessment'>('overview');
   const [teacherNotes, setTeacherNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [student, setStudent] = useState<any>(null);
   const [softSkills, setSoftSkills] = useState({
     collaboration: 85,
     creativity: 78,
@@ -28,23 +31,81 @@ export default function StudentInsightPage() {
     problemSolving: 88
   });
 
-  // Mock student data (in production, fetch from DB or localStorage)
-  const student = {
-    id: studentId,
-    name: 'Nguyễn Văn A',
-    email: 'student@example.com',
-    avatar: '👨‍🎓',
-    totalXP: 1250,
-    progress: 75,
-    averageScore: 85,
-    lessonsCompleted: 12,
-    totalLessons: 16,
-    lastActive: '2 hours ago',
-    joinedAt: '2024-09-15',
-    streak: 7,
-    emotion: 'happy',
-    engagement: 92
-  };
+  // Fetch student data from API
+  useEffect(() => {
+    const fetchStudentData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        console.log(`📊 [Student Detail] Fetching data for student ID: ${studentId}`);
+        
+        const response = await fetch(`/api/teacher/students/${studentId}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Học sinh không tồn tại');
+          }
+          throw new Error('Không thể tải dữ liệu học sinh');
+        }
+        
+        const data = await response.json();
+        console.log(`✅ [Student Detail] Loaded data for: ${data.student.name}`);
+        
+        setStudent(data.student);
+      } catch (err: any) {
+        console.error('❌ [Student Detail] Error:', err);
+        setError(err.message || 'Có lỗi xảy ra khi tải dữ liệu');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (studentId) {
+      fetchStudentData();
+    }
+  }, [studentId]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Đang tải dữ liệu học sinh...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error || !student) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Quay lại Dashboard
+          </button>
+          
+          <div className="bg-white rounded-xl shadow-lg p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Không tìm thấy học sinh</h2>
+            <p className="text-gray-600 mb-4">{error || 'Học sinh không tồn tại'}</p>
+            <button
+              onClick={() => router.push('/teacher/dashboard')}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Về Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const strengths = [
     { skill: 'Đại số', score: 92, trend: 'up' },

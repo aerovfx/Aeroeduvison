@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Compass, Layout, List, Trophy, BookOpen, FileEdit, FileText, GraduationCap, StickyNote, Kanban, BookOpenCheck, Zap, Award, MessageSquare, Palette, Map, FlaskConical, Sparkles, Brain, Heart, CreditCard, Users, Target, Calendar, Shield, AlertTriangle, TrendingUp, Activity, Database, Settings, Camera } from "lucide-react";
+import { BarChart, Compass, Layout, List, Trophy, BookOpen, FileEdit, FileText, GraduationCap, StickyNote, Kanban, BookOpenCheck, Zap, Award, MessageSquare, Palette, Map, FlaskConical, Sparkles, Brain, Heart, CreditCard, Users, Target, Calendar, Shield, AlertTriangle, TrendingUp, Activity, Database, Settings, Camera, Upload, ScanLine, Grid3x3, HelpCircle, CheckSquare } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
@@ -149,6 +149,60 @@ const teacherRoutes = [
     isHighlighted: false,
   },
   
+  // ===== KHẢO THÍ (EXAMINATION) SYSTEM =====
+  {
+    icon: Upload,
+    label: "📄 Số hoá tài liệu",
+    href: "/teacher/document-digitization",
+    isHighlighted: false,
+    badge: "AI", // AI-powered module
+  },
+  {
+    icon: Grid3x3,
+    label: "📋 Ma trận đề",
+    href: "/teacher/exam-matrix",
+    isHighlighted: false,
+  },
+  {
+    icon: HelpCircle,
+    label: "📚 Ngân hàng câu hỏi",
+    href: "/teacher/question-bank",
+    isHighlighted: false,
+  },
+  {
+    icon: FileText,
+    label: "📝 Đề thi",
+    href: "/teacher/exams",
+    isHighlighted: false,
+    badge: "AI",
+  },
+  {
+    icon: Users,
+    label: "👥 Lớp học",
+    href: "/teacher/classes",
+    isHighlighted: false,
+  },
+  {
+    icon: Target,
+    label: "🎯 Phòng thi trực tuyến",
+    href: "/teacher/online-exam-room",
+    isHighlighted: false,
+  },
+  {
+    icon: CheckSquare,
+    label: "✅ Chấm thi",
+    href: "/teacher/exam-grading",
+    isHighlighted: false,
+    badge: "AI",
+  },
+  {
+    icon: BarChart,
+    label: "📊 Báo cáo",
+    href: "/teacher/exam-reports",
+    isHighlighted: false,
+    badge: "AI",
+  },
+  
   // ===== AI CO-TEACHER TOOLS =====
   {
     icon: Target,
@@ -171,7 +225,7 @@ const teacherRoutes = [
   
   // ===== MANAGEMENT =====
   {
-    icon: FileText,
+    icon: FileEdit,
     label: "📝 Assignments",
     href: "/teacher/assignments",
     isHighlighted: false,
@@ -307,6 +361,7 @@ export const SidebarRoutes = () => {
           label={route.label}
           href={route.href}
           isHighlighted={route.isHighlighted}
+          badge={route.badge}
         />
       ))}
     </div>

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getAllStudentsDataForTeacher, getClassStatistics, sendNotificationToStudent, assignMaterialToStudent } from '@/lib/teacher-data-access';
+import { getAllStudentsDataForTeacher, getClassStatistics, sendNotificationToStudent, assignMaterialToStudent, fetchAllStudentsDataForTeacher } from '@/lib/teacher-data-access';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Student {
@@ -59,16 +59,78 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     loadClassData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadClassData = () => {
-    // Load real student data from localStorage via teacher-data-access
-    const realStudents = getAllStudentsDataForTeacher();
-    const realStats = getClassStatistics();
-
-    setStudents(realStudents);
-    setClassStats(realStats);
-    setLoading(false);
+  const loadClassData = async () => {
+    try {
+      // Fetch students from API
+      const response = await fetch('/api/teacher/students')
+      if (response.ok) {
+        const data = await response.json()
+        const studentsData = (data.students || []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          email: s.email,
+          avatar: s.avatar,
+          totalXP: s.totalXP,
+          progress: s.progress,
+          averageScore: s.averageScore,
+          lessonsCompleted: s.lessonsCompleted,
+          lastActive: s.lastActive,
+          emotion: s.emotion,
+          atRisk: s.atRisk,
+          engagement: s.engagement,
+          streak: s.streak,
+          recentLessons: [],
+          emotionHistory: [],
+        }))
+        
+        setStudents(studentsData)
+        
+        // Calculate stats
+        const totalStudents = studentsData.length
+        const averageXP = totalStudents > 0
+          ? Math.round(studentsData.reduce((sum: number, s: any) => sum + s.totalXP, 0) / totalStudents)
+          : 0
+        const averageProgress = totalStudents > 0
+          ? Math.round(studentsData.reduce((sum: number, s: any) => sum + s.progress, 0) / totalStudents)
+          : 0
+        const averageScore = totalStudents > 0
+          ? Math.round(studentsData.reduce((sum: number, s: any) => sum + s.averageScore, 0) / totalStudents)
+          : 0
+        const totalLessonsCompleted = studentsData.reduce((sum: number, s: any) => sum + s.lessonsCompleted, 0)
+        const averageEngagement = totalStudents > 0
+          ? Math.round(studentsData.reduce((sum: number, s: any) => sum + s.engagement, 0) / totalStudents)
+          : 0
+        const atRiskCount = studentsData.filter((s: any) => s.atRisk).length
+        
+        setClassStats({
+          totalStudents,
+          averageXP,
+          averageProgress,
+          averageScore,
+          totalLessonsCompleted,
+          averageEngagement,
+          atRiskCount,
+        })
+      } else {
+        // Fallback to old method
+        const realStudents = getAllStudentsDataForTeacher();
+        const realStats = getClassStatistics();
+        setStudents(realStudents);
+        setClassStats(realStats);
+      }
+    } catch (error) {
+      console.error('Error loading class data:', error)
+      // Fallback to old method
+      const realStudents = getAllStudentsDataForTeacher();
+      const realStats = getClassStatistics();
+      setStudents(realStudents);
+      setClassStats(realStats);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Auto-refresh data every 30 seconds
@@ -99,8 +161,22 @@ export default function TeacherDashboard() {
 
   const handleViewStudentDetail = (student: Student) => {
     console.log(`👀 [Dashboard] Viewing details for: ${student.name}`);
+    console.log(`📊 [Dashboard] Student ID: ${student.id}`);
     console.log(`📊 [Dashboard] Navigating to: /teacher/student/${student.id}`);
-    router.push(`/teacher/student/${student.id}`);
+    
+    // Validate student ID
+    if (!student.id) {
+      console.error('❌ [Dashboard] Student ID is missing!', student);
+      alert('Lỗi: Không tìm thấy ID học sinh. Vui lòng thử lại.');
+      return;
+    }
+    
+    try {
+      router.push(`/teacher/student/${student.id}`);
+    } catch (error) {
+      console.error('❌ [Dashboard] Navigation error:', error);
+      alert('Lỗi khi điều hướng đến trang chi tiết học sinh.');
+    }
   };
 
   const submitEncouragement = () => {
@@ -847,7 +923,7 @@ export default function TeacherDashboard() {
                           <Target className="h-4 w-4 text-blue-600" />
                         </button>
                         <button
-                          onClick={() => router.push(`/teacher/student/${student.id}`)}
+                          onClick={() => handleViewStudentDetail(student)}
                           className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
                         >
                           View Details
