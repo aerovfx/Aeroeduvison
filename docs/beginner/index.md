@@ -1,3 +1,9 @@
+---
+title: "Module Docs Cho Người Mới"
+description: "Hướng dẫn đầy đủ cho người mới bắt đầu với AeroEduVison - từ cài đặt đến các tác vụ thường gặp"
+published: true
+---
+
 # 📚 Module Docs Cho Người Mới
 
 Chào mừng bạn đến với **AeroEduVison**! Module này được thiết kế đặc biệt cho những người mới bắt đầu, giúp bạn nhanh chóng hiểu và làm việc với dự án.
@@ -32,6 +38,9 @@ Hướng dẫn thực hiện các công việc phổ biến nhất.
 ### 6. [Câu Hỏi Thường Gặp](./06-cau-hoi-thuong-gap.md)
 Tìm câu trả lời cho những thắc mắc phổ biến.
 
+### 7. [Tài Liệu Tham Khảo](./07-tai-lieu-tham-khao.md)
+Danh sách đầy đủ các tài liệu quan trọng trong dự án.
+
 ## 🚀 Bắt Đầu Nhanh
 
 Nếu bạn muốn bắt đầu ngay:
@@ -62,7 +71,19 @@ Nếu bạn muốn bắt đầu ngay:
 
 ## 🔗 Liên Kết Hữu Ích
 
-### Tài Liệu Khác
+### Tài Liệu Trong Dự Án
+
+#### 📚 Guide Directory (Tài liệu chi tiết)
+- 📖 [Guide/README.md](../../Guide/README.md) - Mục lục tất cả tài liệu (299 files)
+- 🚀 [Quick Start Local DB](../../Guide/QUICK_START_LOCAL_DB.md) - Setup database nhanh
+- 🧪 [Testing Quick Reference](../../Guide/TESTING_QUICK_REFERENCE.md) - Hướng dẫn testing
+- 🔐 [Auth Quick Reference](../../Guide/AUTH_QUICK_REFERENCE.md) - Auth testing
+- 🔬 [Python Simulations Guide](../../Guide/PYTHON_SIMULATIONS_GUIDE.md) - Hướng dẫn simulations
+- 🖼️ [OCR Grading Complete Guide](../../Guide/OCR_GRADING_COMPLETE_GUIDE.md) - Hệ thống chấm bài
+- 🤖 [AI Generator Complete Guide](../../Guide/AI_GENERATOR_COMPLETE_GUIDE.md) - Tạo nội dung AI
+- ☁️ [Cloud Run Quick Reference](../../Guide/CLOUD_RUN_QUICK_REFERENCE.md) - Deploy lên Cloud Run
+
+#### 📖 Docs Directory
 - 📖 [Getting Started Guide](../getting-started/index.md) - Hướng dẫn cài đặt chi tiết
 - 🏗️ [Architecture Guide](../ARCHITECTURE.md) - Kiến trúc hệ thống
 - 🔐 [Authentication Guide](../authentication/overview.md) - Hệ thống xác thực

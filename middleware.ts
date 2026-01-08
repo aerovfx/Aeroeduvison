@@ -21,6 +21,9 @@ export async function middleware(request: NextRequest) {
   const legalRoutes = ["/terms", "/privacy", "/cookies"]
   const isLegalRoute = legalRoutes.includes(pathname)
 
+  // Docs routes (always public - documentation should be accessible to everyone)
+  const isDocsRoute = pathname.startsWith("/docs")
+
   // Auth routes
   const authRoutes = ["/auth/login", "/auth/signup", "/forgot-password", "/reset-password"]
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route))
@@ -50,8 +53,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(dashboardUrl, request.url))
   }
 
-  // ===== ALLOW PUBLIC ACCESS TO LEGAL PAGES =====
-  if (isLegalRoute) {
+  // ===== ALLOW PUBLIC ACCESS TO LEGAL PAGES & DOCS =====
+  if (isLegalRoute || isDocsRoute) {
     return NextResponse.next()
   }
 

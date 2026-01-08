@@ -49,6 +49,7 @@ export const Doc = defineDocumentType(() => ({
 export default makeSource({
   contentDirPath: "./docs",
   documentTypes: [Doc],
+  disableImportAliasWarning: true,
   mdx: {
     remarkPlugins: [remarkGfm],
     rehypePlugins: [

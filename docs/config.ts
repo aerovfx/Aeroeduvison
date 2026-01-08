@@ -24,6 +24,51 @@ export const docsConfig = {
     ],
     sidebarNav: [
         {
+            title: "👶 Cho Người Mới",
+            items: [
+                {
+                    title: "Module Docs Cho Người Mới",
+                    href: "/docs/beginner/index",
+                    items: [],
+                },
+                {
+                    title: "Giới Thiệu Tổng Quan",
+                    href: "/docs/beginner/01-gioi-thieu",
+                    items: [],
+                },
+                {
+                    title: "Cấu Trúc Dự Án",
+                    href: "/docs/beginner/02-cau-truc-du-an",
+                    items: [],
+                },
+                {
+                    title: "Khái Niệm Cơ Bản",
+                    href: "/docs/beginner/03-khai-niem-co-ban",
+                    items: [],
+                },
+                {
+                    title: "Các Bước Đầu Tiên",
+                    href: "/docs/beginner/04-buoc-dau-tien",
+                    items: [],
+                },
+                {
+                    title: "Các Tác Vụ Thường Gặp",
+                    href: "/docs/beginner/05-cac-tac-vu-thuong-gap",
+                    items: [],
+                },
+                {
+                    title: "Câu Hỏi Thường Gặp",
+                    href: "/docs/beginner/06-cau-hoi-thuong-gap",
+                    items: [],
+                },
+                {
+                    title: "Tài Liệu Tham Khảo",
+                    href: "/docs/beginner/07-tai-lieu-tham-khao",
+                    items: [],
+                },
+            ],
+        },
+        {
             title: "Getting Started",
             items: [
                 {

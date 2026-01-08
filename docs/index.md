@@ -4,6 +4,15 @@ Welcome to AeroEduVison - an AI-powered Learning Management System with interact
 
 ## 🚀 Quick Navigation
 
+### 👶 Cho Người Mới (Beginner)
+- [📚 Module Docs Cho Người Mới](./beginner/index.md) - **Bắt đầu từ đây nếu bạn mới!**
+- [Giới Thiệu Tổng Quan](./beginner/01-gioi-thieu.md)
+- [Cấu Trúc Dự Án](./beginner/02-cau-truc-du-an.md)
+- [Khái Niệm Cơ Bản](./beginner/03-khai-niem-co-ban.md)
+- [Các Bước Đầu Tiên](./beginner/04-buoc-dau-tien.md)
+- [Các Tác Vụ Thường Gặp](./beginner/05-cac-tac-vu-thuong-gap.md)
+- [Câu Hỏi Thường Gặp](./beginner/06-cau-hoi-thuong-gap.md)
+
 ### Getting Started
 - [Introduction](./getting-started/introduction.md)
 - [Installation](./getting-started/installation.md)
@@ -70,6 +79,7 @@ Welcome to AeroEduVison - an AI-powered Learning Management System with interact
 
 ## 🎯 Popular Topics
 
+- 👶 [Module Docs Cho Người Mới](./beginner/index.md) - **Khuyến nghị cho người mới bắt đầu!**
 - 🚀 [Quick Start in 5 Minutes](./getting-started/quick-start.md)
 - 🔐 [Setting Up Authentication](./authentication/nextauth-setup.md)
 - 🔬 [Running Your First Lab](./simulations/quick-start-labs.md)
@@ -80,7 +90,9 @@ Welcome to AeroEduVison - an AI-powered Learning Management System with interact
 
 ## 🆘 Need Help?
 
+- 👶 **Mới bắt đầu?** → [Module Docs Cho Người Mới](./beginner/index.md)
 - 📖 Browse the [Full Documentation](./getting-started/introduction.md)
+- ❓ Check [FAQ](./beginner/06-cau-hoi-thuong-gap.md)
 - 🐛 Check [Troubleshooting](./troubleshooting/common-issues.md)
 - 💬 Join our community (coming soon)
 - 📧 Contact support: support@aeroeduvison.com

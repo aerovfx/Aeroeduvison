@@ -46,7 +46,8 @@ export function hasRoutePermission(role: UserRole, pathname: string): boolean {
     return pathname.startsWith('/teacher') || 
            pathname.startsWith('/dashboard') ||
            pathname.startsWith('/learning-paths') ||
-           pathname.startsWith('/ai-tutor');
+           pathname.startsWith('/ai-tutor') ||
+           pathname.startsWith('/docs');
   }
   
   // Student can access student routes
@@ -54,7 +55,8 @@ export function hasRoutePermission(role: UserRole, pathname: string): boolean {
     return pathname.startsWith('/dashboard') ||
            pathname.startsWith('/learning-paths') ||
            pathname.startsWith('/ai-tutor') ||
-           pathname.startsWith('/courses');
+           pathname.startsWith('/courses') ||
+           pathname.startsWith('/docs');
   }
   
   return false;

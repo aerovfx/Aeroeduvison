@@ -6,7 +6,7 @@ import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 var Doc = defineDocumentType(() => ({
   name: "Doc",
-  filePathPattern: `**/*.mdx`,
+  filePathPattern: `docs/**/*.md`,
   contentType: "mdx",
   fields: {
     title: {
@@ -33,11 +33,12 @@ var Doc = defineDocumentType(() => ({
     toc: {
       type: "json",
       resolve: (doc) => {
-        const headings = doc.body.raw.match(/^##*\s+.+$/gm) || [];
+        const content = doc.body.raw || "";
+        const headings = content.match(/^##*\s+.+$/gm) || [];
         return headings.map((heading) => {
           const level = heading.match(/^#+/)?.[0].length || 1;
           const title = heading.replace(/^#+\s+/, "");
-          const url = `#${title.toLowerCase().replace(/\s+/g, "-")}`;
+          const url = `#${title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`;
           return { title, url, depth: level };
         });
       }
@@ -47,6 +48,7 @@ var Doc = defineDocumentType(() => ({
 var contentlayer_config_default = makeSource({
   contentDirPath: "./docs",
   documentTypes: [Doc],
+  disableImportAliasWarning: true,
   mdx: {
     remarkPlugins: [remarkGfm],
     rehypePlugins: [
@@ -84,4 +86,4 @@ export {
   Doc,
   contentlayer_config_default as default
 };
-//# sourceMappingURL=compiled-contentlayer-config-54Z5TSDO.mjs.map
+//# sourceMappingURL=compiled-contentlayer-config-5LF5N2BP.mjs.map

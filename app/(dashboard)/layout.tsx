@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import dynamic from 'next/dynamic';
+import Link from "next/link";
 import { Brain } from "lucide-react";
 import { XPProvider } from "@/contexts/XPContext";
 import { STEMProvider } from "@/contexts/STEMContext";
@@ -65,7 +66,12 @@ const DashboardLayout = ({
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <div className="text-sm text-gray-600">Dashboard</div>
+                <Link href="/dashboard" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
+                  Dashboard
+                </Link>
+                <Link href="/docs/beginner/index" className="text-sm text-gray-600 hover:text-gray-900 font-medium">
+                  📚 Docs
+                </Link>
                 <LanguageSwitcherCompact />
                 <UserMenu />
               </div>

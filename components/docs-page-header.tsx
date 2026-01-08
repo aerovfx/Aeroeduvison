@@ -1,5 +1,3 @@
-import { Balancer } from "react-wrap-balancer"
-
 interface DocsPageHeaderProps {
   heading: string
   text?: string
@@ -12,8 +10,8 @@ export function DocsPageHeader({ heading, text }: DocsPageHeaderProps) {
         {heading}
       </h1>
       {text && (
-        <p className="text-lg text-muted-foreground">
-          <Balancer>{text}</Balancer>
+        <p className="text-lg text-muted-foreground max-w-none">
+          {text}
         </p>
       )}
     </div>

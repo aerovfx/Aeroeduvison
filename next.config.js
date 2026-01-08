@@ -45,6 +45,14 @@ const nextConfig = {
         aggregateTimeout: 300,
       };
     }
+    
+    // Alias contentlayer/generated to .contentlayer/generated/index.mjs
+    const path = require("path")
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "contentlayer/generated": path.resolve(__dirname, ".contentlayer/generated/index.mjs"),
+    };
+    
     return config;
   },
 }
