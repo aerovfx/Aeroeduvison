@@ -15,6 +15,7 @@ export { AIRateLimiter, createAIRateLimiter } from './rate-limiter';
 export { GradingValidator, createGradingValidator } from './services/grading-validator';
 export { HumanReviewWorkflow, createHumanReviewWorkflow } from './services/human-review-workflow';
 export { ContentQualityScorer, createContentQualityScorer } from './quality/content-quality-scorer';
+export { ContentValidator, createContentValidator } from './quality/content-validator';
 
 // Testing & Benchmarking
 export { ABTestingFramework, createABTestingFramework } from './testing/ab-testing-framework';
@@ -31,7 +32,8 @@ export type { RateLimitConfig, RateLimitStatus } from './rate-limiter';
 // Types - Enhanced Services
 export type { ValidationResult, ValidationIssue, GradingConsistencyCheck } from './services/grading-validator';
 export type { ReviewTask, ReviewerStats } from './services/human-review-workflow';
-export type { QualityScore, QualityIssue } from './quality/content-quality-scorer';
+export type { QualityScore, QualityIssue, CurriculumCompliance, BiasDetection } from './quality/content-quality-scorer';
+export type { ValidationResult as ContentValidationResult } from './quality/content-validator';
 
 // Types - Testing
 export type { ABTestConfig, ABVariant, ABTestResult, ABTestSummary } from './testing/ab-testing-framework';

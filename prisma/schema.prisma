@@ -686,5 +686,6 @@ model Question {
   @@index([createdAt])
   @@index([qualityScore])
   @@index([usageCount])
-  @@fulltext([content, explanation]) // Full-text search
+  // Note: Full-text search can be implemented using PostgreSQL's tsvector/tsquery
+  // For now, use regular indexes and LIKE queries for search
 }

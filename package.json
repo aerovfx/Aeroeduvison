@@ -17,6 +17,8 @@
     "db:import-students": "tsx scripts/import-students-from-list.ts",
     "db:generate-demo-data": "tsx scripts/generate-demo-student-data.ts",
     "db:add-students-to-11a2": "tsx scripts/add-students-to-class-11a2.ts",
+    "test:question-bank": "tsx scripts/test-question-bank-api.ts",
+    "test:content-validation": "tsx scripts/test-content-validation-api.ts",
     "db:reset": "prisma migrate reset --force",
     "add-language-switcher": "node scripts/add-language-switcher.js",
     "add-language-switcher-all": "node scripts/add-language-switcher-all.js",

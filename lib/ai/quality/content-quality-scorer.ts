@@ -13,17 +13,46 @@ export interface QualityScore {
     clarity: number;
     engagement: number;
     appropriateness: number;
+    curriculumCompliance?: number; // 0-100
+    biasFree?: number; // 0-100
   };
   issues: QualityIssue[];
   recommendations: string[];
   needsReview: boolean;
+  curriculumCompliance?: CurriculumCompliance;
+  biasDetection?: BiasDetection;
+  readability?: {
+    score: number; // 0-100
+    level: 'very_easy' | 'easy' | 'medium' | 'hard' | 'very_hard';
+    avgSentenceLength: number;
+    avgWordsPerSentence: number;
+    gradeLevel: string;
+  };
 }
 
 export interface QualityIssue {
-  type: 'accuracy' | 'completeness' | 'clarity' | 'formatting' | 'inappropriate';
+  type: 'accuracy' | 'completeness' | 'clarity' | 'formatting' | 'inappropriate' | 'curriculum' | 'bias';
   severity: 'low' | 'medium' | 'high';
   message: string;
   location?: string;
+}
+
+export interface CurriculumCompliance {
+  aligned: boolean;
+  gradeLevel: string;
+  subject: string;
+  topics: string[];
+  standards: string[];
+  complianceScore: number; // 0-100
+  issues: string[];
+}
+
+export interface BiasDetection {
+  detected: boolean;
+  types: ('gender' | 'cultural' | 'socioeconomic' | 'regional' | 'other')[];
+  severity: 'low' | 'medium' | 'high';
+  examples: string[];
+  recommendations: string[];
 }
 
 export class ContentQualityScorer {
@@ -36,7 +65,15 @@ export class ContentQualityScorer {
     topic: string;
   }): QualityScore {
     const issues: QualityIssue[] = [];
-    const scores = {
+    const scores: {
+      accuracy: number;
+      completeness: number;
+      clarity: number;
+      engagement: number;
+      appropriateness: number;
+      curriculumCompliance?: number;
+      biasFree?: number;
+    } = {
       accuracy: 100,
       completeness: 100,
       clarity: 100,
@@ -100,11 +137,12 @@ export class ContentQualityScorer {
     }
 
     const readabilityScore = this.calculateReadabilityScore(lesson.content, context.grade);
+    const readability = this.getReadabilityDetails(lesson.content, context.grade);
     if (readabilityScore < 60) {
       issues.push({
         type: 'clarity',
         severity: 'medium',
-        message: 'Content may be too complex for target grade level',
+        message: `Content may be too complex for target grade level (readability: ${readability.level})`,
       });
       scores.clarity -= 20;
     }
@@ -156,7 +194,55 @@ export class ContentQualityScorer {
       });
     }
 
-    const overall = Object.values(scores).reduce((a, b) => a + b, 0) / 5;
+    // 6. Check curriculum compliance
+    const curriculumCompliance = this.checkCurriculumCompliance(lesson, context);
+    if (!curriculumCompliance.aligned) {
+      curriculumCompliance.issues.forEach(issue => {
+        issues.push({
+          type: 'curriculum',
+          severity: 'high',
+          message: issue,
+        });
+      });
+      scores.curriculumCompliance = curriculumCompliance.complianceScore;
+    } else {
+      scores.curriculumCompliance = 100;
+    }
+
+    // 7. Check for bias
+    const biasDetection = this.detectBias(lesson.content, context);
+    if (biasDetection.detected) {
+      biasDetection.types.forEach(type => {
+        issues.push({
+          type: 'bias',
+          severity: biasDetection.severity,
+          message: `Potential ${type} bias detected`,
+        });
+      });
+      scores.biasFree = biasDetection.severity === 'high' ? 50 : biasDetection.severity === 'medium' ? 70 : 85;
+    } else {
+      scores.biasFree = 100;
+    }
+
+    // Calculate overall score (weighted average)
+    const weights = {
+      accuracy: 0.25,
+      completeness: 0.20,
+      clarity: 0.20,
+      engagement: 0.15,
+      appropriateness: 0.10,
+      curriculumCompliance: 0.05,
+      biasFree: 0.05,
+    };
+    
+    const overall = 
+      scores.accuracy * weights.accuracy +
+      scores.completeness * weights.completeness +
+      scores.clarity * weights.clarity +
+      scores.engagement * weights.engagement +
+      scores.appropriateness * weights.appropriateness +
+      (scores.curriculumCompliance || 100) * weights.curriculumCompliance +
+      (scores.biasFree || 100) * weights.biasFree;
 
     return {
       overall: Math.max(0, Math.min(100, overall)),
@@ -166,10 +252,15 @@ export class ContentQualityScorer {
         clarity: Math.max(0, scores.clarity),
         engagement: Math.max(0, scores.engagement),
         appropriateness: Math.max(0, scores.appropriateness),
+        curriculumCompliance: scores.curriculumCompliance || 100,
+        biasFree: scores.biasFree || 100,
       },
       issues,
       recommendations: this.generateRecommendations(issues, scores),
       needsReview: overall < 70 || issues.some(i => i.severity === 'high'),
+      curriculumCompliance,
+      biasDetection,
+      readability,
     };
   }
 
@@ -493,11 +584,213 @@ export class ContentQualityScorer {
       recommendations.push('Double-check all calculations and formulas');
     }
 
+    if (scores.curriculumCompliance && scores.curriculumCompliance < 80) {
+      recommendations.push('Review content alignment with curriculum standards');
+      recommendations.push('Ensure topics match grade-level expectations');
+    }
+
+    if (scores.biasFree && scores.biasFree < 90) {
+      recommendations.push('Review content for potential bias');
+      recommendations.push('Ensure examples represent diverse perspectives');
+    }
+
     if (issues.some(i => i.severity === 'high')) {
       recommendations.push('Address high-severity issues before using this content');
     }
 
     return recommendations;
+  }
+
+  /**
+   * Check curriculum compliance (Vietnam GDPT 2018)
+   */
+  private checkCurriculumCompliance(
+    lesson: GeneratedLesson,
+    context: { subject: string; grade: string; topic: string }
+  ): CurriculumCompliance {
+    const issues: string[] = [];
+    let complianceScore = 100;
+
+    // Grade level validation
+    const gradeNum = parseInt(context.grade.replace(/\D/g, ''));
+    if (isNaN(gradeNum) || gradeNum < 6 || gradeNum > 12) {
+      issues.push(`Invalid grade level: ${context.grade}`);
+      complianceScore -= 20;
+    }
+
+    // Subject validation
+    const validSubjects = [
+      'Toán học', 'Vật lý', 'Hóa học', 'Sinh học', 'Ngữ văn',
+      'Lịch sử', 'Địa lý', 'Giáo dục công dân', 'Tiếng Anh',
+      'Công nghệ', 'Tin học', 'Thể dục', 'Mỹ thuật', 'Âm nhạc'
+    ];
+    if (!validSubjects.some(s => context.subject.includes(s))) {
+      issues.push(`Subject may not align with curriculum: ${context.subject}`);
+      complianceScore -= 15;
+    }
+
+    // Check for curriculum keywords
+    const curriculumKeywords = [
+      'GDPT 2018', 'chương trình giáo dục phổ thông',
+      'năng lực', 'phẩm chất', 'kiến thức', 'kỹ năng'
+    ];
+    const hasCurriculumKeywords = curriculumKeywords.some(keyword =>
+      lesson.content.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    if (!hasCurriculumKeywords && lesson.content.length > 500) {
+      issues.push('Content may not explicitly reference curriculum standards');
+      complianceScore -= 10;
+    }
+
+    // Check learning objectives format (SMART)
+    if (lesson.objectives) {
+      const smartKeywords = ['hiểu', 'phân tích', 'áp dụng', 'đánh giá', 'tạo ra'];
+      const hasSmartObjectives = lesson.objectives.some(obj =>
+        smartKeywords.some(keyword => obj.toLowerCase().includes(keyword))
+      );
+      if (!hasSmartObjectives) {
+        issues.push('Learning objectives may not follow SMART format');
+        complianceScore -= 10;
+      }
+    }
+
+    return {
+      aligned: complianceScore >= 80,
+      gradeLevel: context.grade,
+      subject: context.subject,
+      topics: [context.topic],
+      standards: ['GDPT 2018'],
+      complianceScore: Math.max(0, Math.min(100, complianceScore)),
+      issues,
+    };
+  }
+
+  /**
+   * Detect bias in content
+   */
+  private detectBias(
+    content: string,
+    context: { subject: string; grade: string; topic: string }
+  ): BiasDetection {
+    const detectedTypes: BiasDetection['types'] = [];
+    const examples: string[] = [];
+    let severity: 'low' | 'medium' | 'high' = 'low';
+
+    const contentLower = content.toLowerCase();
+
+    // Gender bias detection
+    const genderPatterns = {
+      male: /\b(ông|anh|nam|chàng|trai|bạn nam)\b/gi,
+      female: /\b(bà|cô|chị|nữ|nàng|gái|bạn nữ)\b/gi,
+    };
+    const maleMatches = (contentLower.match(genderPatterns.male) || []).length;
+    const femaleMatches = (contentLower.match(genderPatterns.female) || []).length;
+    
+    if (maleMatches > 0 || femaleMatches > 0) {
+      const ratio = maleMatches / (maleMatches + femaleMatches);
+      if (ratio > 0.75 || ratio < 0.25) {
+        detectedTypes.push('gender');
+        examples.push(`Gender representation imbalance: ${Math.round(ratio * 100)}% male, ${Math.round((1 - ratio) * 100)}% female`);
+        severity = ratio > 0.9 || ratio < 0.1 ? 'high' : 'medium';
+      }
+    }
+
+    // Cultural bias detection (check for diverse examples)
+    const culturalMarkers = [
+      /\b(việt nam|vietnam|hà nội|sài gòn|hồ chí minh)\b/gi,
+      /\b(mỹ|america|usa|new york|los angeles)\b/gi,
+      /\b(trung quốc|china|beijing|shanghai)\b/gi,
+      /\b(nhật bản|japan|tokyo|osaka)\b/gi,
+    ];
+    const culturalMatches = culturalMarkers.map(pattern => 
+      (contentLower.match(pattern) || []).length
+    );
+    const totalCultural = culturalMatches.reduce((a, b) => a + b, 0);
+    
+    if (totalCultural > 0) {
+      const maxCultural = Math.max(...culturalMatches);
+      const maxRatio = maxCultural / totalCultural;
+      if (maxRatio > 0.8) {
+        detectedTypes.push('cultural');
+        examples.push('Content may over-represent a single culture');
+        severity = maxRatio > 0.9 ? 'high' : 'medium';
+      }
+    }
+
+    // Socioeconomic bias (check for expensive/elite examples)
+    const socioeconomicMarkers = [
+      /\b(xe hơi|ô tô|du lịch nước ngoài|nhà lầu|biệt thự)\b/gi,
+      /\b(giàu có|thượng lưu|quý tộc)\b/gi,
+    ];
+    const socioeconomicMatches = socioeconomicMarkers.some(pattern =>
+      pattern.test(contentLower)
+    );
+    if (socioeconomicMatches && !contentLower.includes('ví dụ') && !contentLower.includes('example')) {
+      detectedTypes.push('socioeconomic');
+      examples.push('Content may assume higher socioeconomic background');
+      severity = 'medium';
+    }
+
+    // Regional bias (check for urban vs rural)
+    const urbanMarkers = /\b(thành phố|đô thị|hà nội|sài gòn|hồ chí minh)\b/gi;
+    const ruralMarkers = /\b(nông thôn|làng quê|miền núi|vùng sâu|vùng xa)\b/gi;
+    const urbanMatches = (contentLower.match(urbanMarkers) || []).length;
+    const ruralMatches = (contentLower.match(ruralMarkers) || []).length;
+    
+    if (urbanMatches > 0 && ruralMatches === 0) {
+      detectedTypes.push('regional');
+      examples.push('Content may favor urban perspectives');
+      severity = urbanMatches > 3 ? 'medium' : 'low';
+    }
+
+    const recommendations: string[] = [];
+    if (detectedTypes.includes('gender')) {
+      recommendations.push('Include balanced gender representation in examples');
+    }
+    if (detectedTypes.includes('cultural')) {
+      recommendations.push('Include diverse cultural perspectives and examples');
+    }
+    if (detectedTypes.includes('socioeconomic')) {
+      recommendations.push('Use examples accessible to all socioeconomic backgrounds');
+    }
+    if (detectedTypes.includes('regional')) {
+      recommendations.push('Include examples from both urban and rural contexts');
+    }
+
+    return {
+      detected: detectedTypes.length > 0,
+      types: detectedTypes,
+      severity,
+      examples,
+      recommendations,
+    };
+  }
+
+  /**
+   * Get detailed readability information
+   */
+  private getReadabilityDetails(text: string, grade: string): QualityScore['readability'] {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const avgWordsPerSentence = sentences.length > 0 ? words.length / sentences.length : 0;
+    const avgSentenceLength = this.calculateAverageSentenceLength(text);
+    const readabilityScore = this.calculateReadabilityScore(text, grade);
+
+    let level: 'very_easy' | 'easy' | 'medium' | 'hard' | 'very_hard';
+    if (readabilityScore >= 80) level = 'very_easy';
+    else if (readabilityScore >= 70) level = 'easy';
+    else if (readabilityScore >= 60) level = 'medium';
+    else if (readabilityScore >= 50) level = 'hard';
+    else level = 'very_hard';
+
+    return {
+      score: readabilityScore,
+      level,
+      avgSentenceLength,
+      avgWordsPerSentence,
+      gradeLevel: grade,
+    };
   }
 }
 
