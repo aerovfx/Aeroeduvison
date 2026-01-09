@@ -48,6 +48,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { PageHeader } from "@/components/teacher/PageHeader"
+import { PageFilters } from "@/components/teacher/PageFilters"
+import { TableLoadingSkeleton } from "@/components/teacher/LoadingSkeleton"
+import { EmptyState } from "@/components/teacher/EmptyState"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -215,79 +219,73 @@ export default function QuestionBankPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <HelpCircle className="h-8 w-8 text-blue-600" />
-            Ngân hàng câu hỏi
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Quản lý và tổ chức câu hỏi cho các kỳ thi
-          </p>
-        </div>
-        <Button onClick={() => router.push("/teacher/question-bank/create")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Tạo câu hỏi mới
-        </Button>
-      </div>
+      <PageHeader
+        title="Ngân hàng câu hỏi"
+        description="Quản lý và tổ chức câu hỏi cho các kỳ thi. Tạo, chỉnh sửa và duyệt câu hỏi."
+        icon={<HelpCircle className="h-6 w-6" />}
+        actions={
+          <Button onClick={() => router.push("/teacher/question-bank/create")} size="lg" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Tạo câu hỏi mới
+          </Button>
+        }
+      />
 
       {/* Filters and Search */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <form onSubmit={handleSearch} className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Tìm kiếm câu hỏi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </form>
-        
-        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as QuestionStatus)}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Tất cả">Tất cả</SelectItem>
-            <SelectItem value="Đã duyệt">Đã duyệt</SelectItem>
-            <SelectItem value="Chờ duyệt">Chờ duyệt</SelectItem>
-            <SelectItem value="Nháp">Nháp</SelectItem>
-          </SelectContent>
-        </Select>
+      <PageFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearch}
+        placeholder="Tìm kiếm câu hỏi..."
+        filters={
+          <>
+            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as QuestionStatus)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Tất cả">Tất cả</SelectItem>
+                <SelectItem value="Đã duyệt">Đã duyệt</SelectItem>
+                <SelectItem value="Chờ duyệt">Chờ duyệt</SelectItem>
+                <SelectItem value="Nháp">Nháp</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select value={selectedType} onValueChange={(value) => setSelectedType(value as QuestionType)}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Loại câu hỏi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Tất cả loại">Tất cả loại</SelectItem>
-            <SelectItem value="TNKQ - Nhiều lựa chọn">TNKQ - Nhiều lựa chọn</SelectItem>
-            <SelectItem value="TNKQ - Đúng/Sai">TNKQ - Đúng/Sai</SelectItem>
-            <SelectItem value="TNKQ - Trả lời ngắn">TNKQ - Trả lời ngắn</SelectItem>
-            <SelectItem value="Tự luận">Tự luận</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as QuestionType)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Loại câu hỏi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Tất cả loại">Tất cả loại</SelectItem>
+                <SelectItem value="TNKQ - Nhiều lựa chọn">TNKQ - Nhiều lựa chọn</SelectItem>
+                <SelectItem value="TNKQ - Đúng/Sai">TNKQ - Đúng/Sai</SelectItem>
+                <SelectItem value="TNKQ - Trả lời ngắn">TNKQ - Trả lời ngắn</SelectItem>
+                <SelectItem value="Tự luận">Tự luận</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
       {/* Questions Table */}
-      <div className="bg-white rounded-lg border shadow-sm">
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center p-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="p-6">
+            <TableLoadingSkeleton rows={5} />
           </div>
         ) : questions.length === 0 ? (
-          <div className="text-center p-12">
-            <HelpCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">Chưa có câu hỏi nào</p>
-            <Button onClick={() => router.push("/teacher/question-bank/create")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tạo câu hỏi đầu tiên
-            </Button>
-          </div>
+          <EmptyState
+            icon={<HelpCircle className="h-12 w-12" />}
+            title="Chưa có câu hỏi nào"
+            description="Bắt đầu bằng cách tạo câu hỏi đầu tiên cho ngân hàng câu hỏi của bạn"
+            action={{
+              label: "Tạo câu hỏi đầu tiên",
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => router.push("/teacher/question-bank/create")
+            }}
+          />
         ) : (
           <Table>
             <TableHeader>

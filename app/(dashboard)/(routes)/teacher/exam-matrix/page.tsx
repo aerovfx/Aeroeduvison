@@ -12,6 +12,7 @@ import {
   Eye,
   Edit,
   Trash2,
+  Copy,
   Loader2,
   CheckCircle2,
   XCircle,
@@ -49,6 +50,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DigitizeMatrixModal } from "@/components/exam-matrix/digitize-modal"
+import { GenerateExamModal } from "@/components/exam-matrix/generate-exam-modal"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -74,8 +76,11 @@ export default function ExamMatrixPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [examTypeFilter, setExamTypeFilter] = useState("Tất cả loại đề")
   const [isDigitizeModalOpen, setIsDigitizeModalOpen] = useState(false)
+  const [isGenerateExamModalOpen, setIsGenerateExamModalOpen] = useState(false)
+  const [selectedMatrixForExam, setSelectedMatrixForExam] = useState<{ id: string; name: string } | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [matrixToDelete, setMatrixToDelete] = useState<string | null>(null)
+  const [duplicating, setDuplicating] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMatrices()
@@ -157,6 +162,29 @@ export default function ExamMatrixPage() {
     } catch (error) {
       console.error("Error deleting matrix:", error)
       toast.error("Không thể xóa ma trận")
+    }
+  }
+
+  const handleDuplicate = async (id: string) => {
+    try {
+      setDuplicating(id)
+      const response = await fetch(`/api/exam-matrices/${id}/duplicate`, {
+        method: "POST",
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to duplicate matrix")
+      }
+      
+      const data = await response.json()
+      toast.success("Đã nhân bản ma trận thành công")
+      fetchMatrices()
+    } catch (error: any) {
+      console.error("Error duplicating matrix:", error)
+      toast.error(error.message || "Không thể nhân bản ma trận")
+    } finally {
+      setDuplicating(null)
     }
   }
 
@@ -333,26 +361,69 @@ export default function ExamMatrixPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        {/* Xem - Available for all matrices */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (matrix.type === "Số hoá") {
+                              router.push(`/teacher/exam-matrix/${matrix.id}/review`)
+                            } else {
+                              router.push(`/teacher/exam-matrix/${matrix.id}`)
+                            }
+                          }}
+                          title="Xem chi tiết"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+
+                        {/* Sửa - Available for completed matrices */}
                         {matrix.status === "Hoàn tất" && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}`)}
-                              title="Xem"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}/edit`)}
-                              title="Sửa"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}/edit`)}
+                            title="Sửa ma trận"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         )}
+
+                        {/* Tạo đề thi - Only for completed matrices */}
+                        {matrix.status === "Hoàn tất" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setSelectedMatrixForExam({ id: matrix.id, name: matrix.name })
+                              setIsGenerateExamModalOpen(true)
+                            }}
+                            title="Tạo đề thi từ ma trận"
+                            className="text-primary hover:text-primary"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        )}
+
+                        {/* Nhân bản - Available for all matrices except processing */}
+                        {matrix.status !== "Đang xử lý" && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDuplicate(matrix.id)}
+                            disabled={duplicating === matrix.id}
+                            title="Nhân bản ma trận"
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            {duplicating === matrix.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+
+                        {/* Xóa - Available for all matrices except processing */}
                         {matrix.status !== "Đang xử lý" && (
                           <Button
                             variant="ghost"
@@ -361,7 +432,7 @@ export default function ExamMatrixPage() {
                               setMatrixToDelete(matrix.id)
                               setDeleteDialogOpen(true)
                             }}
-                            title="Xóa"
+                            title="Xóa ma trận"
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -386,6 +457,19 @@ export default function ExamMatrixPage() {
           setIsDigitizeModalOpen(false)
         }}
       />
+
+      {/* Generate Exam Modal */}
+      {selectedMatrixForExam && (
+        <GenerateExamModal
+          isOpen={isGenerateExamModalOpen}
+          onClose={() => {
+            setIsGenerateExamModalOpen(false)
+            setSelectedMatrixForExam(null)
+          }}
+          matrixId={selectedMatrixForExam.id}
+          matrixName={selectedMatrixForExam.name}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

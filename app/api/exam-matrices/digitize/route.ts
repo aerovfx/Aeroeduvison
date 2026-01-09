@@ -5,6 +5,7 @@ import { db as prisma } from "@/lib/db"
 import { writeFile, mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
+import { MatrixProcessService } from "@/lib/exam-matrix/matrix-process-service"
 
 // POST /api/exam-matrices/digitize - Upload and digitize matrix file
 export async function POST(request: NextRequest) {
@@ -80,8 +81,31 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // TODO: Queue OCR/parsing job
-    // await queueMatrixProcessing(matrix.id)
+    // Start processing in background (non-blocking)
+    // This will update status: "Hàng đợi" -> "Đang xử lý" -> "Hoàn tất"
+    // Use setTimeout to avoid blocking the response
+    setTimeout(async () => {
+      try {
+        await MatrixProcessService.processMatrix({
+          matrixId: matrix.id,
+          userId: session.user.id,
+        })
+      } catch (error: any) {
+        console.error("Background matrix processing failed:", error)
+        // Error is already handled in processMatrix, but log here for debugging
+        try {
+          await prisma.examMatrix.update({
+            where: { id: matrix.id },
+            data: {
+              status: "Lỗi",
+              processingError: error.message || "Xử lý thất bại",
+            },
+          })
+        } catch (updateError) {
+          console.error("Failed to update matrix error status:", updateError)
+        }
+      }
+    }, 100)
 
     return NextResponse.json({
       success: true,

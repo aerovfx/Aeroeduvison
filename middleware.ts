@@ -6,6 +6,18 @@ import { getDashboardUrl, hasRoutePermission, getFallbackUrl } from '@/lib/auth-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   
+  // Allow static files immediately (before any auth checks)
+  if (
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/fonts/") ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot)$/i)
+  ) {
+    return NextResponse.next()
+  }
+  
   // Get the token to check authentication status
   const token = await getToken({ 
     req: request, 
@@ -27,11 +39,6 @@ export async function middleware(request: NextRequest) {
   // Auth routes
   const authRoutes = ["/auth/login", "/auth/signup", "/forgot-password", "/reset-password"]
   const isAuthRoute = authRoutes.some(route => pathname.startsWith(route))
-
-  // API routes (always allow)
-  if (pathname.startsWith("/api")) {
-    return NextResponse.next()
-  }
 
   // Test routes (allow in development)
   const testRoutes = [

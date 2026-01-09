@@ -44,6 +44,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DocumentUploadModal } from "@/components/document-digitization/upload-modal"
+import { PageHeader } from "@/components/teacher/PageHeader"
+import { PageFilters } from "@/components/teacher/PageFilters"
+import { TableLoadingSkeleton, CardLoadingSkeleton } from "@/components/teacher/LoadingSkeleton"
+import { EmptyState } from "@/components/teacher/EmptyState"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -245,31 +249,32 @@ export default function DocumentDigitizationPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b bg-white">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold">Số hoá tài liệu</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Quản lý và số hoá tài liệu với AI
-              </p>
-            </div>
-          </div>
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Header */}
+        <PageHeader
+          title="Số hoá tài liệu"
+          description="Quản lý và số hoá tài liệu với AI. Upload tài liệu, trích xuất văn bản và phân tích nội dung tự động."
+          icon={<Upload className="h-6 w-6" />}
+          badge="AI"
+          actions={
+            <Button onClick={() => setIsUploadModalOpen(true)} size="lg" className="gap-2">
+              <Upload className="h-4 w-4" />
+              Tải lên tài liệu
+            </Button>
+          }
+        />
 
-          {/* Status Tabs */}
-          <Tabs value={selectedStatus} onValueChange={(v) => handleStatusChange(v as DocumentStatus)}>
-            <TabsList className="grid w-full max-w-md grid-cols-5">
-              <TabsTrigger value="Tất cả">Tất cả</TabsTrigger>
-              <TabsTrigger value="Hàng đợi">Hàng đợi</TabsTrigger>
-              <TabsTrigger value="Đang xử lý">Đang xử lý</TabsTrigger>
-              <TabsTrigger value="Hoàn tất">Hoàn tất</TabsTrigger>
-              <TabsTrigger value="Lỗi">Lỗi</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
+        {/* Status Tabs */}
+        <Tabs value={selectedStatus} onValueChange={(v) => handleStatusChange(v as DocumentStatus)}>
+          <TabsList className="grid w-full max-w-2xl grid-cols-5">
+            <TabsTrigger value="Tất cả">Tất cả</TabsTrigger>
+            <TabsTrigger value="Hàng đợi">Hàng đợi</TabsTrigger>
+            <TabsTrigger value="Đang xử lý">Đang xử lý</TabsTrigger>
+            <TabsTrigger value="Hoàn tất">Hoàn tất</TabsTrigger>
+            <TabsTrigger value="Lỗi">Lỗi</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
       {/* Breadcrumbs */}
       {currentPath.length > 0 && (
@@ -296,7 +301,29 @@ export default function DocumentDigitizationPage() {
         </div>
       )}
 
-      {/* Action Bar */}
+        {/* Filters and Search */}
+        <PageFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          placeholder="Tìm kiếm tài liệu theo tên..."
+          filters={
+            selectedDocuments.size > 0 && (
+              <Badge variant="secondary" className="gap-2">
+                Đã chọn: {selectedDocuments.size}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-xs"
+                  onClick={() => setSelectedDocuments(new Set())}
+                >
+                  Bỏ chọn
+                </Button>
+              </Badge>
+            )
+          }
+        />
+
+        {/* Action Bar */}
       <div className="border-b bg-white px-6 py-4">
         <div className="container mx-auto flex items-center justify-between gap-4">
           <div className="flex-1 max-w-md">
@@ -323,22 +350,23 @@ export default function DocumentDigitizationPage() {
         </div>
       </div>
 
-      {/* Documents Table */}
-      <div className="flex-1 overflow-auto">
-        <div className="container mx-auto px-6 py-4">
+        {/* Documents Table */}
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <div className="p-6">
+              <TableLoadingSkeleton rows={5} />
             </div>
           ) : filteredDocuments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-2">Chưa có tài liệu nào</p>
-              <Button onClick={() => setIsUploadModalOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Tải tài liệu lên
-              </Button>
-            </div>
+            <EmptyState
+              icon={<FileText className="h-12 w-12" />}
+              title="Chưa có tài liệu nào"
+              description="Bắt đầu bằng cách tải lên tài liệu để số hóa với AI"
+              action={{
+                label: "Tải tài liệu lên",
+                icon: <Upload className="h-4 w-4" />,
+                onClick: () => setIsUploadModalOpen(true)
+              }}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -466,6 +494,31 @@ export default function DocumentDigitizationPage() {
           )}
         </div>
       </div>
+
+      {/* Breadcrumbs */}
+      {currentPath.length > 0 && (
+        <div className="bg-white rounded-lg border px-4 py-2">
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              onClick={() => setCurrentPath([])}
+              className="hover:text-primary transition-colors"
+            >
+              🏠
+            </button>
+            {currentPath.map((segment, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="text-muted-foreground">/</span>
+                <button
+                  onClick={() => setCurrentPath(currentPath.slice(0, index + 1))}
+                  className="hover:text-primary transition-colors"
+                >
+                  {segment}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upload Modal */}
       <DocumentUploadModal

@@ -19,6 +19,7 @@ import { ErrorRecovery } from "@/lib/errors"
 import { apiLogger } from "@/lib/logging-simple"
 import { getRedisClient } from "@/lib/redis"
 import { getBullMQManager } from "@/lib/queue/bullmq"
+import { GeminiService } from "@/lib/ai/services/gemini-service"
 
 export interface ProcessDocumentOptions {
   documentId: string
@@ -239,13 +240,29 @@ export class DocumentProcessService {
   }
 
   /**
-   * Extract text using Gemini Vision
+   * Extract text using Gemini Vision (via GeminiService)
    */
   private static async extractTextWithGeminiVision(
     fileBuffer: Buffer,
     mimeType?: string
   ): Promise<string> {
-    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+    // Use unified GeminiService
+    const base64Image = fileBuffer.toString('base64')
+    const imageMimeType = mimeType || 'image/jpeg'
+    
+    try {
+      return await GeminiService.extractTextFromImage(
+        base64Image,
+        imageMimeType,
+        'vi' // Vietnamese
+      )
+    } catch (error: any) {
+      apiLogger.error("Gemini OCR failed, trying fallback", {
+        metadata: { error: error.message },
+      })
+      
+      // Fallback to direct API call if service fails
+      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
 
     if (!geminiApiKey || geminiApiKey.includes("your-")) {
       throw new Error("GEMINI_API_KEY chưa được cấu hình")

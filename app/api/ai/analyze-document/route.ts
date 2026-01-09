@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { GeminiService } from "@/lib/ai/services/gemini-service"
 
 // POST /api/ai/analyze-document - Analyze document content with AI
 export async function POST(request: NextRequest) {
@@ -24,20 +25,14 @@ export async function POST(request: NextRequest) {
 
     // Use AI to analyze and structure the document
     try {
-      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+      // Try using GeminiService first
+      const isGeminiAvailable = await GeminiService.isAvailable()
       
-      if (geminiApiKey) {
-        // Use Gemini AI for analysis
-        console.log("🤖 [ANALYZE] Using Gemini AI for document analysis")
+      if (isGeminiAvailable) {
+        console.log("🤖 [ANALYZE] Using GeminiService for document analysis")
         
-        const genAI = new GoogleGenerativeAI(geminiApiKey)
-        // Use Gemini 2.5 Flash for faster response (or Pro for better quality)
-        const model = genAI.getGenerativeModel({ 
-          model: process.env.GEMINI_MODEL || "gemini-2.5-flash" 
-        })
-
         // Build prompt for analysis and restructuring
-        let prompt = `Bạn là một AI chuyên phân tích và tái cấu trúc tài liệu giáo dục. Hãy phân tích tài liệu sau và trả về kết quả dưới dạng JSON.
+        const prompt = `Bạn là một AI chuyên phân tích và tái cấu trúc tài liệu giáo dục. Hãy phân tích tài liệu sau và trả về kết quả dưới dạng JSON.
 
 ### Tài liệu cần phân tích:
 ${text.substring(0, 8000)}${text.length > 8000 ? "\n...(còn tiếp)" : ""}
@@ -97,65 +92,120 @@ Lưu ý:
 - Chủ đề phải liên quan đến giáo dục (Toán, Văn, Lý, Hóa, Sinh, Sử, Địa, Anh, etc.)`
 
         // If image is provided, use multimodal analysis
-        const contents: any[] = []
-        
-        if (imageBase64 && mimeType) {
-          // Add image for layout analysis
-          contents.push({
-            inlineData: {
-              mimeType: mimeType,
-              data: imageBase64
-            }
-          })
-          prompt = `Phân tích cả hình ảnh và văn bản để tái cấu trúc tài liệu. ${prompt}`
-        }
-        
-        contents.push({ text: prompt })
-
-        const result = await model.generateContent(contents)
-        const response = result.response
-        const aiText = response.text()
-
-        // Try to parse JSON from response
         let aiAnalysis: any = null
+        
         try {
-          // Extract JSON from markdown code blocks if present
-          const jsonMatch = aiText.match(/```json\s*([\s\S]*?)\s*```/) || 
-                           aiText.match(/```\s*([\s\S]*?)\s*```/) ||
-                           aiText.match(/\{[\s\S]*\}/)
-          
-          if (jsonMatch) {
-            aiAnalysis = JSON.parse(jsonMatch[1] || jsonMatch[0])
+          if (imageBase64 && mimeType) {
+            // Use vision API for image + text analysis
+            const fullPrompt = `Phân tích cả hình ảnh và văn bản để tái cấu trúc tài liệu. ${prompt}`
+            const analysisText = await GeminiService.analyzeImage(
+              imageBase64,
+              fullPrompt,
+              mimeType,
+              { temperature: 0.4, maxTokens: 8000 }
+            )
+            aiAnalysis = await GeminiService.generateJSON<any>(analysisText, {
+              temperature: 0.3,
+            })
           } else {
-            // Try parsing the whole response
-            aiAnalysis = JSON.parse(aiText)
+            // Text-only analysis
+            aiAnalysis = await GeminiService.generateJSON<any>(prompt, {
+              systemPrompt: "You are an expert document analyzer. Always return valid JSON.",
+              temperature: 0.4,
+            })
           }
-        } catch (parseError) {
+        } catch (parseError: any) {
           console.warn("Failed to parse Gemini JSON response, using fallback:", parseError)
-          // Fallback to basic extraction
           aiAnalysis = null
         }
 
         if (aiAnalysis) {
-          console.log("✅ [ANALYZE] Gemini analysis successful")
+          console.log("✅ [ANALYZE] GeminiService analysis successful")
           
           return NextResponse.json({
             type: aiAnalysis.type || detectDocumentType(text, fileName),
             structure: aiAnalysis.structure || extractStructure(text),
             keyTopics: aiAnalysis.keyTopics || extractTopics(text),
             summary: aiAnalysis.summary || generateSummary(text),
-            restructuredText: aiAnalysis.restructuredText || text, // Tái cấu trúc văn bản
-            layoutAnalysis: aiAnalysis.layoutAnalysis || null, // Phân tích layout
+            restructuredText: aiAnalysis.restructuredText || text,
+            layoutAnalysis: aiAnalysis.layoutAnalysis || null,
             metadata: {
               wordCount: text.split(/\s+/).length,
               characterCount: text.length,
               estimatedPages: Math.ceil(text.length / 2000),
-              aiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
-              aiProvider: "gemini",
+              aiModel: "gemini-2.0-flash-exp",
+              aiProvider: "gemini-service",
               hasRestructuredText: !!aiAnalysis.restructuredText,
               hasLayoutAnalysis: !!aiAnalysis.layoutAnalysis,
             },
           })
+        }
+      }
+      
+      // Fallback to direct Gemini API if service fails
+      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+      if (geminiApiKey) {
+        console.log("🤖 [ANALYZE] Using direct Gemini API (fallback)")
+        
+        const genAI = new GoogleGenerativeAI(geminiApiKey)
+        const model = genAI.getGenerativeModel({ 
+          model: process.env.GEMINI_MODEL || "gemini-2.5-flash" 
+        })
+
+        const fallbackPrompt = `Bạn là một AI chuyên phân tích và tái cấu trúc tài liệu giáo dục. Hãy phân tích tài liệu sau và trả về kết quả dưới dạng JSON.
+
+### Tài liệu cần phân tích:
+${text.substring(0, 8000)}${text.length > 8000 ? "\n...(còn tiếp)" : ""}
+
+### Yêu cầu phân tích và tái cấu trúc:
+1. **Loại tài liệu** (type): Xác định loại tài liệu (exam, textbook, question_bank, document)
+2. **Cấu trúc** (structure): Phân tích cấu trúc tài liệu
+3. **Chủ đề chính** (keyTopics): Liệt kê 3-5 chủ đề/chủ điểm chính
+4. **Tóm tắt** (summary): Tóm tắt nội dung chính trong 2-3 câu
+5. **Văn bản tái cấu trúc** (restructuredText): Tái cấu trúc văn bản với định dạng rõ ràng
+6. **Phân tích layout** (layoutAnalysis): Phân tích bố cục (nếu có hình ảnh)
+
+Trả về JSON hợp lệ.`
+
+        const contents: any[] = []
+        if (imageBase64 && mimeType) {
+          contents.push({
+            inlineData: { mimeType, data: imageBase64 }
+          })
+        }
+        contents.push({ text: fallbackPrompt })
+
+        const result = await model.generateContent(contents)
+        const aiText = result.response.text()
+
+        try {
+          const jsonMatch = aiText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                           aiText.match(/```\s*([\s\S]*?)\s*```/) ||
+                           aiText.match(/\{[\s\S]*\}/)
+          
+          if (jsonMatch) {
+            const aiAnalysis = JSON.parse(jsonMatch[1] || jsonMatch[0])
+            
+            return NextResponse.json({
+              type: aiAnalysis.type || detectDocumentType(text, fileName),
+              structure: aiAnalysis.structure || extractStructure(text),
+              keyTopics: aiAnalysis.keyTopics || extractTopics(text),
+              summary: aiAnalysis.summary || generateSummary(text),
+              restructuredText: aiAnalysis.restructuredText || text,
+              layoutAnalysis: aiAnalysis.layoutAnalysis || null,
+              metadata: {
+                wordCount: text.split(/\s+/).length,
+                characterCount: text.length,
+                estimatedPages: Math.ceil(text.length / 2000),
+                aiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+                aiProvider: "gemini-direct",
+                hasRestructuredText: !!aiAnalysis.restructuredText,
+                hasLayoutAnalysis: !!aiAnalysis.layoutAnalysis,
+              },
+            })
+          }
+        } catch (parseError) {
+          console.warn("Failed to parse fallback Gemini response:", parseError)
         }
       }
 

@@ -50,6 +50,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { PageHeader } from "@/components/teacher/PageHeader"
+import { PageFilters } from "@/components/teacher/PageFilters"
+import { TableLoadingSkeleton } from "@/components/teacher/LoadingSkeleton"
+import { EmptyState } from "@/components/teacher/EmptyState"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -213,85 +217,77 @@ export default function ExamsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <FileText className="h-8 w-8 text-blue-600" />
-            Đề thi
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Quản lý và tổ chức các đề thi cho học sinh
-          </p>
-        </div>
-        <Button onClick={() => router.push("/teacher/exams/create")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Tạo đề thi mới
-        </Button>
-      </div>
+      <PageHeader
+        title="Đề thi"
+        description="Quản lý và tổ chức các đề thi cho học sinh. Tạo, chỉnh sửa và theo dõi kết quả thi."
+        icon={<FileText className="h-6 w-6" />}
+        badge="AI"
+        actions={
+          <Button onClick={() => router.push("/teacher/exams/create")} size="lg" className="gap-2">
+            <Plus className="h-4 w-4" />
+            Tạo đề thi mới
+          </Button>
+        }
+      />
 
       {/* Filters and Search */}
-      <div className="flex flex-col md:flex-row gap-4">
-        <form onSubmit={handleSearch} className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Tìm kiếm đề thi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </form>
-        
-        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as ExamStatus)}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Tất cả">Tất cả</SelectItem>
-            <SelectItem value="Nháp">Nháp</SelectItem>
-            <SelectItem value="Đã lên lịch">Đã lên lịch</SelectItem>
-            <SelectItem value="Đang diễn ra">Đang diễn ra</SelectItem>
-            <SelectItem value="Đã hoàn thành">Đã hoàn thành</SelectItem>
-            <SelectItem value="Đã lưu trữ">Đã lưu trữ</SelectItem>
-          </SelectContent>
-        </Select>
+      <PageFilters
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onSearchSubmit={handleSearch}
+        placeholder="Tìm kiếm đề thi..."
+        filters={
+          <>
+            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as ExamStatus)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Trạng thái" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Tất cả">Tất cả</SelectItem>
+                <SelectItem value="Nháp">Nháp</SelectItem>
+                <SelectItem value="Đã lên lịch">Đã lên lịch</SelectItem>
+                <SelectItem value="Đang diễn ra">Đang diễn ra</SelectItem>
+                <SelectItem value="Đã hoàn thành">Đã hoàn thành</SelectItem>
+                <SelectItem value="Đã lưu trữ">Đã lưu trữ</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ExamType)}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Loại đề thi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Tất cả loại">Tất cả loại</SelectItem>
-            <SelectItem value="Kiểm tra 1 tiết">Kiểm tra 1 tiết</SelectItem>
-            <SelectItem value="Kiểm tra giữa kỳ">Kiểm tra giữa kỳ</SelectItem>
-            <SelectItem value="Thi cuối kỳ">Thi cuối kỳ</SelectItem>
-            <SelectItem value="Thi thử">Thi thử</SelectItem>
-            <SelectItem value="Bài tập">Bài tập</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ExamType)}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Loại đề thi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Tất cả loại">Tất cả loại</SelectItem>
+                <SelectItem value="Kiểm tra 1 tiết">Kiểm tra 1 tiết</SelectItem>
+                <SelectItem value="Kiểm tra giữa kỳ">Kiểm tra giữa kỳ</SelectItem>
+                <SelectItem value="Thi cuối kỳ">Thi cuối kỳ</SelectItem>
+                <SelectItem value="Thi thử">Thi thử</SelectItem>
+                <SelectItem value="Bài tập">Bài tập</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
       {/* Exams Table */}
-      <div className="bg-white rounded-lg border shadow-sm">
+      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center p-12">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="p-6">
+            <TableLoadingSkeleton rows={5} />
           </div>
         ) : filteredExams.length === 0 ? (
-          <div className="text-center p-12">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 mb-2">Chưa có đề thi nào</p>
-            <p className="text-sm text-gray-500 mb-4">
-              Tạo đề thi mới để bắt đầu quản lý các kỳ thi
-            </p>
-            <Button onClick={() => router.push("/teacher/exams/create")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tạo đề thi đầu tiên
-            </Button>
-          </div>
+          <EmptyState
+            icon={<FileText className="h-12 w-12" />}
+            title="Chưa có đề thi nào"
+            description="Tạo đề thi mới để bắt đầu quản lý các kỳ thi cho học sinh của bạn"
+            action={{
+              label: "Tạo đề thi đầu tiên",
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => router.push("/teacher/exams/create")
+            }}
+          />
         ) : (
           <Table>
             <TableHeader>
