@@ -179,7 +179,15 @@ AeroEdu là nền tảng giáo dục thông minh tích hợp AI, cung cấp tr�
 │  │   API    │ │  (Google │      │(SendGrid)│ │(Twilio)  │         │
 │  │(MediaPipe│ │Document  │      └──────────┘ └──────────┘         │
 │  │   )      │ │   AI)    │                                         │
-│  └──────────┘ └──────────┘      Payment:                           │
+│  └──────────┘ └──────────┘                                         │
+│                                                                      │
+│  Document Digitization:            Payment:                         │
+│  ┌──────────┐ ┌──────────┐      ┌──────────┐                       │
+│  │ Gemini   │ │ Gemini   │      │  Stripe  │                       │
+│  │ Vision   │ │   AI     │      │   API    │                       │
+│  │   API    │ │   API    │      └──────────┘                       │
+│  │ (OCR)    │ │(Analysis)│                                         │
+│  └──────────┘ └──────────┘                                         │
 │                                  ┌──────────┐                       │
 │  Queue & Jobs:                   │  Stripe  │                       │
 │  ┌──────────┐                    │   API    │                       │
@@ -275,6 +283,14 @@ Modules:
   │   ├── Class Management
   │   └── Capacity Control
   │
+  ├── Document Digitization Module
+  │   ├── Document Upload & Management
+  │   ├── OCR Processing (Gemini Vision)
+  │   ├── AI Content Analysis
+  │   ├── Text Restructuring
+  │   ├── Result File Generation
+  │   └── Integration with Teaching Materials
+  │
   └── Calendar Module
       ├── Academic Calendar
       ├── Schedule Management
@@ -323,6 +339,16 @@ GET    /api/v1/analytics/dashboard
 GET    /api/v1/analytics/student/:id
 GET    /api/v1/analytics/course/:id
 GET    /api/v1/analytics/trends
+
+# Document Digitization
+POST   /api/documents/upload
+GET    /api/documents
+GET    /api/documents/:id
+POST   /api/documents/:id/process
+POST   /api/documents/:id/save-result
+GET    /api/documents/file/[...path]
+POST   /api/documents/fix-status
+POST   /api/ai/analyze-document
 
 Performance Optimizations:
   - Connection Pooling: PgBouncer (max 100 connections)
@@ -581,7 +607,111 @@ GET    /api/v1/presence/online
 GET    /api/v1/presence/:userId
 ```
 
-### 3.4 LabTwin Service (Physics Engine)
+### 3.4 Document Digitization Module (Core Service)
+
+**Vị trí:** Nằm trong Core Service, thuộc Content Management
+
+```typescript
+Module: Document Digitization
+Location: Core Service (Modular Monolith)
+Technology: Next.js 15, TypeScript, Prisma, Google Gemini API
+Deployment: Cloud Run (same as Core Service)
+
+Architecture: Service Layer with Queue Integration
+
+Components:
+  ├── Upload Service
+  │   ├── File Upload & Validation
+  │   ├── Storage Management
+  │   ├── Folder Organization
+  │   └── Metadata Extraction
+  │
+  ├── OCR Service
+  │   ├── Gemini Vision API Integration
+  │   ├── Text Extraction
+  │   ├── Image Processing
+  │   └── Error Handling & Retry
+  │
+  ├── AI Analysis Service
+  │   ├── Content Type Detection
+  │   ├── Structure Analysis
+  │   ├── Topic Extraction
+  │   ├── Text Restructuring
+  │   └── Layout Analysis
+  │
+  ├── Result Management Service
+  │   ├── Result File Generation
+  │   ├── Metadata Packaging
+  │   ├── File Serving
+  │   └── Download Management
+  │
+  └── Queue Worker
+      ├── Background Processing
+      ├── Retry Mechanism
+      ├── Job Tracking
+      └── Status Updates
+
+Service Layer:
+  lib/document-digitization/
+  ├── process-service.ts    # Main processing service
+  ├── worker.ts             # Queue worker
+  └── api-helpers.ts        # API utilities
+
+API Endpoints:
+POST   /api/documents/upload              # Upload documents
+GET    /api/documents                     # List documents
+GET    /api/documents/:id                 # Get document
+POST   /api/documents/:id/process       # Process document (OCR + AI)
+POST   /api/documents/:id/save-result    # Save result file
+GET    /api/documents/file/[...path]      # Serve files
+POST   /api/documents/fix-status          # Fix invalid status
+POST   /api/ai/analyze-document           # AI analysis (internal)
+
+Workflow:
+1. Upload Document
+   ↓
+2. OCR Extraction (Gemini Vision)
+   ↓
+3. AI Analysis (Gemini AI)
+   - Document type detection
+   - Structure analysis
+   - Topic extraction
+   - Text restructuring
+   - Layout analysis
+   ↓
+4. Save Result File
+   - Metadata header
+   - Restructured text
+   - System footer
+   ↓
+5. Update Database
+   - OCR text
+   - AI analysis
+   - Result file URL
+
+Features:
+  - Retry mechanism (3 attempts, exponential backoff)
+  - Redis caching (1 hour TTL)
+  - BullMQ queue for background processing
+  - Structured logging
+  - Error recovery
+  - File security (path traversal prevention)
+
+Performance:
+  - OCR Processing: < 10s (p95)
+  - AI Analysis: < 15s (p95)
+  - Total Processing: < 30s (p95)
+  - Cache Hit Rate: > 80%
+  - Queue Processing: < 5 minutes average
+
+External Services:
+  - Google Gemini Vision API (OCR)
+  - Google Gemini AI API (Analysis)
+  - Redis (Cache & Queue)
+  - Google Cloud Storage (File storage)
+```
+
+### 3.5 LabTwin Service (Physics Engine)
 
 **Lý do tách riêng:** Cần Python scientific computing stack, GPU acceleration
 
@@ -1322,6 +1452,79 @@ CREATE INDEX idx_notifications_created ON notifications(created_at DESC);
 CREATE INDEX idx_notifications_priority ON notifications(priority);
 
 -- ============================================================================
+-- DOCUMENT DIGITIZATION
+-- ============================================================================
+
+-- Document Folders (Hierarchical organization)
+CREATE TABLE document_folders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    parent_id UUID REFERENCES document_folders(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    path VARCHAR(500) NOT NULL, -- Full path like "SGK toán 9/Chương 5/Bài 17"
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_document_folders_user ON document_folders(user_id);
+CREATE INDEX idx_document_folders_parent ON document_folders(parent_id);
+CREATE INDEX idx_document_folders_path ON document_folders(path);
+
+-- Documents (Digitized documents)
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL, -- Original filename
+    display_name VARCHAR(255), -- Display name (e.g., "SGK toán 9")
+    type VARCHAR(50) NOT NULL, -- "VĂN BẢN", "THƯ MỤC", "PDF", "IMAGE"
+    mime_type VARCHAR(100), -- e.g., "application/pdf", "image/jpeg"
+    file_size INTEGER, -- Size in bytes
+    original_url TEXT NOT NULL, -- URL to original file
+    digitized_url TEXT, -- URL to digitized/processed file
+    folder_id UUID REFERENCES document_folders(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Processing Status
+    status VARCHAR(50) DEFAULT 'Hàng đợi', -- "Hàng đợi", "Đang xử lý", "Hoàn tất", "Lỗi"
+    processing_error TEXT, -- Error message if status is "Lỗi"
+    execution_time INTEGER, -- Processing time in seconds
+    processed_at TIMESTAMP,
+    
+    -- OCR & AI Results
+    ocr_text TEXT, -- Extracted text from OCR
+    metadata JSONB, -- Additional metadata:
+    --   - ocrResult: {confidence, totalLines, provider, model}
+    --   - aiAnalysis: {type, structure, keyTopics, summary, restructuredText, layoutAnalysis}
+    --   - resultFile: {url, fileName, savedAt, format, size}
+    --   - processedFileHash: string
+    --   - hasOcrText: boolean
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_documents_user ON documents(user_id);
+CREATE INDEX idx_documents_folder ON documents(folder_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_created ON documents(created_at DESC);
+CREATE INDEX idx_documents_type ON documents(type);
+
+-- Document Processing Logs
+CREATE TABLE document_processing_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    stage VARCHAR(50) NOT NULL, -- "processing", "ocr", "ai", "completed", "error"
+    message TEXT NOT NULL,
+    metadata JSONB, -- Additional context
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_processing_logs_document ON document_processing_logs(document_id);
+CREATE INDEX idx_processing_logs_stage ON document_processing_logs(stage);
+CREATE INDEX idx_processing_logs_created ON document_processing_logs(created_at DESC);
+
+-- ============================================================================
 -- CONTENT MANAGEMENT
 -- ============================================================================
 
@@ -1917,7 +2120,7 @@ db.createCollection("ai_usage_logs");
   model: String, // gpt-4, gemini-pro, etc.
   
   // Operation
-  operation: String, // generate_content, grade_essay, generate_quiz
+  operation: String, // generate_content, grade_essay, generate_quiz, analyze_document, ocr_extraction
   
   // Tokens & Cost
   tokensUsed: {
@@ -2032,6 +2235,23 @@ analytics:course:{courseId}:{period} -> JSON
   TTL: 1 hour
   Data: Course-wide analytics
 
+# Document Digitization Caching
+document:result:{documentId} -> JSON
+  TTL: 1 hour
+  Data: { success, documentId, ocrText, aiAnalysis, resultFileUrl, executionTime }
+
+document:metadata:{documentId} -> JSON
+  TTL: 30 minutes
+  Data: Document metadata (status, processing info, file info)
+
+document:list:{userId}:{status} -> JSON
+  TTL: 5 minutes
+  Data: List of documents for user with specific status
+
+document:analysis:{documentId} -> JSON
+  TTL: 24 hours
+  Data: AI analysis results (type, structure, topics, summary)
+
 # Lab Results Caching
 lab:results:{userId}:{labId} -> JSON
   TTL: 1 hour
@@ -2080,6 +2300,12 @@ notifications:unread:{userId} -> LIST
 
 # Job Queue (BullMQ)
 bull:{queueName}:{jobId} -> HASH
+  Data: Job data, status, progress, result, error
+
+# Document Processing Queue
+bull:document-processing:{jobId} -> HASH
+  Data: { documentId, userId, status, attempts, createdAt, processedAt }
+  TTL: 7 days (completed), 30 days (failed)
   Data: Job details and status
 
 # Distributed Locks
@@ -2095,6 +2321,15 @@ lock:grading:{submissionId} -> STRING
 cache:warm:queue -> LIST
   Data: List of cache keys to warm
 
+# Document Digitization API Caching
+api:documents:{userId}:{status} -> JSON
+  TTL: 5 minutes
+  Data: Cached document list response
+
+api:document:{documentId} -> JSON
+  TTL: 10 minutes
+  Data: Cached document details response
+
 # API Response Caching
 api:response:{endpoint_hash}:{params_hash} -> JSON
   TTL: Varies by endpoint (5-30 minutes)
@@ -2108,6 +2343,7 @@ api:response:{endpoint_hash}:{params_hash} -> JSON
 SUBSCRIBE cache:invalidate:user:{userId}
 SUBSCRIBE cache:invalidate:course:{courseId}
 SUBSCRIBE cache:invalidate:assessment:{assessmentId}
+SUBSCRIBE cache:invalidate:document:{documentId}
 
 # Published messages trigger cache clearing across all instances
 PUBLISH cache:invalidate:user:123 '{"keys": ["user:profile:123", "user:courses:123"]}'
@@ -14824,10 +15060,16 @@ the learning experience through intelligent automation and personalized educatio
 
 **Goals:**
 - [x] AI-powered content generation ✅ (Week 1-2 COMPLETED)
-- [ ] Intelligent grading system 🚧 (Week 3-4 IN PROGRESS)
+- [x] Document Digitization with AI ✅ (Week 3-4 COMPLETED)
+  - [x] OCR with Gemini Vision API
+  - [x] AI content analysis and restructuring
+  - [x] Result file generation
+  - [x] Queue system integration
+  - [x] Caching strategy
+- [ ] Intelligent grading system 🚧 (Week 5-6 IN PROGRESS)
 - [ ] Learning path recommendations
 - [ ] Chatbot tutor integration
-- [ ] Auto quiz generation
+- [ ] Auto quiz generation from digitized documents
 
 **Milestones:**
 - ✅ Week 1-2: AI service infrastructure **COMPLETED 100%**
@@ -14862,6 +15104,32 @@ the learning experience through intelligent automation and personalized educatio
 ---
 
 ## Q3 2025 (PLANNED) 📋
+
+### Phase 2.5: Document Digitization (COMPLETED) ✅
+
+**Status:** ✅ Completed in Q2 2025
+
+**Features Implemented:**
+- [x] Document upload and management
+- [x] OCR processing with Gemini Vision API
+- [x] AI content analysis and restructuring
+- [x] Result file generation with metadata
+- [x] Queue system for background processing
+- [x] Redis caching for performance
+- [x] Error handling and retry mechanism
+- [x] Integration with Teacher Service
+
+**Metrics:**
+- Processing time: < 30s (p95)
+- Cache hit rate: > 80%
+- Success rate: > 95%
+
+**Documentation:**
+- [Document Digitization Architecture](../docs/DOCUMENT_DIGITIZATION_ARCHITECTURE.md)
+- [Document Digitization Workflow](../docs/DIGITIZATION_WORKFLOW.md)
+- [Teacher Service Integration](../docs/DOCUMENT_DIGITIZATION_TEACHER_SERVICE_INTEGRATION.md)
+
+---
 
 ### Phase 3: Advanced Features
 

@@ -9269,3 +9269,2280 @@ Phần này bao gồm:
 - ✅ Automation để optimize costs
 - ✅ Tổng tiết kiệm: ~$5,475/month (76% reduction)
 
+# KIẾN TRÚC HỆ THỐNG TỐI ƯU - AEROEDU (Tiếp theo)
+
+---
+
+## 12. API DOCUMENTATION
+
+### 12.1 OpenAPI/Swagger Specification
+
+```yaml
+# ============================================================================
+# OPENAPI 3.0 SPECIFICATION
+# ============================================================================
+
+# openapi.yaml
+openapi: 3.0.3
+
+info:
+  title: AeroEdu API
+  version: 1.0.0
+  description: |
+    # AeroEdu Educational Platform API
+    
+    The AeroEdu API provides programmatic access to the educational platform,
+    enabling integration with learning management systems, student information
+    systems, and third-party educational tools.
+    
+    ## Features
+    - Course management and enrollment
+    - Assessment creation and grading
+    - Student progress tracking
+    - Virtual laboratory simulations
+    - AI-powered learning assistance
+    
+    ## Authentication
+    All API requests require authentication using JWT tokens or API keys.
+    
+    ## Rate Limiting
+    - Students: 100 requests/minute
+    - Teachers: 500 requests/minute
+    - Admins: 1000 requests/minute
+    
+    ## Support
+    - Email: api-support@aeroedu.vn
+    - Documentation: https://docs.aeroedu.vn
+    - Status: https://status.aeroedu.vn
+  
+  contact:
+    name: AeroEdu API Support
+    email: api-support@aeroedu.vn
+    url: https://aeroedu.vn/support
+  
+  license:
+    name: Proprietary
+    url: https://aeroedu.vn/terms
+
+servers:
+  - url: https://api.aeroedu.vn/v1
+    description: Production server
+  - url: https://staging-api.aeroedu.vn/v1
+    description: Staging server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Users
+    description: User management operations
+  - name: Courses
+    description: Course management and enrollment
+  - name: Assessments
+    description: Quiz, assignment, and exam management
+  - name: Grading
+    description: Grade management and calculation
+  - name: Analytics
+    description: Learning analytics and reports
+  - name: Labs
+    description: Virtual laboratory simulations
+  - name: AI
+    description: AI-powered features
+
+# ============================================================================
+# SECURITY SCHEMES
+# ============================================================================
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from the login endpoint.
+        Include in Authorization header: `Bearer <token>`
+    
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for server-to-server authentication.
+        Obtain from Settings > API Keys in the admin dashboard.
+  
+  # ============================================================================
+  # REUSABLE SCHEMAS
+  # ============================================================================
+  
+  schemas:
+    # Common Models
+    
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid input parameters
+            details:
+              type: object
+              additionalProperties: true
+        meta:
+          $ref: '#/components/schemas/Meta'
+    
+    Success:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        meta:
+          $ref: '#/components/schemas/Meta'
+    
+    Meta:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2025-01-02T10:30:00Z'
+        requestId:
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 150
+        totalPages:
+          type: integer
+          example: 8
+        hasNext:
+          type: boolean
+          example: true
+        hasPrev:
+          type: boolean
+          example: false
+    
+    # User Models
+    
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - full_name
+        - role
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: '123e4567-e89b-12d3-a456-426614174000'
+        email:
+          type: string
+          format: email
+          example: student@aeroedu.vn
+        full_name:
+          type: string
+          example: John Doe
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+          example: https://cdn.aeroedu.vn/avatars/123.jpg
+        role:
+          type: string
+          enum: [STUDENT, TEACHER, ADMIN]
+          example: STUDENT
+        email_verified:
+          type: boolean
+          example: true
+        is_active:
+          type: boolean
+          example: true
+        xp:
+          type: integer
+          example: 1500
+        level:
+          type: integer
+          example: 5
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            profile:
+              type: object
+              properties:
+                student_id:
+                  type: string
+                  example: STU2025001
+                date_of_birth:
+                  type: string
+                  format: date
+                  example: '2000-01-15'
+                gender:
+                  type: string
+                  enum: [MALE, FEMALE, OTHER, PREFER_NOT_TO_SAY]
+                phone:
+                  type: string
+                  example: '+84123456789'
+                address:
+                  type: object
+                  properties:
+                    street:
+                      type: string
+                    city:
+                      type: string
+                    country:
+                      type: string
+                learning_preferences:
+                  type: object
+                  properties:
+                    pace:
+                      type: string
+                      enum: [SLOW, NORMAL, FAST]
+                    difficulty:
+                      type: string
+                      enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+    
+    # Course Models
+    
+    Course:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - credits
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          example: CS101
+        name:
+          type: string
+          example: Introduction to Computer Science
+        description:
+          type: string
+          example: Fundamentals of programming and computer science
+        credits:
+          type: integer
+          minimum: 1
+          maximum: 10
+          example: 3
+        level:
+          type: string
+          enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+          example: BEGINNER
+        department:
+          type: string
+          example: Computer Science
+        prerequisites:
+          type: array
+          items:
+            type: string
+          example: [MATH101]
+        learning_objectives:
+          type: array
+          items:
+            type: string
+          example:
+            - Understand basic programming concepts
+            - Write simple programs in Python
+        syllabus:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, ARCHIVED]
+          example: ACTIVE
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    CourseOffering:
+      allOf:
+        - $ref: '#/components/schemas/Course'
+        - type: object
+          required:
+            - offering_id
+            - semester
+            - academic_year
+          properties:
+            offering_id:
+              type: string
+              format: uuid
+            semester:
+              type: string
+              example: FALL2025
+            academic_year:
+              type: string
+              example: '2025'
+            instructor:
+              $ref: '#/components/schemas/User'
+            capacity:
+              type: integer
+              example: 50
+            enrolled:
+              type: integer
+              example: 35
+            schedule:
+              type: object
+              properties:
+                days:
+                  type: array
+                  items:
+                    type: string
+                    enum: [MON, TUE, WED, THU, FRI, SAT, SUN]
+                  example: [MON, WED, FRI]
+                time:
+                  type: string
+                  example: '09:00-10:30'
+                room:
+                  type: string
+                  example: A101
+            location:
+              type: string
+              example: Main Campus
+    
+    # Assessment Models
+    
+    Assessment:
+      type: object
+      required:
+        - id
+        - title
+        - type
+        - course_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          example: Midterm Exam
+        type:
+          type: string
+          enum: [QUIZ, ASSIGNMENT, PROJECT, MIDTERM, FINAL]
+          example: MIDTERM
+        course_id:
+          type: string
+          format: uuid
+        offering_id:
+          type: string
+          format: uuid
+        instructions:
+          type: string
+          example: Complete all questions within 60 minutes
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Question'
+        settings:
+          type: object
+          properties:
+            time_limit:
+              type: integer
+              description: Time limit in minutes
+              example: 60
+            attempts_allowed:
+              type: integer
+              example: 2
+            shuffle_questions:
+              type: boolean
+              example: true
+            show_answers:
+              type: boolean
+              example: false
+        max_score:
+          type: number
+          format: float
+          example: 100.0
+        weight:
+          type: number
+          format: float
+          example: 0.3
+          description: Weight in final grade calculation
+        available_from:
+          type: string
+          format: date-time
+        due_date:
+          type: string
+          format: date-time
+        late_submission_allowed:
+          type: boolean
+          example: false
+        is_published:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    
+    Question:
+      type: object
+      required:
+        - id
+        - type
+        - question
+        - points
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [MCQ, TRUE_FALSE, SHORT_ANSWER, ESSAY, CODE]
+          example: MCQ
+        question:
+          type: string
+          example: What is the capital of France?
+        points:
+          type: number
+          format: float
+          example: 5.0
+        options:
+          type: array
+          items:
+            type: string
+          example: [Paris, London, Berlin, Madrid]
+        correct_answer:
+          oneOf:
+            - type: string
+            - type: integer
+            - type: array
+          example: Paris
+        explanation:
+          type: string
+          nullable: true
+        difficulty:
+          type: integer
+          minimum: 1
+          maximum: 5
+          example: 2
+        topic:
+          type: string
+          example: Geography
+    
+    AssessmentSubmission:
+      type: object
+      required:
+        - id
+        - assessment_id
+        - student_id
+      properties:
+        id:
+          type: string
+          format: uuid
+        assessment_id:
+          type: string
+          format: uuid
+        student_id:
+          type: string
+          format: uuid
+        answers:
+          type: object
+          additionalProperties: true
+        started_at:
+          type: string
+          format: date-time
+        submitted_at:
+          type: string
+          format: date-time
+        time_spent:
+          type: integer
+          description: Time spent in seconds
+          example: 3600
+        score:
+          type: number
+          format: float
+          nullable: true
+          example: 85.5
+        max_score:
+          type: number
+          format: float
+          example: 100.0
+        percentage:
+          type: number
+          format: float
+          example: 85.5
+        feedback:
+          type: string
+          nullable: true
+        graded_by:
+          type: string
+          format: uuid
+          nullable: true
+        graded_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [IN_PROGRESS, SUBMITTED, GRADED, LATE]
+          example: GRADED
+        attempt_number:
+          type: integer
+          example: 1
+    
+    # Grade Models
+    
+    GradeSummary:
+      type: object
+      properties:
+        student_id:
+          type: string
+          format: uuid
+        course_id:
+          type: string
+          format: uuid
+        offering_id:
+          type: string
+          format: uuid
+        semester:
+          type: string
+          example: FALL2025
+        academic_year:
+          type: string
+          example: '2025'
+        components:
+          type: object
+          properties:
+            quiz_avg:
+              type: number
+              format: float
+              example: 85.5
+            assignment_avg:
+              type: number
+              format: float
+              example: 90.0
+            midterm_score:
+              type: number
+              format: float
+              example: 88.0
+            final_score:
+              type: number
+              format: float
+              example: 92.0
+        overall_score:
+          type: number
+          format: float
+          example: 89.2
+        letter_grade:
+          type: string
+          example: A
+        grade_points:
+          type: number
+          format: float
+          example: 4.0
+        status:
+          type: string
+          enum: [IN_PROGRESS, PASS, FAIL, INCOMPLETE, WITHDRAWN]
+          example: PASS
+        calculated_at:
+          type: string
+          format: date-time
+    
+    # Lab Models
+    
+    LabExperiment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        lab_id:
+          type: string
+          example: refraction
+        lab_name:
+          type: string
+          example: Light Refraction Experiment
+        lab_type:
+          type: string
+          enum: [PHYSICS, CHEMISTRY, BIOLOGY]
+          example: PHYSICS
+        parameters:
+          type: object
+          additionalProperties: true
+          example:
+            angle: 45
+            medium: water
+        results:
+          type: object
+          additionalProperties: true
+        score:
+          type: number
+          format: float
+          example: 95.0
+        accuracy:
+          type: number
+          format: float
+          example: 98.5
+        time_spent:
+          type: integer
+          example: 1200
+        xp_earned:
+          type: integer
+          example: 50
+        completed_at:
+          type: string
+          format: date-time
+
+# ============================================================================
+# API ENDPOINTS
+# ============================================================================
+
+paths:
+  # ============================================================================
+  # AUTHENTICATION ENDPOINTS
+  # ============================================================================
+  
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - full_name
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@aeroedu.vn
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: SecurePass123!
+                full_name:
+                  type: string
+                  example: John Doe
+                role:
+                  type: string
+                  enum: [STUDENT, TEACHER]
+                  default: STUDENT
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+                            example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      description: Authenticate user and receive JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: student@aeroedu.vn
+                password:
+                  type: string
+                  format: password
+                  example: SecurePass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+                          token:
+                            type: string
+                            description: JWT access token
+                          refreshToken:
+                            type: string
+                            description: Refresh token for obtaining new access tokens
+                          expiresIn:
+                            type: integer
+                            description: Token expiry time in seconds
+                            example: 3600
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Obtain a new access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                          expiresIn:
+                            type: integer
+        '401':
+          description: Invalid refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # ============================================================================
+  # USER ENDPOINTS
+  # ============================================================================
+  
+  /users/me:
+    get:
+      tags:
+        - Users
+      summary: Get current user profile
+      description: Retrieve authenticated user's profile information
+      operationId: getCurrentUser
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    put:
+      tags:
+        - Users
+      summary: Update current user profile
+      description: Update authenticated user's profile information
+      operationId: updateCurrentUser
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name:
+                  type: string
+                avatar_url:
+                  type: string
+                  format: uri
+                profile:
+                  type: object
+                  properties:
+                    phone:
+                      type: string
+                    date_of_birth:
+                      type: string
+                      format: date
+                    gender:
+                      type: string
+                      enum: [MALE, FEMALE, OTHER, PREFER_NOT_TO_SAY]
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+  
+  # ============================================================================
+  # COURSE ENDPOINTS
+  # ============================================================================
+  
+  /courses:
+    get:
+      tags:
+        - Courses
+      summary: List all courses
+      description: Retrieve a paginated list of available courses
+      operationId: listCourses
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+          description: Number of items per page
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by course name or code
+        - name: department
+          in: query
+          schema:
+            type: string
+          description: Filter by department
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+          description: Filter by level
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, ARCHIVED]
+          description: Filter by status
+      responses:
+        '200':
+          description: Courses retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Course'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    
+    post:
+      tags:
+        - Courses
+      summary: Create a new course
+      description: Create a new course (requires TEACHER or ADMIN role)
+      operationId: createCourse
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - name
+                - credits
+              properties:
+                code:
+                  type: string
+                  pattern: '^[A-Z0-9-]+$'
+                  example: CS101
+                name:
+                  type: string
+                  example: Introduction to Computer Science
+                description:
+                  type: string
+                credits:
+                  type: integer
+                  minimum: 1
+                  maximum: 10
+                level:
+                  type: string
+                  enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+                department:
+                  type: string
+                prerequisites:
+                  type: array
+                  items:
+                    type: string
+                learning_objectives:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Course created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+  
+  /courses/{courseId}:
+    get:
+      tags:
+        - Courses
+      summary: Get course details
+      description: Retrieve detailed information about a specific course
+      operationId: getCourse
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Course details retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Course'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    put:
+      tags:
+        - Courses
+      summary: Update course
+      description: Update course information (requires TEACHER or ADMIN role)
+      operationId: updateCourse
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                credits:
+                  type: integer
+                level:
+                  type: string
+                  enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+                status:
+                  type: string
+                  enum: [ACTIVE, INACTIVE, ARCHIVED]
+      responses:
+        '200':
+          description: Course updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Course'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    
+    delete:
+      tags:
+        - Courses
+      summary: Delete course
+      description: Delete a course (requires ADMIN role)
+      operationId: deleteCourse
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Course deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  
+  /courses/{courseId}/enroll:
+    post:
+      tags:
+        - Courses
+      summary: Enroll in course
+      description: Enroll the authenticated student in a course
+      operationId: enrollInCourse
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Enrolled successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          enrollment_id:
+                            type: string
+                            format: uuid
+                          status:
+                            type: string
+                            example: APPROVED
+        '400':
+          description: Already enrolled or course full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  
+  # ============================================================================
+  # ASSESSMENT ENDPOINTS
+  # ============================================================================
+  
+  /assessments:
+    get:
+      tags:
+        - Assessments
+      summary: List assessments
+      description: Retrieve assessments for enrolled courses
+      operationId: listAssessments
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: course_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by course
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [QUIZ, ASSIGNMENT, PROJECT, MIDTERM, FINAL]
+          description: Filter by assessment type
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [UPCOMING, IN_PROGRESS, COMPLETED, OVERDUE]
+          description: Filter by status
+      responses:
+        '200':
+          description: Assessments retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Assessment'
+    
+    post:
+      tags:
+        - Assessments
+      summary: Create assessment
+      description: Create a new assessment (requires TEACHER or ADMIN role)
+      operationId: createAssessment
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - type
+                - course_id
+                - questions
+              properties:
+                title:
+                  type: string
+                type:
+                  type: string
+                  enum: [QUIZ, ASSIGNMENT, PROJECT, MIDTERM, FINAL]
+                course_id:
+                  type: string
+                  format: uuid
+                instructions:
+                  type: string
+                questions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Question'
+                settings:
+                  type: object
+                  properties:
+                    time_limit:
+                      type: integer
+                    attempts_allowed:
+                      type: integer
+                    shuffle_questions:
+                      type: boolean
+                due_date:
+                  type: string
+                  format: date-time
+                max_score:
+                  type: number
+                weight:
+                  type: number
+      responses:
+        '201':
+          description: Assessment created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Assessment'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+  
+  /assessments/{assessmentId}/submit:
+    post:
+      tags:
+        - Assessments
+      summary: Submit assessment
+      description: Submit answers for an assessment
+      operationId: submitAssessment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - answers
+              properties:
+                answers:
+                  type: object
+                  additionalProperties: true
+                  description: Question ID to answer mapping
+                  example:
+                    q1: Paris
+                    q2: [option1, option3]
+                    q3: The answer is...
+      responses:
+        '201':
+          description: Assessment submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssessmentSubmission'
+        '400':
+          description: Invalid submission or time limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+  
+  # ============================================================================
+  # GRADING ENDPOINTS
+  # ============================================================================
+  
+  /grades/student/{studentId}:
+    get:
+      tags:
+        - Grading
+      summary: Get student grades
+      description: Retrieve all grades for a specific student
+      operationId: getStudentGrades
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: semester
+          in: query
+          schema:
+            type: string
+          description: Filter by semester
+        - name: academic_year
+          in: query
+          schema:
+            type: string
+          description: Filter by academic year
+      responses:
+        '200':
+          description: Grades retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GradeSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: Cannot access other student's grades
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /grades/transcript/{studentId}:
+    get:
+      tags:
+        - Grading
+      summary: Get student transcript
+      description: Generate official transcript for a student
+      operationId: getTranscript
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, pdf]
+            default: json
+          description: Response format
+      responses:
+        '200':
+          description: Transcript retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          student:
+                            $ref: '#/components/schemas/User'
+                          gpa:
+                            type: number
+                            format: float
+                            example: 3.75
+                          total_credits:
+                            type: integer
+                            example: 90
+                          courses:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/GradeSummary'
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+  
+  # ============================================================================
+  # ANALYTICS ENDPOINTS
+  # ============================================================================
+  
+  /analytics/dashboard:
+    get:
+      tags:
+        - Analytics
+      summary: Get dashboard analytics
+      description: Retrieve analytics data for dashboard
+      operationId: getDashboardAnalytics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          enrolled_courses:
+                            type: integer
+                            example: 5
+                          completed_assessments:
+                            type: integer
+                            example: 12
+                          average_grade:
+                            type: number
+                            format: float
+                            example: 85.5
+                          total_xp:
+                            type: integer
+                            example: 1500
+                          current_level:
+                            type: integer
+                            example: 5
+                          recent_activities:
+                            type: array
+                            items:
+                              type: object
+  
+  /analytics/course/{courseId}:
+    get:
+      tags:
+        - Analytics
+      summary: Get course analytics
+      description: Retrieve analytics for a specific course
+      operationId: getCourseAnalytics
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Course analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total_students:
+                            type: integer
+                          average_grade:
+                            type: number
+                            format: float
+                          completion_rate:
+                            type: number
+                            format: float
+                          grade_distribution:
+                            type: object
+                            properties:
+                              A:
+                                type: integer
+                              B:
+                                type: integer
+                              C:
+                                type: integer
+                              D:
+                                type: integer
+                              F:
+                                type: integer
+  
+  # ============================================================================
+  # LAB ENDPOINTS
+  # ============================================================================
+  
+  /labs/experiments:
+    get:
+      tags:
+        - Labs
+      summary: List available lab experiments
+      description: Retrieve list of available virtual lab experiments
+      operationId: listLabExperiments
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lab_type
+          in: query
+          schema:
+            type: string
+            enum: [PHYSICS, CHEMISTRY, BIOLOGY]
+          description: Filter by lab type
+      responses:
+        '200':
+          description: Lab experiments retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            lab_id:
+                              type: string
+                              example: refraction
+                            name:
+                              type: string
+                              example: Light Refraction
+                            type:
+                              type: string
+                              enum: [PHYSICS, CHEMISTRY, BIOLOGY]
+                            description:
+                              type: string
+                            difficulty:
+                              type: integer
+                            estimated_time:
+                              type: integer
+                              description: Estimated completion time in minutes
+  
+  /labs/simulate:
+    post:
+      tags:
+        - Labs
+      summary: Run lab simulation
+      description: Execute a virtual lab experiment with given parameters
+      operationId: runLabSimulation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - lab_id
+                - parameters
+              properties:
+                lab_id:
+                  type: string
+                  example: refraction
+                parameters:
+                  type: object
+                  additionalProperties: true
+                  example:
+                    angle: 45
+                    medium: water
+      responses:
+        '200':
+          description: Simulation completed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          results:
+                            type: object
+                            additionalProperties: true
+                          accuracy:
+                            type: number
+                            format: float
+                          xp_earned:
+                            type: integer
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  # ============================================================================
+  # AI ENDPOINTS
+  # ============================================================================
+  
+  /ai/generate/quiz:
+    post:
+      tags:
+        - AI
+      summary: Generate quiz using AI
+      description: Use AI to generate quiz questions based on topic and difficulty
+      operationId: generateQuiz
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - topic
+                - question_count
+              properties:
+                topic:
+                  type: string
+                  example: Photosynthesis
+                question_count:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  example: 10
+                difficulty:
+                  type: string
+                  enum: [EASY, MEDIUM, HARD]
+                  default: MEDIUM
+                question_types:
+                  type: array
+                  items:
+                    type: string
+                    enum: [MCQ, TRUE_FALSE, SHORT_ANSWER]
+                  example: [MCQ, TRUE_FALSE]
+      responses:
+        '200':
+          description: Quiz generated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          questions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Question'
+                          tokens_used:
+                            type: integer
+                            example: 1500
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          description: AI quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  
+  /ai/grade/essay:
+    post:
+      tags:
+        - AI
+      summary: Grade essay using AI
+      description: Use AI to grade an essay submission
+      operationId: gradeEssay
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - question
+                - answer
+                - rubric
+              properties:
+                question:
+                  type: string
+                  example: Explain the process of photosynthesis
+                answer:
+                  type: string
+                  example: Photosynthesis is the process by which...
+                rubric:
+                  type: object
+                  properties:
+                    max_score:
+                      type: number
+                      example: 10
+                    criteria:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          points:
+                            type: number
+                          description:
+                            type: string
+      responses:
+        '200':
+          description: Essay graded successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Success'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          score:
+                            type: number
+                            format: float
+                            example: 8.5
+                          max_score:
+                            type: number
+                            example: 10
+                          feedback:
+                            type: string
+                            example: Good explanation of the process...
+                          breakdown:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                criterion:
+                                  type: string
+                                score:
+                                  type: number
+                                comment:
+                                  type: string
+
+# ============================================================================
+# REUSABLE RESPONSES
+# ============================================================================
+
+components:
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: UNAUTHORIZED
+              message: Authentication token required
+    
+    ForbiddenError:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: FORBIDDEN
+              message: You don't have permission to perform this action
+    
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: NOT_FOUND
+              message: The requested resource was not found
+    
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid input parameters
+              details:
+                email: Email is required
+                password: Password must be at least 8 characters
+
+# Apply security globally
+security:
+  - BearerAuth: []
+```
+
+### 12.2 API Documentation Generation
+
+```typescript
+// ============================================================================
+// SWAGGER UI SETUP
+// ============================================================================
+
+// app/api/docs/route.ts
+import { NextResponse } from 'next/server';
+import SwaggerUI from 'swagger-ui-react';
+import 'swagger-ui-react/swagger-ui.css';
+import yaml from 'js-yaml';
+import fs from 'fs';
+import path from 'path';
+
+export async function GET() {
+  // Load OpenAPI spec
+  const specPath = path.join(process.cwd(), 'docs', 'openapi.yaml');
+  const spec = yaml.load(fs.readFileSync(specPath, 'utf8'));
+  
+  // Return HTML with Swagger UI
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>AeroEdu API Documentation</title>
+        <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+      </head>
+      <body>
+        <div id="swagger-ui"></div>
+        <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+        <script>
+          window.onload = function() {
+            SwaggerUIBundle({
+              spec: ${JSON.stringify(spec)},
+              dom_id: '#swagger-ui',
+              deepLinking: true,
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIBundle.SwaggerUIStandalonePreset
+              ],
+              plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+              ],
+              layout: "BaseLayout"
+            });
+          };
+        </script>
+      </body>
+    </html>
+  `;
+  
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html',
+    },
+  });
+}
+
+// ============================================================================
+// REDOC DOCUMENTATION
+// ============================================================================
+
+// app/api/redoc/route.ts
+export async function GET() {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>AeroEdu API Reference</title>
+        <meta charset="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+          }
+        </style>
+      </head>
+      <body>
+        <redoc spec-url='/api/openapi.json'></redoc>
+        <script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+      </body>
+    </html>
+  `;
+  
+  return new NextResponse(html, {
+    headers: {
+      'Content-Type': 'text/html',
+    },
+  });
+}
+
+// ============================================================================
+// API SPEC ENDPOINT
+// ============================================================================
+
+// app/api/openapi.json/route.ts
+export async function GET() {
+  const specPath = path.join(process.cwd(), 'docs', 'openapi.yaml');
+  const spec = yaml.load(fs.readFileSync(specPath, 'utf8'));
+  
+  return NextResponse.json(spec);
+}
+```
+
+### 12.3 SDK Generation
+
+```bash
+# ============================================================================
+# GENERATE CLIENT SDKs
+# ============================================================================
+
+# Install OpenAPI Generator
+npm install -g @openapitools/openapi-generator-cli
+
+# Generate TypeScript/JavaScript SDK
+openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g typescript-fetch \
+  -o sdks/typescript \
+  --additional-properties=npmName=@aeroedu/sdk,npmVersion=1.0.0
+
+# Generate Python SDK
+openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g python \
+  -o sdks/python \
+  --additional-properties=packageName=aeroedu_sdk,packageVersion=1.0.0
+
+# Generate Java SDK
+openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g java \
+  -o sdks/java \
+  --additional-properties=artifactId=aeroedu-sdk,artifactVersion=1.0.0
+
+# Generate PHP SDK
+openapi-generator-cli generate \
+  -i docs/openapi.yaml \
+  -g php \
+  -o sdks/php \
+  --additional-properties=packageName=aeroedu/sdk
+```
+
+### 12.4 SDK Usage Examples
+
+```typescript
+// ============================================================================
+// TYPESCRIPT SDK USAGE
+// ============================================================================
+
+// sdks/typescript/example.ts
+import { Configuration, AuthApi, CoursesApi, AssessmentsApi } from '@aeroedu/sdk';
+
+// Initialize configuration
+const config = new Configuration({
+  basePath: 'https://api.aeroedu.vn/v1',
+  accessToken: 'your-jwt-token',
+});
+
+// Example 1: Authentication
+const authApi = new AuthApi(config);
+
+async function login() {
+  try {
+    const response = await authApi.loginUser({
+      email: 'student@aeroedu.vn',
+      password: 'SecurePass123!',
+    });
+    
+    console.log('Login successful:', response.data);
+    
+    // Store token
+    const token = response.data.token;
+    
+    // Update configuration with token
+    config.accessToken = token;
+  } catch (error) {
+    console.error('Login failed:', error);
+  }
+}
+
+// Example 2: List courses
+const coursesApi = new CoursesApi(config);
+
+async function listCourses() {
+  try {
+    const response = await coursesApi.listCourses({
+      page: 1,
+      limit: 20,
+      level: 'BEGINNER',
+    });
+    
+    console.log('Courses:', response.data);
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+  }
+}
+
+// Example 3: Enroll in course
+async function enrollInCourse(courseId: string) {
+  try {
+    const response = await coursesApi.enrollInCourse({
+      courseId,
+    });
+    
+    console.log('Enrollment successful:', response.data);
+  } catch (error) {
+    console.error('Enrollment failed:', error);
+  }
+}
+
+// Example 4: Submit assessment
+const assessmentsApi = new AssessmentsApi(config);
+
+async function submitAssessment(assessmentId: string, answers: Record<string, any>) {
+  try {
+    const response = await assessmentsApi.submitAssessment({
+      assessmentId,
+      answers,
+    });
+    
+    console.log('Assessment submitted:', response.data);
+    console.log('Score:', response.data.score);
+  } catch (error) {
+    console.error('Submission failed:', error);
+  }
+}
+
+// Example 5: Error handling with retries
+async function fetchCoursesWithRetry(maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await coursesApi.listCourses({ page: 1, limit: 20 });
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+    }
+  }
+}
+```
+
+```python
+# ============================================================================
+# PYTHON SDK USAGE
+# ============================================================================
+
+# sdks/python/example.py
+from aeroedu_sdk import Configuration, ApiClient, AuthApi, CoursesApi, AssessmentsApi
+from aeroedu_sdk.exceptions import ApiException
+
+# Initialize configuration
+config = Configuration(
+    host="https://api.aeroedu.vn/v1"
+)
+
+# Example 1: Authentication
+def login(email: str, password: str):
+    with ApiClient(config) as api_client:
+        auth_api = AuthApi(api_client)
+        
+        try:
+            response = auth_api.login_user({
+                "email": email,
+                "password": password
+            })
+            
+            print(f"Login successful: {response.data}")
+            
+            # Store token
+            token = response.data['token']
+            
+            # Update configuration
+            config.access_token = token
+            
+            return token
+        except ApiException as e:
+            print(f"Login failed: {e}")
+            return None
+
+# Example 2: List courses
+def list_courses(page=1, limit=20, level=None):
+    with ApiClient(config) as api_client:
+        courses_api = CoursesApi(api_client)
+        
+        try:
+            response = courses_api.list_courses(
+                page=page,
+                limit=limit,
+                level=level
+            )
+            
+            return response.data
+        except ApiException as e:
+            print(f"Error fetching courses: {e}")
+            return []
+
+# Example 3: Submit assessment
+def submit_assessment(assessment_id: str, answers: dict):
+    with ApiClient(config) as api_client:
+        assessments_api = AssessmentsApi(api_client)
+        
+        try:
+            response = assessments_api.submit_assessment(
+                assessment_id=assessment_id,
+                answers=answers
+            )
+            
+            print(f"Assessment submitted: {response.data}")
+            print(f"Score: {response.data['score']}/{response.data['max_score']}")
+            
+            return response.data
+        except ApiException as e:
+            print(f"Submission failed: {e}")
+            return None
+
+# Example 4: Context manager for API client
+from contextlib import contextmanager
+
+@contextmanager
+def aeroedu_client(token=None):
+    """Context manager for AeroEdu API client"""
+    config = Configuration(
+        host="https://api.aeroedu.vn/v1",
+        access_token=token
+    )
+    
+    with ApiClient(config) as api_client:
+        yield api_client
+
+# Usage
+def main():
+    # Login
+    token = login("student@aeroedu.vn", "SecurePass123!")
+    
+    if token:
+        # Use context manager
+        with aeroedu_client(token) as client:
+            courses_api = CoursesApi(client)
+            courses = courses_api.list_courses(level="BEGINNER")
+            
+            for course in courses.data:
+                print(f"Course: {course['name']} ({course['code']})")
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+**Đã hoàn thành Phần 12 (API Documentation)**
+
+Phần này bao gồm:
+- ✅ OpenAPI 3.0 specification đầy đủ
+- ✅ Swagger UI và ReDoc setup
+- ✅ SDK generation cho multiple languages
+- ✅ Usage examples và best practices
+- ✅ Authentication và error handling
+- ✅ Rate limiting documentation
+- ✅ Comprehensive endpoint coverage
+
+Tiếp tục với:
+- **13. Testing Strategy**
+- **14. Development Guidelines**
+- **15. Conclusion & Roadmap**
+
+Bạn muốn tôi tiếp tục không?

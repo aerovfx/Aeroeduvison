@@ -79,15 +79,25 @@ export async function GET(request: NextRequest) {
     }
 
     // Use Prisma directly (QuestionBankManager requires Redis which may not be available)
-    const [questions, total] = await Promise.all([
-      prisma.question.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.question.count({ where }),
-    ])
+    let questions, total
+    try {
+      [questions, total] = await Promise.all([
+        prisma.question.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.question.count({ where }),
+      ])
+    } catch (dbError: any) {
+      // Check if error is due to missing table
+      if (dbError.code === "P2021" || dbError.message?.includes("does not exist") || 
+          dbError.message?.includes("relation") || dbError.message?.includes("table")) {
+        throw new Error("Database table 'Question' does not exist. Please run: npx prisma db push")
+      }
+      throw dbError
+    }
 
     return NextResponse.json({
       questions: questions.map((q) => ({
@@ -109,22 +119,31 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error("Error fetching questions:", error)
+    console.error("Error details:", {
+      code: error.code,
+      message: error.message,
+      meta: error.meta,
+    })
     
     // Check for Prisma schema errors
     if (error.message?.includes("Cannot read properties of undefined") || 
         error.code === "P2001" || 
-        error.code === "P2021") {
+        error.code === "P2021" ||
+        error.message?.includes("does not exist") ||
+        error.message?.includes("relation") ||
+        error.message?.includes("table")) {
       return NextResponse.json(
         { 
-          error: "Database schema not synced. Please run: npx prisma generate && npx prisma db push",
-          code: "PRISMA_SCHEMA_NOT_SYNCED"
+          error: "Database schema not synced. The 'Question' table does not exist in the database. Please run: npx prisma generate && npx prisma db push",
+          code: "PRISMA_SCHEMA_NOT_SYNCED",
+          details: error.message
         },
         { status: 500 }
       )
     }
     
     return NextResponse.json(
-      { error: error.message || "Failed to fetch questions" },
+      { error: error.message || "Failed to fetch questions", code: error.code },
       { status: 500 }
     )
   }

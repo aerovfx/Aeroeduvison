@@ -169,7 +169,13 @@ export default function QuestionBankPage() {
   }
 
   const getTypeBadge = (type: string) => {
+    // Map database types to display format
     const typeMap: { [key: string]: { label: string; color: string } } = {
+      "MCQ": { label: "Nhiều lựa chọn", color: "bg-blue-100 text-blue-800" },
+      "TRUE_FALSE": { label: "Đúng/Sai", color: "bg-purple-100 text-purple-800" },
+      "SHORT_ANSWER": { label: "Trả lời ngắn", color: "bg-orange-100 text-orange-800" },
+      "ESSAY": { label: "Tự luận", color: "bg-green-100 text-green-800" },
+      // Also support old format for backward compatibility
       "TNKQ_Nhiều_lựa_chọn": { label: "Nhiều lựa chọn", color: "bg-blue-100 text-blue-800" },
       "TNKQ_Đúng_Sai": { label: "Đúng/Sai", color: "bg-purple-100 text-purple-800" },
       "TNKQ_Trả_lời_ngắn": { label: "Trả lời ngắn", color: "bg-orange-100 text-orange-800" },
@@ -181,14 +187,21 @@ export default function QuestionBankPage() {
   }
 
   const getDifficultyBadge = (difficulty: string) => {
-    const difficultyMap: { [key: string]: string } = {
-      "Dễ": "bg-green-100 text-green-800",
-      "Trung bình": "bg-yellow-100 text-yellow-800",
-      "Khó": "bg-red-100 text-red-800",
+    // Map database difficulty to display format
+    const difficultyMap: { [key: string]: { label: string; color: string } } = {
+      "EASY": { label: "Dễ", color: "bg-green-100 text-green-800" },
+      "MEDIUM": { label: "Trung bình", color: "bg-yellow-100 text-yellow-800" },
+      "HARD": { label: "Khó", color: "bg-red-100 text-red-800" },
+      // Also support Vietnamese format for backward compatibility
+      "Dễ": { label: "Dễ", color: "bg-green-100 text-green-800" },
+      "Trung bình": { label: "Trung bình", color: "bg-yellow-100 text-yellow-800" },
+      "Khó": { label: "Khó", color: "bg-red-100 text-red-800" },
     }
+    
+    const diffInfo = difficultyMap[difficulty] || { label: difficulty, color: "bg-gray-100 text-gray-800" }
     return (
-      <Badge className={difficultyMap[difficulty] || "bg-gray-100 text-gray-800"}>
-        {difficulty}
+      <Badge className={diffInfo.color}>
+        {diffInfo.label}
       </Badge>
     )
   }

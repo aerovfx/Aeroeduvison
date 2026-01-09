@@ -136,6 +136,46 @@ export default function DocumentDigitizationPage() {
     }
   }
 
+  const handleProcess = async (id: string) => {
+    try {
+      toast.loading("Đang số hóa tài liệu với AI...", { id: `process-${id}` })
+      
+      const response = await fetch(`/api/documents/${id}/process`, {
+        method: "POST",
+      })
+      
+      if (!response.ok) {
+        let errorMessage = "Failed to process document"
+        try {
+          const error = await response.json()
+          errorMessage = error.error || error.message || errorMessage
+        } catch (e) {
+          // If response is not JSON, get text
+          const text = await response.text()
+          errorMessage = text || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+      
+      const data = await response.json()
+      toast.success(data.message || "Đã bắt đầu số hóa tài liệu", { id: `process-${id}` })
+      
+      // Refresh documents after a short delay
+      setTimeout(() => {
+        fetchDocuments()
+      }, 1000)
+    } catch (error: any) {
+      console.error("Error processing document:", error)
+      const errorMessage = error.message || "Không thể số hóa tài liệu"
+      toast.error(errorMessage, { id: `process-${id}` })
+      
+      // Refresh to show updated status
+      setTimeout(() => {
+        fetchDocuments()
+      }, 500)
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       const response = await fetch(`/api/documents/${id}`, {
@@ -381,6 +421,17 @@ export default function DocumentDigitizationPage() {
                               <Download className="h-4 w-4" />
                             </Button>
                           </>
+                        )}
+                        {(doc.status === "Hàng đợi" || doc.status === "Lỗi") && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleProcess(doc.id)}
+                            title="Số hóa với AI"
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Upload className="h-4 w-4" />
+                          </Button>
                         )}
                         {doc.status !== "Đang xử lý" && (
                           <>

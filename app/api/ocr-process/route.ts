@@ -58,26 +58,18 @@ export async function POST(req: NextRequest) {
     } catch (ocrError: any) {
       console.error('PaddleOCR service error:', ocrError.message);
       
-      // Fallback to simulation if OCR service is down
-      console.log('⚠️ Falling back to simulation OCR');
+      // DO NOT use fallback simulation - return error instead
+      // This prevents wrong OCR text from being saved to documents
+      console.error('❌ OCR service not available - returning error instead of simulation');
       
-      return NextResponse.json({
-        success: true,
-        data: {
-          text: 'Cách mạng tháng Tám năm 1945 thắng lợi vì có sự lãnh đạo sáng suốt của Đảng Cộng sản Việt Nam, nhân dân cả nước đoàn kết một lòng, tinh thần yêu nước và khát vọng độc lập dân tộc cao.',
-          lines: [
-            'Cách mạng tháng Tám năm 1945 thắng lợi vì có sự lãnh đạo sáng suốt',
-            'của Đảng Cộng sản Việt Nam, nhân dân cả nước đoàn kết một lòng,',
-            'tinh thần yêu nước và khát vọng độc lập dân tộc cao.'
-          ],
-          confidence: 0.89,
-          boxes: [],
-          total_lines: 3,
-          filename: file.name,
-          fallback: true,
-          warning: 'PaddleOCR service not available, using simulation'
-        }
-      });
+      return NextResponse.json(
+        { 
+          error: 'OCR service không khả dụng. Vui lòng đảm bảo OCR service đang chạy.',
+          details: ocrError.message,
+          serviceUrl: OCR_SERVER_URL,
+        },
+        { status: 503 } // Service Unavailable
+      );
     }
 
   } catch (error: any) {

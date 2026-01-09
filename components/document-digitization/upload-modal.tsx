@@ -32,6 +32,7 @@ export function DocumentUploadModal({
   const [files, setFiles] = useState<FileWithPreview[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
+  const [enableAIProcessing, setEnableAIProcessing] = useState(true)
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     // Validate file types and sizes
@@ -133,6 +134,26 @@ export function DocumentUploadModal({
 
       const data = await response.json()
       toast.success(data.message || `Đã tải lên ${files.length} file thành công`)
+      
+      // Process documents with AI if enabled
+      if (enableAIProcessing && data.documents) {
+        const processPromises = data.documents.map(async (doc: any) => {
+          try {
+            const processResponse = await fetch(`/api/documents/${doc.id}/process`, {
+              method: "POST",
+            })
+            if (processResponse.ok) {
+              console.log(`✅ Started processing document ${doc.id}`)
+            }
+          } catch (error) {
+            console.error(`Error starting processing for ${doc.id}:`, error)
+          }
+        })
+        
+        // Process in background (don't wait)
+        Promise.all(processPromises).catch(console.error)
+        toast.success("Đang xử lý tài liệu với AI...")
+      }
       
       // Reset state
       setFiles([])
@@ -290,13 +311,28 @@ export function DocumentUploadModal({
           {/* Right Panel - Instructions */}
           <div className="space-y-4">
             <div className="flex items-center justify-center mb-4">
-              <div className="text-6xl">🐰</div>
+              <div className="text-6xl">🤖</div>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Tải PDF hoặc Ảnh</h3>
+              <h3 className="font-semibold mb-2">Số hóa với AI</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Chọn nhiều tệp và nhấn 'Nhóm lại' để gộp chúng thành một thư mục.
+                Tài liệu sẽ được tự động số hóa bằng OCR và phân tích với AI sau khi upload.
               </p>
+              
+              {/* AI Processing Toggle */}
+              <div className="flex items-center space-x-2 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <input
+                  type="checkbox"
+                  id="enableAI"
+                  checked={enableAIProcessing}
+                  onChange={(e) => setEnableAIProcessing(e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="enableAI" className="text-sm font-medium cursor-pointer">
+                  Tự động số hóa với AI
+                </label>
+              </div>
+              
               <div className="space-y-2 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Hỗ trợ:</span>
@@ -305,6 +341,10 @@ export function DocumentUploadModal({
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Kích thước tối đa:</span>
                   <span className="text-muted-foreground">50MB/tệp</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">AI Features:</span>
+                  <span className="text-muted-foreground">OCR + Phân tích nội dung</span>
                 </div>
               </div>
             </div>

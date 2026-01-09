@@ -118,8 +118,9 @@ export async function POST(request: NextRequest) {
 
         uploadedDocuments.push(document)
 
-        // TODO: Queue OCR processing job
-        // await queueOCRProcessing(document.id)
+        // Auto-process with AI if enabled (can be controlled by frontend)
+        // For now, we'll process in background
+        // The frontend can call /api/documents/[id]/process to trigger processing
       } catch (fileError: any) {
         console.error(`Error processing file ${file.name}:`, fileError)
         // Continue with other files, but log the error
