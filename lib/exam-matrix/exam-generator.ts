@@ -1,5 +1,5 @@
 import { db as prisma } from "@/lib/db"
-import { apiLogger } from "@/lib/logger"
+import { apiLogger } from "@/lib/logging-simple"
 
 /**
  * Service để tạo đề thi từ ma trận

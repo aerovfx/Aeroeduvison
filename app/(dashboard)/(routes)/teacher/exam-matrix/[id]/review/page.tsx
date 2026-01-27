@@ -423,51 +423,17 @@ export default function MatrixReviewPage() {
                         <XCircle className="h-16 w-16 text-red-600 mx-auto" />
                         <div>
                           <h3 className="font-semibold text-red-900 mb-2">Số hóa thất bại</h3>
-                          <p className="text-sm text-red-700 mb-4 whitespace-pre-line">
+                          <p className="text-sm text-red-700 mb-4">
                             {matrix.processingError || "Không thể xử lý file ma trận. Vui lòng thử lại."}
                           </p>
-                          {matrix.processingError?.includes("GEMINI_API_KEY") && (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
-                              <p className="text-sm font-medium text-yellow-900 mb-2">
-                                💡 Hướng dẫn sửa lỗi:
-                              </p>
-                              <ol className="text-xs text-yellow-800 space-y-1 list-decimal list-inside">
-                                <li>Kiểm tra GEMINI_API_KEY trong file .env hoặc .env.local</li>
-                                <li>Đảm bảo API key bắt đầu với "AIza"</li>
-                                <li>Restart Next.js server sau khi sửa</li>
-                                <li>Lấy API key mới tại: https://aistudio.google.com/app/apikey</li>
-                              </ol>
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={handleReprocess}
-                              disabled={processing}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              <RefreshCw className={cn("h-4 w-4 mr-2", processing && "animate-spin")} />
-                              {processing ? "Đang xử lý..." : "Số hóa lại"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={async () => {
-                                try {
-                                  const response = await fetch("/api/exam-matrices/check-gemini")
-                                  const data = await response.json()
-                                  if (data.isAvailable) {
-                                    toast.success("Gemini API đã sẵn sàng!")
-                                  } else {
-                                    toast.error(data.message || "Gemini API không khả dụng")
-                                  }
-                                } catch (error) {
-                                  toast.error("Không thể kiểm tra Gemini API")
-                                }
-                              }}
-                            >
-                              <AlertCircle className="h-4 w-4 mr-2" />
-                              Kiểm tra API
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={handleReprocess}
+                            disabled={processing}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            <RefreshCw className={cn("h-4 w-4 mr-2", processing && "animate-spin")} />
+                            {processing ? "Đang xử lý..." : "Số hóa lại"}
+                          </Button>
                         </div>
                       </div>
                     </div>

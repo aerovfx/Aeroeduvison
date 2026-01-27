@@ -5,8 +5,9 @@ import { getDashboardUrl, hasRoutePermission, getFallbackUrl } from '@/lib/auth-
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  
+
   // Allow static files immediately (before any auth checks)
+  // This MUST be checked first to avoid any token fetching for static files
   if (
     pathname === "/favicon.ico" ||
     pathname.startsWith("/_next/") ||
@@ -17,18 +18,25 @@ export async function middleware(request: NextRequest) {
   ) {
     return NextResponse.next()
   }
-  
+
   // Get the token to check authentication status
-  const token = await getToken({ 
-    req: request, 
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName: 'next-auth.session-token'
-  })
+  // Only fetch token if not a static file
+  let token = null
+  try {
+    token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === "production"
+    })
+  } catch (error) {
+    // If token fetch fails, continue without token (will redirect to login if needed)
+    console.warn('[MIDDLEWARE] Token fetch failed:', error)
+  }
 
   // Marketing/Public routes (only for non-authenticated users)
   const marketingRoutes = ["/", "/pricing", "/contact-sales"]
   const isMarketingRoute = marketingRoutes.includes(pathname)
-  
+
   // Legal pages (always public)
   const legalRoutes = ["/terms", "/privacy", "/cookies"]
   const isLegalRoute = legalRoutes.includes(pathname)
@@ -54,7 +62,7 @@ export async function middleware(request: NextRequest) {
   // ===== REDIRECT AUTHENTICATED USERS FROM MARKETING PAGES =====
   if (token && (isMarketingRoute || isAuthRoute)) {
     console.log(`🔒 [MIDDLEWARE] Authenticated user trying to access ${pathname}, redirecting to dashboard`)
-    
+
     // Use utility function for role-based redirect
     const dashboardUrl = getDashboardUrl(token.role as any)
     return NextResponse.redirect(new URL(dashboardUrl, request.url))
@@ -74,32 +82,32 @@ export async function middleware(request: NextRequest) {
   if (token) {
     // Check if user has permission to access the current route
     const hasPermission = hasRoutePermission(token.role as any, pathname)
-    
+
     if (!hasPermission) {
       console.log(`🚫 [MIDDLEWARE] User ${token.email} (${token.role}) doesn't have permission for ${pathname}`)
       const fallbackUrl = getFallbackUrl(token.role as any)
       return NextResponse.redirect(new URL(fallbackUrl, request.url))
     }
-    
+
     console.log(`✅ [MIDDLEWARE] User ${token.email} (${token.role}) accessing ${pathname}`)
     return NextResponse.next()
   }
-  
+
   // ===== PROTECT ALL AUTHENTICATED ROUTES =====
   const protectedRoutes = ['/admin', '/teacher', '/dashboard', '/learning-paths', '/ai-tutor', '/courses']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
-  
+
   if (isProtectedRoute) {
     console.log(`🚫 [MIDDLEWARE] Unauthenticated access to ${pathname}, redirecting to login`)
     return NextResponse.redirect(new URL('/auth/login?callbackUrl=' + encodeURIComponent(pathname), request.url))
   }
-  
+
   // ===== DEFAULT: REQUIRE AUTH FOR ALL OTHER ROUTES =====
   if (!token) {
     console.log(`🚫 [MIDDLEWARE] Unauthenticated access to ${pathname}, redirecting to login`)
     return NextResponse.redirect(new URL('/auth/login?callbackUrl=' + encodeURIComponent(pathname), request.url))
   }
-  
+
   return NextResponse.next()
 }
 
@@ -112,7 +120,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api/auth|api|_next/static|_next/image|favicon.ico).*)',
   ],
 }
- 

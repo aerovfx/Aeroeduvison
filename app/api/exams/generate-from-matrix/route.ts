@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { MatrixExamGenerator } from "@/lib/exam-matrix/exam-generator"
 import { createSuccessResponse, createErrorResponse } from "@/lib/document-digitization/api-helpers"
-import { apiLogger } from "@/lib/logger"
+import { apiLogger } from "@/lib/logging-simple"
 
 /**
  * POST /api/exams/generate-from-matrix

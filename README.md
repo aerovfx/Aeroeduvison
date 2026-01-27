@@ -1,137 +1,94 @@
-# 🎓 AeroVFX MathLMS
+# AeroeduVision ⚡ AI-Powered Education Platform ⚡
 
-An AI-powered Learning Management System with interactive simulations, advanced OCR grading, and comprehensive student tracking.
+## 📖 Overview
 
-## 🚀 Quick Start
+AeroeduVision is an innovative platform designed to revolutionize education through AI-powered tools and interactive learning experiences. Built on cutting-edge technologies, AeroeduVision provides educators and students with a seamless, engaging, and effective learning environment.
 
-```bash
-# Install dependencies
-npm install
+### Key Features
 
-# Setup local database
-npm run db:push
-
-# Start development server
-npm run dev
-```
-
-Visit `http://localhost:3000`
-
-## 📚 Documentation
-
-All documentation has been organized in the **[Guide/](./Guide)** directory.
-
-### Quick Links:
-- 📖 [Complete Setup Guide](./Guide/SETUP.md)
-- 🚀 [Quick Start Guide](./Guide/QUICK_START.md)
-- 🧪 [Testing Guide](./Guide/TESTING_QUICK_REFERENCE.md)
-- 🔧 [Troubleshooting](./Guide/TROUBLESHOOTING.md)
-- 📊 [Project Summary](./Guide/SUMMARY_ALL_WORK_DONE.md)
-
-## 🎯 Features
-
-- ✅ **NextAuth v5** - Advanced authentication with 2FA
-- ✅ **20+ Python Simulations** - Physics, Chemistry, Biology labs
-- ✅ **Advanced OCR** - Automatic grading with ML
-- ✅ **AI Content Generation** - Automated lesson creation
-- ✅ **Cloud Run Deployment** - Production-ready infrastructure
-- ✅ **Vision Tracking** - Real-time student monitoring
-- ✅ **Multi-language Support** - Vietnamese & English
-
-## 🛠️ Tech Stack
-
-- **Frontend:** Next.js 15, React 19, TailwindCSS
-- **Backend:** NextAuth v5, Prisma, PostgreSQL
-- **AI/ML:** Google Gemini, Ollama, PaddleOCR
-- **Cloud:** Google Cloud Run, Cloud Storage
-- **Simulations:** Python (FastAPI), Taichi, OpenCV
-
-## 📁 Project Structure
-
-```
-├── app/                    # Next.js app directory
-├── components/             # React components
-├── lib/                    # Utilities and services
-├── prisma/                # Database schema
-├── python-simulations/    # Python simulation servers
-├── python-ocr/            # OCR grading service
-├── Guide/                 # 📚 All documentation (299 files)
-└── public/                # Static assets
-```
-
-## 🔧 Development
-
-```bash
-# Install dependencies
-npm install
-
-# Setup environment variables
-cp .env.example .env.local
-
-# Run database migrations
-npm run db:push
-
-# Start dev server
-npm run dev
-
-# Start all Python labs
-./Guide/START_ALL_LABS.sh
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Test specific feature
-npm run test:auth
-npm run test:simulations
-
-# Quick health check
-./Guide/quick-health-check.sh
-```
-
-## 🚀 Deployment
-
-See [Cloud Run Deployment Guide](./Guide/CLOUD_RUN_DEPLOYMENT_GUIDE.md)
-
-```bash
-# Deploy to Cloud Run
-./Guide/deploy-to-cloud-run.sh
-
-# Verify deployment
-./Guide/verify-cloud-run-deployment.sh
-```
-
-## 📊 Statistics
-
-- **Total Code Files:** 2,000+
-- **Documentation Files:** 299
-- **Python Simulations:** 20+
-- **API Endpoints:** 100+
-- **Components:** 300+
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## 📝 License
-
-This project is proprietary and confidential.
-
-## 🔗 Links
-
-- **Repository:** https://github.com/aerovfx/Aeroeduvison
-- **Documentation:** [Guide Directory](./Guide)
-- **Production:** https://aeroeduvison.com
+- **Interactive Labs**: Hands-on virtual labs for science, technology, engineering, and mathematics (STEM) subjects.
+- **AI-Powered Insights**: Personalized learning analytics and recommendations.
+- **Seamless Integration**: Compatible with popular learning management systems (LMS).
+- **Scalable Architecture**: Supports thousands of concurrent users with auto-scaling capabilities.
+- **Secure and Reliable**: Built with security best practices and robust error handling.
 
 ---
 
-**Last Updated:** 2025-12-28  
-**Version:** 2.0  
-**Developer:** AeroVFX Team
+## ⚡ Quick Start
+
+### ✅ Prerequisites
+
+- Docker and Docker Compose
+- Node.js 18+
+- Google Cloud SDK (gcloud CLI)
+- API Keys: OpenAI, Redis, Google OAuth
+
+### 📦 Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-org/AeroeduVision.git
+   cd AeroeduVision
+   ```
+
+2. **Configure environment**
+   ```bash
+   cp .env.example .env.local
+   # Edit .env.local with your API keys and database credentials
+   ```
+
+3. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Access the platform**
+   - Local: [http://localhost:3000](http://localhost:3000)
+   - API Docs: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+
+---
+
+## 🏗️ Architecture
+
+AeroeduVision leverages a modern, scalable architecture:
+
+- **Frontend**: Next.js with TypeScript and Tailwind CSS
+- **Backend**: Node.js with RESTful APIs
+- **Database**: PostgreSQL with Prisma ORM
+- **Caching**: Redis for session management and caching
+- **Deployment**: Dockerized services deployed on Google Cloud Run
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a new branch for your feature or bug fix
+3. Submit a pull request with a detailed description
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 💬 Support
+
+- Documentation: [Wiki](https://github.com/your-org/AeroeduVision/wiki)
+- Issues: [GitHub Issues](https://github.com/your-org/AeroeduVision/issues)
+- Community: [Discord](https://discord.gg/your-invite-code)
+
+---
+
+## 🙏 Acknowledgments
+
+We thank all contributors and supporters who have helped make AeroeduVision a reality. Made with ❤️ by the AeroeduVision Team.

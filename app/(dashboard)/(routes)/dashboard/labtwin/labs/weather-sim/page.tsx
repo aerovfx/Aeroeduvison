@@ -2,8 +2,6 @@
 
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -264,17 +262,19 @@ export default function WeatherSimPage() {
     return (
 
       <VisionThemeWrapper title="Weather Sim" subtitle="Hệ thống học tập thông minh">
-      <div className="container mx-auto p-6">
-        <div className="text-center space-y-4">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-          <p className="text-muted-foreground">Đang tải...</p>
+        <div className="container mx-auto p-6">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+            <p className="text-muted-foreground">Đang tải...</p>
+          </div>
         </div>
-      </div>
+      </VisionThemeWrapper>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <VisionThemeWrapper title="Weather Sim" subtitle="Hệ thống học tập thông minh">
+      <div className="container mx-auto p-6 space-y-6">
       {/* Back Button */}
       <Button
         onClick={() => router.push('/dashboard/labtwin/labs')}
@@ -701,7 +701,7 @@ export default function WeatherSimPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
     </VisionThemeWrapper>
   );
 }

@@ -2,8 +2,6 @@
 
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
-"use client";
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -909,6 +907,7 @@ export default function StandingWavesPage() {
             </CardContent>
           </Card>
         </div>
+      </div>
       </div>
     </VisionThemeWrapper>
   );

@@ -9,7 +9,7 @@ import { authOptions } from '@/lib/auth';
 import { AIServiceOrchestrator } from '@/lib/ai/ai-service-orchestrator';
 import { createEnhancedGradingService } from '@/lib/ai/services/enhanced-smart-grading';
 import { createEnhancedGradingValidator } from '@/lib/ai/services/enhanced-grading-validator';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');

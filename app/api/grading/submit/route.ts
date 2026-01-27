@@ -10,7 +10,7 @@ import { AIServiceOrchestrator } from '@/lib/ai/ai-service-orchestrator';
 import { createEnhancedGradingService } from '@/lib/ai/services/enhanced-smart-grading';
 import { createEnhancedGradingValidator } from '@/lib/ai/services/enhanced-grading-validator';
 import { createEnhancedHumanReviewWorkflow } from '@/lib/ai/services/enhanced-human-review-workflow';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
 // Initialize services

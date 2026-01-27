@@ -10,7 +10,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { createEnhancedHumanReviewWorkflow } from '@/lib/ai/services/enhanced-human-review-workflow';
 import { createEnhancedGradingValidator } from '@/lib/ai/services/enhanced-grading-validator';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');

@@ -176,57 +176,17 @@ export class MatrixProcessService {
     // Extract text using Gemini Vision
     const base64Image = fileBuffer.toString("base64")
     
-    // Validate Gemini API key before processing
-    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
-    if (!geminiApiKey || geminiApiKey.trim().length === 0) {
-      throw new Error(
-        "GEMINI_API_KEY chưa được cấu hình. Vui lòng:\n" +
-        "1. Thêm GEMINI_API_KEY vào file .env hoặc .env.local\n" +
-        "2. Restart Next.js server\n" +
-        "3. Lấy API key tại: https://aistudio.google.com/app/apikey"
-      )
-    }
-    
-    // Check for placeholder values
-    const isPlaceholder = 
-      geminiApiKey === "your-gemini-api-key-here" ||
-      geminiApiKey === "your-gemini-api-key" ||
-      geminiApiKey.includes("your-") ||
-      geminiApiKey.includes("placeholder")
-    
-    if (isPlaceholder) {
-      throw new Error(
-        "GEMINI_API_KEY chứa giá trị placeholder. Vui lòng thay thế bằng API key thực tế.\n" +
-        "Lấy API key tại: https://aistudio.google.com/app/apikey"
-      )
-    }
-    
-    // Validate API key format (should start with AIza)
-    if (!geminiApiKey.startsWith("AIza")) {
-      apiLogger.warn("Gemini API key format may be invalid", {
-        metadata: { keyPrefix: geminiApiKey.substring(0, 10) },
-      })
-    }
-    
     // Check if Gemini is available
     try {
       const isAvailable = await GeminiService.isAvailable()
       if (!isAvailable) {
-        throw new Error(
-          "Gemini API không khả dụng. Vui lòng kiểm tra:\n" +
-          "1. GEMINI_API_KEY có đúng không\n" +
-          "2. API key có còn hiệu lực không\n" +
-          "3. Có kết nối internet không"
-        )
+        throw new Error("Gemini API không khả dụng. Vui lòng kiểm tra GEMINI_API_KEY.")
       }
     } catch (checkError: any) {
-      apiLogger.error("Gemini availability check failed", {
+      apiLogger.warn("Gemini availability check failed", {
         metadata: { error: checkError.message },
       })
-      throw new Error(
-        `Không thể kết nối đến Gemini API: ${checkError.message}\n` +
-        "Vui lòng kiểm tra GEMINI_API_KEY và thử lại."
-      )
+      // Continue anyway, let extractTextFromImage handle the error
     }
     
     const extractedText = await GeminiService.extractTextFromImage(

@@ -2,8 +2,6 @@
 
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
-"use client";
-
 import { useState } from "react";
 import { Sparkles, Palette, Download, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
