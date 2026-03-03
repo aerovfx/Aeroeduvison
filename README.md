@@ -1,94 +1,144 @@
-# AeroeduVision ⚡ AI-Powered Education Platform ⚡
+# AeroeduVision
 
-## 📖 Overview
+AeroeduVision is a Next.js education platform with a Strangler migration path from Node route handlers to Rust services, plus desktop wrappers built with Bun + Electron.
 
-AeroeduVision is an innovative platform designed to revolutionize education through AI-powered tools and interactive learning experiences. Built on cutting-edge technologies, AeroeduVision provides educators and students with a seamless, engaging, and effective learning environment.
+## Current Architecture
 
-### Key Features
+### Web App (primary runtime)
+- Framework: Next.js App Router (`app/**`)
+- Runtime: Node.js/Bun for dev scripts
+- Auth: `next-auth`
+- DB: PostgreSQL + Prisma
 
-- **Interactive Labs**: Hands-on virtual labs for science, technology, engineering, and mathematics (STEM) subjects.
-- **AI-Powered Insights**: Personalized learning analytics and recommendations.
-- **Seamless Integration**: Compatible with popular learning management systems (LMS).
-- **Scalable Architecture**: Supports thousands of concurrent users with auto-scaling capabilities.
-- **Secure and Reliable**: Built with security best practices and robust error handling.
+### Strangler Services (Rust)
+- `rust-services/vector-sim-service` (port `8091`)
+  - `POST /v1/vector-similarity`
+  - `DELETE /v1/vector-similarity`
+  - `DELETE /v1/vector-similarity/cache`
+- `rust-services/aero-backend` (port `8090`)
+  - `POST/GET /api/ocr-grading`
+  - `POST /api/ocr/auto-grade`
+  - `POST /api/ocr/upload`
+  - `POST /api/ocr-process`
+  - `POST /api/llm-grading`
+  - `POST /api/assignments/grade-ocr`
+  - plus scaffold fallback for unmigrated APIs
 
----
+### Desktop
+- `desktop-current-app`: Electron wrapper for current web app
+- `desktop-bun-electron`: standalone Bun + Electron + React desktop app
 
-## ⚡ Quick Start
+## Repository Map
 
-### ✅ Prerequisites
+- `app/`: Next.js routes/pages/components
+- `rust-services/`: Rust microservices for Strangler migration
+- `desktop-current-app/`: desktop wrapper for existing app
+- `desktop-bun-electron/`: standalone desktop client
+- `docs/rust-migration/`: API inventory + migration matrix
+- `scripts/rust-migration/generate-inventory.ts`: regenerate matrix/inventory
 
-- Docker and Docker Compose
-- Node.js 18+
-- Google Cloud SDK (gcloud CLI)
-- API Keys: OpenAI, Redis, Google OAuth
+## Quick Start (Web)
 
-### 📦 Installation
+1. Install dependencies:
+```bash
+cd /Users/pixibox/Aeroeduvison
+bun install
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-org/AeroeduVision.git
-   cd AeroeduVision
-   ```
+2. Configure env:
+```bash
+cp .env.local.example .env.local
+```
 
-2. **Configure environment**
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your API keys and database credentials
-   ```
+3. Start web app:
+```bash
+bun run dev -H 127.0.0.1 -p 3100
+```
 
-3. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## Run Rust Services
 
-4. **Run the development server**
-   ```bash
-   npm run dev
-   ```
+Terminal A:
+```bash
+cd /Users/pixibox/Aeroeduvison
+bun run rust:vector
+```
 
-5. **Access the platform**
-   - Local: [http://localhost:3000](http://localhost:3000)
-   - API Docs: [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+Terminal B:
+```bash
+cd /Users/pixibox/Aeroeduvison
+bun run rust:backend
+```
 
----
+Health checks:
+```bash
+curl http://127.0.0.1:8091/health
+curl http://127.0.0.1:8090/health
+```
 
-## 🏗️ Architecture
+## Strangler Controls
 
-AeroeduVision leverages a modern, scalable architecture:
+### Route-level switches (Node handler -> Rust upstream)
+Enable with `.env.local` flags:
+- `USE_RUST_VECTOR_SERVICE=true`
+- `USE_RUST_OCR_GRADING_SERVICE=true`
+- `USE_RUST_OCR_PROCESS_SERVICE=true`
+- `USE_RUST_OCR_AUTO_GRADE_SERVICE=true`
+- `USE_RUST_OCR_UPLOAD_SERVICE=true`
+- `USE_RUST_LLM_GRADING_SERVICE=true`
+- `USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE=true`
 
-- **Frontend**: Next.js with TypeScript and Tailwind CSS
-- **Backend**: Node.js with RESTful APIs
-- **Database**: PostgreSQL with Prisma ORM
-- **Caching**: Redis for session management and caching
-- **Deployment**: Dockerized services deployed on Google Cloud Run
+Per-request override:
+- query: `?target=node|rust`
+- header: `x-strangler-target: node|rust`
 
----
+### Direct proxy rewrites
+- `DIRECT_RUST_VECTOR_PROXY=true`
+- `DIRECT_RUST_OCR_GRADING_PROXY=true`
+- `DIRECT_RUST_OCR_PROCESS_PROXY=true`
+- `DIRECT_RUST_LLM_GRADING_PROXY=true`
 
-## 🤝 Contributing
+### Canary rollout
+Global canary (vector/ocr routes):
+- `ENABLE_RUST_CANARY_PROXY=true`
+- `RUST_CANARY_PERCENT=10`
 
-We welcome contributions! Please follow these steps:
+Scoped canary for `llm-grading`:
+- `ENABLE_RUST_CANARY_LLM_GRADING_PROXY=true`
+- `RUST_CANARY_LLM_GRADING_PERCENT=10`
+- supports 10 -> 25 -> 50 -> 100 and auto-rollout envs in `.env.local.example`
 
-1. Fork the repository
-2. Create a new branch for your feature or bug fix
-3. Submit a pull request with a detailed description
+## Desktop Build
 
----
+### desktop-current-app
+```bash
+cd /Users/pixibox/Aeroeduvison/desktop-current-app
+bun run clean
+bun run build:electron
+```
 
-## 📜 License
+### desktop-bun-electron
+```bash
+cd /Users/pixibox/Aeroeduvison/desktop-bun-electron
+bun run build
+```
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+## Migration Matrix
 
----
+Regenerate API inventory and migration status:
+```bash
+cd /Users/pixibox/Aeroeduvison
+bun run rust:migration:inventory
+```
 
-## 💬 Support
+Artifacts:
+- `docs/rust-migration/api-inventory.json`
+- `docs/rust-migration/migration-matrix.csv`
+- `docs/rust-migration/migration-matrix.md`
 
-- Documentation: [Wiki](https://github.com/your-org/AeroeduVision/wiki)
-- Issues: [GitHub Issues](https://github.com/your-org/AeroeduVision/issues)
-- Community: [Discord](https://discord.gg/your-invite-code)
+## Notes
 
----
-
-## 🙏 Acknowledgments
-
-We thank all contributors and supporters who have helped make AeroeduVision a reality. Made with ❤️ by the AeroeduVision Team.
+- Build artifacts are intentionally ignored (`**/node_modules`, `**/target`, `**/dist`, `**/dist-electron`, `.contentlayer/generated`, `*.tsbuildinfo`).
+- If push fails with large files, check commit contents before pushing:
+```bash
+git show --stat --name-only HEAD
+```
