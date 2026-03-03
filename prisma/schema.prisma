@@ -335,49 +335,41 @@ model StripeCustomer {
 }
 
 model User {
-  id                    String            @id @default(cuid())
-  name                  String?
-  email                 String            @unique
-  emailVerified         DateTime?
-  image                 String?
-  password              String?
-  role                  String            @default("STUDENT")
-  schoolId              String            @default("default-school")
-  xp                    Int               @default(0)
-  
-  // Student Information
-  idNumber              String?           // Mã định danh Bộ
-  dateOfBirth           DateTime?         // Ngày sinh
-  gender                String?           // Giới tính (Nam/Nữ)
-  
-  // Account Security
-  failedLoginAttempts   Int               @default(0)
-  lockedUntil           DateTime?
-  lastLoginAt           DateTime?
-  lastLoginIp           String?
-  
-  // Two-Factor Authentication
-  twoFactorEnabled      Boolean           @default(false)
-  twoFactorSecret       String?
-  twoFactorBackupCodes  String[]          @default([])
-  
-  createdAt             DateTime          @default(now())
-  updatedAt             DateTime          @updatedAt
-  
-  Account               Account[]
-  ChatMessage           ChatMessage[]
-  ChatParticipant       ChatParticipant[]
-  Course                Course[]
-  DebateVote            DebateVote[]
-  STEMProject           STEMProject[]
-  Session               Session[]
-  AuthLog               AuthLog[]
-  LabCompletion         LabCompletion[]
-  DocumentFolder        DocumentFolder[]
-  Document              Document[]
-  ExamMatrix            ExamMatrix[]
-  Classes               Class[]           @relation("ClassTeacher")
-  ClassStudents         ClassStudent[]   @relation("ClassStudent")
+  id                   String            @id @default(cuid())
+  name                 String?
+  email                String            @unique
+  emailVerified        DateTime?
+  image                String?
+  updatedAt            DateTime          @updatedAt
+  role                 String            @default("STUDENT")
+  schoolId             String            @default("default-school")
+  xp                   Int               @default(0)
+  failedLoginAttempts  Int               @default(0)
+  lockedUntil          DateTime?
+  lastLoginAt          DateTime?
+  lastLoginIp          String?
+  twoFactorEnabled     Boolean           @default(false)
+  twoFactorSecret      String?
+  twoFactorBackupCodes String[]          @default([])
+  createdAt            DateTime          @default(now())
+  password             String?
+  dateOfBirth          DateTime?
+  gender               String?
+  idNumber             String?
+  Account              Account[]
+  AuthLog              AuthLog[]
+  ChatMessage          ChatMessage[]
+  ChatParticipant      ChatParticipant[]
+  Classes              Class[]           @relation("ClassTeacher")
+  ClassStudents        ClassStudent[]    @relation("ClassStudent")
+  Course               Course[]
+  DebateVote           DebateVote[]
+  Document             Document[]
+  DocumentFolder       DocumentFolder[]
+  ExamMatrix           ExamMatrix[]
+  LabCompletion        LabCompletion[]
+  STEMProject          STEMProject[]
+  Session              Session[]
 
   @@index([schoolId])
   @@index([email])
@@ -405,16 +397,16 @@ model VerificationToken {
 }
 
 model AuthLog {
-  id          String   @id
-  userId      String?
-  email       String
-  action      String   // 'login', 'logout', 'register', 'password_reset', 'failed_login', '2fa_enabled', '2fa_verified'
-  status      String   // 'success', 'failed', 'blocked'
-  ipAddress   String?
-  userAgent   String?
-  metadata    Json?    // Additional context (e.g., failure reason, device info)
-  createdAt   DateTime @default(now())
-  User        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id
+  userId    String?
+  email     String
+  action    String
+  status    String
+  ipAddress String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  User      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([email])
@@ -425,10 +417,10 @@ model AuthLog {
 model LabCompletion {
   id          String   @id @default(cuid())
   userId      String
-  labId       String   // e.g., 'refraction', 'light-propagation', 'light-shadows'
+  labId       String
   labName     String
   xpEarned    Int
-  parameters  Json?    // Store parameters used in the experiment
+  parameters  Json?
   completedAt DateTime @default(now())
   User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -438,21 +430,18 @@ model LabCompletion {
   @@index([completedAt])
 }
 
-// ===== KHẢO THÍ SYSTEM - DOCUMENT DIGITIZATION MODULE =====
-
 model DocumentFolder {
-  id          String     @id @default(cuid())
-  name        String
-  parentId    String?    // For nested folders
-  userId      String     // Owner/creator
-  path        String     // Full path like "SGK toán 9/Chương 5/Bài 17"
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
-  parent      DocumentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children    DocumentFolder[] @relation("FolderHierarchy")
-  documents   Document[]
-  User        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String           @id @default(cuid())
+  name      String
+  parentId  String?
+  userId    String
+  path      String
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  documents Document[]
+  parent    DocumentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DocumentFolder[] @relation("FolderHierarchy")
+  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([parentId])
@@ -460,28 +449,27 @@ model DocumentFolder {
 }
 
 model Document {
-  id                String              @id @default(cuid())
-  name              String              // Original filename
-  displayName       String              // Display name (e.g., "SGK toán 9")
-  type              String              // "VĂN BẢN", "THƯ MỤC", "PDF", "IMAGE"
-  mimeType          String?             // e.g., "application/pdf", "image/jpeg"
-  fileSize          Int?                // Size in bytes
-  originalUrl       String              // URL to original file (S3/GCS)
-  digitizedUrl      String?             // URL to digitized/processed file
-  folderId          String?             // Parent folder
-  userId            String              // Owner/creator
-  status            String              @default("Hàng đợi") // "Hàng đợi", "Đang xử lý", "Hoàn tất", "Lỗi"
-  processingError   String?            // Error message if status is "Lỗi"
-  executionTime     Int?                // Processing time in seconds
-  ocrText           String?             // Extracted text from OCR
-  metadata          Json?               // Additional metadata (pages, dimensions, etc.)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  processedAt       DateTime?           // When processing completed
-  
-  folder            DocumentFolder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
-  User              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  processingLogs    DocumentProcessingLog[]
+  id              String                  @id @default(cuid())
+  name            String
+  displayName     String
+  type            String
+  mimeType        String?
+  fileSize        Int?
+  originalUrl     String
+  digitizedUrl    String?
+  folderId        String?
+  userId          String
+  status          String                  @default("Hàng đợi")
+  processingError String?
+  executionTime   Int?
+  ocrText         String?
+  metadata        Json?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  processedAt     DateTime?
+  folder          DocumentFolder?         @relation(fields: [folderId], references: [id])
+  User            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processingLogs  DocumentProcessingLog[]
 
   @@index([userId])
   @@index([folderId])
@@ -491,42 +479,39 @@ model Document {
 }
 
 model DocumentProcessingLog {
-  id          String   @id @default(cuid())
-  documentId  String
-  stage       String   // "upload", "ocr", "processing", "completed", "error"
-  message     String?
-  metadata    Json?    // Additional log data
-  createdAt   DateTime @default(now())
-  Document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  documentId String
+  stage      String
+  message    String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  Document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
   @@index([createdAt])
   @@index([stage])
 }
 
-// ===== KHẢO THÍ SYSTEM - EXAM MATRIX MODULE =====
-
 model ExamMatrix {
-  id              String            @id @default(cuid())
-  name            String            // Matrix name (e.g., "metrix.jfif (Imported)")
-  grade           String            // "Khối 6", "Khối 9", etc.
-  examType        String            // "Kiểm tra 1 tiết", "Kiểm tra giữa kỳ", etc.
-  duration        Int               // Duration in minutes (e.g., 45)
-  totalScore      Float             // Total score (e.g., 10.0)
-  totalQuestions  Int               @default(0) // Calculated total questions
-  type            String            @default("Tạo mới") // "Tạo mới", "Số hoá"
-  status          String            @default("Hàng đợi") // "Hàng đợi", "Đang xử lý", "Hoàn tất", "Lỗi"
-  originalFileUrl  String?           // If digitized from file
-  digitizedFileUrl String?          // Processed file URL
-  processingError String?           // Error message if status is "Lỗi"
-  userId          String            // Creator/Owner
-  createdAt       DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  processedAt     DateTime?
-  
-  topics          MatrixTopic[]
-  User            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  processingLogs  MatrixProcessingLog[]
+  id               String                @id @default(cuid())
+  name             String
+  grade            String
+  examType         String
+  duration         Int
+  totalScore       Float
+  totalQuestions   Int                   @default(0)
+  type             String                @default("Tạo mới")
+  status           String                @default("Hàng đợi")
+  originalFileUrl  String?
+  digitizedFileUrl String?
+  processingError  String?
+  userId           String
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  processedAt      DateTime?
+  User             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processingLogs   MatrixProcessingLog[]
+  topics           MatrixTopic[]
 
   @@index([userId])
   @@index([status])
@@ -536,62 +521,55 @@ model ExamMatrix {
 }
 
 model MatrixTopic {
-  id                String            @id @default(cuid())
-  matrixId          String
-  order             Int               // Ordinal number (TT)
-  topic             String            // Topic name (e.g., "Phương trình và hệ hai phương trình bậc nhất hai ẩn")
-  content           String?           // Content/Knowledge unit
-  percentageScore   Float?            // % Điểm (calculated)
-  
-  // Question distributions
-  distributions     QuestionDistribution[]
-  
-  ExamMatrix        ExamMatrix        @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  id              String                 @id @default(cuid())
+  matrixId        String
+  order           Int
+  topic           String
+  content         String?
+  percentageScore Float?
+  ExamMatrix      ExamMatrix             @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  distributions   QuestionDistribution[]
 
   @@index([matrixId])
   @@index([order])
 }
 
 model QuestionDistribution {
-  id                String            @id @default(cuid())
-  topicId           String
-  questionType      String            // "TNKQ_Nhiều_lựa_chọn", "TNKQ_Đúng_Sai", "TNKQ_Trả_lời_ngắn", "Tự_luận"
-  cognitiveLevel    String            // "Biết", "Hiểu", "Vận dụng"
-  count             Int               @default(0) // Number of questions
-  
-  MatrixTopic       MatrixTopic       @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  id             String      @id @default(cuid())
+  topicId        String
+  questionType   String
+  cognitiveLevel String
+  count          Int         @default(0)
+  MatrixTopic    MatrixTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
-  @@index([topicId])
   @@unique([topicId, questionType, cognitiveLevel])
+  @@index([topicId])
 }
 
 model MatrixProcessingLog {
-  id          String      @id @default(cuid())
-  matrixId    String
-  stage       String      // "upload", "ocr", "parsing", "processing", "completed", "error"
-  message     String?
-  metadata    Json?       // Additional log data
-  createdAt   DateTime    @default(now())
-  ExamMatrix  ExamMatrix  @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  id         String     @id @default(cuid())
+  matrixId   String
+  stage      String
+  message    String?
+  metadata   Json?
+  createdAt  DateTime   @default(now())
+  ExamMatrix ExamMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
 
   @@index([matrixId])
   @@index([createdAt])
   @@index([stage])
 }
 
-// ===== KHẢO THÍ SYSTEM - CLASS MANAGEMENT MODULE =====
-
 model Class {
-  id          String        @id @default(cuid())
-  name        String        // Tên lớp (e.g., "Lớp 9A1")
-  grade       String        // Khối (e.g., "Khối 9")
-  schoolYear  String        // Năm học (e.g., "2025-2026")
-  description String?       // Mô tả
-  teacherId   String        // Giáo viên chủ nhiệm
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  
-  teacher     User          @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  id          String         @id @default(cuid())
+  name        String
+  grade       String
+  schoolYear  String
+  description String?
+  teacherId   String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  teacher     User           @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
   students    ClassStudent[]
 
   @@index([teacherId])
@@ -601,29 +579,23 @@ model Class {
 }
 
 model ClassStudent {
-  id              String        @id @default(cuid())
-  classId         String
-  studentId       String
-  studentNumber   Int?          // Số thứ tự trong lớp
-  enrollmentDate  DateTime      @default(now())
-  status          String        @default("active") // "active", "inactive", "transferred"
-  
-  // Student metrics/stats
-  attendanceRate  Float?        // Tỷ lệ tham gia (%)
-  averageScore    Float?        // Điểm trung bình
-  totalXP         Int           @default(0)
-  completedExams  Int           @default(0)
-  passedExams     Int           @default(0)
-  
-  // Additional metadata
-  notes           String?       // Ghi chú của giáo viên
-  metadata        Json?         // Thông tin bổ sung
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
-  class           Class         @relation(fields: [classId], references: [id], onDelete: Cascade)
-  student         User          @relation("ClassStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  id             String   @id @default(cuid())
+  classId        String
+  studentId      String
+  studentNumber  Int?
+  enrollmentDate DateTime @default(now())
+  status         String   @default("active")
+  attendanceRate Float?
+  averageScore   Float?
+  totalXP        Int      @default(0)
+  completedExams Int      @default(0)
+  passedExams    Int      @default(0)
+  notes          String?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student        User     @relation("ClassStudent", fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([classId, studentId])
   @@index([classId])
@@ -631,50 +603,36 @@ model ClassStudent {
   @@index([status])
 }
 
-// ===== KHẢO THÍ SYSTEM - QUESTION BANK MODULE =====
-
 model Question {
-  id                String            @id @default(cuid())
-  topic             String            // Chủ đề (e.g., "Phương trình bậc nhất")
-  subject           String            // Môn học (e.g., "Toán học", "Văn học")
-  grade             String            // Khối (e.g., "Khối 9", "Khối 10")
-  questionType      String            // "MCQ", "TRUE_FALSE", "SHORT_ANSWER", "ESSAY", "CODE"
-  difficulty        String            // "EASY", "MEDIUM", "HARD"
-  content           String            @db.Text // Nội dung câu hỏi
-  options           String[]          // Các lựa chọn (cho MCQ)
-  correctAnswer     String?           // Đáp án đúng (index cho MCQ, giá trị cho khác)
-  explanation       String            @db.Text // Giải thích chi tiết
-  learningObjectives String[]         // Mục tiêu học tập
-  keywords          String[]          // Từ khóa để tìm kiếm
-  
-  // Quality metrics
-  qualityScore      Float?            // Điểm chất lượng (0-100)
-  discriminationIndex Float?           // Chỉ số phân biệt (0-1)
-  
-  // Usage tracking
-  usageCount        Int               @default(0) // Số lần sử dụng
-  averageScore      Float?            // Điểm trung bình học sinh đạt được
-  averageTimeSeconds Int?             // Thời gian trung bình để trả lời (giây)
-  
-  // Metadata
-  aiGenerated       Boolean           @default(false) // Được tạo bởi AI
-  aiModel           String?           // Model AI đã sử dụng (e.g., "gpt-4", "gemini-flash")
-  humanReviewed     Boolean           @default(false) // Đã được giáo viên duyệt
-  reviewedBy        String?           // ID giáo viên đã duyệt
-  reviewedAt        DateTime?         // Thời gian duyệt
-  status            String            @default("Nháp") // "Nháp", "Chờ duyệt", "Đã duyệt", "Từ chối"
-  
-  // Relations
-  createdBy         String            // ID người tạo (User)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
-  // Tags for categorization
-  tags              String[]          // Tags để phân loại (e.g., ["đại số", "phương trình"])
-  
-  // Additional metadata
-  metadata          Json?             // Thông tin bổ sung
-  
+  id                  String    @id @default(cuid())
+  topic               String
+  subject             String
+  grade               String
+  questionType        String
+  difficulty          String
+  content             String
+  options             String[]
+  correctAnswer       String?
+  explanation         String
+  learningObjectives  String[]
+  keywords            String[]
+  qualityScore        Float?
+  discriminationIndex Float?
+  usageCount          Int       @default(0)
+  averageScore        Float?
+  averageTimeSeconds  Int?
+  aiGenerated         Boolean   @default(false)
+  aiModel             String?
+  humanReviewed       Boolean   @default(false)
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  status              String    @default("Nháp")
+  createdBy           String
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  tags                String[]
+  metadata            Json?
+
   @@index([subject])
   @@index([grade])
   @@index([questionType])
@@ -686,6 +644,4 @@ model Question {
   @@index([createdAt])
   @@index([qualityScore])
   @@index([usageCount])
-  // Note: Full-text search can be implemented using PostgreSQL's tsvector/tsquery
-  // For now, use regular indexes and LIKE queries for search
 }

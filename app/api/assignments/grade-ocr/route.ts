@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+const USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE = process.env.USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE === 'true';
 
 // Simple similarity calculator for fallback
 function calculateSimpleSimilarity(text1: string, text2: string): number {
@@ -28,6 +30,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Unauthorized - Teacher access required' },
         { status: 401 }
+      );
+    }
+
+    const target = req.nextUrl.searchParams.get('target') || req.headers.get('x-strangler-target');
+    const shouldUseRust =
+      target === 'rust' || (target !== 'node' && USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE);
+
+    if (shouldUseRust) {
+      const formData = await req.formData();
+      const rustResponse = await fetch(`${RUST_BACKEND_URL}/api/assignments/grade-ocr`, {
+        method: 'POST',
+        body: formData
+      });
+      const rustData = await rustResponse.json().catch(() => ({}));
+      return NextResponse.json(
+        {
+          ...rustData,
+          backend: 'rust',
+          strangler_target: 'rust'
+        },
+        { status: rustResponse.status }
       );
     }
 
@@ -183,4 +206,3 @@ Quy tắc đạo hàm cơ bản: (x^n)' = n*x^(n-1)
     );
   }
 }
-

@@ -1,10 +1,18 @@
 # Dependencies
 /node_modules
+**/node_modules/
 
 # Build output
 /.next
 /out
 /build
+**/.next/
+**/dist/
+**/dist-electron/
+**/target/
+.contentlayer/generated/
+*.tsbuildinfo
+openfang-env/
 
 # Production
 /.vercel

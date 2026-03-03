@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+const USE_RUST_LLM_GRADING_SERVICE = process.env.USE_RUST_LLM_GRADING_SERVICE === 'true';
 
 // Auto-select best AI based on context
 function autoSelectAI(studentAnswer: string, questionText: string, modelAnswer: string): string {
@@ -59,6 +61,28 @@ const subjectPrompts = {
 
 export async function POST(req: NextRequest) {
   try {
+    const target = req.nextUrl.searchParams.get('target') || req.headers.get('x-strangler-target');
+    const shouldUseRust =
+      target === 'rust' || (target !== 'node' && USE_RUST_LLM_GRADING_SERVICE);
+
+    if (shouldUseRust) {
+      const rawBody = await req.text();
+      const rustResponse = await fetch(`${RUST_BACKEND_URL}/api/llm-grading`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: rawBody,
+      });
+      const rustData = await rustResponse.json().catch(() => ({}));
+      return NextResponse.json(
+        {
+          ...rustData,
+          backend: 'rust',
+          strangler_target: 'rust'
+        },
+        { status: rustResponse.status }
+      );
+    }
+
     const { 
       student_answer, 
       question_text, 

@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
 const OCR_BACKEND_URL = process.env.OCR_BACKEND_URL || 'http://localhost:8014';
+const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+const USE_RUST_OCR_UPLOAD_SERVICE = process.env.USE_RUST_OCR_UPLOAD_SERVICE === 'true';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,11 +17,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const target = req.nextUrl.searchParams.get('target') || req.headers.get('x-strangler-target');
+    const shouldUseRust =
+      target === 'rust' || (target !== 'node' && USE_RUST_OCR_UPLOAD_SERVICE);
+
     // Get form data from request
     const formData = await req.formData();
-    
-    // Forward to Python OCR backend
-    const response = await fetch(`${OCR_BACKEND_URL}/ocr`, {
+
+    const upstreamUrl = shouldUseRust
+      ? `${RUST_BACKEND_URL}/api/ocr/upload`
+      : `${OCR_BACKEND_URL}/ocr`;
+
+    const response = await fetch(upstreamUrl, {
       method: 'POST',
       body: formData,
     });
@@ -28,13 +37,22 @@ export async function POST(req: NextRequest) {
       const error = await response.text();
       console.error('OCR backend error:', error);
       return NextResponse.json(
-        { error: 'OCR processing failed', details: error },
+        {
+          error: 'OCR processing failed',
+          details: error,
+          backend: shouldUseRust ? 'rust' : 'node',
+          strangler_target: shouldUseRust ? 'rust' : 'node'
+        },
         { status: response.status }
       );
     }
 
     const result = await response.json();
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      backend: shouldUseRust ? 'rust' : 'node',
+      strangler_target: shouldUseRust ? 'rust' : 'node'
+    });
 
   } catch (error: any) {
     console.error('OCR upload error:', error);

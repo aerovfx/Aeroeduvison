@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Simple in-memory cache for embeddings
 const embeddingCache = new Map<string, number[]>();
+const RUST_VECTOR_SERVICE_URL = process.env.RUST_VECTOR_SERVICE_URL || 'http://127.0.0.1:8091';
+const USE_RUST_VECTOR_SERVICE = process.env.USE_RUST_VECTOR_SERVICE === 'true';
 
 // Calculate cosine similarity
 function cosineSimilarity(vec1: number[], vec2: number[]): number {
@@ -58,6 +60,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const target = req.nextUrl.searchParams.get('target') || req.headers.get('x-strangler-target');
+    const shouldUseRust = target === 'rust' || (target !== 'node' && USE_RUST_VECTOR_SERVICE);
+
+    if (shouldUseRust) {
+      const rustResponse = await fetch(`${RUST_VECTOR_SERVICE_URL}/v1/vector-similarity`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          student_answer,
+          model_answer,
+          use_cache
+        }),
+        signal: AbortSignal.timeout(8_000)
+      });
+
+      if (!rustResponse.ok) {
+        const body = await rustResponse.text();
+        throw new Error(`Rust service failed ${rustResponse.status}: ${body}`);
+      }
+
+      const rustData = await rustResponse.json();
+      return NextResponse.json({
+        ...rustData,
+        backend: 'rust',
+        strangler_target: 'rust'
+      });
+    }
+
     const startTime = Date.now();
     
     // Check cache first
@@ -95,7 +127,9 @@ export async function POST(req: NextRequest) {
       model_vector_size: modelVector.length,
       cache_used: use_cache && embeddingCache.has(cacheKey + '_student'),
       cache_size: embeddingCache.size,
-      processing_time_ms: processingTime
+      processing_time_ms: processingTime,
+      backend: 'node',
+      strangler_target: 'node'
     });
 
   } catch (error: any) {
@@ -115,4 +149,3 @@ export async function DELETE() {
     cache_size: 0 
   });
 }
-

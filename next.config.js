@@ -55,6 +55,58 @@ const nextConfig = {
     
     return config;
   },
+
+  async rewrites() {
+    const directRustProxy = process.env.DIRECT_RUST_VECTOR_PROXY === "true";
+    const rustBase = process.env.RUST_VECTOR_SERVICE_URL || "http://127.0.0.1:8091";
+    const directRustOcrProxy = process.env.DIRECT_RUST_OCR_GRADING_PROXY === "true";
+    const directRustOcrProcessProxy = process.env.DIRECT_RUST_OCR_PROCESS_PROXY === "true";
+    const directRustLlmGradingProxy = process.env.DIRECT_RUST_LLM_GRADING_PROXY === "true";
+    const rustBackendBase = process.env.RUST_BACKEND_URL || "http://127.0.0.1:8090";
+
+    if (
+      !directRustProxy &&
+      !directRustOcrProxy &&
+      !directRustOcrProcessProxy &&
+      !directRustLlmGradingProxy
+    ) {
+      return [];
+    }
+
+    const rules = [
+      {
+        source: "/api/vector-similarity",
+        destination: `${rustBase}/v1/vector-similarity`,
+      },
+      {
+        source: "/api/vector-similarity/cache",
+        destination: `${rustBase}/v1/vector-similarity/cache`,
+      },
+    ];
+
+    if (directRustOcrProxy) {
+      rules.push({
+        source: "/api/ocr-grading",
+        destination: `${rustBackendBase}/api/ocr-grading`,
+      });
+    }
+
+    if (directRustOcrProcessProxy) {
+      rules.push({
+        source: "/api/ocr-process",
+        destination: `${rustBackendBase}/api/ocr-process`,
+      });
+    }
+
+    if (directRustLlmGradingProxy) {
+      rules.push({
+        source: "/api/llm-grading",
+        destination: `${rustBackendBase}/api/llm-grading`,
+      });
+    }
+
+    return rules;
+  },
 }
 
 module.exports = withContentlayer(nextConfig)
