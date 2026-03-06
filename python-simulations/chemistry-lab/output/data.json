@@ -1,0 +1,1391 @@
+{
+  "simulation_type": "chemistry-lab",
+  "version": "1.0.0",
+  "description": "Phòng thí nghiệm Hóa học ảo - Cân bằng phương trình, tính mol, mô phỏng phản ứng",
+  "data": {
+    "equations": {
+      "description": "Các phương trình hóa học đã cân bằng",
+      "data": [
+        {
+          "original": "H2 + O2 -> H2O",
+          "balanced": "2H2 + O2 → 2H2O",
+          "data": {
+            "equation": "2H2 + O2 → 2H2O",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "H2",
+                "coefficient": 2,
+                "molecular_mass": 2.02,
+                "elements": {
+                  "H": 2
+                }
+              },
+              {
+                "formula": "O2",
+                "coefficient": 1,
+                "molecular_mass": 32.0,
+                "elements": {
+                  "O": 2
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "H2O",
+                "coefficient": 2,
+                "molecular_mass": 18.02,
+                "elements": {
+                  "H": 2,
+                  "O": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "N2 + H2 -> NH3",
+          "balanced": "N2 + 3H2 → 2NH3",
+          "data": {
+            "equation": "N2 + 3H2 → 2NH3",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "N2",
+                "coefficient": 1,
+                "molecular_mass": 28.02,
+                "elements": {
+                  "N": 2
+                }
+              },
+              {
+                "formula": "H2",
+                "coefficient": 3,
+                "molecular_mass": 2.02,
+                "elements": {
+                  "H": 2
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "NH3",
+                "coefficient": 2,
+                "molecular_mass": 17.03,
+                "elements": {
+                  "N": 1,
+                  "H": 3
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "CH4 + O2 -> CO2 + H2O",
+          "balanced": "CH4 + 2O2 → CO2 + 2H2O",
+          "data": {
+            "equation": "CH4 + 2O2 → CO2 + 2H2O",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "CH4",
+                "coefficient": 1,
+                "molecular_mass": 16.04,
+                "elements": {
+                  "C": 1,
+                  "H": 4
+                }
+              },
+              {
+                "formula": "O2",
+                "coefficient": 2,
+                "molecular_mass": 32.0,
+                "elements": {
+                  "O": 2
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "CO2",
+                "coefficient": 1,
+                "molecular_mass": 44.01,
+                "elements": {
+                  "C": 1,
+                  "O": 2
+                }
+              },
+              {
+                "formula": "H2O",
+                "coefficient": 2,
+                "molecular_mass": 18.02,
+                "elements": {
+                  "H": 2,
+                  "O": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "C + O2 -> CO2",
+          "balanced": "C + O2 → CO2",
+          "data": {
+            "equation": "C + O2 → CO2",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "C",
+                "coefficient": 1,
+                "molecular_mass": 12.01,
+                "elements": {
+                  "C": 1
+                }
+              },
+              {
+                "formula": "O2",
+                "coefficient": 1,
+                "molecular_mass": 32.0,
+                "elements": {
+                  "O": 2
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "CO2",
+                "coefficient": 1,
+                "molecular_mass": 44.01,
+                "elements": {
+                  "C": 1,
+                  "O": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "Fe + O2 -> Fe2O3",
+          "balanced": "4Fe + 3O2 → 2Fe2O3",
+          "data": {
+            "equation": "4Fe + 3O2 → 2Fe2O3",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "Fe",
+                "coefficient": 4,
+                "molecular_mass": 55.85,
+                "elements": {
+                  "Fe": 1
+                }
+              },
+              {
+                "formula": "O2",
+                "coefficient": 3,
+                "molecular_mass": 32.0,
+                "elements": {
+                  "O": 2
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "Fe2O3",
+                "coefficient": 2,
+                "molecular_mass": 159.7,
+                "elements": {
+                  "Fe": 2,
+                  "O": 3
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "Zn + HCl -> ZnCl2 + H2",
+          "balanced": "Zn + 2HCl → ZnCl2 + H2",
+          "data": {
+            "equation": "Zn + 2HCl → ZnCl2 + H2",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "Zn",
+                "coefficient": 1,
+                "molecular_mass": 65.38,
+                "elements": {
+                  "Zn": 1
+                }
+              },
+              {
+                "formula": "HCl",
+                "coefficient": 2,
+                "molecular_mass": 36.46,
+                "elements": {
+                  "H": 1,
+                  "Cl": 1
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "ZnCl2",
+                "coefficient": 1,
+                "molecular_mass": 136.28,
+                "elements": {
+                  "Zn": 1,
+                  "Cl": 2
+                }
+              },
+              {
+                "formula": "H2",
+                "coefficient": 1,
+                "molecular_mass": 2.02,
+                "elements": {
+                  "H": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "CaCO3 -> CaO + CO2",
+          "balanced": "CaCO3 → CaO + CO2",
+          "data": {
+            "equation": "CaCO3 → CaO + CO2",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "CaCO3",
+                "coefficient": 1,
+                "molecular_mass": 100.09,
+                "elements": {
+                  "Ca": 1,
+                  "C": 1,
+                  "O": 3
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "CaO",
+                "coefficient": 1,
+                "molecular_mass": 56.08,
+                "elements": {
+                  "Ca": 1,
+                  "O": 1
+                }
+              },
+              {
+                "formula": "CO2",
+                "coefficient": 1,
+                "molecular_mass": 44.01,
+                "elements": {
+                  "C": 1,
+                  "O": 2
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "HCl + NaOH -> NaCl + H2O",
+          "balanced": "HCl + NaOH → NaCl + H2O",
+          "data": {
+            "equation": "HCl + NaOH → NaCl + H2O",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "HCl",
+                "coefficient": 1,
+                "molecular_mass": 36.46,
+                "elements": {
+                  "H": 1,
+                  "Cl": 1
+                }
+              },
+              {
+                "formula": "NaOH",
+                "coefficient": 1,
+                "molecular_mass": 40.0,
+                "elements": {
+                  "Na": 1,
+                  "O": 1,
+                  "H": 1
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "NaCl",
+                "coefficient": 1,
+                "molecular_mass": 58.44,
+                "elements": {
+                  "Na": 1,
+                  "Cl": 1
+                }
+              },
+              {
+                "formula": "H2O",
+                "coefficient": 1,
+                "molecular_mass": 18.02,
+                "elements": {
+                  "H": 2,
+                  "O": 1
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "CuSO4 + NaOH -> Cu(OH)2 + Na2SO4",
+          "balanced": "10CuSO4 + 10NaOH → 10Cu(OH)2 + 10Na2SO4",
+          "data": {
+            "equation": "10CuSO4 + 10NaOH → 10Cu(OH)2 + 10Na2SO4",
+            "is_balanced": false,
+            "reactants": [
+              {
+                "formula": "CuSO4",
+                "coefficient": 10,
+                "molecular_mass": 159.62,
+                "elements": {
+                  "Cu": 1,
+                  "S": 1,
+                  "O": 4
+                }
+              },
+              {
+                "formula": "NaOH",
+                "coefficient": 10,
+                "molecular_mass": 40.0,
+                "elements": {
+                  "Na": 1,
+                  "O": 1,
+                  "H": 1
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "Cu(OH)2",
+                "coefficient": 10,
+                "molecular_mass": 80.56,
+                "elements": {
+                  "Cu": 1,
+                  "O": 1,
+                  "H": 1
+                }
+              },
+              {
+                "formula": "Na2SO4",
+                "coefficient": 10,
+                "molecular_mass": 142.05,
+                "elements": {
+                  "Na": 2,
+                  "S": 1,
+                  "O": 4
+                }
+              }
+            ]
+          }
+        },
+        {
+          "original": "AgNO3 + NaCl -> AgCl + NaNO3",
+          "balanced": "AgNO3 + NaCl → AgCl + NaNO3",
+          "data": {
+            "equation": "AgNO3 + NaCl → AgCl + NaNO3",
+            "is_balanced": true,
+            "reactants": [
+              {
+                "formula": "AgNO3",
+                "coefficient": 1,
+                "molecular_mass": 169.88,
+                "elements": {
+                  "Ag": 1,
+                  "N": 1,
+                  "O": 3
+                }
+              },
+              {
+                "formula": "NaCl",
+                "coefficient": 1,
+                "molecular_mass": 58.44,
+                "elements": {
+                  "Na": 1,
+                  "Cl": 1
+                }
+              }
+            ],
+            "products": [
+              {
+                "formula": "AgCl",
+                "coefficient": 1,
+                "molecular_mass": 143.32,
+                "elements": {
+                  "Ag": 1,
+                  "Cl": 1
+                }
+              },
+              {
+                "formula": "NaNO3",
+                "coefficient": 1,
+                "molecular_mass": 85.0,
+                "elements": {
+                  "Na": 1,
+                  "N": 1,
+                  "O": 3
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "count": 10
+    },
+    "calculations": {
+      "description": "Các ví dụ tính toán mol",
+      "data": [
+        {
+          "id": "water_mass_to_mol",
+          "type": "mass_to_mol",
+          "description": "Tính số mol của 36g H₂O",
+          "input": {
+            "mass": 36,
+            "molecular_mass": 18
+          },
+          "output": {
+            "mol": 2.0
+          },
+          "formula": "n = m/M = 36/18 = 2 mol"
+        },
+        {
+          "id": "co2_mol_to_volume",
+          "type": "mol_to_volume",
+          "description": "Thể tích của 0.5 mol CO₂ (đktc)",
+          "input": {
+            "mol": 0.5
+          },
+          "output": {
+            "volume": 11.193
+          },
+          "formula": "V = n × 22.4 = 0.5 × 22.4 = 11.2 L"
+        },
+        {
+          "id": "nacl_concentration",
+          "type": "mol_to_concentration",
+          "description": "Nồng độ của 0.2 mol NaCl trong 1L dung dịch",
+          "input": {
+            "mol": 0.2,
+            "volume": 1
+          },
+          "output": {
+            "concentration": 0.2
+          },
+          "formula": "CM = n/V = 0.2/1 = 0.2 M"
+        }
+      ],
+      "count": 3
+    },
+    "molecular_masses": {
+      "description": "Khối lượng phân tử các chất phổ biến",
+      "data": [
+        {
+          "formula": "H2O",
+          "molecular_mass": 18.02,
+          "elements": {
+            "H": 2,
+            "O": 1
+          }
+        },
+        {
+          "formula": "CO2",
+          "molecular_mass": 44.01,
+          "elements": {
+            "C": 1,
+            "O": 2
+          }
+        },
+        {
+          "formula": "NH3",
+          "molecular_mass": 17.03,
+          "elements": {
+            "N": 1,
+            "H": 3
+          }
+        },
+        {
+          "formula": "CH4",
+          "molecular_mass": 16.04,
+          "elements": {
+            "C": 1,
+            "H": 4
+          }
+        },
+        {
+          "formula": "HCl",
+          "molecular_mass": 36.46,
+          "elements": {
+            "H": 1,
+            "Cl": 1
+          }
+        },
+        {
+          "formula": "NaCl",
+          "molecular_mass": 58.44,
+          "elements": {
+            "Na": 1,
+            "Cl": 1
+          }
+        },
+        {
+          "formula": "CaCO3",
+          "molecular_mass": 100.09,
+          "elements": {
+            "Ca": 1,
+            "C": 1,
+            "O": 3
+          }
+        },
+        {
+          "formula": "H2SO4",
+          "molecular_mass": 98.09,
+          "elements": {
+            "H": 2,
+            "S": 1,
+            "O": 4
+          }
+        },
+        {
+          "formula": "NaOH",
+          "molecular_mass": 40.0,
+          "elements": {
+            "Na": 1,
+            "O": 1,
+            "H": 1
+          }
+        },
+        {
+          "formula": "CuSO4",
+          "molecular_mass": 159.62,
+          "elements": {
+            "Cu": 1,
+            "S": 1,
+            "O": 4
+          }
+        },
+        {
+          "formula": "AgNO3",
+          "molecular_mass": 169.88,
+          "elements": {
+            "Ag": 1,
+            "N": 1,
+            "O": 3
+          }
+        },
+        {
+          "formula": "Fe2O3",
+          "molecular_mass": 159.7,
+          "elements": {
+            "Fe": 2,
+            "O": 3
+          }
+        },
+        {
+          "formula": "MgO",
+          "molecular_mass": 40.31,
+          "elements": {
+            "Mg": 1,
+            "O": 1
+          }
+        }
+      ],
+      "count": 13
+    },
+    "reactions": {
+      "description": "Các phản ứng với hiệu ứng trực quan",
+      "data": [
+        {
+          "id": "hcl_naoh",
+          "data": {
+            "name": "Axit - Bazơ: HCl + NaOH",
+            "equation": "HCl + NaOH -> NaCl + H2O",
+            "type": "neutralization",
+            "effects": [
+              {
+                "type": "color_change",
+                "description": "Phenolphthalein chuyển từ hồng sang không màu",
+                "color_before": "#FF69B4",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              },
+              {
+                "type": "heat",
+                "description": "Tỏa nhiệt",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 5.0
+              }
+            ],
+            "equation_data": {
+              "equation": "HCl + NaOH → NaCl + H2O",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "HCl",
+                  "coefficient": 1,
+                  "molecular_mass": 36.46,
+                  "elements": {
+                    "H": 1,
+                    "Cl": 1
+                  }
+                },
+                {
+                  "formula": "NaOH",
+                  "coefficient": 1,
+                  "molecular_mass": 40.0,
+                  "elements": {
+                    "Na": 1,
+                    "O": 1,
+                    "H": 1
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "NaCl",
+                  "coefficient": 1,
+                  "molecular_mass": 58.44,
+                  "elements": {
+                    "Na": 1,
+                    "Cl": 1
+                  }
+                },
+                {
+                  "formula": "H2O",
+                  "coefficient": 1,
+                  "molecular_mass": 18.02,
+                  "elements": {
+                    "H": 2,
+                    "O": 1
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "zn_hcl",
+          "data": {
+            "name": "Kim loại + Axit: Zn + HCl",
+            "equation": "Zn + 2HCl -> ZnCl2 + H2",
+            "type": "redox",
+            "effects": [
+              {
+                "type": "gas",
+                "description": "Khí H₂ bay lên (không màu)",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#E0E0E0",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              },
+              {
+                "type": "color_change",
+                "description": "Dung dịch không đổi màu",
+                "color_before": "#FFFF00",
+                "color_after": "#FFFF00",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "Zn + 2HCl → ZnCl2 + H2",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "Zn",
+                  "coefficient": 1,
+                  "molecular_mass": 65.38,
+                  "elements": {
+                    "Zn": 1
+                  }
+                },
+                {
+                  "formula": "HCl",
+                  "coefficient": 2,
+                  "molecular_mass": 36.46,
+                  "elements": {
+                    "H": 1,
+                    "Cl": 1
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "ZnCl2",
+                  "coefficient": 1,
+                  "molecular_mass": 136.28,
+                  "elements": {
+                    "Zn": 1,
+                    "Cl": 2
+                  }
+                },
+                {
+                  "formula": "H2",
+                  "coefficient": 1,
+                  "molecular_mass": 2.02,
+                  "elements": {
+                    "H": 2
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "cuso4_naoh",
+          "data": {
+            "name": "Kết tủa: CuSO₄ + NaOH",
+            "equation": "CuSO4 + 2NaOH -> Cu(OH)2 + Na2SO4",
+            "type": "precipitation",
+            "effects": [
+              {
+                "type": "precipitate",
+                "description": "Kết tủa xanh Cu(OH)₂",
+                "color_before": "#0EA5E9",
+                "color_after": "#0EA5E9",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#4ADE80",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "CuSO4 + 2NaOH → Cu(OH)2 + Na2SO4",
+              "is_balanced": false,
+              "reactants": [
+                {
+                  "formula": "CuSO4",
+                  "coefficient": 1,
+                  "molecular_mass": 159.62,
+                  "elements": {
+                    "Cu": 1,
+                    "S": 1,
+                    "O": 4
+                  }
+                },
+                {
+                  "formula": "NaOH",
+                  "coefficient": 2,
+                  "molecular_mass": 40.0,
+                  "elements": {
+                    "Na": 1,
+                    "O": 1,
+                    "H": 1
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "Cu(OH)2",
+                  "coefficient": 1,
+                  "molecular_mass": 80.56,
+                  "elements": {
+                    "Cu": 1,
+                    "O": 1,
+                    "H": 1
+                  }
+                },
+                {
+                  "formula": "Na2SO4",
+                  "coefficient": 1,
+                  "molecular_mass": 142.05,
+                  "elements": {
+                    "Na": 2,
+                    "S": 1,
+                    "O": 4
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "h2o2_ki",
+          "data": {
+            "name": "Phân hủy: H₂O₂ + KI (xúc tác)",
+            "equation": "2H2O2 -> 2H2O + O2",
+            "type": "decomposition",
+            "effects": [
+              {
+                "type": "gas",
+                "description": "Khí O₂ bay lên mạnh (bọt khí)",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#E0F2FE",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              },
+              {
+                "type": "color_change",
+                "description": "Dung dịch chuyển từ không màu sang vàng nhạt",
+                "color_before": "#FFFFFF",
+                "color_after": "#FEF3C7",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "2H2O2 → 2H2O + O2",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "H2O2",
+                  "coefficient": 2,
+                  "molecular_mass": 34.02,
+                  "elements": {
+                    "H": 2,
+                    "O": 2
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "H2O",
+                  "coefficient": 2,
+                  "molecular_mass": 18.02,
+                  "elements": {
+                    "H": 2,
+                    "O": 1
+                  }
+                },
+                {
+                  "formula": "O2",
+                  "coefficient": 1,
+                  "molecular_mass": 32.0,
+                  "elements": {
+                    "O": 2
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "mg_o2",
+          "data": {
+            "name": "Cháy: Mg + O₂",
+            "equation": "2Mg + O2 -> 2MgO",
+            "type": "combustion",
+            "effects": [
+              {
+                "type": "heat",
+                "description": "Cháy sáng chói, nhiệt độ rất cao",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 2000.0
+              },
+              {
+                "type": "color_change",
+                "description": "Kim loại Mg trắng → MgO trắng",
+                "color_before": "#D1D5DB",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "2Mg + O2 → 2MgO",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "Mg",
+                  "coefficient": 2,
+                  "molecular_mass": 24.31,
+                  "elements": {
+                    "Mg": 1
+                  }
+                },
+                {
+                  "formula": "O2",
+                  "coefficient": 1,
+                  "molecular_mass": 32.0,
+                  "elements": {
+                    "O": 2
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "MgO",
+                  "coefficient": 2,
+                  "molecular_mass": 40.31,
+                  "elements": {
+                    "Mg": 1,
+                    "O": 1
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "agno3_nacl",
+          "data": {
+            "name": "Kết tủa trắng: AgNO₃ + NaCl",
+            "equation": "AgNO3 + NaCl -> AgCl + NaNO3",
+            "type": "precipitation",
+            "effects": [
+              {
+                "type": "precipitate",
+                "description": "Kết tủa trắng AgCl",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#F9FAFB",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "AgNO3 + NaCl → AgCl + NaNO3",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "AgNO3",
+                  "coefficient": 1,
+                  "molecular_mass": 169.88,
+                  "elements": {
+                    "Ag": 1,
+                    "N": 1,
+                    "O": 3
+                  }
+                },
+                {
+                  "formula": "NaCl",
+                  "coefficient": 1,
+                  "molecular_mass": 58.44,
+                  "elements": {
+                    "Na": 1,
+                    "Cl": 1
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "AgCl",
+                  "coefficient": 1,
+                  "molecular_mass": 143.32,
+                  "elements": {
+                    "Ag": 1,
+                    "Cl": 1
+                  }
+                },
+                {
+                  "formula": "NaNO3",
+                  "coefficient": 1,
+                  "molecular_mass": 85.0,
+                  "elements": {
+                    "Na": 1,
+                    "N": 1,
+                    "O": 3
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "fe_cuso4",
+          "data": {
+            "name": "Thế kim loại: Fe + CuSO₄",
+            "equation": "Fe + CuSO4 -> FeSO4 + Cu",
+            "type": "displacement",
+            "effects": [
+              {
+                "type": "color_change",
+                "description": "Dung dịch từ xanh → xanh nhạt",
+                "color_before": "#0EA5E9",
+                "color_after": "#BAE6FD",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#FFFFFF",
+                "temperature_change": 0.0
+              },
+              {
+                "type": "precipitate",
+                "description": "Cu đỏ bám trên Fe",
+                "color_before": "#FFFFFF",
+                "color_after": "#FFFFFF",
+                "gas_color": "#CCCCCC",
+                "precipitate_color": "#DC2626",
+                "temperature_change": 0.0
+              }
+            ],
+            "equation_data": {
+              "equation": "Fe + CuSO4 → FeSO4 + Cu",
+              "is_balanced": true,
+              "reactants": [
+                {
+                  "formula": "Fe",
+                  "coefficient": 1,
+                  "molecular_mass": 55.85,
+                  "elements": {
+                    "Fe": 1
+                  }
+                },
+                {
+                  "formula": "CuSO4",
+                  "coefficient": 1,
+                  "molecular_mass": 159.62,
+                  "elements": {
+                    "Cu": 1,
+                    "S": 1,
+                    "O": 4
+                  }
+                }
+              ],
+              "products": [
+                {
+                  "formula": "FeSO4",
+                  "coefficient": 1,
+                  "molecular_mass": 151.92,
+                  "elements": {
+                    "Fe": 1,
+                    "S": 1,
+                    "O": 4
+                  }
+                },
+                {
+                  "formula": "Cu",
+                  "coefficient": 1,
+                  "molecular_mass": 63.55,
+                  "elements": {
+                    "Cu": 1
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "count": 7
+    },
+    "simulations": {
+      "description": "Các ví dụ mô phỏng phản ứng",
+      "data": [
+        {
+          "id": "zn_hcl_sim",
+          "name": "Zn + HCl: Zn dư",
+          "data": {
+            "reaction": {
+              "name": "Kim loại + Axit: Zn + HCl",
+              "equation": "Zn + 2HCl -> ZnCl2 + H2",
+              "type": "redox",
+              "effects": [
+                {
+                  "type": "gas",
+                  "description": "Khí H₂ bay lên (không màu)",
+                  "color_before": "#FFFFFF",
+                  "color_after": "#FFFFFF",
+                  "gas_color": "#E0E0E0",
+                  "precipitate_color": "#FFFFFF",
+                  "temperature_change": 0.0
+                },
+                {
+                  "type": "color_change",
+                  "description": "Dung dịch không đổi màu",
+                  "color_before": "#FFFF00",
+                  "color_after": "#FFFF00",
+                  "gas_color": "#CCCCCC",
+                  "precipitate_color": "#FFFFFF",
+                  "temperature_change": 0.0
+                }
+              ],
+              "equation_data": {
+                "equation": "Zn + 2HCl → ZnCl2 + H2",
+                "is_balanced": true,
+                "reactants": [
+                  {
+                    "formula": "Zn",
+                    "coefficient": 1,
+                    "molecular_mass": 65.38,
+                    "elements": {
+                      "Zn": 1
+                    }
+                  },
+                  {
+                    "formula": "HCl",
+                    "coefficient": 2,
+                    "molecular_mass": 36.46,
+                    "elements": {
+                      "H": 1,
+                      "Cl": 1
+                    }
+                  }
+                ],
+                "products": [
+                  {
+                    "formula": "ZnCl2",
+                    "coefficient": 1,
+                    "molecular_mass": 136.28,
+                    "elements": {
+                      "Zn": 1,
+                      "Cl": 2
+                    }
+                  },
+                  {
+                    "formula": "H2",
+                    "coefficient": 1,
+                    "molecular_mass": 2.02,
+                    "elements": {
+                      "H": 2
+                    }
+                  }
+                ]
+              }
+            },
+            "limiting_reactant": "Zn",
+            "products_formed": {
+              "ZnCl2": 0.1,
+              "H2": 0.1
+            },
+            "reactants_remaining": {
+              "Zn": 0.0,
+              "HCl": 0.1
+            },
+            "reaction_extent": 0.1
+          }
+        },
+        {
+          "id": "cuso4_naoh_sim",
+          "name": "CuSO₄ + NaOH: Vừa đủ",
+          "data": {
+            "reaction": {
+              "name": "Kết tủa: CuSO₄ + NaOH",
+              "equation": "CuSO4 + 2NaOH -> Cu(OH)2 + Na2SO4",
+              "type": "precipitation",
+              "effects": [
+                {
+                  "type": "precipitate",
+                  "description": "Kết tủa xanh Cu(OH)₂",
+                  "color_before": "#0EA5E9",
+                  "color_after": "#0EA5E9",
+                  "gas_color": "#CCCCCC",
+                  "precipitate_color": "#4ADE80",
+                  "temperature_change": 0.0
+                }
+              ],
+              "equation_data": {
+                "equation": "CuSO4 + 2NaOH → Cu(OH)2 + Na2SO4",
+                "is_balanced": false,
+                "reactants": [
+                  {
+                    "formula": "CuSO4",
+                    "coefficient": 1,
+                    "molecular_mass": 159.62,
+                    "elements": {
+                      "Cu": 1,
+                      "S": 1,
+                      "O": 4
+                    }
+                  },
+                  {
+                    "formula": "NaOH",
+                    "coefficient": 2,
+                    "molecular_mass": 40.0,
+                    "elements": {
+                      "Na": 1,
+                      "O": 1,
+                      "H": 1
+                    }
+                  }
+                ],
+                "products": [
+                  {
+                    "formula": "Cu(OH)2",
+                    "coefficient": 1,
+                    "molecular_mass": 80.56,
+                    "elements": {
+                      "Cu": 1,
+                      "O": 1,
+                      "H": 1
+                    }
+                  },
+                  {
+                    "formula": "Na2SO4",
+                    "coefficient": 1,
+                    "molecular_mass": 142.05,
+                    "elements": {
+                      "Na": 2,
+                      "S": 1,
+                      "O": 4
+                    }
+                  }
+                ]
+              }
+            },
+            "limiting_reactant": "CuSO4",
+            "products_formed": {
+              "Cu(OH)2": 0.1,
+              "Na2SO4": 0.1
+            },
+            "reactants_remaining": {
+              "CuSO4": 0.0,
+              "NaOH": 0.0
+            },
+            "reaction_extent": 0.1
+          }
+        }
+      ],
+      "count": 2
+    },
+    "elements": {
+      "description": "Bảng khối lượng nguyên tử",
+      "data": [
+        {
+          "symbol": "Ag",
+          "mass": 107.87
+        },
+        {
+          "symbol": "Al",
+          "mass": 26.98
+        },
+        {
+          "symbol": "Ar",
+          "mass": 39.95
+        },
+        {
+          "symbol": "Au",
+          "mass": 196.97
+        },
+        {
+          "symbol": "B",
+          "mass": 10.81
+        },
+        {
+          "symbol": "Ba",
+          "mass": 137.33
+        },
+        {
+          "symbol": "Be",
+          "mass": 9.012
+        },
+        {
+          "symbol": "Br",
+          "mass": 79.9
+        },
+        {
+          "symbol": "C",
+          "mass": 12.01
+        },
+        {
+          "symbol": "Ca",
+          "mass": 40.08
+        },
+        {
+          "symbol": "Cl",
+          "mass": 35.45
+        },
+        {
+          "symbol": "Cr",
+          "mass": 52.0
+        },
+        {
+          "symbol": "Cu",
+          "mass": 63.55
+        },
+        {
+          "symbol": "F",
+          "mass": 19.0
+        },
+        {
+          "symbol": "Fe",
+          "mass": 55.85
+        },
+        {
+          "symbol": "H",
+          "mass": 1.008
+        },
+        {
+          "symbol": "He",
+          "mass": 4.003
+        },
+        {
+          "symbol": "I",
+          "mass": 126.9
+        },
+        {
+          "symbol": "K",
+          "mass": 39.1
+        },
+        {
+          "symbol": "Li",
+          "mass": 6.941
+        },
+        {
+          "symbol": "Mg",
+          "mass": 24.31
+        },
+        {
+          "symbol": "Mn",
+          "mass": 54.94
+        },
+        {
+          "symbol": "N",
+          "mass": 14.01
+        },
+        {
+          "symbol": "Na",
+          "mass": 22.99
+        },
+        {
+          "symbol": "Ne",
+          "mass": 20.18
+        },
+        {
+          "symbol": "O",
+          "mass": 16.0
+        },
+        {
+          "symbol": "P",
+          "mass": 30.97
+        },
+        {
+          "symbol": "Pb",
+          "mass": 207.2
+        },
+        {
+          "symbol": "S",
+          "mass": 32.07
+        },
+        {
+          "symbol": "Si",
+          "mass": 28.09
+        },
+        {
+          "symbol": "Sr",
+          "mass": 87.62
+        },
+        {
+          "symbol": "Zn",
+          "mass": 65.38
+        }
+      ],
+      "count": 32
+    }
+  },
+  "statistics": {
+    "total_equations": 10,
+    "total_calculations": 3,
+    "total_molecules": 13,
+    "total_reactions": 7,
+    "total_simulations": 2,
+    "total_elements": 32
+  }
+}

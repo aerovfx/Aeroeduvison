@@ -1,0 +1,2924 @@
+{
+  "simulation_type": "optics-lab",
+  "version": "1.0.0",
+  "description": "Phòng thí nghiệm Quang học ảo - Mô phỏng các hiện tượng quang học",
+  "data": {
+    "refraction": {
+      "description": "Khúc xạ ánh sáng theo định luật Snell",
+      "scenarios": [
+        {
+          "id": "air_water_15",
+          "name": "Không khí → Nước (15°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.0,
+            "n2": 1.33,
+            "wavelength": 580,
+            "angle_in_deg": 15.0,
+            "angle_out_deg": 11.22,
+            "is_total_reflection": false,
+            "critical_angle_deg": null,
+            "rays": [
+              {
+                "start": {
+                  "x": -38.82,
+                  "y": 144.89
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 29.19,
+                  "y": -147.13
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 12.94,
+                  "y": 48.3
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "air_water_30",
+          "name": "Không khí → Nước (30°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.0,
+            "n2": 1.33,
+            "wavelength": 580,
+            "angle_in_deg": 30.0,
+            "angle_out_deg": 22.08,
+            "is_total_reflection": false,
+            "critical_angle_deg": null,
+            "rays": [
+              {
+                "start": {
+                  "x": -75.0,
+                  "y": 129.9
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 56.39,
+                  "y": -139.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 25.0,
+                  "y": 43.3
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "air_water_45",
+          "name": "Không khí → Nước (45°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.0,
+            "n2": 1.33,
+            "wavelength": 580,
+            "angle_in_deg": 45.0,
+            "angle_out_deg": 32.12,
+            "is_total_reflection": false,
+            "critical_angle_deg": null,
+            "rays": [
+              {
+                "start": {
+                  "x": -106.07,
+                  "y": 106.07
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 79.75,
+                  "y": -127.04
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 35.36,
+                  "y": 35.36
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "air_water_60",
+          "name": "Không khí → Nước (60°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.0,
+            "n2": 1.33,
+            "wavelength": 580,
+            "angle_in_deg": 60.0,
+            "angle_out_deg": 40.63,
+            "is_total_reflection": false,
+            "critical_angle_deg": null,
+            "rays": [
+              {
+                "start": {
+                  "x": -129.9,
+                  "y": 75.0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 97.67,
+                  "y": -113.84
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 43.3,
+                  "y": 25.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "air_water_75",
+          "name": "Không khí → Nước (75°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.0,
+            "n2": 1.33,
+            "wavelength": 580,
+            "angle_in_deg": 75.0,
+            "angle_out_deg": 46.57,
+            "is_total_reflection": false,
+            "critical_angle_deg": null,
+            "rays": [
+              {
+                "start": {
+                  "x": -144.89,
+                  "y": 38.82
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 108.94,
+                  "y": -103.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 48.3,
+                  "y": 12.94
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "water_air_30",
+          "name": "Nước → Không khí (30°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.33,
+            "n2": 1.0,
+            "wavelength": 580,
+            "angle_in_deg": 30.0,
+            "angle_out_deg": 41.68,
+            "is_total_reflection": false,
+            "critical_angle_deg": 48.75,
+            "rays": [
+              {
+                "start": {
+                  "x": -75.0,
+                  "y": 129.9
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 99.75,
+                  "y": -112.03
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 25.0,
+                  "y": 43.3
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "water_air_40",
+          "name": "Nước → Không khí (40°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.33,
+            "n2": 1.0,
+            "wavelength": 580,
+            "angle_in_deg": 40.0,
+            "angle_out_deg": 58.75,
+            "is_total_reflection": false,
+            "critical_angle_deg": 48.75,
+            "rays": [
+              {
+                "start": {
+                  "x": -96.42,
+                  "y": 114.91
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 128.24,
+                  "y": -77.82
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 32.14,
+                  "y": 38.3
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "water_air_48.6",
+          "name": "Nước → Không khí (48.6°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.33,
+            "n2": 1.0,
+            "wavelength": 580,
+            "angle_in_deg": 48.6,
+            "angle_out_deg": 86.07,
+            "is_total_reflection": false,
+            "critical_angle_deg": 48.75,
+            "rays": [
+              {
+                "start": {
+                  "x": -112.52,
+                  "y": 99.2
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 149.65,
+                  "y": -10.28
+                },
+                "color": "#FFFF00",
+                "intensity": 0.9,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 37.51,
+                  "y": 33.07
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "water_air_60",
+          "name": "Nước → Không khí (60°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.33,
+            "n2": 1.0,
+            "wavelength": 580,
+            "angle_in_deg": 60.0,
+            "angle_out_deg": null,
+            "is_total_reflection": true,
+            "critical_angle_deg": 48.75,
+            "rays": [
+              {
+                "start": {
+                  "x": -129.9,
+                  "y": 75.0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 129.9,
+                  "y": 75.0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "water_air_75",
+          "name": "Nước → Không khí (75°)",
+          "data": {
+            "type": "refraction",
+            "n1": 1.33,
+            "n2": 1.0,
+            "wavelength": 580,
+            "angle_in_deg": 75.0,
+            "angle_out_deg": null,
+            "is_total_reflection": true,
+            "critical_angle_deg": 48.75,
+            "rays": [
+              {
+                "start": {
+                  "x": -144.89,
+                  "y": 38.82
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 144.89,
+                  "y": 38.82
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        }
+      ],
+      "count": 10
+    },
+    "reflection": {
+      "description": "Phản xạ ánh sáng (gương và khuếch tán)",
+      "scenarios": [
+        {
+          "id": "specular_15",
+          "name": "Phản xạ gương (15°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 15.0,
+            "angle_out_deg": 15.0,
+            "is_diffuse": false,
+            "rays": [
+              {
+                "start": {
+                  "x": -38.82,
+                  "y": 144.89
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 38.82,
+                  "y": 144.89
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "specular_30",
+          "name": "Phản xạ gương (30°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 30.0,
+            "angle_out_deg": 30.0,
+            "is_diffuse": false,
+            "rays": [
+              {
+                "start": {
+                  "x": -75.0,
+                  "y": 129.9
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 75.0,
+                  "y": 129.9
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "specular_45",
+          "name": "Phản xạ gương (45°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 45.0,
+            "angle_out_deg": 45.0,
+            "is_diffuse": false,
+            "rays": [
+              {
+                "start": {
+                  "x": -106.07,
+                  "y": 106.07
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 106.07,
+                  "y": 106.07
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "specular_60",
+          "name": "Phản xạ gương (60°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 60.0,
+            "angle_out_deg": 60.0,
+            "is_diffuse": false,
+            "rays": [
+              {
+                "start": {
+                  "x": -129.9,
+                  "y": 75.0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 129.9,
+                  "y": 75.0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "specular_75",
+          "name": "Phản xạ gương (75°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 75.0,
+            "angle_out_deg": 75.0,
+            "is_diffuse": false,
+            "rays": [
+              {
+                "start": {
+                  "x": -144.89,
+                  "y": 38.82
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 144.89,
+                  "y": 38.82
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "diffuse_30",
+          "name": "Phản xạ khuếch tán (30°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 30.0,
+            "angle_out_deg": 30.0,
+            "is_diffuse": true,
+            "rays": [
+              {
+                "start": {
+                  "x": -75.0,
+                  "y": 129.9
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": 90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": 81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": 56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": 20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": -20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": -56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": -81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": -90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "diffuse_45",
+          "name": "Phản xạ khuếch tán (45°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 45.0,
+            "angle_out_deg": 45.0,
+            "is_diffuse": true,
+            "rays": [
+              {
+                "start": {
+                  "x": -106.07,
+                  "y": 106.07
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": 90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": 81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": 56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": 20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": -20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": -56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": -81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": -90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "diffuse_60",
+          "name": "Phản xạ khuếch tán (60°)",
+          "data": {
+            "type": "reflection",
+            "angle_in_deg": 60.0,
+            "angle_out_deg": 60.0,
+            "is_diffuse": true,
+            "rays": [
+              {
+                "start": {
+                  "x": -129.9,
+                  "y": 75.0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": 90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.3,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": 81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": 56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": 20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 87.74,
+                  "y": -20.03
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 70.36,
+                  "y": -56.11
+                },
+                "color": "#FFFF00",
+                "intensity": 0.825,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 39.05,
+                  "y": -81.09
+                },
+                "color": "#FFFF00",
+                "intensity": 0.65,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0.0,
+                  "y": -90.0
+                },
+                "color": "#FFFF00",
+                "intensity": 0.475,
+                "wavelength": 580
+              }
+            ]
+          }
+        }
+      ],
+      "count": 8
+    },
+    "prism": {
+      "description": "Tán sắc ánh sáng qua lăng kính",
+      "scenarios": [
+        {
+          "id": "equilateral_40",
+          "name": "Lăng kính đều (góc tới 40°)",
+          "data": {
+            "type": "prism",
+            "apex_angle_deg": 60.0,
+            "n_prism": 1.5,
+            "incident_angle_deg": 40.0,
+            "rays": [
+              {
+                "start": {
+                  "x": -96.42,
+                  "y": 114.91
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFFFF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 41.86,
+                  "y": -90.82
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 41.86,
+                  "y": -90.82
+                },
+                "end": {
+                  "x": 134.02,
+                  "y": -129.64
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 41.69,
+                  "y": -90.89
+                },
+                "color": "#FFA500",
+                "intensity": 0.8,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 41.69,
+                  "y": -90.89
+                },
+                "end": {
+                  "x": 134.27,
+                  "y": -128.7
+                },
+                "color": "#FFA500",
+                "intensity": 1.0,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 41.62,
+                  "y": -90.93
+                },
+                "color": "#FFFF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 41.62,
+                  "y": -90.93
+                },
+                "end": {
+                  "x": 134.39,
+                  "y": -128.24
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 41.38,
+                  "y": -91.04
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 41.38,
+                  "y": -91.04
+                },
+                "end": {
+                  "x": 134.76,
+                  "y": -126.81
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 41.0,
+                  "y": -91.21
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 41.0,
+                  "y": -91.21
+                },
+                "end": {
+                  "x": 135.38,
+                  "y": -124.25
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 40.55,
+                  "y": -91.41
+                },
+                "color": "#8B00FF",
+                "intensity": 0.8,
+                "wavelength": 420
+              },
+              {
+                "start": {
+                  "x": 40.55,
+                  "y": -91.41
+                },
+                "end": {
+                  "x": 136.13,
+                  "y": -120.83
+                },
+                "color": "#8B00FF",
+                "intensity": 1.0,
+                "wavelength": 420
+              }
+            ],
+            "deviations": {
+              "red": 32.13,
+              "orange": 32.5,
+              "yellow": 32.68,
+              "green": 33.2,
+              "blue": 34.07,
+              "violet": 35.1
+            },
+            "spectrum_colors": {
+              "red": "#FF0000",
+              "orange": "#FFA500",
+              "yellow": "#FFFF00",
+              "green": "#00FF00",
+              "blue": "#0000FF",
+              "violet": "#8B00FF"
+            }
+          }
+        },
+        {
+          "id": "equilateral_50",
+          "name": "Lăng kính đều (góc tới 50°)",
+          "data": {
+            "type": "prism",
+            "apex_angle_deg": 60.0,
+            "n_prism": 1.5,
+            "incident_angle_deg": 50.0,
+            "rays": [
+              {
+                "start": {
+                  "x": -114.91,
+                  "y": 96.42
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFFFF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 49.89,
+                  "y": -86.67
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 49.89,
+                  "y": -86.67
+                },
+                "end": {
+                  "x": 144.0,
+                  "y": -120.49
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 49.69,
+                  "y": -86.78
+                },
+                "color": "#FFA500",
+                "intensity": 0.8,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 49.69,
+                  "y": -86.78
+                },
+                "end": {
+                  "x": 144.04,
+                  "y": -119.91
+                },
+                "color": "#FFA500",
+                "intensity": 1.0,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 49.6,
+                  "y": -86.83
+                },
+                "color": "#FFFF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 49.6,
+                  "y": -86.83
+                },
+                "end": {
+                  "x": 144.07,
+                  "y": -119.62
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 49.31,
+                  "y": -86.99
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 49.31,
+                  "y": -86.99
+                },
+                "end": {
+                  "x": 144.14,
+                  "y": -118.76
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 48.86,
+                  "y": -87.25
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 48.86,
+                  "y": -87.25
+                },
+                "end": {
+                  "x": 144.25,
+                  "y": -117.25
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 48.33,
+                  "y": -87.55
+                },
+                "color": "#8B00FF",
+                "intensity": 0.8,
+                "wavelength": 420
+              },
+              {
+                "start": {
+                  "x": 48.33,
+                  "y": -87.55
+                },
+                "end": {
+                  "x": 144.39,
+                  "y": -115.35
+                },
+                "color": "#8B00FF",
+                "intensity": 1.0,
+                "wavelength": 420
+              }
+            ],
+            "deviations": {
+              "red": 32.13,
+              "orange": 32.5,
+              "yellow": 32.68,
+              "green": 33.2,
+              "blue": 34.07,
+              "violet": 35.1
+            },
+            "spectrum_colors": {
+              "red": "#FF0000",
+              "orange": "#FFA500",
+              "yellow": "#FFFF00",
+              "green": "#00FF00",
+              "blue": "#0000FF",
+              "violet": "#8B00FF"
+            }
+          }
+        },
+        {
+          "id": "equilateral_60",
+          "name": "Lăng kính đều (góc tới 60°)",
+          "data": {
+            "type": "prism",
+            "apex_angle_deg": 60.0,
+            "n_prism": 1.5,
+            "incident_angle_deg": 60.0,
+            "rays": [
+              {
+                "start": {
+                  "x": -129.9,
+                  "y": 75.0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFFFF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 56.4,
+                  "y": -82.58
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 56.4,
+                  "y": -82.58
+                },
+                "end": {
+                  "x": 153.44,
+                  "y": -106.73
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 56.17,
+                  "y": -82.73
+                },
+                "color": "#FFA500",
+                "intensity": 0.8,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 56.17,
+                  "y": -82.73
+                },
+                "end": {
+                  "x": 153.36,
+                  "y": -106.31
+                },
+                "color": "#FFA500",
+                "intensity": 1.0,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 56.07,
+                  "y": -82.8
+                },
+                "color": "#FFFF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 56.07,
+                  "y": -82.8
+                },
+                "end": {
+                  "x": 153.32,
+                  "y": -106.1
+                },
+                "color": "#FFFF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 55.75,
+                  "y": -83.02
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 55.75,
+                  "y": -83.02
+                },
+                "end": {
+                  "x": 153.2,
+                  "y": -105.47
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 55.23,
+                  "y": -83.36
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 55.23,
+                  "y": -83.36
+                },
+                "end": {
+                  "x": 153.0,
+                  "y": -104.38
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 54.64,
+                  "y": -83.75
+                },
+                "color": "#8B00FF",
+                "intensity": 0.8,
+                "wavelength": 420
+              },
+              {
+                "start": {
+                  "x": 54.64,
+                  "y": -83.75
+                },
+                "end": {
+                  "x": 152.77,
+                  "y": -103.01
+                },
+                "color": "#8B00FF",
+                "intensity": 1.0,
+                "wavelength": 420
+              }
+            ],
+            "deviations": {
+              "red": 32.13,
+              "orange": 32.5,
+              "yellow": 32.68,
+              "green": 33.2,
+              "blue": 34.07,
+              "violet": 35.1
+            },
+            "spectrum_colors": {
+              "red": "#FF0000",
+              "orange": "#FFA500",
+              "yellow": "#FFFF00",
+              "green": "#00FF00",
+              "blue": "#0000FF",
+              "violet": "#8B00FF"
+            }
+          }
+        },
+        {
+          "id": "right_angle",
+          "name": "Lăng kính vuông",
+          "data": {
+            "type": "prism",
+            "apex_angle_deg": 90.0,
+            "n_prism": 1.5,
+            "incident_angle_deg": 45.0,
+            "rays": [
+              {
+                "start": {
+                  "x": -106.07,
+                  "y": 106.07
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#FFFFFF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 46.05,
+                  "y": -88.77
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 650
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 45.87,
+                  "y": -88.86
+                },
+                "color": "#FFA500",
+                "intensity": 0.8,
+                "wavelength": 600
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 45.78,
+                  "y": -88.91
+                },
+                "color": "#FFFF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 45.52,
+                  "y": -89.04
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 530
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 45.1,
+                  "y": -89.25
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 470
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 44.61,
+                  "y": -89.5
+                },
+                "color": "#8B00FF",
+                "intensity": 0.8,
+                "wavelength": 420
+              }
+            ],
+            "deviations": {},
+            "spectrum_colors": {
+              "red": "#FF0000",
+              "orange": "#FFA500",
+              "yellow": "#FFFF00",
+              "green": "#00FF00",
+              "blue": "#0000FF",
+              "violet": "#8B00FF"
+            }
+          }
+        }
+      ],
+      "count": 4
+    },
+    "lens": {
+      "description": "Tạo ảnh qua thấu kính",
+      "scenarios": [
+        {
+          "id": "convex_50",
+          "name": "Thấu kính hội tụ (d=50cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "convex",
+            "focal_length": 100,
+            "object_distance": 50,
+            "image_info": {
+              "image_distance": -100.0,
+              "magnification": 2.0,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Ảnh ảo"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": 200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": -100.0,
+                  "y": 100.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": -100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "convex_100",
+          "name": "Thấu kính hội tụ (d=100cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "convex",
+            "focal_length": 100,
+            "object_distance": 100,
+            "image_info": {
+              "image_distance": Infinity,
+              "magnification": 0,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Không có ảnh"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": 200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": -100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "convex_150",
+          "name": "Thấu kính hội tụ (d=150cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "convex",
+            "focal_length": 100,
+            "object_distance": 150,
+            "image_info": {
+              "image_distance": 300.0,
+              "magnification": -2.0,
+              "is_real": true,
+              "is_inverted": true,
+              "image_type": "Ảnh thật"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": 200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 300.0,
+                  "y": -100.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": -100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "convex_200",
+          "name": "Thấu kính hội tụ (d=200cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "convex",
+            "focal_length": 100,
+            "object_distance": 200,
+            "image_info": {
+              "image_distance": 200.0,
+              "magnification": -1.0,
+              "is_real": true,
+              "is_inverted": true,
+              "image_type": "Ảnh thật"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": 200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 200.0,
+                  "y": -50.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": -100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "convex_300",
+          "name": "Thấu kính hội tụ (d=300cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "convex",
+            "focal_length": 100,
+            "object_distance": 300,
+            "image_info": {
+              "image_distance": 150.0,
+              "magnification": -0.5,
+              "is_real": true,
+              "is_inverted": true,
+              "image_type": "Ảnh thật"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -300,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": 200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -300,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": 150.0,
+                  "y": -25.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -300,
+                  "y": 50
+                },
+                "end": {
+                  "x": -100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "concave_50",
+          "name": "Thấu kính phân kỳ (d=50cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "concave",
+            "focal_length": -100,
+            "object_distance": 50,
+            "image_info": {
+              "image_distance": -33.33,
+              "magnification": 0.67,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Ảnh ảo"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": -200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": -33.33,
+                  "y": 33.5
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -50,
+                  "y": 50
+                },
+                "end": {
+                  "x": 100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "concave_100",
+          "name": "Thấu kính phân kỳ (d=100cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "concave",
+            "focal_length": -100,
+            "object_distance": 100,
+            "image_info": {
+              "image_distance": -50.0,
+              "magnification": 0.5,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Ảnh ảo"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": -200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": -50.0,
+                  "y": 25.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -100,
+                  "y": 50
+                },
+                "end": {
+                  "x": 100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "concave_150",
+          "name": "Thấu kính phân kỳ (d=150cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "concave",
+            "focal_length": -100,
+            "object_distance": 150,
+            "image_info": {
+              "image_distance": -60.0,
+              "magnification": 0.4,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Ảnh ảo"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": -200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": -60.0,
+                  "y": 20.0
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -150,
+                  "y": 50
+                },
+                "end": {
+                  "x": 100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        },
+        {
+          "id": "concave_200",
+          "name": "Thấu kính phân kỳ (d=200cm)",
+          "data": {
+            "type": "lens",
+            "lens_type": "concave",
+            "focal_length": -100,
+            "object_distance": 200,
+            "image_info": {
+              "image_distance": -66.67,
+              "magnification": 0.33,
+              "is_real": false,
+              "is_inverted": false,
+              "image_type": "Ảnh ảo"
+            },
+            "rays": [
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 50
+                },
+                "color": "#FF0000",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 50
+                },
+                "end": {
+                  "x": -200,
+                  "y": 0
+                },
+                "color": "#FF0000",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#00FF00",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 0,
+                  "y": 0
+                },
+                "end": {
+                  "x": -66.67,
+                  "y": 16.5
+                },
+                "color": "#00FF00",
+                "intensity": 0.8,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": -200,
+                  "y": 50
+                },
+                "end": {
+                  "x": 100,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 1.0,
+                "wavelength": 580
+              },
+              {
+                "start": {
+                  "x": 100,
+                  "y": 0
+                },
+                "end": {
+                  "x": 0,
+                  "y": 0
+                },
+                "color": "#0000FF",
+                "intensity": 0.8,
+                "wavelength": 580
+              }
+            ]
+          }
+        }
+      ],
+      "count": 9
+    },
+    "materials": {
+      "description": "Các môi trường và chiết suất",
+      "data": [
+        {
+          "id": "vacuum",
+          "n": 1.0,
+          "name": "Chân không",
+          "color": "#000000"
+        },
+        {
+          "id": "air",
+          "n": 1.000293,
+          "name": "Không khí",
+          "color": "#E0F2FE"
+        },
+        {
+          "id": "water",
+          "n": 1.333,
+          "name": "Nước",
+          "color": "#0EA5E9"
+        },
+        {
+          "id": "glass",
+          "n": 1.5,
+          "name": "Thủy tinh",
+          "color": "#60A5FA"
+        },
+        {
+          "id": "diamond",
+          "n": 2.42,
+          "name": "Kim cương",
+          "color": "#E0E7FF"
+        },
+        {
+          "id": "oil",
+          "n": 1.47,
+          "name": "Dầu",
+          "color": "#FCD34D"
+        },
+        {
+          "id": "alcohol",
+          "n": 1.36,
+          "name": "Cồn",
+          "color": "#BAE6FD"
+        },
+        {
+          "id": "ice",
+          "n": 1.31,
+          "name": "Băng",
+          "color": "#DBEAFE"
+        }
+      ],
+      "count": 8
+    },
+    "spectrum": {
+      "description": "Phổ bước sóng ánh sáng khả kiến",
+      "data": [
+        {
+          "wavelength": 380,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 390,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 400,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 410,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 420,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 430,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 440,
+          "color": "#8B00FF"
+        },
+        {
+          "wavelength": 450,
+          "color": "#0000FF"
+        },
+        {
+          "wavelength": 460,
+          "color": "#0000FF"
+        },
+        {
+          "wavelength": 470,
+          "color": "#0000FF"
+        },
+        {
+          "wavelength": 480,
+          "color": "#0000FF"
+        },
+        {
+          "wavelength": 490,
+          "color": "#0000FF"
+        },
+        {
+          "wavelength": 500,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 510,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 520,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 530,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 540,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 550,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 560,
+          "color": "#00FF00"
+        },
+        {
+          "wavelength": 570,
+          "color": "#FFFF00"
+        },
+        {
+          "wavelength": 580,
+          "color": "#FFFF00"
+        },
+        {
+          "wavelength": 590,
+          "color": "#FFA500"
+        },
+        {
+          "wavelength": 600,
+          "color": "#FFA500"
+        },
+        {
+          "wavelength": 610,
+          "color": "#FFA500"
+        },
+        {
+          "wavelength": 620,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 630,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 640,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 650,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 660,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 670,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 680,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 690,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 700,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 710,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 720,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 730,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 740,
+          "color": "#FF0000"
+        },
+        {
+          "wavelength": 750,
+          "color": "#8B0000"
+        },
+        {
+          "wavelength": 760,
+          "color": "#8B0000"
+        },
+        {
+          "wavelength": 770,
+          "color": "#8B0000"
+        },
+        {
+          "wavelength": 780,
+          "color": "#8B0000"
+        }
+      ],
+      "count": 41
+    }
+  },
+  "statistics": {
+    "total_scenarios": 31,
+    "total_materials": 8,
+    "total_wavelengths": 41
+  }
+}

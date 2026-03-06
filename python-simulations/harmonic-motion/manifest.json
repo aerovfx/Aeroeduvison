@@ -1,0 +1,37 @@
+{
+  "id": "harmonic-motion",
+  "name": "Dao động điều hòa",
+  "description": "Vẽ đồ thị chuyển động dựa vào hàm số x = A×cos(ωt + φ). Nghiên cứu các đặc trưng của dao động điều hòa: biên độ, tần số, chu kỳ, pha ban đầu.",
+  "category": "Cơ học",
+  "level": "Lớp 11-12",
+  "duration": "45 phút",
+  "xp": 85,
+  "version": "1.0.0",
+  "author": "LabTwin Team",
+  "tags": ["dao động", "điều hòa", "đồ thị", "hàm số", "vật lý"],
+  "features": [
+    "Đồ thị x(t), v(t), a(t)",
+    "Thay đổi biên độ A",
+    "Thay đổi tần số f",
+    "Thay đổi pha ban đầu φ",
+    "Biểu diễn năng lượng",
+    "Presets thực tế"
+  ],
+  "learning_objectives": [
+    "Hiểu khái niệm dao động điều hòa",
+    "Nhận biết đồ thị hàm cos",
+    "Phân tích ảnh hưởng của các tham số",
+    "Tính toán chu kỳ, tần số",
+    "Áp dụng vào các hiện tượng thực tế"
+  ],
+  "prerequisites": [
+    "Hàm lượng giác (sin, cos)",
+    "Đạo hàm cơ bản",
+    "Khái niệm lực và gia tốc"
+  ],
+  "difficulty": "Trung bình",
+  "icon": "Activity",
+  "color": "#F59E0B"
+}
+
+

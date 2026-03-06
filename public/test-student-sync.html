@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Sync Test - LMS Math</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+    h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+    .status.pass { background: #10b981; color: white; }
+    .status.fail { background: #ef4444; color: white; }
+    .status.pending { background: #f59e0b; color: white; }
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .test-section h3 {
+      margin-top: 0;
+      color: #4f46e5;
+    }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      margin: 5px;
+    }
+    button:hover {
+      background: #5568d3;
+    }
+    .result {
+      margin-top: 15px;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      background: #f3f4f6;
+    }
+    .result.success { background: #d1fae5; color: #065f46; }
+    .result.error { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Student Modules Sync Test</h1>
+    <p>Test synchronization between student modules for <code>student@example.com</code></p>
+
+    <!-- Test 1 -->
+    <div class="test-section">
+      <h3>Test 1: Check LocalStorage Data</h3>
+      <button onclick="testLocalStorage()">🔍 Inspect LocalStorage</button>
+      <div id="localStorage-result" class="result"></div>
+    </div>
+
+    <!-- Test 2 -->
+    <div class="test-section">
+      <h3>Test 2: Simulate Lesson Completion</h3>
+      <button onclick="simulateLessonCompletion()">✅ Complete Lesson (85%)</button>
+      <button onclick="simulateLessonFail()">❌ Fail Lesson (45%)</button>
+      <div id="lesson-result" class="result"></div>
+    </div>
+
+    <!-- Test 3 -->
+    <div class="test-section">
+      <h3>Test 3: Check Assignments Sync</h3>
+      <button onclick="checkAssignments()">📝 View Assignments</button>
+      <div id="assignments-result" class="result"></div>
+    </div>
+
+    <!-- Test 4 -->
+    <div class="test-section">
+      <h3>Test 4: Check Unlock Status</h3>
+      <button onclick="checkUnlockStatus()">🔒 Check Next Lesson</button>
+      <div id="unlock-result" class="result"></div>
+    </div>
+
+    <!-- Test 5 -->
+    <div class="test-section">
+      <h3>Test 5: Reset All Data</h3>
+      <button onclick="resetAllData()" style="background: #ef4444;">🔄 Clear All Progress</button>
+      <div id="reset-result" class="result"></div>
+    </div>
+  </div>
+
+  <script>
+    function testLocalStorage() {
+      const result = document.getElementById('localStorage-result');
+      const keys = [
+        'learning-path-progress',
+        'ai-tutor-assignments',
+        'learningPath',
+        'ai-learning-planner'
+      ];
+      
+      let output = '📦 LocalStorage Contents:\n\n';
+      keys.forEach(key => {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            const count = Array.isArray(parsed) ? parsed.length : Object.keys(parsed).length;
+            output += `✅ ${key}: ${count} items\n`;
+          } catch {
+            output += `⚠️ ${key}: ${data.length} chars (not JSON)\n`;
+          }
+        } else {
+          output += `❌ ${key}: NOT FOUND\n`;
+        }
+      });
+      
+      result.textContent = output;
+      result.className = 'result success';
+    }
+
+    function simulateLessonCompletion() {
+      const lessonId = 'lesson-w1-d5';
+      const result = document.getElementById('lesson-result');
+      
+      // Save to learning-path-progress
+      const pathProgress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
+      pathProgress[lessonId] = {
+        completed: true,
+        score: 85,
+        maxScore: 100,
+        percentage: 85,
+        earnedXP: 88,
+        completedAt: new Date().toISOString(),
+        passed: true
+      };
+      localStorage.setItem('learning-path-progress', JSON.stringify(pathProgress));
+      
+      // Save to assignments
+      const assignments = JSON.parse(localStorage.getItem('ai-tutor-assignments') || '[]');
+      assignments.unshift({
+        id: lessonId,
+        title: 'Ứng dụng đạo hàm',
+        subject: 'mathematics',
+        type: 'lesson',
+        status: 'completed',
+        difficulty: 'beginner',
+        duration: 68,
+        xpReward: 104,
+        accuracy: 85,
+        completedAt: new Date(),
+        assignedAt: new Date(),
+        description: 'Bài học về Ứng dụng đạo hàm - AI Generated',
+        tags: ['ai-generated', 'mathematics', 'beginner'],
+        aiGenerated: true,
+        progress: 100,
+        score: 85,
+        maxScore: 100
+      });
+      localStorage.setItem('ai-tutor-assignments', JSON.stringify(assignments));
+      
+      result.textContent = `✅ Simulated lesson completion:\n\n` +
+        `Lesson: ${lessonId}\n` +
+        `Score: 85/100 (85%)\n` +
+        `XP: +88\n` +
+        `Status: PASSED\n\n` +
+        `✓ Saved to learning-path-progress\n` +
+        `✓ Saved to ai-tutor-assignments\n\n` +
+        `→ Next lesson should unlock!`;
+      result.className = 'result success';
+    }
+
+    function simulateLessonFail() {
+      const lessonId = 'lesson-w1-d5';
+      const result = document.getElementById('lesson-result');
+      
+      const pathProgress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
+      pathProgress[lessonId] = {
+        completed: true,
+        score: 45,
+        maxScore: 100,
+        percentage: 45,
+        earnedXP: 46,
+        completedAt: new Date().toISOString(),
+        passed: false
+      };
+      localStorage.setItem('learning-path-progress', JSON.stringify(pathProgress));
+      
+      result.textContent = `❌ Simulated lesson FAIL:\n\n` +
+        `Lesson: ${lessonId}\n` +
+        `Score: 45/100 (45%)\n` +
+        `XP: +46\n` +
+        `Status: FAILED (< 60%)\n\n` +
+        `✓ Saved to learning-path-progress\n\n` +
+        `→ Next lesson stays LOCKED!`;
+      result.className = 'result error';
+    }
+
+    function checkAssignments() {
+      const result = document.getElementById('assignments-result');
+      const assignments = JSON.parse(localStorage.getItem('ai-tutor-assignments') || '[]');
+      
+      if (assignments.length === 0) {
+        result.textContent = '⚠️ No assignments found. Complete a lesson first!';
+        result.className = 'result error';
+        return;
+      }
+      
+      let output = `📝 Found ${assignments.length} assignments:\n\n`;
+      assignments.slice(0, 5).forEach((a, i) => {
+        const statusIcon = a.status === 'completed' ? '✅' : a.status === 'in-progress' ? '🔄' : '⏳';
+        output += `${i + 1}. ${statusIcon} ${a.title}\n`;
+        output += `   Subject: ${a.subject} | Difficulty: ${a.difficulty}\n`;
+        output += `   Status: ${a.status} | Progress: ${a.progress || 0}%\n`;
+        if (a.accuracy) output += `   Accuracy: ${a.accuracy}%\n`;
+        if (a.score) output += `   Score: ${a.score}/${a.maxScore}\n`;
+        output += `\n`;
+      });
+      
+      result.textContent = output;
+      result.className = 'result success';
+    }
+
+    function checkUnlockStatus() {
+      const result = document.getElementById('unlock-result');
+      const pathProgress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
+      
+      const lesson4 = pathProgress['lesson-w1-d4'];
+      const lesson5 = pathProgress['lesson-w1-d5'];
+      
+      let output = '🔒 Unlock Status Check:\n\n';
+      
+      output += 'Lesson W1-D4 (Current):\n';
+      if (lesson4) {
+        output += `  ✓ Completed: ${lesson4.completed}\n`;
+        output += `  ✓ Score: ${lesson4.score}/${lesson4.maxScore} (${lesson4.percentage}%)\n`;
+        output += `  ${lesson4.passed ? '✅ PASSED' : '❌ FAILED'}\n\n`;
+      } else {
+        output += '  ❌ Not completed yet\n\n';
+      }
+      
+      output += 'Lesson W1-D5 (Next):\n';
+      if (lesson4?.passed) {
+        output += '  ✅ UNLOCKED - Previous lesson passed!\n';
+      } else {
+        output += '  🔒 LOCKED - Previous lesson not passed or incomplete\n';
+      }
+      
+      result.textContent = output;
+      result.className = lesson4?.passed ? 'result success' : 'result error';
+    }
+
+    function resetAllData() {
+      const result = document.getElementById('reset-result');
+      
+      const keys = [
+        'learning-path-progress',
+        'ai-tutor-assignments',
+        'learningPath',
+        'ai-learning-planner'
+      ];
+      
+      keys.forEach(key => localStorage.removeItem(key));
+      
+      result.textContent = '✅ All student data cleared!\n\n' +
+        'Removed:\n' +
+        keys.map(k => `  - ${k}`).join('\n') + '\n\n' +
+        'Refresh page to start fresh.';
+      result.className = 'result success';
+    }
+
+    // Auto-run on load
+    window.addEventListener('load', () => {
+      testLocalStorage();
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,140 @@
+═══════════════════════════════════════════════════════════════
+  📊 CURRENT STATUS & NEXT ACTIONS
+═══════════════════════════════════════════════════════════════
+
+TÌNH TRẠNG HIỆN TẠI:
+───────────────────────────────────────────────────────────────
+
+✅ Code fixes applied:
+   • lib/auth.ts - Removed cached baseUrl
+   • lib/auth.ts - Added trustHost: true
+   • lib/auth.ts - Added Cloud Run detection
+   • next.config.js - Added ignoreDuringBuilds
+
+✅ Deploy scripts ready:
+   • deploy-local-amd64.sh - With AMD64 + auto clear conflicts
+
+❌ Cloud Run service crashing:
+   • ERR_CONNECTION_RESET
+   • ERR_TIMED_OUT
+   • /api/auth/session fails
+
+NGUYÊN NHÂN CRASH:
+   99% là thiếu DATABASE_URL
+   → Prisma cannot connect
+   → Service crashes
+
+═══════════════════════════════════════════════════════════════
+
+FIX NGAY (CHỌN 1):
+───────────────────────────────────────────────────────────────
+
+OPTION A: Switch to Simple Auth (⚡ NHANH NHẤT - 5 PHÚT)
+
+  Bước 1: Switch auth
+    ./switch-to-simple-auth.sh
+
+  Bước 2: Deploy
+    ./deploy-local-amd64.sh
+
+  Bước 3: Test
+    https://inphysic.com/auth/login
+    teacher@example.com / teacher123
+
+  Ưu điểm:
+    ✅ Không cần database
+    ✅ Fix ngay lập tức
+    ✅ Đơn giản
+
+  Nhược điểm:
+    ⚠️ Chỉ có 2 users hardcoded
+    ⚠️ Không lưu users mới
+
+───────────────────────────────────────────────────────────────
+
+OPTION B: Add DATABASE_URL (Nếu bạn có DB)
+
+  Bước 1: Check .env.local
+    grep DATABASE_URL .env.local
+
+  Bước 2: Edit deploy-local-amd64.sh
+    Thêm DATABASE_URL vào --set-env-vars (line ~116)
+
+  Bước 3: Deploy
+    ./deploy-local-amd64.sh
+
+  Ưu điểm:
+    ✅ Giữ full features
+    ✅ Lưu users vào database
+
+  Nhược điểm:
+    ⚠️ Cần database setup
+    ⚠️ Phức tạp hơn
+
+═══════════════════════════════════════════════════════════════
+
+KHUYẾN NGHỊ:
+───────────────────────────────────────────────────────────────
+
+Để test nhanh và fix ngay:
+  → Chọn OPTION A (Simple Auth)
+
+  Lý do:
+  • Fix trong 5 phút
+  • Không cần database
+  • Đủ để test login flow
+  • Sau này có thể switch back nếu cần
+
+═══════════════════════════════════════════════════════════════
+
+COMMANDS:
+───────────────────────────────────────────────────────────────
+
+# OPTION A (Recommended):
+./switch-to-simple-auth.sh
+./deploy-local-amd64.sh
+
+# OPTION B (If you have DB):
+# Edit deploy-local-amd64.sh first, then:
+./deploy-local-amd64.sh
+
+═══════════════════════════════════════════════════════════════
+
+CHECK LOGS (Optional trước khi fix):
+───────────────────────────────────────────────────────────────
+
+./check-cloud-run-status.sh
+
+Hoặc:
+  gcloud run services logs read lmsmath-app \
+    --region asia-east1 --limit 50
+
+═══════════════════════════════════════════════════════════════
+
+FILES TẠO MỚI:
+───────────────────────────────────────────────────────────────
+
+✅ check-cloud-run-status.sh      - Diagnostic tool
+✅ switch-to-simple-auth.sh       - Quick fix
+✅ FIX_ERR_CONNECTION_RESET.md    - Complete guide
+✅ FIX_NOW_CONNECTION_RESET.txt   - Quick action
+✅ CURRENT_STATUS_AND_FIX.txt     - This file
+
+═══════════════════════════════════════════════════════════════
+
+🎯 HÀNH ĐỘNG NGAY BÂY GIỜ:
+───────────────────────────────────────────────────────────────
+
+Để fix lỗi ERR_CONNECTION_RESET trong 5 phút:
+
+1. ./switch-to-simple-auth.sh
+2. ./deploy-local-amd64.sh
+3. Wait 5-10 minutes
+4. Test: https://inphysic.com/auth/login
+
+═══════════════════════════════════════════════════════════════
+
+🎊 Chọn option và chạy ngay!
+
+═══════════════════════════════════════════════════════════════
+

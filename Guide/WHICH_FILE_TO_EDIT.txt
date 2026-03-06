@@ -1,0 +1,209 @@
+═══════════════════════════════════════════════════════════════
+  📁 WHICH FILE TO EDIT FOR CLOUD RUN DEPLOYMENT
+═══════════════════════════════════════════════════════════════
+
+CÂU HỎI:
+  "File nào quan trọng nhất để push lên Cloud Run?"
+
+TRẢ LỜI:
+  🔥 FINAL_DEPLOY_NOW.sh
+
+═══════════════════════════════════════════════════════════════
+
+KẾT QUẢ KIỂM TRA:
+───────────────────────────────────────────────────────────────
+
+✅ Google Client ID đã đồng bộ:
+   442514522574-95bi4m5do7h479aol12boottsua0bj5g.apps.googleusercontent.com
+
+✅ Files đã sync:
+   .env.local      → Development (local only)
+   .env            → Reference (local only)
+   env.example     → Template
+
+═══════════════════════════════════════════════════════════════
+
+FILES VÀ MỤC ĐÍCH:
+───────────────────────────────────────────────────────────────
+
+Local Development (KHÔNG push lên Cloud Run):
+❌ .env.local       - Gitignored, local dev only
+❌ .env             - Gitignored, backup only
+❌ env.example      - Template, reference only
+
+Cloud Run Deployment (QUAN TRỌNG):
+🔥 FINAL_DEPLOY_NOW.sh  - Deploy script (EDIT THIS!)
+📝 deploy.sh            - Alternative deploy script
+🌐 Cloud Run Console    - Manual UI option
+
+═══════════════════════════════════════════════════════════════
+
+FILE QUAN TRỌNG NHẤT:
+───────────────────────────────────────────────────────────────
+
+  📁 FINAL_DEPLOY_NOW.sh
+
+  Vị trí: /Users/vietchung/lmsmath/FINAL_DEPLOY_NOW.sh
+  
+  Dòng cần edit: ~99-106
+  
+  Tìm đoạn:
+    --set-env-vars "\
+    NEXTAUTH_URL=https://inphysic.com,\
+    ...
+  
+  Thêm:
+    AI_PROVIDER=openrouter,\
+    OPENROUTER_API_KEY=sk-or-v1-your-key,\
+    OPENROUTER_MODEL=anthropic/claude-3.5-sonnet"
+
+═══════════════════════════════════════════════════════════════
+
+TẠI SAO FILE NÀY?
+───────────────────────────────────────────────────────────────
+
+  ✅ Set environment variables lên Cloud Run
+  ✅ Build Docker image với code mới nhất
+  ✅ Push image to Google Container Registry
+  ✅ Deploy to Cloud Run
+  ✅ Tất cả trong 1 command
+
+  Files .env.local không được push vì:
+  ❌ Bị gitignore
+  ❌ Chỉ dùng local
+  ❌ Docker không copy chúng
+
+═══════════════════════════════════════════════════════════════
+
+CÁC FILE .ENV VÀ VAI TRÒ:
+───────────────────────────────────────────────────────────────
+
+.env.local (Local Development):
+  Vị trí: /Users/vietchung/lmsmath/.env.local
+  Dùng cho: npm run dev
+  Push lên Cloud Run: ❌ NO
+  Git tracking: ❌ NO (.gitignore)
+  
+  Nội dung hiện tại:
+  ✅ NEXTAUTH_URL="http://localhost:3000"
+  ✅ GOOGLE_CLIENT_ID="442514522574-95bi4m5do7h479aol12boottsua0bj5g..."
+  ✅ All secrets synced
+
+.env (Reference):
+  Same as .env.local, just backup
+
+env.example (Template):
+  Template để tạo .env.local
+  Không chứa giá trị thật
+  Git tracked (committed)
+
+FINAL_DEPLOY_NOW.sh (PRODUCTION):
+  Deploy script
+  Set env vars DIRECTLY trên Cloud Run
+  Git tracked
+  🔥 THIS IS THE ONE TO EDIT!
+
+═══════════════════════════════════════════════════════════════
+
+CÁCH DEPLOY LÊN CLOUD RUN:
+───────────────────────────────────────────────────────────────
+
+Method 1: Edit Deploy Script (Automated)
+  
+  1. Edit file:
+     code FINAL_DEPLOY_NOW.sh
+  
+  2. Find line ~99-106 (--set-env-vars)
+  
+  3. Verify all keys correct:
+     ✅ NEXTAUTH_URL=https://inphysic.com
+     ✅ GOOGLE_CLIENT_ID=442514522574-95bi4m5do7h479aol...
+  
+  4. Add AI keys (optional):
+     AI_PROVIDER=openrouter,\
+     OPENROUTER_API_KEY=sk-or-v1-...,\
+     OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+  
+  5. Save and run:
+     ./FINAL_DEPLOY_NOW.sh
+  
+  6. Wait ~15 minutes
+  
+  7. Done! ✅
+
+Method 2: Cloud Run Console (Manual)
+  
+  1. Go to: https://console.cloud.google.com/run
+  2. Click: lmsmath-app
+  3. Click: EDIT & DEPLOY NEW REVISION
+  4. Tab: Variables & Secrets
+  5. Manually add all variables
+  6. Click: DEPLOY
+
+═══════════════════════════════════════════════════════════════
+
+CHECKLIST:
+───────────────────────────────────────────────────────────────
+
+Local Files:
+[x] ✅ .env.local synced
+[x] ✅ .env synced
+[x] ✅ Google Client ID correct
+[x] ✅ All secrets present
+
+Deploy Script:
+[ ] Edit FINAL_DEPLOY_NOW.sh
+[ ] Verify NEXTAUTH_URL=https://inphysic.com
+[ ] Verify GOOGLE_CLIENT_ID correct
+[ ] Add AI keys (if needed)
+[ ] Run: ./FINAL_DEPLOY_NOW.sh
+
+═══════════════════════════════════════════════════════════════
+
+TÓM LẠI:
+───────────────────────────────────────────────────────────────
+
+❓ File nào quan trọng nhất để push lên Cloud Run?
+
+✅ FINAL_DEPLOY_NOW.sh
+
+❓ Files .env.local có push lên Cloud Run không?
+
+❌ KHÔNG - chúng bị gitignore
+
+❓ Làm sao để set env vars lên Cloud Run?
+
+✅ Edit FINAL_DEPLOY_NOW.sh → Run script
+   HOẶC
+✅ Cloud Run Console → Manual entry
+
+❓ Google Client ID đã đúng chưa?
+
+✅ ĐÃ ĐÚNG: 442514522574-95bi4m5do7h479aol12boottsua0bj5g
+
+═══════════════════════════════════════════════════════════════
+
+HÀNH ĐỘNG TIẾP THEO:
+───────────────────────────────────────────────────────────────
+
+1. Mở file:
+   code FINAL_DEPLOY_NOW.sh
+
+2. Verify env vars (line ~99-106)
+
+3. Add AI keys nếu cần
+
+4. Deploy:
+   ./FINAL_DEPLOY_NOW.sh
+
+5. Test:
+   https://inphysic.com/auth/login
+
+═══════════════════════════════════════════════════════════════
+
+🔥 EDIT THIS FILE: FINAL_DEPLOY_NOW.sh
+
+🚀 THEN RUN: ./FINAL_DEPLOY_NOW.sh
+
+═══════════════════════════════════════════════════════════════
+

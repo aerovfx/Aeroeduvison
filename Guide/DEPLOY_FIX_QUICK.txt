@@ -1,0 +1,142 @@
+═══════════════════════════════════════════════════════════════
+  🔧 FIX CLOUD BUILD ERROR - Quick Guide
+═══════════════════════════════════════════════════════════════
+
+LỖI:
+  ❌ NOT_FOUND: Requested entity was not found
+  ❌ Cloud Build không hoạt động
+
+NGUYÊN NHÂN:
+  • Cloud Build API chưa enable
+  • Thiếu permissions
+
+GIẢI PHÁP:
+  ✅ Dùng local build + Artifact Registry
+
+═══════════════════════════════════════════════════════════════
+
+2 BƯỚC ĐƠN GIẢN:
+───────────────────────────────────────────────────────────────
+
+Bước 1: Setup (CHỈ CHẠY 1 LẦN)
+  ./setup-cloud-build.sh
+  
+  Thời gian: 2-3 phút
+  Enable APIs và grant permissions
+
+Bước 2: Deploy (MỖI LẦN DEPLOY)
+  ./deploy-local-amd64.sh
+  
+  Thời gian: 5-10 phút
+  Build AMD64 và deploy
+
+═══════════════════════════════════════════════════════════════
+
+COMMANDS:
+───────────────────────────────────────────────────────────────
+
+# First time only
+./setup-cloud-build.sh
+
+# Every deploy
+./deploy-local-amd64.sh
+
+═══════════════════════════════════════════════════════════════
+
+FILES MỚI:
+───────────────────────────────────────────────────────────────
+
+✅ setup-cloud-build.sh     - Setup APIs (run once)
+✅ deploy-local-amd64.sh     - Deploy script (run always)
+✅ FIX_CLOUD_BUILD_ERROR.md  - Complete guide
+
+═══════════════════════════════════════════════════════════════
+
+WHAT'S DIFFERENT:
+───────────────────────────────────────────────────────────────
+
+Before:
+  gcloud builds submit
+  ❌ NOT_FOUND error
+
+After:
+  docker buildx build --push
+  ✅ Works!
+
+═══════════════════════════════════════════════════════────════
+
+TROUBLESHOOTING:
+───────────────────────────────────────────────────────────────
+
+"buildx not found":
+  docker buildx create --name multiplatform --use
+
+"permission denied":
+  gcloud auth configure-docker asia-east1-docker.pkg.dev
+
+"repository not found":
+  gcloud artifacts repositories create lmsmath \
+    --repository-format=docker \
+    --location=asia-east1 \
+    --project=gen-lang-client-0712182643
+
+═══════════════════════════════════════════════════════════════
+
+WHY THIS WORKS:
+───────────────────────────────────────────────────────────────
+
+Cloud Build method:
+  ❌ Complex setup
+  ❌ Many APIs needed
+  ❌ Permission issues
+
+Local build method:
+  ✅ Simple
+  ✅ Fewer dependencies
+  ✅ Faster
+  ✅ Works on Mac M1/M2
+
+═══════════════════════════════════════════════════════════════
+
+COMPARISON:
+───────────────────────────────────────────────────────────────
+
+Method          Speed      APIs Needed    Difficulty
+Cloud Build     Slower     Many           Hard
+Local Build     Faster     Few            Easy ✅
+
+═══════════════════════════════════════════════════════════════
+
+CHECKLIST:
+───────────────────────────────────────────────────────────────
+
+[ ] Docker running
+[ ] gcloud authenticated
+[ ] Project set: gen-lang-client-0712182643
+[ ] Run: ./setup-cloud-build.sh (once)
+[ ] Run: ./deploy-local-amd64.sh (always)
+
+═══════════════════════════════════════════════════════════════
+
+AFTER DEPLOY:
+───────────────────────────────────────────────────────────────
+
+1. Clear cookies:
+   https://inphysic.com/clear-cookies.html
+
+2. Hard refresh:
+   Cmd+Shift+R
+
+3. Test:
+   https://inphysic.com/auth/login
+
+═══════════════════════════════════════════════════════════════
+
+🎉 READY!
+
+Run these in order:
+1. ./setup-cloud-build.sh (first time only)
+2. ./deploy-local-amd64.sh (every deploy)
+
+═══════════════════════════════════════════════════════════════
+
