@@ -12,7 +12,7 @@ import { Sidebar } from "./_components/sidebar";
 import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 // Dynamic import to avoid hydration mismatch
-const ChatbotWidget = dynamic(() => import('@/components/chatbot/ChatbotWidget'), {
+const ChatbotWidget = dynamic(() => import('@/components/chatbot/ChatbotOpenFang'), {
   ssr: false
 });
 
