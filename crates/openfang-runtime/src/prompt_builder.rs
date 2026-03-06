@@ -522,10 +522,11 @@ pub fn tool_hint(name: &str) -> &'static str {
 
 /// Cap a string to `max_chars`, appending "..." if truncated.
 fn cap_str(s: &str, max_chars: usize) -> String {
-    if s.len() <= max_chars {
+    if s.chars().count() <= max_chars {
         s.to_string()
     } else {
-        format!("{}...", &s[..max_chars])
+        let capped: String = s.chars().take(max_chars).collect();
+        format!("{}...", capped)
     }
 }
 

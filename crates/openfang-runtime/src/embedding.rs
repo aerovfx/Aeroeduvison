@@ -174,6 +174,41 @@ impl EmbeddingDriver for OpenAIEmbeddingDriver {
     }
 }
 
+
+/// Mock embedding driver for testing without API keys.
+pub struct MockEmbeddingDriver {
+    dims: usize,
+}
+
+impl MockEmbeddingDriver {
+    pub fn new(dims: usize) -> Self {
+        Self { dims }
+    }
+}
+
+#[async_trait]
+impl EmbeddingDriver for MockEmbeddingDriver {
+    async fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
+        let mut results = Vec::with_capacity(texts.len());
+        for text in texts {
+            // Generate a deterministic "embedding" based on string hash for testing similarity
+            let mut vector = vec![0.0f32; self.dims];
+            let hash = text.chars().fold(0u32, |h, c| h.wrapping_add(c as u32));
+            for (i, val) in vector.iter_mut().enumerate() {
+                let mut v = ((hash.wrapping_add(i as u32) % 100) as f32) / 100.0;
+                if i % 2 == 0 { v = -v; }
+                *val = v;
+            }
+            results.push(vector);
+        }
+        Ok(results)
+    }
+
+    fn dimensions(&self) -> usize {
+        self.dims
+    }
+}
+
 /// Create an embedding driver from kernel config.
 pub fn create_embedding_driver(
     provider: &str,
@@ -195,6 +230,9 @@ pub fn create_embedding_driver(
         "ollama" => OLLAMA_BASE_URL.to_string(),
         "vllm" => VLLM_BASE_URL.to_string(),
         "lmstudio" => LMSTUDIO_BASE_URL.to_string(),
+        "mock" => {
+            return Ok(Box::new(MockEmbeddingDriver::new(infer_dimensions(model))));
+        }
         other => {
             warn!("Unknown embedding provider '{other}', using OpenAI-compatible format");
             format!("https://{other}/v1")
