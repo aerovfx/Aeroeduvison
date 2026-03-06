@@ -12,6 +12,8 @@ export interface ChatMessage {
   content: string;
 }
 
+export type OpenFangMessage = ChatMessage;
+
 export interface ChatRequest {
   model: string;
   messages: ChatMessage[];
@@ -37,6 +39,14 @@ export interface ChatResponse {
   };
 }
 
+export interface AgentInfo {
+  id: string;
+  name: string;
+  state: string;
+  model_name: string;
+  model_provider: string;
+}
+
 export class OpenFangError extends Error {
   constructor(
     message: string,
@@ -54,11 +64,12 @@ export class OpenFangClient {
   private timeoutMs: number;
   private maxRetries: number;
 
-  constructor(config: OpenFangConfig) {
-    this.baseUrl = config.baseUrl.replace(/\/$/, '');
-    this.apiKey = config.apiKey;
-    this.timeoutMs = config.timeoutMs || 30000;
-    this.maxRetries = config.maxRetries || 3;
+  constructor(config?: Partial<OpenFangConfig>) {
+    // Default to proxy endpoint in Next.js which redirects to local Open Fang
+    this.baseUrl = config?.baseUrl?.replace(/\/$/, '') || '/api/openfang';
+    this.apiKey = config?.apiKey || process.env.OPENFANG_API_KEY;
+    this.timeoutMs = config?.timeoutMs || 30000;
+    this.maxRetries = config?.maxRetries || 3;
   }
 
   private getHeaders(): Record<string, string> {
@@ -124,51 +135,40 @@ export class OpenFangClient {
     }
   }
 
-  async chat(
-    message: string,
-    options: {
-      agent?: string;
-      temperature?: number;
-      maxTokens?: number;
-    } = {}
-  ): Promise<ChatResponse> {
-    const endpoint = `${this.baseUrl}/v1/chat/completions`;
-
-    const request: ChatRequest = {
-      model: options.agent || 'tutor',
-      messages: [{ role: 'user', content: message }],
-      temperature: options.temperature,
-      max_tokens: options.maxTokens,
-    };
-
-    return this.fetchWithRetry<ChatResponse>(endpoint, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify(request),
-    });
+  async listAgents(): Promise<AgentInfo[]> {
+    // Note: The proxy might need to support GET for this
+    const response = await fetch(`${this.baseUrl}?action=list_agents`);
+    if (!response.ok) return [];
+    return response.json();
   }
 
-  async chatWithHistory(
-    messages: ChatMessage[],
-    options: {
-      agent?: string;
-      temperature?: number;
-      maxTokens?: number;
-    } = {}
-  ): Promise<ChatResponse> {
-    const endpoint = `${this.baseUrl}/v1/chat/completions`;
+  async chat(
+    message: string,
+    agent: string = 'tutor',
+    history: ChatMessage[] = []
+  ): Promise<{ response: string; raw: ChatResponse }> {
+    const endpoint = this.baseUrl; // Using proxy
 
-    const request: ChatRequest = {
-      model: options.agent || 'tutor',
-      messages,
-      temperature: options.temperature,
-      max_tokens: options.maxTokens,
+    const messages: ChatMessage[] = [
+      ...history,
+      { role: 'user', content: message }
+    ];
+
+    const request = {
+      agent,
+      message, // Simplify for proxy usage
+      messages, // Full history if needed
     };
 
-    return this.fetchWithRetry<ChatResponse>(endpoint, {
+    const raw = await this.fetchWithRetry<ChatResponse>(endpoint, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(request),
     });
+
+    return {
+      response: raw.choices[0]?.message?.content || '',
+      raw
+    };
   }
 }

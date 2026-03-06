@@ -5,8 +5,17 @@ import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 
 import { SidebarItem } from "./sidebar-item";
+import { LucideIcon } from "lucide-react";
 
-const guestRoutes = [
+interface SidebarRoute {
+    icon: LucideIcon;
+    label: string;
+    href: string;
+    isHighlighted: boolean;
+    badge?: string;
+}
+
+const guestRoutes: SidebarRoute[] = [
   {
     icon: Layout,
     label: "Dashboard",
@@ -28,7 +37,7 @@ const guestRoutes = [
 ];
 
 // AI-Driven Student Routes - Organized by Categories
-const studentRoutes = [
+const studentRoutes: SidebarRoute[] = [
   // ===== CORE AI MODULES =====
   {
     icon: Trophy,
@@ -128,7 +137,7 @@ const studentRoutes = [
 ];
 
 // AI-Driven Teacher Routes - Focused on Teaching & AI Assistance
-const teacherRoutes = [
+const teacherRoutes: SidebarRoute[] = [
   // ===== CORE AI TEACHING MODULES =====
   {
     icon: Brain,
@@ -211,6 +220,20 @@ const teacherRoutes = [
     isHighlighted: false,
   },
   {
+    icon: Search,
+    label: "🔍 Semantic Library",
+    href: "/teacher/semantic-library",
+    isHighlighted: false,
+    badge: "OpenFang",
+  },
+  {
+    icon: Sparkles,
+    label: "✨ Open Fang AI Gen",
+    href: "/teacher/ai-generator",
+    isHighlighted: false,
+    badge: "Fang",
+  },
+  {
     icon: Sparkles,
     label: "✨ AI Content Gen",
     href: "/teacher/create-module",
@@ -257,7 +280,7 @@ const teacherRoutes = [
 ]
 
 // ===== ADMIN ROUTES =====
-const adminRoutes = [
+const adminRoutes: SidebarRoute[] = [
   // ===== CORE ADMIN MODULES =====
   {
     icon: Layout,

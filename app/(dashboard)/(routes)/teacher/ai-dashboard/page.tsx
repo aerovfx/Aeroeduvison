@@ -30,6 +30,7 @@ import AICoTeacherPanel from '@/components/teacher/AICoTeacherPanel';
 import EngagementHeatmap from '@/components/teacher/EngagementHeatmap';
 import EmotionTimeline from '@/components/teacher/EmotionTimeline';
 import QuickActions from '@/components/teacher/QuickActions';
+import OpenFangInsight from '@/components/teacher/OpenFangInsight';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface StudentWithAnalytics {
@@ -360,6 +361,8 @@ export default function AIDrivenTeacherDashboard() {
             </div>
 
             {/* Main View Area */}
+            <OpenFangInsight />
+            
             {selectedView === 'overview' && (
               <ClassOverview students={filteredStudents} timeRange={timeRange} />
             )}
