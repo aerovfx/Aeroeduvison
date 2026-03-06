@@ -8,6 +8,7 @@ pub mod anthropic;
 pub mod copilot;
 pub mod fallback;
 pub mod gemini;
+pub mod mock;
 pub mod openai;
 
 use crate::llm_driver::{DriverConfig, LlmDriver, LlmError};
@@ -157,6 +158,11 @@ fn provider_defaults(provider: &str) -> Option<ProviderDefaults> {
             api_key_env: "QIANFAN_API_KEY",
             key_required: true,
         }),
+        "mock" => Some(ProviderDefaults {
+            base_url: "mock://",
+            api_key_env: "MOCK_API_KEY",
+            key_required: false,
+        }),
         _ => None,
     }
 }
@@ -186,6 +192,11 @@ fn provider_defaults(provider: &str) -> Option<ProviderDefaults> {
 /// - Any custom provider with `base_url` set uses OpenAI-compatible format
 pub fn create_driver(config: &DriverConfig) -> Result<Arc<dyn LlmDriver>, LlmError> {
     let provider = config.provider.as_str();
+
+    // Mock driver for testing
+    if provider == "mock" {
+        return Ok(Arc::new(mock::MockDriver::new()));
+    }
 
     // Anthropic uses a different API format — special case
     if provider == "anthropic" {
