@@ -1,0 +1,54 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/lmsmath-app:$COMMIT_SHA', '.']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/lmsmath-app:$COMMIT_SHA']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'lmsmath-app'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/lmsmath-app:$COMMIT_SHA'
+      - '--region'
+      - 'asia-east2'
+      - '--platform'
+      - 'managed'
+      - '--cpu'
+      - '1'
+      - '--memory'
+      - '512Mi'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+      - '--concurrency'
+      - '80'
+      - '--timeout'
+      - '300'
+      - '--port'
+      - '3000'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,PORT=3000,HOSTNAME=0.0.0.0,NEXT_TELEMETRY_DISABLED=1'
+      - '--set-secrets'
+      - 'DATABASE_URL=database-url:latest,NEXTAUTH_SECRET=nextauth-secret:latest'
+      - '--execution-environment'
+      - 'gen2'
+      - '--cpu-boost'
+
+# Store images in Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/lmsmath-app:$COMMIT_SHA'
+
+# Build configuration
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+  logging: CLOUD_LOGGING_ONLY

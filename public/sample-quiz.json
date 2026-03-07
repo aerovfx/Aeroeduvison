@@ -1,0 +1,72 @@
+[
+  {
+    "question": "What is the value of x in the equation 2x + 5 = 13?",
+    "options": ["3", "4", "5", "6"],
+    "correctAnswer": 1,
+    "points": 2,
+    "explanation": "Solve by isolating x: 2x = 13 - 5 = 8, so x = 4"
+  },
+  {
+    "question": "What is the derivative of x²?",
+    "options": ["x", "2x", "x²", "2x²"],
+    "correctAnswer": 1,
+    "points": 3,
+    "explanation": "Using the power rule: d/dx(x²) = 2x"
+  },
+  {
+    "question": "What is the area of a circle with radius 5?",
+    "options": ["25π", "10π", "50π", "5π"],
+    "correctAnswer": 0,
+    "points": 2,
+    "explanation": "Area = πr² = π(5)² = 25π"
+  },
+  {
+    "question": "Solve: 3x - 7 = 14",
+    "options": ["x = 5", "x = 6", "x = 7", "x = 8"],
+    "correctAnswer": 2,
+    "points": 2,
+    "explanation": "3x = 14 + 7 = 21, so x = 7"
+  },
+  {
+    "question": "What is the slope of the line y = 3x + 2?",
+    "options": ["2", "3", "5", "1"],
+    "correctAnswer": 1,
+    "points": 2,
+    "explanation": "In the form y = mx + b, the slope is the coefficient of x, which is 3"
+  },
+  {
+    "question": "What is 15% of 200?",
+    "options": ["25", "30", "35", "40"],
+    "correctAnswer": 1,
+    "points": 1,
+    "explanation": "15% of 200 = 0.15 × 200 = 30"
+  },
+  {
+    "question": "What is the square root of 144?",
+    "options": ["11", "12", "13", "14"],
+    "correctAnswer": 1,
+    "points": 1,
+    "explanation": "12² = 144, so √144 = 12"
+  },
+  {
+    "question": "What is the sum of the angles in a triangle?",
+    "options": ["90°", "180°", "270°", "360°"],
+    "correctAnswer": 1,
+    "points": 2,
+    "explanation": "The sum of interior angles in any triangle is always 180°"
+  },
+  {
+    "question": "What is the formula for the volume of a cylinder?",
+    "options": ["πr²h", "2πrh", "πr²", "2πr²h"],
+    "correctAnswer": 0,
+    "points": 3,
+    "explanation": "Volume of cylinder = π × radius² × height = πr²h"
+  },
+  {
+    "question": "What is the next number in the sequence: 2, 4, 8, 16, ?",
+    "options": ["24", "32", "28", "20"],
+    "correctAnswer": 1,
+    "points": 2,
+    "explanation": "Each number is doubled: 2→4→8→16→32"
+  }
+]

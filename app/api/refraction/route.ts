@@ -1,0 +1,54 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    
+    const response = await fetch(`http://localhost:8017/api/simulate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Backend responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Refraction API error:', error);
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Backend not available',
+        message: 'Refraction backend is not running on port 8017'
+      },
+      { status: 503 }
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const response = await fetch(`http://localhost:8017/api/health`);
+    
+    if (!response.ok) {
+      throw new Error(`Backend responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    return NextResponse.json(
+      { 
+        success: false, 
+        error: 'Backend not available',
+        message: 'Refraction backend is not running on port 8017'
+      },
+      { status: 503 }
+    );
+  }
+}

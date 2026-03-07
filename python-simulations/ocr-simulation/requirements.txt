@@ -1,0 +1,26 @@
+# OCR Simulation V2 - Requirements
+# Enhanced OCR Pipeline with FastAPI backend
+
+# Core dependencies
+numpy>=1.24.0
+opencv-python>=4.8.0
+
+# FastAPI backend (optional - for API server)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+websockets>=12.0
+
+# Real OCR engine - PaddleOCR (PRODUCTION READY!)
+paddlepaddle>=3.2.0
+paddleocr>=3.2.0
+opencv-contrib-python==4.10.0.84
+
+# Optional: Alternative OCR engines
+# pytesseract>=0.3.10
+# easyocr>=1.7.0
+
+# Utilities
+Pillow>=10.0.0
+pydantic>=2.0.0
+

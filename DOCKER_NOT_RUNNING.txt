@@ -1,0 +1,88 @@
+# 🐳 DOCKER ERROR - SOLUTION
+
+## Your Error
+```
+ERROR: Cannot connect to the Docker daemon at unix:///Users/vietchung/.docker/run/docker.sock.
+Is the docker daemon running?
+```
+
+## Why It's Happening
+Docker Desktop is not running on your Mac.
+
+---
+
+## ✅ HOW TO FIX - 2 MINUTES
+
+### 1. Start Docker
+```bash
+open -a Docker
+```
+
+### 2. Wait 30-60 seconds
+Watch for the Docker icon to appear in your menu bar (top right corner of your screen)
+
+### 3. Verify it's running
+```bash
+docker ps
+```
+You should see output with no errors.
+
+---
+
+## 🚀 THEN DEPLOY
+
+### Fastest Option (Recommended):
+```bash
+./docker-startup-and-deploy.sh
+```
+
+This script:
+- Waits for Docker to be ready
+- Authenticates with Google Cloud
+- Runs all setup and deployment
+- Shows you the final service URL
+
+### Manual Option:
+```bash
+gcloud auth activate-service-account --key-file=gen-lang-client-0712182643-47b71bba4d28.json
+gcloud config set project gen-lang-client-0712182643
+./setup-cloud-deployment.sh
+./deploy-to-gen-lang-client.sh
+```
+
+---
+
+## 📁 QUICK REFERENCE
+
+**Files Created for You**:
+- `docker-startup-and-deploy.sh` - Automated Docker + Deploy
+- `DOCKER_QUICK_FIX.md` - This quick fix guide
+- `DOCKER_TROUBLESHOOTING.md` - Detailed troubleshooting
+- `DEPLOYMENT_QUICK_START.sh` - Interactive guide
+
+---
+
+## 🎯 COPY & PASTE
+
+**One command to start and deploy**:
+```bash
+open -a Docker && echo "Waiting for Docker..." && sleep 45 && ./docker-startup-and-deploy.sh
+```
+
+**Just start Docker**:
+```bash
+open -a Docker
+```
+
+**Check Docker is running**:
+```bash
+docker ps
+```
+
+---
+
+**Status**: Docker not running  
+**Solution**: Start Docker and run deployment script  
+**Time**: ~5-10 minutes
+
+👉 **Next**: Run `open -a Docker` and wait 30-60 seconds

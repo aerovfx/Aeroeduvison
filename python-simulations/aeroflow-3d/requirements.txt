@@ -1,0 +1,14 @@
+# AeroFlow XR Dependencies
+# MVP version - Taichi GPU-accelerated 3D fluid simulation
+
+# Core dependencies
+taichi>=1.7.0          # GPU-accelerated physics engine
+numpy>=1.24.0          # Numerical computations
+fastapi>=0.104.0       # API server
+uvicorn>=0.24.0        # ASGI server
+pydantic>=2.4.0        # Data validation
+
+# Optional but recommended
+# torch>=2.0.0         # For AI optimization (Phase 2)
+# open3d>=0.17.0       # For mesh visualization (Phase 2)
+

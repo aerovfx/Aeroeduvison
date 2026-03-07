@@ -1,0 +1,165 @@
+🚀 AEROEDUVISION DEPLOYMENT - SETUP COMPLETE
+===========================================
+
+📦 Files Created:
+================
+✅ deploy-aeroeduvision.sh (6.2K)
+   Main deployment script for Google Cloud Run
+   
+✅ DEPLOYMENT_GUIDE_AEROEDUVISION.md  
+   Complete step-by-step deployment guide with prerequisites
+   
+✅ BUILD_FIX_GUIDE.md
+   Solutions for build-related issues and errors
+   
+✅ DEPLOYMENT_STATUS.md
+   Current status and quick reference commands
+   
+✅ README_DEPLOYMENT.md
+   Complete overview and detailed instructions
+
+🎯 Project Configuration:
+========================
+Project ID:     gen-lang-client-0712182643
+Region:         asia-southeast1
+Service Name:   aeroeduvision
+Service Port:   3000
+Memory:         2Gi
+CPU:            2
+Auto-scaling:   0-10 instances
+
+✨ Deployment Script Features:
+=============================
+✓ Automatic Docker image build
+✓ Push to Google Container Registry
+✓ Sync environment variables to Secret Manager
+✓ Deploy to Google Cloud Run
+✓ Automatic service configuration
+✓ Health checks and monitoring
+
+⚠️ Pre-Deployment Checklist:
+==========================
+Before running the deployment script:
+
+1. Fix remaining JSX errors:
+   - app/(dashboard)/(routes)/dashboard/labtwin/labs/light-propagation/page.tsx
+   - app/(dashboard)/(routes)/dashboard/labtwin/labs/light-shadows/page.tsx
+   - app/(dashboard)/(routes)/dashboard/labtwin/labs/mechaforce/page.tsx
+   
+   QUICK FIX: Move problematic files aside temporarily
+   mkdir -p docs/root-docs
+   mv *.md docs/root-docs/ 2>/dev/null || true
+
+2. Verify Docker is running:
+   docker version
+
+3. Verify gcloud is configured:
+   gcloud config list
+
+4. Create/update .env.local with all required variables:
+   DATABASE_URL, NEXTAUTH_SECRET, GOOGLE_CLIENT_ID, etc.
+
+5. Ensure you have permissions:
+   - Cloud Run Admin
+   - Secret Manager Admin
+   - Service Account User
+
+🚀 How to Deploy:
+================
+
+Step 1: Fix build issues
+   mkdir -p docs/root-docs
+   mv *.md docs/root-docs/ 2>/dev/null || true
+   npm run build
+
+Step 2: Prepare environment
+   cp .env.local.example .env.local
+   # Edit .env.local with your actual values
+   nano .env.local
+
+Step 3: Run deployment
+   chmod +x deploy-aeroeduvision.sh
+   ./deploy-aeroeduvision.sh
+
+Step 4: Monitor deployment
+   gcloud run services describe aeroeduvision --region=asia-southeast1
+   gcloud run services logs tail aeroeduvision --region=asia-southeast1 -f
+
+📋 Required Environment Variables:
+==================================
+
+Database:
+  DATABASE_URL=postgresql://user:password@host:5432/dbname
+
+Authentication:
+  NEXTAUTH_SECRET=your-generated-secret
+  NEXTAUTH_URL=https://aeroeduvision-xxx.run.app
+  GOOGLE_CLIENT_ID=your-google-client-id
+  GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+Cache & Sessions:
+  REDIS_URL=redis://host:port
+
+AI Services:
+  GEMINI_API_KEY=your-gemini-api-key
+  OPENAI_API_KEY=your-openai-api-key
+  OPENAI_BASE_URL=http://localhost:11434/v1
+  AI_PREFERRED_PROVIDER=ollama  # or openai
+
+Other:
+  NEXT_PUBLIC_TRACKING_SERVER_URL=wss://your-server/ws/tracking
+
+💡 Tips & Tricks:
+================
+
+- Use gcloud to manage secrets:
+  gcloud secrets list
+  gcloud secrets versions access latest --secret=DATABASE_URL
+
+- Monitor service in real-time:
+  gcloud run services logs read aeroeduvision --limit=50 --follow
+
+- Update environment variables after deployment:
+  gcloud run deploy aeroeduvision --update-env-vars KEY=VALUE --region=asia-southeast1
+
+- Rollback to previous version:
+  gcloud run deploy aeroeduvision --image gcr.io/.../aeroeduvision:previous
+
+- Scale manually:
+  gcloud run deploy aeroeduvision --min-instances 1 --max-instances 20 --region=asia-southeast1
+
+🔍 Troubleshooting:
+==================
+
+Issue: "Cannot connect to Docker daemon"
+Solution: Start Docker Desktop or Docker service
+
+Issue: "Permission denied" errors
+Solution: Check gcloud authentication and IAM roles
+  gcloud auth login
+  gcloud projects get-iam-policy gen-lang-client-0712182643
+
+Issue: Build fails with module errors
+Solution: Check package.json dependencies are installed
+  npm ci --legacy-peer-deps
+
+Issue: Deployment timeout
+Solution: Check Cloud Run quotas and service account permissions
+  gcloud run describe aeroeduvision --region=asia-southeast1
+
+📚 Documentation Files:
+======================
+For detailed information, see:
+- README_DEPLOYMENT.md - Complete overview
+- DEPLOYMENT_GUIDE_AEROEDUVISION.md - Step-by-step guide
+- BUILD_FIX_GUIDE.md - Build error solutions
+- DEPLOYMENT_STATUS.md - Current status
+
+✅ Status: Ready to Deploy
+===========================
+The deployment script is fully configured and ready to use.
+Just follow the pre-deployment checklist above and run:
+
+./deploy-aeroeduvision.sh
+
+Good luck! 🎉

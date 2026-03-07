@@ -1,0 +1,103 @@
+{
+  "id": "optics-lab",
+  "name": "Phòng thí nghiệm Quang học",
+  "description": "Phòng thí nghiệm quang học ảo với mô phỏng khúc xạ, phản xạ, tán sắc ánh sáng và thấu kính. Sử dụng Canvas 2D để vẽ tia sáng động và FastAPI backend tính toán theo định luật Snell.",
+  "category": "Quang học",
+  "level": "Lớp 11-12",
+  "duration": "60 phút",
+  "xp": 120,
+  "version": "1.0.0",
+  "author": "LabTwin Team",
+  "tags": [
+    "quang học",
+    "khúc xạ",
+    "phản xạ",
+    "tán sắc",
+    "lăng kính",
+    "thấu kính",
+    "định luật Snell",
+    "vật lý",
+    "Canvas 2D"
+  ],
+  "features": [
+    "Khúc xạ ánh sáng (Định luật Snell)",
+    "Phản xạ gương và phản xạ khuếch tán",
+    "Tán sắc ánh sáng qua lăng kính",
+    "Thấu kính hội tụ và phân kỳ",
+    "Canvas 2D vẽ tia sáng động",
+    "Tương tác real-time",
+    "Nhiều preset và scenarios",
+    "Phản xạ toàn phần",
+    "Tính góc tới hạn",
+    "Mô phỏng phổ màu"
+  ],
+  "learning_objectives": [
+    "Hiểu và áp dụng định luật Snell về khúc xạ ánh sáng",
+    "Quan sát và giải thích hiện tượng phản xạ gương và phản xạ khuếch tán",
+    "Nhận biết hiện tượng phản xạ toàn phần và tính góc tới hạn",
+    "Hiểu hiện tượng tán sắc ánh sáng qua lăng kính",
+    "Tính toán vị trí và tính chất ảnh qua thấu kính",
+    "Phân biệt thấu kính hội tụ và phân kỳ",
+    "Vận dụng công thức thấu kính: 1/f = 1/d + 1/d'",
+    "Quan sát ảnh thật và ảnh ảo"
+  ],
+  "prerequisites": [
+    "Khái niệm về ánh sáng và tia sáng",
+    "Chiết suất của môi trường",
+    "Góc tới, góc phản xạ, góc khúc xạ",
+    "Thấu kính và tiêu điểm"
+  ],
+  "difficulty": "Trung bình - Nâng cao",
+  "icon": "Lightbulb",
+  "color": "#F59E0B",
+  "experiments": [
+    {
+      "id": "refraction",
+      "name": "Khúc xạ ánh sáng",
+      "description": "Mô phỏng khúc xạ khi ánh sáng đi từ môi trường này sang môi trường khác",
+      "duration": "15 phút",
+      "difficulty": "Dễ"
+    },
+    {
+      "id": "reflection",
+      "name": "Phản xạ ánh sáng",
+      "description": "So sánh phản xạ gương và phản xạ khuếch tán",
+      "duration": "10 phút",
+      "difficulty": "Dễ"
+    },
+    {
+      "id": "prism",
+      "name": "Tán sắc qua lăng kính",
+      "description": "Quan sát sự phân tách ánh sáng trắng thành các màu khác nhau",
+      "duration": "20 phút",
+      "difficulty": "Trung bình"
+    },
+    {
+      "id": "lens",
+      "name": "Thấu kính",
+      "description": "Tạo ảnh qua thấu kính hội tụ và phân kỳ",
+      "duration": "15 phút",
+      "difficulty": "Trung bình"
+    }
+  ],
+  "api": {
+    "enabled": true,
+    "port": 8002,
+    "endpoints": [
+      "/api/refraction",
+      "/api/reflection",
+      "/api/prism",
+      "/api/lens",
+      "/api/materials",
+      "/api/spectrum"
+    ]
+  },
+  "frontend": {
+    "type": "canvas",
+    "interactive": true,
+    "real_time": true,
+    "animations": true
+  }
+}
+
+

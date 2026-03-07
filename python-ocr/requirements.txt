@@ -1,0 +1,19 @@
+# PaddleOCR Service Dependencies
+
+# Core OCR
+paddleocr==2.7.0.3
+paddlepaddle==2.6.0  # hoặc paddlepaddle-gpu nếu có GPU
+
+# Image processing
+Pillow==10.1.0
+opencv-python==4.8.1.78
+numpy==1.24.3
+
+# API Server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Utilities
+aiofiles==23.2.1
+

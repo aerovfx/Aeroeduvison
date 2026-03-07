@@ -1,0 +1,63 @@
+{
+  "version": "1.0.0",
+  "examples": [
+    {
+      "name": "Không khí → Nước",
+      "n1": 1.0,
+      "n2": 1.33,
+      "angle": 30
+    },
+    {
+      "name": "Không khí → Thủy tinh",
+      "n1": 1.0,
+      "n2": 1.5,
+      "angle": 45
+    },
+    {
+      "name": "Nước → Không khí",
+      "n1": 1.33,
+      "n2": 1.0,
+      "angle": 30
+    },
+    {
+      "name": "Thủy tinh → Không khí",
+      "n1": 1.5,
+      "n2": 1.0,
+      "angle": 50
+    }
+  ],
+  "materials": [
+    {
+      "name": "Không khí",
+      "n": 1.0,
+      "color": "#E0F2FE"
+    },
+    {
+      "name": "Nước",
+      "n": 1.33,
+      "color": "#0EA5E9"
+    },
+    {
+      "name": "Thủy tinh",
+      "n": 1.5,
+      "color": "#60A5FA"
+    },
+    {
+      "name": "Kim cương",
+      "n": 2.42,
+      "color": "#E0E7FF"
+    },
+    {
+      "name": "Dầu",
+      "n": 1.47,
+      "color": "#FCD34D"
+    }
+  ],
+  "animation_frames": 10,
+  "snell_verification": {
+    "left_side": 0.49999999999999994,
+    "right_side": 0.49999999999999994,
+    "difference": 0.0,
+    "verified": true
+  }
+}

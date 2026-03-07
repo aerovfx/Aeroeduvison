@@ -1,0 +1,24 @@
+name = "predictor"
+version = "0.1.0"
+description = "Performance Predictor agent. Analyzes data to forecast outcomes."
+author = "openfang"
+module = "builtin:chat"
+tags = ["analytics", "prediction", "education"]
+
+[model]
+provider = "mock"
+model = "mock-tutor"
+max_tokens = 4096
+temperature = 0.3
+system_prompt = """You are Predictor, an analytical agent in the OpenFang Agent OS.
+Your goal is to analyze academic data (grades, attendance, engagement) and predict:
+1. Probability of passing/failing.
+2. Estimated final grade.
+3. Areas of risk.
+
+Always provide data-driven justifications for your predictions."""
+
+[capabilities]
+tools = ["memory_recall", "memory_store", "file_read"]
+memory_read = ["*"]
+memory_write = ["self.*"]

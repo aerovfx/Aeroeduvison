@@ -1,0 +1,30 @@
+═══════════════════════════════════════════════════════════════
+  🚨 ACTION REQUIRED NOW
+═══════════════════════════════════════════════════════════════
+
+LỖI HIỆN TẠI:
+  ❌ Cloud Run service CRASH
+  ❌ ERR_CONNECTION_RESET
+  ❌ Thiếu DATABASE_URL
+
+FIX NGAY (2 LỆNH):
+
+  ./switch-to-simple-auth.sh
+  ./deploy-local-amd64.sh
+
+Thời gian: 5-10 phút
+
+═══════════════════════════════════════════════════════════════
+
+SAU ĐÓ TEST:
+  
+  https://inphysic.com/auth/login
+  teacher@example.com / teacher123
+
+═══════════════════════════════════════════════════════════════
+
+ĐỌC THÊM:
+  📄 CURRENT_STATUS_AND_FIX.txt
+  📄 FIX_NOW_CONNECTION_RESET.txt
+
+═══════════════════════════════════════════════════════════════

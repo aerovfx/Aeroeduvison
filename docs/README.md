@@ -1,105 +1,181 @@
-# OpenFang Documentation
+# 📚 AeroEduVison Documentation
 
-Welcome to the OpenFang documentation. OpenFang is the open-source Agent Operating System -- 14 Rust crates, 40 channels, 60 skills, 20 LLM providers, 76 API endpoints, and 16 security systems in a single binary.
+This directory contains the complete documentation for AeroEduVison, organized in a structure similar to [Cursor Docs](https://cursor.com/docs).
 
----
+## 🗂️ Directory Structure
 
-## Getting Started
-
-| Guide | Description |
-|-------|-------------|
-| [Getting Started](getting-started.md) | Installation, first agent, first chat session |
-| [Configuration](configuration.md) | Complete `config.toml` reference with every field |
-| [CLI Reference](cli-reference.md) | Every command and subcommand with examples |
-| [Troubleshooting](troubleshooting.md) | Common issues, FAQ, diagnostics |
-
-## Core Concepts
-
-| Guide | Description |
-|-------|-------------|
-| [Architecture](architecture.md) | 12-crate structure, kernel boot, agent lifecycle, memory substrate |
-| [Agent Templates](agent-templates.md) | 30 pre-built agents across 4 performance tiers |
-| [Workflows](workflows.md) | Multi-agent pipelines with branching, fan-out, loops, and triggers |
-| [Security](security.md) | 16 defense-in-depth security systems |
-
-## Integrations
-
-| Guide | Description |
-|-------|-------------|
-| [Channel Adapters](channel-adapters.md) | 40 messaging channels -- setup, configuration, custom adapters |
-| [LLM Providers](providers.md) | 20 providers, 51 models, 23 aliases -- setup and model routing |
-| [Skills](skill-development.md) | 60 bundled skills, custom skill development, FangHub marketplace |
-| [MCP & A2A](mcp-a2a.md) | Model Context Protocol and Agent-to-Agent protocol integration |
-
-## Reference
-
-| Guide | Description |
-|-------|-------------|
-| [API Reference](api-reference.md) | All 76 REST/WS/SSE endpoints with request/response examples |
-| [Desktop App](desktop.md) | Tauri 2.0 native app -- build, features, architecture |
-
-## Release & Operations
-
-| Guide | Description |
-|-------|-------------|
-| [Production Checklist](production-checklist.md) | Every step before tagging v0.1.0 -- signing keys, secrets, verification |
-
-## Additional Resources
-
-| Resource | Description |
-|----------|-------------|
-| [CONTRIBUTING.md](../CONTRIBUTING.md) | Development setup, code style, PR guidelines |
-| [MIGRATION.md](../MIGRATION.md) | Migrating from OpenClaw, LangChain, or AutoGPT |
-| [SECURITY.md](../SECURITY.md) | Security policy and vulnerability reporting |
-| [CHANGELOG.md](../CHANGELOG.md) | Release notes and version history |
-
----
-
-## Quick Reference
-
-### Start in 30 Seconds
-
-```bash
-export GROQ_API_KEY="your-key"
-openfang init && openfang start
-# Open http://127.0.0.1:4200
+```
+docs/
+├── index.md                          # Main documentation homepage
+├── config.ts                         # Navigation configuration
+│
+├── getting-started/                  # 🚀 Getting Started
+│   ├── index.md                     # Section overview
+│   ├── introduction.md              # Project introduction
+│   ├── installation.md              # Installation guide
+│   ├── quick-start.md               # 5-minute quick start
+│   └── environment-setup.md         # Environment configuration
+│
+├── authentication/                   # 🔐 Authentication
+│   ├── overview.md                  # Auth system overview
+│   ├── nextauth-setup.md            # NextAuth configuration
+│   ├── user-management.md           # User CRUD operations
+│   ├── session-handling.md          # Session management
+│   ├── 2fa.md                       # Two-factor authentication
+│   └── oauth-providers.md           # Google, GitHub OAuth
+│
+├── simulations/                      # 🔬 Simulations & Labs
+│   ├── overview.md                  # Simulations overview
+│   ├── quick-start-labs.md          # Quick start guide
+│   ├── python-simulations.md        # Python setup
+│   ├── physics-labs.md              # Physics simulations
+│   ├── chemistry-labs.md            # Chemistry simulations
+│   └── custom-simulations.md        # Create custom labs
+│
+├── ocr-grading/                      # 🖼️ OCR & Auto-Grading
+│   ├── overview.md                  # OCR system overview
+│   ├── advanced-pipeline.md         # Advanced OCR pipeline
+│   ├── ml-training.md               # ML model training
+│   ├── auto-grading.md              # Auto-grading system
+│   └── paddleocr.md                 # PaddleOCR integration
+│
+├── ai-features/                      # 🤖 AI Features
+│   ├── overview.md                  # AI features overview
+│   ├── content-generator.md         # AI content generation
+│   ├── intelligent-tutoring.md      # AI tutoring system
+│   ├── learning-path-builder.md     # AI path builder
+│   └── api-integration.md           # AI API integration
+│
+├── deployment/                       # ☁️ Deployment
+│   ├── overview.md                  # Deployment overview
+│   ├── cloud-run.md                 # Google Cloud Run
+│   ├── docker.md                    # Docker configuration
+│   ├── environment-variables.md     # Env var management
+│   ├── prisma.md                    # Database setup
+│   ├── cloud-sql.md                 # Cloud SQL configuration
+│   └── cicd.md                      # CI/CD pipeline
+│
+├── api-reference/                    # 📖 API Reference
+│   ├── rest-api.md                  # REST API documentation
+│   ├── websocket.md                 # WebSocket events
+│   ├── python-api.md                # Python API
+│   ├── auth-api.md                  # Authentication API
+│   └── simulations-api.md           # Simulations API
+│
+└── troubleshooting/                  # 🔧 Troubleshooting
+    ├── common-issues.md             # Common problems
+    ├── debug-guide.md               # Debugging guide
+    ├── testing-guide.md             # Testing documentation
+    ├── performance.md               # Performance optimization
+    └── faq.md                       # Frequently asked questions
 ```
 
-### Key Numbers
+## 🎯 Documentation Principles
 
-| Metric | Count |
-|--------|-------|
-| Crates | 14 |
-| Agent templates | 30 |
-| Messaging channels | 40 |
-| Bundled skills | 60 |
-| Built-in tools | 38 |
-| LLM providers | 20 |
-| Models in catalog | 51 |
-| Model aliases | 23 |
-| API endpoints | 76 |
-| Security systems | 16 |
-| Tests | 967 |
+### 1. **Clear Structure**
+- Organized by feature/module
+- Progressive disclosure (basic → advanced)
+- Consistent formatting
 
-### Important Paths
+### 2. **Code Examples**
+- Real, working code snippets
+- Include language tags
+- Show expected output
 
-| Path | Description |
-|------|-------------|
-| `~/.openfang/config.toml` | Main configuration file |
-| `~/.openfang/data/openfang.db` | SQLite database |
-| `~/.openfang/skills/` | Installed skills |
-| `~/.openfang/daemon.json` | Daemon PID and port info |
-| `agents/` | Agent template manifests |
+### 3. **Visual Aids**
+- Architecture diagrams
+- Flow charts
+- Screenshots where helpful
 
-### Key Environment Variables
+### 4. **Search-Friendly**
+- Descriptive titles
+- Rich metadata
+- Proper headings hierarchy
 
-| Variable | Provider |
-|----------|----------|
-| `ANTHROPIC_API_KEY` | Anthropic (Claude) |
-| `OPENAI_API_KEY` | OpenAI (GPT-4o) |
-| `GEMINI_API_KEY` | Google Gemini |
-| `GROQ_API_KEY` | Groq (fast Llama/Mixtral) |
-| `DEEPSEEK_API_KEY` | DeepSeek |
-| `XAI_API_KEY` | xAI (Grok) |
+## 🚀 Quick Navigation
 
-Only one provider key is needed to get started. Groq offers a free tier.
+### For New Users
+1. [Introduction](./getting-started/introduction.md) - Understand what AeroEduVison is
+2. [Quick Start](./getting-started/quick-start.md) - Get running in 5 minutes
+3. [Installation](./getting-started/installation.md) - Detailed setup guide
+
+### For Developers
+1. [API Reference](./api-reference/rest-api.md) - Complete API docs
+2. [Custom Simulations](./simulations/custom-simulations.md) - Create your own labs
+3. [Deployment Guide](./deployment/cloud-run.md) - Deploy to production
+
+### For Teachers
+1. [AI Content Generator](./ai-features/content-generator.md) - Auto-create lessons
+2. [OCR Grading](./ocr-grading/overview.md) - Automatic grading system
+3. [Learning Paths](./ai-features/learning-path-builder.md) - Build custom paths
+
+## 📝 Contributing to Docs
+
+### Adding New Documentation
+
+1. **Create MD file** in appropriate directory
+2. **Follow naming convention**: lowercase-with-dashes.md
+3. **Add to config.ts** for navigation
+4. **Include frontmatter**:
+
+```md
+---
+title: "Your Page Title"
+description: "Brief description"
+---
+
+# Your Page Title
+
+Content here...
+```
+
+### Documentation Standards
+
+- **Use clear headings** (H1 for title, H2 for sections, H3 for subsections)
+- **Code blocks** must specify language
+- **Link related pages** for easy navigation
+- **Include examples** for complex features
+- **Add troubleshooting** sections when relevant
+
+## 🔍 Documentation Search
+
+The docs support full-text search through:
+1. **Navigation config** - Quick access to known pages
+2. **File system search** - Find by filename
+3. **Content search** - Search within documentation
+
+## 🛠️ Documentation Tech Stack
+
+- **Format**: Markdown (.md files)
+- **Rendering**: Next.js + MDX
+- **Navigation**: Custom config-based sidebar
+- **Styling**: TailwindCSS
+- **Code Highlighting**: Shiki/Prism
+
+## 📊 Documentation Stats
+
+- **Total Pages**: 50+
+- **Categories**: 8
+- **Code Examples**: 200+
+- **Diagrams**: 20+
+- **Last Updated**: 2025-12-28
+
+## 🔗 Related Resources
+
+- **[Main README](../README.md)** - Project overview
+- **[Guide Directory](../Guide)** - Legacy documentation
+- **[GitHub Repository](https://github.com/aerovfx/Aeroeduvison)** - Source code
+
+---
+
+## 📞 Feedback
+
+Found an issue or have a suggestion?
+- Open an issue on GitHub
+- Submit a pull request
+- Contact: docs@aeroeduvison.com
+
+---
+
+**Last Updated:** 2025-12-28  
+**Maintained by:** AeroEduVison Team

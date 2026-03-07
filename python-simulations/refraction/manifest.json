@@ -1,0 +1,34 @@
+{
+  "id": "refraction",
+  "name": "Khúc xạ ánh sáng",
+  "description": "Mô phỏng khúc xạ ánh sáng khi đi qua các môi trường khác nhau. Thí nghiệm minh họa định luật Snell và hiện tượng phản xạ toàn phần.",
+  "category": "Quang học",
+  "level": "Lớp 11",
+  "duration": "45 phút",
+  "xp": 80,
+  "version": "1.0.0",
+  "author": "LabTwin Team",
+  "tags": ["quang học", "khúc xạ", "định luật Snell", "vật lý"],
+  "features": [
+    "Định luật Snell",
+    "Thay đổi góc tới",
+    "Nhiều môi trường",
+    "Phản xạ toàn phần",
+    "Đồ thị tương tác"
+  ],
+  "learning_objectives": [
+    "Hiểu định luật Snell về khúc xạ ánh sáng",
+    "Quan sát sự thay đổi góc khúc xạ khi thay đổi môi trường",
+    "Nhận biết hiện tượng phản xạ toàn phần",
+    "Tính toán góc tới hạn"
+  ],
+  "prerequisites": [
+    "Khái niệm về ánh sáng",
+    "Chiết suất của môi trường"
+  ],
+  "difficulty": "Trung bình",
+  "icon": "Settings",
+  "color": "#8B5CF6"
+}
+
+

@@ -6,30 +6,6 @@ Bản kế hoạch này đề xuất cách thức tích hợp Open Fang Agent OS
 
 Aeroeduvison là một nền tảng giáo dục dựa trên Next.js và Rust. Open Fang sẽ đóng vai trò là "bộ não" điều hành các tác vụ AI phức tạp, vượt xa các chatbot thông thường.
 
-### Phase 1: Nền tảng & Hạ tầng (Hoàn tất)
-- [x] Build Open Fang CLI & và thiết lập Daemon.
-- [x] Triển khai Next.js API Client (`lib/openfang.ts`) và API Route Proxy.
-- [x] Tích hợp Chatbot UI cơ bản vào Aeroeduvison.
-- [x] Spawn và cấu hình Mock Agent (Tutor).
-
-### Phase 2: Autonomous Content & Analysis (Hoàn tất)
-- [x] Phát triển trang **AI Content Generator** cho giáo viên.
-- [x] Tích hợp **Researcher Hand** để tạo bộ câu hỏi trắc nghiệm tự động.
-- [x] Nâng cấp **Chatbot Open Fang** với khả năng chuyển đổi Agent (Tutor/Researcher) và giao diện Premium.
-- [x] Triển khai **MockDriver** nâng cao hỗ trợ phản hồi có cấu trúc (Quiz/Summary).
-
-### Phase 3: Analytics & Advanced Intelligence (Hoàn tất)
-- [x] Khởi tạo Agent **Predictor** cho dự báo học tập.
-- [x] Tích hợp **AI Prediction Insights** vào Dashboard của giáo viên.
-- [x] Thiết lập **Vector Database** (SQLite + Mock Embedding) cho bộ nhớ dài hạn.
-- [x] Vá lỗi UTF-8 trong Kernel (`cap_str`) đảm bảo tính ổn định (Production Readiness).
-
-### Phase 4: Knowledge Management (Hoàn tất)
-- [x] Xây dựng trang **Semantic Library** tích hợp tìm kiếm sâu.
-- [x] Triển khai Researcher Agent hỗ trợ truy vấn tri thức thông minh.
-- [x] Seeding bộ dữ liệu mẫu (Logarit) vào Knowledge Graph của Open Fang.
-- [x] Tích hợp chuyển hướng và Sidebar Navigation cho các module AI mới.
-
 ### 1. Hệ thống Gia sư Thông minh (AI Tutor)
 Sử dụng agent `tutor` mặc định của Open Fang để hỗ trợ học sinh ngay trên giao diện Aeroeduvison.
 

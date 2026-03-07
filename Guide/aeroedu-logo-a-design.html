@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AeroEdu Logo - Chữ A Gradient</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .logo-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 30px;
+            padding: 60px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        /* Logo A chính */
+        .logo-a {
+            width: 120px;
+            height: 120px;
+            position: relative;
+            margin-right: 30px;
+        }
+
+        .letter-a {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 300% 300%;
+            animation: gradientShift 4s ease infinite;
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        /* Tạo chữ A bằng CSS */
+        .letter-a::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 60px solid white;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        .letter-a::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 8px;
+            background: white;
+            border-radius: 4px;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        /* Đường bay từ chữ A */
+        .flight-path {
+            position: absolute;
+            top: 20px;
+            right: -40px;
+            width: 60px;
+            height: 2px;
+            background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+            border-radius: 1px;
+            animation: flightMove 3s ease-in-out infinite;
+        }
+
+        .flight-path::before {
+            content: '';
+            position: absolute;
+            right: -8px;
+            top: -3px;
+            width: 0;
+            height: 0;
+            border-left: 8px solid #4ecdc4;
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+        }
+
+        .logo-text {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 4s ease infinite;
+            letter-spacing: -2px;
+        }
+
+        .tagline {
+            font-size: 18px;
+            color: #666;
+            margin-top: 15px;
+            font-weight: 300;
+        }
+
+        .variations {
+            margin-top: 50px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+
+        .variation {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .variation:hover {
+            transform: translateY(-5px);
+        }
+
+        .variation h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        /* Logo A Compact */
+        .logo-a-compact {
+            width: 60px;
+            height: 60px;
+            position: relative;
+            margin-right: 15px;
+        }
+
+        .letter-a-compact {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 300% 300%;
+            animation: gradientShift 4s ease infinite;
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .letter-a-compact::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 30px solid white;
+            filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
+        }
+
+        .letter-a-compact::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 4px;
+            background: white;
+            border-radius: 2px;
+            filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.3));
+        }
+
+        /* Logo A Minimal */
+        .logo-a-minimal {
+            width: 40px;
+            height: 40px;
+            position: relative;
+            margin-right: 12px;
+        }
+
+        .letter-a-minimal {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 300% 300%;
+            animation: gradientShift 4s ease infinite;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .letter-a-minimal::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 20px solid white;
+            filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+        }
+
+        .letter-a-minimal::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 12px;
+            height: 3px;
+            background: white;
+            border-radius: 1px;
+            filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.3));
+        }
+
+        .logo-compact, .logo-minimal {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .logo-compact .logo-text, .logo-minimal .logo-text {
+            font-size: 28px;
+        }
+
+        .logo-minimal .logo-text {
+            font-size: 24px;
+        }
+
+        .color-palette {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .color {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .color-1 { background: linear-gradient(135deg, #ff6b6b, #ee5a52); }
+        .color-2 { background: linear-gradient(135deg, #4ecdc4, #44a08d); }
+        .color-3 { background: linear-gradient(135deg, #45b7d1, #2196f3); }
+        .color-4 { background: linear-gradient(135deg, #96ceb4, #4caf50); }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes flightMove {
+            0%, 100% { transform: translateX(0); opacity: 0.7; }
+            50% { transform: translateX(20px); opacity: 1; }
+        }
+
+        .philosophy {
+            margin-top: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(78, 205, 196, 0.1));
+            border-radius: 20px;
+            border-left: 4px solid #ff6b6b;
+        }
+
+        .philosophy h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .philosophy p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        /* Logo A với hiệu ứng 3D */
+        .logo-a-3d {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            margin-right: 25px;
+            transform-style: preserve-3d;
+            animation: rotate3D 8s linear infinite;
+        }
+
+        .letter-a-3d {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+            background-size: 300% 300%;
+            animation: gradientShift 4s ease infinite;
+            border-radius: 15px;
+            position: relative;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+            transform: rotateX(15deg) rotateY(15deg);
+        }
+
+        .letter-a-3d::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 50px solid white;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        .letter-a-3d::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 35px;
+            height: 6px;
+            background: white;
+            border-radius: 3px;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+        }
+
+        @keyframes rotate3D {
+            0% { transform: rotateX(15deg) rotateY(0deg); }
+            100% { transform: rotateX(15deg) rotateY(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .logo-container {
+                padding: 40px 30px;
+            }
+            
+            .logo-text {
+                font-size: 36px;
+            }
+            
+            .logo-a {
+                width: 80px;
+                height: 80px;
+                margin-right: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <div class="logo">
+            <div class="logo-a">
+                <div class="letter-a"></div>
+                <div class="flight-path"></div>
+            </div>
+            <div class="logo-text">AeroEdu</div>
+        </div>
+        <div class="tagline">Cá nhân hóa để bay cao</div>
+        
+        <div class="color-palette">
+            <div class="color color-1"></div>
+            <div class="color color-2"></div>
+            <div class="color color-3"></div>
+            <div class="color color-4"></div>
+        </div>
+
+        <div class="variations">
+            <div class="variation">
+                <h3>Logo A Compact</h3>
+                <div class="logo-compact">
+                    <div class="logo-a-compact">
+                        <div class="letter-a-compact"></div>
+                    </div>
+                    <div class="logo-text">AeroEdu</div>
+                </div>
+                <p>Phiên bản nhỏ gọn cho mobile</p>
+            </div>
+            
+            <div class="variation">
+                <h3>Logo A Minimal</h3>
+                <div class="logo-minimal">
+                    <div class="logo-a-minimal">
+                        <div class="letter-a-minimal"></div>
+                    </div>
+                    <div class="logo-text">AeroEdu</div>
+                </div>
+                <p>Phiên bản tối giản cho favicon</p>
+            </div>
+
+            <div class="variation">
+                <h3>Logo A 3D</h3>
+                <div class="logo-compact">
+                    <div class="logo-a-3d">
+                        <div class="letter-a-3d"></div>
+                    </div>
+                    <div class="logo-text">AeroEdu</div>
+                </div>
+                <p>Phiên bản 3D với hiệu ứng xoay</p>
+            </div>
+        </div>
+
+        <div class="philosophy">
+            <h3>🎯 Triết lý thiết kế chữ "A"</h3>
+            <p>
+                Logo chữ "A" của AeroEdu được thiết kế với phong cách <strong>Gradient Minimalism</strong>, 
+                kết hợp chữ "A" cách điệu với đường bay động thể hiện triết lý cá nhân hóa học tập. 
+                Chữ "A" tượng trưng cho sự khởi đầu, dẫn đầu và tiến bộ. Đường bay từ chữ "A" 
+                thể hiện mỗi học sinh có con đường riêng nhưng đều hướng tới mục tiêu bay cao. 
+                Gradient màu sắc nổi bật đại diện cho sự đa dạng và linh hoạt trong phương pháp học tập.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
