@@ -58,6 +58,14 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
   const directOcrGradingProxy = process.env.DIRECT_RUST_OCR_GRADING_PROXY === "true";
   const directOcrProcessProxy = process.env.DIRECT_RUST_OCR_PROCESS_PROXY === "true";
   const directLlmGradingProxy = process.env.DIRECT_RUST_LLM_GRADING_PROXY === "true";
+  const directCoursesProxy = process.env.DIRECT_RUST_COURSES_PROXY === "true";
+  const directClassesProxy = process.env.DIRECT_RUST_CLASSES_PROXY === "true";
+  const directStudentsProxy = process.env.DIRECT_RUST_STUDENTS_PROXY === "true";
+  const directGradingProxy = process.env.DIRECT_RUST_GRADING_PROXY === "true";
+  const directAuthProxy = process.env.DIRECT_RUST_AUTH_PROXY === "true";
+  const directAdminUsersProxy = process.env.DIRECT_RUST_ADMIN_USERS_PROXY === "true";
+  const directAIProxy = process.env.DIRECT_RUST_AI_PROXY === "true";
+  const directContentGenProxy = process.env.DIRECT_RUST_CONTENT_GEN_PROXY === "true";
 
   switch (pathname) {
     case "/api/vector-similarity":
@@ -95,6 +103,276 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
         directProxyEnabled: directLlmGradingProxy,
         canaryKey: "llm-grading",
         canaryEnvPrefix: "LLM_GRADING",
+      };
+    // Batch 1: Search & Discovery
+    case "/api/search":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/search",
+        directProxyEnabled: false,
+        canaryKey: "search",
+        canaryEnvPrefix: "SEARCH",
+      };
+    case "/api/vector/search":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/vector/search",
+        directProxyEnabled: false,
+        canaryKey: "vector-search",
+        canaryEnvPrefix: "VECTOR_SEARCH",
+      };
+    case "/api/refraction":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/refraction",
+        directProxyEnabled: false,
+        canaryKey: "refraction",
+        canaryEnvPrefix: "REFRACTION",
+      };
+    // Batch 2: Course Management
+    case "/api/courses":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/courses",
+        directProxyEnabled: directCoursesProxy,
+        canaryKey: "courses",
+        canaryEnvPrefix: "COURSES",
+      };
+    case "/api/classes":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/classes",
+        directProxyEnabled: directClassesProxy,
+        canaryKey: "classes",
+        canaryEnvPrefix: "CLASSES",
+      };
+    // Batch 3: Student Management
+    case "/api/students":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/students",
+        directProxyEnabled: directStudentsProxy,
+        canaryKey: "students",
+        canaryEnvPrefix: "STUDENTS",
+      };
+    case "/api/teacher/students":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/teacher/students",
+        directProxyEnabled: directStudentsProxy,
+        canaryKey: "teacher-students",
+        canaryEnvPrefix: "TEACHER_STUDENTS",
+      };
+    case "/api/admin/students":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/admin/students",
+        directProxyEnabled: directStudentsProxy,
+        canaryKey: "admin-students",
+        canaryEnvPrefix: "ADMIN_STUDENTS",
+      };
+    // Batch 4: Grading System
+    case "/api/grading/submit":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/grading/submit",
+        directProxyEnabled: directGradingProxy,
+        canaryKey: "grading-submit",
+        canaryEnvPrefix: "GRADING_SUBMIT",
+      };
+    case "/api/grading/batch":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/grading/batch",
+        directProxyEnabled: directGradingProxy,
+        canaryKey: "grading-batch",
+        canaryEnvPrefix: "GRADING_BATCH",
+      };
+    case "/api/grading/dashboard":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/grading/dashboard",
+        directProxyEnabled: directGradingProxy,
+        canaryKey: "grading-dashboard",
+        canaryEnvPrefix: "GRADING_DASHBOARD",
+      };
+    case "/api/grading/review":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/grading/review",
+        directProxyEnabled: directGradingProxy,
+        canaryKey: "grading-review",
+        canaryEnvPrefix: "GRADING_REVIEW",
+      };
+    // Batch 5: Auth & Users
+    case "/api/auth/login":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/login",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-login",
+        canaryEnvPrefix: "AUTH_LOGIN",
+      };
+    case "/api/auth/register":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/register",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-register",
+        canaryEnvPrefix: "AUTH_REGISTER",
+      };
+    case "/api/auth/forgot-password":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/forgot-password",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-forgot-password",
+        canaryEnvPrefix: "AUTH_FORGOT_PASSWORD",
+      };
+    case "/api/auth/reset-password":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/reset-password",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-reset-password",
+        canaryEnvPrefix: "AUTH_RESET_PASSWORD",
+      };
+    case "/api/auth/change-password":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/change-password",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-change-password",
+        canaryEnvPrefix: "AUTH_CHANGE_PASSWORD",
+      };
+    case "/api/auth/verify":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/verify",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-verify",
+        canaryEnvPrefix: "AUTH_VERIFY",
+      };
+    case "/api/auth/2fa/setup":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/2fa/setup",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-2fa-setup",
+        canaryEnvPrefix: "AUTH_2FA_SETUP",
+      };
+    case "/api/auth/2fa/verify":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/2fa/verify",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-2fa-verify",
+        canaryEnvPrefix: "AUTH_2FA_VERIFY",
+      };
+    case "/api/auth/2fa/disable":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/auth/2fa/disable",
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth-2fa-disable",
+        canaryEnvPrefix: "AUTH_2FA_DISABLE",
+      };
+    case "/api/admin/users":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/admin/users",
+        directProxyEnabled: directAdminUsersProxy,
+        canaryKey: "admin-users",
+        canaryEnvPrefix: "ADMIN_USERS",
+      };
+    // Batch 6: AI Services
+    case "/api/ai-generate-lesson":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-generate-lesson",
+        directProxyEnabled: directAIProxy,
+        canaryKey: "ai-generate-lesson",
+        canaryEnvPrefix: "AI_GENERATE_LESSON",
+      };
+    case "/api/ai-chat":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-chat",
+        directProxyEnabled: directAIProxy,
+        canaryKey: "ai-chat",
+        canaryEnvPrefix: "AI_CHAT",
+      };
+    case "/api/ai-tutor-chat":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-tutor-chat",
+        directProxyEnabled: directAIProxy,
+        canaryKey: "ai-tutor-chat",
+        canaryEnvPrefix: "AI_TUTOR_CHAT",
+      };
+    case "/api/ai-grade-lesson":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-grade-lesson",
+        directProxyEnabled: directAIProxy,
+        canaryKey: "ai-grade-lesson",
+        canaryEnvPrefix: "AI_GRADE_LESSON",
+      };
+    case "/api/ai/analyze-document":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai/analyze-document",
+        directProxyEnabled: directAIProxy,
+        canaryKey: "ai-analyze-document",
+        canaryEnvPrefix: "AI_ANALYZE_DOCUMENT",
+      };
+    case "/api/ai-content/generate":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-content/generate",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "ai-content-generate",
+        canaryEnvPrefix: "AI_CONTENT_GENERATE",
+      };
+    case "/api/ai-content/generate-stream":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-content/generate-stream",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "ai-content-generate-stream",
+        canaryEnvPrefix: "AI_CONTENT_GENERATE_STREAM",
+      };
+    case "/api/ai-content/save":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/ai-content/save",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "ai-content-save",
+        canaryEnvPrefix: "AI_CONTENT_SAVE",
+      };
+    case "/api/content-generation/generate":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/content-generation/generate",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "content-generation-generate",
+        canaryEnvPrefix: "CONTENT_GENERATION_GENERATE",
+      };
+    case "/api/content-generation/batch":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/content-generation/batch",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "content-generation-batch",
+        canaryEnvPrefix: "CONTENT_GENERATION_BATCH",
+      };
+    case "/api/content-generation/validate":
+      return {
+        rustBase: rustBackendBase,
+        rustPath: "/api/content-generation/validate",
+        directProxyEnabled: directContentGenProxy,
+        canaryKey: "content-generation-validate",
+        canaryEnvPrefix: "CONTENT_GENERATION_VALIDATE",
       };
     default:
       return null;

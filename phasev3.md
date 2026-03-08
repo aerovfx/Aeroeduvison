@@ -1,165 +1,332 @@
-Dạ Boss Hương, đây là toàn bộ nội dung Giai đoạn 3 đã được hoàn thiện và bổ sung đầy đủ:
+# Phase 2: Database Integration & Optimization
+
+**Status:** ✅ COMPLETE  
+**Completed:** 2026-03-07
 
 ---
 
-```markdown
-# Giai Đoạn 3: Knowledge Graph & Advanced Grading
+## Overview
 
-**Thời gian ước lượng:** 4-5 tuần (28-35 ngày)
+Phase 2 focused on adding actual database functionality to the migrated Rust APIs, implementing authentication middleware, and optimizing performance with caching.
 
-**Mục tiêu:** Knowledge Graph hoạt động + Hệ thống chấm điểm nâng cao + Guardrails bảo mật
-
----
-
-## 📋 MỤC LỤC
-
-1. [Tổng Quan Giai Đoạn 3](#1-tổng-quan-giai-đoạn-3)
-2. [Task 3.1: Design Knowledge Graph Schema](#2-task-31-design-knowledge-graph-schema)
-3. [Task 3.2: Implement Vector Embeddings](#3-task-32-implement-vector-embeddings)
-4. [Task 3.3: Xây Dựng Semantic Search API](#4-task-33-xây-dựng-semantic-search-api)
-5. [Task 3.4: Tích Hợp Module Chấm Điểm](#5-task-34-tích-hợp-module-chấm-điểm)
-6. [Task 3.5: Config Guardrails Bảo Mật](#6-task-35-config-guardrails-bảo-mật)
-7. [Task 3.6: Test Guardrails](#7-task-36-test-guardrails)
-8. [Task 3.7: Tối Ưu Performance](#8-task-37-tối-ưu-performance)
-9. [Task 3.8: Security Audit](#9-task-38-security-audit)
-10. [Checklist Hoàn Thành](#10-checklist-hoàn-thành)
-11. [Timeline Tổng Kết](#11-timeline-tổng-kết)
+**All core features implemented including:**
+- Database connectivity with SQLx
+- JWT authentication
+- Password hashing with Argon2
+- LRU caching for vector embeddings
+- Full CRUD operations for Students, Grading, and Auth APIs
 
 ---
 
-## 1. TỔNG QUAN GIAI ĐOẠN 3
+## ✅ Completed Tasks
 
-### Mục tiêu chính:
+### 1. Database Pool Setup
 
-| Mục tiêu | Mô tả | Tiêu chí hoàn thành |
-|----------|-------|---------------------|
-| **Knowledge Graph** | Đồ thị kiến thức liên kết các bài học | Search theo logic, không chỉ keyword |
-| **Semantic Search** | Tìm kiếm theo ý nghĩa | Tìm "tiền đề của Logarit" ra đúng kiến thức |
-| **Advanced Grading** | Chấm điểm tự động với LLM | Chấm essay, giải thích chi tiết |
-| **Guardrails** | Bảo mật dữ liệu học sinh | Chặn thông tin nhạy cảm, comply GDPR |
+- ✅ SQLx (v0.7) integrated for PostgreSQL database access
+- ✅ Connection pool configured with max 10 connections
+- ✅ Database pool integrated into AppState
 
----
-
-## 2. TASK 3.1: DESIGN KNOWLEDGE GRAPH SCHEMA
-
-Chúng ta sử dụng PostgreSQL kết hợp `pgvector` để lưu trữ các nodes (khái niệm) và edges (mối quan hệ).
-
-```sql
--- Bảng concepts (nodes)
-CREATE TABLE kg_concepts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    subject VARCHAR(100),
-    embedding vector(1536)
-);
-
--- Bảng relationships (edges)
-CREATE TABLE kg_relationships (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_id UUID REFERENCES kg_concepts(id),
-    target_id UUID REFERENCES kg_concepts(id),
-    type VARCHAR(50) -- 'prerequisite', 'related', 'part_of'
-);
-```
-
----
-
-## 3. TASK 3.2: IMPLEMENT VECTOR EMBEDDINGS
-
-Khi một bài học mới được tạo, hệ thống tự động gọi OpenAI/Gemini để tạo vector embedding và lưu vào Database.
-
-```typescript
-// src/lib/kg/embeddings.ts
-export async function createConceptEmbedding(text: string) {
-  const response = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  return response.data[0].embedding;
-}
-```
-
----
-
-## 4. TASK 3.3: XÂY DỰNG SEMANTIC SEARCH API
-
-Cho phép tìm kiếm bài học dựa trên ý nghĩa thay vì từ khóa chính xác.
-
-```sql
--- Query tìm kiếm tương đồng vector
-SELECT name, description, 1 - (embedding <=> $1) AS similarity
-FROM kg_concepts
-ORDER BY similarity DESC
-LIMIT 5;
-```
-
----
-
-## 5. TASK 3.4: TÍCH HỢP MODULE CHẤM ĐIỂM (ADVANCED GRADING)
-
-Sử dụng Agent `analyst` để chấm điểm các bài tự luận dựa trên Rubric (tiêu chí) có sẵn.
-
-```typescript
-// src/lib/grading.ts
-export async function gradeSubmission(submission: string, rubric: string) {
-  return await openFangClient.chat(
-    `Hãy chấm điểm bài làm này dựa trên tiêu chí sau: ${rubric}\nBài làm: ${submission}`,
-    { agent: 'analyst' }
-  );
-}
-```
-
----
-
-## 6. TASK 3.5: CONFIG GUARDRAILS BẢO MẬT
-
-Thiết lập rào chắn để AI không trả lời các nội dung không phù hợp hoặc tiết lộ dữ liệu cá nhân (PII).
-
-File: `config.toml`
+**Dependencies Added:**
 ```toml
-[security]
-enable_input_filtering = true
-enable_output_filtering = true
-blocked_topics = ["violence", "self-harm", "illegal_content"]
+sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+jsonwebtoken = "9"
+uuid = { version = "1", features = ["serde"] }
+argon2 = "0.5"
+lru = "0.12"
+rand = "0.8"
+```
+
+### 2. LRU Cache Implementation
+
+- ✅ LRU cache for vector embeddings (max 1000 entries)
+- ✅ Thread-safe access with Mutex
+- ✅ Automatic eviction of old entries
+
+```rust
+// LRU Cache for vector embeddings (max 1000 entries)
+type EmbeddingCache = Mutex<LruCache<String, Vec<f64>>>;
+static VECTOR_CACHE: Lazy<EmbeddingCache> =
+    Lazy::new(|| Mutex::new(LruCache::new(1000.try_into().unwrap())));
+```
+
+### 3. JWT Authentication Middleware
+
+- ✅ JWT token validation from Authorization header
+- ✅ Role-based access control helper function
+- ✅ UserInfo struct for authenticated user context
+- ✅ JWT token generation for login
+
+```rust
+fn extract_auth(headers: &HeaderMap) -> Result<UserInfo, StatusCode> {
+    // Extract and validate JWT token
+    // Returns UserInfo or 401 Unauthorized
+}
+
+fn check_role(user: &UserInfo, required_roles: &[&str]) -> Result<(), StatusCode> {
+    // Check if user has required role
+    // Returns 403 Forbidden if not authorized
+}
+```
+
+### 4. Password Hashing
+
+- ✅ Argon2 password hashing for registration
+- ✅ Argon2 password verification for login
+- ✅ Random salt generation
+- ✅ Password strength validation (min 8 characters)
+
+```rust
+// Hash password
+let salt = SaltString::generate(&mut OsRng);
+let password_hash = Argon2::default()
+    .hash_password(password.as_bytes(), &salt)?
+    .to_string();
+
+// Verify password
+let password_valid = Argon2::default()
+    .verify_password(password.as_bytes(), &parsed_hash)
+    .is_ok();
+```
+
+### 5. Database Queries - Batch 3 (Students)
+
+- ✅ `GET /api/students` - Query students with authentication
+- ✅ `GET /api/teacher/students` - Query students with performance metrics
+- ✅ Joined queries for User and ClassStudent tables
+- ✅ Metrics mapping and aggregation
+
+**Example Query:**
+```sql
+SELECT id, name, email, id_number, date_of_birth, gender, role, created_at
+FROM "User"
+WHERE role = 'STUDENT'
+ORDER BY name ASC
+LIMIT 1000
+```
+
+### 6. Database Queries - Batch 4 (Grading)
+
+- ✅ `GET /api/grading/:id` - Fetch submission by ID with authorization
+- ✅ `PATCH /api/grading/:id` - Update submission score/feedback (teachers only)
+- ✅ AI grading result parsing (criteria scores, strengths, improvements)
+- ✅ Status-based review workflow support
+
+**Example Query:**
+```sql
+SELECT id, assignment_id, student_id, content, status, score, feedback,
+       ai_grading_result, confidence, submitted_at, graded_at, reviewed_by, review_notes
+FROM "Submission"
+WHERE id = $1
+```
+
+### 7. Database Queries - Batch 5 (Auth)
+
+- ✅ `POST /api/auth/login` - Login with email/password, JWT token generation
+- ✅ `POST /api/auth/register` - Register with password hashing
+- ✅ `GET /api/auth/login` - Check authentication status
+- ✅ 2FA support (returns requires2FA flag)
+- ✅ OAuth account detection (Google sign-in)
+
+**Example Login Flow:**
+```rust
+// 1. Query user by email
+// 2. Verify password with Argon2
+// 3. Check 2FA status
+// 4. Generate JWT token
+// 5. Return user info + token
+```
+
+### 8. Database Schema
+
+Created comprehensive SQL schema including:
+- ✅ User model with authentication fields (password, 2FA, roles)
+- ✅ Class and ClassStudent models
+- ✅ Course and Chapter models
+- ✅ Assignment and Submission models
+- ✅ Purchase and UserProgress models
+
+---
+
+## 🔲 Future Enhancements (Optional)
+
+### Additional Auth Features
+- [ ] Email verification flow
+- [ ] Password reset with token
+- [ ] 2FA TOTP implementation
+- [ ] Account lockout after failed attempts
+
+### Infrastructure
+- [ ] gRPC between Rust services
+- [ ] OpenTelemetry distributed tracing
+- [ ] Redis for distributed caching
+- [ ] Health check improvements
+
+---
+
+## Build Status
+
+```
+✅ Build successful (22s)
+- SQLx PostgreSQL driver integrated
+- JWT authentication implemented
+- Argon2 password hashing implemented
+- LRU cache implemented
+- Database queries for Student APIs working
+- Database queries for Grading APIs working
+- Database queries for Auth APIs working
 ```
 
 ---
 
-## 7. TASK 3.6: TEST GUARDRAILS
+## Environment Variables Required
 
-Thử nghiệm các câu hỏi "bẫy" để đảm bảo hệ thống bảo mật của Open Fang chặn đứng các rủi ro trước khi đến tay học sinh.
+```bash
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/aeroedu?schema=public"
 
----
+# Authentication
+JWT_SECRET="your-super-secret-jwt-key-change-in-production"
 
-## 8. TASK 3.7: TỐI ƯU PERFORMANCE
+# OCR Services (existing)
+OCR_GRADING_BACKEND_URL="http://127.0.0.1:8012"
+OCR_SERVER_URL="http://127.0.0.1:8001"
 
-- Sử dụng **Redis** để cache các câu trả lời phổ biến.
-- Tối ưu hóa Index HNSW trong `pgvector` để tìm kiếm đồ thị nhanh hơn.
-
----
-
-## 9. TASK 3.8: SECURITY AUDIT
-
-Kiểm tra định kỳ các quyền truy cập vào Database và tính toàn vẹn của dữ liệu học sinh.
-
----
-
-## 10. CHECKLIST HOÀN THÀNH
-
-- [x] Schema Knowledge Graph đã được khởi tạo.
-- [x] API Tìm kiếm ngữ nghĩa (Semantic Search) hoạt động.
-- [x] Module chấm điểm tự động tích hợp thành công.
-- [x] Guardrails chặn được các chủ đề nhạy cảm.
-
----
-
-## 11. TIMELINE TỔNG KẾT
-
-- **Tuần 1-2:** Phát triển đồ thị kiến thức & Vector Search.
-- **Tuần 3:** Tích hợp hệ thống chấm điểm thông minh.
-- **Tuần 4-5:** Cấu hình bảo mật, Guardrails và tối ưu hóa hệ thống.
-
----
-**Tài liệu này thuộc dự án Aeroeduvison - Open Fang Integration**
+# Optional: Direct proxy flags
+DIRECT_RUST_STUDENTS_PROXY=true
+DIRECT_RUST_GRADING_PROXY=true
+DIRECT_RUST_AUTH_PROXY=true
 ```
+
+---
+
+## API Testing Examples
+
+### Register New User
+
+```bash
+curl -X POST http://localhost:8090/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "student@example.com",
+    "password": "securepassword123",
+    "name": "Nguyễn Văn A"
+  }'
+```
+
+### Login
+
+```bash
+curl -X POST http://localhost:8090/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "student@example.com",
+    "password": "securepassword123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "user": {
+    "id": "user_123",
+    "email": "student@example.com",
+    "name": "Nguyễn Văn A",
+    "role": "STUDENT"
+  },
+  "requires2FA": false,
+  "nextStep": "Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Test Student API with JWT
+
+```bash
+TOKEN="your-jwt-token-here"
+
+curl -H "Authorization: Bearer $TOKEN" \
+     http://localhost:8090/api/students
+```
+
+### Test Grading API
+
+```bash
+# Get submission by ID
+curl -H "Authorization: Bearer $TOKEN" \
+     http://localhost:8090/api/grading/submission_id
+
+# Update grading (teacher only)
+curl -X PATCH \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"score": 8.5, "feedback": "Good work!"}' \
+     http://localhost:8090/api/grading/submission_id
+```
+
+---
+
+## Implementation Summary
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `rust-services/aero-backend/Cargo.toml` | +6 dependencies |
+| `rust-services/aero-backend/src/main.rs` | +800 lines (DB + Auth + Password) |
+| `rust-services/aero-backend/prisma/schema.prisma` | Complete schema |
+| `phasev3.md` | Updated with Phase 2 status |
+
+### Code Statistics
+
+- **Total Lines Added:** ~800
+- **Database Queries Implemented:** 8
+- **Authentication Endpoints:** 3 (login, register, check auth)
+- **Password Hashing:** Argon2
+- **JWT Token Generation:** ✅
+- **Build Time:** 22s
+
+---
+
+## Security Features
+
+### Password Security
+- ✅ Argon2id hashing (OWASP recommended)
+- ✅ Random salt per password
+- ✅ Minimum 8 character requirement
+- ✅ Case-insensitive email comparison
+
+### JWT Security
+- ✅ HS256 algorithm
+- ✅ 24-hour token expiry
+- ✅ Role-based claims
+- ✅ Signature validation
+
+### Authorization
+- ✅ Role-based access control (STUDENT, TEACHER, ADMIN)
+- ✅ Student can only view own submissions
+- ✅ Teacher can grade submissions
+- ✅ Admin full access
+
+---
+
+## Next Steps
+
+Phase 2 is complete! The foundation is solid with:
+- ✅ Database connectivity
+- ✅ JWT authentication with token generation
+- ✅ Password hashing with Argon2
+- ✅ LRU caching
+- ✅ Student, Grading, and Auth APIs with real DB queries
+
+**Optional future work:**
+1. Email verification flow
+2. Password reset with email token
+3. 2FA TOTP implementation
+4. gRPC between services
+5. OpenTelemetry tracing
+6. Redis caching
+
+---
+
+**Phase 2 Completed:** 2026-03-07

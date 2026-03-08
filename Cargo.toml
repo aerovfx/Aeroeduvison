@@ -16,6 +16,11 @@ members = [
     "crates/openfang-extensions",
     "xtask",
 ]
+# Exclude standalone Rust services that have their own Cargo workspaces
+exclude = [
+    "rust-services",
+    "openfang-core",
+]
 
 [workspace.package]
 version = "0.1.0"

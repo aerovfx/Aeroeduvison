@@ -1,0 +1,80 @@
+# Prometheus Configuration for AeroeduVision
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'aeroedu-monitor'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Rule files (optional)
+# rule_files:
+#   - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scheme: http
+
+  # OpenTelemetry Collector
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8889']
+    metrics_path: /metrics
+    scheme: http
+
+  # Rust Backend Service
+  - job_name: 'aero-backend'
+    static_configs:
+      - targets: ['aero-backend:8090']
+    metrics_path: /metrics
+    scheme: http
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\d+'
+        replacement: '${1}'
+
+  # Vector Similarity Service
+  - job_name: 'vector-sim-service'
+    static_configs:
+      - targets: ['vector-sim-service:8091']
+    metrics_path: /metrics
+    scheme: http
+
+  # Next.js Application
+  - job_name: 'nextjs-app'
+    static_configs:
+      - targets: ['nextjs-app:3000']
+    metrics_path: /api/metrics
+    scheme: http
+
+  # PostgreSQL Exporter (add postgres_exporter service if needed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: /metrics
+    scheme: http
+
+  # Redis Exporter (add redis_exporter service if needed)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: /metrics
+    scheme: http
+
+  # Nginx (add nginx-prometheus-exporter if needed)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:80']
+    metrics_path: /stub_status
+    scheme: http

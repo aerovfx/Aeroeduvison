@@ -1,0 +1,49 @@
+# Multi-stage Dockerfile for aero-backend (Rust)
+FROM rust:1.75-slim AS base
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+FROM base AS builder
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifests
+COPY rust-services/aero-backend/Cargo.toml rust-services/aero-backend/Cargo.lock ./
+COPY rust-services/vector-sim-service/Cargo.toml rust-services/vector-sim-service/Cargo.lock ./vector-sim-service/
+
+# Create dummy source for caching
+RUN mkdir -p rust-services/aero-backend/src && \
+    echo "fn main() {}" > rust-services/aero-backend/src/main.rs && \
+    mkdir -p rust-services/vector-sim-service/src && \
+    echo "fn main() {}" > rust-services/vector-sim-service/src/main.rs
+
+# Build dependencies (cached layer)
+RUN cargo build --release --manifest-path rust-services/aero-backend/Cargo.toml && \
+    rm -rf rust-services/aero-backend/src
+
+# Copy actual source code
+COPY rust-services/aero-backend/src rust-services/aero-backend/src
+COPY rust-services/aero-backend/build.rs rust-services/aero-backend/
+COPY rust-services/aero-backend/prisma rust-services/aero-backend/prisma
+
+# Build the application
+WORKDIR /app/rust-services/aero-backend
+RUN cargo build --release
+
+# Runtime image
+FROM base AS runner
+WORKDIR /app
+
+COPY --from=builder /app/rust-services/aero-backend/target/release/aero-backend /app/aero-backend
+
+# Create non-root user
+RUN useradd -r -u 1000 appuser
+USER appuser
+
+EXPOSE 8090
+
+CMD ["./aero-backend"]

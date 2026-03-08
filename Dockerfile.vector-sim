@@ -1,0 +1,48 @@
+# Multi-stage Dockerfile for vector-sim-service (Rust)
+FROM rust:1.75-slim AS base
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+FROM base AS builder
+WORKDIR /app
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifests
+COPY rust-services/vector-sim-service/Cargo.toml rust-services/vector-sim-service/Cargo.lock ./
+
+# Create dummy source for caching
+RUN mkdir -p rust-services/vector-sim-service/src && \
+    echo "fn main() {}" > rust-services/vector-sim-service/src/main.rs && \
+    mkdir -p rust-services/vector-sim-service/proto && \
+    echo "syntax = \"proto3\";" > rust-services/vector-sim-service/proto/vector.proto
+
+# Build dependencies (cached layer)
+RUN cargo build --release --manifest-path rust-services/vector-sim-service/Cargo.toml && \
+    rm -rf rust-services/vector-sim-service/src
+
+# Copy actual source code
+COPY rust-services/vector-sim-service/src rust-services/vector-sim-service/src
+COPY rust-services/vector-sim-service/build.rs rust-services/vector-sim-service/
+COPY rust-services/vector-sim-service/proto rust-services/vector-sim-service/proto
+
+# Build the application
+WORKDIR /app/rust-services/vector-sim-service
+RUN cargo build --release
+
+# Runtime image
+FROM base AS runner
+WORKDIR /app
+
+COPY --from=builder /app/rust-services/vector-sim-service/target/release/vector-sim-service /app/vector-sim-service
+
+# Create non-root user
+RUN useradd -r -u 1000 appuser
+USER appuser
+
+EXPOSE 8091
+
+CMD ["./vector-sim-service"]

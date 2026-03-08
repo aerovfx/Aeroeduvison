@@ -12,3 +12,25 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 once_cell = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
+chrono = { version = "0.4", features = ["serde"] }
+# Database - SQLx for PostgreSQL
+sqlx = { version = "0.7", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+# JWT for authentication
+jsonwebtoken = "9"
+uuid = { version = "1", features = ["serde"] }
+# Password hashing
+argon2 = "0.5"
+# LRU Cache
+lru = "0.12"
+# Random number generation for salt
+rand = "0.8"
+# OpenTelemetry tracing
+opentelemetry = "0.21"
+opentelemetry_sdk = { version = "0.21", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.14"
+tracing-opentelemetry = "0.22"
+# Redis caching
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+# Prometheus metrics
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"

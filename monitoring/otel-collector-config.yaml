@@ -1,0 +1,76 @@
+# OpenTelemetry Collector Configuration
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+  
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1000
+    spike_limit_mib: 200
+  
+  resource:
+    attributes:
+      - key: service.namespace
+        value: aeroedu
+        action: upsert
+  
+  # Filter out health check spans
+  filter:
+    spans:
+      exclude:
+        match_type: strict
+        attributes:
+          - key: http.target
+            value: /health
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: aero
+  
+  logging:
+    loglevel: debug
+  
+  # Jaeger/Tempo for tracing (optional)
+  # otlp/jaeger:
+  #   endpoint: jaeger:4317
+  #   tls:
+  #     insecure: true
+  
+  # Debug exporter for development
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, filter]
+      exporters: [logging, debug]
+    
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus, logging]
+    
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [logging, debug]
+  
+  # Extensions for health check and profiling
+  extensions:
+    health_check:
+      endpoint: 0.0.0.0:13133
+    zpages:
+      endpoint: 0.0.0.0:55679

@@ -1,0 +1,33 @@
+# Grafana Datasources Configuration
+apiVersion: 1
+
+datasources:
+  # Prometheus Datasource
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      timeInterval: "15s"
+      httpMethod: POST
+    
+  # Optional: Jaeger/Tempo for tracing
+  # - name: Tempo
+  #   type: tempo
+  #   access: proxy
+  #   url: http://tempo:3200
+  #   isDefault: false
+  #   editable: true
+  #   jsonData:
+  #     httpMethod: GET
+  #     tracesToLogs:
+  #       datasourceUid: 'prometheus'
+  #       tags: ['instance', 'job']
+  #       mappedTags: [{ key: 'service.name', value: 'Service' }]
+  #       mapTagNamesEnabled: true
+  #       spanStartTimeShift: '1h'
+  #       spanEndTimeShift: '1h'
+  #       filterByTraceID: true
+  #       filterBySpanID: false

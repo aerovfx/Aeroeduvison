@@ -70,6 +70,11 @@ async fn main() {
         service_version: "0.1.0",
     };
 
+    let http_addr = std::env::var("VECTOR_SIM_SERVICE_ADDR")
+        .ok()
+        .and_then(|v| v.parse::<SocketAddr>().ok())
+        .unwrap_or_else(|| "127.0.0.1:8091".parse().expect("valid default http addr"));
+
     let app = Router::new()
         .route("/health", get(health))
         .route(
@@ -79,14 +84,10 @@ async fn main() {
         .route("/v1/vector-similarity/cache", delete(clear_vector_cache))
         .with_state(state);
 
-    let addr = std::env::var("VECTOR_SIM_SERVICE_ADDR")
-        .ok()
-        .and_then(|v| v.parse::<SocketAddr>().ok())
-        .unwrap_or_else(|| "127.0.0.1:8091".parse().expect("valid default addr"));
+    info!("HTTP server listening on {}", http_addr);
+    info!("Note: gRPC support requires protoc to be installed");
 
-    info!("vector-sim-service listening on {}", addr);
-
-    let listener = tokio::net::TcpListener::bind(addr)
+    let listener = tokio::net::TcpListener::bind(http_addr)
         .await
         .expect("failed to bind listener");
 

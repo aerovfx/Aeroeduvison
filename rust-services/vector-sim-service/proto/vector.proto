@@ -1,0 +1,48 @@
+syntax = "proto3";
+package vector;
+
+// Vector Similarity Service
+// Provides vector embedding and similarity calculation
+
+service VectorService {
+  // Calculate similarity between two texts
+  rpc CalculateSimilarity(VectorSimilarityRequest) returns (VectorSimilarityResponse);
+  
+  // Clear vector cache
+  rpc ClearCache(ClearCacheRequest) returns (ClearCacheResponse);
+  
+  // Health check
+  rpc GetHealth(HealthRequest) returns (HealthResponse);
+}
+
+message VectorSimilarityRequest {
+  string student_answer = 1;
+  string model_answer = 2;
+  bool use_cache = 3;
+}
+
+message VectorSimilarityResponse {
+  double similarity = 1;
+  int32 similarity_percent = 2;
+  int32 student_vector_size = 3;
+  int32 model_vector_size = 4;
+  bool cache_used = 5;
+  int32 cache_size = 6;
+  int64 processing_time_ms = 7;
+  string backend = 8;
+}
+
+message ClearCacheRequest {}
+
+message ClearCacheResponse {
+  string message = 1;
+  int32 cache_size = 2;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+  string service = 2;
+  string version = 3;
+}

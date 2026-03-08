@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart, Compass, Layout, List, Trophy, BookOpen, FileEdit, FileText, GraduationCap, StickyNote, Kanban, BookOpenCheck, Zap, Award, MessageSquare, Palette, Map, FlaskConical, Sparkles, Brain, Heart, CreditCard, Users, Target, Calendar, Shield, AlertTriangle, TrendingUp, Activity, Database, Settings, Camera, Upload, ScanLine, Grid3x3, HelpCircle, CheckSquare } from "lucide-react";
+import { BarChart, Compass, Layout, List, Trophy, BookOpen, FileEdit, FileText, GraduationCap, StickyNote, Kanban, BookOpenCheck, Zap, Award, MessageSquare, Palette, Map, FlaskConical, Sparkles, Brain, Heart, CreditCard, Users, Target, Calendar, Shield, AlertTriangle, TrendingUp, Activity, Database, Settings, Camera, Upload, ScanLine, Grid3x3, HelpCircle, CheckSquare, Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 

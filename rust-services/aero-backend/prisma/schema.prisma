@@ -1,0 +1,171 @@
+// Prisma schema for Rust backend
+// This is a copy of the main schema for Prisma Client Rust generation
+
+generator client {
+  provider = "prisma-client-rust"
+  output   = "../src/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  name                String?
+  email               String    @unique
+  emailVerified       DateTime?
+  image               String?
+  updatedAt           DateTime  @updatedAt
+  role                String    @default("STUDENT")
+  schoolId            String    @default("default-school")
+  xp                  Int       @default(0)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  twoFactorEnabled    Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  password            String?
+  dateOfBirth         DateTime?
+  gender              String?
+  idNumber            String?
+  isActive            Boolean   @default(true)
+  ClassStudents       ClassStudent[]
+  Classes             Class[]      @relation("ClassTeacher")
+  Submissions         Submission[]
+  Assignments         Assignment[]
+  Purchases           Purchase[]
+  UserProgress        UserProgress[]
+
+  @@index([schoolId])
+  @@index([email])
+}
+
+model Class {
+  id          String   @id @default(cuid())
+  name        String
+  grade       String
+  schoolYear  String
+  description String?
+  teacherId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  teacher     User     @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  students    ClassStudent[]
+
+  @@index([teacherId])
+}
+
+model ClassStudent {
+  id            String   @id @default(cuid())
+  classId       String
+  studentId     String
+  averageScore  Float?
+  attendanceRate Float?
+  totalXP       Int?
+  completedExams Int?
+  passedExams   Int?
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime
+  class         Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student       User     @relation("ClassStudent", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, studentId])
+  @@index([studentId])
+  @@index([classId])
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Chapters    Chapter[]
+  Purchases   Purchase[]
+
+  @@index([userId])
+}
+
+model Chapter {
+  id           String         @id
+  title        String
+  description  String?
+  videoUrl     String?
+  position     Int
+  isPublished  Boolean        @default(false)
+  isFree       Boolean        @default(false)
+  courseId     String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  Course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  UserProgress UserProgress[]
+
+  @@index([courseId])
+}
+
+model Assignment {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  courseId    String
+  rubricId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Submissions Submission[]
+
+  @@index([courseId])
+}
+
+model Submission {
+  id              String   @id @default(cuid())
+  assignmentId    String
+  studentId       String
+  content         String
+  status          String   @default("PENDING")
+  score           Float?
+  feedback        String?
+  aiGradingResult Json?
+  confidence      Float?
+  submittedAt     DateTime @default(now())
+  gradedAt        DateTime?
+  reviewedBy      String?
+  reviewNotes     String?
+  humanReviewData Json?
+  Assignment      Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student         User       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+model Purchase {
+  id        String   @id @default(cuid())
+  userId    String
+  courseId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([courseId])
+}
+
+model UserProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  chapterId String
+  isCompleted Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, chapterId])
+  @@index([chapterId])
+}
