@@ -2,6 +2,9 @@
 /node_modules
 **/node_modules/
 
+# LaTeX compile temp
+/tmp/
+
 # Build output
 /.next
 /out
@@ -63,3 +66,11 @@ Thumbs.db
 **/models/
 python-simulations/**/venv/
 python-simulations/**/__pycache__/
+
+# Desktop app release builds
+desktop-current-app/release/
+desktop-current-app/build/
+desktop-current-app/dist/
+*.dmg
+*.exe
+*.AppImage
