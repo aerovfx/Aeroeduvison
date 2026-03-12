@@ -351,6 +351,39 @@
       "tags": ["AI", "machine learning", "dataset", "mô hình"]
     },
     {
+      "id": "llm-training",
+      "name": "LLM Training Simulator",
+      "description": "Mô phỏng quá trình huấn luyện mô hình ngôn ngữ lớn (LLM) từ A-Z. Học về Transformer, Pre-training, Fine-tuning, và ứng dụng thực tế!",
+      "category": "Machine Learning",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 500,
+      "duration": "120 phút",
+      "port": null,
+      "icon": "Brain",
+      "features": [
+        "🧠 7 giai đoạn học tập tương tác",
+        "📚 Transformer & BERT Architecture",
+        "⚙️ Inference & Temperature Control",
+        "🔬 Pre-training Simulation",
+        "🎯 Fine-tuning (SFT & LoRA)",
+        "💡 Chain of Thought Reasoning",
+        "📊 Benchmark Evaluation (MMLU, GSM8K, HumanEval)",
+        "💬 AI Chat Assistant"
+      ],
+      "learning_objectives": [
+        "Hiểu kiến trúc Transformer và cơ chế Self-Attention",
+        "Phân biệt BERT (Masked LM) và GPT (Causal LM)",
+        "Nắm vững quá trình Inference và vai trò của Temperature",
+        "Hiểu Pre-training và các thách thức tính toán",
+        "Áp dụng Supervised Fine-Tuning (SFT) và PEFT/LoRA",
+        "Sử dụng Chain of Thought để cải thiện reasoning",
+        "Đánh giá mô hình qua các benchmark tiêu chuẩn",
+        "Triển khai AI Assistant hoàn chỉnh"
+      ],
+      "tags": ["LLM", "transformer", "GPT", "BERT", "AI", "machine learning", "deep learning", "NLP", "fine-tuning", "LoRA"]
+    },
+    {
       "id": "harmonic-motion",
       "name": "Dao động điều hòa - Con lắc lò xo",
       "description": "Khám phá dao động điều hòa của con lắc lò xo với animation và đồ thị chi tiết",
