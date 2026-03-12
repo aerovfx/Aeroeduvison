@@ -792,9 +792,39 @@
         "Tối ưu hóa quá trình dạy học tương tác"
       ],
       "tags": ["plickers", "quiz", "computer vision", "classroom", "game", "tương tác", "trắc nghiệm", "real-time"]
+    },
+    {
+      "id": "circuit-simulator",
+      "name": "⚡ Mạch Điện DC - Định Luật Ohm",
+      "description": "Mô phỏng mạch điện một chiều (DC) với pin, công tắc và bóng đèn. Học về dòng điện, định luật Ohm và sự khác biệt giữa dòng quy ước và dòng electron!",
+      "category": "Cơ học",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 150,
+      "duration": "25 phút",
+      "port": null,
+      "icon": "Zap",
+      "features": [
+        "🔋 Mạch điện DC với pin, công tắc, bóng đèn",
+        "💡 Bóng đèn sáng khi đóng mạch",
+        "⚡ Điều chỉnh điện áp 1V-12V",
+        "🔄 2 chế độ: Dòng quy ước & Dòng electron",
+        "📊 Tính toán dòng điện theo định luật Ohm",
+        "🎨 Animation hạt điện tử chuyển động",
+        "📖 Lý thuyết và câu hỏi kiểm tra",
+        "🎯 Interactive controls"
+      ],
+      "learning_objectives": [
+        "Hiểu nguyên lý mạch điện một chiều (DC)",
+        "Áp dụng định luật Ohm: I = V/R",
+        "Phân biệt dòng quy ước và dòng electron",
+        "Quan sát mối quan hệ điện áp - dòng điện",
+        "Nhận biết mạch kín vs mạch hở"
+      ],
+      "tags": ["mạch điện", "DC", "định luật Ohm", "dòng điện", "điện áp", "vật lý", "điện học", "pin", "bóng đèn"]
     }
   ],
-  "total": 31,
+  "total": 32,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
