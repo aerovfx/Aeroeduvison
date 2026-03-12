@@ -822,9 +822,39 @@
         "Nhận biết mạch kín vs mạch hở"
       ],
       "tags": ["mạch điện", "DC", "định luật Ohm", "dòng điện", "điện áp", "vật lý", "điện học", "pin", "bóng đèn"]
+    },
+    {
+      "id": "momentum-collision",
+      "name": "💥 Động Lượng & Va Chạm",
+      "description": "Thí nghiệm bảo toàn động lượng với 2 bóng trên mặt phẳng nghiêng. Quan sát sự truyền chuyển động và kiểm chứng định luật bảo toàn động lượng!",
+      "category": "Cơ học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "30 phút",
+      "port": null,
+      "icon": "Activity",
+      "features": [
+        "⚡ Mặt phẳng nghiêng với 2 bóng",
+        "💫 Mô phỏng va chạm đàn hồi",
+        "🎯 Điều chỉnh khối lượng mỗi bóng",
+        "📊 Hiển thị động lượng realtime",
+        "🔄 Vector vận tốc trực quan",
+        "📐 Tính toán theo công thức p = m·v",
+        "📖 Định luật bảo toàn động lượng",
+        "🎮 Interactive simulation"
+      ],
+      "learning_objectives": [
+        "Hiểu khái niệm động lượng p = m·v",
+        "Áp dụng định luật bảo toàn động lượng",
+        "Phân tích va chạm đàn hồi",
+        "Quan sát sự truyền chuyển động",
+        "Tính toán động lượng trước/sau va chạm"
+      ],
+      "tags": ["động lượng", "va chạm", "bảo toàn", "mặt phẳng nghiêng", "vật lý", "cơ học", "tương tác"]
     }
   ],
-  "total": 32,
+  "total": 33,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
