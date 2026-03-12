@@ -912,9 +912,39 @@
         "Ứng dụng winglets giảm lực cản"
       ],
       "tags": ["CFD", "khí động học", "xoáy", "turbulence", "máy bay", "vật lý", "chất lưu", "aerodynamics"]
+    },
+    {
+      "id": "advanced-cfd-simulation",
+      "name": "🔬 Mô Phỏng CFD Nâng Cao",
+      "description": "Mô phỏng CFD chuyên sâu với 3 chế độ: B-2 Stealth, Máy bay giấy, và Upload ảnh thật. Kéo thả điểm neo, xem phân bố áp suất và xoáy khí động!",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 400,
+      "duration": "50 phút",
+      "port": null,
+      "icon": "Plane",
+      "features": [
+        "✈️ 3 chế độ: B-2, Paper Plane, Custom Image",
+        "📷 Upload ảnh máy bay thật của bạn",
+        "🎯 Kéo thả điểm neo (drag & drop anchors)",
+        "🔴 Phân bố áp suất (Đỏ: Cao, Xanh: Thấp)",
+        "🌀 Ống xoáy rìa cánh (Wingtip Vortices)",
+        "💫 Tube vortices từ mép sau",
+        "🎨 Gradient background theo mode",
+        "🖱️ Interactive canvas controls"
+      ],
+      "learning_objectives": [
+        "Hiểu phân bố áp suất trên cánh máy bay",
+        "Phân tích wingtip vortices và tube vortices",
+        "Áp dụng CFD vào thiết kế thực tế",
+        "Tương tác với dữ liệu mô phỏng",
+        "So sánh các mẫu máy bay khác nhau"
+      ],
+      "tags": ["CFD", "B-2", "stealth", "áp suất", "xoáy", "aerodynamics", "tương tác", "upload", "advanced"]
     }
   ],
-  "total": 35,
+  "total": 36,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
