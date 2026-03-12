@@ -942,9 +942,39 @@
         "So sánh các mẫu máy bay khác nhau"
       ],
       "tags": ["CFD", "B-2", "stealth", "áp suất", "xoáy", "aerodynamics", "tương tác", "upload", "advanced"]
+    },
+    {
+      "id": "cfd-car-simulation",
+      "name": "🏎️ CFD Xe Hơi Thể Thao",
+      "description": "Mô phỏng đường dòng khí (Streamlines) lướt qua thân xe hơi thể thao với xoáy đuôi khổng lồ. Xem áp suất cao/thấp qua màu sắc!",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 350,
+      "duration": "45 phút",
+      "port": null,
+      "icon": "Car",
+      "features": [
+        "🏎️ Xe hơi thể thao 3D isometric",
+        "🌊 Streamlines lướt dọc thân xe",
+        "🔴→🔵→🟡 Màu áp suất động học",
+        "💨 Xoáy đuôi Cam/Xanh khổng lồ",
+        "📐 Sàn hầm gió với grid isometric",
+        "🎨 4 chế độ: Car, B-2, Paper, Image",
+        "📷 Upload ảnh tùy ý",
+        "🖱️ Interactive controls"
+      ],
+      "learning_objectives": [
+        "Hiểu dòng chảy qua thân xe hơi",
+        "Nhận biết vùng áp suất cao/thấp",
+        "Phân tích wake turbulence",
+        "Áp dụng khí động học ô tô",
+        "Thiết kế xe tối ưu lực cản"
+      ],
+      "tags": ["CFD", "xe hơi", "streamlines", "áp suất", "wake", "aerodynamics", "ôtô", "hầm gió"]
     }
   ],
-  "total": 36,
+  "total": 37,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
