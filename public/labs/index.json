@@ -852,9 +852,39 @@
         "Tính toán động lượng trước/sau va chạm"
       ],
       "tags": ["động lượng", "va chạm", "bảo toàn", "mặt phẳng nghiêng", "vật lý", "cơ học", "tương tác"]
+    },
+    {
+      "id": "inclined-plane-diagram",
+      "name": "📐 Quả Bóng Trên Mặt Phẳng Nghiêng",
+      "description": "Sơ đồ phân tích lực tác dụng lên quả bóng đặt trên mặt phẳng nghiêng. Học về trọng lực, phản lực, và các thành phần lực!",
+      "category": "Cơ học",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 120,
+      "duration": "20 phút",
+      "port": null,
+      "icon": "Settings",
+      "features": [
+        "📐 Điều chỉnh góc nghiêng 5°-60°",
+        "⚽ Quả bóng với hiệu ứng 3D",
+        "🎯 Vector lực đầy đủ (P, N, mg·sinθ, mg·cosθ)",
+        "📊 Phân tích thành phần lực",
+        "🔄 Điểm tiếp xúc và phản lực",
+        "📏 Chiều cao và khoảng cách",
+        "📖 Công thức và giải thích",
+        "🎨 Interactive diagram"
+      ],
+      "learning_objectives": [
+        "Hiểu các lực tác dụng trên mặt phẳng nghiêng",
+        "Phân tích trọng lực thành 2 thành phần",
+        "Tính toán phản lực N = mg·cosθ",
+        "Nhận biết thành phần gây lăn mg·sinθ",
+        "Áp dụng vào bài toán thực tế"
+      ],
+      "tags": ["mặt phẳng nghiêng", "phân tích lực", "trọng lực", "phản lực", "vật lý", "cơ học", "tĩnh học"]
     }
   ],
-  "total": 33,
+  "total": 34,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
