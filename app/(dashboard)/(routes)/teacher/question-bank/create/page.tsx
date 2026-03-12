@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ArrowLeft, Plus, Trash2, Save, Loader2, HelpCircle } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Save, Loader2, HelpCircle, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -99,6 +99,7 @@ export default function CreateQuestionPage() {
 
   const [newKeyword, setNewKeyword] = useState("")
   const [newObjective, setNewObjective] = useState("")
+  const [generatingAnswer, setGeneratingAnswer] = useState(false)
 
   const handleInputChange = (field: keyof QuestionFormData, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -151,6 +152,39 @@ export default function CreateQuestionPage() {
       ...prev,
       learningObjectives: prev.learningObjectives.filter((o) => o !== objective),
     }))
+  }
+
+  const handleGenerateAnswer = async () => {
+    if (!formData.content.trim()) {
+      toast.error("Vui lòng nhập nội dung câu hỏi trước")
+      return
+    }
+    setGeneratingAnswer(true)
+    try {
+      const res = await fetch("/api/question-bank/generate-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: formData.content,
+          questionType: formData.type,
+          subject: formData.subject,
+          grade: formData.grade,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Không thể sinh đáp án")
+      }
+      const data = await res.json()
+      if (data.answer) {
+        handleInputChange("correctAnswer", data.answer)
+        toast.success("Đã sinh đáp án mẫu bằng AI")
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Không thể sinh đáp án")
+    } finally {
+      setGeneratingAnswer(false)
+    }
   }
 
   const validateForm = (): boolean => {
@@ -532,7 +566,24 @@ export default function CreateQuestionPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                <Label htmlFor="correctAnswer">Đáp án / Hướng dẫn chấm *</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="correctAnswer">Đáp án / Hướng dẫn chấm *</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGenerateAnswer}
+                    disabled={generatingAnswer || !formData.content.trim()}
+                    className="gap-1.5 shrink-0"
+                  >
+                    {generatingAnswer ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Gen đáp án
+                  </Button>
+                </div>
                 <Textarea
                   id="correctAnswer"
                   placeholder="Nhập đáp án mẫu hoặc hướng dẫn chấm điểm..."

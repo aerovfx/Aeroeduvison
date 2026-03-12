@@ -28,10 +28,11 @@ class QdrantClient {
   private collectionName: string;
   private vectorSize: number;
 
-  constructor() {
+  constructor(collectionOverride?: string) {
     this.baseUrl = process.env.QDRANT_URL || 'http://localhost:6333';
     this.apiKey = process.env.QDRANT_API_KEY || null;
-    this.collectionName = process.env.QDRANT_COLLECTION || 'lmsmath_vectors';
+    this.collectionName =
+      collectionOverride ?? process.env.QDRANT_COLLECTION ?? 'lmsmath_vectors';
     this.vectorSize = parseInt(process.env.EMBEDDING_DIMENSION || '1536'); // OpenAI default
   }
 
@@ -264,14 +265,23 @@ class QdrantClient {
   }
 }
 
-// Singleton instance
-let qdrantClient: QdrantClient | null = null;
+// Singleton instances per collection
+const clientCache = new Map<string, QdrantClient>();
 
-export function getQdrantClient(): QdrantClient {
-  if (!qdrantClient) {
-    qdrantClient = new QdrantClient();
+const DEFAULT_COLLECTION = process.env.QDRANT_COLLECTION || 'lmsmath_vectors';
+const RAG_COLLECTION = process.env.QDRANT_RAG_COLLECTION || 'rag_documents';
+
+export function getQdrantClient(collection?: string): QdrantClient {
+  const key = collection || DEFAULT_COLLECTION;
+  if (!clientCache.has(key)) {
+    clientCache.set(key, new QdrantClient(key));
   }
-  return qdrantClient;
+  return clientCache.get(key)!;
+}
+
+/** Client for RAG vector store (collection rag_documents) */
+export function getQdrantRagClient(): QdrantClient {
+  return getQdrantClient(RAG_COLLECTION);
 }
 
 export default getQdrantClient;

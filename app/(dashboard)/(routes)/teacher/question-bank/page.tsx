@@ -1,388 +1,219 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { 
-  Plus, 
-  Search, 
-  FileText, 
-  HelpCircle,
-  Eye,
-  Edit,
-  Trash2,
-  Loader2,
-  Filter,
-  BookOpen,
-  Tag,
-  CheckCircle2,
-  XCircle,
-  Clock
-} from "lucide-react"
+import { Plus, Upload, Sparkles, FileText, Database, BookOpen, List } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { PageHeader } from "@/components/teacher/PageHeader"
-import { PageFilters } from "@/components/teacher/PageFilters"
-import { TableLoadingSkeleton } from "@/components/teacher/LoadingSkeleton"
-import { EmptyState } from "@/components/teacher/EmptyState"
+import { BulkGenerateModal } from "@/components/question-bank/bulk-generate-modal"
+import { NeumorphicCard } from "@/components/ui/neumorphic-card"
+import { NeumorphicButton } from "@/components/ui/neumorphic-button"
 import { toast } from "react-hot-toast"
-import { cn } from "@/lib/utils"
-
-type QuestionStatus = "Tất cả" | "Đã duyệt" | "Chờ duyệt" | "Nháp"
-type QuestionType = "Tất cả loại" | "TNKQ - Nhiều lựa chọn" | "TNKQ - Đúng/Sai" | "TNKQ - Trả lời ngắn" | "Tự luận"
-
-interface Question {
-  id: string
-  content: string
-  type: string
-  subject: string
-  grade: string
-  difficulty: string
-  cognitiveLevel: string
-  status: string
-  createdAt: string
-  updatedAt: string
-  createdBy?: string
-}
 
 export default function QuestionBankPage() {
-  const { data: session } = useSession()
   const router = useRouter()
-  const [questions, setQuestions] = useState<Question[]>([])
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const [totalQuestions, setTotalQuestions] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [selectedStatus, setSelectedStatus] = useState<QuestionStatus>("Tất cả")
-  const [selectedType, setSelectedType] = useState<QuestionType>("Tất cả loại")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [questionToDelete, setQuestionToDelete] = useState<string | null>(null)
 
   useEffect(() => {
-    if (session?.user) {
-      fetchQuestions()
-    }
-  }, [session, selectedStatus, selectedType])
+    loadTotalQuestions()
+  }, [])
 
-  const fetchQuestions = async () => {
+  const loadTotalQuestions = async () => {
     try {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (selectedStatus !== "Tất cả") {
-        params.append("status", selectedStatus)
-      }
-      if (selectedType !== "Tất cả loại") {
-        params.append("type", selectedType)
-      }
-      if (searchQuery) {
-        params.append("search", searchQuery)
-      }
-
-      const response = await fetch(`/api/question-bank?${params.toString()}`)
-      
-      if (!response.ok) {
-        let errorMessage = "Không thể tải danh sách câu hỏi"
-        try {
-          const error = await response.json()
-          if (error.code === "PRISMA_SCHEMA_NOT_SYNCED") {
-            errorMessage = "Database chưa được đồng bộ. Vui lòng chạy: npx prisma generate && npx prisma db push"
-          } else {
-            errorMessage = error.error || errorMessage
-          }
-        } catch {
-          // Ignore JSON parse errors
-        }
-        toast.error(errorMessage)
-        setQuestions([])
-        return
-      }
-      
+      const response = await fetch('/api/questions?limit=1')
       const data = await response.json()
-      setQuestions(data.questions || [])
-    } catch (error: any) {
-      console.error("Error fetching questions:", error)
-      toast.error("Lỗi khi tải danh sách câu hỏi")
-      setQuestions([])
+      if (data.success) {
+        setTotalQuestions(data.data.pagination.total)
+      }
+    } catch (error) {
+      console.error('Error loading total questions:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    fetchQuestions()
-  }
-
-  const handleDelete = async (questionId: string) => {
-    try {
-      const response = await fetch(`/api/question-bank/${questionId}`, {
-        method: "DELETE",
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Không thể xóa câu hỏi")
-      }
-
-      toast.success("Đã xóa câu hỏi")
-      fetchQuestions()
-      setDeleteDialogOpen(false)
-      setQuestionToDelete(null)
-    } catch (error: any) {
-      console.error("Error deleting question:", error)
-      toast.error(error.message || "Lỗi khi xóa câu hỏi")
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "Đã duyệt":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100"><CheckCircle2 className="w-3 h-3 mr-1" />Đã duyệt</Badge>
-      case "Chờ duyệt":
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100"><Clock className="w-3 h-3 mr-1" />Chờ duyệt</Badge>
-      case "Nháp":
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Nháp</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
-  }
-
-  const getTypeBadge = (type: string) => {
-    // Map database types to display format
-    const typeMap: { [key: string]: { label: string; color: string } } = {
-      "MCQ": { label: "Nhiều lựa chọn", color: "bg-blue-100 text-blue-800" },
-      "TRUE_FALSE": { label: "Đúng/Sai", color: "bg-purple-100 text-purple-800" },
-      "SHORT_ANSWER": { label: "Trả lời ngắn", color: "bg-orange-100 text-orange-800" },
-      "ESSAY": { label: "Tự luận", color: "bg-green-100 text-green-800" },
-      // Also support old format for backward compatibility
-      "TNKQ_Nhiều_lựa_chọn": { label: "Nhiều lựa chọn", color: "bg-blue-100 text-blue-800" },
-      "TNKQ_Đúng_Sai": { label: "Đúng/Sai", color: "bg-purple-100 text-purple-800" },
-      "TNKQ_Trả_lời_ngắn": { label: "Trả lời ngắn", color: "bg-orange-100 text-orange-800" },
-      "Tự_luận": { label: "Tự luận", color: "bg-green-100 text-green-800" },
-    }
-    
-    const typeInfo = typeMap[type] || { label: type, color: "bg-gray-100 text-gray-800" }
-    return <Badge className={typeInfo.color}>{typeInfo.label}</Badge>
-  }
-
-  const getDifficultyBadge = (difficulty: string) => {
-    // Map database difficulty to display format
-    const difficultyMap: { [key: string]: { label: string; color: string } } = {
-      "EASY": { label: "Dễ", color: "bg-green-100 text-green-800" },
-      "MEDIUM": { label: "Trung bình", color: "bg-yellow-100 text-yellow-800" },
-      "HARD": { label: "Khó", color: "bg-red-100 text-red-800" },
-      // Also support Vietnamese format for backward compatibility
-      "Dễ": { label: "Dễ", color: "bg-green-100 text-green-800" },
-      "Trung bình": { label: "Trung bình", color: "bg-yellow-100 text-yellow-800" },
-      "Khó": { label: "Khó", color: "bg-red-100 text-red-800" },
-    }
-    
-    const diffInfo = difficultyMap[difficulty] || { label: difficulty, color: "bg-gray-100 text-gray-800" }
-    return (
-      <Badge className={diffInfo.color}>
-        {diffInfo.label}
-      </Badge>
-    )
-  }
-
-  if (!session?.user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
+  const handleSuccess = async (count: number) => {
+    setTotalQuestions(count)
+    toast.success(`Đã thêm câu hỏi vào ngân hàng đề!`)
+    setTimeout(() => {
+      router.push("/teacher/question-bank/list")
+    }, 1000)
   }
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <PageHeader
-        title="Ngân hàng câu hỏi"
-        description="Quản lý và tổ chức câu hỏi cho các kỳ thi. Tạo, chỉnh sửa và duyệt câu hỏi."
-        icon={<HelpCircle className="h-6 w-6" />}
-        actions={
-          <Button onClick={() => router.push("/teacher/question-bank/create")} size="lg" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Tạo câu hỏi mới
-          </Button>
-        }
-      />
-
-      {/* Filters and Search */}
-      <PageFilters
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSearchSubmit={handleSearch}
-        placeholder="Tìm kiếm câu hỏi..."
-        filters={
-          <>
-            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as QuestionStatus)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tất cả">Tất cả</SelectItem>
-                <SelectItem value="Đã duyệt">Đã duyệt</SelectItem>
-                <SelectItem value="Chờ duyệt">Chờ duyệt</SelectItem>
-                <SelectItem value="Nháp">Nháp</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as QuestionType)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Loại câu hỏi" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tất cả loại">Tất cả loại</SelectItem>
-                <SelectItem value="TNKQ - Nhiều lựa chọn">TNKQ - Nhiều lựa chọn</SelectItem>
-                <SelectItem value="TNKQ - Đúng/Sai">TNKQ - Đúng/Sai</SelectItem>
-                <SelectItem value="TNKQ - Trả lời ngắn">TNKQ - Trả lời ngắn</SelectItem>
-                <SelectItem value="Tự luận">Tự luận</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        }
-      />
-
-      {/* Questions Table */}
-      <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-6">
-            <TableLoadingSkeleton rows={5} />
+    <div className="flex flex-col h-full neu-container">
+      {/* Header with Gradient Text */}
+      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold gradient-text mb-2">Ngân Hàng Câu Hỏi</h1>
+              <p className="text-gray-600">Quản lý và sinh hàng loạt câu hỏi với AI</p>
+            </div>
+            <div className="flex items-center gap-4">
+              {loading ? (
+                <NeumorphicCard variant="default" size="sm" className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-gray-600">Đang tải...</span>
+                  </div>
+                </NeumorphicCard>
+              ) : (
+                <NeumorphicCard variant="gradient" size="sm" className="px-4 py-2">
+                  <div className="flex items-center gap-3">
+                    <Database className="w-5 h-5 text-blue-500" />
+                    <div>
+                      <div className="text-xs text-gray-600">TỔNG SỐ CÂU</div>
+                      <div className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
+                        {totalQuestions}
+                      </div>
+                    </div>
+                  </div>
+                </NeumorphicCard>
+              )}
+              <NeumorphicButton
+                variant="primary"
+                size="lg"
+                onClick={() => setGenerateOpen(true)}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Sinh hàng loạt
+              </NeumorphicButton>
+            </div>
           </div>
-        ) : questions.length === 0 ? (
-          <EmptyState
-            icon={<HelpCircle className="h-12 w-12" />}
-            title="Chưa có câu hỏi nào"
-            description="Bắt đầu bằng cách tạo câu hỏi đầu tiên cho ngân hàng câu hỏi của bạn"
-            action={{
-              label: "Tạo câu hỏi đầu tiên",
-              icon: <Plus className="h-4 w-4" />,
-              onClick: () => router.push("/teacher/question-bank/create")
-            }}
-          />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">#</TableHead>
-                <TableHead className="min-w-[300px]">Nội dung câu hỏi</TableHead>
-                <TableHead>Loại</TableHead>
-                <TableHead>Môn học</TableHead>
-                <TableHead>Khối</TableHead>
-                <TableHead>Độ khó</TableHead>
-                <TableHead>Mức độ</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead>Thời gian</TableHead>
-                <TableHead className="text-right">Hành động</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {questions.map((question, index) => (
-                <TableRow key={question.id}>
-                  <TableCell className="font-medium">{index + 1}</TableCell>
-                  <TableCell>
-                    <div className="max-w-[300px]">
-                      <p className="line-clamp-2 text-sm">{question.content}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>{getTypeBadge(question.type)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{question.subject}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{question.grade}</Badge>
-                  </TableCell>
-                  <TableCell>{getDifficultyBadge(question.difficulty)}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{question.cognitiveLevel}</Badge>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(question.status)}</TableCell>
-                  <TableCell className="text-sm text-gray-500">
-                    {new Date(question.createdAt).toLocaleDateString("vi-VN")}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/teacher/question-bank/${question.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/teacher/question-bank/${question.id}/edit`)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setQuestionToDelete(question.id)
-                          setDeleteDialogOpen(true)
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
+        </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa câu hỏi này? Hành động này không thể hoàn tác.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setQuestionToDelete(null)}>
-              Hủy
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => questionToDelete && handleDelete(questionToDelete)}
-              className="bg-red-600 hover:bg-red-700"
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="container mx-auto">
+          {/* Action Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <NeumorphicCard
+              variant="gradient"
+              hover
+              size="lg"
+              onClick={() => setGenerateOpen(true)}
+              className="cursor-pointer"
             >
-              Xóa
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+                  <Sparkles className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-lg gradient-text">Sinh tự động</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Tạo hàng loạt câu hỏi tự động theo chủ đề và khối lớp. Tỉ lệ: 60% Nhiều lựa chọn, 20% Đúng-Sai, 10% Trả lời ngắn, 10% Tự luận
+              </p>
+            </NeumorphicCard>
+
+            <NeumorphicCard variant="gradient" hover size="lg" className="opacity-75">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center neu-shadow-inner">
+                  <Upload className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-lg gradient-text">Import từ file</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Nhập câu hỏi từ file Excel, Word có sẵn (Coming soon)
+              </p>
+            </NeumorphicCard>
+
+            <NeumorphicCard
+              variant="gradient"
+              hover
+              size="lg"
+              onClick={() => router.push("/teacher/question-bank/add")}
+              className="cursor-pointer"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center neu-shadow-inner">
+                  <Plus className="w-6 h-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-lg gradient-text">Thêm thủ công</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Tự nhập từng câu hỏi vào ngân hàng đề
+              </p>
+            </NeumorphicCard>
+          </div>
+
+          {/* Stats & Guide */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Stats Card */}
+            <NeumorphicCard variant="gradient" size="lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-lg">Thống kê ngân hàng</h3>
+              </div>
+              
+              {loading ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+                  <span className="text-gray-600">Đang tải dữ liệu...</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <div className="text-5xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
+                      {totalQuestions}
+                    </div>
+                    <span className="text-sm text-gray-600">câu hỏi</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Tổng số câu hỏi đã lưu trữ
+                  </p>
+                  <NeumorphicButton
+                    variant="outline"
+                    onClick={() => router.push("/teacher/question-bank/list")}
+                    className="w-full"
+                  >
+                    <List className="w-4 h-4 mr-2" />
+                    Xem tất cả câu hỏi
+                  </NeumorphicButton>
+                </>
+              )}
+            </NeumorphicCard>
+
+            {/* Quick Guide */}
+            <NeumorphicCard variant="gradient" size="lg">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center neu-shadow-inner">
+                  <BookOpen className="w-5 h-5 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-lg">Hướng dẫn nhanh</h3>
+              </div>
+              
+              <ol className="space-y-3 text-sm text-gray-600">
+                {[
+                  "Chọn môn học và khối lớp",
+                  "Nhập các chủ đề kiến thức cần sinh câu hỏi",
+                  "Chỉ định số câu hỏi cho mỗi chủ đề",
+                  "Click 'Sinh câu hỏi' và chờ kết quả",
+                  "Xem và chỉnh sửa câu hỏi trong danh sách"
+                ].map((step, index) => (
+                  <li key={index} className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 neu-shadow">
+                      {index + 1}
+                    </div>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </NeumorphicCard>
+          </div>
+        </div>
+      </div>
+
+      {/* Bulk Generate Modal */}
+      <BulkGenerateModal
+        isOpen={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        onSuccess={handleSuccess}
+      />
     </div>
   )
 }

@@ -3,7 +3,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
-import { FaceLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
 import { AdvancedEmotionDetector, EmotionStatsTracker, FloatingEmojiManager, EMOTION_CONFIG } from './advanced-emotion-recognition';
 import { SignLanguageDetector } from './sign-language-detector';
 import { SIGN_CONFIG } from './sign-language-config';
@@ -13,19 +12,40 @@ export default function VisionTrackerPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [status, setStatus] = useState('Initializing...');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     // Logic Refs
     const emotionDetectorRef = useRef<AdvancedEmotionDetector | null>(null);
     const statsTrackerRef = useRef<EmotionStatsTracker | null>(null);
     const emojiManagerRef = useRef<FloatingEmojiManager | null>(null);
-    const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
+    const faceLandmarkerRef = useRef<any>(null);
+    const mediaPipeVisionRef = useRef<{ FaceLandmarker: any; DrawingUtils: any } | null>(null);
     const handsRef = useRef<any>(null); // Legacy Hands
     const cameraRef = useRef<any>(null);
     const lastVideoTimeRef = useRef(-1);
     const signDetectorRef = useRef<SignLanguageDetector | null>(null);
+    // Buffer biểu cảm để gửi gộp mỗi 30s → giảm tải (không gửi từng frame)
+    const emotionBufferRef = useRef<{ emotionType: string; confidence: number }[]>([]);
+    const emotionFlushIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    // Guard: MediaPipe WASM must only be initialized once per page (avoids "Module.arguments" error with StrictMode double-mount)
+    const visionInitOnceRef = useRef(false);
 
     // Initializer
     useEffect(() => {
+        // Global error handler for WebGL errors
+        const handleError = (event: ErrorEvent) => {
+            if (event.message?.includes('maxTextureDimension2D') || 
+                event.message?.includes('WebGL') ||
+                event.message?.includes('WEBGL')) {
+                console.error('❌ [Vision Tracker] Caught global WebGL error:', event.message);
+                setStatus('GPU không hỗ trợ');
+                setErrorMsg('WebGL/WebGPU không khả dụng trên thiết bị này. Vui lòng cập nhật trình duyệt hoặc driver.');
+                event.preventDefault();
+            }
+        };
+
+        window.addEventListener('error', handleError);
+
         // Initialize helpers
         emotionDetectorRef.current = new AdvancedEmotionDetector();
         statsTrackerRef.current = new EmotionStatsTracker();
@@ -34,25 +54,69 @@ export default function VisionTrackerPage() {
 
         const initAI = async () => {
             try {
+                // Check WebGL support before initializing
+                const checkWebGLSupport = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                        if (!gl) {
+                            return false;
+                        }
+                        // Check for required extensions
+                        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                        if (debugInfo) {
+                            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                            console.log('WebGL Renderer:', renderer);
+                        }
+                        // Check max texture size
+                        const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+                        console.log('Max Texture Size:', maxTextureSize);
+                        if (maxTextureSize < 2048) {
+                            console.warn('⚠️ Max texture size too small:', maxTextureSize);
+                            return false;
+                        }
+                        return true;
+                    } catch (e) {
+                        console.error('WebGL support check failed:', e);
+                        return false;
+                    }
+                };
+
+                if (!checkWebGLSupport()) {
+                    throw new Error('WebGL not supported or insufficient capabilities');
+                }
+
                 // Initialize new helpers
                 initHeatmap();
                 initActionUnits();
 
-                // 1. Setup Vision Tasks (Face)
-                const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
-                );
-
-                faceLandmarkerRef.current = await FaceLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                        delegate: "CPU"
-                    },
-                    outputFaceBlendshapes: true,
-                    runningMode: "VIDEO",
-                    numFaces: 1
-                });
-                console.log("FaceLandmarker loaded");
+                // 1. Setup Vision Tasks (Face) — load MediaPipe only in browser via dynamic import (avoids SSR/Event errors)
+                if (!visionInitOnceRef.current) {
+                    visionInitOnceRef.current = true;
+                    const MP = await import("@mediapipe/tasks-vision").catch((e) => {
+                        visionInitOnceRef.current = false;
+                        throw new Error(`MediaPipe load failed: ${e?.message || (e && typeof e === 'object' && 'type' in e ? `event ${(e as Event).type}` : String(e))}`);
+                    });
+                    const { FaceLandmarker: FL, FilesetResolver: FSR, DrawingUtils: DU } = MP;
+                    if (!FL || !FSR || !DU) {
+                        visionInitOnceRef.current = false;
+                        throw new Error("MediaPipe module missing FaceLandmarker/FilesetResolver/DrawingUtils");
+                    }
+                    mediaPipeVisionRef.current = { FaceLandmarker: FL, DrawingUtils: DU };
+                    // Serve WASM/JS via API route with correct MIME (avoids HTML 404 → "Unexpected token '<'" / ModuleFactory not set)
+                    const wasmBase = typeof window !== "undefined" ? `${window.location.origin}/api/mediapipe-wasm/wasm` : "/api/mediapipe-wasm/wasm";
+                    const vision = await FSR.forVisionTasks(wasmBase);
+                    faceLandmarkerRef.current = await FL.createFromOptions(vision, {
+                        baseOptions: {
+                            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                            delegate: "CPU"
+                        },
+                        outputFaceBlendshapes: true,
+                        runningMode: "VIDEO",
+                        numFaces: 1
+                    });
+                    console.log("FaceLandmarker loaded");
+                }
 
                 // 2. Setup Legacy Hands (Check global window)
                 const initHands = () => {
@@ -93,16 +157,80 @@ export default function VisionTrackerPage() {
                 };
                 initHands();
                 initChart(); // Initialize charts
+                // Gửi buffer biểu cảm mỗi 30s để giảm tải
+                emotionFlushIntervalRef.current = setInterval(() => {
+                    const buf = emotionBufferRef.current;
+                    if (buf.length === 0) return;
+                    emotionBufferRef.current = [];
+                    fetch('/api/vision-tracker/emotion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ samples: buf })
+                    }).catch(() => {});
+                }, 30000);
             } catch (error) {
-                console.error("Failed to init AI:", error);
-                setStatus("Error loading AI models");
+                visionInitOnceRef.current = false; // allow retry on next mount/reload
+                let msg: string;
+                let name = "Error";
+                if (error instanceof Error) {
+                    msg = error.message;
+                    name = error.name;
+                } else if (error && typeof error === "object" && "type" in error && typeof (error as Event).target !== "undefined") {
+                    const ev = error as Event;
+                    msg = `Load failed (${ev.type}): ${ev.target ? String((ev.target as any)?.src || (ev.target as any)?.href || "unknown") : "unknown"}`;
+                } else {
+                    msg = String(error);
+                }
+                
+                // Handle WebGL/WebGPU errors
+                if (msg.includes('maxTextureDimension2D') || msg.includes('WebGL') || msg.includes('WebGPU')) {
+                    console.error("❌ [Vision Tracker] GPU/WebGL Error:", msg);
+                    setStatus("GPU không hỗ trợ - WebGL/WebGPU không khả dụng");
+                    setErrorMsg("Trình duyệt hoặc GPU của bạn không hỗ trợ WebGL/WebGPU cần thiết cho Vision Tracker. Vui lòng cập nhật trình duyệt hoặc driver đồ họa.");
+                } else {
+                    console.error("Failed to init AI:", name, msg, error);
+                    setStatus("Error loading AI models");
+                    setErrorMsg(msg);
+                }
             }
         };
 
         if (window) initAI();
 
         return () => {
-            // Cleanup if needed
+            // Cleanup error handler
+            window.removeEventListener('error', handleError);
+            
+            // Stop camera
+            if (cameraRef.current) {
+                try {
+                    cameraRef.current.stop();
+                } catch (e) {
+                    console.warn('Error stopping camera:', e);
+                }
+            }
+            
+            // Release hands
+            if (handsRef.current) {
+                try {
+                    handsRef.current.close();
+                } catch (e) {
+                    console.warn('Error closing hands:', e);
+                }
+            }
+            
+            // Clear intervals
+            if (emotionFlushIntervalRef.current) {
+                clearInterval(emotionFlushIntervalRef.current);
+                emotionFlushIntervalRef.current = null;
+            }
+            
+            // Flush lần cuối nếu còn
+            const buf = emotionBufferRef.current;
+            if (buf.length > 0) {
+                emotionBufferRef.current = [];
+                fetch('/api/vision-tracker/emotion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ samples: buf }) }).catch(() => {});
+            }
         };
     }, []);
 
@@ -139,10 +267,13 @@ export default function VisionTrackerPage() {
                     );
 
                     if (faceResult && faceResult.faceLandmarks.length > 0) {
-                        // Draw Mesh
-                        const drawingUtils = new DrawingUtils(ctx);
-                        for (const landmarks of faceResult.faceLandmarks) {
-                            drawingUtils.drawConnectors(landmarks, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+                        // Draw Mesh (use dynamically loaded MediaPipe classes)
+                        const MP = mediaPipeVisionRef.current;
+                        if (MP?.DrawingUtils && MP?.FaceLandmarker?.FACE_LANDMARKS_TESSELATION) {
+                            const drawingUtils = new MP.DrawingUtils(ctx);
+                            for (const landmarks of faceResult.faceLandmarks) {
+                                drawingUtils.drawConnectors(landmarks, MP.FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: '#C0C0C070', lineWidth: 1 });
+                            }
                         }
 
                         // Process Emotion & FACS
@@ -156,6 +287,9 @@ export default function VisionTrackerPage() {
                                 updateEmotionUI(emotion);
                                 statsTrackerRef.current?.record(emotion);
                                 updateStatsUI();
+                                // Buffer để gửi gộp lên server (giảm tải)
+                                emotionBufferRef.current.push({ emotionType: emotion.type, confidence: emotion.confidence });
+                                if (emotionBufferRef.current.length >= 30) flushEmotionBuffer();
 
                                 // Spawn Emoji
                                 if (Math.random() > 0.92) {
@@ -207,6 +341,18 @@ export default function VisionTrackerPage() {
 
         ctx.restore();
     };
+
+    // --- Flush emotion buffer lên server (gộp theo phút ở API) ---
+    function flushEmotionBuffer() {
+        const buf = emotionBufferRef.current;
+        if (buf.length === 0) return;
+        emotionBufferRef.current = [];
+        fetch('/api/vision-tracker/emotion', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ samples: buf })
+        }).catch(() => {});
+    }
 
     // --- Helper Functions ---
     const updateEmotionUI = (emotion: any) => {
@@ -544,6 +690,51 @@ export default function VisionTrackerPage() {
 
             <div className="container">
                 <div className="bento-grid">
+                    {/* Error Banner */}
+                    {errorMsg && (
+                        <div className="col-12" style={{ gridColumn: 'span 12', marginBottom: '16px' }}>
+                            <div style={{
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '12px',
+                                padding: '16px',
+                                color: '#fca5a5',
+                                fontSize: '0.9rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '12px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                                    <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                                    <div>
+                                        <div style={{ fontWeight: 700, marginBottom: '4px' }}>Lỗi WebGL/WebGPU</div>
+                                        <div style={{ opacity: 0.9 }}>{errorMsg}</div>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setStatus('Skipped');
+                                        setErrorMsg(null);
+                                    }}
+                                    style={{
+                                        background: 'rgba(239, 68, 68, 0.2)',
+                                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        borderRadius: '8px',
+                                        padding: '8px 16px',
+                                        color: '#fca5a5',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 600,
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    Bỏ qua
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bento-item item-camera">
                         <div id="videoContainer" style={{ width: '100%', height: '100%', position: 'relative' }}>
                             <video id="videoElement" ref={videoRef} autoPlay playsInline style={{ display: 'none' }}></video>

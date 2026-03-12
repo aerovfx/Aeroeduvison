@@ -667,3 +667,55 @@
   }
 }
 
+/* ============================================
+   Utility Classes
+   ============================================ */
+.neu-shadow-sm {
+  box-shadow:
+    4px 4px 8px var(--neu-shadow-dark),
+    -4px -4px 8px var(--neu-shadow-light) !important;
+}
+
+.neu-shadow-inner {
+  box-shadow:
+    inset 4px 4px 8px var(--neu-shadow-inset-dark),
+    inset -4px -4px 8px var(--neu-shadow-inset-light) !important;
+}
+
+.neu-shadow {
+  box-shadow:
+    8px 8px 16px var(--neu-shadow-dark),
+    -8px -8px 16px var(--neu-shadow-light) !important;
+}
+
+.neu-shadow-lg {
+  box-shadow:
+    12px 12px 24px var(--neu-shadow-dark),
+    -12px -12px 24px var(--neu-shadow-light) !important;
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Textarea with neumorphic styling */
+textarea.neu-input {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Dialog Content with neumorphic styling */
+.dialog-neu-content {
+  background: var(--neu-card-bg);
+  border-radius: 24px;
+  border: 1px solid var(--neu-border);
+  box-shadow:
+    20px 20px 40px var(--neu-shadow-dark),
+    -20px -20px 40px var(--neu-shadow-light),
+    inset 1px 1px 2px var(--neu-shadow-inset-dark);
+}
+

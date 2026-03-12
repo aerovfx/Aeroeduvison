@@ -3,54 +3,29 @@
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { 
-  Upload, 
-  Plus, 
-  Search, 
-  FileText, 
-  Grid3x3,
-  Eye,
-  Edit,
-  Trash2,
-  Copy,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  Filter
+import {
+  Upload, Plus, Search, FileText, Grid3x3, Eye, Edit, Trash2,
+  Copy, Loader2, CheckCircle2, XCircle, Clock, AlertCircle, FileCode2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DigitizeMatrixModal } from "@/components/exam-matrix/digitize-modal"
 import { GenerateExamModal } from "@/components/exam-matrix/generate-exam-modal"
+import { NeumorphicCard } from "@/components/ui/neumorphic-card"
+import { NeumorphicButton } from "@/components/ui/neumorphic-button"
+import { NeumorphicInput } from "@/components/ui/neumorphic-input"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -78,89 +53,39 @@ export default function ExamMatrixPage() {
   const [isDigitizeModalOpen, setIsDigitizeModalOpen] = useState(false)
   const [isGenerateExamModalOpen, setIsGenerateExamModalOpen] = useState(false)
   const [selectedMatrixForExam, setSelectedMatrixForExam] = useState<{ id: string; name: string } | null>(null)
+  const [exportingToLatexId, setExportingToLatexId] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [matrixToDelete, setMatrixToDelete] = useState<string | null>(null)
   const [duplicating, setDuplicating] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchMatrices()
-  }, [selectedStatus, examTypeFilter])
+  useEffect(() => { fetchMatrices() }, [selectedStatus, examTypeFilter])
 
   const fetchMatrices = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (selectedStatus !== "Tất cả") {
-        params.append("status", selectedStatus)
-      }
-      if (examTypeFilter !== "Tất cả loại đề") {
-        params.append("examType", examTypeFilter)
-      }
+      if (selectedStatus !== "Tất cả") params.append("status", selectedStatus)
+      if (examTypeFilter !== "Tất cả loại đề") params.append("examType", examTypeFilter)
 
       const response = await fetch(`/api/exam-matrices?${params.toString()}`)
-      
-      if (!response.ok) {
-        let errorMessage = "Không thể tải danh sách ma trận"
-        try {
-          const error = await response.json()
-          errorMessage = error.error || error.message || errorMessage
-          console.error("Fetch matrices error response:", error)
-          
-          // Show specific error for schema issues
-          if (errorMessage.includes("Database schema")) {
-            errorMessage = "Database chưa được cập nhật. Vui lòng chạy: npx prisma db push"
-          }
-        } catch (e) {
-          console.error("Failed to parse error response:", e)
-          errorMessage = `Lỗi khi tải danh sách (status ${response.status})`
-        }
-        throw new Error(errorMessage)
-      }
-      
+      if (!response.ok) throw new Error("Không thể tải danh sách ma trận")
       const data = await response.json()
       setMatrices(data.matrices || [])
     } catch (error: any) {
-      console.error("Error fetching matrices:", error)
-      const errorMessage = error.message || "Không thể tải danh sách ma trận"
-      toast.error(errorMessage)
-      
-      // Log full error in development
-      if (process.env.NODE_ENV === "development") {
-        console.error("Full error details:", error)
-      }
+      toast.error(error.message || "Không thể tải danh sách ma trận")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleStatusChange = (status: MatrixStatus) => {
-    setSelectedStatus(status)
-  }
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query)
-  }
-
-  const filteredMatrices = matrices.filter((matrix) => {
-    if (searchQuery) {
-      return matrix.name.toLowerCase().includes(searchQuery.toLowerCase())
-    }
-    return true
-  })
-
   const handleDelete = async (id: string) => {
     try {
-      const response = await fetch(`/api/exam-matrices/${id}`, {
-        method: "DELETE",
-      })
-      if (!response.ok) throw new Error("Failed to delete matrix")
-      
+      await fetch(`/api/exam-matrices/${id}`, { method: "DELETE" })
       toast.success("Đã xóa ma trận")
       fetchMatrices()
       setDeleteDialogOpen(false)
       setMatrixToDelete(null)
     } catch (error) {
-      console.error("Error deleting matrix:", error)
       toast.error("Không thể xóa ma trận")
     }
   }
@@ -168,328 +93,270 @@ export default function ExamMatrixPage() {
   const handleDuplicate = async (id: string) => {
     try {
       setDuplicating(id)
-      const response = await fetch(`/api/exam-matrices/${id}/duplicate`, {
-        method: "POST",
-      })
-      
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to duplicate matrix")
-      }
-      
-      const data = await response.json()
-      toast.success("Đã nhân bản ma trận thành công")
+      await fetch(`/api/exam-matrices/${id}/duplicate`, { method: "POST" })
+      toast.success("Đã nhân bản ma trận")
       fetchMatrices()
     } catch (error: any) {
-      console.error("Error duplicating matrix:", error)
-      toast.error(error.message || "Không thể nhân bản ma trận")
+      toast.error(error.message || "Không thể nhân bản")
     } finally {
       setDuplicating(null)
     }
   }
 
+  const handleExportToLatex = async (matrixId: string) => {
+    try {
+      setExportingToLatexId(matrixId)
+      const res = await fetch("/api/latex-projects/export-from-matrix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matrixId }),
+      })
+      if (!res.ok) throw new Error("Export failed")
+      const data = await res.json()
+      toast.success("Đã tạo tài liệu LaTeX")
+      router.push(`/teacher/latex-documents/${data.id}`)
+    } catch (e: any) {
+      toast.error(e.message || "Không thể xuất sang LaTeX")
+    } finally {
+      setExportingToLatexId(null)
+    }
+  }
+
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "Hoàn tất":
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />
-      case "Đang xử lý":
-        return <Loader2 className="h-4 w-4 text-orange-600 animate-spin" />
-      case "Lỗi":
-        return <XCircle className="h-4 w-4 text-red-600" />
-      case "Hàng đợi":
-        return <Clock className="h-4 w-4 text-gray-600" />
-      default:
-        return <AlertCircle className="h-4 w-4 text-gray-400" />
+    const icons: Record<string, any> = {
+      "Hoàn tất": CheckCircle2, "Đang xử lý": Loader2, "Lỗi": XCircle, "Hàng đợi": Clock,
     }
+    const Icon = icons[status] || AlertCircle
+    const colors: Record<string, string> = {
+      "Hoàn tất": "text-green-600", "Đang xử lý": "text-orange-600", "Lỗi": "text-red-600", "Hàng đợi": "text-gray-600",
+    }
+    return <Icon className={`h-4 w-4 ${status === "Đang xử lý" ? "animate-spin" : ""} ${colors[status] || ""}`} />
   }
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      "Hoàn tất": "bg-green-100 text-green-800",
-      "Đang xử lý": "bg-orange-100 text-orange-800",
-      "Lỗi": "bg-red-100 text-red-800",
-      "Hàng đợi": "bg-gray-100 text-gray-800",
-    }
-    return variants[status] || "bg-gray-100 text-gray-800"
+  const stats = {
+    total: matrices.length,
+    completed: matrices.filter(m => m.status === "Hoàn tất").length,
+    processing: matrices.filter(m => m.status === "Đang xử lý").length,
+    queue: matrices.filter(m => m.status === "Hàng đợi").length,
   }
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString)
-    const time = date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    const dateStr = date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })
-    return `${time} / ${dateStr}`
-  }
+  const filteredMatrices = matrices.filter(m =>
+    !searchQuery || m.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="border-b bg-white">
+    <div className="flex flex-col h-full neu-container">
+      {/* Header with Gradient Text */}
+      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold">Ma trận đề</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Quản lý và tạo ma trận đề thi
-              </p>
+              <h1 className="text-4xl font-bold gradient-text mb-2">Ma Trận Đề</h1>
+              <p className="text-gray-600">Quản lý và tạo ma trận đề thi chuyên nghiệp</p>
+            </div>
+            <div className="flex gap-2">
+              <NeumorphicButton variant="outline" onClick={() => setIsDigitizeModalOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Số hoá
+              </NeumorphicButton>
+              <NeumorphicButton variant="primary" onClick={() => router.push("/teacher/exam-matrix/create")}>
+                <Plus className="h-4 w-4 mr-2" />
+                Tạo ma trận
+              </NeumorphicButton>
             </div>
           </div>
 
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            {[
+              { label: "Tổng cộng", value: stats.total, color: "from-blue-500 to-blue-600", icon: Grid3x3 },
+              { label: "Hoàn tất", value: stats.completed, color: "from-green-500 to-green-600", icon: CheckCircle2 },
+              { label: "Đang xử lý", value: stats.processing, color: "from-orange-500 to-orange-600", icon: Loader2 },
+              { label: "Hàng đợi", value: stats.queue, color: "from-gray-500 to-gray-600", icon: Clock },
+            ].map((stat) => (
+              <NeumorphicCard key={stat.label} variant="gradient" hover className="text-center p-4">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <stat.icon className={`w-6 h-6 bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`} style={{ WebkitTextFillColor: 'transparent' }} />
+                  <div className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
+                    {stat.value}
+                  </div>
+                </div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
+              </NeumorphicCard>
+            ))}
+          </div>
+
           {/* Status Tabs */}
-          <Tabs value={selectedStatus} onValueChange={(v) => handleStatusChange(v as MatrixStatus)}>
-            <TabsList className="grid w-full max-w-md grid-cols-5">
-              <TabsTrigger value="Tất cả">Tất cả</TabsTrigger>
-              <TabsTrigger value="Hàng đợi">Hàng đợi</TabsTrigger>
-              <TabsTrigger value="Đang xử lý">Đang xử lý</TabsTrigger>
-              <TabsTrigger value="Hoàn tất">Hoàn tất</TabsTrigger>
-              <TabsTrigger value="Lỗi">Lỗi</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <NeumorphicCard variant="default" size="sm">
+            <Tabs value={selectedStatus} onValueChange={(v) => setSelectedStatus(v as MatrixStatus)}>
+              <TabsList className="grid w-full grid-cols-5 neu-shadow">
+                <TabsTrigger value="Tất cả">Tất cả</TabsTrigger>
+                <TabsTrigger value="Hàng đợi">Hàng đợi</TabsTrigger>
+                <TabsTrigger value="Đang xử lý">Đang xử lý</TabsTrigger>
+                <TabsTrigger value="Hoàn tất">Hoàn tất</TabsTrigger>
+                <TabsTrigger value="Lỗi">Lỗi</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </NeumorphicCard>
         </div>
       </div>
 
       {/* Action Bar */}
-      <div className="border-b bg-white px-6 py-4">
-        <div className="container mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
+      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="flex-1 max-w-md">
+                <NeumorphicInput
                   placeholder="Tìm kiếm ma trận..."
+                  icon={<Search className="w-4 h-4" />}
                   value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  className="pl-10"
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
+              <Select value={examTypeFilter} onValueChange={setExamTypeFilter}>
+                <SelectTrigger className="w-[200px] neu-shadow-sm">
+                  <SelectValue placeholder="Loại đề" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Tất cả loại đề">Tất cả</SelectItem>
+                  <SelectItem value="Kiểm tra 1 tiết">1 tiết</SelectItem>
+                  <SelectItem value="Kiểm tra giữa kỳ">Giữa kỳ</SelectItem>
+                  <SelectItem value="Kiểm tra cuối kỳ">Cuối kỳ</SelectItem>
+                  <SelectItem value="Thi học kỳ">Học kỳ</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={examTypeFilter} onValueChange={setExamTypeFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Tất cả loại đề" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tất cả loại đề">Tất cả loại đề</SelectItem>
-                <SelectItem value="Kiểm tra 1 tiết">Kiểm tra 1 tiết</SelectItem>
-                <SelectItem value="Kiểm tra giữa kỳ">Kiểm tra giữa kỳ</SelectItem>
-                <SelectItem value="Kiểm tra cuối kỳ">Kiểm tra cuối kỳ</SelectItem>
-                <SelectItem value="Thi học kỳ">Thi học kỳ</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setIsDigitizeModalOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Số hoá ma trận
-            </Button>
-            <Button onClick={() => router.push("/teacher/exam-matrix/create")}>
-              <Plus className="h-4 w-4 mr-2" />
-              Tạo ma trận
-            </Button>
           </div>
         </div>
       </div>
 
       {/* Matrices Table */}
-      <div className="flex-1 overflow-auto">
-        <div className="container mx-auto px-6 py-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredMatrices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Grid3x3 className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground mb-2">Chưa có ma trận nào</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Bắt đầu bằng cách tạo ma trận mới
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsDigitizeModalOpen(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Số hoá ma trận
-                </Button>
-                <Button onClick={() => router.push("/teacher/exam-matrix/create")}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Tạo ma trận
-                </Button>
+      <div className="flex-1 overflow-auto p-6">
+        <div className="container mx-auto">
+          <NeumorphicCard variant="gradient" size="lg">
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 neu-shadow" />
+                  <p className="text-gray-600">Đang tải...</p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="flex items-center gap-2">
-                    TÊN MA TRẬN
-                    <span className="text-muted-foreground">↓</span>
-                  </TableHead>
-                  <TableHead>LOẠI</TableHead>
-                  <TableHead>LOẠI ĐỀ</TableHead>
-                  <TableHead className="flex items-center gap-2">
-                    THỜI GIAN
-                    <span className="text-muted-foreground">↓</span>
-                  </TableHead>
-                  <TableHead>TRẠNG THÁI</TableHead>
-                  <TableHead>HÀNH ĐỘNG</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredMatrices.map((matrix) => (
-                  <TableRow key={matrix.id} className="hover:bg-muted/50">
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-blue-600" />
-                        <div className="font-medium">{matrix.name}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{matrix.type}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {matrix.examType || "-"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatTime(matrix.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(matrix.status)}
-                        <Badge className={cn("text-xs", getStatusBadge(matrix.status))}>
-                          {matrix.status}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {/* Xem - Available for all matrices */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (matrix.type === "Số hoá") {
-                              router.push(`/teacher/exam-matrix/${matrix.id}/review`)
-                            } else {
-                              router.push(`/teacher/exam-matrix/${matrix.id}`)
-                            }
-                          }}
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        {/* Sửa - Available for completed matrices */}
-                        {matrix.status === "Hoàn tất" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}/edit`)}
-                            title="Sửa ma trận"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-
-                        {/* Tạo đề thi - Only for completed matrices */}
-                        {matrix.status === "Hoàn tất" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setSelectedMatrixForExam({ id: matrix.id, name: matrix.name })
-                              setIsGenerateExamModalOpen(true)
-                            }}
-                            title="Tạo đề thi từ ma trận"
-                            className="text-primary hover:text-primary"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        )}
-
-                        {/* Nhân bản - Available for all matrices except processing */}
-                        {matrix.status !== "Đang xử lý" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDuplicate(matrix.id)}
-                            disabled={duplicating === matrix.id}
-                            title="Nhân bản ma trận"
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            {duplicating === matrix.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-
-                        {/* Xóa - Available for all matrices except processing */}
-                        {matrix.status !== "Đang xử lý" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setMatrixToDelete(matrix.id)
-                              setDeleteDialogOpen(true)
-                            }}
-                            title="Xóa ma trận"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+            ) : filteredMatrices.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner mb-4">
+                  <Grid3x3 className="w-10 h-10 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">Chưa có ma trận nào</h3>
+                <p className="text-gray-500 mb-6">Bắt đầu bằng cách tạo ma trận mới</p>
+                <div className="flex gap-2">
+                  <NeumorphicButton variant="outline" onClick={() => setIsDigitizeModalOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Số hoá
+                  </NeumorphicButton>
+                  <NeumorphicButton variant="primary" onClick={() => router.push("/teacher/exam-matrix/create")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tạo ma trận
+                  </NeumorphicButton>
+                </div>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-500" />
+                      TÊN MA TRẬN
+                    </TableHead>
+                    <TableHead>LOẠI</TableHead>
+                    <TableHead>LOẠI ĐỀ</TableHead>
+                    <TableHead className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-orange-500" />
+                      THỜI GIAN
+                    </TableHead>
+                    <TableHead>TRẠNG THÁI</TableHead>
+                    <TableHead className="text-right">HÀNH ĐỘNG</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                </TableHeader>
+                <TableBody>
+                  {filteredMatrices.map((matrix) => (
+                    <TableRow key={matrix.id} className="hover:bg-gray-50 transition-colors">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+                            <FileText className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="font-medium">{matrix.name}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="neu-shadow-sm">{matrix.type}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{matrix.examType || "-"}</TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        {new Date(matrix.createdAt).toLocaleDateString("vi-VN")}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(matrix.status)}
+                          <Badge className={cn("neu-shadow", matrix.status === "Hoàn tất" ? "bg-green-100 text-green-800" : matrix.status === "Đang xử lý" ? "bg-orange-100 text-orange-800" : matrix.status === "Lỗi" ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800")}>
+                            {matrix.status}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}`)}>
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          {matrix.status === "Hoàn tất" && (
+                            <>
+                              <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow text-blue-600" onClick={() => router.push(`/teacher/exam-matrix/${matrix.id}/edit`)}>
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => { setSelectedMatrixForExam({ id: matrix.id, name: matrix.name }); setIsGenerateExamModalOpen(true); }}>
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => handleExportToLatex(matrix.id)} disabled={exportingToLatexId === matrix.id}>
+                                {exportingToLatexId === matrix.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode2 className="w-4 h-4" />}
+                              </Button>
+                            </>
+                          )}
+                          {matrix.status !== "Đang xử lý" && (
+                            <>
+                              <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow text-blue-600" onClick={() => handleDuplicate(matrix.id)} disabled={duplicating === matrix.id}>
+                                {duplicating === matrix.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                              </Button>
+                              <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow text-red-600" onClick={() => { setMatrixToDelete(matrix.id); setDeleteDialogOpen(true); }}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </NeumorphicCard>
         </div>
       </div>
 
-      {/* Digitize Modal */}
-      <DigitizeMatrixModal
-        isOpen={isDigitizeModalOpen}
-        onClose={() => setIsDigitizeModalOpen(false)}
-        onUploadComplete={() => {
-          fetchMatrices()
-          setIsDigitizeModalOpen(false)
-        }}
-      />
-
-      {/* Generate Exam Modal */}
+      {/* Modals */}
+      <DigitizeMatrixModal isOpen={isDigitizeModalOpen} onClose={() => setIsDigitizeModalOpen(false)} onUploadComplete={fetchMatrices} />
       {selectedMatrixForExam && (
-        <GenerateExamModal
-          isOpen={isGenerateExamModalOpen}
-          onClose={() => {
-            setIsGenerateExamModalOpen(false)
-            setSelectedMatrixForExam(null)
-          }}
-          matrixId={selectedMatrixForExam.id}
-          matrixName={selectedMatrixForExam.name}
-        />
+        <GenerateExamModal isOpen={isGenerateExamModalOpen} onClose={() => { setIsGenerateExamModalOpen(false); setSelectedMatrixForExam(null); }} matrixId={selectedMatrixForExam.id} matrixName={selectedMatrixForExam.name} />
       )}
-
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="neu-card">
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bạn có chắc chắn muốn xóa ma trận này? Hành động này không thể hoàn tác.
-            </AlertDialogDescription>
+            <AlertDialogTitle className="gradient-text">Xóa ma trận?</AlertDialogTitle>
+            <AlertDialogDescription>Hành động này không thể hoàn tác.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setMatrixToDelete(null)}>
-              Hủy
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => matrixToDelete && handleDelete(matrixToDelete)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Xóa
-            </AlertDialogAction>
+            <AlertDialogCancel className="neu-button">Hủy</AlertDialogCancel>
+            <AlertDialogAction onClick={() => matrixToDelete && handleDelete(matrixToDelete)} className="neu-button bg-gradient-to-br from-red-500 to-red-600">Xóa</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

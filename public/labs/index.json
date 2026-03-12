@@ -762,9 +762,39 @@
         "So sánh với other algorithms"
       ],
       "tags": ["genetic", "algorithm", "optimization", "evolution", "Python", "AI"]
+    },
+    {
+      "id": "plickers-quiz",
+      "name": "🎯 Plickers Quiz - Quét thẻ trả lời",
+      "description": "Hệ thống quiz tương tác thời gian thực sử dụng computer vision. Giáo viên quét thẻ bằng camera, học sinh không cần thiết bị! Lấy cảm hứng từ Plickers.",
+      "category": "Học qua trò chơi",
+      "level": "Dễ",
+      "difficulty": "Dễ",
+      "xp": 200,
+      "duration": "30 phút",
+      "port": null,
+      "icon": "Trophy",
+      "features": [
+        "📱 Giáo viên dùng camera để quét",
+        "🎴 Học sinh giơ thẻ giấy A/B/C/D",
+        "⚡ Kết quả tức thì trên màn hình",
+        "👥 Hỗ trợ đến 63 học sinh/lớp",
+        "📊 Thống kê realtime từng câu hỏi",
+        "🖨️ In thẻ Plickers từ hệ thống",
+        "🎮 Gamification với leaderboard",
+        "💾 Xuất báo cáo kết quả"
+      ],
+      "learning_objectives": [
+        "Hiểu nguyên lý computer vision trong giáo dục",
+        "Áp dụng marker detection để nhận diện đáp án",
+        "Trải nghiệm classroom interaction thời gian thực",
+        "Phân tích kết quả học tập tức thì",
+        "Tối ưu hóa quá trình dạy học tương tác"
+      ],
+      "tags": ["plickers", "quiz", "computer vision", "classroom", "game", "tương tác", "trắc nghiệm", "real-time"]
     }
   ],
-  "total": 30,
+  "total": 31,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
@@ -776,6 +806,7 @@
     "Sinh học",
     "Khí tượng",
     "Computer Vision",
-    "Sóng"
+    "Sóng",
+    "Học qua trò chơi"
   ]
 }

@@ -72,31 +72,11 @@ function createMainWindow() {
     console.log("[desktop] did-finish-load:", webUrl);
     void win.webContents
       .executeJavaScript(`
-        (() => {
-          const id = "__desktop-diag-banner__";
-          const old = document.getElementById(id);
-          if (old) old.remove();
-          const banner = document.createElement("div");
-          banner.id = id;
-          banner.textContent = "Desktop render OK";
-          banner.style.position = "fixed";
-          banner.style.top = "12px";
-          banner.style.left = "12px";
-          banner.style.zIndex = "2147483647";
-          banner.style.background = "#ffeb3b";
-          banner.style.color = "#111";
-          banner.style.padding = "8px 10px";
-          banner.style.borderRadius = "8px";
-          banner.style.fontFamily = "Arial,sans-serif";
-          banner.style.fontSize = "14px";
-          banner.style.boxShadow = "0 2px 8px rgba(0,0,0,.25)";
-          document.body.appendChild(banner);
-          return {
-            href: location.href,
-            title: document.title,
-            readyState: document.readyState
-          };
-        })();
+        (() => ({
+          href: location.href,
+          title: document.title,
+          readyState: document.readyState
+        }))();
       `)
       .then((result) => console.log("[desktop] executeJavaScript result:", result))
       .catch((error) => console.error("[desktop] executeJavaScript failed:", error));

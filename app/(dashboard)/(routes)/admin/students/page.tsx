@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import '@/styles/neumorphic-theme.css';
 import {
   Search, Filter, Users, TrendingUp, TrendingDown, Minus,
   AlertTriangle, CheckCircle, Clock, Brain, Heart, Zap,
@@ -49,9 +50,138 @@ interface AISuggestion {
   action: string;
 }
 
+// Neumorphic Card Component
+const NeuCard = ({ children, className = '', hover = true }: { children: React.ReactNode; className?: string; hover?: boolean }) => (
+  <div
+    className={`neu-bento-item ${hover ? 'neu-bento-item' : ''} ${className}`}
+    style={{
+      background: 'var(--neu-card-bg)',
+      borderRadius: '20px',
+      padding: '20px',
+      boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)',
+      border: '1px solid var(--neu-border)',
+      transition: 'all 0.3s ease'
+    }}
+  >
+    {children}
+  </div>
+);
+
+// Neumorphic Badge Component
+const NeuBadge = ({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'success' | 'danger' | 'warning' | 'info' }) => {
+  const variantStyles = {
+    default: { background: 'var(--neu-card-bg)', color: 'var(--neu-text-primary)' },
+    success: { background: 'rgba(72, 187, 120, 0.15)', color: 'var(--neu-accent-success)' },
+    danger: { background: 'rgba(245, 101, 101, 0.15)', color: 'var(--neu-accent-danger)' },
+    warning: { background: 'rgba(237, 137, 54, 0.15)', color: 'var(--neu-accent-warning)' },
+    info: { background: 'rgba(66, 153, 225, 0.15)', color: 'var(--neu-accent-info)' }
+  };
+
+  return (
+    <span
+      className="px-3 py-1 rounded-full text-xs font-semibold"
+      style={{
+        ...variantStyles[variant],
+        boxShadow: '2px 2px 4px var(--neu-shadow-dark), -2px -2px 4px var(--neu-shadow-light)',
+        border: '1px solid var(--neu-border)'
+      }}
+    >
+      {children}
+    </span>
+  );
+};
+
+// Neumorphic Button Component
+const NeuButton = ({
+  children,
+  onClick,
+  variant = 'default',
+  className = '',
+  size = 'md'
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'default' | 'primary' | 'success' | 'danger';
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+}) => {
+  const sizeStyles = {
+    sm: { padding: '10px 18px', fontSize: '0.8rem' },
+    md: { padding: '14px 28px', fontSize: '0.9rem' },
+    lg: { padding: '18px 36px', fontSize: '1rem' }
+  };
+
+  const variantBg = {
+    default: 'var(--neu-button-bg)',
+    primary: 'var(--neu-button-primary-bg)',
+    success: 'var(--neu-button-success-bg)',
+    danger: 'var(--neu-button-danger-bg)'
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`neu-button ${variant === 'primary' ? 'neu-button-primary' : ''} ${className}`}
+      style={{
+        background: variantBg[variant],
+        borderRadius: '16px',
+        ...sizeStyles[size],
+        fontWeight: '600',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        boxShadow: variant === 'primary'
+          ? '8px 8px 16px rgba(102, 126, 234, 0.4), -6px -6px 12px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
+          : '8px 8px 16px var(--neu-shadow-dark), -8px -8px 16px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)',
+        border: '1px solid var(--neu-border)',
+        color: variant === 'primary' ? 'var(--neu-text-inverse)' : 'var(--neu-text-primary)'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = variant === 'primary'
+          ? '10px 10px 20px rgba(102, 126, 234, 0.5), -8px -8px 16px var(--neu-shadow-light)'
+          : '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = variant === 'primary'
+          ? '8px 8px 16px rgba(102, 126, 234, 0.4), -6px -6px 12px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
+          : '8px 8px 16px var(--neu-shadow-dark), -8px -8px 16px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)';
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+// Neumorphic StatBox Component
+const NeuStatBox = ({
+  label,
+  value,
+  subValue,
+  icon: Icon,
+  iconColor
+}: {
+  label: string;
+  value: string | number;
+  subValue?: string;
+  icon: React.ElementType;
+  iconColor: string;
+}) => (
+  <NeuCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="text-sm" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>{label}</span>
+      <Icon className="w-5 h-5" style={{ color: iconColor }} />
+    </div>
+    <p className="text-2xl font-bold" style={{ color: 'var(--neu-text-primary)' }}>{value}</p>
+    {subValue && (
+      <p className="text-sm mt-1" style={{ color: 'var(--neu-accent-success)', fontWeight: '600' }}>{subValue}</p>
+    )}
+  </NeuCard>
+);
+
 export default function AdminStudentsPage() {
   const { t } = useLanguage();
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [selectedRisk, setSelectedRisk] = useState<string>('all');
@@ -70,10 +200,10 @@ export default function AdminStudentsPage() {
         class: selectedClass,
         risk: selectedRisk
       });
-      
+
       const response = await fetch(`/api/admin/students?${params}`);
       if (!response.ok) throw new Error('Failed to fetch students');
-      
+
       const data = await response.json();
       console.log('✅ [Admin Students] Fetched:', data.students.length, 'students');
       setStudents(data.students);
@@ -88,10 +218,12 @@ export default function AdminStudentsPage() {
   const fetchStudentDetail = async (studentId: string) => {
     try {
       const response = await fetch(`/api/admin/students/${studentId}`);
-      if (!response.ok) throw new Error('Failed to fetch student detail');
-      
-      const data = await response.json();
-      console.log('✅ [Admin Students] Detail fetched for:', data.student.name);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = (data as { error?: string })?.error || data?.message || response.statusText || 'Failed to fetch student detail';
+        throw new Error(`${response.status === 404 ? 'Student not found' : message}`);
+      }
+      console.log('✅ [Admin Students] Detail fetched for:', data.student?.name);
       setStudentDetail(data);
     } catch (error) {
       console.error('❌ [Admin Students] Error fetching detail:', error);
@@ -184,31 +316,49 @@ export default function AdminStudentsPage() {
 
   const getRiskColor = (level: string) => {
     switch (level) {
-      case 'critical': return 'bg-red-100 border-red-300 text-red-800';
-      case 'high': return 'bg-orange-100 border-orange-300 text-orange-800';
-      case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-      default: return 'bg-green-100 border-green-300 text-green-800';
+      case 'critical': return 'danger';
+      case 'high': return 'warning';
+      case 'medium': return 'warning';
+      default: return 'success';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'mastered': return 'bg-green-500';
-      case 'learning': return 'bg-blue-500';
-      case 'review': return 'bg-yellow-500';
-      case 'struggling': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'mastered': return 'var(--neu-accent-success)';
+      case 'learning': return 'var(--neu-accent-info)';
+      case 'review': return 'var(--neu-accent-warning)';
+      case 'struggling': return 'var(--neu-accent-danger)';
+      default: return 'var(--neu-text-muted)';
     }
   };
 
   const getEventIcon = (type: string) => {
     switch (type) {
-      case 'quiz': return <Award className="w-5 h-5 text-blue-500" />;
-      case 'login': return <Activity className="w-5 h-5 text-green-500" />;
-      case 'emotion_spike': return <Heart className="w-5 h-5 text-pink-500" />;
-      case 'intervention': return <MessageSquare className="w-5 h-5 text-purple-500" />;
-      case 'achievement': return <Zap className="w-5 h-5 text-yellow-500" />;
-      default: return <CheckCircle className="w-5 h-5 text-gray-500" />;
+      case 'quiz': return { icon: Award, color: 'var(--neu-accent-info)' };
+      case 'login': return { icon: Activity, color: 'var(--neu-accent-success)' };
+      case 'emotion_spike': return { icon: Heart, color: 'var(--neu-accent-danger)' };
+      case 'intervention': return { icon: MessageSquare, color: 'var(--neu-accent-primary)' };
+      case 'achievement': return { icon: Zap, color: 'var(--neu-accent-warning)' };
+      default: return { icon: CheckCircle, color: 'var(--neu-text-muted)' };
+    }
+  };
+
+  const getAIBgColor = (type: string) => {
+    switch (type) {
+      case 'alert': return 'rgba(245, 101, 101, 0.1)';
+      case 'suggestion': return 'rgba(66, 153, 225, 0.1)';
+      case 'opportunity': return 'rgba(72, 187, 120, 0.1)';
+      default: return 'var(--neu-card-bg)';
+    }
+  };
+
+  const getAIBorderColor = (type: string) => {
+    switch (type) {
+      case 'alert': return 'rgba(245, 101, 101, 0.3)';
+      case 'suggestion': return 'rgba(66, 153, 225, 0.3)';
+      case 'opportunity': return 'rgba(72, 187, 120, 0.3)';
+      default: return 'var(--neu-border)';
     }
   };
 
@@ -221,83 +371,91 @@ export default function AdminStudentsPage() {
 
   if (viewMode === 'detail' && selectedStudent) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6">
+      <div className="neumorphic-theme" style={{ padding: '30px' }}>
         {/* Header */}
-        <div className="mb-6">
-          <button
+        <div className="mb-8" style={{ animation: 'fadeIn 0.8s ease-out' }}>
+          <NeuButton
             onClick={() => setViewMode('list')}
-            className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2 mb-4"
+            variant="default"
+            size="sm"
+            className="mb-6"
           >
             ← Back to Students
-          </button>
-          
+          </NeuButton>
+
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+            <div className="flex items-center gap-5">
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                  boxShadow: '8px 8px 16px var(--neu-shadow-dark), -8px -8px 16px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
+                }}
+              >
                 {selectedStudent.avatar}
-              
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{selectedStudent.name}</h1>
-                <p className="text-gray-600">{selectedStudent.email}</p>
+                <h1
+                  className="text-3xl font-bold mb-1"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text'
+                  }}
+                >
+                  {selectedStudent.name}
+                </h1>
+                <p className="text-gray-600" style={{ color: 'var(--neu-text-secondary)' }}>{selectedStudent.email}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                    Class {selectedStudent.class}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getRiskColor(selectedStudent.riskLevel)}`}>
+                  <NeuBadge variant="info">Class {selectedStudent.class}</NeuBadge>
+                  <NeuBadge variant={getRiskColor(selectedStudent.riskLevel) as any}>
                     {selectedStudent.riskLevel.toUpperCase()} Risk
-                  </span>
+                  </NeuBadge>
                 </div>
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
+            <div className="flex gap-3">
+              <NeuButton variant="default" size="sm">
+                <MessageSquare className="w-4 h-4" style={{ marginRight: '8px' }} />
                 Chat
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-                <Target className="w-4 h-4" />
+              </NeuButton>
+              <NeuButton variant="primary" size="sm">
+                <Target className="w-4 h-4" style={{ marginRight: '8px' }} />
                 Adjust Path
-              </button>
+              </NeuButton>
             </div>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Current XP</span>
-              <TrendingUp className="w-4 h-4 text-green-500" />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{selectedStudent.currentXP}</p>
-            <p className="text-sm text-green-600">+{selectedStudent.xpChange}%</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Mastery</span>
-              <Award className="w-4 h-4 text-blue-500" />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{selectedStudent.masteryPercentage}%</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Emotion Score</span>
-              <Heart className="w-4 h-4 text-pink-500" />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{selectedStudent.emotionScore}/10</p>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Last Active</span>
-              <Clock className="w-4 h-4 text-gray-500" />
-            </div>
-            <p className="text-sm font-medium text-gray-900">{selectedStudent.lastActive}</p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+          <NeuStatBox
+            label="Current XP"
+            value={selectedStudent.currentXP}
+            subValue={`+${selectedStudent.xpChange}%`}
+            icon={TrendingUp}
+            iconColor="var(--neu-accent-success)"
+          />
+          <NeuStatBox
+            label="Mastery"
+            value={`${selectedStudent.masteryPercentage}%`}
+            icon={Award}
+            iconColor="var(--neu-accent-info)"
+          />
+          <NeuStatBox
+            label="Emotion Score"
+            value={`${selectedStudent.emotionScore}/10`}
+            icon={Heart}
+            iconColor="var(--neu-accent-danger)"
+          />
+          <NeuStatBox
+            label="Last Active"
+            value={selectedStudent.lastActive}
+            icon={Clock}
+            iconColor="var(--neu-text-secondary)"
+          />
         </div>
 
         {/* Main Content Grid */}
@@ -305,32 +463,83 @@ export default function AdminStudentsPage() {
           {/* Left: PLG Skills + Timeline */}
           <div className="lg:col-span-2 space-y-6">
             {/* PLG Skills Mini-Map */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Brain className="w-6 h-6 text-purple-600" />
+            <NeuCard>
+              <h2
+                className="text-xl font-bold mb-6 flex items-center gap-3"
+                style={{ color: 'var(--neu-text-primary)' }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                    boxShadow: '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)'
+                  }}
+                >
+                  <Brain className="w-5 h-5 text-white" />
+                </div>
                 Personal Learning Graph
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {(studentDetail?.plgSkills || mockPLGSkills).map((skill: any, idx: number) => (
                   <div
                     key={idx}
-                    className="border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer"
+                    className="neu-status-item"
+                    style={{
+                      background: 'var(--neu-card-bg)',
+                      borderRadius: '14px',
+                      padding: '16px',
+                      boxShadow: 'inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)',
+                      border: '1px solid var(--neu-border)',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--neu-border-hover)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--neu-border)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-gray-600">{skill.name}</span>
-                      <div className={`w-3 h-3 rounded-full ${getStatusColor(skill.status)}`} />
+                    <div className="flex items-center justify-between mb-3">
+                      <span
+                        className="text-xs font-semibold"
+                        style={{ color: 'var(--neu-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}
+                      >
+                        {skill.name}
+                      </span>
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{
+                          background: getStatusColor(skill.status),
+                          boxShadow: '2px 2px 4px var(--neu-shadow-dark), -2px -2px 4px var(--neu-shadow-light)'
+                        }}
+                      />
                     </div>
-                    <div className="mb-2">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="mb-3">
+                      <div
+                        className="w-full rounded-full h-2.5"
+                        style={{
+                          background: 'var(--neu-bg-secondary)',
+                          boxShadow: 'inset 2px 2px 4px var(--neu-shadow-inset-dark), inset -2px -2px 4px var(--neu-shadow-inset-light)'
+                        }}
+                      >
                         <div
-                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full"
-                          style={{ width: `${skill.mastery * 100}%` }}
+                          className="h-2.5 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${skill.mastery * 100}%`,
+                            background: 'linear-gradient(90deg, var(--neu-accent-info) 0%, var(--neu-accent-primary) 100%)',
+                            boxShadow: '2px 2px 4px var(--neu-shadow-dark)'
+                          }}
                         />
                       </div>
                     </div>
-                    <div className="text-xs text-gray-600">
+                    <div className="text-xs" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>
                       {skill.predictedGain ? (
-                        <span className="text-green-600">+{Math.round(skill.predictedGain * 100)}% gain predicted</span>
+                        <span style={{ color: 'var(--neu-accent-success)', fontWeight: '600' }}>
+                          +{Math.round(skill.predictedGain * 100)}% gain predicted
+                        </span>
                       ) : skill.nextReview ? (
                         <span>Review in {skill.nextReview}</span>
                       ) : null}
@@ -338,79 +547,189 @@ export default function AdminStudentsPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </NeuCard>
 
             {/* Timeline */}
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <Activity className="w-6 h-6 text-blue-600" />
+            <NeuCard>
+              <h2
+                className="text-xl font-bold mb-6 flex items-center gap-3"
+                style={{ color: 'var(--neu-text-primary)' }}
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neu-accent-info) 0%, var(--neu-accent-primary) 100%)',
+                    boxShadow: '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)'
+                  }}
+                >
+                  <Activity className="w-5 h-5 text-white" />
+                </div>
                 Activity Timeline
               </h2>
               <div className="space-y-4">
-                {(studentDetail?.timeline || mockTimeline).map((event: any) => (
-                  <div key={event.id} className="flex gap-4 border-l-2 border-gray-200 pl-4 pb-4 last:pb-0">
-                    <div className="mt-1">
-                      {getEventIcon(event.type)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <h3 className="font-semibold text-gray-900">{event.title}</h3>
-                        <span className="text-xs text-gray-500">{event.timestamp}</span>
+                {(studentDetail?.timeline || mockTimeline).map((event: any) => {
+                  const EventIcon = getEventIcon(event.type).icon;
+                  const iconColor = getEventIcon(event.type).color;
+
+                  return (
+                    <div
+                      key={event.id}
+                      className="flex gap-4 pb-4 last:pb-0"
+                      style={{
+                        borderLeft: '3px solid var(--neu-border)',
+                        paddingLeft: '16px'
+                      }}
+                    >
+                      <div
+                        className="mt-1 w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: 'var(--neu-card-bg)',
+                          boxShadow: '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)',
+                          border: '1px solid var(--neu-border)'
+                        }}
+                      >
+                        <EventIcon className="w-5 h-5" style={{ color: iconColor }} />
                       </div>
-                      {event.details && (
-                        <p className="text-sm text-gray-600 mt-1">{event.details}</p>
-                      )}
-                      {event.xpGained && (
-                        <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded">
-                          +{event.xpGained} XP
-                        </span>
-                      )}
-                      {event.emotionChange && (
-                        <div className="mt-2 flex items-center gap-2 text-sm">
-                          <span className="text-gray-600">{event.emotionChange.from}</span>
-                          <ChevronRight className="w-4 h-4 text-gray-400" />
-                          <span className="text-blue-600 font-medium">{event.emotionChange.to}</span>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <h3
+                            className="font-bold"
+                            style={{ color: 'var(--neu-text-primary)', fontSize: '0.95rem' }}
+                          >
+                            {event.title}
+                          </h3>
+                          <span
+                            className="text-xs"
+                            style={{ color: 'var(--neu-text-muted)', fontWeight: '500' }}
+                          >
+                            {event.timestamp}
+                          </span>
                         </div>
-                      )}
+                        {event.details && (
+                          <p
+                            className="text-sm mt-1"
+                            style={{ color: 'var(--neu-text-secondary)', lineHeight: '1.5' }}
+                          >
+                            {event.details}
+                          </p>
+                        )}
+                        {event.xpGained && (
+                          <span
+                            className="inline-block mt-2 px-3 py-1 text-xs font-semibold rounded-lg"
+                            style={{
+                              background: 'rgba(72, 187, 120, 0.15)',
+                              color: 'var(--neu-accent-success)',
+                              boxShadow: '2px 2px 4px var(--neu-shadow-dark), -2px -2px 4px var(--neu-shadow-light)',
+                              border: '1px solid rgba(72, 187, 120, 0.3)'
+                            }}
+                          >
+                            +{event.xpGained} XP
+                          </span>
+                        )}
+                        {event.emotionChange && (
+                          <div className="mt-2 flex items-center gap-2 text-sm">
+                            <span style={{ color: 'var(--neu-text-secondary)' }}>{event.emotionChange.from}</span>
+                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--neu-text-muted)' }} />
+                            <span
+                              className="font-semibold"
+                              style={{ color: 'var(--neu-accent-info)' }}
+                            >
+                              {event.emotionChange.to}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
+            </NeuCard>
           </div>
 
           {/* Right: AI Suggestions */}
-          <div className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-              <Zap className="w-6 h-6 text-yellow-500" />
+          <NeuCard>
+            <h2
+              className="text-xl font-bold mb-6 flex items-center gap-3"
+              style={{ color: 'var(--neu-text-primary)' }}
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neu-accent-warning) 0%, #f56565 100%)',
+                  boxShadow: '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)'
+                }}
+              >
+                <Zap className="w-5 h-5 text-white" />
+              </div>
               AI Suggestions
             </h2>
             <div className="space-y-4">
               {(studentDetail?.aiSuggestions || mockAISuggestions).map((suggestion: any) => {
-                const bgColor = 
-                  suggestion.type === 'alert' ? 'bg-red-50 border-red-200' :
-                  suggestion.type === 'suggestion' ? 'bg-blue-50 border-blue-200' :
-                  'bg-green-50 border-green-200';
-                
                 const icon =
-                  suggestion.type === 'alert' ? <AlertTriangle className="w-5 h-5 text-red-500" /> :
-                  suggestion.type === 'suggestion' ? <Brain className="w-5 h-5 text-blue-500" /> :
-                  <Zap className="w-5 h-5 text-green-500" />;
+                  suggestion.type === 'alert' ? <AlertTriangle className="w-5 h-5" style={{ color: 'var(--neu-accent-danger)' }} /> :
+                  suggestion.type === 'suggestion' ? <Brain className="w-5 h-5" style={{ color: 'var(--neu-accent-info)' }} /> :
+                  <Zap className="w-5 h-5" style={{ color: 'var(--neu-accent-success)' }} />;
 
                 return (
-                  <div key={suggestion.id} className={`border rounded-lg p-4 ${bgColor}`}>
+                  <div
+                    key={suggestion.id}
+                    className="border rounded-xl p-4 transition-all"
+                    style={{
+                      background: getAIBgColor(suggestion.type),
+                      borderColor: getAIBorderColor(suggestion.type),
+                      boxShadow: '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)',
+                      borderRadius: '14px'
+                    }}
+                  >
                     <div className="flex items-start gap-3 mb-3">
-                      {icon}
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: 'var(--neu-card-bg)',
+                          boxShadow: '3px 3px 6px var(--neu-shadow-dark), -3px -3px 6px var(--neu-shadow-light)'
+                        }}
+                      >
+                        {icon}
+                      </div>
                       <div className="flex-1">
-                        <h3 className="font-bold text-gray-900 text-sm">{suggestion.title}</h3>
-                        <p className="text-xs text-gray-700 mt-1">{suggestion.description}</p>
+                        <h3
+                          className="font-bold text-sm mb-1"
+                          style={{ color: 'var(--neu-text-primary)' }}
+                        >
+                          {suggestion.title}
+                        </h3>
+                        <p
+                          className="text-xs"
+                          style={{ color: 'var(--neu-text-secondary)', lineHeight: '1.4' }}
+                        >
+                          {suggestion.description}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-600">
+                      <span
+                        className="text-xs font-semibold"
+                        style={{ color: 'var(--neu-text-muted)' }}
+                      >
                         {Math.round(suggestion.confidence * 100)}% confidence
                       </span>
-                      <button className="px-3 py-1 bg-white text-blue-600 rounded-md text-xs font-medium hover:bg-blue-50 transition-colors">
+                      <button
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={{
+                          background: 'var(--neu-button-bg)',
+                          color: 'var(--neu-accent-primary)',
+                          boxShadow: '3px 3px 6px var(--neu-shadow-dark), -3px -3px 6px var(--neu-shadow-light)',
+                          border: '1px solid var(--neu-border)'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'translateY(-1px)';
+                          e.currentTarget.style.boxShadow = '4px 4px 8px var(--neu-shadow-dark), -4px -4px 8px var(--neu-shadow-light)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '3px 3px 6px var(--neu-shadow-dark), -3px -3px 6px var(--neu-shadow-light)';
+                        }}
+                      >
                         {suggestion.action}
                       </button>
                     </div>
@@ -419,39 +738,76 @@ export default function AdminStudentsPage() {
               })}
             </div>
 
-            <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-              <p className="text-xs text-gray-700">
-                <strong className="text-purple-700">💡 AI Tip:</strong> These suggestions are generated in real-time based on PLG, XP, and emotion data. Click &quot;Apply&quot; to execute automatically.
+            <div
+              className="mt-6 p-4 rounded-xl border"
+              style={{
+                background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+                borderColor: 'rgba(102, 126, 234, 0.3)',
+                boxShadow: 'inset 3px 3px 6px var(--neu-shadow-inset-dark), inset -3px -3px 6px var(--neu-shadow-inset-light)'
+              }}
+            >
+              <p className="text-xs" style={{ color: 'var(--neu-text-secondary)', lineHeight: '1.5' }}>
+                <strong style={{ color: 'var(--neu-accent-primary)', fontWeight: '700' }}>💡 AI Tip:</strong> These suggestions are generated in real-time based on PLG, XP, and emotion data. Click &quot;Apply&quot; to execute automatically.
               </p>
             </div>
-          </div>
+          </NeuCard>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6">
+    <div className="neumorphic-theme" style={{ padding: '30px' }}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+      <div className="neu-header mb-10">
+        <h1
+          className="text-4xl font-bold mb-2"
+          style={{
+            background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            letterSpacing: '-1px'
+          }}
+        >
+          <Users className="w-10 h-10 inline-block mr-3" style={{ verticalAlign: 'middle' }} />
           Student Insights Hub
         </h1>
-        <p className="text-gray-600">Track student behavior, emotions, and progress in real-time</p>
+        <p className="text-gray-600" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>
+          Track student behavior, emotions, and progress in real-time
+        </p>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border p-4 mb-6">
+      <NeuCard className="mb-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="md:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search
+              className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5"
+              style={{ color: 'var(--neu-text-muted)' }}
+            />
             <input
               type="text"
               placeholder="Search students..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="neu-input w-full pl-12 pr-4 py-3"
+              style={{
+                background: 'var(--neu-input-bg)',
+                borderRadius: '16px',
+                border: '1px solid var(--neu-border)',
+                boxShadow: 'inset 6px 6px 12px var(--neu-shadow-inset-dark), inset -6px -6px 12px var(--neu-shadow-inset-light)',
+                color: 'var(--neu-text-primary)',
+                fontSize: '0.9rem',
+                transition: 'all 0.3s ease'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.boxShadow = 'inset 8px 8px 16px var(--neu-shadow-inset-dark), inset -8px -8px 16px var(--neu-shadow-inset-light), 0 0 0 3px var(--neu-input-focus-ring)';
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.boxShadow = 'inset 6px 6px 12px var(--neu-shadow-inset-dark), inset -6px -6px 12px var(--neu-shadow-inset-light)';
+              }}
             />
           </div>
 
@@ -459,7 +815,17 @@ export default function AdminStudentsPage() {
           <select
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="neu-input px-4 py-3"
+            style={{
+              background: 'var(--neu-input-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--neu-border)',
+              boxShadow: 'inset 6px 6px 12px var(--neu-shadow-inset-dark), inset -6px -6px 12px var(--neu-shadow-inset-light)',
+              color: 'var(--neu-text-primary)',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
           >
             <option value="all">All Classes</option>
             <option value="10A">Class 10A</option>
@@ -471,7 +837,17 @@ export default function AdminStudentsPage() {
           <select
             value={selectedRisk}
             onChange={(e) => setSelectedRisk(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="neu-input px-4 py-3"
+            style={{
+              background: 'var(--neu-input-bg)',
+              borderRadius: '16px',
+              border: '1px solid var(--neu-border)',
+              boxShadow: 'inset 6px 6px 12px var(--neu-shadow-inset-dark), inset -6px -6px 12px var(--neu-shadow-inset-light)',
+              color: 'var(--neu-text-primary)',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
           >
             <option value="all">All Risk Levels</option>
             <option value="critical">Critical</option>
@@ -480,138 +856,183 @@ export default function AdminStudentsPage() {
             <option value="low">Low</option>
           </select>
         </div>
-      </div>
+      </NeuCard>
 
       {/* Loading State */}
       {isLoading && (
-        <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading students...</p>
-        </div>
+        <NeuCard>
+          <div className="text-center py-12">
+            <div
+              className="animate-spin rounded-full h-16 w-16 mx-auto mb-4"
+              style={{
+                background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                borderBottom: '3px solid transparent'
+              }}
+            />
+            <p className="text-gray-600" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>
+              Loading students...
+            </p>
+          </div>
+        </NeuCard>
       )}
 
       {/* Students Grid */}
       {!isLoading && (
         <div className="grid grid-cols-1 gap-4">
           {students.map((student) => (
-          <div
-            key={student.id}
-            className="bg-white rounded-xl shadow-sm border hover:shadow-md transition-all p-6"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-xl font-bold">
-                  {student.avatar}
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">{student.name}</h3>
-                  <p className="text-sm text-gray-600">{student.email}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                      {student.class}
-                    </span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getRiskColor(student.riskLevel)}`}>
-                      {student.riskLevel.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-8">
-                {/* XP */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">XP</p>
-                  <p className="text-xl font-bold text-gray-900">{student.currentXP}</p>
-                  <div className="flex items-center gap-1 text-sm mt-1">
-                    {student.xpChange > 0 ? (
-                      <TrendingUp className="w-4 h-4 text-green-500" />
-                    ) : student.xpChange < 0 ? (
-                      <TrendingDown className="w-4 h-4 text-red-500" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-gray-500" />
-                    )}
-                    <span className={student.xpChange > 0 ? 'text-green-600' : student.xpChange < 0 ? 'text-red-600' : 'text-gray-600'}>
-                      {student.xpChange > 0 ? '+' : ''}{student.xpChange}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Mastery */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">Mastery</p>
-                  <div className="relative w-16 h-16">
-                    <svg className="transform -rotate-90 w-16 h-16">
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="#e5e7eb"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <circle
-                        cx="32"
-                        cy="32"
-                        r="28"
-                        stroke="url(#gradient)"
-                        strokeWidth="4"
-                        fill="none"
-                        strokeDasharray={`${student.masteryPercentage * 1.76} 176`}
-                        strokeLinecap="round"
-                      />
-                      <defs>
-                        <linearGradient id="gradient">
-                          <stop offset="0%" stopColor="#3b82f6" />
-                          <stop offset="100%" stopColor="#a855f7" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                    <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-gray-900">
-                      {student.masteryPercentage}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Emotion */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-1">Emotion</p>
-                  <div className="flex items-center gap-2">
-                    <Heart className="w-5 h-5 text-pink-500" />
-                    <p className="text-xl font-bold text-gray-900">{student.emotionScore}</p>
-                    <span className="text-sm text-gray-600">/10</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => handleViewStudent(student)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 text-sm"
+            <NeuCard key={student.id} className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-5">
+                  <div
+                    className="w-18 h-18 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                      boxShadow: '6px 6px 12px var(--neu-shadow-dark), -6px -6px 12px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)'
+                    }}
                   >
-                    <Eye className="w-4 h-4" />
-                    View Details
-                  </button>
-                  <button className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm">
-                    <MessageSquare className="w-4 h-4" />
-                    Chat
-                  </button>
+                    {student.avatar}
+                  </div>
+
+                  <div>
+                    <h3
+                      className="text-lg font-bold mb-1"
+                      style={{ color: 'var(--neu-text-primary)' }}
+                    >
+                      {student.name}
+                    </h3>
+                    <p className="text-sm" style={{ color: 'var(--neu-text-secondary)' }}>{student.email}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <NeuBadge variant="info">{student.class}</NeuBadge>
+                      <NeuBadge variant={getRiskColor(student.riskLevel) as any}>
+                        {student.riskLevel.toUpperCase()}
+                      </NeuBadge>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-10">
+                  {/* XP */}
+                  <div className="text-center">
+                    <p className="text-sm mb-1" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>XP</p>
+                    <p className="text-xl font-bold" style={{ color: 'var(--neu-text-primary)' }}>{student.currentXP}</p>
+                    <div className="flex items-center gap-1 text-sm mt-1">
+                      {student.xpChange > 0 ? (
+                        <TrendingUp className="w-4 h-4" style={{ color: 'var(--neu-accent-success)' }} />
+                      ) : student.xpChange < 0 ? (
+                        <TrendingDown className="w-4 h-4" style={{ color: 'var(--neu-accent-danger)' }} />
+                      ) : (
+                        <Minus className="w-4 h-4" style={{ color: 'var(--neu-text-muted)' }} />
+                      )}
+                      <span
+                        className="font-semibold"
+                        style={{
+                          color: student.xpChange > 0 ? 'var(--neu-accent-success)' : student.xpChange < 0 ? 'var(--neu-accent-danger)' : 'var(--neu-text-secondary)'
+                        }}
+                      >
+                        {student.xpChange > 0 ? '+' : ''}{student.xpChange}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mastery */}
+                  <div className="text-center">
+                    <p className="text-sm mb-1" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>Mastery</p>
+                    <div className="relative w-18 h-18 mx-auto">
+                      <svg className="transform -rotate-90 w-18 h-18">
+                        <circle
+                          cx="36"
+                          cy="36"
+                          r="30"
+                          stroke="var(--neu-bg-secondary)"
+                          strokeWidth="5"
+                          fill="none"
+                          style={{
+                            boxShadow: 'inset 2px 2px 4px var(--neu-shadow-inset-dark), inset -2px -2px 4px var(--neu-shadow-inset-light)'
+                          }}
+                        />
+                        <circle
+                          cx="36"
+                          cy="36"
+                          r="30"
+                          stroke="url(#gradient)"
+                          strokeWidth="5"
+                          fill="none"
+                          strokeDasharray={`${student.masteryPercentage * 1.88} 188`}
+                          strokeLinecap="round"
+                          style={{
+                            filter: 'drop-shadow(2px 2px 3px var(--neu-shadow-dark))'
+                          }}
+                        />
+                        <defs>
+                          <linearGradient id="gradient">
+                            <stop offset="0%" stopColor="var(--neu-accent-info)" />
+                            <stop offset="100%" stopColor="var(--neu-accent-primary)" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                      <span
+                        className="absolute inset-0 flex items-center justify-center text-sm font-bold"
+                        style={{ color: 'var(--neu-text-primary)' }}
+                      >
+                        {student.masteryPercentage}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Emotion */}
+                  <div className="text-center">
+                    <p className="text-sm mb-1" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>Emotion</p>
+                    <div className="flex items-center gap-2 justify-center">
+                      <Heart className="w-5 h-5" style={{ color: 'var(--neu-accent-danger)' }} />
+                      <p className="text-xl font-bold" style={{ color: 'var(--neu-text-primary)' }}>{student.emotionScore}</p>
+                      <span className="text-sm" style={{ color: 'var(--neu-text-secondary)' }}>/10</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col gap-2">
+                    <NeuButton
+                      onClick={() => handleViewStudent(student)}
+                      variant="primary"
+                      size="sm"
+                    >
+                      <Eye className="w-4 h-4" style={{ marginRight: '8px' }} />
+                      View Details
+                    </NeuButton>
+                    <NeuButton
+                      variant="default"
+                      size="sm"
+                    >
+                      <MessageSquare className="w-4 h-4" style={{ marginRight: '8px' }} />
+                      Chat
+                    </NeuButton>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </NeuCard>
           ))}
         </div>
       )}
 
       {!isLoading && students.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border p-12 text-center">
-          <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No students found</h3>
-          <p className="text-gray-600">Try adjusting your filters or search term</p>
-        </div>
+        <NeuCard>
+          <div className="text-center py-12">
+            <Users
+              className="w-16 h-16 mx-auto mb-4"
+              style={{ color: 'var(--neu-text-muted)' }}
+            />
+            <h3
+              className="text-xl font-bold mb-2"
+              style={{ color: 'var(--neu-text-primary)' }}
+            >
+              No students found
+            </h3>
+            <p className="text-gray-600" style={{ color: 'var(--neu-text-secondary)', fontWeight: '500' }}>
+              Try adjusting your filters or search term
+            </p>
+          </div>
+        </NeuCard>
       )}
     </div>
   );
 }
-

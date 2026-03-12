@@ -86,6 +86,13 @@ export default function MatrixReviewPage() {
     fetchMatrix()
   }, [matrixId])
 
+  // Tự làm mới khi ma trận đang xử lý để cập nhật khi trích xuất xong
+  useEffect(() => {
+    if (!matrix || (matrix.status !== "Đang xử lý" && matrix.status !== "Hàng đợi")) return
+    const t = setInterval(fetchMatrix, 5000)
+    return () => clearInterval(t)
+  }, [matrixId, matrix?.status])
+
   const fetchMatrix = async () => {
     try {
       setLoading(true)
@@ -299,6 +306,49 @@ export default function MatrixReviewPage() {
       {/* Content */}
       <div className="flex-1 overflow-auto">
         <div className="container mx-auto px-6 py-6">
+          {/* Đang trích xuất — nhắc user có thể ra đề sau khi xong */}
+          {matrix.type === "Số hoá" && (matrix.status === "Đang xử lý" || matrix.status === "Hàng đợi") && (
+            <Card className="mb-6 border-muted">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary shrink-0" />
+                  <div>
+                    <CardTitle className="text-base">Đang trích xuất nội dung</CardTitle>
+                    <CardDescription className="mt-0.5">
+                      Khi xong, bạn có thể ra đề theo nội dung đã trích xuất ngay tại trang này.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Ra đề theo nội dung đã trích xuất — nổi bật khi ma trận Số hoá đã Hoàn tất */}
+          {matrix.status === "Hoàn tất" && matrix.type === "Số hoá" && canGenerateExam && (
+            <Card className="mb-6 border-primary/30 bg-primary/5">
+              <CardContent className="pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      Ra đề theo nội dung đã trích xuất
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Ma trận đã được số hóa xong. Tạo đề thi tự động từ ngân hàng câu hỏi theo yêu cầu ma trận.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={() => setGenerateExamModalOpen(true)}
+                    className="gap-2 shrink-0"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Tạo đề thi từ nội dung đã trích xuất
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Tabs defaultValue="image" className="space-y-4">
             <TabsList>
               <TabsTrigger value="image">Hình ảnh</TabsTrigger>

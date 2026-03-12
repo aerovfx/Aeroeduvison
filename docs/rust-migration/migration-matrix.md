@@ -1,8 +1,8 @@
 # API Migration Matrix
 
-Generated: 2026-03-03T13:23:36.067Z
+Generated: 2026-03-08T10:44:36.673Z
 
-Total routes: **172**
+Total routes: **177**
 
 | Route | Source | Status | Batch | Target | Notes |
 |---|---|---|---|---|---|
@@ -99,11 +99,14 @@ Total routes: **172**
 | `/api/grading/[id]` | `app/api/grading/[id]/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/grading/batch` | `app/api/grading/batch/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/grading/dashboard` | `app/api/grading/dashboard/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
+| `/api/grading/grade` | `app/api/grading/grade/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/grading/review` | `app/api/grading/review/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
+| `/api/grading/secure` | `app/api/grading/secure/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/grading/submit` | `app/api/grading/submit/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/harmonic-motion` | `app/api/harmonic-motion/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/health` | `app/api/health/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/image-signed-url` | `app/api/image-signed-url/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
+| `/api/kg/search` | `app/api/kg/search/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/lab-completion` | `app/api/lab-completion/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/labs/index` | `app/api/labs/index/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/labtwin` | `app/api/labtwin/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
@@ -133,6 +136,8 @@ Total routes: **172**
 | `/api/question-bank` | `app/api/question-bank/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/question-bank/[id]` | `app/api/question-bank/[id]/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/queue/jobs` | `app/api/queue/jobs/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
+| `/api/quiz/generate` | `app/api/quiz/generate/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
+| `/api/quiz/validate` | `app/api/quiz/validate/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/redis/cache` | `app/api/redis/cache/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/redis/health` | `app/api/redis/health/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |
 | `/api/refraction` | `app/api/refraction/route.ts` | scaffolded | backlog | node | Scaffold placeholder (501) in Rust backend |

@@ -10,7 +10,7 @@ export function AuthSessionProvider({
   return (
     <SessionProvider 
       basePath="/api/auth"
-      refetchInterval={5}
+      refetchInterval={5 * 60}
       refetchOnWindowFocus={true}
       refetchWhenOffline={false}
     >

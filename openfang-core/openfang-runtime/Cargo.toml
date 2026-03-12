@@ -1,0 +1,28 @@
+[package]
+name = "openfang-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "OpenFang Runtime - Agent Loop & LLM Drivers"
+
+[dependencies]
+# Core
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async
+async-trait = "0.1"
+futures = "0.3"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+
+# Workspace
+openfang-types = { path = "../openfang-types" }

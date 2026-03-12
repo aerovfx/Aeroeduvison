@@ -41,13 +41,32 @@ export function DocsLayoutWrapper({
   useEffect(() => {
     const savedLeft = localStorage.getItem("docs-left-sidebar-open")
     const savedRight = localStorage.getItem("docs-right-sidebar-open")
-    
+
     if (savedLeft !== null) {
       setLeftSidebarOpen(savedLeft === "true")
     }
     if (savedRight !== null) {
       setRightSidebarOpen(savedRight === "true")
     }
+  }, [])
+
+  // Save preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem("docs-left-sidebar-open", String(leftSidebarOpen))
+    localStorage.setItem("docs-right-sidebar-open", String(rightSidebarOpen))
+  }, [leftSidebarOpen, rightSidebarOpen])
+
+  // Keyboard shortcut: Ctrl/Cmd + B to toggle left sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault()
+        setLeftSidebarOpen(prev => !prev)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
   return (
@@ -76,7 +95,21 @@ export function DocsLayoutWrapper({
                   : "w-0 -translate-x-full opacity-0 md:translate-x-0 md:border-0 md:overflow-hidden"
               )}
             >
-              <div className="h-full px-3 py-6 pr-6 lg:px-4 lg:py-8">
+              <div className="h-full px-3 py-6 pr-6 lg:px-4 lg:py-8 relative">
+                {/* Sidebar Toggle Button - Hidden by request */}
+                {/* <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setLeftSidebarOpen(false)}
+                  className={cn(
+                    "absolute right-2 top-2 h-8 w-8",
+                    "hover:bg-accent transition-colors"
+                  )}
+                  title="Đóng sidebar (Ctrl+B)"
+                  aria-label="Đóng sidebar"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button> */}
                 {leftSidebar}
               </div>
             </aside>
@@ -90,11 +123,11 @@ export function DocsLayoutWrapper({
                 className={cn(
                   "fixed left-0 top-1/2 z-40 -translate-y-1/2",
                   "h-10 w-6 rounded-r-full rounded-l-none",
-                  "shadow-lg transition-all hover:scale-110",
+                  "shadow-lg transition-all hover:scale-110 hover:bg-accent",
                   "md:left-0"
                 )}
-                title="Hiện sidebar trái"
-                aria-label="Hiện sidebar trái"
+                title="Mở sidebar (Ctrl+B)"
+                aria-label="Mở sidebar"
               >
                 <PanelLeft className="h-4 w-4" />
               </Button>
@@ -117,8 +150,6 @@ export function DocsLayoutWrapper({
             </main>
           </div>
         </div>
-
-        {/* Toggle Buttons - Now inside sidebars */}
       </div>
     </SidebarContext.Provider>
   )

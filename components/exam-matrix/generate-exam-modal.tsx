@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Loader2, AlertCircle, CheckCircle2, XCircle, FileText, Sparkles } from "lucide-react"
+import { Loader2, AlertCircle, CheckCircle2, XCircle, FileText, FileCode2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -62,6 +62,7 @@ export function GenerateExamModal({
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [generating, setGenerating] = useState(false)
+  const [exportingToLatex, setExportingToLatex] = useState(false)
 
   // Load preview when modal opens
   useEffect(() => {
@@ -116,31 +117,35 @@ export function GenerateExamModal({
       })
 
       if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || "Failed to generate exam")
+        const err = await response.json()
+        throw new Error(err.error?.message || err.error || "Không thể tạo đề thi")
       }
 
       const data = await response.json()
-      
-      if (data.success) {
-        // Store selected questions in sessionStorage for exam creation
-        if (data.data.selectedQuestions) {
-          sessionStorage.setItem(
-            `exam-from-matrix-${matrixId}`,
-            JSON.stringify({
-              examData: data.data.examData,
-              questions: data.data.selectedQuestions,
-              matrixId: matrixId,
-            })
-          )
-        }
-        
-        toast.success(data.data.message || "Đã chọn câu hỏi từ ma trận!")
-        
-        // Navigate to exam creation page
-        // TODO: Update route when exam creation page is ready
-        router.push(`/teacher/exams/create?fromMatrix=${matrixId}`)
+
+      if (data.success && data.data) {
+        const { examId, message } = data.data
+        toast.success(message || "Đã tạo đề thi từ ma trận!")
         onClose()
+        // Cho user chọn: Xem đề thi hoặc Mở Soạn LaTeX với đề vừa tạo
+        if (examId) {
+          const openLatex = window.confirm("Đã tạo đề thi. Bạn có muốn mở Soạn LaTeX với đề vừa tạo không?")
+          if (openLatex) {
+            try {
+              const res = await fetch("/api/latex-projects/export-from-exam", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ examId }),
+              })
+              if (res.ok) {
+                const d = await res.json()
+                router.push(`/teacher/latex-documents/${d.id}`)
+                return
+              }
+            } catch (_) {}
+          }
+        }
+        router.push(`/teacher/exams`)
       }
     } catch (error: any) {
       console.error("Generate error:", error)
@@ -160,6 +165,29 @@ export function GenerateExamModal({
         return <XCircle className="h-4 w-4 text-red-600" />
       default:
         return null
+    }
+  }
+
+  const handleExportMatrixToLatex = async () => {
+    setExportingToLatex(true)
+    try {
+      const res = await fetch("/api/latex-projects/export-from-matrix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matrixId }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        throw new Error(d.error || "Xuất thất bại")
+      }
+      const data = await res.json()
+      toast.success("Đã tạo tài liệu LaTeX. Đang mở...")
+      onClose()
+      router.push(`/teacher/latex-documents/${data.id}`)
+    } catch (e: any) {
+      toast.error(e.message || "Không thể xuất sang LaTeX")
+    } finally {
+      setExportingToLatex(false)
     }
   }
 
@@ -320,27 +348,44 @@ export function GenerateExamModal({
             )}
 
             {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="outline" onClick={onClose}>
-                Hủy
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t">
               <Button
-                onClick={handleGenerate}
-                disabled={generating || !title.trim()}
-                className="gap-2"
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleExportMatrixToLatex}
+                disabled={exportingToLatex}
+                className="gap-2 text-muted-foreground"
               >
-                {generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Đang tạo...
-                  </>
+                {exportingToLatex ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    <FileText className="h-4 w-4" />
-                    Tạo đề thi
-                  </>
+                  <FileCode2 className="h-4 w-4" />
                 )}
+                Xuất ma trận sang LaTeX
               </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={onClose}>
+                  Hủy
+                </Button>
+                <Button
+                  onClick={handleGenerate}
+                  disabled={generating || !title.trim()}
+                  className="gap-2"
+                >
+                  {generating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4" />
+                      Tạo đề thi
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (

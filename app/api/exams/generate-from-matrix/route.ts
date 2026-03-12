@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { db as prisma } from "@/lib/db"
 import { MatrixExamGenerator } from "@/lib/exam-matrix/exam-generator"
 import { createSuccessResponse, createErrorResponse } from "@/lib/document-digitization/api-helpers"
 import { apiLogger } from "@/lib/logging-simple"
@@ -15,10 +16,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json(
-        createErrorResponse("Unauthorized", "UNAUTHORIZED"),
-        { status: 401 }
-      )
+      return createErrorResponse({ message: "Unauthorized", code: "UNAUTHORIZED" }, 401)
     }
 
     const body = await request.json()
@@ -26,12 +24,11 @@ export async function POST(request: NextRequest) {
 
     if (!matrixId) {
       return NextResponse.json(
-        createErrorResponse("Matrix ID is required", "BAD_REQUEST"),
-        { status: 400 }
+        createErrorResponse({ message: "Matrix ID is required", code: "BAD_REQUEST" }, 400)
       )
     }
 
-    // Generate exam from matrix
+    // Generate exam from matrix (tự động chọn câu hỏi từ ngân hàng theo ma trận)
     const result = await MatrixExamGenerator.generateExamFromMatrix(
       matrixId,
       session.user.id,
@@ -43,40 +40,72 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    // Return exam data with selected questions
-    // Note: Exam model creation will be handled by frontend or separate API
-    // This allows flexibility if Exam model structure differs
-    
-    apiLogger.info("Exam data generated from matrix", {
+    const pointsPerQuestion = result.selectedQuestions.length > 0
+      ? result.examData.totalScore / result.selectedQuestions.length
+      : 0
+
+    if (typeof (prisma as any).exam?.create !== "function") {
+      return createErrorResponse(
+        { message: "Schema chưa đồng bộ. Chạy: npx prisma generate && npx prisma db push", code: "SCHEMA_NOT_SYNCED" },
+        500
+      )
+    }
+
+    // Tạo đề thi và gán câu hỏi vào DB
+    const exam = await (prisma as any).exam.create({
+      data: {
+        title: result.examData.title,
+        description: result.examData.description ?? undefined,
+        examType: result.examData.examType,
+        duration: result.examData.duration,
+        totalScore: result.examData.totalScore,
+        totalQuestions: result.selectedQuestions.length,
+        status: "Nháp",
+        matrixId,
+        userId: session.user.id,
+        examQuestions: {
+          create: result.selectedQuestions.map((q: { id: string }, idx: number) => ({
+            questionId: q.id,
+            order: idx + 1,
+            points: pointsPerQuestion,
+          })),
+        },
+      },
+      include: {
+        examQuestions: true,
+      },
+    })
+
+    apiLogger.info("Exam created from matrix", {
       matrixId,
+      examId: exam.id,
       totalQuestions: result.selectedQuestions.length,
       stats: result.stats,
     })
 
-    return NextResponse.json(
-      createSuccessResponse({
+    return createSuccessResponse({
+      examId: exam.id,
         examData: result.examData,
         selectedQuestions: result.selectedQuestions,
         missingRequirements: result.missingRequirements,
         stats: result.stats,
-        message: result.stats.coverage >= 0.8 
-          ? "Đã chọn đủ câu hỏi từ ma trận. Có thể tạo đề thi."
-          : "Đã chọn câu hỏi từ ma trận. Một số yêu cầu thiếu câu hỏi.",
-        requiresManualCreation: true, // Frontend will handle exam creation
-      })
-    )
+        message:
+          result.stats.coverage >= 0.8
+            ? "Đã tạo đề thi từ ma trận. Hệ thống đã tự động chọn câu hỏi từ ngân hàng theo yêu cầu ma trận."
+            : "Đã tạo đề thi với số câu hỏi có sẵn. Một số yêu cầu thiếu câu hỏi trong ngân hàng.",
+    })
   } catch (error: any) {
     apiLogger.error("Error generating exam from matrix", {
       error: error.message,
       stack: error.stack,
     })
 
-    return NextResponse.json(
-      createErrorResponse(
-        error.message || "Failed to generate exam from matrix",
-        "INTERNAL_ERROR"
-      ),
-      { status: 500 }
+    return createErrorResponse(
+      {
+        message: error.message || "Failed to generate exam from matrix",
+        code: "INTERNAL_ERROR",
+      },
+      500
     )
   }
 }
@@ -90,10 +119,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
 
     if (!session?.user) {
-      return NextResponse.json(
-        createErrorResponse("Unauthorized", "UNAUTHORIZED"),
-        { status: 401 }
-      )
+      return createErrorResponse({ message: "Unauthorized", code: "UNAUTHORIZED" }, 401)
     }
 
     const { searchParams } = new URL(request.url)
@@ -101,8 +127,7 @@ export async function GET(request: NextRequest) {
 
     if (!matrixId) {
       return NextResponse.json(
-        createErrorResponse("Matrix ID is required", "BAD_REQUEST"),
-        { status: 400 }
+        createErrorResponse({ message: "Matrix ID is required", code: "BAD_REQUEST" }, 400)
       )
     }
 
@@ -112,19 +137,19 @@ export async function GET(request: NextRequest) {
       session.user.id
     )
 
-    return NextResponse.json(createSuccessResponse(preview))
+    return createSuccessResponse(preview)
   } catch (error: any) {
     apiLogger.error("Error previewing exam from matrix", {
       error: error.message,
       stack: error.stack,
     })
 
-    return NextResponse.json(
-      createErrorResponse(
-        error.message || "Failed to preview exam from matrix",
-        "INTERNAL_ERROR"
-      ),
-      { status: 500 }
+    return createErrorResponse(
+      {
+        message: error.message || "Failed to preview exam from matrix",
+        code: "INTERNAL_ERROR",
+      },
+      500
     )
   }
 }

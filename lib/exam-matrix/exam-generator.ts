@@ -227,18 +227,7 @@ export class MatrixExamGenerator {
           totalRequired,
           totalSelected,
           missing: totalRequired - totalSelected,
-          coverage: totalSelected / totalRequired,
-        },
-      }
-
-      return {
-        success: true,
-        exam,
-        stats: {
-          totalRequired,
-          totalSelected,
-          missing: totalRequired - totalSelected,
-          coverage: totalSelected / totalRequired,
+          coverage: totalRequired > 0 ? totalSelected / totalRequired : 1,
         },
       }
     } catch (error: any) {
@@ -345,8 +334,8 @@ export class MatrixExamGenerator {
         summary: {
           totalRequired,
           totalAvailable,
-          coverage: totalAvailable / totalRequired,
-          canGenerate: totalAvailable >= totalRequired * 0.8, // 80% coverage minimum
+          coverage: totalRequired > 0 ? totalAvailable / totalRequired : 1,
+          canGenerate: totalRequired === 0 || totalAvailable >= totalRequired * 0.8, // 80% coverage minimum
         },
       }
     } catch (error: any) {

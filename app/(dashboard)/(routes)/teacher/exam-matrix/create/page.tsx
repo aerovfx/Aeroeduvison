@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Plus, Trash2, Save, Loader2 } from "lucide-react"
+import { ArrowLeft, Plus, Trash2, Save, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MatrixTable } from "@/components/exam-matrix/matrix-table"
+import { AutoGenerateModal } from "@/components/exam-matrix/auto-generate-modal"
 import { toast } from "react-hot-toast"
 import { useSession } from "next-auth/react"
 
@@ -50,6 +51,7 @@ export default function CreateMatrixPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [autoGenerateOpen, setAutoGenerateOpen] = useState(false)
   const [formData, setFormData] = useState<MatrixFormData>({
     name: "",
     grade: "Khối 6",
@@ -138,6 +140,21 @@ export default function CreateMatrixPage() {
     return Math.round((topicTotal / totalQuestions) * 100)
   }
 
+  const handleAutoGenerateSuccess = (matrixData: any) => {
+    // Populate the form with auto-generated data
+    const generatedTopics: Topic[] = matrixData.topics.map((t: any, index: number) => ({
+      id: `topic-${index}`,
+      order: index + 1,
+      topic: t.topic,
+      content: t.content,
+      distributions: t.distributions,
+      percentageScore: t.percentageScore,
+    }))
+    
+    setTopics(generatedTopics)
+    toast.success("Đã tạo ma trận thành công! Bạn có thể chỉnh sửa thêm nếu cần.")
+  }
+
   // Update percentage scores when topics or totalQuestions change
   useEffect(() => {
     setTopics((prevTopics) =>
@@ -223,6 +240,14 @@ export default function CreateMatrixPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              onClick={() => setAutoGenerateOpen(true)}
+              size="lg"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Tạo tự động
+            </Button>
             <div className="px-4 py-2 bg-gray-100 rounded-lg">
               <div className="text-xs text-muted-foreground">TỔNG SỐ CÂU</div>
               <div className="text-2xl font-bold">{totalQuestions}</div>
@@ -361,6 +386,14 @@ export default function CreateMatrixPage() {
           </div>
         </div>
       </div>
+
+      {/* Auto Generate Modal */}
+      <AutoGenerateModal
+        isOpen={autoGenerateOpen}
+        onClose={() => setAutoGenerateOpen(false)}
+        onSuccess={handleAutoGenerateSuccess}
+        defaultValues={formData}
+      />
     </div>
   )
 }

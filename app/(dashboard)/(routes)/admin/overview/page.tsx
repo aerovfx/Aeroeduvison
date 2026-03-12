@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import '@/styles/neumorphic-theme.css';
 import {
   TrendingUp, Users, Award, AlertTriangle, Brain,
   Activity, Heart, Zap, ArrowUp, ArrowDown,
-  CheckCircle, Clock, RefreshCw, Eye, ChevronRight
+  CheckCircle, Clock, RefreshCw, Eye, ChevronRight,
+  School, LayoutDashboard
 } from 'lucide-react';
 
 interface KPICard {
@@ -29,9 +31,192 @@ interface AIInsight {
   timestamp: string;
 }
 
+// ============================================
+// Neumorphic Components
+// ============================================
+
+interface NeuCardProps {
+  children: React.ReactNode;
+  className?: string;
+  hover?: boolean;
+  onClick?: () => void;
+}
+
+const NeuCard: React.FC<NeuCardProps> = ({ children, className = '', hover = true, onClick }) => (
+  <div
+    className={`neu-card ${hover ? 'neu-bento-item' : ''} ${className}`}
+    onClick={onClick}
+    style={{
+      background: 'var(--neu-card-bg)',
+      borderRadius: '20px',
+      padding: '24px',
+      boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)',
+      border: '1px solid var(--neu-border)',
+      transition: 'all 0.3s ease',
+      ...(hover && {
+        cursor: 'pointer',
+      })
+    }}
+  >
+    {children}
+  </div>
+);
+
+interface NeuBadgeProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  className?: string;
+}
+
+const NeuBadge: React.FC<NeuBadgeProps> = ({ children, variant = 'default', className = '' }) => {
+  const variantStyles = {
+    default: { background: 'var(--neu-card-bg)', color: 'var(--neu-text-primary)' },
+    success: { background: 'var(--neu-accent-success)', color: '#ffffff' },
+    warning: { background: 'var(--neu-accent-warning)', color: '#ffffff' },
+    danger: { background: 'var(--neu-accent-danger)', color: '#ffffff' },
+    info: { background: 'var(--neu-accent-info)', color: '#ffffff' },
+  };
+
+  return (
+    <span
+      className={`neu-badge ${className}`}
+      style={{
+        ...variantStyles[variant],
+        padding: '4px 12px',
+        borderRadius: '8px',
+        fontSize: '0.75rem',
+        fontWeight: '600',
+        boxShadow: '2px 2px 4px var(--neu-shadow-dark), -2px -2px 4px var(--neu-shadow-light)',
+        display: 'inline-block',
+      }}
+    >
+      {children}
+    </span>
+  );
+};
+
+interface NeuButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'default' | 'primary' | 'success' | 'danger';
+  className?: string;
+  size?: 'sm' | 'md' | 'lg';
+  disabled?: boolean;
+}
+
+const NeuButton: React.FC<NeuButtonProps> = ({
+  children,
+  onClick,
+  variant = 'default',
+  className = '',
+  size = 'md',
+  disabled = false,
+}) => {
+  const sizeStyles = {
+    sm: { padding: '10px 18px', fontSize: '0.8rem' },
+    md: { padding: '14px 28px', fontSize: '0.9rem' },
+    lg: { padding: '18px 36px', fontSize: '1rem' },
+  };
+
+  const variantStyles = {
+    default: {
+      background: 'var(--neu-button-bg)',
+      color: 'var(--neu-text-primary)',
+      boxShadow: '8px 8px 16px var(--neu-shadow-dark), -8px -8px 16px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)',
+    },
+    primary: {
+      background: 'var(--neu-button-primary-bg)',
+      color: 'var(--neu-text-inverse)',
+      boxShadow: '8px 8px 16px rgba(102, 126, 234, 0.4), -6px -6px 12px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+    },
+    success: {
+      background: 'var(--neu-button-success-bg)',
+      color: 'var(--neu-text-inverse)',
+    },
+    danger: {
+      background: 'var(--neu-button-danger-bg)',
+      color: 'var(--neu-text-inverse)',
+    },
+  };
+
+  return (
+    <button
+      className={`neu-button ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        ...variantStyles[variant],
+        ...sizeStyles[size],
+        border: 'none',
+        borderRadius: '16px',
+        fontWeight: '600',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 0.3s ease',
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+interface NeuStatBoxProps {
+  label: string;
+  value: string | number;
+  icon: any;
+  trend?: 'up' | 'down' | 'stable';
+  change?: number;
+  color: string;
+  gradientFrom: string;
+  gradientTo: string;
+}
+
+const NeuStatBox: React.FC<NeuStatBoxProps> = ({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  change,
+  color,
+  gradientFrom,
+  gradientTo,
+}) => (
+  <NeuCard hover={false}>
+    <div className="flex items-center justify-between mb-4">
+      <div
+        className="flex items-center justify-center"
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '12px',
+          background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)`,
+          boxShadow: '6px 6px 12px rgba(102, 126, 234, 0.4), -4px -4px 8px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <Icon className="w-6 h-6" style={{ color: '#ffffff' }} />
+      </div>
+      {change !== undefined && (
+        <div
+          className="flex items-center gap-1 text-sm font-medium"
+          style={{
+            color: trend === 'up' ? 'var(--neu-accent-success)' : trend === 'down' ? 'var(--neu-accent-danger)' : 'var(--neu-text-secondary)',
+          }}
+        >
+          {trend === 'up' ? <ArrowUp className="w-4 h-4" /> : trend === 'down' ? <ArrowDown className="w-4 h-4" /> : null}
+          {Math.abs(change)}%
+        </div>
+      )}
+    </div>
+    <h3 className="text-sm font-medium mb-1" style={{ color: 'var(--neu-text-secondary)', fontSize: '0.85rem' }}>
+      {label}
+    </h3>
+    <p className="text-3xl font-bold" style={{ color: 'var(--neu-text-primary)' }}>{value}</p>
+  </NeuCard>
+);
+
 export default function AdminOverviewPage() {
   const { t } = useLanguage();
-  
+
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month'>('week');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(new Date());
@@ -68,9 +253,9 @@ export default function AdminOverviewPage() {
     console.log(`   Action: ${insight.action}`);
     console.log(`   Affected: ${insight.affectedCount} students/teachers`);
     console.log(`   Confidence: ${Math.round(insight.confidence * 100)}%`);
-    
+
     alert(`🚀 Action: ${insight.action}\n\nInsight: ${insight.title}\nAffected: ${insight.affectedCount}\nConfidence: ${Math.round(insight.confidence * 100)}%\n\nThis would trigger the corresponding API endpoint.`);
-    
+
     // TODO: Call actual API based on action type
     switch (insight.action) {
       case 'Review Student Details':
@@ -103,12 +288,12 @@ export default function AdminOverviewPage() {
 
   // Mock data for charts (emotion, teacher response) - these would also come from API in production
   const emotionData = [
-    { emotion: 'Excited', value: 25, color: 'bg-yellow-400' },
-    { emotion: t('emotion.focused'), value: 40, color: 'bg-blue-500' },
-    { emotion: 'Confused', value: 15, color: 'bg-purple-400' },
-    { emotion: 'Frustrated', value: 8, color: 'bg-red-400' },
-    { emotion: 'Bored', value: 7, color: 'bg-gray-400' },
-    { emotion: 'Anxious', value: 5, color: 'bg-orange-400' }
+    { emotion: 'Excited', value: 25, color: '#fbbf24' },
+    { emotion: t('emotion.focused'), value: 40, color: '#3b82f6' },
+    { emotion: 'Confused', value: 15, color: '#a78bfa' },
+    { emotion: 'Frustrated', value: 8, color: '#f87171' },
+    { emotion: 'Bored', value: 7, color: '#9ca3af' },
+    { emotion: 'Anxious', value: 5, color: '#fb923c' }
   ];
 
   const teacherResponse = [
@@ -130,7 +315,7 @@ export default function AdminOverviewPage() {
     try {
       console.log(`🔄 [Admin Overview] Fetching data for: ${timeRange}`);
       const response = await fetch(`/api/admin/overview?range=${timeRange}`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }
@@ -189,10 +374,10 @@ export default function AdminOverviewPage() {
   // Fetch data on mount and when timeRange changes
   useEffect(() => {
     fetchData();
-    
+
     // Auto-refresh every 5 minutes if enabled
     if (!autoRefresh) return;
-    
+
     const interval = setInterval(() => {
       console.log('🔄 [Admin] Auto-refresh: Fetching latest data...');
       fetchData();
@@ -203,47 +388,100 @@ export default function AdminOverviewPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-100 border-red-300 text-red-800';
-      case 'medium': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-      case 'low': return 'bg-blue-100 border-blue-300 text-blue-800';
-      default: return 'bg-gray-100 border-gray-300 text-gray-800';
+      case 'high': return { bg: 'rgba(245, 101, 101, 0.15)', border: 'rgba(245, 101, 101, 0.4)', text: 'var(--neu-accent-danger)' };
+      case 'medium': return { bg: 'rgba(237, 137, 54, 0.15)', border: 'rgba(237, 137, 54, 0.4)', text: 'var(--neu-accent-warning)' };
+      case 'low': return { bg: 'rgba(66, 153, 225, 0.15)', border: 'rgba(66, 153, 225, 0.4)', text: 'var(--neu-accent-info)' };
+      default: return { bg: 'var(--neu-card-bg)', border: 'var(--neu-border)', text: 'var(--neu-text-primary)' };
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'alert': return <AlertTriangle className="w-5 h-5 text-red-500" />;
-      case 'opportunity': return <Zap className="w-5 h-5 text-yellow-500" />;
-      case 'warning': return <Clock className="w-5 h-5 text-orange-500" />;
-      default: return <Brain className="w-5 h-5 text-blue-500" />;
+      case 'alert': return <AlertTriangle className="w-5 h-5" style={{ color: 'var(--neu-accent-danger)' }} />;
+      case 'opportunity': return <Zap className="w-5 h-5" style={{ color: 'var(--neu-accent-warning)' }} />;
+      case 'warning': return <Clock className="w-5 h-5" style={{ color: 'var(--neu-accent-warning)' }} />;
+      default: return <Brain className="w-5 h-5" style={{ color: 'var(--neu-accent-info)' }} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 p-6">
+    <div
+      className="neumorphic-theme"
+      style={{
+        background: 'linear-gradient(135deg, var(--neu-bg-gradient-start) 0%, var(--neu-bg-gradient-mid) 50%, var(--neu-bg-gradient-end) 100%)',
+        backgroundSize: '200% 200%',
+        animation: 'gradientShift 15s ease infinite',
+        minHeight: '100vh',
+        padding: '24px',
+      }}
+    >
       {/* Header */}
-      <div className="mb-8">
+      <div className="neu-header" style={{ marginBottom: '32px' }}>
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              System Overview
-            </h1>
-            <p className="text-gray-600 mt-2">AI-Driven Education · Real-time Insights</p>
-          
-              </div>
+          <div className="flex items-center gap-4">
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                boxShadow: '8px 8px 16px rgba(102, 126, 234, 0.4), -6px -6px 12px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <LayoutDashboard className="w-7 h-7" style={{ color: '#ffffff' }} />
+            </div>
+            <div>
+              <h1
+                className="text-4xl font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  letterSpacing: '-1px',
+                }}
+              >
+                System Overview
+              </h1>
+              <p className="text-gray-600 mt-2" style={{ color: 'var(--neu-text-secondary)', fontSize: '0.95rem', fontWeight: '500' }}>
+                AI-Driven Education · Real-time Insights
+              </p>
+            </div>
+          </div>
 
           <div className="flex items-center gap-4">
             {/* Time Range Selector */}
-            <div className="flex bg-white rounded-lg shadow-sm border p-1">
+            <div
+              className="flex rounded-lg p-1"
+              style={{
+                background: 'var(--neu-card-bg)',
+                boxShadow: 'inset 6px 6px 12px var(--neu-shadow-inset-dark), inset -6px -6px 12px var(--neu-shadow-inset-light)',
+                border: '1px solid var(--neu-border)',
+              }}
+            >
               {(['today', 'week', 'month'] as const).map((range) => (
                 <button
                   key={range}
                   onClick={() => handleTimeRangeChange(range)}
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                    timeRange === range
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100'
+                    timeRange === range ? 'neu-button-primary' : ''
                   }`}
+                  style={{
+                    ...(timeRange === range
+                      ? {
+                          background: 'var(--neu-button-primary-bg)',
+                          color: '#ffffff',
+                          boxShadow: '6px 6px 12px rgba(102, 126, 234, 0.4), -4px -4px 8px var(--neu-shadow-light)',
+                        }
+                      : {
+                          background: 'transparent',
+                          color: 'var(--neu-text-secondary)',
+                        }
+                    ),
+                    border: 'none',
+                    borderRadius: '12px',
+                  }}
                 >
                   {range.charAt(0).toUpperCase() + range.slice(1)}
                 </button>
@@ -251,31 +489,26 @@ export default function AdminOverviewPage() {
             </div>
 
             {/* Auto Refresh Toggle */}
-            <button
+            <NeuButton
               onClick={handleAutoRefreshToggle}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
-                autoRefresh
-                  ? 'bg-green-50 border-green-300 text-green-700'
-                  : 'bg-gray-50 border-gray-300 text-gray-600'
-              }`}
+              variant={autoRefresh ? 'success' : 'default'}
+              size="sm"
             >
-              <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">
-                {autoRefresh ? 'Auto-Refresh ON' : 'Auto-Refresh OFF'}
-              </span>
-            </button>
+              <div className="flex items-center gap-2">
+                <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
+                <span className="text-sm font-medium">
+                  {autoRefresh ? 'Auto-Refresh ON' : 'Auto-Refresh OFF'}
+                </span>
+              </div>
+            </NeuButton>
 
             {/* Manual Refresh Button */}
-            <button
-              onClick={handleManualRefresh}
-              className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-all"
-              title="Refresh data now"
-            >
-              <RefreshCw className="w-4 h-4 text-gray-600" />
-            </button>
+            <NeuButton onClick={handleManualRefresh} size="sm" variant="default">
+              <RefreshCw className="w-4 h-4" />
+            </NeuButton>
 
             {mounted && (
-              <div className="text-xs text-gray-500">
+              <div className="text-xs" style={{ color: 'var(--neu-text-muted)' }}>
                 Last updated: {lastUpdate.toLocaleTimeString()}
               </div>
             )}
@@ -286,34 +519,24 @@ export default function AdminOverviewPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {kpiData.map((kpi, index) => {
-          const Icon = kpi.icon;
+          const gradientColors = [
+            { from: '#3b82f6', to: '#2563eb' },
+            { from: '#22c55e', to: '#16a34a' },
+            { from: '#f97316', to: '#ea580c' },
+            { from: '#ef4444', to: '#dc2626' },
+          ];
           return (
-            <div
+            <NeuStatBox
               key={index}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-lg bg-gradient-to-br ${
-                  index === 0 ? 'from-blue-100 to-blue-200' :
-                  index === 1 ? 'from-green-100 to-green-200' :
-                  index === 2 ? 'from-orange-100 to-orange-200' :
-                  'from-red-100 to-red-200'
-                }`}>
-                  <Icon className={`w-6 h-6 ${kpi.color}`} />
-                </div>
-                <div className={`flex items-center gap-1 text-sm font-medium ${
-                  kpi.trend === 'up' ? 'text-green-600' : 
-                  kpi.trend === 'down' ? 'text-red-600' : 
-                  'text-gray-600'
-                }`}>
-                  {kpi.trend === 'up' ? <ArrowUp className="w-4 h-4" /> : 
-                   kpi.trend === 'down' ? <ArrowDown className="w-4 h-4" /> : null}
-                  {Math.abs(kpi.change)}%
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm font-medium mb-1">{kpi.label}</h3>
-              <p className="text-3xl font-bold text-gray-900">{kpi.value}</p>
-            </div>
+              label={kpi.label}
+              value={kpi.value}
+              icon={kpi.icon}
+              trend={kpi.trend}
+              change={kpi.change}
+              color={kpi.color}
+              gradientFrom={gradientColors[index]?.from || '#667eea'}
+              gradientTo={gradientColors[index]?.to || '#764ba2'}
+            />
           );
         })}
       </div>
@@ -321,20 +544,45 @@ export default function AdminOverviewPage() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* AI Insights - Takes 2 columns */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="lg:col-span-2" style={{ background: 'var(--neu-card-bg)', borderRadius: '24px', padding: '24px', boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)', border: '1px solid var(--neu-border)' }}>
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg">
-                <Brain className="w-6 h-6 text-purple-600" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '48px',
+                  height: '48px',
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                  boxShadow: '6px 6px 12px rgba(102, 126, 234, 0.4), -4px -4px 8px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+                }}
+              >
+                <Brain className="w-6 h-6" style={{ color: '#ffffff' }} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">AI Insights</h2>
-                <p className="text-sm text-gray-500">Top 3 insights today</p>
+                <h2
+                  className="text-xl font-bold"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    backgroundClip: 'text',
+                  }}
+                >
+                  AI Insights
+                </h2>
+                <p className="text-sm" style={{ color: 'var(--neu-text-muted)', fontSize: '0.85rem' }}>Top 3 insights today</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleViewAllInsights}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+              className="text-sm font-medium flex items-center gap-1"
+              style={{
+                color: 'var(--neu-accent-primary)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
             >
               View All
               <ChevronRight className="w-4 h-4" />
@@ -342,50 +590,70 @@ export default function AdminOverviewPage() {
           </div>
 
           <div className="space-y-4">
-            {aiInsights.map((insight) => (
-              <div
-                key={insight.id}
-                className={`border rounded-lg p-4 ${getPriorityColor(insight.priority)}`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="mt-1">
-                    {getTypeIcon(insight.type)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-bold text-gray-900">{insight.title}</h3>
-                      <span className="text-xs bg-white px-2 py-1 rounded-full">
-                        {insight.affectedCount} affected
-                      </span>
+            {aiInsights.map((insight) => {
+              const priorityColors = getPriorityColor(insight.priority);
+              return (
+                <div
+                  key={insight.id}
+                  className="border rounded-lg p-4"
+                  style={{
+                    background: priorityColors.bg,
+                    borderColor: priorityColors.border,
+                    borderRadius: '16px',
+                    padding: '16px',
+                    boxShadow: 'inset 3px 3px 6px var(--neu-shadow-inset-dark), inset -3px -3px 6px var(--neu-shadow-inset-light)',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1">
+                      {getTypeIcon(insight.type)}
                     </div>
-                    <p className="text-sm text-gray-700 mb-3">{insight.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 text-xs text-gray-600">
-                        <span className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3" />
-                          {Math.round(insight.confidence * 100)}% confidence
-                        </span>
-                        <span>{insight.timestamp}</span>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-bold" style={{ color: 'var(--neu-text-primary)' }}>{insight.title}</h3>
+                        <NeuBadge variant={insight.priority === 'high' ? 'danger' : insight.priority === 'medium' ? 'warning' : 'info'}>
+                          {insight.affectedCount} affected
+                        </NeuBadge>
                       </div>
-                      <button 
-                        onClick={() => handleInsightAction(insight)}
-                        className="px-3 py-1 bg-white text-blue-600 rounded-md text-sm font-medium hover:bg-blue-50 transition-colors"
-                      >
-                        {insight.action}
-                      </button>
+                      <p className="text-sm mb-3" style={{ color: 'var(--neu-text-secondary)' }}>{insight.description}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--neu-text-secondary)' }}>
+                          <span className="flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" style={{ color: 'var(--neu-accent-success)' }} />
+                            {Math.round(insight.confidence * 100)}% confidence
+                          </span>
+                          <span>{insight.timestamp}</span>
+                        </div>
+                        <NeuButton
+                          onClick={() => handleInsightAction(insight)}
+                          size="sm"
+                          variant="primary"
+                        >
+                          {insight.action}
+                        </NeuButton>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+          <div
+            className="mt-6 p-4 rounded-lg border"
+            style={{
+              background: 'linear-gradient(135deg, rgba(66, 153, 225, 0.1) 0%, rgba(129, 140, 248, 0.1) 100%)',
+              borderColor: 'rgba(66, 153, 225, 0.3)',
+              borderRadius: '16px',
+              padding: '16px',
+            }}
+          >
             <div className="flex items-center gap-3">
-              <Eye className="w-5 h-5 text-blue-600" />
+              <Eye className="w-5 h-5" style={{ color: 'var(--neu-accent-primary)' }} />
               <div>
-                <p className="text-sm font-medium text-gray-900">Why am I seeing this?</p>
-                <p className="text-xs text-gray-600 mt-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--neu-text-primary)' }}>Why am I seeing this?</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--neu-text-secondary)' }}>
                   AI analyzes student behavior, XP trends, and emotion patterns to surface actionable insights.
                   Click any insight for detailed explainability.
                 </p>
@@ -395,18 +663,32 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* XP Growth Chart */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">XP Growth</h3>
+        <div style={{ background: 'var(--neu-card-bg)', borderRadius: '24px', padding: '24px', boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)', border: '1px solid var(--neu-border)' }}>
+          <h3
+            className="text-lg font-bold mb-4"
+            style={{
+              background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}
+          >
+            XP Growth
+          </h3>
           <div className="space-y-3">
             {xpGrowthData.map((data, idx) => (
               <div key={idx} className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 w-12">{data.date}</span>
-                <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                <span className="text-sm" style={{ color: 'var(--neu-text-secondary)', width: '48px' }}>{data.date}</span>
+                <div className="flex-1" style={{ background: 'var(--neu-bg-secondary)', borderRadius: '12px', height: '24px', overflow: 'hidden', boxShadow: 'inset 3px 3px 6px var(--neu-shadow-inset-dark), inset -3px -3px 6px var(--neu-shadow-inset-light)' }}>
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-end px-2"
-                    style={{ width: `${(data.avgXP / 1300) * 100}%` }}
+                    className="h-full rounded-full flex items-center justify-end px-2"
+                    style={{
+                      width: `${(data.avgXP / 1300) * 100}%`,
+                      background: 'linear-gradient(90deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                      borderRadius: '12px',
+                    }}
                   >
-                    <span className="text-xs text-white font-medium">{data.avgXP}</span>
+                    <span className="text-xs font-medium" style={{ color: '#ffffff' }}>{data.avgXP}</span>
                   </div>
                 </div>
               </div>
@@ -418,27 +700,50 @@ export default function AdminOverviewPage() {
       {/* Bottom Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Emotion Stability */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div style={{ background: 'var(--neu-card-bg)', borderRadius: '24px', padding: '24px', boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)', border: '1px solid var(--neu-border)' }}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-pink-100 to-pink-200 rounded-lg">
-              <Heart className="w-6 h-6 text-pink-600" />
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                boxShadow: '6px 6px 12px rgba(236, 72, 153, 0.4), -4px -4px 8px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <Heart className="w-6 h-6" style={{ color: '#ffffff' }} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Emotion Distribution</h3>
-              <p className="text-sm text-gray-500">Real-time student emotions</p>
+              <h3
+                className="text-lg font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                Emotion Distribution
+              </h3>
+              <p className="text-sm" style={{ color: 'var(--neu-text-muted)', fontSize: '0.85rem' }}>Real-time student emotions</p>
             </div>
           </div>
           <div className="space-y-3">
             {emotionData.map((emotion, idx) => (
               <div key={idx}>
                 <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-700 font-medium">{emotion.emotion}</span>
-                  <span className="text-gray-600">{emotion.value}%</span>
+                  <span className="font-medium" style={{ color: 'var(--neu-text-primary)' }}>{emotion.emotion}</span>
+                  <span style={{ color: 'var(--neu-text-secondary)' }}>{emotion.value}%</span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-3">
+                <div className="w-full" style={{ background: 'var(--neu-bg-secondary)', borderRadius: '8px', height: '12px', boxShadow: 'inset 2px 2px 4px var(--neu-shadow-inset-dark), inset -2px -2px 4px var(--neu-shadow-inset-light)' }}>
                   <div
-                    className={`${emotion.color} h-3 rounded-full transition-all`}
-                    style={{ width: `${emotion.value}%` }}
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${emotion.value}%`,
+                      background: emotion.color,
+                      borderRadius: '8px',
+                    }}
                   />
                 </div>
               </div>
@@ -447,35 +752,59 @@ export default function AdminOverviewPage() {
         </div>
 
         {/* Teacher Response Time */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div style={{ background: 'var(--neu-card-bg)', borderRadius: '24px', padding: '24px', boxShadow: '10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light), inset 1px 1px 2px var(--neu-shadow-inset-dark)', border: '1px solid var(--neu-border)' }}>
           <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-gradient-to-br from-green-100 to-green-200 rounded-lg">
-              <Clock className="w-6 h-6 text-green-600" />
+            <div
+              className="flex items-center justify-center"
+              style={{
+                width: '48px',
+                height: '48px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                boxShadow: '6px 6px 12px rgba(34, 197, 94, 0.4), -4px -4px 8px var(--neu-shadow-light), inset 2px 2px 4px rgba(0, 0, 0, 0.1)',
+              }}
+            >
+              <Clock className="w-6 h-6" style={{ color: '#ffffff' }} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">Teacher Response Time</h3>
-              <p className="text-sm text-gray-500">Avg hours to respond</p>
+              <h3
+                className="text-lg font-bold"
+                style={{
+                  background: 'linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                Teacher Response Time
+              </h3>
+              <p className="text-sm" style={{ color: 'var(--neu-text-muted)', fontSize: '0.85rem' }}>Avg hours to respond</p>
             </div>
           </div>
           <div className="space-y-4">
             {teacherResponse.map((teacher, idx) => (
               <div key={idx} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-400 flex items-center justify-center text-white font-bold">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold"
+                    style={{
+                      background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                      color: '#ffffff',
+                      boxShadow: '4px 4px 8px rgba(96, 165, 250, 0.4), -4px -4px 8px var(--neu-shadow-light)',
+                    }}
+                  >
                     {teacher.teacher.split(' ')[1].charAt(0)}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{teacher.teacher}</p>
-                    <p className="text-xs text-gray-500">{teacher.interventions} interventions</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--neu-text-primary)' }}>{teacher.teacher}</p>
+                    <p className="text-xs" style={{ color: 'var(--neu-text-muted)' }}>{teacher.interventions} interventions</p>
                   </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  teacher.time < 3 ? 'bg-green-100 text-green-700' :
-                  teacher.time < 5 ? 'bg-yellow-100 text-yellow-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
+                <NeuBadge
+                  variant={teacher.time < 3 ? 'success' : teacher.time < 5 ? 'warning' : 'danger'}
+                >
                   {teacher.time}h
-                </div>
+                </NeuBadge>
               </div>
             ))}
           </div>
@@ -484,4 +813,3 @@ export default function AdminOverviewPage() {
     </div>
   );
 }
-

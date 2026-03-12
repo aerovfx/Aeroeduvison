@@ -335,44 +335,84 @@ model StripeCustomer {
 }
 
 model User {
-  id                   String            @id @default(cuid())
-  name                 String?
-  email                String            @unique
-  emailVerified        DateTime?
-  image                String?
-  updatedAt            DateTime          @updatedAt
-  role                 String            @default("STUDENT")
-  schoolId             String            @default("default-school")
-  xp                   Int               @default(0)
-  failedLoginAttempts  Int               @default(0)
-  lockedUntil          DateTime?
-  lastLoginAt          DateTime?
-  lastLoginIp          String?
-  twoFactorEnabled     Boolean           @default(false)
-  twoFactorSecret      String?
-  twoFactorBackupCodes String[]          @default([])
-  createdAt            DateTime          @default(now())
-  password             String?
-  dateOfBirth          DateTime?
-  gender               String?
-  idNumber             String?
-  Account              Account[]
-  AuthLog              AuthLog[]
-  ChatMessage          ChatMessage[]
-  ChatParticipant      ChatParticipant[]
-  Classes              Class[]           @relation("ClassTeacher")
-  ClassStudents        ClassStudent[]    @relation("ClassStudent")
-  Course               Course[]
-  DebateVote           DebateVote[]
-  Document             Document[]
-  DocumentFolder       DocumentFolder[]
-  ExamMatrix           ExamMatrix[]
-  LabCompletion        LabCompletion[]
-  STEMProject          STEMProject[]
-  Session              Session[]
+  id                       String                     @id @default(cuid())
+  name                     String?
+  email                    String                     @unique
+  emailVerified            DateTime?
+  image                    String?
+  updatedAt                DateTime                   @updatedAt
+  role                     String                     @default("STUDENT")
+  schoolId                 String                     @default("default-school")
+  xp                       Int                        @default(0)
+  failedLoginAttempts      Int                        @default(0)
+  lockedUntil              DateTime?
+  lastLoginAt              DateTime?
+  lastLoginIp              String?
+  twoFactorEnabled         Boolean                    @default(false)
+  twoFactorSecret          String?
+  twoFactorBackupCodes     String[]                   @default([])
+  createdAt                DateTime                   @default(now())
+  password                 String?
+  dateOfBirth              DateTime?
+  gender                   String?
+  idNumber                 String?
+  Account                  Account[]
+  AuthLog                  AuthLog[]
+  ChatMessage              ChatMessage[]
+  ChatParticipant          ChatParticipant[]
+  Classes                  Class[]                    @relation("ClassTeacher")
+  ClassStudents            ClassStudent[]             @relation("ClassStudent")
+  Course                   Course[]
+  DebateVote               DebateVote[]
+  Document                 Document[]
+  DocumentFolder           DocumentFolder[]
+  LatexProject             LatexProject[]
+  LatexProjectCollaborator LatexProjectCollaborator[]
+  Exam                     Exam[]
+  ExamMatrix               ExamMatrix[]
+  EmotionCapture           EmotionCapture[]
+  LabCompletion            LabCompletion[]
+  STEMProject              STEMProject[]
+  Session                  Session[]
+  ExamRoomTeacher          OnlineExamRoom[]           @relation(name: "ExamRoomTeacher")
+  ExamRoomParticipant      ExamRoomParticipant[]      @relation(name: "ExamRoomParticipants")
+  DigitizedResource        DigitizedResource[]
+  UserAgentSettings        UserAgentSettings?
 
   @@index([schoolId])
   @@index([email])
+}
+
+// Cài đặt agents theo vai trò (student/teacher/admin) - lưu theo userId
+model UserAgentSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  role      String   // STUDENT | TEACHER | ADMIN
+  settings  Json     // { "ai-tutor": {...}, "study-planner": {...}, ... }
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([role])
+}
+
+// Biểu cảm gộp theo cửa sổ thời gian (1 phút) để giảm tải: không lưu từng frame
+model EmotionCapture {
+  id            String   @id @default(cuid())
+  userId        String
+  windowStart   DateTime // Đầu cửa sổ (làm tròn theo phút)
+  sampleCount   Int      @default(0)
+  avgConfidence Float    @default(0)
+  emotionCounts Json // { "happy": 5, "neutral": 10 } - số lần mỗi biểu cảm trong cửa sổ
+  sessionId     String? // Optional: phiên học / lớp
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  User          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, windowStart])
+  @@index([userId])
+  @@index([windowStart])
+  @@index([userId, windowStart])
 }
 
 model UserProgress {
@@ -431,17 +471,19 @@ model LabCompletion {
 }
 
 model DocumentFolder {
-  id        String           @id @default(cuid())
-  name      String
-  parentId  String?
-  userId    String
-  path      String
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  documents Document[]
-  parent    DocumentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children  DocumentFolder[] @relation("FolderHierarchy")
-  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  name               String
+  parentId           String?
+  userId             String
+  path               String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  documents          Document[]
+  latexProjects      LatexProject[]
+  digitizedResources DigitizedResource[]
+  parent             DocumentFolder?     @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children           DocumentFolder[]    @relation("FolderHierarchy")
+  User               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([parentId])
@@ -492,32 +534,93 @@ model DocumentProcessingLog {
   @@index([stage])
 }
 
+model LatexProject {
+  id            String                     @id @default(cuid())
+  userId        String
+  title         String
+  mainContent   String                     @default("")
+  folderId      String?
+  extraFiles    Json? // map filename -> content for multi-file later
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  User          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folder        DocumentFolder?            @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  versions      LatexProjectVersion[]
+  collaborators LatexProjectCollaborator[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([createdAt])
+}
+
+model LatexProjectVersion {
+  id            String       @id @default(cuid())
+  projectId     String
+  mainContent   String
+  titleSnapshot String?
+  trigger       String       @default("save") // "save" | "compile"
+  createdAt     DateTime     @default(now())
+  LatexProject  LatexProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([createdAt])
+}
+
+model LatexProjectCollaborator {
+  id           String       @id @default(cuid())
+  projectId    String
+  userId       String
+  role         String       @default("VIEW") // "VIEW" | "EDIT"
+  createdAt    DateTime     @default(now())
+  LatexProject LatexProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  User         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+}
+
 model ExamMatrix {
-  id               String                @id @default(cuid())
-  name             String
-  grade            String
-  examType         String
-  duration         Int
-  totalScore       Float
-  totalQuestions   Int                   @default(0)
-  type             String                @default("Tạo mới")
-  status           String                @default("Hàng đợi")
-  originalFileUrl  String?
-  digitizedFileUrl String?
-  processingError  String?
-  userId           String
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  processedAt      DateTime?
-  User             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  processingLogs   MatrixProcessingLog[]
-  topics           MatrixTopic[]
+  id                String                   @id @default(cuid())
+  name              String
+  grade             String
+  examType          String
+  duration          Int
+  totalScore        Float
+  totalQuestions    Int                      @default(0)
+  type              String                   @default("Tạo mới")
+  status            String                   @default("Hàng đợi")
+  originalFileUrl   String?
+  digitizedFileUrl  String?
+  processingError   String?
+  userId            String
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+  processedAt       DateTime?
+  User              User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  processingLogs    MatrixProcessingLog[]
+  topics            MatrixTopic[]
+  selectedQuestions MatrixSelectedQuestion[]
+  onlineExamRooms   OnlineExamRoom[]
 
   @@index([userId])
   @@index([status])
   @@index([grade])
   @@index([examType])
   @@index([createdAt])
+}
+
+model MatrixSelectedQuestion {
+  id         String     @id @default(cuid())
+  matrixId   String
+  questionId String
+  createdAt  DateTime   @default(now())
+  ExamMatrix ExamMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  Question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([matrixId, questionId])
+  @@index([matrixId])
+  @@index([questionId])
 }
 
 model MatrixTopic {
@@ -558,6 +661,42 @@ model MatrixProcessingLog {
   @@index([matrixId])
   @@index([createdAt])
   @@index([stage])
+}
+
+model Exam {
+  id             String         @id @default(cuid())
+  title          String
+  description    String?
+  examType       String
+  duration       Int // phút
+  totalScore     Float
+  totalQuestions Int            @default(0)
+  status         String         @default("Nháp")
+  matrixId       String?
+  userId         String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  User           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examQuestions  ExamQuestion[]
+
+  @@index([userId])
+  @@index([matrixId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model ExamQuestion {
+  id         String   @id @default(cuid())
+  examId     String
+  questionId String
+  order      Int      @default(0)
+  points     Float    @default(0)
+  Exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  Question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, questionId])
+  @@index([examId])
+  @@index([questionId])
 }
 
 model Class {
@@ -604,7 +743,7 @@ model ClassStudent {
 }
 
 model Question {
-  id                  String    @id @default(cuid())
+  id                  String                   @id @default(cuid())
   topic               String
   subject             String
   grade               String
@@ -618,20 +757,23 @@ model Question {
   keywords            String[]
   qualityScore        Float?
   discriminationIndex Float?
-  usageCount          Int       @default(0)
+  usageCount          Int                      @default(0)
   averageScore        Float?
   averageTimeSeconds  Int?
-  aiGenerated         Boolean   @default(false)
+  aiGenerated         Boolean                  @default(false)
   aiModel             String?
-  humanReviewed       Boolean   @default(false)
+  humanReviewed       Boolean                  @default(false)
   reviewedBy          String?
   reviewedAt          DateTime?
-  status              String    @default("Nháp")
+  status              String                   @default("Nháp")
   createdBy           String
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
   tags                String[]
   metadata            Json?
+  matrixSelections    MatrixSelectedQuestion[]
+  examQuestions       ExamQuestion[]
+  examRoomQuestions   ExamRoomQuestion[]
 
   @@index([subject])
   @@index([grade])
@@ -644,4 +786,490 @@ model Question {
   @@index([createdAt])
   @@index([qualityScore])
   @@index([usageCount])
+}
+
+// Fine-tune: bài đào tạo mặc định + lịch sử + phát hiện trùng
+model FineTuneLesson {
+  id           String            @id @default(cuid())
+  name         String
+  description  String?
+  systemPrompt String?           @map("system_prompt")
+  isDefault    Boolean           @default(false) @map("is_default")
+  createdById  String?           @map("created_by_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  examples     FineTuneExample[]
+  runs         FineTuneRun[]
+
+  @@index([isDefault])
+  @@index([createdById])
+}
+
+model FineTuneExample {
+  id                String         @id @default(cuid())
+  lessonId          String         @map("lesson_id")
+  userPrompt        String         @map("user_prompt")
+  assistantResponse String         @map("assistant_response")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  lesson            FineTuneLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@index([lessonId])
+}
+
+model FineTuneRun {
+  id            String          @id @default(cuid())
+  modelName     String          @map("model_name")
+  lessonId      String?         @map("lesson_id")
+  lesson        FineTuneLesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  status        String          @default("completed")
+  examplesCount Int             @default(0) @map("examples_count")
+  startedAt     DateTime        @default(now()) @map("started_at")
+  completedAt   DateTime?       @map("completed_at")
+  createdById   String?         @map("created_by_id")
+
+  @@index([modelName])
+  @@index([lessonId])
+  @@index([startedAt])
+}
+
+model OnlineExamRoom {
+  id           String                @id @default(cuid())
+  name         String
+  description  String?
+  teacherId    String
+  examMatrixId String?
+  startTime    DateTime
+  endTime      DateTime
+  duration     Int                   @default(45) // minutes
+  status       String                @default("draft") // draft, active, completed, cancelled
+  isPublic     Boolean               @default(false)
+  accessCode   String?               @unique // 6-digit code for students to join
+  maxStudents  Int?
+  instructions String?               @db.Text
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  Teacher      User                  @relation(fields: [teacherId], references: [id], onDelete: Cascade, name: "ExamRoomTeacher")
+  ExamMatrix   ExamMatrix?           @relation(fields: [examMatrixId], references: [id], onDelete: SetNull)
+  participants ExamRoomParticipant[]
+  questions    ExamRoomQuestion[]
+
+  @@index([teacherId])
+  @@index([status])
+  @@index([startTime])
+  @@index([accessCode])
+}
+
+model ExamRoomParticipant {
+  id          String           @id @default(cuid())
+  examRoomId  String
+  studentId   String
+  joinedAt    DateTime         @default(now())
+  submittedAt DateTime?
+  status      String           @default("joined") // joined, taking, submitted, absent
+  score       Float?
+  answers     ExamRoomAnswer[]
+  ExamRoom    OnlineExamRoom   @relation(fields: [examRoomId], references: [id], onDelete: Cascade)
+  Student     User             @relation(fields: [studentId], references: [id], onDelete: Cascade, name: "ExamRoomParticipants")
+
+  @@unique([examRoomId, studentId])
+  @@index([examRoomId])
+  @@index([studentId])
+  @@index([status])
+}
+
+model ExamRoomQuestion {
+  id           String           @id @default(cuid())
+  examRoomId   String
+  questionId   String
+  position     Int
+  points       Float            @default(1.0)
+  questionType String
+  ExamRoom     OnlineExamRoom   @relation(fields: [examRoomId], references: [id], onDelete: Cascade)
+  Question     Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers      ExamRoomAnswer[]
+
+  @@unique([examRoomId, questionId])
+  @@index([examRoomId])
+  @@index([questionId])
+}
+
+model ExamRoomAnswer {
+  id            String              @id @default(cuid())
+  participantId String
+  questionId    String
+  answer        String              @db.Text
+  isCorrect     Boolean?
+  pointsEarned  Float?
+  submittedAt   DateTime            @default(now())
+  Participant   ExamRoomParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  Question      ExamRoomQuestion    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, questionId])
+  @@index([participantId])
+  @@index([questionId])
+}
+
+// ============================================
+// Digitization Models for Educational Materials
+// ============================================
+
+// Main model for all digitized resources (unified)
+model DigitizedResource {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?   @db.Text
+  resourceType     String // TEXTBOOK, EXAM_PAPER, AUDIO, VIDEO, DOCUMENT, IMAGE
+  subject          String?
+  grade            String?
+  language         String    @default("vi")
+  originalFileUrl  String
+  digitizedFileUrl String?
+  thumbnailUrl     String?
+  fileSize         Int? // bytes
+  mimeType         String?
+  duration         Int? // seconds for audio/video
+  pageCount        Int? // for books/documents
+  ocrText          String?   @db.Text
+  metadata         Json? // flexible metadata
+  status           String    @default("pending") // pending, processing, completed, failed
+  processingError  String?
+  quality          String? // LOW, MEDIUM, HIGH
+  isPublic         Boolean   @default(false)
+  downloadCount    Int       @default(0)
+  viewCount        Int       @default(0)
+  userId           String
+  folderId         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  processedAt      DateTime?
+
+  User           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  DocumentFolder DocumentFolder?             @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  Textbook       Textbook?
+  ExamPaper      ExamPaper?
+  AudioResource  AudioResource?
+  VideoResource  VideoResource?
+  ResourceTag    ResourceTag[]
+  ProcessingLog  DigitizationProcessingLog[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([resourceType])
+  @@index([subject])
+  @@index([grade])
+  @@index([status])
+  @@index([createdAt])
+  @@index([isPublic])
+}
+
+// Textbook-specific metadata
+model Textbook {
+  id              String   @id @default(cuid())
+  resourceId      String   @unique
+  title           String
+  authors         String[] // list of author names
+  publisher       String?
+  edition         String?
+  isbn            String?
+  publicationYear Int?
+  curriculum      String? // e.g., "VN-GDPT-2018"
+  chapters        Json? // chapter structure: [{title, pageCount, startPage}]
+  tableOfContents String?  @db.Text
+  subject         String
+  grade           String
+  language        String   @default("vi")
+  isDigitalNative Boolean  @default(false) // true if born-digital, false if scanned
+  scanQuality     String? // DPI or quality metric
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  DigitizedResource DigitizedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([subject])
+  @@index([grade])
+  @@index([isbn])
+}
+
+// Exam paper / test specific metadata
+model ExamPaper {
+  id                 String   @id @default(cuid())
+  resourceId         String   @unique
+  title              String
+  examType           String // MIDTERM, FINAL, QUIZ, PRACTICE, ENTRANCE, GRADUATION
+  subject            String
+  grade              String
+  schoolYear         String // e.g., "2024-2025"
+  semester           Int? // 1 or 2
+  duration           Int? // minutes
+  totalScore         Float?
+  questionCount      Int?
+  isOfficial         Boolean  @default(false)
+  source             String? // school, department, ministry
+  academicYear       String?
+  region             String? // province/city
+  schoolName         String?
+  extractedQuestions Json? // structured questions from OCR
+  answerKey          String?  @db.Text
+  solutions          String?  @db.Text
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  DigitizedResource DigitizedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([examType])
+  @@index([subject])
+  @@index([grade])
+  @@index([schoolYear])
+  @@index([isOfficial])
+}
+
+// Audio resource metadata (lectures, listening tests, podcasts)
+model AudioResource {
+  id           String   @id @default(cuid())
+  resourceId   String   @unique
+  title        String
+  audioType    String // LECTURE, LISTENING_TEST, PODCAST, PRONUNCIATION, MUSIC
+  subject      String?
+  grade        String?
+  language     String   @default("vi")
+  speaker      String? // narrator/teacher name
+  duration     Int // seconds
+  format       String? // MP3, WAV, AAC, etc.
+  bitrate      Int? // kbps
+  sampleRate   Int? // Hz
+  channels     Int? // 1=mono, 2=stereo
+  transcript   String?  @db.Text
+  hasSubtitles Boolean  @default(false)
+  chapters     Json? // [{title, startTime, endTime}]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  DigitizedResource DigitizedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([audioType])
+  @@index([subject])
+  @@index([language])
+}
+
+// Video resource metadata (lectures, tutorials, demonstrations)
+model VideoResource {
+  id                String   @id @default(cuid())
+  resourceId        String   @unique
+  title             String
+  videoType         String // LECTURE, TUTORIAL, DEMO, ANIMATION, DOCUMENTARY, LAB
+  subject           String?
+  grade             String?
+  language          String   @default("vi")
+  presenter         String? // teacher/presenter name
+  duration          Int // seconds
+  format            String? // MP4, WEBM, MOV, etc.
+  resolution        String? // 720p, 1080p, 4K
+  fps               Int? // frames per second
+  hasAudio          Boolean  @default(true)
+  hasSubtitles      Boolean  @default(false)
+  subtitleLanguages String[] // list of language codes
+  transcript        String?  @db.Text
+  chapters          Json? // [{title, startTime, endTime}]
+  thumbnailUrl      String?
+  previewUrl        String? // short preview clip
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  DigitizedResource DigitizedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([videoType])
+  @@index([subject])
+  @@index([language])
+}
+
+// Flexible tagging system for resources
+model ResourceTag {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  color       String? // hex color for UI
+  category    String? // subject, topic, skill, etc.
+  usageCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resources DigitizedResource[]
+
+  @@index([category])
+  @@index([usageCount])
+}
+
+// Processing logs for digitization workflow
+model DigitizationProcessingLog {
+  id         String   @id @default(cuid())
+  resourceId String
+  stage      String // UPLOAD, OCR, PROCESSING, QUALITY_CHECK, PUBLISHING
+  action     String // started, completed, failed, retry
+  message    String?  @db.Text
+  metadata   Json? // technical details
+  duration   Int? // milliseconds
+  createdAt  DateTime @default(now())
+
+  DigitizedResource DigitizedResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([resourceId])
+  @@index([stage])
+  @@index([createdAt])
+}
+
+// ============================================
+// Agent System Tables
+// ============================================
+
+// Agent sessions for tracking conversations
+model AgentSession {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  agentId   String
+  userId    String
+  state     String   @default("idle") // idle, running, paused, stopped, error
+  messages  Json     @default("[]") // Array of messages
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([agentId])
+  @@index([sessionId])
+  @@index([createdAt])
+}
+
+// Agent usage tracking
+model AgentUsage {
+  id           String   @id @default(cuid())
+  agentId      String
+  userId       String
+  action       String
+  tokensUsed   Int      @default(0)
+  cost         Float    @default(0)
+  responseTime Int      // milliseconds
+  success      Boolean  @default(true)
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// Practice exams for students
+model PracticeExam {
+  id            String   @id @default(cuid())
+  studentId     String
+  subject       String
+  grade         String
+  examType      String
+  questionCount Int      @default(30)
+  timeLimit     Int      @default(45) // minutes
+  questions     Json     @default("[]") // Array of question objects
+  answers       Json     @default("[]") // Array of user answers
+  score         Float?
+  percentage    Float?
+  breakdown     Json?    // { correct, incorrect, byTopic }
+  recommendations Json?  @default("[]")
+  completed     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  @@index([studentId])
+  @@index([subject])
+  @@index([grade])
+  @@index([completed])
+  @@index([createdAt])
+}
+
+// Career recommendations for students
+model CareerRecommendation {
+  id             String   @id @default(cuid())
+  studentId      String
+  career         String
+  matchScore     Float
+  reasons        Json     @default("[]")
+  universities   Json     @default("[]")
+  salaryRange    String?
+  demandLevel    String   // high, medium, low
+  actionPlan     Json     @default("[]")
+  createdAt      DateTime @default(now())
+
+  @@index([studentId])
+  @@index([career])
+  @@index([matchScore])
+  @@index([createdAt])
+}
+
+// Lesson plans for teachers
+model LessonPlan {
+  id          String   @id @default(cuid())
+  teacherId   String
+  subject     String
+  grade       String
+  topic       String
+  duration    Int      @default(45)
+  content     Json     // Full lesson plan content
+  slides      Json?    // Slide data if generated
+  quiz        Json?    // Quiz questions if generated
+  status      String   @default("draft") // draft, published, archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([teacherId])
+  @@index([subject])
+  @@index([grade])
+  @@index([status])
+}
+
+// Daily reminders for students
+model DailyReminder {
+  id        String   @id @default(cuid())
+  studentId String
+  type      String   // study, exam, career
+  message   String
+  sent      Boolean  @default(false)
+  sentAt    DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([studentId])
+  @@index([type])
+  @@index([sent])
+  @@index([createdAt])
+}
+
+// Weekly/Monthly reports
+model AgentReport {
+  id        String   @id @default(cuid())
+  type      String   // daily, weekly, monthly
+  userId    String?
+  agentId   String?
+  metrics   Json     @default("{}")
+  summary   String?
+  period    String   // e.g., "2026-W12" or "2026-03"
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([userId])
+  @@index([period])
+  @@index([createdAt])
+}
+
+// Rate limiting
+model RateLimit {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String
+  count     Int      @default(0)
+  window    DateTime // Window start time
+  resetAt   DateTime // When the limit resets
+
+  @@unique([userId, endpoint, window])
+  @@index([userId])
+  @@index([endpoint])
+  @@index([resetAt])
 }

@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, FlaskConical, Star, Clock, ArrowRight, Zap, Settings, Atom, Waves, Camera, Activity, Wind, Box, Info, Sparkles, Target, Brain, Filter, X, Flame } from "lucide-react";
+import { ArrowLeft, FlaskConical, Star, Clock, ArrowRight, Zap, Settings, Atom, Waves, Camera, Activity, Wind, Box, Info, Sparkles, Target, Brain, Filter, X, Flame, Trophy } from "lucide-react";
 
 const iconMap: { [key: string]: any } = {
   'Zap': Zap,
@@ -23,7 +23,8 @@ const iconMap: { [key: string]: any } = {
   'Wind': Wind,
   'Box': Box,
   'Brain': Brain,
-  'Flame': Flame
+  'Flame': Flame,
+  'Trophy': Trophy
 };
 
 export default function LabsIndexPage() {
@@ -92,7 +93,8 @@ export default function LabsIndexPage() {
     'Thị giác máy tính': '👁️',
     'Computer Vision': '📷',
     'Procedural Generation': '🎲',
-    'Machine Learning': '🤖'
+    'Machine Learning': '🤖',
+    'Học qua trò chơi': '🎮'
   };
 
   const categoryColors: { [key: string]: { bg: string, text: string, border: string } } = {
@@ -104,7 +106,8 @@ export default function LabsIndexPage() {
     'Thị giác máy tính': { bg: 'bg-gradient-to-br from-teal-100 to-teal-200', text: 'text-teal-700', border: 'border-teal-300' },
     'Computer Vision': { bg: 'bg-gradient-to-br from-emerald-100 to-emerald-200', text: 'text-emerald-700', border: 'border-emerald-300' },
     'Procedural Generation': { bg: 'bg-gradient-to-br from-indigo-100 to-indigo-200', text: 'text-indigo-700', border: 'border-indigo-300' },
-    'Machine Learning': { bg: 'bg-gradient-to-br from-purple-100 to-purple-200', text: 'text-purple-700', border: 'border-purple-300' }
+    'Machine Learning': { bg: 'bg-gradient-to-br from-purple-100 to-purple-200', text: 'text-purple-700', border: 'border-purple-300' },
+    'Học qua trò chơi': { bg: 'bg-gradient-to-br from-lime-100 to-green-200', text: 'text-green-700', border: 'border-green-300' }
   };
 
   if (loading) {

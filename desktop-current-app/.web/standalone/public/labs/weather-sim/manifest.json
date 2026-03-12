@@ -1,0 +1,47 @@
+{
+  "id": "weather-sim",
+  "name": "Weather Analytics",
+  "title": "Phân tích thời tiết thời gian thực",
+  "description": "Dự báo bão, cảnh báo mưa, giám sát động đất",
+  "version": "1.0.0",
+  "category": "Khí tượng",
+  "level": "Nâng cao",
+  "difficulty": "Nâng cao",
+  "duration": "15-30 phút",
+  "xp": 250,
+  "icon": "Wind",
+  "tags": [
+    "weather-sim",
+    "khí tượng",
+    "simulation",
+    "interactive"
+  ],
+  "features": [
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
+  ],
+  "learning_objectives": [
+    "Hiểu phân tích thời tiết thời gian thực",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
+  ],
+  "backend": {
+    "port": 8018,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
+}

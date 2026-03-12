@@ -23,17 +23,26 @@ interface EmbeddingResult {
   cached: boolean;
 }
 
+/** OpenAI API key is valid when set and not the placeholder "ollama" (used for local LLM) */
+function hasValidOpenAIKey(): boolean {
+  const key = process.env.OPENAI_API_KEY;
+  return !!(key && key !== 'ollama' && key.length > 10);
+}
+
 class EmbeddingService {
   private defaultModel: string;
   private cacheEnabled: boolean;
 
   constructor() {
-    // Default to OpenAI if available, otherwise OpenRouter
-    this.defaultModel =
-      process.env.EMBEDDING_MODEL ||
-      process.env.OPENAI_API_KEY
-        ? 'text-embedding-3-small'
-        : 'openai/text-embedding-3-small';
+    // EMBEDDING_MODEL wins. If OPENAI_API_KEY is real → OpenAI default; else Ollama embedding (training/RAG without OpenAI).
+    const envModel = process.env.EMBEDDING_MODEL;
+    if (envModel) {
+      this.defaultModel = envModel;
+    } else if (hasValidOpenAIKey()) {
+      this.defaultModel = 'text-embedding-3-small';
+    } else {
+      this.defaultModel = process.env.EMBEDDING_OLLAMA_MODEL || 'ollama/nomic-embed-text';
+    }
     this.cacheEnabled = process.env.EMBEDDING_CACHE_ENABLED !== 'false';
   }
 
@@ -127,8 +136,10 @@ class EmbeddingService {
     model: string
   ): Promise<{ embedding: number[]; dimensions: number }> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+    if (!apiKey || apiKey === 'ollama') {
+      throw new Error(
+        'OPENAI_API_KEY is missing or set to "ollama". For local training/RAG use Ollama embeddings: set EMBEDDING_MODEL=ollama/nomic-embed-text (and run `ollama run nomic-embed-text`).'
+      );
     }
 
     // Normalize model name
@@ -177,8 +188,10 @@ class EmbeddingService {
     options: EmbeddingOptions
   ): Promise<EmbeddingResult[]> {
     const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY not configured');
+    if (!apiKey || apiKey === 'ollama') {
+      throw new Error(
+        'OPENAI_API_KEY is missing or set to "ollama". For local training/RAG set EMBEDDING_MODEL=ollama/nomic-embed-text.'
+      );
     }
 
     const normalizedModel = model.replace('openai/', '');
@@ -276,7 +289,7 @@ class EmbeddingService {
     text: string,
     model: string
   ): Promise<{ embedding: number[]; dimensions: number }> {
-    const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+    const ollamaUrl = process.env.OLLAMA_HOST || process.env.OLLAMA_URL || 'http://localhost:11434';
     const normalizedModel = model.replace('ollama/', '');
 
     try {
@@ -292,8 +305,13 @@ class EmbeddingService {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Ollama API error: ${response.status} - ${error}`);
+        const errorBody = await response.text();
+        if (response.status === 404) {
+          throw new Error(
+            `Ollama embedding model "${normalizedModel}" not found. Pull it first: ollama pull ${normalizedModel}`
+          );
+        }
+        throw new Error(`Ollama API error: ${response.status} - ${errorBody}`);
       }
 
       const data = await response.json();

@@ -54,51 +54,184 @@ function getCanaryState(key: string): CanaryState {
 function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null {
   const rustVectorBase = process.env.RUST_VECTOR_SERVICE_URL || "http://127.0.0.1:8091";
   const rustBackendBase = process.env.RUST_BACKEND_URL || "http://127.0.0.1:8090";
+  const rustAuthBase = process.env.RUST_AUTH_URL || "http://127.0.0.1:8092";
+  const rustCourseBase = process.env.RUST_COURSE_URL || "http://127.0.0.1:8093";
+  const rustAdminBase = process.env.RUST_ADMIN_URL || "http://127.0.0.1:8094";
+  const rustAiBase = process.env.RUST_AI_URL || "http://127.0.0.1:8095";
+  const rustStudentBase = process.env.RUST_STUDENT_URL || "http://127.0.0.1:8096";
+  const rustStemBase = process.env.RUST_STEM_URL || "http://127.0.0.1:8097";
+  const rustMediaBase = process.env.RUST_MEDIA_URL || "http://127.0.0.1:8098";
+
   const directVectorProxy = process.env.DIRECT_RUST_VECTOR_PROXY === "true";
   const directOcrGradingProxy = process.env.DIRECT_RUST_OCR_GRADING_PROXY === "true";
   const directOcrProcessProxy = process.env.DIRECT_RUST_OCR_PROCESS_PROXY === "true";
   const directLlmGradingProxy = process.env.DIRECT_RUST_LLM_GRADING_PROXY === "true";
+  const directAuthProxy = process.env.DIRECT_RUST_AUTH_PROXY === "true";
+  const directAdminProxy = process.env.DIRECT_RUST_ADMIN_PROXY === "true";
+  const directCourseProxy = process.env.DIRECT_RUST_COURSE_PROXY === "true";
+  const directAiProxy = process.env.DIRECT_RUST_AI_PROXY === "true";
+  const directStudentProxy = process.env.DIRECT_RUST_STUDENT_PROXY === "true";
+  const directStemProxy = process.env.DIRECT_RUST_STEM_PROXY === "true";
+  const directMediaProxy = process.env.DIRECT_RUST_MEDIA_PROXY === "true";
 
-  switch (pathname) {
-    case "/api/vector-similarity":
-      return {
-        rustBase: rustVectorBase,
-        rustPath: "/v1/vector-similarity",
-        directProxyEnabled: directVectorProxy,
-        canaryKey: "core",
-      };
-    case "/api/vector-similarity/cache":
-      return {
-        rustBase: rustVectorBase,
-        rustPath: "/v1/vector-similarity/cache",
-        directProxyEnabled: directVectorProxy,
-        canaryKey: "core",
-      };
-    case "/api/ocr-grading":
-      return {
-        rustBase: rustBackendBase,
-        rustPath: "/api/ocr-grading",
-        directProxyEnabled: directOcrGradingProxy,
-        canaryKey: "core",
-      };
-    case "/api/ocr-process":
-      return {
-        rustBase: rustBackendBase,
-        rustPath: "/api/ocr-process",
-        directProxyEnabled: directOcrProcessProxy,
-        canaryKey: "core",
-      };
-    case "/api/llm-grading":
-      return {
-        rustBase: rustBackendBase,
-        rustPath: "/api/llm-grading",
-        directProxyEnabled: directLlmGradingProxy,
-        canaryKey: "llm-grading",
-        canaryEnvPrefix: "LLM_GRADING",
-      };
-    default:
-      return null;
+  // === VECTOR SERVICE (8091) ===
+  if (pathname === "/api/vector-similarity" || pathname === "/api/vector-similarity/cache") {
+    return {
+      rustBase: rustVectorBase,
+      rustPath: pathname === "/api/vector-similarity" ? "/v1/vector-similarity" : "/v1/vector-similarity/cache",
+      directProxyEnabled: directVectorProxy,
+      canaryKey: "vector",
+    };
   }
+
+  // === AERO BACKEND (8090) - OCR & Grading ===
+  if (pathname === "/api/ocr-grading") {
+    return {
+      rustBase: rustBackendBase,
+      rustPath: "/api/ocr-grading",
+      directProxyEnabled: directOcrGradingProxy,
+      canaryKey: "ocr-grading",
+    };
+  }
+  if (pathname === "/api/ocr-process") {
+    return {
+      rustBase: rustBackendBase,
+      rustPath: "/api/ocr-process",
+      directProxyEnabled: directOcrProcessProxy,
+      canaryKey: "ocr-process",
+    };
+  }
+  if (pathname === "/api/llm-grading") {
+    return {
+      rustBase: rustBackendBase,
+      rustPath: "/api/llm-grading",
+      directProxyEnabled: directLlmGradingProxy,
+      canaryKey: "llm-grading",
+      canaryEnvPrefix: "LLM_GRADING",
+    };
+  }
+
+  // === AUTH SERVICE (8092) ===
+  if (pathname.startsWith("/api/auth/")) {
+    const authPathMap: Record<string, string> = {
+      "/api/auth/login": "/api/auth/login",
+      "/api/auth/register": "/api/auth/register",
+      "/api/auth/2fa/setup": "/api/auth/2fa/setup",
+      "/api/auth/2fa/verify": "/api/auth/2fa/verify",
+      "/api/auth/2fa/disable": "/api/auth/2fa/disable",
+      "/api/auth/forgot-password": "/api/auth/forgot-password",
+      "/api/auth/reset-password": "/api/auth/reset-password",
+      "/api/auth/verify": "/api/auth/verify",
+    };
+    const rustPath = authPathMap[pathname];
+    if (rustPath) {
+      return {
+        rustBase: rustAuthBase,
+        rustPath: rustPath,
+        directProxyEnabled: directAuthProxy,
+        canaryKey: "auth",
+      };
+    }
+  }
+
+  // === COURSE SERVICE (8093) ===
+  if (pathname.startsWith("/api/courses")) {
+    return {
+      rustBase: rustCourseBase,
+      rustPath: pathname.replace("/api/courses", "/api/courses"),
+      directProxyEnabled: directCourseProxy,
+      canaryKey: "courses",
+    };
+  }
+
+  // === ADMIN SERVICE (8094) ===
+  if (pathname.startsWith("/api/admin")) {
+    return {
+      rustBase: rustAdminBase,
+      rustPath: pathname.replace("/api/admin", "/api/admin"),
+      directProxyEnabled: directAdminProxy,
+      canaryKey: "admin",
+    };
+  }
+  if (pathname === "/api/webhook" || pathname === "/api/metrics" || pathname === "/api/health" || pathname === "/api/cache") {
+    const pathMap: Record<string, string> = {
+      "/api/webhook": "/api/webhook",
+      "/api/metrics": "/api/metrics",
+      "/api/health": "/api/health",
+      "/api/cache": "/api/cache",
+    };
+    return {
+      rustBase: rustAdminBase,
+      rustPath: pathMap[pathname] || pathname,
+      directProxyEnabled: directAdminProxy,
+      canaryKey: "admin",
+    };
+  }
+
+  // === AI SERVICE (8095) ===
+  const aiPaths = [
+    "/api/ai-chat", "/api/ai-tutor-chat", "/api/ai-generate-lesson",
+    "/api/ai-grade-lesson", "/api/generate-lesson", "/api/generate-lesson-grok",
+    "/api/generate-daily-plan", "/api/search",
+  ];
+  if (aiPaths.includes(pathname)) {
+    return {
+      rustBase: rustAiBase,
+      rustPath: pathname,
+      directProxyEnabled: directAiProxy,
+      canaryKey: "ai",
+    };
+  }
+
+  // === STUDENT SERVICE (8096) ===
+  const studentPaths = ["/api/students", "/api/classes", "/api/learning-paths"];
+  if (studentPaths.includes(pathname)) {
+    return {
+      rustBase: rustStudentBase,
+      rustPath: pathname,
+      directProxyEnabled: directStudentProxy,
+      canaryKey: "student",
+    };
+  }
+
+  // === STEM SERVICE (8097) ===
+  const stemPaths = [
+    "/api/physics-motion", "/api/motionsim", "/api/motion-sim",
+    "/api/projectile", "/api/harmonic-motion", "/api/refraction",
+    "/api/chemistry-lab", "/api/chemlab-3d", "/api/optics-lab",
+    "/api/lab-completion",
+  ];
+  if (stemPaths.includes(pathname)) {
+    return {
+      rustBase: rustStemBase,
+      rustPath: pathname,
+      directProxyEnabled: directStemProxy,
+      canaryKey: "stem",
+    };
+  }
+
+  // === MEDIA SERVICE (8098) ===
+  const mediaPaths = ["/api/documents", "/api/exam-matrices", "/api/upload", "/api/question-bank", "/api/image-signed-url"];
+  if (mediaPaths.includes(pathname)) {
+    return {
+      rustBase: rustMediaBase,
+      rustPath: pathname,
+      directProxyEnabled: directMediaProxy,
+      canaryKey: "media",
+    };
+  }
+
+  // === UPDATE LEARNING PROGRESS (Student Service) ===
+  if (pathname === "/api/update-learning-progress") {
+    return {
+      rustBase: rustStudentBase,
+      rustPath: "/api/update-learning-progress",
+      directProxyEnabled: directStudentProxy,
+      canaryKey: "student",
+    };
+  }
+
+  return null;
 }
 
 function getCanarySteps(raw?: string) {
@@ -403,7 +536,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ===== PROTECT ALL AUTHENTICATED ROUTES =====
-  const protectedRoutes = ['/admin', '/teacher', '/dashboard', '/learning-paths', '/ai-tutor', '/courses']
+  const protectedRoutes = ['/admin', '/teacher', '/dashboard', '/learning-paths', '/ai-tutor', '/student', '/courses']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
   if (isProtectedRoute) {
@@ -422,18 +555,52 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Rust canary proxy routes - all API routes
     '/api/vector-similarity',
     '/api/vector-similarity/cache',
     '/api/ocr-grading',
     '/api/ocr-process',
     '/api/llm-grading',
+    '/api/auth/:path*',
+    '/api/courses/:path*',
+    '/api/admin/:path*',
+    '/api/ai-chat',
+    '/api/ai-tutor-chat',
+    '/api/ai-generate-lesson',
+    '/api/ai-grade-lesson',
+    '/api/generate-lesson',
+    '/api/generate-lesson-grok',
+    '/api/generate-daily-plan',
+    '/api/search',
+    '/api/students',
+    '/api/classes',
+    '/api/learning-paths',
+    '/api/physics-motion',
+    '/api/motionsim',
+    '/api/motion-sim',
+    '/api/projectile',
+    '/api/harmonic-motion',
+    '/api/refraction',
+    '/api/chemistry-lab',
+    '/api/chemlab-3d',
+    '/api/optics-lab',
+    '/api/lab-completion',
+    '/api/documents',
+    '/api/exam-matrices',
+    '/api/upload',
+    '/api/question-bank',
+    '/api/image-signed-url',
+    '/api/webhook',
+    '/api/metrics',
+    '/api/health',
+    '/api/cache',
+    '/api/update-learning-progress',
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api/auth|api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

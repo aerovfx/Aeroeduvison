@@ -1,0 +1,47 @@
+{
+  "id": "biogrowth",
+  "name": "BioGrowth",
+  "title": "Mô phỏng sinh trưởng",
+  "description": "Mô phỏng tăng trưởng tế bào và quần thể",
+  "version": "1.0.0",
+  "category": "Sinh học",
+  "level": "Trung bình",
+  "difficulty": "Trung bình",
+  "duration": "15-30 phút",
+  "xp": 180,
+  "icon": "Activity",
+  "tags": [
+    "biogrowth",
+    "sinh học",
+    "simulation",
+    "interactive"
+  ],
+  "features": [
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
+  ],
+  "learning_objectives": [
+    "Hiểu mô phỏng sinh trưởng",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
+  ],
+  "backend": {
+    "port": 8001,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
+}

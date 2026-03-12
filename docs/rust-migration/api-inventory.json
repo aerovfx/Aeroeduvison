@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-03-03T13:23:36.063Z",
-  "total": 172,
+  "generatedAt": "2026-03-08T10:44:36.671Z",
+  "total": 177,
   "items": [
     {
       "route": "/api/admin",
@@ -747,8 +747,24 @@
       "notes": "Scaffold placeholder (501) in Rust backend"
     },
     {
+      "route": "/api/grading/grade",
+      "sourceFile": "app/api/grading/grade/route.ts",
+      "status": "scaffolded",
+      "batch": "backlog",
+      "targetService": "node",
+      "notes": "Scaffold placeholder (501) in Rust backend"
+    },
+    {
       "route": "/api/grading/review",
       "sourceFile": "app/api/grading/review/route.ts",
+      "status": "scaffolded",
+      "batch": "backlog",
+      "targetService": "node",
+      "notes": "Scaffold placeholder (501) in Rust backend"
+    },
+    {
+      "route": "/api/grading/secure",
+      "sourceFile": "app/api/grading/secure/route.ts",
       "status": "scaffolded",
       "batch": "backlog",
       "targetService": "node",
@@ -781,6 +797,14 @@
     {
       "route": "/api/image-signed-url",
       "sourceFile": "app/api/image-signed-url/route.ts",
+      "status": "scaffolded",
+      "batch": "backlog",
+      "targetService": "node",
+      "notes": "Scaffold placeholder (501) in Rust backend"
+    },
+    {
+      "route": "/api/kg/search",
+      "sourceFile": "app/api/kg/search/route.ts",
       "status": "scaffolded",
       "batch": "backlog",
       "targetService": "node",
@@ -1013,6 +1037,22 @@
     {
       "route": "/api/queue/jobs",
       "sourceFile": "app/api/queue/jobs/route.ts",
+      "status": "scaffolded",
+      "batch": "backlog",
+      "targetService": "node",
+      "notes": "Scaffold placeholder (501) in Rust backend"
+    },
+    {
+      "route": "/api/quiz/generate",
+      "sourceFile": "app/api/quiz/generate/route.ts",
+      "status": "scaffolded",
+      "batch": "backlog",
+      "targetService": "node",
+      "notes": "Scaffold placeholder (501) in Rust backend"
+    },
+    {
+      "route": "/api/quiz/validate",
+      "sourceFile": "app/api/quiz/validate/route.ts",
       "status": "scaffolded",
       "batch": "backlog",
       "targetService": "node",

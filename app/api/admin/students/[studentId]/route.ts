@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 
 export async function GET(
   req: Request,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,48 +14,47 @@ export async function GET(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const { studentId } = params;
+    const { studentId } = await params;
 
-    // Fetch student with full details
     const student = await db.user.findUnique({
-      where: { id: studentId },
-      include: {
-        purchases: {
-          include: {
-            course: {
-              include: {
-                chapters: {
-                  where: { isPublished: true },
-                  orderBy: { position: 'asc' }
-                }
-              }
-            }
-          }
-        },
-        userProgress: {
-          include: {
-            chapter: true
-          }
-        }
-      }
+      where: { id: studentId, role: 'STUDENT' }
     });
 
     if (!student) {
       return new NextResponse('Student not found', { status: 404 });
     }
 
-    // Calculate metrics
-    const totalChapters = student.purchases.reduce((sum, purchase) => 
-      sum + (purchase.course?.chapters?.length || 0), 0
+    const [purchases, userProgress] = await Promise.all([
+      db.purchase.findMany({
+        where: { userId: studentId },
+        include: {
+          Course: {
+            include: {
+              Chapter: {
+                where: { isPublished: true },
+                orderBy: { position: 'asc' }
+              }
+            }
+          }
+        }
+      }),
+      db.userProgress.findMany({
+        where: { userId: studentId },
+        include: { Chapter: true }
+      })
+    ]);
+
+    const totalChapters = purchases.reduce(
+      (sum, p) => sum + (p.Course?.Chapter?.length ?? 0),
+      0
     );
-    const completedChapters = student.userProgress.filter(p => p.isCompleted).length;
-    const masteryPercentage = totalChapters > 0 
-      ? Math.round((completedChapters / totalChapters) * 100) 
+    const completedChapters = userProgress.filter(p => p.isCompleted).length;
+    const masteryPercentage = totalChapters > 0
+      ? Math.round((completedChapters / totalChapters) * 100)
       : 0;
 
-    const currentXP = completedChapters * 100 + student.purchases.length * 50;
+    const currentXP = completedChapters * 100 + purchases.length * 50;
 
-    // Calculate risk level
     const daysSinceActive = Math.floor(
       (Date.now() - student.updatedAt.getTime()) / (1000 * 60 * 60 * 24)
     );
@@ -69,11 +68,10 @@ export async function GET(
       riskLevel = 'medium';
     }
 
-    // Mock PLG skills (would use PLG API in production)
     const plgSkills = [
-      { 
-        name: 'Mathematics', 
-        mastery: masteryPercentage / 100, 
+      {
+        name: 'Mathematics',
+        mastery: masteryPercentage / 100,
         status: masteryPercentage > 80 ? 'mastered' : masteryPercentage > 50 ? 'learning' : 'struggling',
         nextReview: '3 days',
         predictedGain: 0.15
@@ -87,13 +85,13 @@ export async function GET(
       }
     ];
 
-    // Mock timeline (would use interaction logs in production)
+    const firstProgress = userProgress[0];
     const timeline = [
       {
         id: '1',
         type: 'quiz',
-        title: `Completed ${student.userProgress[0]?.chapter?.title || 'Chapter'}`,
-        timestamp: student.userProgress[0]?.updatedAt?.toISOString() || new Date().toISOString(),
+        title: `Completed ${firstProgress?.Chapter?.title ?? 'Chapter'}`,
+        timestamp: firstProgress?.updatedAt?.toISOString() ?? new Date().toISOString(),
         xpGained: 100
       },
       {
@@ -104,9 +102,7 @@ export async function GET(
       }
     ];
 
-    // Mock AI suggestions
-    const aiSuggestions = [];
-    
+    const aiSuggestions: Array<{ id: string; type: string; title: string; description: string; confidence: number; action: string }> = [];
     if (daysSinceActive >= 3) {
       aiSuggestions.push({
         id: '1',
@@ -117,7 +113,6 @@ export async function GET(
         action: 'Send Message'
       });
     }
-
     if (masteryPercentage < 50) {
       aiSuggestions.push({
         id: '2',
@@ -129,36 +124,37 @@ export async function GET(
       });
     }
 
+    const courseChapterIds = (p: typeof purchases[0]) =>
+      (p.Course?.Chapter ?? []).map(ch => ch.id);
+
     return NextResponse.json({
       student: {
         id: student.id,
         name: student.name,
         email: student.email,
-        avatar: student.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'ST',
-        class: student.purchases[0]?.course?.title || 'No Class',
+        avatar: student.name?.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() ?? 'ST',
+        class: purchases[0]?.Course?.title ?? 'No Class',
         currentXP,
         masteryPercentage,
         emotionScore: masteryPercentage > 70 ? 8.5 : masteryPercentage > 50 ? 7.0 : 5.5,
         riskLevel,
-        lastActive: daysSinceActive === 0 ? 'Today' : 
-                   daysSinceActive === 1 ? 'Yesterday' :
-                   `${daysSinceActive} days ago`,
-        enrolledCourses: student.purchases.length
+        lastActive: daysSinceActive === 0 ? 'Today' :
+          daysSinceActive === 1 ? 'Yesterday' :
+            `${daysSinceActive} days ago`,
+        enrolledCourses: purchases.length
       },
       plgSkills,
       timeline,
       aiSuggestions,
-      courses: student.purchases.map(p => ({
-        id: p.course.id,
-        title: p.course.title,
-        totalChapters: p.course.chapters.length,
-        completedChapters: student.userProgress.filter(
-          prog => prog.isCompleted && 
-          p.course.chapters.some(ch => ch.id === prog.chapterId)
+      courses: purchases.map(p => ({
+        id: p.Course.id,
+        title: p.Course.title,
+        totalChapters: (p.Course?.Chapter ?? []).length,
+        completedChapters: userProgress.filter(
+          prog => prog.isCompleted && courseChapterIds(p).includes(prog.chapterId)
         ).length
       }))
     });
-
   } catch (error) {
     console.error('[ADMIN_STUDENT_DETAIL_API]', error);
     return new NextResponse('Internal Error', { status: 500 });

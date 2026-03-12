@@ -6,7 +6,7 @@ import { db as prisma } from "@/lib/db"
 // GET /api/exam-matrices/[id] - Get matrix details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -15,8 +15,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const matrix = await prisma.examMatrix.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         topics: {
           include: {
@@ -59,7 +60,7 @@ export async function GET(
 // DELETE /api/exam-matrices/[id] - Delete matrix
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -68,8 +69,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const matrix = await prisma.examMatrix.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!matrix) {
@@ -88,7 +90,7 @@ export async function DELETE(
 
     // Delete matrix (cascade will delete topics and distributions)
     await prisma.examMatrix.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

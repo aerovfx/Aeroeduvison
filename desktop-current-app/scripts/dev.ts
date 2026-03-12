@@ -84,7 +84,9 @@ run("electron-build", "bun", ["build", "electron/main.ts", "electron/preload.ts"
 const port = await findAvailablePort(defaultPort);
 const webUrl = `http://${host}:${port}`;
 run("web-dev", "bun", ["run", "dev", "--", "-H", host, "-p", String(port)], appRoot, {
-  NEXTAUTH_URL: webUrl
+  NEXTAUTH_URL: webUrl,
+  // Option A: auth-service (Rust) no TLS for local/desktop
+  AUTH_DATABASE_INSECURE_LOCAL: "1",
 });
 
 await waitForWebReady(webUrl);

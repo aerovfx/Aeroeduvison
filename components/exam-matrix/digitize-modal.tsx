@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Upload, X, FileText, Image as ImageIcon, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,6 +30,7 @@ export function DigitizeMatrixModal({
   onClose,
   onUploadComplete,
 }: DigitizeMatrixModalProps) {
+  const router = useRouter()
   const [file, setFile] = useState<FileWithPreview | null>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -109,12 +111,17 @@ export function DigitizeMatrixModal({
       }
 
       const data = await response.json()
-      toast.success("Đã tải lên file. Hệ thống đang xử lý...")
+      toast.success("Đã tải lên file. Hệ thống đang trích xuất nội dung...")
       
       // Reset state
       handleRemoveFile()
       onUploadComplete?.()
       onClose()
+
+      // Chuyển đến trang review của ma trận vừa tạo — sau khi trích xuất xong có thể ra đề tại đó
+      if (data.matrix?.id) {
+        router.push(`/teacher/exam-matrix/${data.matrix.id}/review`)
+      }
     } catch (error: any) {
       console.error("Upload error:", error)
       toast.error(error.message || "Không thể tải lên file")

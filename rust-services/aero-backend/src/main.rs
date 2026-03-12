@@ -2,21 +2,28 @@ mod inventory;
 
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use axum::{
     body::Bytes,
-    extract::{Multipart, Path, Request, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Multipart, Path, Request, State, Query,
+    },
     http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{any, delete, get, post},
     Json, Router,
 };
 use once_cell::sync::Lazy;
+use rand::Rng;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tokio::sync::broadcast;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info};
+use futures_util::{sink::SinkExt, stream::StreamExt};
 
 static EMBEDDING_CACHE: Lazy<Mutex<HashMap<String, Vec<f64>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -27,6 +34,8 @@ struct AppState {
     ocr_backend_url: String,
     ocr_server_url: String,
     client: Client,
+    lobby_state: Arc<Mutex<HashMap<String, LobbyState>>>,
+    auth_service_url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,12 +103,123 @@ struct NotImplementedResponse {
     migrated_in_rust: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct LobbyPlayer {
+    id: String,
+    name: String,
+    team: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PreviewQuestion {
+    question: String,
+    options: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct QuizQuestion {
+    id: String,
+    question: String,
+    options: Vec<String>,
+    correct_index: usize,
+}
+
+#[derive(Debug, Clone)]
+struct LobbyState {
+    code: String,
+    players: Vec<LobbyPlayer>,
+    tx: broadcast::Sender<LobbyWsResponse>,
+    game_state: Option<GameState>,
+    full_questions: Vec<QuizQuestion>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LobbyJoinRequest {
+    code: String,
+    name: String,
+    team: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct LobbyLeaveRequest {
+    code: String,
+    player_id: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LobbyCreateResponse {
+    code: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LobbyJoinResponse {
+    player_id: String,
+    players: Vec<LobbyPlayer>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct LobbyStateResponse {
+    code: String,
+    players: Vec<LobbyPlayer>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GameState {
+    question_index: usize,
+    total_questions: usize,
+    time_left: i32,
+    question_time: i32,
+    score_a: i32,
+    score_b: i32,
+    tug_position: i32,
+    is_finished: bool,
+    #[serde(default = "default_game_status")]
+    status: String,
+    question_text: String,
+    options: Vec<String>,
+    #[serde(default)]
+    questions_preview: Vec<PreviewQuestion>,
+}
+
+#[derive(Debug, Deserialize)]
+struct LobbyWsMessage {
+    #[serde(rename = "type")]
+    message_type: String,
+    name: Option<String>,
+    team: Option<String>,
+    player_id: Option<String>,
+    game_state: Option<GameState>,
+    questions: Option<Vec<QuizQuestion>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct LobbyWsResponse {
+    #[serde(rename = "type")]
+    message_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    player_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    players: Option<Vec<LobbyPlayer>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    game_state: Option<GameState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    questions: Option<Vec<QuizQuestion>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+}
+
 fn default_true() -> bool {
     true
 }
 
 fn default_llm_provider() -> String {
     "auto".to_string()
+}
+
+fn default_game_status() -> String {
+    "lobby".to_string()
 }
 
 fn default_subject() -> String {
@@ -125,6 +245,9 @@ async fn main() {
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .expect("failed to build reqwest client"),
+        lobby_state: Arc::new(Mutex::new(HashMap::new())),
+        auth_service_url: std::env::var("AUTH_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8091".to_string()),
     };
 
     let app = Router::new()
@@ -140,9 +263,20 @@ async fn main() {
         .route("/api/ocr-process", post(ocr_process_post))
         .route("/api/llm-grading", post(llm_grading_post))
         .route("/api/assignments/grade-ocr", post(assignments_grade_ocr_post))
+        .route("/api/labtwin/quiz/lobby/create", post(lobby_create))
+        .route("/api/labtwin/quiz/lobby/join", post(lobby_join))
+        .route("/api/labtwin/quiz/lobby/leave", post(lobby_leave))
+        .route("/api/labtwin/quiz/lobby/:code", get(lobby_get))
+        .route("/api/labtwin/quiz/lobby/:code/ws", get(lobby_ws))
         .route("/api", any(api_not_implemented_root))
         .route("/api/*path", any(api_not_implemented))
-        .with_state(state);
+        .with_state(state)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        );
 
     let addr = std::env::var("AERO_BACKEND_ADDR")
         .ok()
@@ -158,6 +292,466 @@ async fn main() {
     axum::serve(listener, app)
         .await
         .expect("server error while serving aero-backend");
+}
+
+fn generate_lobby_code() -> String {
+    let alphabet: Vec<char> = "ABCDEFGHJKMNPQRSTUVWXYZ23456789".chars().collect();
+    let mut rng = rand::thread_rng();
+    (0..6)
+        .map(|_| {
+            let index = rng.gen_range(0..alphabet.len());
+            alphabet[index]
+        })
+        .collect()
+}
+
+async fn require_teacher(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<(), (StatusCode, String)> {
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Missing Authorization header".to_string()))?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or_else(|| (StatusCode::UNAUTHORIZED, "Invalid Authorization header".to_string()))?;
+    require_teacher_token(state, token).await
+}
+
+async fn require_teacher_token(
+    state: &AppState,
+    token: &str,
+) -> Result<(), (StatusCode, String)> {
+    let url = format!("{}/api/auth/me", state.auth_service_url);
+    let response = state
+        .client
+        .get(url)
+        .bearer_auth(token)
+        .send()
+        .await
+        .map_err(|_| (StatusCode::BAD_GATEWAY, "Auth service unreachable".to_string()))?;
+
+    if !response.status().is_success() {
+        return Err((StatusCode::UNAUTHORIZED, "Invalid token".to_string()));
+    }
+
+    let user: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|_| (StatusCode::BAD_GATEWAY, "Invalid auth response".to_string()))?;
+
+    let role = user
+        .get("role")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if role != "teacher" && role != "admin" {
+        return Err((StatusCode::FORBIDDEN, "Teacher access required".to_string()));
+    }
+
+    Ok(())
+}
+
+fn broadcast_lobby_state(lobby: &LobbyState) {
+    let payload = LobbyWsResponse {
+        message_type: "state".to_string(),
+        player_id: None,
+        code: Some(lobby.code.clone()),
+        players: Some(lobby.players.clone()),
+        game_state: None,
+        questions: None,
+        error: None,
+    };
+    let _ = lobby.tx.send(payload);
+}
+
+async fn lobby_create(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<LobbyCreateResponse>, (StatusCode, String)> {
+    require_teacher(&state, &headers).await?;
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .expect("lobby state lock poisoned");
+
+    let mut code = generate_lobby_code();
+    while lobby_state.contains_key(&code) {
+        code = generate_lobby_code();
+    }
+
+    lobby_state.insert(
+        code.clone(),
+        LobbyState {
+            code: code.clone(),
+            players: Vec::new(),
+            tx: broadcast::channel(64).0,
+            game_state: None,
+            full_questions: Vec::new(),
+        },
+    );
+
+    Ok(Json(LobbyCreateResponse { code }))
+}
+
+async fn lobby_join(
+    State(state): State<AppState>,
+    Json(payload): Json<LobbyJoinRequest>,
+) -> Result<Json<LobbyJoinResponse>, (StatusCode, String)> {
+    if payload.code.trim().is_empty() || payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Missing code or name".to_string()));
+    }
+
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .expect("lobby state lock poisoned");
+
+    let lobby = lobby_state
+        .get_mut(&payload.code)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Lobby not found".to_string()))?;
+
+    let player_id = format!("player_{}", rand::thread_rng().gen::<u64>());
+    let player = LobbyPlayer {
+        id: player_id.clone(),
+        name: payload.name.trim().to_string(),
+        team: payload.team.trim().to_uppercase(),
+    };
+
+    lobby.players.push(player);
+    broadcast_lobby_state(lobby);
+
+    Ok(Json(LobbyJoinResponse {
+        player_id,
+        players: lobby.players.clone(),
+    }))
+}
+
+async fn lobby_leave(
+    State(state): State<AppState>,
+    Json(payload): Json<LobbyLeaveRequest>,
+) -> Result<Json<LobbyStateResponse>, (StatusCode, String)> {
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .expect("lobby state lock poisoned");
+
+    let lobby = lobby_state
+        .get_mut(&payload.code)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Lobby not found".to_string()))?;
+
+    lobby.players.retain(|player| player.id != payload.player_id);
+    broadcast_lobby_state(lobby);
+
+    Ok(Json(LobbyStateResponse {
+        code: lobby.code.clone(),
+        players: lobby.players.clone(),
+    }))
+}
+
+async fn lobby_get(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+) -> Result<Json<LobbyStateResponse>, (StatusCode, String)> {
+    let lobby_state = state
+        .lobby_state
+        .lock()
+        .expect("lobby state lock poisoned");
+
+    let lobby = lobby_state
+        .get(&code)
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Lobby not found".to_string()))?;
+
+    Ok(Json(LobbyStateResponse {
+        code: lobby.code.clone(),
+        players: lobby.players.clone(),
+    }))
+}
+
+async fn lobby_ws(
+    State(state): State<AppState>,
+    Path(code): Path<String>,
+    Query(params): Query<HashMap<String, String>>,
+    ws: WebSocketUpgrade,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let token = params.get("token").cloned();
+    let is_host = if let Some(token_value) = token {
+        require_teacher_token(&state, &token_value).await.is_ok()
+    } else {
+        false
+    };
+
+    let tx = {
+        let lobby_state = state
+            .lobby_state
+            .lock()
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "lobby lock poisoned".to_string()))?;
+
+        let lobby = lobby_state
+            .get(&code)
+            .ok_or_else(|| (StatusCode::NOT_FOUND, "Lobby not found".to_string()))?;
+
+        lobby.tx.clone()
+    };
+
+    Ok(ws.on_upgrade(move |socket| lobby_ws_handle(socket, state, code, tx, is_host)))
+}
+
+async fn lobby_ws_handle(
+    socket: WebSocket,
+    state: AppState,
+    code: String,
+    tx: broadcast::Sender<LobbyWsResponse>,
+    is_host: bool,
+) {
+    let (mut ws_sender, mut ws_receiver) = socket.split();
+    let mut rx = tx.subscribe();
+    let mut current_player_id: Option<String> = None;
+
+    if let Ok(initial_state) = get_lobby_state(&state, &code) {
+        let message = LobbyWsResponse {
+            message_type: "state".to_string(),
+            player_id: None,
+            code: Some(code.clone()),
+            players: Some(initial_state.players),
+            game_state: None,
+            questions: None,
+            error: None,
+        };
+        let _ = ws_sender
+            .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+            .await;
+    }
+
+    if let Ok(game_state) = get_lobby_game_state(&state, &code) {
+        let message = LobbyWsResponse {
+            message_type: "game_state".to_string(),
+            player_id: None,
+            code: Some(code.clone()),
+            players: None,
+            game_state: Some(game_state),
+            questions: None,
+            error: None,
+        };
+        let _ = ws_sender
+            .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+            .await;
+    }
+
+    if is_host {
+        if let Ok((game_state, questions)) = get_lobby_snapshot(&state, &code) {
+            if game_state.is_some() || !questions.is_empty() {
+                let message = LobbyWsResponse {
+                    message_type: "host_snapshot".to_string(),
+                    player_id: None,
+                    code: Some(code.clone()),
+                    players: None,
+                    game_state,
+                    questions: if questions.is_empty() { None } else { Some(questions) },
+                    error: None,
+                };
+                let _ = ws_sender
+                    .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+                    .await;
+            }
+        }
+    }
+
+    loop {
+        tokio::select! {
+            Some(Ok(msg)) = ws_receiver.next() => {
+                if let Message::Text(text) = msg {
+                    if let Ok(payload) = serde_json::from_str::<LobbyWsMessage>(&text) {
+                        match payload.message_type.as_str() {
+                            "join" => {
+                                let name = payload.name.unwrap_or_default();
+                                let team = payload.team.unwrap_or_else(|| "A".to_string());
+                                match lobby_add_player(&state, &code, name, team) {
+                                    Ok(player_id) => {
+                                        current_player_id = Some(player_id.clone());
+                                        let message = LobbyWsResponse {
+                                            message_type: "joined".to_string(),
+                                            player_id: Some(player_id),
+                                            code: Some(code.clone()),
+                                            players: None,
+                                            game_state: None,
+                                            questions: None,
+                                            error: None,
+                                        };
+                                        let _ = ws_sender
+                                            .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+                                            .await;
+                                    }
+                                    Err(err) => {
+                                        let message = LobbyWsResponse {
+                                            message_type: "error".to_string(),
+                                            player_id: None,
+                                            code: Some(code.clone()),
+                                            players: None,
+                                            game_state: None,
+                                            questions: None,
+                                            error: Some(err),
+                                        };
+                                        let _ = ws_sender
+                                            .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+                                            .await;
+                                    }
+                                }
+                            }
+                            "leave" => {
+                                if let Some(player_id) = payload.player_id.or(current_player_id.clone()) {
+                                    let _ = lobby_remove_player(&state, &code, &player_id);
+                                }
+                            }
+                            "host_state" => {
+                                if is_host {
+                                    if let Some(game_state) = payload.game_state {
+                                        let _ = lobby_update_game_state(&state, &code, game_state.clone(), payload.questions);
+                                    }
+                                }
+                            }
+                            "ping" => {
+                                let message = LobbyWsResponse {
+                                    message_type: "pong".to_string(),
+                                    player_id: None,
+                                    code: Some(code.clone()),
+                                    players: None,
+                                    game_state: None,
+                                    questions: None,
+                                    error: None,
+                                };
+                                let _ = ws_sender
+                                    .send(Message::Text(serde_json::to_string(&message).unwrap_or_default()))
+                                    .await;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            Ok(state_update) = rx.recv() => {
+                let _ = ws_sender
+                    .send(Message::Text(serde_json::to_string(&state_update).unwrap_or_default()))
+                    .await;
+            }
+            else => {
+                break;
+            }
+        }
+    }
+
+    if let Some(player_id) = current_player_id {
+        let _ = lobby_remove_player(&state, &code, &player_id);
+    }
+}
+
+fn get_lobby_state(state: &AppState, code: &str) -> Result<LobbyStateResponse, String> {
+    let lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get(code).ok_or_else(|| "Lobby not found".to_string())?;
+    Ok(LobbyStateResponse {
+        code: lobby.code.clone(),
+        players: lobby.players.clone(),
+    })
+}
+
+fn get_lobby_game_state(state: &AppState, code: &str) -> Result<GameState, String> {
+    let lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get(code).ok_or_else(|| "Lobby not found".to_string())?;
+    lobby
+        .game_state
+        .clone()
+        .ok_or_else(|| "Game state not found".to_string())
+}
+
+fn get_lobby_snapshot(
+    state: &AppState,
+    code: &str,
+) -> Result<(Option<GameState>, Vec<QuizQuestion>), String> {
+    let lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get(code).ok_or_else(|| "Lobby not found".to_string())?;
+    Ok((lobby.game_state.clone(), lobby.full_questions.clone()))
+}
+
+fn lobby_add_player(state: &AppState, code: &str, name: String, team: String) -> Result<String, String> {
+    if name.trim().is_empty() {
+        return Err("Missing player name".to_string());
+    }
+
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get_mut(code).ok_or_else(|| "Lobby not found".to_string())?;
+
+    let player_id = format!("player_{}", rand::thread_rng().gen::<u64>());
+    let player = LobbyPlayer {
+        id: player_id.clone(),
+        name: name.trim().to_string(),
+        team: team.trim().to_uppercase(),
+    };
+
+    lobby.players.push(player);
+    broadcast_lobby_state(lobby);
+    Ok(player_id)
+}
+
+fn lobby_remove_player(state: &AppState, code: &str, player_id: &str) -> Result<(), String> {
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get_mut(code).ok_or_else(|| "Lobby not found".to_string())?;
+    lobby.players.retain(|player| player.id != player_id);
+    broadcast_lobby_state(lobby);
+    Ok(())
+}
+
+fn lobby_update_game_state(
+    state: &AppState,
+    code: &str,
+    game_state: GameState,
+    questions: Option<Vec<QuizQuestion>>,
+) -> Result<(), String> {
+    let mut lobby_state = state
+        .lobby_state
+        .lock()
+        .map_err(|_| "lobby lock poisoned".to_string())?;
+
+    let lobby = lobby_state.get_mut(code).ok_or_else(|| "Lobby not found".to_string())?;
+    lobby.game_state = Some(game_state.clone());
+    if let Some(questions) = questions {
+        lobby.full_questions = questions;
+    }
+
+    let payload = LobbyWsResponse {
+        message_type: "game_state".to_string(),
+        player_id: None,
+        code: Some(lobby.code.clone()),
+        players: None,
+        game_state: Some(game_state),
+        questions: None,
+        error: None,
+    };
+    let _ = lobby.tx.send(payload);
+
+    Ok(())
 }
 
 async fn health(State(state): State<AppState>) -> Json<HealthResponse> {

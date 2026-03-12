@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-const repoRoot = "/Users/pixibox/Aeroeduvison";
+// Run from repo root: bun run rust:migration:inventory
+const repoRoot = process.cwd();
 const apiDir = path.join(repoRoot, "app", "api");
 const docsDir = path.join(repoRoot, "docs", "rust-migration");
 const rustInventoryPath = path.join(repoRoot, "rust-services", "aero-backend", "src", "inventory.rs");
@@ -69,6 +70,7 @@ async function main() {
     })
     .sort((a, b) => a.route.localeCompare(b.route));
 
+  await fs.mkdir(docsDir, { recursive: true });
   const jsonPath = path.join(docsDir, "api-inventory.json");
   await fs.writeFile(jsonPath, JSON.stringify({ generatedAt: new Date().toISOString(), total: inventory.length, items: inventory }, null, 2));
 

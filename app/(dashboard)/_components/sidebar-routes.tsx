@@ -12,18 +12,21 @@ const guestRoutes = [
     label: "Dashboard",
     href: "/",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Compass,
     label: "Browse",
     href: "/search",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpen,
     label: "📚 Documentation",
     href: "/docs",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
 ];
 
@@ -35,54 +38,98 @@ const studentRoutes = [
     label: "📊 Dashboard",
     href: "/dashboard",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Map,
     label: "🗺️ Learning Path",
     href: "/learning-paths",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BarChart,
     label: "📈 Analytics",
     href: "/dashboard/analytics",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
+  // ===== STUDENT AGENTS (AEROEDUVISION_AGENTS_ARCHITECTURE) =====
   {
     icon: Brain,
-    label: "🤖 AI Tutor",
-    href: "/ai-tutor",
-    isHighlighted: true, // PRIMARY
+    label: "🤖 Gia Sư AI",
+    href: "/student/ai-tutor",
+    isHighlighted: true, // PRIMARY - Trợ lý học tập
+  },
+  {
+    icon: Calendar,
+    label: "📅 Kế hoạch học",
+    href: "/learning-paths",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: Activity,
+    label: "📈 Tiến độ",
+    href: "/student/progress",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: FileText,
+    label: "📝 Ôn thi",
+    href: "/student/exam-prep",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: GraduationCap,
+    label: "💼 Hướng nghiệp",
+    href: "/student/career",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: Settings,
+    label: "⚙️ Cài đặt Agent",
+    href: "/student/agent-settings",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Heart,
     label: "💝 Emotion Tracker",
     href: "/dashboard/emotion",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Camera,
     label: "👁️ Vision Tracker",
     href: "/dashboard/vision-tracker",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: FileEdit,
     label: "📝 Assignments",
     href: "/dashboard/assignments",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Award,
     label: "🏆 Achievements",
     href: "/dashboard/achievements",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: MessageSquare,
     label: "🔔 Notifications",
     href: "/dashboard/notifications",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   
@@ -92,12 +139,14 @@ const studentRoutes = [
     label: "🧪 LabTwin",
     href: "/dashboard/labtwin",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Zap,
     label: "🚀 STEM",
     href: "/dashboard/stem",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   // ===== ADDITIONAL MODULES: COLLABORATION & PLANNING =====
@@ -106,24 +155,35 @@ const studentRoutes = [
     label: "📝 Notes",
     href: "/dashboard/notes",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Kanban,
     label: "📋 Scrum Board",
     href: "/dashboard/scrumboard",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: Map,
+    label: "🗺️ Bản đồ học nhóm",
+    href: "/dashboard/study-group-map",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpenCheck,
     label: "👥 Danh bạ",
     href: "/dashboard/contacts",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpen,
     label: "📚 Documentation",
     href: "/docs",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
 ];
 
@@ -141,12 +201,21 @@ const teacherRoutes = [
     label: "👥 Class Overview",
     href: "/teacher/dashboard",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BarChart,
     label: "📊 Analytics",
     href: "/teacher/analytics",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
+  },
+  {
+    icon: Heart,
+    label: "🗺️ Bản đồ cảm xúc",
+    href: "/teacher/emotion-map",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   // ===== KHẢO THÍ (EXAMINATION) SYSTEM =====
@@ -155,25 +224,36 @@ const teacherRoutes = [
     label: "📄 Số hoá tài liệu",
     href: "/teacher/document-digitization",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
     badge: "AI", // AI-powered module
+  },
+  {
+    icon: FileEdit,
+    label: "Soạn LaTeX",
+    href: "/teacher/latex-documents",
+    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Grid3x3,
     label: "📋 Ma trận đề",
     href: "/teacher/exam-matrix",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: HelpCircle,
     label: "📚 Ngân hàng câu hỏi",
     href: "/teacher/question-bank",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: FileText,
     label: "📝 Đề thi",
     href: "/teacher/exams",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
     badge: "AI",
   },
   {
@@ -181,18 +261,21 @@ const teacherRoutes = [
     label: "👥 Lớp học",
     href: "/teacher/classes",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Target,
     label: "🎯 Phòng thi trực tuyến",
     href: "/teacher/online-exam-room",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: CheckSquare,
     label: "✅ Chấm thi",
     href: "/teacher/exam-grading",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
     badge: "AI",
   },
   {
@@ -200,6 +283,7 @@ const teacherRoutes = [
     label: "📊 Báo cáo",
     href: "/teacher/exam-reports",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
     badge: "AI",
   },
   
@@ -209,18 +293,21 @@ const teacherRoutes = [
     label: "🎯 Learning Paths",
     href: "/teacher/learning-path-builder",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Sparkles,
     label: "✨ AI Content Gen",
     href: "/teacher/create-module",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: MessageSquare,
     label: "💬 Student Chat",
     href: "/teacher/interaction-center",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   // ===== MANAGEMENT =====
@@ -229,30 +316,28 @@ const teacherRoutes = [
     label: "📝 Assignments",
     href: "/teacher/assignments",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Award,
     label: "🏆 Grading",
     href: "/teacher/grading",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Calendar,
     label: "📅 Schedule",
     href: "/teacher/calendar",
     isHighlighted: false,
-  },
-  {
-    icon: Sparkles,
-    label: "🎨 Logo Design",
-    href: "/dashboard/logo-design",
-    isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpen,
     label: "📚 Documentation",
     href: "/docs",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
 ]
 
@@ -270,18 +355,21 @@ const adminRoutes = [
     label: "👩‍🎓 Student Insights",
     href: "/admin/students",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: AlertTriangle,
     label: "⚠️ At-Risk Manager",
     href: "/admin/at-risk",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: MessageSquare,
     label: "💬 Alerts Inbox",
     href: "/admin/alerts",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   // ===== ANALYTICS & MONITORING =====
@@ -290,18 +378,21 @@ const adminRoutes = [
     label: "🧑‍🏫 Teacher Performance",
     href: "/admin/teachers",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Heart,
     label: "💝 Emotion Monitor",
     href: "/admin/emotion",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpen,
     label: "📚 Content Monitor",
     href: "/admin/content",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   
   // ===== SYSTEM MANAGEMENT =====
@@ -310,24 +401,28 @@ const adminRoutes = [
     label: "🔒 Operations",
     href: "/admin/operations",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Brain,
     label: "🤖 AI Models",
     href: "/admin/models",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: Settings,
     label: "⚙️ Settings",
     href: "/admin/settings",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
   {
     icon: BookOpen,
     label: "📚 Documentation",
     href: "/docs",
     isHighlighted: false,
+    className: "neu-card hover:neu-shadow-lg",
   },
 ]
 
@@ -354,9 +449,9 @@ export const SidebarRoutes = () => {
 
   return (
     <div className="flex flex-col w-full">
-      {routes.map((route) => (
+      {routes.map((route, index) => (
         <SidebarItem
-          key={route.href}
+          key={`${route.href}-${index}`}
           icon={route.icon}
           label={route.label}
           href={route.href}

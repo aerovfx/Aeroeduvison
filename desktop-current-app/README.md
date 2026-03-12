@@ -11,7 +11,7 @@ Muc tieu: dong goi ung dung web hien tai thanh desktop app bang Electron, khong 
 ## Su dung
 1. Cai dependencies cho wrapper:
 ```bash
-cd /Users/pixibox/Aeroeduvison/desktop-current-app
+cd desktop-current-app
 bun install
 ```
 
@@ -20,7 +20,9 @@ bun install
 bun run dev
 ```
 
-Desktop app se mo ung dung hien tai tren `http://127.0.0.1:3000`.
+Desktop app se mo ung dung tren port tu dong (mac dinh 3100).
+
+3. Neu dung Rust auth-service cung desktop (chay `bun run rust:all` tu thu muc goc repo): auth-service dang dung **Option A** (local, khong TLS) qua `AUTH_DATABASE_INSECURE_LOCAL=1` trong script. Dam bao `DATABASE_URL` trong thu muc goc co the ket noi (Postgres local hoac URL co `sslmode=disable`).
 
 ## Ghi chu
 - Wrapper nay chi boc app hien tai, khong them API moi, khong doi UI/feature.

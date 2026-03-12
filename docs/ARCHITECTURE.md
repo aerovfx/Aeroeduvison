@@ -1,633 +1,443 @@
-# 🏗️ Kiến Trúc Hệ Thống LMSMath / InPhysic.com
+# Phân Tích Kiến Trúc Hệ Thống OpenFang
 
-## 📊 Sơ Đồ Kiến Trúc Tổng Quan
+OpenFang là một **Agent Operating System** mã nguồn mở, viết hoàn toàn bằng Rust. Hệ thống biên dịch thành **1 binary duy nhất (~32MB)**, bao gồm 14 crate, 137K+ dòng code và 1,767+ test.
+
+---
+
+## Tổng Quan Kiến Trúc
 
 ```mermaid
-flowchart TD
-    %% Clients
-    subgraph CLIENTS["👥 Clients"]
-        WEB[Web Browser<br/>Next.js 15 App Router<br/>React + TypeScript]
-        MOBILE[Mobile Browser<br/>PWA Support]
-        TEACHER[Teacher Portal<br/>Admin Dashboard]
+graph TB
+    subgraph "User Interfaces"
+        CLI["openfang-cli<br/>CLI + TUI Dashboard"]
+        Desktop["openfang-desktop<br/>Tauri 2.0 Native App"]
+        API["openfang-api<br/>140+ REST/WS/SSE Endpoints"]
     end
 
-    %% CDN & Edge
-    CDN[Cloud CDN<br/>Static Assets<br/>Images, Videos]
-    
-    %% Load Balancer
-    LB[Google Cloud Load Balancer<br/>HTTPS Termination<br/>Custom Domain: inphysic.com]
-
-    %% API Gateway / Ingress
-    subgraph API_LAYER["🔌 API Layer"]
-        INGRESS[Cloud Run Ingress<br/>Rate Limiting<br/>WAF Rules]
-        NEXTAPI[Next.js API Routes<br/>/api/* endpoints]
-        AUTH[NextAuth.js<br/>OAuth2 + JWT<br/>Session Management]
+    subgraph "Core Engine"
+        Kernel["openfang-kernel<br/>Orchestration Core"]
+        Runtime["openfang-runtime<br/>Agent Loop + LLM Drivers"]
     end
 
-    %% Application Services
-    subgraph APP_SERVICES["⚙️ Application Services"]
-        DASHBOARD[Dashboard Service<br/>Student/Teacher/Admin]
-        COURSES[Course Management<br/>Chapters, Lessons]
-        LABS[Lab Simulations<br/>Python Backends]
-        AI_TUTOR[AI Tutor Service<br/>Chat, Recommendations]
-        GRADING[Grading Engine<br/>OCR + LLM Grading]
-        LEARNING[Learning Paths<br/>Personalized Routes]
-        ANALYTICS[Analytics Service<br/>Progress Tracking]
+    subgraph "Data Layer"
+        Memory["openfang-memory<br/>SQLite + Semantic + KG"]
+        Types["openfang-types<br/>Shared Types + Taint"]
     end
 
-    %% Data Layer
-    subgraph DATA["💾 Data Layer"]
-        PG[(PostgreSQL<br/>Prisma ORM<br/>User, Courses, Progress)]
-        REDIS[(Redis Cache<br/>Session Store<br/>Rate Limiting)]
-        GCS[Google Cloud Storage<br/>Files, Videos, Images<br/>Signed URLs]
-        VECTOR[Vector DB<br/>Embeddings<br/>Semantic Search]
+    subgraph "Extension Layer"
+        Skills["openfang-skills<br/>60 Bundled Skills"]
+        Hands["openfang-hands<br/>7 Autonomous Hands"]
+        Extensions["openfang-extensions<br/>25 MCP Templates"]
     end
 
-    %% AI & ML Services
-    subgraph AI_LAYER["🤖 AI Services"]
-        LLM[LLM Providers<br/>OpenAI / Anthropic<br/>Gemini / Ollama]
-        EMB[Embedding Service<br/>Text Embeddings<br/>Vector Generation]
-        OCR[OCR Service<br/>Python OCR Backend<br/>Image Processing]
-        VISION[Vision Service<br/>Image Analysis]
+    subgraph "Communication Layer"
+        Channels["openfang-channels<br/>40 Messaging Adapters"]
+        Wire["openfang-wire<br/>OFP P2P Protocol"]
     end
 
-    %% External Services
-    subgraph EXTERNAL["🌐 External Services"]
-        GOOGLE[Google OAuth<br/>Authentication]
-        STRIPE[Stripe<br/>Payments]
-        EMAIL[Email Service<br/>Nodemailer<br/>Verification]
-    end
+    Migrate["openfang-migrate<br/>Migration Engine"]
 
-    %% Infrastructure
-    subgraph INFRA["☁️ Infrastructure"]
-        CLOUDRUN[Google Cloud Run<br/>Serverless Containers<br/>Auto-scaling]
-        CLOUDBUILD[Cloud Build<br/>CI/CD Pipeline<br/>Docker Build]
-        SECRETS[Secret Manager<br/>API Keys, Secrets]
-        MONITORING[Cloud Monitoring<br/>Logging, Alerts]
-        IAM[IAM & Security<br/>Service Accounts<br/>RBAC]
-    end
-
-    %% Connections - Client to CDN
-    WEB -->|HTTPS| CDN
-    MOBILE -->|HTTPS| CDN
-    TEACHER -->|HTTPS| CDN
-    
-    %% CDN to Load Balancer
-    CDN -->|HTTPS| LB
-    
-    %% Load Balancer to Ingress
-    LB -->|HTTPS| INGRESS
-    
-    %% Ingress to API Layer
-    INGRESS --> NEXTAPI
-    INGRESS --> AUTH
-    
-    %% API to Services
-    NEXTAPI --> DASHBOARD
-    NEXTAPI --> COURSES
-    NEXTAPI --> LABS
-    NEXTAPI --> AI_TUTOR
-    NEXTAPI --> GRADING
-    NEXTAPI --> LEARNING
-    NEXTAPI --> ANALYTICS
-    
-    %% Auth Connections
-    AUTH --> GOOGLE
-    AUTH --> PG
-    AUTH --> REDIS
-    
-    %% Services to Data
-    DASHBOARD --> PG
-    COURSES --> PG
-    LEARNING --> PG
-    ANALYTICS --> PG
-    GRADING --> PG
-    
-    DASHBOARD --> REDIS
-    COURSES --> REDIS
-    ANALYTICS --> REDIS
-    
-    COURSES --> GCS
-    LABS --> GCS
-    GRADING --> GCS
-    DASHBOARD --> GCS
-    
-    AI_TUTOR --> VECTOR
-    LEARNING --> VECTOR
-    
-    %% Services to AI
-    AI_TUTOR --> LLM
-    GRADING --> LLM
-    LEARNING --> LLM
-    
-    AI_TUTOR --> EMB
-    EMB --> VECTOR
-    
-    GRADING --> OCR
-    GRADING --> VISION
-    
-    %% Lab Services
-    LABS -->|HTTP| PYTHON[Python Simulation<br/>Backends<br/>Port 8000-8010]
-    
-    %% External Services
-    DASHBOARD --> STRIPE
-    AUTH --> EMAIL
-    
-    %% Infrastructure
-    CLOUDRUN --> NEXTAPI
-    CLOUDRUN --> DASHBOARD
-    CLOUDRUN --> COURSES
-    CLOUDRUN --> LABS
-    CLOUDRUN --> AI_TUTOR
-    CLOUDRUN --> GRADING
-    
-    CLOUDBUILD --> CLOUDRUN
-    CLOUDRUN --> SECRETS
-    CLOUDRUN --> MONITORING
-    CLOUDRUN --> IAM
-    
-    %% Styling
-    classDef client fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    classDef api fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef service fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef data fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    classDef ai fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    classDef infra fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    
-    class WEB,MOBILE,TEACHER client
-    class NEXTAPI,AUTH,INGRESS api
-    class DASHBOARD,COURSES,LABS,AI_TUTOR,GRADING,LEARNING,ANALYTICS service
-    class PG,REDIS,GCS,VECTOR data
-    class LLM,EMB,OCR,VISION ai
-    class CLOUDRUN,CLOUDBUILD,SECRETS,MONITORING,IAM infra
+    CLI --> API
+    Desktop --> API
+    API --> Kernel
+    Kernel --> Runtime
+    Kernel --> Memory
+    Kernel --> Channels
+    Kernel --> Wire
+    Runtime --> Types
+    Runtime --> Skills
+    Runtime --> Hands
+    Runtime --> Extensions
+    Memory --> Types
+    Channels --> Types
 ```
 
 ---
 
-## 📋 Giải Thích Chi Tiết Từng Thành Phần
+## 14 Crate — Chi Tiết Từng Tầng
 
-### 1. 👥 **Clients (Frontend)**
+### 1. `openfang-types` — Foundation Layer
 
-#### **Web Browser (Next.js 15)**
-- **Framework**: Next.js 15.5.7 với App Router
-- **Tech Stack**: React 18, TypeScript, Tailwind CSS
-- **Features**:
-  - Server-Side Rendering (SSR)
-  - Static Site Generation (SSG)
-  - Incremental Static Regeneration (ISR)
-  - React Server Components (RSC)
-- **Key Pages**:
-  - `/dashboard` - Student dashboard
-  - `/teacher/dashboard` - Teacher portal
-  - `/admin/dashboard` - Admin panel
-  - `/dashboard/labtwin` - Lab simulations
-  - `/ai-tutor` - AI tutoring
+> Tầng nền tảng, **không chứa business logic**. Chỉ định nghĩa data structures dùng chung.
 
-#### **Mobile Browser (PWA)**
-- Progressive Web App support
-- Responsive design
-- Offline capabilities (future)
-
-#### **Teacher Portal**
-- Course management
-- Student analytics
-- Grading interface
-- Content creation tools
+| Module | Chức năng |
+|--------|-----------|
+| `agent` | `AgentId`, `AgentManifest`, `AgentMode` |
+| `message` | `Message`, `ContentBlock`, `ToolCall`, `TokenUsage` |
+| `config` | `KernelConfig` — toàn bộ config hệ thống |
+| `taint` | Information Flow taint tracking (labels propagate source→sink) |
+| `manifest_signing` | Ed25519 signed agent manifests |
+| `capability` | Role-based capability declarations |
+| `model_catalog` | 123+ model definitions, pricing, context windows |
+| `tool` | `ToolDefinition`, `ToolCall`, `ToolResult` |
+| `event` | Event bus types |
+| `approval` | Approval gate types |
 
 ---
 
-### 2. 🔌 **API Layer**
+### 2. `openfang-memory` — Data Persistence
 
-#### **Cloud Run Ingress**
-- **Location**: Google Cloud Run
-- **Features**:
-  - HTTPS termination
-  - Custom domain: `inphysic.com`
-  - Rate limiting
-  - WAF rules (Cloud Armor)
-  - Request routing
+> 3 storage backends hợp nhất qua 1 `MemorySubstrate` API duy nhất.
 
-#### **Next.js API Routes** (`/api/*`)
-- **Authentication**: `/api/auth/[...nextauth]`
-- **Courses**: `/api/courses/*`
-- **Grading**: `/api/llm-grading`, `/api/ocr-grading`
-- **AI**: `/api/ai-tutor-chat`, `/api/ai-intelligent/generate`
-- **Labs**: `/api/motionsim`, `/api/optics-lab`, etc.
-- **Analytics**: `/api/admin/stats`, `/api/teacher/stats`
-
-#### **NextAuth.js**
-- **Providers**: Google OAuth, Credentials
-- **Session**: JWT-based
-- **Storage**: Database (Prisma)
-- **Security**: 
-  - CSRF protection
-  - Secure cookies
-  - Session encryption
-
----
-
-### 3. ⚙️ **Application Services**
-
-#### **Dashboard Service**
-- Student progress tracking
-- Course enrollment
-- Assignment management
-- Achievement system
-- Emotion tracking
-- Vision tracking
-
-#### **Course Management**
-- Course creation/editing
-- Chapter management
-- Lesson content
-- Attachment handling
-- Publishing workflow
-
-#### **Lab Simulations**
-- **Python Backends**: Multiple simulation services
-  - Motion simulation (port 8001)
-  - Optics lab (port 8002)
-  - Chemistry lab (port 8003)
-  - Projectile motion (port 8004)
-  - Harmonic motion (port 8005)
-- **Communication**: HTTP REST API
-- **Features**: Real-time physics simulations
-
-#### **AI Tutor Service**
-- Chat interface
-- Personalized recommendations
-- Learning path suggestions
-- Content generation
-- Question answering
-
-#### **Grading Engine**
-- **OCR Grading**: Image-based answer processing
-- **LLM Grading**: AI-powered essay grading
-- **Rule-based**: Symbolic math checking
-- **Rubric Engine**: Structured grading criteria
-
-#### **Learning Paths**
-- Personalized learning routes
-- Progress tracking
-- Adaptive content delivery
-- Skill-based recommendations
-
-#### **Analytics Service**
-- Student performance metrics
-- Course analytics
-- Engagement tracking
-- Predictive analytics
-
----
-
-### 4. 💾 **Data Layer**
-
-#### **PostgreSQL (Primary Database)**
-- **ORM**: Prisma
-- **Schema**: 
-  - Users (students, teachers, admins)
-  - Courses, Chapters, Lessons
-  - Enrollments, Progress
-  - Assignments, Submissions
-  - Grades, Rubrics
-  - Learning paths
-  - Analytics data
-- **Connection**: Prisma Accelerate (connection pooling)
-
-#### **Redis Cache**
-- Session storage
-- Rate limiting counters
-- Temporary data caching
-- Real-time data
-
-#### **Google Cloud Storage (GCS)**
-- **Buckets**:
-  - User uploads
-  - Course materials
-  - Lab assets
-  - Video content
-  - Generated PDFs
-- **Access**: Signed URLs for secure access
-- **CDN**: Integrated with Cloud CDN
-
-#### **Vector Database** (Future)
-- Embeddings storage
-- Semantic search
-- RAG (Retrieval Augmented Generation)
-- Similarity matching
-
----
-
-### 5. 🤖 **AI Services**
-
-#### **LLM Providers**
-- **OpenAI**: GPT-4, GPT-3.5
-- **Anthropic**: Claude
-- **Google**: Gemini
-- **Local**: Ollama (self-hosted)
-- **Usage**:
-  - Content generation
-  - Essay grading
-  - Question answering
-  - Personalized recommendations
-
-#### **Embedding Service**
-- Text embeddings generation
-- Vector storage
-- Semantic search
-- Content similarity
-
-#### **OCR Service**
-- **Backend**: Python OCR service
-- **Features**:
-  - Image processing
-  - Text extraction
-  - Handwriting recognition
-  - Math equation recognition
-
-#### **Vision Service**
-- Image analysis
-- Diagram recognition
-- Chart/graph interpretation
-- Visual content understanding
-
----
-
-### 6. 🌐 **External Services**
-
-#### **Google OAuth**
-- Authentication provider
-- User profile data
-- Email verification
-
-#### **Stripe**
-- Payment processing
-- Subscription management
-- Course purchases
-
-#### **Email Service (Nodemailer)**
-- Account verification
-- Password reset
-- Notifications
-- Course updates
-
----
-
-### 7. ☁️ **Infrastructure**
-
-#### **Google Cloud Run**
-- **Service**: `lmsmath-app`
-- **Region**: `asia-east1`
-- **Configuration**:
-  - Memory: 2Gi
-  - CPU: 2 cores
-  - Max instances: 10
-  - Min instances: 0 (auto-scale)
-  - Timeout: 300s
-  - Execution: Gen2
-  - CPU boost: Enabled
-
-#### **Cloud Build (CI/CD)**
-- **Trigger**: Manual or Git push
-- **Build**: Docker container (AMD64)
-- **Registry**: Artifact Registry
-- **Deploy**: Automatic to Cloud Run
-- **Config**: `cloudbuild.yaml`
-
-#### **Secret Manager**
-- API keys (OpenAI, Anthropic, etc.)
-- Database credentials
-- OAuth secrets
-- JWT secrets
-
-#### **Cloud Monitoring**
-- Application logs
-- Performance metrics
-- Error tracking
-- Alerting
-
-#### **IAM & Security**
-- Service accounts
-- Role-based access control (RBAC)
-- API authentication
-- Network policies
-
----
-
-## 🔄 Luồng Dữ Liệu Chính
-
-### **1. User Authentication Flow**
-```
-User → Login Form → NextAuth → Google OAuth
-  ↓
-Session Created → JWT Token → Stored in Cookie
-  ↓
-Middleware Validates → Access Granted
-```
-
-### **2. Course Access Flow**
-```
-User → Dashboard → Course List → Select Course
-  ↓
-API Call → Prisma Query → PostgreSQL
-  ↓
-Course Data + Progress → Render Page
-```
-
-### **3. Lab Simulation Flow**
-```
-User → Lab Page → Select Simulation
-  ↓
-Frontend → API Route → Python Backend (HTTP)
-  ↓
-Simulation Result → Display in Browser
-```
-
-### **4. AI Tutoring Flow**
-```
-User → AI Tutor Chat → Send Message
-  ↓
-API Route → LLM Provider (OpenAI/Claude)
-  ↓
-Response Generated → Return to User
-  ↓
-Store Conversation → PostgreSQL
-```
-
-### **5. Grading Flow**
-```
-Student → Submit Assignment → Upload Image/Text
-  ↓
-OCR Service (if image) → Extract Text
-  ↓
-LLM Grading → Rubric Check → Score Calculation
-  ↓
-Store Grade → PostgreSQL → Notify Student
-```
-
-### **6. File Upload Flow**
-```
-User → Upload File → API Route
-  ↓
-Generate Signed URL → Google Cloud Storage
-  ↓
-Upload to GCS → Store Metadata → PostgreSQL
-  ↓
-Return File URL → Display in UI
+```mermaid
+graph LR
+    A["MemorySubstrate API"] --> B["structured<br/>(SQLite: KV, sessions)"]
+    A --> C["semantic<br/>(Text search → Vector future)"]
+    A --> D["knowledge<br/>(SQLite: Entities + Relations)"]
+    A --> E["session<br/>(Conversation history)"]
+    A --> F["consolidation<br/>(Memory compaction)"]
+    A --> G["usage<br/>(Token/cost tracking)"]
 ```
 
 ---
 
-## 🔒 Bảo Mật & Compliance
+### 3. `openfang-kernel` — Orchestration Core (~5K LOC)
 
-### **Authentication & Authorization**
-- ✅ NextAuth.js với secure cookies
-- ✅ JWT tokens với expiration
-- ✅ Role-based access control (Student/Teacher/Admin)
-- ✅ Middleware protection cho protected routes
-- ✅ OAuth2 với Google
+> **Trái tim của hệ thống.** Quản lý lifecycle, scheduling, permissions, và inter-agent communication.
 
-### **Data Protection**
-- ✅ HTTPS everywhere (TLS 1.3)
-- ✅ Database encryption at rest
-- ✅ Secrets in Google Secret Manager
-- ✅ Signed URLs cho file access
-- ✅ Input validation & sanitization
+| Module | Chức năng |
+|--------|-----------|
+| `kernel.rs` | `OpenFangKernel` — boot, spawn, message routing, shutdown |
+| `registry.rs` | Agent registry — track tất cả agents đang chạy |
+| `scheduler.rs` | Task scheduler cho workflows |
+| `cron.rs` | Cron job engine (schedule-based execution) |
+| `config.rs` | Config loading + validation |
+| `config_reload.rs` | Hot-reload config mỗi 30s |
+| `capabilities.rs` | RBAC — agents declare tools, kernel enforces |
+| `auth.rs` | API key authentication |
+| `approval.rs` | Approval gates cho sensitive actions |
+| `supervisor.rs` | Agent supervisor (restart on crash) |
+| `metering.rs` | Token/cost metering per agent |
+| `event_bus.rs` | Pub/sub event bus |
+| `workflow.rs` | Multi-step workflow engine |
+| `triggers.rs` | Event-driven triggers |
+| `background.rs` | Background agent executor |
+| `heartbeat.rs` | Agent health monitoring |
+| `pairing.rs` | Device pairing (mobile ↔ server) |
+| `whatsapp_gateway.rs` | WhatsApp QR login bridge |
 
-### **Security Headers**
-- ✅ Content Security Policy (CSP)
-- ✅ X-Frame-Options: DENY
-- ✅ X-Content-Type-Options: nosniff
-- ✅ Referrer-Policy: strict-origin-when-cross-origin
-
-### **Rate Limiting**
-- ✅ API rate limiting
-- ✅ Login attempt throttling
-- ✅ Request size limits
-
-### **Monitoring & Auditing**
-- ✅ Cloud Logging cho tất cả requests
-- ✅ Error tracking
-- ✅ Security event logging
-- ✅ Audit trails cho grade changes
-
----
-
-## 📈 Scalability & Performance
-
-### **Horizontal Scaling**
-- Cloud Run auto-scaling (0-10 instances)
-- Stateless application design
-- Database connection pooling (Prisma Accelerate)
-
-### **Caching Strategy**
-- Redis for session & hot data
-- CDN for static assets
-- ISR for frequently accessed pages
-- API response caching
-
-### **Database Optimization**
-- Indexed queries
-- Connection pooling
-- Query optimization
-- Read replicas (future)
-
-### **Performance Monitoring**
-- Cloud Monitoring metrics
-- Application Performance Monitoring (APM)
-- Error rate tracking
-- Response time monitoring
+**Boot sequence:**
+1. Load config (`~/.openfang/config.toml`)
+2. Initialize `MemorySubstrate` (SQLite)
+3. Load agent registry + skill registry
+4. Start event bus + scheduler + cron
+5. Spawn background agents
+6. Start config hot-reload watcher
 
 ---
 
-## 🚀 Deployment Architecture
+### 4. `openfang-runtime` — Agent Execution (~2.8K LOC agent loop)
 
-### **Current Setup**
+> Nơi agent thực sự "suy nghĩ". Chạy LLM loop, gọi tools, và sandbox code.
+
+#### Agent Loop (`agent_loop.rs`)
+
 ```
-Source Code (Git) 
-  ↓
-Cloud Build (Docker Build)
-  ↓
-Artifact Registry (Container Image)
-  ↓
-Cloud Run (Deploy)
-  ↓
-Load Balancer (HTTPS)
-  ↓
-Custom Domain (inphysic.com)
+User Message
+    ↓
+Load Session Context + Recall Memories
+    ↓
+Build Prompt (system + history + tools)
+    ↓
+┌──────── LLM Call (with retry + fallback) ──────┐
+│   ↓                                             │
+│   Parse Response                                │
+│   ↓                                             │
+│   Tool Calls? ──Yes──→ Execute Tools (parallel) │
+│       │                     ↓                   │
+│       │              Append Results              │
+│       │                     ↓                   │
+│       └────────── Loop (max 50 iterations) ─────┘
+│       │
+│      No
+│       ↓
+│   Save Session + Update Memories
+│       ↓
+│   Return AgentLoopResult
+└─────────────────────────────────────────────────┘
 ```
 
-### **Environment Variables**
-- Production: Set in Cloud Run
-- Development: `.env.local`
-- Secrets: Google Secret Manager
+#### LLM Drivers
 
-### **Build Process**
-1. Code push to repository
-2. Cloud Build triggered
-3. Docker image built (AMD64)
-4. Image pushed to Artifact Registry
-5. Cloud Run service updated
-6. Traffic routed to new revision
+| Driver | Providers |
+|--------|-----------|
+| `anthropic.rs` | Anthropic (Claude) |
+| `gemini.rs` | Google Gemini |
+| `openai.rs` | OpenAI + 24 compatible (Groq, DeepSeek, Ollama, vLLM, etc.) |
+| `fallback.rs` | Automatic failover chain |
+| `copilot.rs` | Copilot integration |
 
----
+Key: `LlmDriver` trait → `complete()` + `stream()` methods.
 
-## 📊 Monitoring & Observability
+#### 53 Built-in Tools
 
-### **Logs**
-- Application logs → Cloud Logging
-- Access logs → Cloud Logging
-- Error logs → Cloud Logging
-- Audit logs → Cloud Logging
+Key categories: file I/O, web fetch, web search, shell exec, code analysis, image gen, TTS, browser automation, MCP, A2A protocol.
 
-### **Metrics**
-- Request count
-- Response time
-- Error rate
-- CPU/Memory usage
-- Active instances
+#### Security Subsystems in Runtime
 
-### **Alerts**
-- High error rate
-- Slow response times
-- Resource exhaustion
-- Security events
+| Module | Protection |
+|--------|-----------|
+| `sandbox.rs` | WASM dual-metered (fuel + epoch) |
+| `subprocess_sandbox.rs` | `env_clear()` + selective passthrough |
+| `loop_guard.rs` | SHA256 loop detection + circuit breaker |
+| `session_repair.rs` | 7-phase message history recovery |
+| `shell_bleed.rs` | Shell injection prevention |
+| `auth_cooldown.rs` | Provider circuit breaker |
 
 ---
 
-## 🔮 Future Enhancements
+### 5. `openfang-api` — HTTP Server (Axum)
 
-### **Short Term (1-3 months)**
-- [ ] Vector database integration
-- [ ] Enhanced caching layer
-- [ ] Real-time collaboration (Yjs)
-- [ ] Mobile app (React Native)
+> 140+ endpoints. Dashboard SPA (Alpine.js). OpenAI-compatible API.
 
-### **Medium Term (3-6 months)**
-- [ ] Microservices architecture
-- [ ] GraphQL API
-- [ ] Advanced analytics dashboard
-- [ ] Multi-region deployment
+| Category | Endpoints | Examples |
+|----------|-----------|---------|
+| Agents | 20+ | CRUD, message, stream, clone, files |
+| Channels | 6 | configure, test, reload, WhatsApp QR |
+| Hands | 10+ | activate, pause, resume, stats |
+| Skills | 5 | list, install, uninstall, create |
+| Memory | 4 | KV get/set/delete per agent |
+| A2A | 8 | agent card, send task, discover |
+| Budget | 4 | global status, per-agent ranking |
+| Audit | 2 | recent entries, Merkle verification |
+| Integrations | 7 | add, remove, reconnect, health |
+| OpenAI Compat | 2 | `/v1/chat/completions`, `/v1/models` |
 
-### **Long Term (6-12 months)**
-- [ ] Kubernetes migration
-- [ ] Event-driven architecture
-- [ ] Advanced AI features
-- [ ] Global CDN optimization
-
----
-
-## 📝 Notes
-
-- **Current Status**: Monolithic Next.js app on Cloud Run
-- **Database**: Single PostgreSQL instance with Prisma
-- **Storage**: Google Cloud Storage
-- **AI**: Multiple LLM providers with fallback
-- **Security**: Next.js 15.5.7 (patched for CVE-2025-55182)
+**Middleware stack:** Auth → GCRA Rate Limiter → Security Headers → Request Logging → Compression → Tracing → CORS
 
 ---
 
-**Last Updated**: 2024-12-06  
-**Version**: 1.0  
-**Maintainer**: Development Team
+### 6. `openfang-channels` — 40 Messaging Adapters
 
+> Mỗi adapter convert platform messages → unified `ChannelMessage` events.
+
+| Wave | Channels |
+|------|----------|
+| Core | Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Email |
+| Enterprise | Teams, Mattermost, Google Chat, Webex, Feishu, Zulip |
+| Social | LINE, Viber, Messenger, Mastodon, Bluesky, Reddit, LinkedIn, Twitch |
+| Community | IRC, XMPP, Guilded, Revolt, Keybase, Discourse, Gitter |
+| Privacy + Niche | Threema, Nostr, Mumble, Nextcloud, Rocket.Chat, Ntfy, Gotify, DingTalk, Zalo, Webhooks |
+
+Mỗi adapter hỗ trợ: per-channel model overrides, DM/group policies, rate limiting, output formatting.
+
+---
+
+### 7. `openfang-skills` — Skill System
+
+> Pluggable tool bundles. 5 runtime types:
+
+| Runtime | Execution |
+|---------|-----------|
+| `PromptOnly` | Inject SKILL.md vào system prompt (default) |
+| `Python` | Subprocess execution |
+| `Wasm` | WASM sandbox |
+| `Node` | OpenClaw compatibility |
+| `Builtin` | Compiled into binary |
+
+60 bundled skills + FangHub marketplace + ClawHub compatibility.
+
+---
+
+### 8. `openfang-hands` — 7 Autonomous Hands
+
+> **Core innovation.** Pre-built agents chạy tự động theo schedule, không cần prompt.
+
+| Hand | Mô tả |
+|------|-------|
+| **Clip** | YouTube → vertical shorts (8-phase pipeline) |
+| **Lead** | Daily lead generation + scoring 0-100 |
+| **Collector** | OSINT intelligence + change detection |
+| **Predictor** | Superforecasting + Brier score tracking |
+| **Researcher** | Deep research + CRAAP credibility eval |
+| **Twitter** | Autonomous social media management |
+| **Browser** | Web automation via Playwright (purchase approval gate) |
+
+Mỗi Hand có: `HAND.toml` manifest, system prompt, SKILL.md, guardrails, dashboard metrics.
+
+---
+
+### 9. `openfang-extensions` — Integration System
+
+> 25 MCP server templates + AES-256-GCM credential vault + OAuth2 PKCE.
+
+Categories: DevTools, Productivity, Communication, Data, Cloud, AI.
+
+---
+
+### 10. `openfang-wire` — P2P Protocol
+
+> OFP (OpenFang Protocol) — agent-to-agent networking qua TCP.
+
+- `PeerNode`: Network endpoint
+- `PeerRegistry`: Known peers tracking
+- `WireMessage`: JSON-RPC framed protocol
+- HMAC-SHA256 mutual authentication
+
+---
+
+### 11-14. Supporting Crates
+
+| Crate | Chức năng |
+|-------|-----------|
+| `openfang-cli` | CLI commands + TUI (ratatui) + daemon management + MCP server mode |
+| `openfang-desktop` | Tauri 2.0 native app (system tray, notifications, global shortcuts) |
+| `openfang-migrate` | Migration engine (OpenClaw, LangChain, AutoGPT) |
+| `xtask` | Build automation |
+
+---
+
+## 16 Security Layers
+
+```mermaid
+graph TD
+    A["WASM Dual-Metered Sandbox"] --> B["Merkle Hash-Chain Audit"]
+    B --> C["Taint Tracking"]
+    C --> D["Ed25519 Signed Manifests"]
+    D --> E["SSRF Protection"]
+    E --> F["Secret Zeroization"]
+    F --> G["OFP Mutual Auth"]
+    G --> H["Capability Gates - RBAC"]
+    H --> I["Security Headers"]
+    I --> J["Health Endpoint Redaction"]
+    J --> K["Subprocess Sandbox"]
+    K --> L["Prompt Injection Scanner"]
+    L --> M["Loop Guard"]
+    M --> N["Session Repair"]
+    N --> O["Path Traversal Prevention"]
+    O --> P["GCRA Rate Limiter"]
+```
+
+| # | System | What It Does |
+|---|--------|-------------|
+| 1 | **WASM Dual-Metered Sandbox** | Tool code runs in WebAssembly with fuel metering + epoch interruption |
+| 2 | **Merkle Hash-Chain Audit Trail** | Every action cryptographically linked — tamper-proof |
+| 3 | **Information Flow Taint Tracking** | Labels propagate from source to sink |
+| 4 | **Ed25519 Signed Agent Manifests** | Cryptographic identity signing |
+| 5 | **SSRF Protection** | Block private IPs, cloud metadata, DNS rebinding |
+| 6 | **Secret Zeroization** | `Zeroizing<String>` auto-wipes keys from memory |
+| 7 | **OFP Mutual Authentication** | HMAC-SHA256 nonce-based P2P auth |
+| 8 | **Capability Gates** | RBAC — declare required tools, kernel enforces |
+| 9 | **Security Headers** | CSP, X-Frame-Options, HSTS on every response |
+| 10 | **Health Endpoint Redaction** | Minimal public info, full diagnostics require auth |
+| 11 | **Subprocess Sandbox** | `env_clear()` + selective passthrough |
+| 12 | **Prompt Injection Scanner** | Detect override attempts and data exfil patterns |
+| 13 | **Loop Guard** | SHA256 tool call loop detection + circuit breaker |
+| 14 | **Session Repair** | 7-phase message history recovery |
+| 15 | **Path Traversal Prevention** | Canonicalization with symlink escape prevention |
+| 16 | **GCRA Rate Limiter** | Cost-aware token bucket, per-IP tracking |
+
+---
+
+## Data Flow — Tin Nhắn Từ Telegram → Agent → Trả Lời
+
+```mermaid
+sequenceDiagram
+    participant T as Telegram
+    participant CH as openfang-channels
+    participant K as openfang-kernel
+    participant R as openfang-runtime
+    participant M as openfang-memory
+    participant LLM as LLM Provider
+
+    T->>CH: Incoming message (webhook/polling)
+    CH->>K: ChannelMessage event
+    K->>K: Route to bound agent
+    K->>M: Load session history
+    K->>R: run_agent_loop()
+    R->>R: Build prompt (system + history + tools)
+    R->>LLM: CompletionRequest
+    LLM-->>R: CompletionResponse (text + tool_calls?)
+    R->>R: Execute tools if needed
+    R->>M: Save session + memories
+    R-->>K: AgentLoopResult
+    K->>CH: Send reply
+    CH->>T: Telegram API response
+```
+
+---
+
+## Cấu Trúc Thư Mục
+
+```
+openfang/
+├── crates/                  # 13 Rust crates
+│   ├── openfang-kernel/         # 22 source files
+│   ├── openfang-runtime/        # 53 source files
+│   ├── openfang-api/            # 12 source files + static/
+│   ├── openfang-channels/       # 47 source files
+│   ├── openfang-memory/         # 10 source files
+│   ├── openfang-types/          # 19 source files
+│   ├── openfang-skills/         # 69 source files
+│   ├── openfang-hands/          # 18 source files
+│   ├── openfang-extensions/     # 34 source files
+│   ├── openfang-wire/           # 5 source files
+│   ├── openfang-cli/            # 36 source files
+│   ├── openfang-desktop/        # 16 source files
+│   └── openfang-migrate/        # 4 source files
+├── agents/                  # 30 pre-built agent profiles
+├── sdk/                     # JavaScript + Python SDKs
+├── packages/                # WhatsApp Gateway (Node.js)
+├── scripts/                 # Install/build scripts
+├── docs/                    # Documentation
+├── deploy/                  # Deployment configs
+└── xtask/                   # Build automation
+```
+
+---
+
+## Dependency Graph Giữa Các Crate
+
+```mermaid
+graph BT
+    types["openfang-types"]
+    memory["openfang-memory"]
+    wire["openfang-wire"]
+    channels["openfang-channels"]
+    skills["openfang-skills"]
+    hands["openfang-hands"]
+    extensions["openfang-extensions"]
+    runtime["openfang-runtime"]
+    kernel["openfang-kernel"]
+    api["openfang-api"]
+    cli["openfang-cli"]
+    desktop["openfang-desktop"]
+    migrate["openfang-migrate"]
+
+    memory --> types
+    wire --> types
+    channels --> types
+    skills --> types
+    hands --> types
+    extensions --> types
+    runtime --> types
+    runtime --> skills
+    runtime --> hands
+    runtime --> extensions
+    kernel --> types
+    kernel --> memory
+    kernel --> runtime
+    kernel --> channels
+    kernel --> wire
+    api --> kernel
+    api --> runtime
+    cli --> api
+    cli --> kernel
+    desktop --> api
+    migrate --> types
+    migrate --> memory
+```
+
+---
+
+## Key Design Patterns
+
+| Pattern | Áp dụng |
+|---------|---------|
+| **Trait abstraction** | `LlmDriver`, `Memory`, `KernelHandle` — tránh circular deps |
+| **Arc + DashMap** | Concurrent state sharing không cần mutex |
+| **Event bus** | Pub/sub decouple kernel ↔ subsystems |
+| **Config hot-reload** | Poll mỗi 30s, diff + apply changes |
+| **Graceful shutdown** | SIGINT/SIGTERM + API shutdown notify |
+| **Circuit breaker** | `ProviderCooldown` cho LLM rate limits |
+| **Merkle audit** | Cryptographic tamper detection |

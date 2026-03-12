@@ -50,11 +50,12 @@ export function hasRoutePermission(role: UserRole, pathname: string): boolean {
            pathname.startsWith('/docs');
   }
   
-  // Student can access student routes
+  // Student can access student routes (including /student/* agents)
   if (role === 'STUDENT') {
     return pathname.startsWith('/dashboard') ||
            pathname.startsWith('/learning-paths') ||
            pathname.startsWith('/ai-tutor') ||
+           pathname.startsWith('/student') ||
            pathname.startsWith('/courses') ||
            pathname.startsWith('/docs');
   }

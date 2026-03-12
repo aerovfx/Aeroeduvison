@@ -64,9 +64,8 @@ export default function EmotionTracker() {
         setErrorMessage('');
 
         try {
-            const vision = await FilesetResolver.forVisionTasks(
-                'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm'
-            );
+            const wasmBase = typeof window !== "undefined" ? `${window.location.origin}/api/mediapipe-wasm/wasm` : "/api/mediapipe-wasm/wasm";
+            const vision = await FilesetResolver.forVisionTasks(wasmBase);
 
             const faces = await FaceLandmarker.createFromOptions(vision, {
                 baseOptions: {

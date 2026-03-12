@@ -1,0 +1,35 @@
+[package]
+name = "openfang-kernel"
+version = "0.1.0"
+edition = "2021"
+description = "OpenFang Kernel - Orchestration for Aeroeduvison Exam Agent"
+
+[dependencies]
+# Core
+tokio = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+# Async
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# UUID
+uuid = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Workspace crates
+openfang-types = { path = "../openfang-types" }
+openfang-runtime = { path = "../openfang-runtime" }
