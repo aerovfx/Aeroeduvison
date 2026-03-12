@@ -882,9 +882,39 @@
         "Áp dụng vào bài toán thực tế"
       ],
       "tags": ["mặt phẳng nghiêng", "phân tích lực", "trọng lực", "phản lực", "vật lý", "cơ học", "tĩnh học"]
+    },
+    {
+      "id": "paper-plane-cfd",
+      "name": "✈️ CFD Máy Bay Giấy Nghệ Thuật",
+      "description": "Mô phỏng khí động học CFD với xoáy mút cánh và vệt xả dòng. Khám phá dòng chảy chất lưu quanh máy bay giấy 3D đẹp mắt!",
+      "category": "Cơ học",
+      "level": "Nâng cao",
+      "difficulty": "Nâng cao",
+      "xp": 300,
+      "duration": "40 phút",
+      "port": null,
+      "icon": "Wind",
+      "features": [
+        "✈️ Máy bay giấy 3D nghệ thuật",
+        "🌀 Xoáy mút cánh (Wingtip Vortices)",
+        "💨 Vệt xả dòng (Wake Turbulence)",
+        "🎨 Particle system với ribbon trails",
+        "⚡ Điều chỉnh tốc độ gió",
+        "🔬 Mô phỏng CFD real-time 60fps",
+        "📊 Công thức khí động học",
+        "🎮 Interactive visualization"
+      ],
+      "learning_objectives": [
+        "Hiểu nguyên lý xoáy mút cánh",
+        "Nhận biết wake turbulence",
+        "Áp dụng CFD trong thiết kế",
+        "Phân tích dòng chảy chất lưu",
+        "Ứng dụng winglets giảm lực cản"
+      ],
+      "tags": ["CFD", "khí động học", "xoáy", "turbulence", "máy bay", "vật lý", "chất lưu", "aerodynamics"]
     }
   ],
-  "total": 34,
+  "total": 35,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
