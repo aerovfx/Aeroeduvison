@@ -354,13 +354,13 @@
       "id": "llm-training",
       "name": "LLM Training Simulator",
       "description": "Mô phỏng quá trình huấn luyện mô hình ngôn ngữ lớn (LLM) từ A-Z. Học về Transformer, Pre-training, Fine-tuning, và ứng dụng thực tế!",
-      "category": "Machine Learning",
+      "category": "Học qua trò chơi",
       "level": "Nâng cao",
       "difficulty": "Nâng cao",
       "xp": 500,
       "duration": "120 phút",
       "port": null,
-      "icon": "Brain",
+      "icon": "Trophy",
       "features": [
         "🧠 7 giai đoạn học tập tương tác",
         "📚 Transformer & BERT Architecture",
@@ -381,7 +381,7 @@
         "Đánh giá mô hình qua các benchmark tiêu chuẩn",
         "Triển khai AI Assistant hoàn chỉnh"
       ],
-      "tags": ["LLM", "transformer", "GPT", "BERT", "AI", "machine learning", "deep learning", "NLP", "fine-tuning", "LoRA"]
+      "tags": ["LLM", "transformer", "GPT", "BERT", "AI", "machine learning", "deep learning", "NLP", "fine-tuning", "LoRA", "game", "simulation"]
     },
     {
       "id": "harmonic-motion",
