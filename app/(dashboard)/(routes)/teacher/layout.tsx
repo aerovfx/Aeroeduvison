@@ -9,13 +9,12 @@ const TeacherLayout = async ({
   children: React.ReactNode;
 }) => {
   const session = await getServerSession(authOptions);
-  const userId = session?.user?.id;
 
   if (!isTeacher(session?.user?.role)) {
     return redirect("/");
   }
 
-  return <>{children}</>
+  return <>{children}</>;
 }
- 
+
 export default TeacherLayout;

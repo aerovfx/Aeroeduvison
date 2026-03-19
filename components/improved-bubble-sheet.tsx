@@ -1,6 +1,14 @@
-'use client';
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { 
+  calculateTotalScore, 
+  StudentSubmission, 
+  AnswerKey 
+} from '@/lib/grading/grading-logic';
 
 // 📊 Bảng Quy Luật Mapping (QUAN TRỌNG)
 const mappingData = {
@@ -18,621 +26,555 @@ const mappingData = {
   12: { char: '9', columns: [2, 3, 4, 5] },
 };
 
-interface ImprovedBubbleSheetProps {}
+interface ImprovedBubbleSheetProps {
+  mode?: 'student' | 'key_entry' | 'review';
+  initialData?: StudentSubmission;
+  officialKey?: AnswerKey;
+  onSave?: (data: any) => void;
+}
 
-const ImprovedBubbleSheet: React.FC<ImprovedBubbleSheetProps> = () => {
+const ImprovedBubbleSheet: React.FC<ImprovedBubbleSheetProps> = ({ 
+  mode = 'student',
+  initialData,
+  officialKey,
+  onSave 
+}) => {
   // State management
   const [selectedCells, setSelectedCells] = useState<{ [key: string]: boolean }>({});
-  const [animations, setAnimations] = useState<{ [key: string]: boolean }>({});
-  const [showInstructions, setShowInstructions] = useState(true);
   const [timeLeft, setTimeLeft] = useState(50 * 60); // 50 minutes
-  const [currentPage, setCurrentPage] = useState(1);
   
   // Quiz states
-  const [answers, setAnswers] = useState<{ [key: string]: number }>({});
-  const [part2Answers, setPart2Answers] = useState<{ [key: string]: boolean }>({});
-  const [part3Answers, setPart3Answers] = useState<{ [key: string]: number }>({});
+  const [answers, setAnswers] = useState<{ [key: string]: any }>(initialData?.partI as any || {});
+  const [part2Answers, setPart2Answers] = useState<{ [key: string]: any }>(initialData?.partII as any || {});
+  const [part3Answers, setPart3Answers] = useState<{ [key: string]: any }>(initialData?.partIII as any || {});
+  const [essayContent, setEssayContent] = useState(initialData?.essayContent || "");
+  const [essayScore, setEssayScore] = useState(initialData?.essayScore || 0);
 
-  // 🎯 Xử lý click ô tô với validation
-  const handleCellClick = (row: number, col: number) => {
-    // Validation: Đảm bảo không crash khi click linh tinh
-    if (!mappingData[row as keyof typeof mappingData]) {
-      console.warn(`Invalid row: ${row}`);
-      return;
-    }
+  // Computed results in review mode
+  const [gradingResult, setGradingResult] = useState<any>(null);
+  const [isAiGrading, setIsAiGrading] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
-    const data = mappingData[row as keyof typeof mappingData];
-    if (!data.columns.includes(col)) {
-      console.warn(`Column ${col} not available for row ${row}`);
-      return;
-    }
-
-    setSelectedCells(prev => {
-      const newState = { ...prev };
-      const cellKey = `${row}-${col}`;
+  useEffect(() => {
+    if (mode === 'review' && officialKey) {
+      const submission: StudentSubmission = {
+        partI: answers as any,
+        partII: part2Answers as any,
+        partIII: {} as any, // Part III needs conversion from internal state
+        essayScore
+      };
       
-      // Check if the clicked cell is already selected
-      const isCurrentlySelected = prev[cellKey];
-      
-      // Clear all selections in the same column first
-      Object.keys(newState).forEach(key => {
-        const [, column] = key.split('-').map(Number);
-        if (column === col) {
-          delete newState[key];
-        }
-      });
-      
-      // Toggle behavior: Click vào ô đã chọn → bỏ chọn ô đó
-      if (!isCurrentlySelected) {
-        newState[cellKey] = true;
-        
-        // Trigger animation
-        setAnimations(prev => ({ ...prev, [cellKey]: true }));
-        setTimeout(() => {
-          setAnimations(prev => ({ ...prev, [cellKey]: false }));
-        }, 300);
+      // Convert Part III raw bubbles to actual values
+      for (let q = 0; q < 6; q++) {
+        submission.partIII[q + 1] = getActualNumericValue(q);
       }
-      
-      return newState;
-    });
+
+      setGradingResult(calculateTotalScore(submission, officialKey));
+    }
+  }, [answers, part2Answers, part3Answers, mode, officialKey, essayScore]);
+
+  // Transform internal bubble state to numeric string (Part III)
+  const getActualNumericValue = (qIdx: number) => {
+    let result = "";
+    if (part3Answers[`part3_${qIdx}_minus_0`] !== undefined) result += "-";
+    
+    // Column by column (2, 3, 4, 5)
+    for (let col = 0; col < 4; col++) {
+      // Check if comma
+      if (part3Answers[`part3_${qIdx}_comma_${col}`] !== undefined) {
+        result += ".";
+      }
+      // Check if digit
+      for (let digit = 0; digit <= 9; digit++) {
+        if (part3Answers[`part3_${qIdx}_digit_${digit}_${col}`] !== undefined) {
+          result += digit;
+          break;
+        }
+      }
+    }
+    return result;
   };
 
-  // 🎯 Tính giá trị ô vuông cho PHẦN III (squareIndex: 0,1,2,3 → cột 2,3,4,5)
-  const getSquareValue = (squareIndex: number, questionIndex?: number) => {
-    if (questionIndex !== undefined) {
-      // PHẦN III: Sử dụng part3Answers
-      const columnPosition = squareIndex + 1; // 1,2,3,4
-      
-      // Tìm trong part3Answers
-      for (const [key, value] of Object.entries(part3Answers)) {
-        if (key.startsWith(`part3_${questionIndex}_`) && key.endsWith(`_${columnPosition}`)) {
-          const parts = key.split('_');
-          const type = parts[2];
-          const digitIndex = parts[3];
-          
-          if (type === 'minus') return '-';
-          if (type === 'comma') return ',';
-          if (type === 'digit') return digitIndex;
-        }
+  // 🎯 Xử lý click ô tô - Reuse for Part III visual feedback
+  const handleCellClick = (row: number, col: number) => {
+    // Basic implementation for visual grid (if needed)
+  };
+
+  // 🎯 Tính giá trị ô vuông cho PHẦN III
+  const getSquareValue = (squareIndex: number, questionIndex: number) => {
+    // squareIndex: 0,1,2,3 → cột 2,3,4,5
+    const columnPosition = squareIndex; 
+    
+    // Check for comma in this column
+    if (part3Answers[`part3_${questionIndex}_comma_${columnPosition}`] !== undefined) return ',';
+    
+    // Check for digit in this column
+    for (let digit = 0; digit <= 9; digit++) {
+      if (part3Answers[`part3_${questionIndex}_digit_${digit}_${columnPosition}`] !== undefined) {
+        return digit;
       }
-      
-      return ''; // Không tô gì → ô vuông hiển thị trống
-    } else {
-      // Fallback cho bubble sheet gốc
-      const column = squareIndex + 2; // 2,3,4,5
-      
-      for (let row = 1; row <= 12; row++) {
-        const cellKey = `${row}-${column}`;
-        if (selectedCells[cellKey]) {
-          return mappingData[row as keyof typeof mappingData].char;
-        }
-      }
-      
-      return '';
     }
+    
+    // Special case for minus: only column index 0 can be minus but usually shown separately
+    if (squareIndex === 0 && part3Answers[`part3_${questionIndex}_minus_0`] !== undefined) return '-';
+
+    return ''; 
   };
 
   // 🎯 Reset tất cả
   const resetAll = () => {
-    setSelectedCells({});
-    setAnimations({});
-  };
-
-  // 🎯 Kiểm tra ô có được chọn không
-  const isCellSelected = (row: number, col: number) => {
-    return selectedCells[`${row}-${col}`] || false;
-  };
-
-  // 🎯 Đếm tổng số ô đã chọn
-  const getTotalSelected = () => {
-    return Object.keys(selectedCells).length;
+    setAnswers({});
+    setPart2Answers({});
+    setPart3Answers({});
+    setEssayContent("");
+    setEssayScore(0);
   };
 
   // 🎯 Handle quiz answer selection
-  const handleAnswerSelect = (questionId: string, answerIndex?: any) => {
+  const handleAnswerSelect = (questionId: string, value: any) => {
+    if (mode === 'review') return; // Read-only in review
+
     if (questionId.startsWith('part2_')) {
       // PHẦN II: True/False
-      setPart2Answers(prev => {
-        const newAnswers = { ...prev };
-        // Clear other selections for the same question
-        const questionPrefix = questionId.split('_').slice(0, 2).join('_');
-        Object.keys(newAnswers).forEach(key => {
-          if (key.startsWith(questionPrefix)) {
-            delete newAnswers[key];
-          }
-        });
-        // Set new selection
-        newAnswers[questionId] = answerIndex;
-        return newAnswers;
-      });
+      setPart2Answers(prev => ({
+        ...prev,
+        [questionId]: value
+      }));
     } else if (questionId.startsWith('part3_')) {
-      // PHẦN III: Numerical answers - FIXED logic for mutually exclusive per column
+      // PHẦN III: Numerical
       const parts = questionId.split('_');
       const questionIndex = parts[1];
-      const type = parts[2];
-      const columnPosition = parts[3]; // This is the actual column position (0,1,2,3)
+      const type = parts[2]; // 'digit', 'minus', 'comma'
+      const colPos = parts[parts.length - 1]; // Last part is always column index
       
       setPart3Answers(prev => {
         const newAnswers = { ...prev };
+        const isCurrentlySelected = prev[questionId] === value;
         
-        // Check if the clicked cell is already selected
-        const isCurrentlySelected = prev[questionId] === answerIndex;
-        
-        // CRITICAL FIX: Clear ALL selections in the same column for this question
-        // For digits: bubbleIndex (0,1,2,3) maps to column (1,2,3,4)
-        // For minus: position 0 maps to column 1  
-        // For comma: position 2,3 maps to column 3,4
+        // Mutually exclusive in the same column for this question
         Object.keys(newAnswers).forEach(key => {
-          if (key.startsWith(`part3_${questionIndex}_`) && key.endsWith(`_${columnPosition}`)) {
+          if (key.startsWith(`part3_${questionIndex}_`) && key.endsWith(`_${colPos}`)) {
             delete newAnswers[key];
           }
         });
         
-        // Toggle behavior: Click vào ô đã chọn → bỏ chọn ô đó
         if (!isCurrentlySelected) {
-          newAnswers[questionId] = answerIndex;
+          newAnswers[questionId] = value;
         }
-        
-        // Debug log
-        const selectedInColumn = Object.keys(newAnswers).filter(k => 
-          k.startsWith(`part3_${questionIndex}_`) && k.endsWith(`_${columnPosition}`)
-        ).length;
-        console.log(`🎯 PHẦN III: ${questionId} | Column: ${columnPosition} | Selected in Column: ${selectedInColumn}`);
-        
         return newAnswers;
       });
     } else {
-      // PHẦN I: Multiple choice (1-40)
+      // PHẦN I
       const questionNum = parseInt(questionId);
       setAnswers(prev => ({
         ...prev,
-        [questionNum]: answerIndex
+        [questionNum]: prev[questionNum] === value ? undefined : value
       }));
+    }
+  };
+
+  const handleNopBai = () => {
+    if (onSave) {
+      const data: StudentSubmission = {
+        partI: answers as any,
+        partII: part2Answers as any,
+        partIII: {} as any,
+        essayContent,
+        essayScore
+      };
+      for (let q = 0; q < 6; q++) {
+        data.partIII[q + 1] = getActualNumericValue(q);
+      }
+      onSave(data);
     }
   };
 
   // Timer effect
   useEffect(() => {
+    if (mode !== 'student') return;
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft(prev => prev > 0 ? prev - 1 : 0);
     }, 1000);
-
     return () => clearInterval(timer);
-  }, []);
+  }, [mode]);
 
-  // Auto-hide instructions after 5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowInstructions(false);
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress
-  const progress = (getTotalSelected() / 4) * 100;
-
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Sticky Timer Header */}
-      <div className="sticky top-0 z-50 bg-blue-600 text-white p-4 shadow-lg">
+    <div className="min-h-screen bg-gray-100 pb-20">
+      {/* Header */}
+      <div className={`sticky top-0 z-50 ${mode === 'key_entry' ? 'bg-orange-600' : mode === 'review' ? 'bg-green-600' : 'bg-blue-600'} text-white p-4 shadow-lg transition-colors`}>
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="text-2xl font-bold">⏰ {formatTime(timeLeft)}</div>
-            <div className="text-sm">Thời gian còn lại</div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="text-sm">Tiến độ: {getTotalSelected()}/4</div>
-            <div className="w-32 bg-blue-400 rounded-full h-2">
-              <div 
-                className="bg-white h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
+            {mode === 'student' && <div className="text-2xl font-bold">⏰ {formatTime(timeLeft)}</div>}
+            <div className="text-lg font-bold">
+              {mode === 'student' ? 'LÀM BÀI THI' : mode === 'key_entry' ? 'NHẬP ĐÁP ÁN MẪU' : 'XEM KẾT QUẢ CHẤM ĐIỂM'}
             </div>
+          </div>
+          {mode === 'review' && gradingResult && (
+            <div className="text-xl font-black bg-white text-green-700 px-4 py-1 rounded-full shadow-inner">
+              TỔNG ĐIỂM: {gradingResult.total.toFixed(2)}
+            </div>
+          )}
+          <div className="flex space-x-2">
+            <Button variant="outline" size="sm" className="bg-transparent border-white text-white hover:bg-white/20" onClick={handleNopBai}>
+              {mode === 'review' ? 'Lưu kết quả' : 'Hoàn thành'}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Left Panel - PDF Content */}
-          <div className="bg-white rounded-lg shadow-lg border-2 border-gray-300">
-            <div className="bg-blue-600 text-white p-3 rounded-t-lg">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold">📄 Đề thi mẫu</span>
-                <div className="flex items-center space-x-2">
-                  <button className="text-white hover:bg-blue-700 p-1 rounded">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </button>
-                  <span className="text-sm">Trang {currentPage}/1</span>
-                </div>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto p-4 flex flex-col gap-6">
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left/Middle - Answer Sheet Sections */}
+          <div className="lg:col-span-2 space-y-6">
             
-            <div className="p-6 space-y-4 text-gray-800 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
-              {/* Mock PDF Content */}
-              <div className="text-center mb-6">
-                <div className="text-lg font-bold text-blue-600 mb-2">BỘ GIÁO DỤC VÀ ĐÀO TẠO</div>
-                <div className="text-sm text-gray-600">KỲ THI TRUNG HỌC PHỔ THÔNG QUỐC GIA NĂM 2024</div>
-                <div className="text-lg font-bold text-blue-600 mt-2">MÔN TOÁN HỌC</div>
-                <div className="text-sm text-gray-600">Thời gian làm bài: 50 phút</div>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-bold text-blue-600 mb-3">PHẦN III: ĐÁP ÁN SỐ (6 câu)</h3>
-                  <div className="space-y-3">
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 1: Giải phương trình 2x + 3 = 7</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 2: Tính giá trị của biểu thức √16 + 3²</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 3: Tìm nghiệm của phương trình x² - 5x + 6 = 0</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 4: Tính diện tích hình tròn có bán kính r = 3</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 5: Giải bất phương trình 2x - 1 &gt; 5</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                    <div className="bg-gray-50 p-3 rounded">
-                      <p className="font-medium">Câu 6: Tính log₂(8) + log₃(27)</p>
-                      <p className="text-sm text-gray-600 mt-1">Nhập kết quả vào phiếu trả lời bên phải</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center text-sm text-gray-500 border-t pt-4 mt-6">
-                <p>Mã đề: 001</p>
-                <p>Trang 1/1</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Panel - Answer Sheet */}
-          <div className="bg-white rounded-lg shadow-lg border-2 border-gray-300">
-            <div className="bg-white text-blue-600 p-3 rounded-t-lg border-b">
-              <h2 className="font-bold text-lg text-center">PHIẾU TRẢ LỜI</h2>
-            </div>
-            
-            <div className="p-4 space-y-4">
-              {/* PHẦN I - Trắc nghiệm đa lựa chọn (40 câu) */}
-              <div className="bg-blue-50 border-2 border-blue-300 p-3 rounded">
-                <div className="text-center text-sm font-bold mb-3 text-blue-600">PHẦN I</div>
-                <div className="text-xs text-center mb-3">(Trắc nghiệm đa lựa chọn - 40 câu)</div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Questions 1-20 */}
-                  <div className="space-y-1">
-                    <div className="text-center text-xs font-bold mb-2">1-20</div>
-                    <div className="grid grid-cols-5 gap-1 mb-2">
-                      <div className="text-center font-medium text-red-600"></div>
-                      <div className="text-center font-medium text-red-600">A</div>
-                      <div className="text-center font-medium text-red-600">B</div>
-                      <div className="text-center font-medium text-red-600">C</div>
-                      <div className="text-center font-medium text-red-600">D</div>
-                    </div>
-                    {Array.from({ length: 20 }, (_, index) => {
-                      const questionId = (index + 1).toString();
-                      const selectedAnswer = answers[parseInt(questionId)];
-                      
-                      return (
-                        <div key={index} className="grid grid-cols-5 gap-1 text-xs">
-                          <div className="text-center font-medium">{index + 1}.</div>
-                          {['A', 'B', 'C', 'D'].map((letter, letterIndex) => (
-                            <div key={letter} className="flex justify-center">
-                              <div
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer transition-all ${
-                                  selectedAnswer === letterIndex
-                                    ? 'bg-black'
-                                    : 'bg-white hover:bg-gray-200'
-                                }`}
-                                onClick={() => handleAnswerSelect(questionId, letterIndex)}
-                              >
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Questions 21-40 */}
-                  <div className="space-y-1">
-                    <div className="text-center text-xs font-bold mb-2">21-40</div>
-                    <div className="grid grid-cols-5 gap-1 mb-2">
-                      <div className="text-center font-medium text-red-600"></div>
-                      <div className="text-center font-medium text-red-600">A</div>
-                      <div className="text-center font-medium text-red-600">B</div>
-                      <div className="text-center font-medium text-red-600">C</div>
-                      <div className="text-center font-medium text-red-600">D</div>
-                    </div>
-                    {Array.from({ length: 20 }, (_, index) => {
-                      const questionId = (index + 21).toString();
-                      const selectedAnswer = answers[parseInt(questionId)];
-                      
-                      return (
-                        <div key={index} className="grid grid-cols-5 gap-1 text-xs">
-                          <div className="text-center font-medium">{index + 21}.</div>
-                          {['A', 'B', 'C', 'D'].map((letter, letterIndex) => (
-                            <div key={letter} className="flex justify-center">
-                              <div
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer transition-all ${
-                                  selectedAnswer === letterIndex
-                                    ? 'bg-black'
-                                    : 'bg-white hover:bg-gray-200'
-                                }`}
-                                onClick={() => handleAnswerSelect(questionId, letterIndex)}
-                              >
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* PHẦN II - Câu đúng/sai (4 câu) */}
-              <div className="bg-pink-100 border-2 border-pink-300 p-3 rounded">
-                <div className="text-center text-sm font-bold mb-3 text-blue-600">PHẦN II</div>
-                <div className="text-xs text-center mb-3">(Câu đúng/sai - 4 câu)</div>
-                
-                <div className="grid grid-cols-4 gap-4">
-                  {Array.from({ length: 4 }, (_, index) => (
-                    <div key={index} className="border border-red-500 p-2 rounded">
-                      <div className="text-center text-xs font-bold mb-2">Câu {index + 1}</div>
-                      <div className="text-xs">
-                        <div className="grid grid-cols-3 gap-1 mb-2">
-                          <div className="text-center font-medium text-red-600"></div>
-                          <div className="text-center font-medium text-red-600">Đúng</div>
-                          <div className="text-center font-medium text-red-600">Sai</div>
-                        </div>
-                        {['a)', 'b)', 'c)', 'd)'].map((option, optIndex) => (
-                          <div key={option} className="grid grid-cols-3 gap-1 mb-1">
-                            <div className="text-center">{option}</div>
-                            <div className="flex justify-center">
-                              <div 
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                  part2Answers[`part2_${index}_${optIndex}_true`] === true ? 'bg-black' : 'bg-white'
-                                }`}
-                                onClick={() => handleAnswerSelect(`part2_${index}_${optIndex}_true`, true)}
-                              ></div>
-                            </div>
-                            <div className="flex justify-center">
-                              <div 
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                  part2Answers[`part2_${index}_${optIndex}_false`] === false ? 'bg-black' : 'bg-white'
-                                }`}
-                                onClick={() => handleAnswerSelect(`part2_${index}_${optIndex}_false`, false)}
-                              ></div>
-                            </div>
-                          </div>
-                        ))}
+            {/* PHẦN I - Trắc nghiệm (18 câu - Follow image) */}
+            <Card className="border-2 border-blue-200 shadow-md">
+              <CardHeader className="bg-blue-50 py-3">
+                <CardTitle className="text-center text-blue-700 font-bold uppercase text-base">PHẦN I - Trắc nghiệm (18 câu)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-2 gap-8">
+                  {[0, 1].map(col => (
+                    <div key={col} className="space-y-2">
+                      <div className="grid grid-cols-5 gap-2 mb-2 text-center text-xs font-bold text-gray-400">
+                        <div></div><div>A</div><div>B</div><div>C</div><div>D</div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+                      {Array.from({ length: 9 }, (_, i) => {
+                        const questionNum = col * 9 + i + 1;
+                        const studentAns = answers[questionNum];
+                        const keyAns = officialKey?.partI[questionNum];
+                        const isCorrect = mode === 'review' ? studentAns === keyAns : null;
+                        
+                        return (
+                          <div key={questionNum} className="grid grid-cols-5 gap-2 items-center text-sm">
+                            <div className="font-bold text-gray-500">{questionNum}.</div>
+                            {[0, 1, 2, 3].map(optIdx => {
+                              const isSelected = studentAns === optIdx;
+                              const isKey = mode === 'review' && keyAns === optIdx;
+                              
+                              let bubbleClass = "w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer transition-all ";
+                              if (isSelected) bubbleClass += "bg-blue-600 border-blue-700 text-white shadow-md ";
+                              else bubbleClass += "bg-white border-blue-300 hover:border-blue-500 ";
 
-              {/* PHẦN III - Đáp án số (6 câu) */}
-              <div className="bg-pink-100 border-2 border-pink-300 p-3 rounded">
-                <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm font-bold text-blue-600">PHẦN III</div>
-                  <div className="text-xs text-gray-600">Hướng dẫn điền</div>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Row 1: Câu 1-3 */}
-                  {Array.from({ length: 3 }, (_, index) => (
-                    <div key={index} className="text-center">
-                      <div className="text-xs font-bold mb-2">Câu {index + 1}</div>
-                      <div className="space-y-1">
-                        {/* 4 ô vuông ở trên - bố trí từ cột 2 đến cột 5 */}
-                        <div className="flex justify-center space-x-1 mb-2">
-                          {[0, 1, 2, 3].map((squareIndex) => (
-                            <div key={squareIndex} className="w-6 h-6 border border-red-500 bg-white rounded flex items-center justify-center text-xs font-bold text-red-600">
-                              {getSquareValue(squareIndex, index)}
-                            </div>
-                          ))}
-                        </div>
-                        
-                        {/* Header row với số cột */}
-                        <div className="grid grid-cols-5 gap-1 mb-1">
-                          <div className="text-center text-xs font-medium"></div>
-                          <div className="text-center text-xs font-medium">2</div>
-                          <div className="text-center text-xs font-medium">3</div>
-                          <div className="text-center text-xs font-medium">4</div>
-                          <div className="text-center text-xs font-medium">5</div>
-                        </div>
-                        
-                        {/* Dấu trừ - chỉ cột 1 (position 0) */}
-                        <div className="grid grid-cols-5 gap-1">
-                          <div className="text-center text-xs">-</div>
-                          <div className="flex justify-center">
-                            <div 
-                              className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                part3Answers[`part3_${index}_minus_0`] !== undefined ? 'bg-black' : 'bg-white'
-                              }`}
-                              onClick={() => handleAnswerSelect(`part3_${index}_minus_0`, 0)}
-                            ></div>
-                          </div>
-                          <div className="w-3 h-3"></div>
-                          <div className="w-3 h-3"></div>
-                          <div className="w-3 h-3"></div>
-                        </div>
+                              if (mode === 'review') {
+                                if (isKey) bubbleClass += " ring-2 ring-green-500 ring-offset-1 ";
+                                if (isSelected && !isCorrect) bubbleClass += " bg-red-500 border-red-700 ";
+                                if (isSelected && isCorrect) bubbleClass += " bg-green-500 border-green-700 ";
+                              }
 
-                        {/* Dấu phẩy - chỉ cột 3,4 (position 2,3) */}
-                        <div className="grid grid-cols-5 gap-1">
-                          <div className="text-center text-xs">,</div>
-                          <div className="w-3 h-3"></div>
-                          <div className="w-3 h-3"></div>
-                          <div className="flex justify-center">
-                            <div 
-                              className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                part3Answers[`part3_${index}_comma_2`] !== undefined ? 'bg-black' : 'bg-white'
-                              }`}
-                              onClick={() => handleAnswerSelect(`part3_${index}_comma_2`, 2)}
-                            ></div>
-                          </div>
-                          <div className="flex justify-center">
-                            <div 
-                              className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                part3Answers[`part3_${index}_comma_3`] !== undefined ? 'bg-black' : 'bg-white'
-                              }`}
-                              onClick={() => handleAnswerSelect(`part3_${index}_comma_3`, 3)}
-                            ></div>
-                          </div>
-                        </div>
-                        
-                        {/* Số 0-9 - tất cả 4 cột */}
-                        {Array.from({ length: 10 }, (_, digitIndex) => (
-                          <div key={digitIndex} className="grid grid-cols-5 gap-1">
-                            <div className="text-center text-xs">{digitIndex}</div>
-                            {Array.from({ length: 4 }, (_, bubbleIndex) => (
-                              <div key={bubbleIndex} className="flex justify-center">
+                              return (
                                 <div 
-                                  className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                    part3Answers[`part3_${index}_digit_${digitIndex}_${bubbleIndex}`] !== undefined ? 'bg-black' : 'bg-white'
-                                  }`}
-                                  onClick={() => handleAnswerSelect(`part3_${index}_digit_${digitIndex}_${bubbleIndex}`, bubbleIndex)}
-                                ></div>
-                              </div>
-                            ))}
+                                  key={optIdx} 
+                                  className={bubbleClass}
+                                  onClick={() => handleAnswerSelect(questionNum.toString(), optIdx)}
+                                >
+                                  {isSelected && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                                </div>
+                              );
+                            })}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   ))}
                 </div>
-                
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  {/* Row 2: Câu 4-6 */}
-                  {Array.from({ length: 3 }, (_, index) => {
-                    const actualIndex = index + 3;
-                    return (
-                      <div key={actualIndex} className="text-center">
-                        <div className="text-xs font-bold mb-2">Câu {actualIndex + 1}</div>
-                        <div className="space-y-1">
-                          {/* 4 ô vuông ở trên - bố trí từ cột 2 đến cột 5 */}
-                          <div className="flex justify-center space-x-1 mb-2">
-                            {[0, 1, 2, 3].map((squareIndex) => (
-                              <div key={squareIndex} className="w-6 h-6 border border-red-500 bg-white rounded flex items-center justify-center text-xs font-bold text-red-600">
-                                {getSquareValue(squareIndex, index)}
-                              </div>
-                            ))}
-                          </div>
-                          
-                          {/* Header row với số cột */}
-                          <div className="grid grid-cols-5 gap-1 mb-1">
-                            <div className="text-center text-xs font-medium"></div>
-                            <div className="text-center text-xs font-medium">2</div>
-                            <div className="text-center text-xs font-medium">3</div>
-                            <div className="text-center text-xs font-medium">4</div>
-                            <div className="text-center text-xs font-medium">5</div>
-                          </div>
-                          
-                          {/* Dấu trừ - chỉ cột 1 (position 0) */}
-                          <div className="grid grid-cols-5 gap-1">
-                            <div className="text-center text-xs">-</div>
-                            <div className="flex justify-center">
-                              <div 
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                  part3Answers[`part3_${actualIndex}_minus_0`] !== undefined ? 'bg-black' : 'bg-white'
-                                }`}
-                                onClick={() => handleAnswerSelect(`part3_${actualIndex}_minus_0`, 0)}
-                              ></div>
-                            </div>
-                            <div className="w-3 h-3"></div>
-                            <div className="w-3 h-3"></div>
-                            <div className="w-3 h-3"></div>
-                          </div>
+              </CardContent>
+            </Card>
 
-                          {/* Dấu phẩy - chỉ cột 3,4 (position 2,3) */}
+            {/* PHẦN II - Câu Đúng/Sai (4 câu) */}
+            <Card className="border-2 border-pink-200 shadow-md">
+              <CardHeader className="bg-pink-50 py-3">
+                <CardTitle className="text-center text-pink-700 font-bold uppercase text-base">PHẦN II - Câu Đúng/Sai (4 câu)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-2 gap-6">
+                  {Array.from({ length: 4 }, (_, qIdx) => {
+                    const qNum = qIdx + 1;
+                    return (
+                      <div key={qNum} className="border border-pink-100 p-4 rounded-lg bg-white shadow-sm">
+                        <div className="font-bold text-pink-600 mb-3 border-b border-pink-50 pb-2">Câu {qNum}</div>
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold text-gray-400">
+                            <div>Lựa chọn</div><div className="text-green-600">Đúng</div><div className="text-red-600">Sai</div>
+                          </div>
+                          {['a', 'b', 'c', 'd'].map(opt => {
+                            const studentVal = part2Answers[`part2_${qIdx}_${opt}`];
+                            const keyVal = officialKey?.partII[qNum]?.[opt];
+                            const isCorrect = mode === 'review' ? studentVal === keyVal : null;
+
+                            return (
+                              <div key={opt} className="grid grid-cols-3 gap-2 items-center text-sm">
+                                <div className="font-medium text-gray-500 text-center uppercase">{opt}.</div>
+                                {[true, false].map(val => {
+                                  const isSelected = studentVal === val;
+                                  const isOfficialKey = mode === 'review' && keyVal === val;
+                                  
+                                  let btnClass = "w-8 h-8 rounded-lg border-2 flex items-center justify-center cursor-pointer transition-all ";
+                                  if (isSelected) btnClass += val ? "bg-green-500 border-green-600" : "bg-red-500 border-red-600";
+                                  else btnClass += "bg-white border-gray-200 hover:border-pink-300";
+
+                                  if (mode === 'review') {
+                                    if (isOfficialKey) btnClass += " ring-2 ring-yellow-400 ring-offset-1 ";
+                                    if (isSelected && !isCorrect) btnClass += " opacity-50 ";
+                                  }
+
+                                  return (
+                                    <div key={val.toString()} className="flex justify-center">
+                                      <div 
+                                        className={btnClass}
+                                        onClick={() => handleAnswerSelect(`part2_${qIdx}_${opt}`, val)}
+                                      >
+                                        {isSelected && <div className="w-3 h-3 bg-white rounded-full"></div>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* PHẦN III - Đáp án số (6 câu) */}
+            <Card className="border-2 border-orange-200 shadow-md">
+              <CardHeader className="bg-orange-50 py-3">
+                <CardTitle className="text-center text-orange-700 font-bold uppercase text-base">PHẦN III - Đáp án số (6 câu)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-3 gap-6">
+                  {Array.from({ length: 6 }, (_, qIdx) => {
+                    const qNum = qIdx + 1;
+                    const studentValue = getActualNumericValue(qIdx);
+                    const keyValue = officialKey?.partIII[qNum];
+                    
+                    return (
+                      <div key={qNum} className="flex flex-col items-center border border-orange-100 p-3 rounded-lg bg-white">
+                        <div className="font-bold text-orange-600 mb-2">Câu {qNum}</div>
+                        
+                        {/* Display box */}
+                        <div className="flex gap-1 mb-4">
+                          {[0, 1, 2, 3].map(sqIdx => (
+                            <div key={sqIdx} className={`w-8 h-10 border-2 rounded flex items-center justify-center font-bold text-lg ${
+                              mode === 'review' && studentValue === keyValue ? 'bg-green-50 text-green-700 border-green-300' : 
+                              mode === 'review' && studentValue !== keyValue ? 'bg-red-50 text-red-700 border-red-300' :
+                              'bg-gray-50 text-gray-700 border-orange-200 shadow-inner'
+                            }`}>
+                              {getSquareValue(sqIdx, qIdx)}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Numeric Grid simplified for space */}
+                        <div className="w-full space-y-2">
+                          {/* Sign & Comma Row */}
                           <div className="grid grid-cols-5 gap-1">
-                            <div className="text-center text-xs">,</div>
-                            <div className="w-3 h-3"></div>
-                            <div className="w-3 h-3"></div>
+                            <div className="text-center text-[10px] font-bold text-gray-400">+/-</div>
                             <div className="flex justify-center">
-                              <div 
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                  part3Answers[`part3_${actualIndex}_comma_2`] !== undefined ? 'bg-black' : 'bg-white'
-                                }`}
-                                onClick={() => handleAnswerSelect(`part3_${actualIndex}_comma_2`, 2)}
-                              ></div>
+                              <div className={`w-4 h-4 rounded-full border ${part3Answers[`part3_${qIdx}_minus_0`] !== undefined ? 'bg-black' : 'bg-white'}`} 
+                                onClick={() => handleAnswerSelect(`part3_${qIdx}_minus_0`, 0)}></div>
+                            </div>
+                            <div className="text-center text-[10px] font-bold text-gray-400">,</div>
+                            <div className="flex justify-center">
+                              <div className={`w-4 h-4 rounded-full border ${part3Answers[`part3_${qIdx}_comma_2`] !== undefined ? 'bg-black' : 'bg-white'}`} 
+                                onClick={() => handleAnswerSelect(`part3_${qIdx}_comma_2`, 2)}></div>
                             </div>
                             <div className="flex justify-center">
-                              <div 
-                                className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                  part3Answers[`part3_${actualIndex}_comma_3`] !== undefined ? 'bg-black' : 'bg-white'
-                                }`}
-                                onClick={() => handleAnswerSelect(`part3_${actualIndex}_comma_3`, 3)}
-                              ></div>
+                              <div className={`w-4 h-4 rounded-full border ${part3Answers[`part3_${qIdx}_comma_3`] !== undefined ? 'bg-black' : 'bg-white'}`} 
+                                onClick={() => handleAnswerSelect(`part3_${qIdx}_comma_3`, 3)}></div>
                             </div>
                           </div>
                           
-                          {/* Số 0-9 - tất cả 4 cột */}
-                          {Array.from({ length: 10 }, (_, digitIndex) => (
-                            <div key={digitIndex} className="grid grid-cols-5 gap-1">
-                              <div className="text-center text-xs">{digitIndex}</div>
-                              {Array.from({ length: 4 }, (_, bubbleIndex) => (
-                                <div key={bubbleIndex} className="flex justify-center">
+                          {/* Digits 0-9 */}
+                          {Array.from({ length: 10 }, (_, digit) => (
+                            <div key={digit} className="grid grid-cols-5 gap-1 items-center">
+                              <div className="text-center text-[10px] font-bold text-gray-500">{digit}</div>
+                              {Array.from({ length: 4 }, (_, col) => (
+                                <div key={col} className="flex justify-center">
                                   <div 
-                                    className={`w-3 h-3 rounded-full border border-red-500 cursor-pointer hover:bg-gray-200 ${
-                                      part3Answers[`part3_${actualIndex}_digit_${digitIndex}_${bubbleIndex}`] !== undefined ? 'bg-black' : 'bg-white'
+                                    className={`w-4 h-4 rounded-full border transition-colors cursor-pointer ${
+                                      part3Answers[`part3_${qIdx}_digit_${digit}_${col}`] !== undefined ? 'bg-blue-600 border-blue-800' : 'bg-white border-gray-300'
                                     }`}
-                                    onClick={() => handleAnswerSelect(`part3_${actualIndex}_digit_${digitIndex}_${bubbleIndex}`, bubbleIndex)}
+                                    onClick={() => handleAnswerSelect(`part3_${qIdx}_digit_${digit}_${col}`, col)}
                                   ></div>
                                 </div>
                               ))}
                             </div>
                           ))}
                         </div>
+
+                        {mode === 'review' && keyValue && (
+                          <div className="mt-3 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+                            Đáp án: {keyValue}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Action Buttons */}
-              <div className="flex justify-center space-x-4 pt-4">
-                <button
-                  onClick={resetAll}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors duration-200 text-sm font-medium"
-                >
-                  🔄 Reset
-                </button>
-                <button
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors duration-200 text-sm font-medium"
-                >
-                  📤 Nộp bài
-                </button>
-              </div>
+          </div>
+
+          {/* Right Panel - Essay & Info */}
+          <div className="space-y-6">
+            
+            {/* Student Info Card (Simulation) */}
+            <Card className="border-2 border-gray-300 shadow-md">
+              <CardHeader className="bg-gray-100">
+                <CardTitle className="text-sm uppercase font-bold text-gray-600">Thông tin thí sinh</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 mb-1 block">HỌ VÀ TÊN</label>
+                  <Input readOnly value="Nguyễn Văn A" className="bg-gray-50 font-medium" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">LỚP</label>
+                    <Input readOnly value="12A1" className="bg-gray-50 font-medium" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 mb-1 block">MÃ ĐỀ</label>
+                    <Input readOnly value="101" className="bg-gray-50 font-black text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Essay Section (NEW) */}
+            <Card className="border-2 border-purple-200 shadow-md">
+              <CardHeader className="bg-purple-50 flex flex-row items-center justify-between py-3">
+                <CardTitle className="text-sm uppercase font-bold text-purple-700">PHẦN TỰ LUẬN</CardTitle>
+                {mode !== 'student' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-[10px] font-bold bg-purple-100 text-purple-700 hover:bg-purple-200"
+                    onClick={async () => {
+                      if (!essayContent) return alert("Vui lòng nhập nội dung bài luận!");
+                      setIsAiGrading(true);
+                      try {
+                        const res = await fetch('/api/grading/essay', {
+                          method: 'POST',
+                          body: JSON.stringify({ essayContent, maxScore: 2.0 })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                          setEssayScore(data.result.score);
+                          setAiFeedback(data.result.feedback);
+                          alert(`AI (${data.model}) đã hoàn tất chấm điểm!`);
+                        }
+                      } catch (e) {
+                        console.error(e);
+                      } finally {
+                        setIsAiGrading(false);
+                      }
+                    }}
+                    disabled={isAiGrading}
+                  >
+                    {isAiGrading ? '⏳ ĐANG CHẤM...' : '🤖 AI CHẤM ĐIỂM'}
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="p-4 space-y-4">
+                <p className="text-xs italic text-gray-600">Nhập nội dung bài làm hoặc nhận xét tại đây.</p>
+                <Textarea 
+                  placeholder="Học sinh viết bài luận..." 
+                  className="min-h-[250px] text-sm leading-relaxed"
+                  value={essayContent}
+                  onChange={(e) => setEssayContent(e.target.value)}
+                  readOnly={mode === 'review' && !onSave}
+                />
+                
+                {aiFeedback && mode !== 'student' && (
+                  <div className="bg-blue-50 border border-blue-100 p-3 rounded-lg text-xs text-blue-800">
+                    <div className="font-bold flex items-center mb-1">
+                      <span className="mr-1">🤖</span> NHẬN XÉT AI:
+                    </div>
+                    {aiFeedback}
+                  </div>
+                )}
+
+                {mode !== 'student' && (
+                  <div className="pt-4 border-t border-purple-100">
+                    <label className="text-xs font-bold text-purple-700 mb-2 block uppercase">Điểm tự luận (tối đa 2.0)</label>
+                    <div className="flex items-center space-x-3">
+                      <Input 
+                        type="number" 
+                        step="0.25" 
+                        max="2" 
+                        min="0"
+                        value={essayScore}
+                        onChange={(e) => setEssayScore(parseFloat(e.target.value) || 0)}
+                        className="w-24 font-bold text-center text-purple-700 border-purple-300"
+                        readOnly={isAiGrading || (mode === 'review' && !onSave)}
+                      />
+                      <span className="text-sm font-bold text-gray-400">/ 2.0</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Score Breakdown (Review Mode) */}
+            {mode === 'review' && gradingResult && (
+              <Card className="border-2 border-green-200 shadow-xl overflow-hidden sticky top-24">
+                <CardHeader className="bg-green-600 text-white">
+                  <CardTitle className="text-center font-black">CHI TIẾT ĐIỂM SỐ</CardTitle>
+                </CardHeader>
+                <div className="p-0">
+                  <table className="w-full text-sm">
+                    <tbody className="divide-y">
+                      <tr className="bg-blue-50">
+                        <td className="p-3 font-bold">Phần I (Trắc nghiệm)</td>
+                        <td className="p-3 text-right font-black text-blue-700">{gradingResult.partI.toFixed(2)}</td>
+                      </tr>
+                      <tr className="bg-pink-50">
+                        <td className="p-3 font-bold">Phần II (Đúng/Sai)</td>
+                        <td className="p-3 text-right font-black text-pink-700">{gradingResult.partII.toFixed(2)}</td>
+                      </tr>
+                      <tr className="bg-orange-50">
+                        <td className="p-3 font-bold">Phần III (Điền số)</td>
+                        <td className="p-3 text-right font-black text-orange-700">{gradingResult.partIII.toFixed(2)}</td>
+                      </tr>
+                      <tr className="bg-purple-50">
+                        <td className="p-3 font-bold">Tự luận</td>
+                        <td className="p-3 text-right font-black text-purple-700">{gradingResult.essay.toFixed(2)}</td>
+                      </tr>
+                      <tr className="bg-green-700 text-white">
+                        <td className="p-3 text-lg font-black uppercase">Tổng cộng</td>
+                        <td className="p-3 text-right text-2xl font-black">{gradingResult.total.toFixed(2)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Actions for other modes */}
+            <div className="pt-4 flex flex-col gap-3">
+              <Button 
+                onClick={resetAll}
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+              >
+                🔄 Reset dữ liệu
+              </Button>
             </div>
+
           </div>
         </div>
       </div>

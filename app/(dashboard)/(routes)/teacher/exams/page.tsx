@@ -1,356 +1,468 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import {
-  Plus, Search, FileText, Eye, Edit, Trash2, Loader2, CheckCircle2,
-  XCircle, Clock, Copy, Play, Calendar, Users, Award, FileCode2, Database
+  Plus, FileText, Eye, Edit, Trash2, Copy, Grid3x3,
+  Search, BarChart3, Clock, CheckCircle2, Sparkles, Loader2
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { NeumorphicCard } from "@/components/ui/neumorphic-card"
-import { NeumorphicButton } from "@/components/ui/neumorphic-button"
-import { NeumorphicInput } from "@/components/ui/neumorphic-input"
 import { toast } from "react-hot-toast"
-import { cn } from "@/lib/utils"
-
-type ExamStatus = "Tất cả" | "Nháp" | "Đã lên lịch" | "Đang diễn ra" | "Đã hoàn thành" | "Đã lưu trữ"
-type ExamType = "Tất cả loại" | "Kiểm tra 1 tiết" | "Kiểm tra giữa kỳ" | "Thi cuối kỳ" | "Thi thử" | "Bài tập"
 
 interface Exam {
   id: string
   title: string
-  description?: string
+  subject?: string
   examType: string
-  status: string
   duration: number
   totalQuestions: number
-  totalPoints: number
+  status: string
   createdAt: string
-  updatedAt: string
-  startTime?: string
-  endTime?: string
-  submissionsCount?: number
 }
 
 export default function ExamsPage() {
-  const { data: session } = useSession()
   const router = useRouter()
   const [exams, setExams] = useState<Exam[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedStatus, setSelectedStatus] = useState<ExamStatus>("Tất cả")
-  const [selectedType, setSelectedType] = useState<ExamType>("Tất cả loại")
   const [searchQuery, setSearchQuery] = useState("")
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [examToDelete, setExamToDelete] = useState<string | null>(null)
-  const [exportingToLatexId, setExportingToLatexId] = useState<string | null>(null)
+  const [subjectFilter, setSubjectFilter] = useState("Tất cả môn")
+  const [selectedExamId, setSelectedExamId] = useState<string | null>(null)
+  const [exportingLatexExamId, setExportingLatexExamId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (session?.user) fetchExams()
-  }, [session, selectedStatus, selectedType])
+    loadExams()
+  }, [subjectFilter])
 
-  const fetchExams = async () => {
+  const loadExams = async () => {
     try {
       setLoading(true)
-      const params = new URLSearchParams()
-      if (selectedStatus !== "Tất cả") params.append("status", selectedStatus)
-      if (selectedType !== "Tất cả loại") params.append("examType", selectedType)
-      if (searchQuery) params.append("search", searchQuery)
-
-      const response = await fetch(`/api/teacher/exams?${params.toString()}`)
+      const response = await fetch('/api/teacher/exams')
       if (!response.ok) {
-        if (response.status === 404) { setExams([]); return }
-        toast.error("Không thể tải danh sách đề thi")
-        setExams([])
-        return
+        throw new Error(`Load exams failed (${response.status})`)
       }
-
-      const data = await response.json()
-      setExams(data.exams || [])
-    } catch (error: any) {
-      console.error("Error fetching exams:", error)
+      const data = await response.json().catch(() => ({}))
+      const list = Array.isArray(data?.exams) ? data.exams : []
+      setExams(
+        list.map((exam: any) => ({
+          id: String(exam.id),
+          title: String(exam.title || "Untitled exam"),
+          subject: exam.subject ? String(exam.subject) : undefined,
+          examType: String(exam.examType || "N/A"),
+          duration: Number(exam.duration || 0),
+          totalQuestions: Number(exam.totalQuestions || 0),
+          status: String(exam.status || "Nháp"),
+          createdAt: String(exam.createdAt || new Date().toISOString()),
+        }))
+      )
+    } catch (error) {
+      console.error('Error loading exams:', error)
       setExams([])
+      toast.error("Không tải được danh sách đề thi")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (examId: string) => {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Xóa đề thi này?')) return
     try {
-      await fetch(`/api/teacher/exams/${examId}`, { method: "DELETE" })
-      toast.success("Đã xóa đề thi")
-      fetchExams()
-      setDeleteDialogOpen(false)
-      setExamToDelete(null)
-    } catch (error: any) {
-      toast.error(error.message || "Lỗi khi xóa đề thi")
+      const response = await fetch(`/api/teacher/exams/${id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        throw new Error("Delete failed")
+      }
+      toast.success('Đã xóa đề thi')
+      loadExams()
+    } catch (error) {
+      toast.error('Không thể xóa đề thi')
+    }
+  }
+
+  const handleDuplicate = async (id: string) => {
+    try {
+      const response = await fetch(`/api/teacher/exams/${id}/duplicate`, { method: 'POST' })
+      if (!response.ok) {
+        throw new Error("Duplicate failed")
+      }
+      toast.success('Đã nhân bản đề thi')
+      loadExams()
+    } catch (error) {
+      toast.error('Không thể nhân bản')
     }
   }
 
   const handleExportToLatex = async (examId: string) => {
+    if (!examId || exportingLatexExamId) return
+    setExportingLatexExamId(examId)
     try {
-      setExportingToLatexId(examId)
-      const res = await fetch("/api/latex-projects/export-from-exam", {
+      const response = await fetch("/api/latex-projects/export-from-exam", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ examId }),
       })
-      if (!res.ok) throw new Error("Export failed")
-      const data = await res.json()
-      toast.success("Đã tạo tài liệu LaTeX")
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || "Không thể gửi đề sang LaTeX")
+      }
+      toast.success("Đã tạo tài liệu LaTeX. Đang mở...")
       router.push(`/teacher/latex-documents/${data.id}`)
-    } catch (e: any) {
-      toast.error(e.message || "Không thể xuất sang LaTeX")
+    } catch (error: any) {
+      toast.error(error?.message || "Không thể gửi đề sang LaTeX")
     } finally {
-      setExportingToLatexId(null)
+      setExportingLatexExamId(null)
     }
   }
 
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, any> = {
-      "Đã hoàn thành": { color: "bg-green-100 text-green-800", icon: CheckCircle2 },
-      "Đang diễn ra": { color: "bg-blue-100 text-blue-800", icon: Play },
-      "Đã lên lịch": { color: "bg-yellow-100 text-yellow-800", icon: Clock },
-      "Nháp": { color: "bg-gray-100 text-gray-800", icon: FileText },
-      "Đã lưu trữ": { color: "bg-purple-100 text-purple-800", icon: ArchiveIcon },
+    const config = {
+      "Hoàn tất": { bg: "bg-green-50", text: "text-green-700", border: "border-green-200" },
+      "Nháp": { bg: "bg-gray-50", text: "text-gray-700", border: "border-gray-200" },
+      "Đang thi": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+      "Kết thúc": { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200" },
     }
-    const badge = badges[status] || { color: "bg-gray-100 text-gray-800", icon: FileText }
-    const Icon = badge.icon
+    const c = config[status as keyof typeof config] || config["Nháp"]
     return (
-      <Badge className={cn("neu-shadow-sm", badge.color)}>
-        <Icon className="w-3 h-3 mr-1" />
+      <span className={`px-2 py-1 rounded-md text-xs border ${c.bg} ${c.text} ${c.border}`}>
         {status}
-      </Badge>
+      </span>
     )
   }
 
-  const getTypeBadge = (type: string) => {
-    const typeMap: Record<string, string> = {
-      "Kiểm tra 1 tiết": "bg-blue-100 text-blue-800",
-      "Kiểm tra giữa kỳ": "bg-orange-100 text-orange-800",
-      "Thi cuối kỳ": "bg-red-100 text-red-800",
-      "Thi thử": "bg-green-100 text-green-800",
-      "Bài tập": "bg-purple-100 text-purple-800",
-    }
-    return <Badge className={cn("neu-shadow-sm", typeMap[type] || "bg-gray-100 text-gray-800")}>{type}</Badge>
-  }
-
-  const filteredExams = exams.filter((exam) =>
-    !searchQuery || exam.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const stats = {
-    total: exams.length,
-    draft: exams.filter(e => e.status === "Nháp").length,
-    ongoing: exams.filter(e => e.status === "Đang diễn ra").length,
-    completed: exams.filter(e => e.status === "Đã hoàn thành").length,
-  }
-
-  if (!session?.user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500 neu-shadow" />
-      </div>
-    )
-  }
+  const selectedExam = exams.find(e => e.id === selectedExamId)
 
   return (
-    <div className="flex flex-col h-full neu-container">
-      {/* Header with Gradient Text */}
-      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-4xl font-bold gradient-text mb-2">Đề Thi</h1>
-              <p className="text-gray-600">Quản lý và tổ chức các đề thi chuyên nghiệp</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Top Bar */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
+                <FileText className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Đề Thi</h1>
+                <p className="text-sm text-gray-600">Quản lý và chấm điểm tự động</p>
+              </div>
             </div>
-            <NeumorphicButton
-              variant="primary"
-              size="lg"
-              onClick={() => router.push("/teacher/exams/create")}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Tạo đề thi mới
-            </NeumorphicButton>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push("/teacher/exams/create")}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo đề thi
+              </button>
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {[
-              { label: "Tổng cộng", value: stats.total, color: "from-blue-500 to-blue-600", icon: Database },
-              { label: "Nháp", value: stats.draft, color: "from-gray-500 to-gray-600", icon: FileText },
-              { label: "Đang diễn ra", value: stats.ongoing, color: "from-green-500 to-green-600", icon: Play },
-              { label: "Hoàn thành", value: stats.completed, color: "from-purple-500 to-purple-600", icon: Award },
-            ].map((stat) => (
-              <NeumorphicCard key={stat.label} variant="gradient" hover className="text-center p-4">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <stat.icon className={`w-6 h-6 bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`} style={{ WebkitTextFillColor: 'transparent' }} />
-                  <div className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
-                    {stat.value}
+      {/* Main Content - 2 Column Layout */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left Column: Exam List - 8 columns */}
+          <div className="col-span-12 lg:col-span-8 space-y-6">
+            {/* Filter Bar */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1 max-w-md">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Tìm kiếm đề thi..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
                   </div>
                 </div>
-                <div className="text-sm text-gray-600">{stat.label}</div>
-              </NeumorphicCard>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Filters and Search */}
-      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <NeumorphicInput
-                placeholder="Tìm kiếm đề thi..."
-                icon={<Search className="w-4 h-4" />}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchExams()}
-              />
+                <select
+                  value={subjectFilter}
+                  onChange={(e) => setSubjectFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="Tất cả môn">Tất cả môn</option>
+                  <option value="Toán học">Toán học</option>
+                  <option value="Vật lý">Vật lý</option>
+                  <option value="Hóa học">Hóa học</option>
+                  <option value="Văn học">Văn học</option>
+                  <option value="Tiếng Anh">Tiếng Anh</option>
+                </select>
+              </div>
             </div>
-            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as ExamStatus)}>
-              <SelectTrigger className="w-[180px] neu-shadow-sm">
-                <SelectValue placeholder="Trạng thái" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tất cả">Tất cả</SelectItem>
-                <SelectItem value="Nháp">Nháp</SelectItem>
-                <SelectItem value="Đã lên lịch">Đã lên lịch</SelectItem>
-                <SelectItem value="Đang diễn ra">Đang diễn ra</SelectItem>
-                <SelectItem value="Đã hoàn thành">Đã hoàn thành</SelectItem>
-                <SelectItem value="Đã lưu trữ">Đã lưu trữ</SelectItem>
-              </SelectContent>
-            </Select>
 
-            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as ExamType)}>
-              <SelectTrigger className="w-[180px] neu-shadow-sm">
-                <SelectValue placeholder="Loại đề" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tất cả loại">Tất cả</SelectItem>
-                <SelectItem value="Kiểm tra 1 tiết">1 tiết</SelectItem>
-                <SelectItem value="Kiểm tra giữa kỳ">Giữa kỳ</SelectItem>
-                <SelectItem value="Thi cuối kỳ">Cuối kỳ</SelectItem>
-                <SelectItem value="Thi thử">Thi thử</SelectItem>
-                <SelectItem value="Bài tập">Bài tập</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Exam Table */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">Đề thi</th>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">Môn</th>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">Loại</th>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">Thời gian</th>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">SL câu</th>
+                      <th className="text-left p-4 text-xs font-medium text-gray-600 uppercase">Trạng thái</th>
+                      <th className="text-right p-4 text-xs font-medium text-gray-600 uppercase">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center">
+                          <div className="flex items-center justify-center gap-3">
+                            <div className="w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
+                            <span className="text-gray-600">Đang tải...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : exams.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center">
+                          <div className="text-center">
+                            <FileText className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                            <p className="text-gray-600 font-medium">Chưa có đề thi nào</p>
+                            <p className="text-sm text-gray-500 mt-1">Tạo đề thi đầu tiên để bắt đầu</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      exams.map((exam) => (
+                        <tr 
+                          key={exam.id} 
+                          className={`hover:bg-gray-50 transition-colors cursor-pointer ${
+                            selectedExamId === exam.id ? 'bg-purple-50' : ''
+                          }`}
+                          onClick={() => setSelectedExamId(exam.id)}
+                        >
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                                <FileText className="w-5 h-5 text-purple-600" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900">{exam.title}</div>
+                                <div className="text-xs text-gray-500">ID: {exam.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm text-gray-600">{exam.subject || "Chưa phân môn"}</td>
+                          <td className="p-4 text-sm text-gray-600">{exam.examType}</td>
+                          <td className="p-4 text-sm text-gray-600">{exam.duration} phút</td>
+                          <td className="p-4 text-sm text-gray-600">{exam.totalQuestions} câu</td>
+                          <td className="p-4">{getStatusBadge(exam.status)}</td>
+                          <td className="text-right p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => router.push(`/teacher/exams/${exam.id}`)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Xem"
+                              >
+                                <Eye className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                onClick={() => router.push(`/teacher/exams/${exam.id}/edit`)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Sửa"
+                              >
+                                <Edit className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                onClick={() => handleDuplicate(exam.id)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                title="Nhân bản"
+                              >
+                                <Copy className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <button
+                                onClick={() => handleExportToLatex(exam.id)}
+                                disabled={exportingLatexExamId === exam.id}
+                                className="p-2 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                                title="Gửi sang LaTeX để biên tập và in"
+                              >
+                                {exportingLatexExamId === exam.id ? (
+                                  <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                                ) : (
+                                  <Sparkles className="w-4 h-4 text-blue-600" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(exam.id)}
+                                className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-4 h-4 text-red-600" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Exams Table */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="container mx-auto">
-          <NeumorphicCard variant="gradient" size="lg">
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500 neu-shadow" />
-                  <p className="text-gray-600">Đang tải...</p>
+          {/* Right Column: Detail Panel - 4 columns */}
+          <div className="col-span-12 lg:col-span-4 space-y-6">
+            {/* Quick Stats */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-purple-600" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Thống kê</h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Tổng số đề</span>
+                  <span className="text-lg font-bold text-purple-700">{exams.length}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Hoàn tất</span>
+                  <span className="text-lg font-bold text-green-700">
+                    {exams.filter(e => e.status === "Hoàn tất").length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Đang thi</span>
+                  <span className="text-lg font-bold text-blue-700">
+                    {exams.filter(e => e.status === "Đang thi").length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm text-gray-600">Nháp</span>
+                  <span className="text-lg font-bold text-gray-700">
+                    {exams.filter(e => e.status === "Nháp").length}
+                  </span>
                 </div>
               </div>
-            ) : filteredExams.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner mb-4">
-                  <FileText className="w-10 h-10 text-blue-600" />
+            </div>
+
+            {/* Selected Exam Details */}
+            {selectedExam ? (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">Chi tiết</h3>
+                      <p className="text-xs text-gray-500 truncate max-w-[150px]">{selectedExam.title}</p>
+                    </div>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">Chưa có đề thi nào</h3>
-                <p className="text-gray-500 mb-6">Tạo đề thi mới để bắt đầu quản lý các kỳ thi</p>
-                <NeumorphicButton variant="primary" onClick={() => router.push("/teacher/exams/create")}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Tạo đề thi đầu tiên
-                </NeumorphicButton>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Môn học</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedExam.subject || "Chưa phân môn"}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Loại đề</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedExam.examType}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Thời gian</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedExam.duration} phút</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Số câu hỏi</span>
+                    <span className="text-sm font-medium text-gray-900">{selectedExam.totalQuestions} câu</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm text-gray-600">Trạng thái</span>
+                    {getStatusBadge(selectedExam.status)}
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-200 flex gap-2">
+                  <button
+                    onClick={() => router.push(`/teacher/exams/${selectedExam.id}`)}
+                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Xem đề thi
+                  </button>
+                  <button
+                    onClick={() => handleExportToLatex(selectedExam.id)}
+                    disabled={exportingLatexExamId === selectedExam.id}
+                    className="px-3 py-2 border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50 transition-colors text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                    title="Gửi sang LaTeX để biên tập và in"
+                  >
+                    {exportingLatexExamId === selectedExam.id ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        LaTeX
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        LaTeX
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => router.push(`/teacher/exams/${selectedExam.id}/edit`)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">#</TableHead>
-                    <TableHead>Tên đề thi</TableHead>
-                    <TableHead>Loại</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Thời gian</TableHead>
-                    <TableHead>Số câu</TableHead>
-                    <TableHead>Điểm</TableHead>
-                    <TableHead className="text-right">Hành động</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredExams.map((exam, index) => (
-                    <TableRow key={exam.id} className="hover:bg-gray-50 transition-colors">
-                      <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{exam.title}</div>
-                          {exam.description && (
-                            <div className="text-xs text-gray-500 truncate max-w-xs">{exam.description}</div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getTypeBadge(exam.examType)}</TableCell>
-                      <TableCell>{getStatusBadge(exam.status)}</TableCell>
-                      <TableCell className="text-sm text-gray-600">{exam.duration ? `${exam.duration} phút` : "-"}</TableCell>
-                      <TableCell><Badge variant="outline" className="neu-shadow-sm">{exam.totalQuestions || 0}</Badge></TableCell>
-                      <TableCell><Badge variant="outline" className="neu-shadow-sm">{exam.totalPoints || 0}đ</Badge></TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => router.push(`/teacher/exams/${exam.id}`)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow text-blue-600" onClick={() => router.push(`/teacher/exams/${exam.id}/edit`)}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => router.push(`/teacher/exams/${exam.id}?action=duplicate`)}>
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow" onClick={() => handleExportToLatex(exam.id)} disabled={exportingToLatexId === exam.id}>
-                            {exportingToLatexId === exam.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCode2 className="w-4 h-4" />}
-                          </Button>
-                          <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow text-red-600" onClick={() => { setExamToDelete(exam.id); setDeleteDialogOpen(true); }}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                  <FileText className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  Chọn đề thi để xem chi tiết
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Click vào một đề thi trong danh sách để xem thông tin chi tiết
+                </p>
+              </div>
             )}
-          </NeumorphicCard>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Thao tác nhanh</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => router.push("/teacher/exams/create")}
+                  className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium flex items-center gap-3"
+                >
+                  <Plus className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Tạo đề thi mới</div>
+                    <div className="text-xs text-purple-100">Tạo từ đầu hoặc từ ma trận</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => router.push("/teacher/exam-matrix")}
+                  className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-3"
+                >
+                  <Grid3x3 className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Ma trận đề thi</div>
+                    <div className="text-xs text-gray-500">Quản lý ma trận</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => router.push("/teacher/question-bank")}
+                  className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium flex items-center gap-3"
+                >
+                  <FileText className="w-5 h-5" />
+                  <div className="text-left">
+                    <div className="font-medium">Ngân hàng câu hỏi</div>
+                    <div className="text-xs text-gray-500">Quản lý câu hỏi</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-
-      {/* Delete Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="neu-card">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="gradient-text">Xóa đề thi?</AlertDialogTitle>
-            <AlertDialogDescription>Hành động này không thể hoàn tác.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="neu-button">Hủy</AlertDialogCancel>
-            <AlertDialogAction onClick={() => examToDelete && handleDelete(examToDelete)} className="neu-button bg-gradient-to-br from-red-500 to-red-600">Xóa</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
-}
-
-function ArchiveIcon(props: any) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/></svg>
 }

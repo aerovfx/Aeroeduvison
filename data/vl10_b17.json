@@ -1,0 +1,145 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 17: Trọng lực và lực căng",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "17",
+    "topic": "Trọng lực và lực căng"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 17: Trọng lực và lực căng có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về trọng lực, trọng lượng và lực căng dây.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Ở gần Trái Đất trọng lực có đặc điểm nào sau đây?",
+      "options": [
+        "Phương thẳng đứng.",
+        "Chiều từ trên xuống dưới.",
+        "Điểm đặt tại trọng tâm của vật.",
+        "Cả A, B, C."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Trọng lực có đặc điểm:\n- Phương thẳng đứng\n- Chiều từ trên xuống dưới.\n- Điểm đặt tại trọng tâm của vật."
+    },
+    {
+      "question_number": 2,
+      "question": "Trọng lực là",
+      "options": [
+        "Lực hút do Trái Đất tác dụng lên vật.",
+        "Lực hấp dẫn do Trái Đất tác dụng lên vật.",
+        "Lực gây ra gia tốc rơi tự do cho vật.",
+        "Cả A, B, C."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Trọng lực là:\n- Lực hút do Trái Đất tác dụng lên vật.\n- Lực hấp dẫn do Trái Đất tác dụng lên vật.\n- Lực gây ra gia tốc rơi tự do cho vật."
+    },
+    {
+      "question_number": 3,
+      "question": "Công thức tính trọng lượng?",
+      "options": [
+        "P = m.g.",
+        "P⇀=m.g.",
+        "P = m.g⇀",
+        "P = mg ."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Công thức tính trọng lượng: P = m.g."
+    },
+    {
+      "question_number": 4,
+      "question": "Một vật khối lượng 20 kg thì có trọng lượng gần bằng giá trị nào sau đây?",
+      "options": [
+        "P = 2 N.",
+        "P = 200 N.",
+        "P = 2000 N.",
+        "P = 20 N."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Lấy g = 9,8 m/s² thì trọng lượng của vật là P = m.g = 20 × 9,8 = 196 N."
+    },
+    {
+      "question_number": 5,
+      "question": "Nhận xét nào sau đây sai?",
+      "options": [
+        "Khối lượng của một vật chỉ lượng chất tạo nên vật đó.",
+        "Khối lượng của một vật không thay đổi theo vị trí đặt vật.",
+        "Vì P = mg nên khối lượng và trọng lượng của vật không thay đổi theo vị trí đặt vật.",
+        "Biết khối lượng của một vật ta có thể suy ra trọng lượng của vật đó."
+      ],
+      "correctAnswer": "C",
+      "explanation": "A, B đúng: khối lượng chỉ lượng chất tạo nên vật đó, không thay đổi ở các vị trí khác nhau, và có tính chất cộng.\nC - sai vì: Công thức P = mg chỉ là công thức tổng quát. Khối lượng vật không thay đổi theo vị trí đặt vật nhưng gia tốc trọng trường g sẽ thay đổi theo vị trí đặt vật, dẫn đến trọng lượng sẽ thay đổi."
+    },
+    {
+      "question_number": 6,
+      "question": "Lực căng dây có đặc điểm nào sau đây?",
+      "options": [
+        "Điểm đặt ở hai đầu dây, chỗ tiếp xúc với vật.",
+        "Phương trùng với phương sợi dây.",
+        "Chiều luôn hướng vào giữa sợi dây.",
+        "Cả A, B và C."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Lực căng dây có đặc điểm:\n- Điểm đặt ở hai đầu dây, chỗ tiếp xúc với vật.\n- Phương trùng với phương sợi dây.\n- Chiều luôn hướng vào giữa sợi dây."
+    },
+    {
+      "question_number": 7,
+      "question": "Một vật khối lượng 10 kg được treo thẳng đứng bởi một sợi dây, vật ở trạng thái cân bằng. Tính độ lớn lực căng tác dụng vào vật. Lấy g = 10 m/s².",
+      "options": [
+        "100 N.",
+        "10 N.",
+        "150 N.",
+        "200 N."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Vật cân bằng dưới tác dụng của hai lực P⇀ và T⇀.\nNên T = P = m.g = 10 × 10 = 100 N."
+    },
+    {
+      "question_number": 8,
+      "question": "Một dây treo chỉ chịu được lực căng giới hạn là 10 N, người ta treo một vật khối lượng 2 kg vào một đầu dây. Hỏi dây có bị đứt không? Lấy g = 10 m/s².",
+      "options": [
+        "dây không bị đứt.",
+        "dây bị đứt.",
+        "còn phụ thuộc vào kích thước của vật.",
+        "không xác định được."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Lực căng dây khi treo vật là T = P = m.g = 2 × 10 = 20 N.\nDo T > Tgh nên dây bị đứt."
+    },
+    {
+      "question_number": 9,
+      "question": "Đơn vị của trọng lực là gì?",
+      "options": [
+        "Niuton (N)",
+        "Kilogam (Kg)",
+        "Lít (l)",
+        "Mét (m)"
+      ],
+      "correctAnswer": "A",
+      "explanation": "Đơn vị của trọng lực là Niuton (N)."
+    },
+    {
+      "question_number": 10,
+      "question": "Đơn vị của lực căng là gì?",
+      "options": [
+        "Niuton (N)",
+        "Kilogam (Kg)",
+        "Lít (l)",
+        "Mét (m)"
+      ],
+      "correctAnswer": "A",
+      "explanation": "Đơn vị của lực căng là Niuton (N)."
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 9: Chuyển động thẳng biến đổi đều",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton",
+      "Bài 15: Định luật 2 Newton",
+      "Bài 16: Định luật 3 Newton"
+    ]
+  }
+}

@@ -69,7 +69,7 @@ export default function StudentInsightPage() {
   // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50-to-br from-blue-50 via-purple-50 to-pink-50 p-6 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Đang tải dữ liệu học sinh...</p>
@@ -81,7 +81,7 @@ export default function StudentInsightPage() {
   // Show error state
   if (error || !student) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
         <div className="max-w-7xl mx-auto">
           <button
             onClick={() => router.back()}
@@ -155,7 +155,7 @@ export default function StudentInsightPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">

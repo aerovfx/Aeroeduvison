@@ -17,6 +17,11 @@ function getOpenAI() {
 const GROK_API_KEY = process.env.GROK_API_KEY;
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 
+// OpenRouter for AI Tutor (ưu tiên khi có key)
+const AI_TUTOR_OPENROUTER_API_KEY = process.env.AI_TUTOR_OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY;
+const AI_TUTOR_OPENROUTER_MODEL = process.env.AI_TUTOR_OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'anthropic/claude-3.5-sonnet';
+const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
 interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -59,12 +64,39 @@ export async function POST(req: Request) {
     const selectedModel = selectAIModel(message, userState, preferredModel);
     console.log('[AI_TUTOR_CHAT] Selected model:', selectedModel);
 
-    let response;
-    let aiModel;
+    let response: string | undefined;
+    let aiModel: string;
 
     try {
-      if (selectedModel === 'gpt4') {
-        // Use GPT-4 for complex educational content
+      // 1) OpenRouter (AI Tutor) – ưu tiên khi có AI_TUTOR_OPENROUTER_API_KEY hoặc OPENROUTER_API_KEY
+      if (AI_TUTOR_OPENROUTER_API_KEY?.trim() && AI_TUTOR_OPENROUTER_API_KEY.startsWith('sk-or-')) {
+        console.log('[AI_TUTOR_CHAT] Using OpenRouter...', AI_TUTOR_OPENROUTER_MODEL);
+        const openRouterRes = await fetch(OPENROUTER_CHAT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${AI_TUTOR_OPENROUTER_API_KEY}`,
+            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://aeroeduvison.local',
+          },
+          body: JSON.stringify({
+            model: AI_TUTOR_OPENROUTER_MODEL,
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 1000,
+          }),
+        });
+
+        if (!openRouterRes.ok) {
+          const errText = await openRouterRes.text();
+          throw new Error(`OpenRouter error: ${openRouterRes.status} ${errText}`);
+        }
+
+        const openRouterData = await openRouterRes.json();
+        response = openRouterData.choices?.[0]?.message?.content ?? '';
+        aiModel = openRouterData.model?.id ?? 'OpenRouter';
+        console.log('[AI_TUTOR_CHAT] OpenRouter response length:', response?.length);
+      } else if (selectedModel === 'gpt4') {
+        // 2) GPT-4 for complex educational content
         console.log('[AI_TUTOR_CHAT] Using GPT-4...');
         const openai = getOpenAI();
         const completion = await openai.chat.completions.create({
@@ -76,12 +108,11 @@ export async function POST(req: Request) {
           frequency_penalty: 0.3,
         });
 
-        response = completion.choices[0].message.content;
+        response = completion.choices[0].message.content ?? '';
         aiModel = 'GPT-4o-mini';
         console.log('[AI_TUTOR_CHAT] GPT-4 response length:', response?.length);
-
-      } else if (selectedModel === 'grok') {
-        // Use Grok for conversational support
+      } else if (selectedModel === 'grok' && GROK_API_KEY) {
+        // 3) Grok for conversational support
         console.log('[AI_TUTOR_CHAT] Using Grok...');
         const grokResponse = await fetch(GROK_API_URL, {
           method: 'POST',
@@ -105,9 +136,8 @@ export async function POST(req: Request) {
         response = grokData.choices[0].message.content;
         aiModel = 'Grok';
         console.log('[AI_TUTOR_CHAT] Grok response length:', response?.length);
-
       } else {
-        throw new Error('No AI model available');
+        throw new Error('No AI model available. Set AI_TUTOR_OPENROUTER_API_KEY, OPENAI_API_KEY, or GROK_API_KEY.');
       }
 
       // Parse response for actions
@@ -124,9 +154,9 @@ export async function POST(req: Request) {
 
     } catch (aiError: any) {
       console.error('[AI_TUTOR_CHAT] AI Error:', aiError.message);
-      
-      // Fallback to the other model
-      if (selectedModel === 'gpt4' && GROK_API_KEY) {
+
+      // Fallback: thử Grok nếu vừa dùng GPT-4
+      if (response == null && selectedModel === 'gpt4' && GROK_API_KEY) {
         console.log('[AI_TUTOR_CHAT] GPT-4 failed, trying Grok...');
         try {
           const grokResponse = await fetch(GROK_API_URL, {

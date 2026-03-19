@@ -1,0 +1,18 @@
+id = "aeroedu_exam_analytics"
+name = "Aeroedu Exam Analytics"
+version = "0.1.0"
+description = "Phân tích ma trận đề và kết quả thi để phát hiện chủ đề yếu và câu hỏi bất thường, sinh báo cáo cho admin/teacher."
+
+[schedule]
+cron = "0 4 * * *" # chạy mỗi ngày lúc 04:00
+
+[tools.http]
+base_url = "http://localhost:3000"
+timeout_sec = 30
+
+[outputs]
+dashboard_section = "Aeroedu / Exams"
+stores_markdown_reports = true
+webhook_enabled = true
+webhook_url_env = "AEROEDU_AGENT_WEBHOOK_URL"
+

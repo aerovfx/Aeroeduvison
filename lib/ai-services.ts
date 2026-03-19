@@ -1,10 +1,9 @@
-// AI Services for Learning Platform
-// Supports Google AI and xAI (Grok) APIs
 
-interface AIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+import { modelSelector, TaskType, Priority } from './ai/model-selector';
+import { GeminiProvider } from './ai/providers/gemini-provider';
+import { OllamaProvider } from './ai/providers/ollama-provider';
+import { OpenAIProvider } from './ai/providers/openai-provider';
+import { AIMessage } from './ai/providers/base-provider';
 
 interface AIResponse {
   content: string;
@@ -16,115 +15,39 @@ interface AIResponse {
   };
 }
 
-// Google AI Service
-export class GoogleAIService {
-  private apiKey: string;
-  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  async generateContent(prompt: string, context?: string): Promise<AIResponse> {
-    try {
-      const response = await fetch(
-        `${this.baseUrl}/models/gemini-1.5-flash-latest:generateContent?key=${this.apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: context ? `${context}\n\n${prompt}` : prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 1024,
-            }
-          })
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Google AI API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      return {
-        content: data.candidates[0].content.parts[0].text,
-        model: 'gemini-1.5-flash',
-        usage: {
-          prompt_tokens: data.usageMetadata?.promptTokenCount || 0,
-          completion_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-          total_tokens: data.usageMetadata?.totalTokenCount || 0,
-        }
-      };
-    } catch (error) {
-      console.error('Google AI Service Error:', error);
-      throw error;
-    }
-  }
-}
-
-// xAI (Grok) Service
-export class XAIService {
-  private apiKey: string;
-  private baseUrl = 'https://api.x.ai/v1';
-
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
-  }
-
-  async chatCompletion(messages: AIMessage[], model = 'grok-4-latest'): Promise<AIResponse> {
-    try {
-      const response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          messages,
-          model,
-          stream: false,
-          temperature: 0.7,
-          max_tokens: 1024,
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`xAI API error: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      return {
-        content: data.choices[0].message.content,
-        model: data.model,
-        usage: data.usage
-      };
-    } catch (error) {
-      console.error('xAI Service Error:', error);
-      throw error;
-    }
-  }
-}
-
 // AI Tutor Service - Main interface for learning platform
 export class AITutorService {
-  private googleAI: GoogleAIService;
-  private xAI: XAIService;
-  private preferredProvider: 'google' | 'xai' = 'google';
+  private gemini: GeminiProvider;
+  private ollama: OllamaProvider;
+  private openai: OpenAIProvider;
 
-  constructor(googleApiKey: string, xaiApiKey: string) {
-    this.googleAI = new GoogleAIService(googleApiKey);
-    this.xAI = new XAIService(xaiApiKey);
+  constructor() {
+    this.gemini = new GeminiProvider();
+    this.ollama = new OllamaProvider();
+    this.openai = new OpenAIProvider();
+  }
+
+  private async callProvider(selection: any, messages: AIMessage[]): Promise<AIResponse> {
+    let provider;
+    switch (selection.provider) {
+      case 'Ollama': provider = this.ollama; break;
+      case 'Google Gemini': provider = this.gemini; break;
+      default: provider = this.openai;
+    }
+
+    const response = await provider.complete(messages, {
+      model: selection.selectedModel,
+    });
+
+    return {
+      content: response.content,
+      model: response.model,
+      usage: {
+        prompt_tokens: response.usage.promptTokens,
+        completion_tokens: response.usage.completionTokens,
+        total_tokens: response.usage.totalTokens
+      }
+    };
   }
 
   // Generate daily learning plan
@@ -138,15 +61,24 @@ export class AITutorService {
     plan: any;
     analysis: any;
   }> {
+    const context = `Học sinh: môn ${userData.subject}, trình độ ${userData.level}, động lực ${userData.motivation}, cảm xúc ${userData.emotion}, XP ${userData.currentXP}`;
+    
+    const selection = await modelSelector.selectModel({
+      taskType: TaskType.LESSON_PLANNING,
+      priority: [Priority.QUALITY, Priority.SPEED],
+      inputLength: 200,
+      expectedOutputLength: 1000,
+      requiresVietnamese: true,
+      requiresRealtime: false,
+      privacyRequired: false,
+      studentAgeGroup: 'secondary'
+    });
+
     const systemPrompt = `You are an AI tutor for Vietnamese high school students. 
     Create a personalized daily learning plan based on the student's data.
     
     Student Data:
-    - Subject: ${userData.subject}
-    - Level: ${userData.level}
-    - Motivation: ${userData.motivation}
-    - Emotion: ${userData.emotion}
-    - Current XP: ${userData.currentXP}
+    ${context}
     
     Return a JSON object with:
     1. "plan": Daily learning plan with lessons, activities, and goals
@@ -155,9 +87,7 @@ export class AITutorService {
     Make it engaging and suitable for Vietnamese teenagers.`;
 
     try {
-      const response = await this.googleAI.generateContent(systemPrompt);
-      
-      // Parse the response (assuming it returns JSON)
+      const response = await this.callProvider(selection, [{ role: 'user', content: systemPrompt }]);
       const parsedResponse = JSON.parse(response.content);
       
       return {
@@ -184,6 +114,17 @@ export class AITutorService {
     exercises: any[];
     explanations: string[];
   }> {
+    const selection = await modelSelector.selectModel({
+      taskType: TaskType.CONTENT_GENERATION,
+      priority: [Priority.QUALITY, Priority.SPEED],
+      inputLength: 100,
+      expectedOutputLength: 2000,
+      requiresVietnamese: true,
+      requiresRealtime: false,
+      privacyRequired: false,
+      studentAgeGroup: 'secondary'
+    });
+
     const prompt = `Create a lesson about ${lessonData.topic} in ${lessonData.subject} 
     for a ${lessonData.difficulty} level student.
     
@@ -196,7 +137,7 @@ export class AITutorService {
     Make it engaging and suitable for Vietnamese high school students.`;
 
     try {
-      const response = await this.xAI.chatCompletion([
+      const response = await this.callProvider(selection, [
         { role: 'system', content: 'You are an expert teacher creating educational content for Vietnamese students.' },
         { role: 'user', content: prompt }
       ]);
@@ -218,6 +159,17 @@ export class AITutorService {
 
   // Provide real-time help
   async provideHelp(question: string, context: string): Promise<string> {
+    const selection = await modelSelector.selectModel({
+      taskType: TaskType.CHAT_SUPPORT,
+      priority: [Priority.SPEED, Priority.COST],
+      inputLength: (question.length + context.length) / 4,
+      expectedOutputLength: 500,
+      requiresVietnamese: true,
+      requiresRealtime: true,
+      privacyRequired: false,
+      studentAgeGroup: 'secondary'
+    });
+
     const messages: AIMessage[] = [
       {
         role: 'system',
@@ -230,7 +182,7 @@ export class AITutorService {
     ];
 
     try {
-      const response = await this.xAI.chatCompletion(messages);
+      const response = await this.callProvider(selection, messages);
       return response.content;
     } catch (error) {
       console.error('Error providing help:', error);
@@ -249,6 +201,17 @@ export class AITutorService {
     recommendations: string[];
     encouragement: string;
   }> {
+    const selection = await modelSelector.selectModel({
+      taskType: TaskType.CHAT_SUPPORT,
+      priority: [Priority.SPEED, Priority.QUALITY],
+      inputLength: 100,
+      expectedOutputLength: 500,
+      requiresVietnamese: true,
+      requiresRealtime: false,
+      privacyRequired: false,
+      studentAgeGroup: 'secondary'
+    });
+
     const prompt = `Analyze this student's emotional state and provide recommendations:
     
     Mood: ${emotionData.mood}
@@ -264,7 +227,7 @@ export class AITutorService {
     Be supportive and understanding.`;
 
     try {
-      const response = await this.googleAI.generateContent(prompt);
+      const response = await this.callProvider(selection, [{ role: 'user', content: prompt }]);
       
       return {
         analysis: response.content,
@@ -345,7 +308,4 @@ export class AITutorService {
 }
 
 // Export singleton instance
-export const aiTutorService = new AITutorService(
-  process.env.GOOGLE_AI_API_KEY || '',
-  process.env.XAI_API_KEY || ''
-);
+export const aiTutorService = new AITutorService();

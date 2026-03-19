@@ -61,6 +61,8 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
   const rustStudentBase = process.env.RUST_STUDENT_URL || "http://127.0.0.1:8096";
   const rustStemBase = process.env.RUST_STEM_URL || "http://127.0.0.1:8097";
   const rustMediaBase = process.env.RUST_MEDIA_URL || "http://127.0.0.1:8098";
+  const rustCameraBase = process.env.RUST_CAMERA_URL || "http://127.0.0.1:8099";
+  const rustGradingBase = process.env.RUST_GRADING_URL || "http://127.0.0.1:8100";
 
   const directVectorProxy = process.env.DIRECT_RUST_VECTOR_PROXY === "true";
   const directOcrGradingProxy = process.env.DIRECT_RUST_OCR_GRADING_PROXY === "true";
@@ -73,6 +75,8 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
   const directStudentProxy = process.env.DIRECT_RUST_STUDENT_PROXY === "true";
   const directStemProxy = process.env.DIRECT_RUST_STEM_PROXY === "true";
   const directMediaProxy = process.env.DIRECT_RUST_MEDIA_PROXY === "true";
+  const directCameraProxy = process.env.DIRECT_RUST_CAMERA_PROXY === "true";
+  const directGradingProxy = process.env.DIRECT_RUST_GRADING_PROXY === "true";
 
   // === VECTOR SERVICE (8091) ===
   if (pathname === "/api/vector-similarity" || pathname === "/api/vector-similarity/cache") {
@@ -231,6 +235,26 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
     };
   }
 
+  // === CAMERA & IOT SERVICE (8099) ===
+  if (pathname.startsWith("/api/camera") || pathname.startsWith("/api/iot")) {
+    return {
+      rustBase: rustCameraBase,
+      rustPath: pathname,
+      directProxyEnabled: directCameraProxy,
+      canaryKey: "camera",
+    };
+  }
+
+  // === GRADING SERVICE (8100) ===
+  if (pathname.startsWith("/api/grading")) {
+    return {
+      rustBase: rustGradingBase,
+      rustPath: pathname,
+      directProxyEnabled: directGradingProxy,
+      canaryKey: "grading",
+    };
+  }
+
   return null;
 }
 
@@ -330,6 +354,19 @@ function recordCanaryDecision(state: CanaryState, target: CanaryTarget) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // ===== FAST PATH: Skip static files and assets immediately =====
+  // This MUST be first to avoid any processing for static assets
+  if (
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/images/") ||
+    pathname.startsWith("/fonts/") ||
+    pathname.startsWith("/models/") ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot|tflite|task|wasm|mp4|webm)$/i)
+  ) {
+    return NextResponse.next()
+  }
+
   // ===== STRANGLER CANARY PROXY FOR HEAVY API =====
   // Apply only on selected API routes before generic /api bypass.
   const stranglerRouteConfig = getStranglerRouteConfig(pathname);
@@ -364,8 +401,8 @@ export async function middleware(request: NextRequest) {
       : process.env.RUST_CANARY_COOKIE_NAME || "rust_canary_bucket";
     const healthIntervalMs = Number(
       useScopedCanaryConfig
-        ? process.env.RUST_CANARY_LLM_GRADING_HEALTHCHECK_INTERVAL_MS || "5000"
-        : process.env.RUST_CANARY_HEALTHCHECK_INTERVAL_MS || "5000"
+        ? process.env.RUST_CANARY_LLM_GRADING_HEALTHCHECK_INTERVAL_MS || "30000"
+        : process.env.RUST_CANARY_HEALTHCHECK_INTERVAL_MS || "30000"
     );
     const disableRustWhenUnhealthy = useScopedCanaryConfig
       ? process.env.RUST_DISABLE_LLM_GRADING_ON_UNHEALTHY !== "false"
@@ -448,16 +485,8 @@ export async function middleware(request: NextRequest) {
     return rewriteResponse;
   }
 
-  // Allow static files immediately (before any auth checks)
-  // This MUST be checked first to avoid any token fetching for static files
-  if (
-    pathname === "/favicon.ico" ||
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/api") ||
-    pathname.startsWith("/images/") ||
-    pathname.startsWith("/fonts/") ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot)$/i)
-  ) {
+  // Allow all remaining API routes through (non-strangler APIs)
+  if (pathname.startsWith("/api")) {
     return NextResponse.next()
   }
 
@@ -503,8 +532,6 @@ export async function middleware(request: NextRequest) {
 
   // ===== REDIRECT AUTHENTICATED USERS FROM MARKETING PAGES =====
   if (token && (isMarketingRoute || isAuthRoute)) {
-    console.log(`🔒 [MIDDLEWARE] Authenticated user trying to access ${pathname}, redirecting to dashboard`)
-
     // Use utility function for role-based redirect
     const dashboardUrl = getDashboardUrl(token.role as any)
     return NextResponse.redirect(new URL(dashboardUrl, request.url))
@@ -526,12 +553,10 @@ export async function middleware(request: NextRequest) {
     const hasPermission = hasRoutePermission(token.role as any, pathname)
 
     if (!hasPermission) {
-      console.log(`🚫 [MIDDLEWARE] User ${token.email} (${token.role}) doesn't have permission for ${pathname}`)
       const fallbackUrl = getFallbackUrl(token.role as any)
       return NextResponse.redirect(new URL(fallbackUrl, request.url))
     }
 
-    console.log(`✅ [MIDDLEWARE] User ${token.email} (${token.role}) accessing ${pathname}`)
     return NextResponse.next()
   }
 
@@ -540,13 +565,11 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
   if (isProtectedRoute) {
-    console.log(`🚫 [MIDDLEWARE] Unauthenticated access to ${pathname}, redirecting to login`)
     return NextResponse.redirect(new URL('/auth/login?callbackUrl=' + encodeURIComponent(pathname), request.url))
   }
 
   // ===== DEFAULT: REQUIRE AUTH FOR ALL OTHER ROUTES =====
   if (!token) {
-    console.log(`🚫 [MIDDLEWARE] Unauthenticated access to ${pathname}, redirecting to login`)
     return NextResponse.redirect(new URL('/auth/login?callbackUrl=' + encodeURIComponent(pathname), request.url))
   }
 
@@ -595,6 +618,8 @@ export const config = {
     '/api/health',
     '/api/cache',
     '/api/update-learning-progress',
+    '/api/camera/:path*',
+    '/api/iot/:path*',
     /*
      * Match all request paths except for the ones starting with:
      * - _next/static (static files)

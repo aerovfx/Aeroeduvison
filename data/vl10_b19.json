@@ -1,0 +1,147 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 19: Lực cản và lực nâng",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "19",
+    "topic": "Lực cản và lực nâng"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 19: Lực cản và lực nâng có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về lực cản của chất lưu và lực nâng.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Một vật khối lượng 2,5 kg rơi thẳng đứng từ độ cao 100 m không vận tốc đầu, sau 20s thì chạm đất. Tính lực cản của không khí (coi như không đổi) tác dụng lên vật lấy g = 10 m/s².",
+      "options": [
+        "23,75 N.",
+        "40 N.",
+        "20 N.",
+        "25 N."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Chọn trục tọa độ Oy gắn với quỹ đạo rơi của vật, gốc tọa độ tại mặt đất, chiều dương hướng xuống. Phương trình chuyển động của vật: y = h - ½at². Khi vật rơi chạm đất y=0 ⇒ a = 2h/t² = 2×100/20² = 0,5 m/s². Áp dụng biểu thức định luật II Newton: P - Fc = ma ⇒ Fc = mg - ma = m(g-a) = 2,5(10-0,5) = 23,75 N"
+    },
+    {
+      "question_number": 2,
+      "question": "Một quả cầu khối lượng m = 1 kg, bán kính r = 8 cm. Tìm vận tốc rơi cực đại của quả cầu. Biết rằng lực cản của không khí có biểu thức F = kSv² hệ số k = 0,024",
+      "options": [
+        "14,4 m/s.",
+        "144 m/s.",
+        "50 m/s.",
+        "35 m/s."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Trong quá trình rơi vật chịu tác dụng của P và Fc. Áp dụng biểu thức của định luật II Newton: P + Fc = ma. Chiếu lên trục Oy theo phương thẳng đứng, chiều dương hướng xuống: P - Fc = ma ⇔ P - kSv² = ma. Khi vật mới chuyển động, lực cản nhỏ, trong quá trình vật chuyển động, lực cản tăng dần. Vận tốc của vật đạt giá trị cực đại khi P - kSv² = 0 ⇒ vmax = P/kS = mg/kπr² = 1×10/(0,024×π×0,08²) = 143,96 m/s"
+    },
+    {
+      "question_number": 3,
+      "question": "Một người có thể bơi trong nước (khi nước không chảy thành dòng) với vận tốc 1,5 m/s. Người đó bơi trên một con sông, xuôi dòng từ điểm A đến điểm B sau đó bơi ngược lại từ B trở về. Biết tổng thời gian bơi là 2 phút và khoảng cách giữa A và B là 50 m. Vận tốc dòng chảy là",
+      "options": [
+        "0,5 m/s",
+        "1 m/s",
+        "2 m/s",
+        "0,75 m/s"
+      ],
+      "correctAnswer": "B",
+      "explanation": "Gọi v là vận tốc của người đó khi nước không chảy, vn là vận tốc của dòng nước. Khi người đó bơi xuôi dòng, vận tốc bơi bằng: vx = v + vn ⇒ tx = AB/vx = AB/(v+vn). Khi người đó bơi ngược dòng, vận tốc bơi bằng: vng = v - vn ⇒ tng = AB/vng = AB/(v-vn). Tổng thời gian đã bơi là: t = tx + tng = AB/(v+vn) + AB/(v-vn) = 2×AB×v/(v²-vn²) ⇒ vn = √(v² - 2×AB×v/t) = √(1,5² - 2×50×1,5/(2×60)) = 1 m/s"
+    },
+    {
+      "question_number": 4,
+      "question": "Khinh khí cầu hoạt động dựa trên nguyên tắc nào?",
+      "options": [
+        "Khí nóng nhẹ hơn, chuyển động nhanh hơn khí lạnh.",
+        "Bay lên nhờ động cơ.",
+        "Dựa theo sức gió của môi trường xung quanh.",
+        "Cả A và C đều đúng."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Khi đốt khí bên trong nóng lên, nhẹ hơn và làm cho khí cầu bay lên. Để điều chỉnh cho khí cầu di chuyển từ nơi này đến nơi khác mới cần chú ý đến sức gió của môi trường xung quanh."
+    },
+    {
+      "question_number": 5,
+      "question": "Cặp lực nào không cân bằng trong các cặp lực sau đây:",
+      "options": [
+        "Lực của mặt nước và lực hút của Trái Đất tác dụng vào thuyền để thuyền đứng yên trên mặt nước.",
+        "Lực của 2 em bé kéo hai đầu sợi dây khi sợi dây đứng yên.",
+        "Lực mà lò xo tác dụng vào vật và lực mà vật tác dụng vào lò xo.",
+        "Lực nâng của sàn nhà và lực hút của trái đất tác dụng vào bàn."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Hai lực này là 2 lực trực đối, không cân bằng vì có điểm đặt khác nhau."
+    },
+    {
+      "question_number": 6,
+      "question": "Gió tác dụng vào buồm một lực có:",
+      "options": [
+        "phương song song với mạn thuyền, cùng chiều với chiều chuyển động của thuyền.",
+        "phương song song với mạn thuyền, ngược chiều với chiều chuyển động của thuyền.",
+        "phương vuông góc với mạn thuyền, chiều từ trên xuống.",
+        "phương vuông góc với mạn thuyền, chiều từ dưới lên."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Gió tác dụng vào buồm một lực có phương song song với mạn thuyền, cùng chiều với chiều chuyển động của thuyền."
+    },
+    {
+      "question_number": 7,
+      "question": "Lực cản của chất lưu phụ thuộc vào yếu tố nào?",
+      "options": [
+        "Khối lượng của vật.",
+        "Hình dạng của vật.",
+        "Thể tích của vật.",
+        "Độ đàn hồi của vật."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Lực cản của chất lưu phụ thuộc vào hình dạng của vật."
+    },
+    {
+      "question_number": 8,
+      "question": "Vì sao đi lại trên bờ thì dễ dàng còn đi lại dưới nước lại khó hơn?",
+      "options": [
+        "Vì nước chuyển động còn không khí không chuyển động.",
+        "Vì khi xuống nước, chúng ta 'nặng hơn'.",
+        "Vì nước có lực cản còn không khí thì không có lực cản.",
+        "Vì lực cản của nước lớn hơn lực cản của không khí."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Khi vật chuyển động trong nước, lực cản của nước lớn hơn lực cản của không khí."
+    },
+    {
+      "question_number": 9,
+      "question": "Lực cản của nước tác dụng lên vật chuyển động trong nó",
+      "options": [
+        "làm chậm tốc độ di chuyển của vật.",
+        "làm tăng tốc độ di chuyển của vật.",
+        "không ảnh hưởng đến tốc độ di chuyển.",
+        "cả A và B đều sai."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Lực cản của nước tác dụng lên vật, làm chậm tốc độ di chuyển của vật."
+    },
+    {
+      "question_number": 10,
+      "question": "Đặc điểm nào của loài cá giúp chúng thích nghi với môi trường nước.",
+      "options": [
+        "Thân thon dài, đầu thuôn nhọn giúp giảm sức cản của nước.",
+        "Mắt không có mí.",
+        "Bên ngoài vảy có tuyến tiết chất nhầy để giảm ma sát với môi trường nước.",
+        "Tất cả các đáp án trên."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Đặc điểm của loài cá giúp chúng thích nghi với môi trường nước: - Thân thon dài, đầu thuôn nhọn giúp giảm sức cản của nước. - Mắt không có mí. - Bên ngoài vảy có tuyến tiết chất nhầy để giảm ma sát với môi trường nước."
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 9: Chuyển động thẳng biến đổi đều",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton",
+      "Bài 15: Định luật 2 Newton",
+      "Bài 16: Định luật 3 Newton",
+      "Bài 17: Trọng lực và lực căng",
+      "Bài 18: Lực ma sát"
+    ]
+  }
+}

@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       project = { mainContent: proj.mainContent ?? "", title: proj.title };
-      content = project.mainContent;
+      content = typeof rawContent === "string" ? rawContent : project.mainContent;
     } else if (typeof rawContent === "string") {
       content = rawContent;
     } else {

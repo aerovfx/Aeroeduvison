@@ -13,60 +13,30 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get("status")
 
-    const examRooms = await db.onlineExamRoom.findMany({
-      where: {
-        teacherId: session.user.id,
-        ...(status && { status }),
-      },
-      include: {
-        ExamMatrix: {
-          select: {
-            id: true,
-            name: true,
-            grade: true,
-            examType: true,
-          },
-        },
-        participants: {
-          select: {
-            id: true,
-            status: true,
-            Student: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
-        questions: {
-          select: {
-            id: true,
-            position: true,
-            points: true,
-            questionType: true,
-            Question: {
-              select: {
-                id: true,
-                content: true,
-                questionType: true,
-              },
-            },
-          },
-          orderBy: { position: "asc" },
-        },
-        _count: {
-          select: {
-            participants: true,
-            questions: true,
-          },
-        },
-      },
+    const includeFields = {
+      ExamMatrix: { select: { id: true, name: true, grade: true, examType: true } },
+      Teacher: { select: { id: true, name: true } },
+      _count: { select: { participants: true, questions: true } },
+    }
+
+    const myRooms = await db.onlineExamRoom.findMany({
+      where: { teacherId: session.user.id, ...(status && { status }) },
+      include: includeFields,
       orderBy: { createdAt: "desc" },
     })
 
-    return NextResponse.json({ examRooms })
+    const publicRooms = await db.onlineExamRoom.findMany({
+      where: {
+        isPublic: true,
+        status: { in: ["active", "draft"] },
+        teacherId: { not: session.user.id },
+      },
+      include: includeFields,
+      orderBy: { startTime: "asc" },
+      take: 50,
+    })
+
+    return NextResponse.json({ examRooms: myRooms, publicRooms })
   } catch (error) {
     console.error("Error fetching exam rooms:", error)
     return NextResponse.json(
@@ -125,9 +95,32 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    if (questionIds && questionIds.length > 0) {
+    // Import questions from an existing Exam (by examId)
+    const { examId } = body
+    let resolvedQuestionIds: string[] = questionIds || []
+
+    if (examId && typeof examId === "string" && resolvedQuestionIds.length === 0) {
+      const exam = await db.examQuestion.findMany({
+        where: { examId },
+        orderBy: { order: "asc" },
+        include: {
+          Question: { select: { id: true, questionType: true } },
+        },
+      })
+      if (exam.length > 0) {
+        const createData = exam.map((eq: any, idx: number) => ({
+          examRoomId: examRoom.id,
+          questionId: eq.questionId,
+          position: idx + 1,
+          points: Number(eq.points) || 1.0,
+          questionType: eq.Question?.questionType || "MCQ",
+        }))
+        await db.examRoomQuestion.createMany({ data: createData })
+        resolvedQuestionIds = exam.map((eq: any) => eq.questionId)
+      }
+    } else if (resolvedQuestionIds.length > 0) {
       await db.examRoomQuestion.createMany({
-        data: questionIds.map((questionId: string, index: number) => ({
+        data: resolvedQuestionIds.map((questionId: string, index: number) => ({
           examRoomId: examRoom.id,
           questionId,
           position: index + 1,
@@ -137,19 +130,14 @@ export async function POST(request: NextRequest) {
       })
 
       const questions = await db.question.findMany({
-        where: { id: { in: questionIds } },
+        where: { id: { in: resolvedQuestionIds } },
         select: { id: true, questionType: true },
       })
 
       for (const question of questions) {
         await db.examRoomQuestion.updateMany({
-          where: {
-            examRoomId: examRoom.id,
-            questionId: question.id,
-          },
-          data: {
-            questionType: question.questionType,
-          },
+          where: { examRoomId: examRoom.id, questionId: question.id },
+          data: { questionType: question.questionType },
         })
       }
     }

@@ -1,0 +1,57 @@
+[
+  {
+    "id": "a466fc9b-ae83-4b18-804a-aed5c784bca2",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-19 11:04:11",
+    "transcript": "Chào. Chào. Chào. Chào. Cảm ơn.\nChào bạn. Tạm biệt, tạm biệt.",
+    "summary": "",
+    "duration": 7,
+    "createdAt": "2026-03-19T04:05:34.120Z",
+    "updatedAt": "2026-03-19T04:05:34.120Z"
+  },
+  {
+    "id": "ed12a566-8667-4ea4-bf00-07e02f866c66",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-19 10:43:41",
+    "transcript": "Tôi hy vọng rằng họ sẽ nói về sự lạc quan. Tôi hy vọng rằng họ sẽ nhận ra những gì tôi đang cố gắng làm ở đây. Và tôi rất tò mò về bạn. Bạn đã làm điều này rất lâu rồi. Nó có vẻ như có rất nhiều điều bạn đã mô tả trong tầm nhìn phía trước này. Điều gì sẽ là chủ đề mà bạn muốn mọi người nói về những gì bạn đang cố gắng làm? Cứ rất đơn giản, bạn đã có một tác động",
+    "summary": "",
+    "duration": 166,
+    "createdAt": "2026-03-19T03:48:05.458Z",
+    "updatedAt": "2026-03-19T03:48:05.458Z"
+  },
+  {
+    "id": "3caaa17f-51be-4e3d-98f5-0b83ca60578a",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-19 10:32:45",
+    "transcript": "Bạn tự hỏi những câu hỏi như vậy đấy.",
+    "summary": "",
+    "duration": 5,
+    "createdAt": "2026-03-19T03:33:12.429Z",
+    "updatedAt": "2026-03-19T03:33:12.429Z"
+  },
+  {
+    "id": "3d8ea1de-aee8-4ebd-afb1-a7f0c62b0da1",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-19 10:24:10",
+    "transcript": "Chúng tôi muốn tạo ra một kiến trúc để các nhà phát minh, những người đổi mới, lập trình viên phần mềm và các nhà nghiên cứu AI.\nVà các nhà nghiên cứu AI thì “bơi” trong món súp này và đưa ra những ý tưởng tuyệt vời. Hãy xem transformers, đặc trưng cơ bản của transformers là một ý tưởng gọi là cơ chế căng thẳng, và nó nói rằng transformers sẽ hiểu ý nghĩa và sự liên quan của mỗi từ với mọi từ khác. Ví dụ, nếu bạn có 10 từ, nó phải tìm ra mối quan hệ giữa chúng. Nhưng nếu bạn có 100.00",
+    "summary": "",
+    "duration": 82,
+    "createdAt": "2026-03-19T03:26:48.584Z",
+    "updatedAt": "2026-03-19T03:26:48.584Z"
+  },
+  {
+    "id": "64bc8864-7b70-44a4-aa50-8188b41b51ae",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-19 10:08:04",
+    "transcript": "Nhưng điều đó có nghĩa là các robot không nhận được đủ ví dụ để học nhanh hơn. Nhưng giờ thì...\nChúng tôi bắt đầu huấn luyện robot trong thế giới số, điều này có nghĩa là có rất nhiều lần lặp lại mỗi ngày, rất nhiều điều kiện, học nhanh hơn rất nhiều. Vì vậy, chúng ta có thể đang ở một khoảnh khắc bùng nổ cho robot ngay bây giờ. Và NVIDIA đang xây dựng các công cụ để điều đó xảy ra. Omniverse của bạn là một ví dụ. Hiểu của tôi là đây là các thế giới 3D giúp huấn luyện",
+    "summary": "",
+    "duration": 32,
+    "createdAt": "2026-03-19T03:09:11.170Z",
+    "updatedAt": "2026-03-19T03:09:11.170Z"
+  }
+]

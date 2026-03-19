@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 9: Chuyển động thẳng biến đổi đều",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "9",
+    "topic": "Chuyển động thẳng biến đổi đều"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 9: Chuyển động thẳng biến đổi đều có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về chuyển động thẳng biến đổi đều.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Trong chuyển động thẳng biến đổi đều, véctơ gia tốc tức thời có đặc điểm:",
+      "options": [
+        "Hướng thay đổi, độ lớn không đổi.",
+        "Hướng không đổi, độ lớn thay đổi.",
+        "Hướng thay đổi, độ lớn thay đổi.",
+        "Hướng không đổi, độ lớn không đổi."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Trong CĐTĐTDĐ, gia tốc $\\vec{a}$ không đổi về cả hướng và độ lớn."
+    },
+    {
+      "question_number": 2,
+      "question": "Xe ô tô bắt đầu chuyển động thẳng nhanh dần đều từ trạng thái đứng yên. Trong 4s đầu ô tô đi được đoạn đường 10m và không đổi chiều chuyển động. Tính vận tốc của ô tô ở cuối giây thứ hai.",
+      "options": [
+        "2,5 m/s",
+        "3 m/s",
+        "5 m/s",
+        "4 m/s"
+      ],
+      "correctAnswer": "A",
+      "explanation": "v₀ = 0, d = v₀t + 1/2at² => a = 1,25 m/s²\nv = v₀ + at = 0 + 1,25 × 2 = 2,5 m/s"
+    },
+    {
+      "question_number": 3,
+      "question": "Vật chuyển động thẳng chậm dần đều với vận tốc ban đầu 20m/s, gia tốc -2m/s². Quãng đường đi được sau 10s là:",
+      "options": [
+        "80m",
+        "100m",
+        "60m",
+        "40m"
+      ],
+      "correctAnswer": "A",
+      "explanation": "Thời điểm dừng: t = -v₀/a = 10s => d = 20×10 + 0,5×(-2)×100 = 100m\nNhưng sau 10s vật đã dừng, vậy d = 100m"
+    },
+    {
+      "question_number": 4,
+      "question": "Vận tốc trung bình của một vật chuyển động thẳng nhanh dần đều trong khoảng thời gian t là:",
+      "options": [
+        "0",
+        "v/2",
+        "2v/t",
+        "v/t"
+      ],
+      "correctAnswer": "B",
+      "explanation": "v̄t = (v₀ + v)/2 = v/2 với v₀ = 0"
+    },
+    {
+      "question_number": 10,
+      "question": "Một đoàn tàu bắt đầu rời ga, chuyển động thẳng nhanh dần đều. Sau khi đi được 1000m đạt đến vận tốc 10m/s. Tính vận tốc của tàu sau khi đi được 2000m.",
+      "options": [
+        "14,14 m/s",
+        "15,5 m/s",
+        "15 m/s",
+        "10 m/s"
+      ],
+      "correctAnswer": "A",
+      "explanation": "v₁² = 2ad₁ => a = v₁²/(2d₁) = 100/(2×1000) = 0,05 m/s²\nv₂² = v₀² + 2ad₂ => v₂ = √(0 + 2×0,05×2000) = √200 ≈ 14,14 m/s"
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton"
+    ]
+  }
+}

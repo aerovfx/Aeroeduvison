@@ -13,12 +13,26 @@ const REDIS_CONFIG = {
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3,
   lazyConnect: true,
+  enableOfflineQueue: false,
 };
 
-export const redis = new Redis(REDIS_CONFIG);
+let _redis: Redis | null = null;
 
-redis.on('connect', () => console.log('✅ Redis connected'));
-redis.on('error', (error) => console.error('❌ Redis error:', error.message));
+function getRedisInstance(): Redis {
+  if (!_redis) {
+    _redis = new Redis(REDIS_CONFIG);
+    _redis.on('error', () => {}); // Suppress unhandled errors during build
+  }
+  return _redis;
+}
+
+export const redis = new Proxy({} as Redis, {
+  get(_, prop) {
+    const r = getRedisInstance();
+    const val = (r as any)[prop];
+    return typeof val === 'function' ? val.bind(r) : val;
+  },
+});
 
 export const redisClient = {
   async set(key: string, value: string, ttl?: number): Promise<void> {

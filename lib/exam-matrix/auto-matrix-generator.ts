@@ -1,8 +1,8 @@
-import { apiLogger } from "@/lib/logging-simple"
+import { EXAM_TYPE_PRESETS, ExamType } from "@/lib/constants/question-bank"
 
 /**
  * Service để tạo ma trận đề thi tự động theo tỉ lệ cognitive level
- * Tỉ lệ: 40% Nhận biết, 30% Thông hiểu, 30% Vận dụng
+ * Tỉ lệ mặc định: 40% Biết, 30% Hiểu, 30% Vận dụng
  */
 
 interface TopicInput {
@@ -43,13 +43,6 @@ export class AutoMatrixGenerator {
     "Vận dụng": 0.3,
   }
 
-  private static readonly QUESTION_TYPE_RATIOS = {
-    "TNKQ_Nhiều_lựa_chọn": 0.6,
-    "TNKQ_Đúng_Sai": 0.2,
-    "TNKQ_Trả_lời_ngắn": 0.1,
-    "Tự_luận": 0.1,
-  }
-
   private static readonly COGNITIVE_LEVELS = ["Biết", "Hiểu", "Vận dụng"]
   private static readonly QUESTION_TYPES = [
     "TNKQ_Nhiều_lựa_chọn",
@@ -57,6 +50,40 @@ export class AutoMatrixGenerator {
     "TNKQ_Trả_lời_ngắn",
     "Tự_luận",
   ]
+
+  /**
+   * Lấy tỉ lệ phân bổ loại câu hỏi dựa theo examType.
+   * Kiểm tra ngắn thiên về MCQ; kiểm tra học kỳ có nhiều tự luận hơn.
+   */
+  private static getQuestionTypeRatios(examType?: string): Record<string, number> {
+    const preset = examType ? EXAM_TYPE_PRESETS[examType as ExamType] : null
+    const mcqRatio = preset?.mcqRatio ?? 0.6
+
+    // Distribute remaining ratio equally across the other 3 types
+    const remaining = 1 - mcqRatio
+    return {
+      "TNKQ_Nhiều_lựa_chọn": mcqRatio,
+      "TNKQ_Đúng_Sai": Math.round((remaining * 0.5) * 100) / 100,
+      "TNKQ_Trả_lời_ngắn": Math.round((remaining * 0.25) * 100) / 100,
+      "Tự_luận": Math.round((remaining * 0.25) * 100) / 100,
+    }
+  }
+
+  /**
+   * Trả về số câu hỏi gợi ý cho một loại kiểm tra.
+   */
+  static getSuggestedQuestionCount(examType: string): number | null {
+    const preset = EXAM_TYPE_PRESETS[examType as ExamType]
+    return preset?.suggestedQuestions ?? null
+  }
+
+  /**
+   * Trả về thời gian làm bài gợi ý cho một loại kiểm tra.
+   */
+  static getSuggestedDuration(examType: string): number | null {
+    const preset = EXAM_TYPE_PRESETS[examType as ExamType]
+    return preset?.suggestedDuration ?? null
+  }
 
   static generateMatrix(
     topics: TopicInput[],
@@ -68,15 +95,17 @@ export class AutoMatrixGenerator {
       throw new Error("Cần ít nhất một đơn vị kiến thức")
     }
 
+    const questionTypeRatios = this.getQuestionTypeRatios(examType)
     const normalizedTopics = this.normalizeTopicWeights(topics)
-    
+
     const generatedTopics: GeneratedTopic[] = normalizedTopics.map((topic, index) => {
       const topicQuestionCount = Math.round(totalQuestions * (topic.weight || 0))
       const topicScore = totalScore * (topic.weight || 0)
-      
+
       const distributions = this.generateDistributionsForTopic(
         topicQuestionCount,
-        topicScore
+        topicScore,
+        questionTypeRatios
       )
 
       return {
@@ -84,7 +113,7 @@ export class AutoMatrixGenerator {
         topic: topic.name,
         content: topic.content || "",
         distributions,
-        percentageScore: Math.round(topicScore / totalScore * 100),
+        percentageScore: Math.round((topicScore / totalScore) * 100),
       }
     })
 
@@ -101,7 +130,7 @@ export class AutoMatrixGenerator {
 
   private static normalizeTopicWeights(topics: TopicInput[]): TopicInput[] {
     const totalWeight = topics.reduce((sum, t) => sum + (t.weight || 1), 0)
-    
+
     return topics.map(topic => ({
       ...topic,
       weight: (topic.weight || 1) / totalWeight,
@@ -110,7 +139,8 @@ export class AutoMatrixGenerator {
 
   private static generateDistributionsForTopic(
     questionCount: number,
-    score: number
+    _score: number,
+    questionTypeRatios: Record<string, number>
   ): Distribution[] {
     const distributions: Distribution[] = []
 
@@ -120,25 +150,21 @@ export class AutoMatrixGenerator {
       "Vận dụng": Math.round(questionCount * this.COGNITIVE_RATIOS["Vận dụng"]),
     }
 
+    // Fix rounding drift
     const totalCognitiveQuestions = Object.values(cognitiveQuestions).reduce((a, b) => a + b, 0)
     if (totalCognitiveQuestions !== questionCount) {
-      const diff = questionCount - totalCognitiveQuestions
-      cognitiveQuestions["Biết"] += diff
+      cognitiveQuestions["Biết"] += questionCount - totalCognitiveQuestions
     }
 
     for (const level of this.COGNITIVE_LEVELS) {
       const levelCount = cognitiveQuestions[level as keyof typeof cognitiveQuestions]
       if (levelCount === 0) continue
 
-      const typeDistribution = this.distributeByQuestionType(levelCount)
-      
+      const typeDistribution = this.distributeByQuestionType(levelCount, questionTypeRatios)
+
       for (const [questionType, count] of Object.entries(typeDistribution)) {
         if (count > 0) {
-          distributions.push({
-            questionType,
-            cognitiveLevel: level,
-            count,
-          })
+          distributions.push({ questionType, cognitiveLevel: level, count })
         }
       }
     }
@@ -146,21 +172,25 @@ export class AutoMatrixGenerator {
     return distributions
   }
 
-  private static distributeByQuestionType(count: number): Record<string, number> {
+  private static distributeByQuestionType(
+    count: number,
+    questionTypeRatios: Record<string, number>
+  ): Record<string, number> {
     const distribution: Record<string, number> = {}
     let remaining = count
 
     const types = [...this.QUESTION_TYPES]
-    
+
     for (let i = 0; i < types.length - 1; i++) {
       const type = types[i]
-      const ratio = this.QUESTION_TYPE_RATIOS[type as keyof typeof this.QUESTION_TYPE_RATIOS]
+      const ratio = questionTypeRatios[type] ?? 0
       const typeCount = Math.round(count * ratio)
       distribution[type] = typeCount
       remaining -= typeCount
     }
 
-    distribution[types[types.length - 1]] = remaining
+    // Last type absorbs rounding remainder
+    distribution[types[types.length - 1]] = Math.max(0, remaining)
 
     return distribution
   }
@@ -173,36 +203,26 @@ export class AutoMatrixGenerator {
       return sum + t.distributions.reduce((s, d) => s + d.count, 0)
     }, 0)
 
-    if (currentTotal === targetTotal) {
-      return topics
-    }
+    if (currentTotal === targetTotal) return topics
 
     const diff = targetTotal - currentTotal
     const sortedTopics = [...topics].sort((a, b) => b.percentageScore - a.percentageScore)
-    
+
     if (diff > 0) {
       for (let i = 0; i < diff; i++) {
-        const topicIndex = i % sortedTopics.length
-        const topic = sortedTopics[topicIndex]
-        
+        const topic = sortedTopics[i % sortedTopics.length]
         const bietDist = topic.distributions.find(
           d => d.cognitiveLevel === "Biết" && d.questionType === "TNKQ_Nhiều_lựa_chọn"
         )
-        if (bietDist) {
-          bietDist.count++
-        }
+        if (bietDist) bietDist.count++
       }
-    } else if (diff < 0) {
+    } else {
       for (let i = 0; i < Math.abs(diff); i++) {
-        const topicIndex = i % sortedTopics.length
-        const topic = sortedTopics[topicIndex]
-        
+        const topic = sortedTopics[i % sortedTopics.length]
         const vanDungDist = topic.distributions.find(
           d => d.cognitiveLevel === "Vận dụng" && d.questionType === "Tự_luận"
         )
-        if (vanDungDist && vanDungDist.count > 0) {
-          vanDungDist.count--
-        }
+        if (vanDungDist && vanDungDist.count > 0) vanDungDist.count--
       }
     }
 
@@ -220,16 +240,15 @@ export class AutoMatrixGenerator {
 
     for (const topic of topics) {
       for (const dist of topic.distributions) {
-        levelCounts[dist.cognitiveLevel] += dist.count
+        levelCounts[dist.cognitiveLevel] = (levelCounts[dist.cognitiveLevel] ?? 0) + dist.count
         totalQuestions += dist.count
       }
     }
 
     return this.COGNITIVE_LEVELS.map(level => ({
       level,
-      percentage: totalQuestions > 0 
-        ? Math.round((levelCounts[level] / totalQuestions) * 100) 
-        : 0,
+      percentage:
+        totalQuestions > 0 ? Math.round((levelCounts[level] / totalQuestions) * 100) : 0,
       questionCount: levelCounts[level],
     }))
   }
@@ -238,22 +257,19 @@ export class AutoMatrixGenerator {
     topics: TopicInput[],
     totalScore: number = 10,
     totalQuestions: number = 30,
-    variantCount: number = 3
+    variantCount: number = 3,
+    examType: string = "Kiểm tra giữa kỳ"
   ): GeneratedMatrix[] {
     const variants: GeneratedMatrix[] = []
 
     for (let i = 0; i < variantCount; i++) {
+      // ±20% weight randomization (was ±10%) for more differentiated variants
       const randomizedTopics = topics.map(topic => ({
         ...topic,
-        weight: (topic.weight || 1) * (0.9 + Math.random() * 0.2),
+        weight: (topic.weight || 1) * (0.8 + Math.random() * 0.4),
       }))
 
-      const variant = this.generateMatrix(
-        randomizedTopics,
-        totalScore,
-        totalQuestions
-      )
-
+      const variant = this.generateMatrix(randomizedTopics, totalScore, totalQuestions, examType)
       variants.push(variant)
     }
 
@@ -267,14 +283,14 @@ export class AutoMatrixGenerator {
   } {
     const actualRatios: Record<string, number> = {}
     const deviations: Record<string, number> = {}
-    
+
     const totalQuestions = matrix.totalQuestions
-    
+
     for (const dist of matrix.cognitiveLevelDistribution) {
       const actualRatio = dist.questionCount / totalQuestions
       const expectedRatio = this.COGNITIVE_RATIOS[dist.level as keyof typeof this.COGNITIVE_RATIOS]
-      const deviation = Math.abs(actualRatio - expectedRatio)
-      
+      const deviation = Math.abs(actualRatio - (expectedRatio ?? 0))
+
       actualRatios[dist.level] = Math.round(actualRatio * 100)
       deviations[dist.level] = Math.round(deviation * 100)
     }

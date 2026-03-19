@@ -57,6 +57,7 @@ export default function LatexDocumentEditorPage() {
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPdfUrlRef = useRef<string | null>(null);
+  const compileInFlightRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -170,13 +171,15 @@ export default function LatexDocumentEditorPage() {
 
   const handleCompile = async () => {
     if (!id) return;
+    if (compileInFlightRef.current) return;
+    compileInFlightRef.current = true;
     setCompiling(true);
     setCompileError(null);
     try {
       const res = await fetch("/api/latex-projects/compile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: id }),
+        body: JSON.stringify({ projectId: id, content }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -199,6 +202,7 @@ export default function LatexDocumentEditorPage() {
       toast.error("Lỗi khi gọi dịch vụ biên dịch");
     } finally {
       setCompiling(false);
+      compileInFlightRef.current = false;
     }
   };
 
@@ -304,10 +308,9 @@ export default function LatexDocumentEditorPage() {
     <div className="flex flex-col h-screen bg-gray-50">
       <header className="flex items-center gap-4 px-4 py-2 bg-white border-b shrink-0">
         <Button
-          variant="ghost"
+          className="gap-1 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
           size="sm"
           onClick={() => router.push("/teacher/latex-documents")}
-          className="gap-1"
         >
           <ArrowLeft className="h-4 w-4" />
           Danh sách
@@ -351,7 +354,7 @@ export default function LatexDocumentEditorPage() {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Lịch sử phiên bản">
+              <Button className="h-8 w-8 p-0 text-gray-700 hover:bg-gray-100 rounded-lg" size="sm" title="Lịch sử phiên bản">
                 <History className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -375,7 +378,7 @@ export default function LatexDocumentEditorPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           {isOwner && (
-            <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShareOpen(true)} title="Chia sẻ">
+            <Button className="gap-1 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg" size="sm" onClick={() => setShareOpen(true)} title="Chia sẻ">
               <Share2 className="h-4 w-4" />
               Chia sẻ
             </Button>
@@ -419,7 +422,7 @@ export default function LatexDocumentEditorPage() {
                     <li key={c.userId} className="flex items-center justify-between text-sm">
                       <span>{c.email || c.name || c.userId}</span>
                       <span className="text-muted-foreground">({c.role})</span>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => handleRemoveCollaborator(c.userId)}>
+                      <Button className="h-7 w-7 p-0 text-red-600" size="sm" onClick={() => handleRemoveCollaborator(c.userId)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </li>
@@ -429,7 +432,7 @@ export default function LatexDocumentEditorPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShareOpen(false)}>Đóng</Button>
+            <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => setShareOpen(false)}>Đóng</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -452,22 +455,20 @@ export default function LatexDocumentEditorPage() {
             <span className="text-sm font-medium">Xem PDF</span>
             <div className="flex items-center gap-1">
               <Button
-                variant="ghost"
+                className="h-8 w-8 p-0 text-gray-700 hover:bg-gray-100 rounded-lg"
                 size="sm"
                 disabled={!pdfBlobUrl}
                 onClick={handleDownloadPdf}
                 title="Tải xuống PDF"
-                className="h-8 w-8 p-0"
               >
                 <Download className="h-4 w-4" />
               </Button>
               <Button
-                variant="ghost"
+                className="h-8 w-8 p-0 text-gray-700 hover:bg-gray-100 rounded-lg"
                 size="sm"
                 disabled={!pdfBlobUrl}
                 onClick={handlePrintPdf}
                 title="In PDF"
-                className="h-8 w-8 p-0"
               >
                 <Printer className="h-4 w-4" />
               </Button>
@@ -483,7 +484,19 @@ export default function LatexDocumentEditorPage() {
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-hidden bg-gray-100">
-            {pdfBlobUrl ? (
+            {compileError ? (
+              <div className="h-full overflow-auto p-4">
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <p className="text-sm font-semibold text-red-700">Biên dịch thất bại (422)</p>
+                  <p className="mt-1 text-xs text-red-700">
+                    Đây là lỗi nội dung LaTeX hoặc package/font, không phải lỗi đăng nhập.
+                  </p>
+                </div>
+                <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700">
+                  {compileError}
+                </pre>
+              </div>
+            ) : pdfBlobUrl ? (
               <iframe
                 src={pdfBlobUrl}
                 title="PDF preview"

@@ -50,6 +50,17 @@ export default makeSource({
   contentDirPath: "./docs",
   documentTypes: [Doc],
   disableImportAliasWarning: true,
+  // Ignore markdown files in root directory and other non-docs folders
+  ignore: [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.claude/**",
+    "**/.contentlayer/**",
+    "**/desktop-current-app/**",
+    "**/*.mdx",
+    // Ignore root-level markdown files (only process docs/**/*.md)
+    "*.md",
+  ],
   mdx: {
     remarkPlugins: [remarkGfm],
     rehypePlugins: [

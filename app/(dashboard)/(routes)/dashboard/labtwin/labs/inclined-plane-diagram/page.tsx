@@ -264,7 +264,7 @@ export default function InclinedPlaneDiagram() {
     }
 
     // Height indicator
-    const height = ballDist * Math.sin(rad);
+    const heightVal = ballDist * Math.sin(rad);
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
@@ -273,11 +273,11 @@ export default function InclinedPlaneDiagram() {
     ctx.lineTo(ballX - 80, planeStartY);
     ctx.stroke();
     ctx.setLineDash([]);
-    
+
     ctx.fillStyle = '#475569';
     ctx.font = 'bold 14px Arial';
     ctx.textAlign = 'right';
-    ctx.fillText(`h = ${height.toFixed(1)}m`, ballX - 90, (ballY + planeStartY) / 2);
+    ctx.fillText(`h = ${heightVal.toFixed(1)}m`, ballX - 90, (ballY + planeStartY) / 2);
 
   }, [angle, showForces, showComponents, ballRadius, animationOffset]);
 

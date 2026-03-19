@@ -1,0 +1,110 @@
+[
+  {
+    "question": "Vật nào sau đây được coi là chất điểm?",
+    "options": {
+      "A": "Một xe máy đi từ TP Hồ Chí Minh ra Hà Nội.",
+      "B": "Một xe ô tô khách loại 45 chỗ ngồi chuyển động từ giữa sân trường ra cổng trường.",
+      "C": "Một bạn học sinh đi từ nhà ra cổng.",
+      "D": "Một bạn học sinh đi từ cuối lớp lên bục giảng."
+    },
+    "answer": "A",
+    "explanation": "A - đúng vì trường hợp này kích thước của xe máy rất nhỏ so với độ dài của quãng đường.\nB - sai vì kích thước của ô tô khách đáng kể so với độ dài quãng đường của nó.\nC - sai vì kích thước của bạn học sinh đáng kể so với quãng đường bạn học sinh di chuyển.\nD - sai vì kích thước của bạn học sinh đáng kể so với quãng đường bạn học sinh di chuyển.",
+    "correct_question": true
+  },
+  {
+    "question": "Trường hợp nào dưới đây không thể coi vật là chất điểm?",
+    "options": {
+      "A": "Viên đạn đang chuyển động trong không khí.",
+      "B": "Trái Đất trong chuyển động quay quanh Mặt Trời.",
+      "C": "Viên bi trong sự rơi từ tầng thứ năm của một tòa nhà xuống đất.",
+      "D": "Trái Đất trong chuyển động tự quay quanh trục của nó."
+    },
+    "answer": "D",
+    "explanation": "Trái Đất trong chuyển động tự quay quanh trục có kích thước đáng kể so với quỹ đạo chuyển động nên không được coi là một chất điểm.",
+    "correct_question": true
+  },
+  {
+    "question": "‘‘Lúc 15 giờ 30 phút hôm qua, xe chúng tôi đang chạy trên quốc lộ 5, cách Hải Dương 10 km”. Việc xác định vị trí của ô tô như trên còn thiếu yếu tố gì?",
+    "options": {
+      "A": "Vật làm mốc.",
+      "B": "Mốc thời gian.",
+      "C": "Thước đo và đồng hồ.",
+      "D": "Chiều dương trên đường đi."
+    },
+    "answer": "D",
+    "explanation": "D - chưa biết xe cách Hải Dương 10 km về hướng nào.",
+    "correct_question": true
+  },
+  {
+    "question": "Hệ quy chiếu bao gồm các yếu tố nào sau đây?",
+    "options": {
+      "A": "Hệ tọa độ kết hợp với mốc thời gian và đồng hồ đo thời gian.",
+      "B": "Hệ tọa độ, đồng hồ đo.",
+      "C": "Hệ tọa độ, thước đo.",
+      "D": "Mốc thời gian và đồng hồ."
+    },
+    "answer": "A",
+    "explanation": "Hệ tọa độ kết hợp với mốc thời gian và đồng hồ đo thời gian được gọi là hệ quy chiếu.",
+    "correct_question": true
+  },
+  {
+    "question": "Độ lớn của độ dịch chuyển và quãng đường đi được của một chuyển động",
+    "options": {
+      "A": "bằng nhau khi vật chuyển động thẳng, không đổi chiều.",
+      "B": "luôn luôn bằng nhau trong mọi trường hợp.",
+      "C": "quãng đường chính là độ lớn của độ dịch chuyển.",
+      "D": "khi vật chuyển động thẳng."
+    },
+    "answer": "A",
+    "explanation": "A - đúng.\nB, C, D - sai.",
+    "correct_question": true
+  },
+  {
+    "question": "Có 3 điểm nằm dọc theo trục Ox (có chiều từ A đến B) theo thứ tự là A là nhà, B là siêu thị và C là trạm xăng. Cho AB = 300 m, BC = 200 m. Một người xuất phát từ nhà qua siêu thị đến trạm xăng rồi quay lại siêu thị và dừng lại ở đây. Hỏi quãng đường và độ lớn độ dịch chuyển của người này trong cả quá trình chuyển động?",
+    "options": {
+      "A": "s = 500 m và d = 200 m.",
+      "B": "s = 700 m và d = 300 m.",
+      "C": "s = 300 m và d = 200 m.",
+      "D": "s = 200 m và d = 300 m."
+    },
+    "answer": "B",
+    "explanation": "Vận dụng khái niệm quãng đường và độ dịch chuyển ta có:\nQuãng đường đi được là s = 300 + 200 + 200 = 700 m.\nĐộ lớn độ dịch chuyển là d = 300 m.",
+    "correct_question": true
+  },
+  {
+    "question": "Có 3 điểm nằm dọc theo trục Ox (có chiều từ A đến B) theo thứ tự là A, B và C. Cho AB = 200 m, BC = 300 m. Một người xuất phát từ A qua B đến C. Hỏi quãng đường và độ lớn độ dịch chuyển của người này trong cả chuyến đi là bao nhiêu?",
+    "options": {
+      "A": "s = 500 m và d = 500 m.",
+      "B": "s = 200 m và d = 200 m.",
+      "C": "s = 500 m và d = 200 m.",
+      "D": "s = 200 m và d = 300 m."
+    },
+    "answer": "A",
+    "explanation": "Quãng đường đi được là s = AB + BC = 200 + 300 = 500 (m).\nĐộ lớn độ dịch chuyển là d = AB + BC = 200 + 300 = 500 (m).",
+    "correct_question": true
+  },
+  {
+    "question": "Một người lái ô tô đi thẳng 6 km theo hướng tây, sau đó rẽ trái đi thẳng theo hướng nam 4 km rồi quay sang hướng đông 3 km. Xác định quãng đường đi được và độ lớn độ dịch chuyển tổng hợp của ô tô.",
+    "options": {
+      "A": "s = 13 km, d = 5 km.",
+      "B": "s = 13 km, d = 13 km.",
+      "C": "s = 13 km, d = 3 km.",
+      "D": "s = 13 km, d = 9 km."
+    },
+    "answer": "A",
+    "explanation": "Quãng đường đi được s = AB + BC + CD = 6 + 4 + 3 = 13 km.\nTa có:\nBH = CD = 3 km; HD = BC = 4 km;\nAH = AB - BH = 6 - 3 = 3 km\nĐộ lớn của độ dịch chuyển tổng hợp: d=DA=AH²+DH²=3²+4²=5(km).",
+    "correct_question": true
+  },
+  {
+    "question": "Một người bơi ngang từ bờ bên này sang bờ bên kia của một dòng sông rộng 50 m có dòng chảy hướng từ Bắc đến Nam. Do nước sông chảy mạnh nên khi sang đên bờ bên kia thì người đó đã trôi xuôi theo dòng nước 50 m. Xác định độ lớn độ dịch chuyển của người đó.",
+    "options": {
+      "A": "50 m.",
+      "B": "50√2 m.",
+      "C": "100 m.",
+      "D": "không đủ dữ kiện để tính."
+    },
+    "answer": "B",
+    "explanation": "Bề rộng bờ sông là OA = 50 m.\nĐiểm dự định đến là A.\nThực tế do nước sông chảy mạnh nên bị đẩy xuống điểm C. Ta có AC = 50 m.\nĐộ lớn độ dịch chuyển là d=OC=OA²+AC²=50²+50²=50√2 (m).",
+    "correct_question": true
+  }
+]

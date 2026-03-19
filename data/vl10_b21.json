@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 21: Moment lực. Cân bằng của vật rắn",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "21",
+    "topic": "Moment lực. Cân bằng của vật rắn"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 21: Moment lực. Cân bằng của vật rắn có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về moment lực và điều kiện cân bằng của vật rắn.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Đơn vị của moment lực M = F.d là",
+      "options": [
+        "m/s.",
+        "N.m.",
+        "kg.m.",
+        "N.kg."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Đơn vị của momen lực là N.m. Do trong hệ SI, lực có đơn vị là N, cánh tay đòn có đơn vị là m."
+    },
+    {
+      "question_number": 2,
+      "question": "Cánh tay đòn của lực bằng",
+      "options": [
+        "khoảng cách từ trục quay đến điểm đặt của lực.",
+        "khoảng cách từ trục quay đến trọng tâm của vật.",
+        "khoảng cách từ trục quay đến giá của lực.",
+        "khoảng cách từ trong tâm của vật đến giá của trục quay."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Cánh tay đòn của lực bằng khoảng cách từ trục quay đến giá của lực"
+    },
+    {
+      "question_number": 3,
+      "question": "Lực có tác dụng làm cho vật rắn quay quanh một trục khi",
+      "options": [
+        "lực có giá nằm trong mặt phẳng vuông góc với trục quay và cắt trục quay",
+        "lực có giá song song với trục quay",
+        "lực có giá cắt trục quay",
+        "lực có giá nằm trong mặt phẳng vuông góc với trục quay và không cắt trục quay"
+      ],
+      "correctAnswer": "D",
+      "explanation": "Lực có tác dụng làm cho vật rắn quay quanh một trục khi lực có giá nằm trong mặt phẳng vuông góc với trục quay và không cắt trục quay"
+    },
+    {
+      "question_number": 4,
+      "question": "Khi một vật rắn quay quanh một trục cố định ở trạng thái cân bằng thì tổng moment lực tác dụng lên vật có giá trị",
+      "options": [
+        "bằng không.",
+        "luôn dương.",
+        "luôn âm.",
+        "khác không."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Khi một vật rắn quay quanh một trục cố định ở trạng thái cân bằng thì tổng moment lực tác dụng lên vật bằng không. Hay nói cách khác tổng các moment lực có xu hướng làm vật quay cùng chiều kim đồng hồ phải bằng tổng các moment lực có xu hướng làm vật quay ngược chiều kim đồng hồ."
+    },
+    {
+      "question_number": 5,
+      "question": "Một lực có độ lớn 10 N tác dụng lên một vật rắn quay quanh một trục cố định, biết khoảng cách từ giá của lực đến trục quay là 20 cm. Moment của lực tác dụng lên vật có giá trị là",
+      "options": [
+        "200 N.m.",
+        "200 N/m.",
+        "2 N.m.",
+        "2 N/m."
+      ],
+      "correctAnswer": "C",
+      "explanation": "M = F.d = 10 × 0,2 = 2 N.m"
+    },
+    {
+      "question_number": 6,
+      "question": "Thanh AB đồng chất, tiết diện đều, trọng lượng 6N, có đầu A tì vào sàn nhà nằm ngang, đầu B được giữ bởi một lò xo BC, độ cứng k = 250 N/m, theo phương thẳng đứng như hình 4. Độ dãn của lò xo khi thanh cân bằng là",
+      "options": [
+        "4,8 cm.",
+        "1,2 cm.",
+        "3,6 cm.",
+        "2,4 cm."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Sử dụng quy tắc momen lực, thanh cân bằng khi: MP→ = MFdh→ ⇔ P.d1 = Fdh.d2 ⇔ P.AB/2.cosα = Fdh.AB.cosα ⇒ Fdh = k.Δl = P/2 ⇒ Δl = P/(2k) = 6/(2×250) = 0,012m = 1,2cm"
+    },
+    {
+      "question_number": 7,
+      "question": "Một thanh cứng AB, dài 7 m, có khối lượng không đáng kể, có trục quay O, hai đầu chịu 2 lực F1 và F2. Cho F1 = 50 N; F2 = 200 N và OA = 2 m. Đặt vào thanh một lực F3 hướng lên và có độ lớn 300 N để cho thanh nằm ngang. Hỏi khoảng cách OC?",
+      "options": [
+        "1 m.",
+        "2 m.",
+        "3 m.",
+        "4 m."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Điều kiện để thanh cân bằng là: MF1→ + MF3→ = MF2→ ⇔ F1.OA + F3.OC = F2.OB ⇒ OC = (F2.OB − F1.OA)/F3 = (200×5 − 50×2)/300 = 3m"
+    },
+    {
+      "question_number": 8,
+      "question": "Một người nâng một tấm gỗ đồng chất, tiết diện đều, có trọng lượng P = 200 N. Người ấy tác dụng một lực F vào đầu trên của tấm gỗ (vuông góc với tấm gỗ) để giữ cho nó hợp với mặt đất một góc a = 30°. Độ lớn lực F bằng",
+      "options": [
+        "86,6 N.",
+        "100 N",
+        "50 N.",
+        "50,6 N."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Điều kiện để thanh cân bằng: MP→ = MF→ ⇔ P.l/2.cos30° = F.l ⇒ F = P/2.cos30° = 200/2.cos30° = 86,6N"
+    },
+    {
+      "question_number": 9,
+      "question": "Có đòn bẩy như hình vẽ. Đầu A của đòn bẩy treo một vật có trọng lượng 30 N. Chiều dài đòn bẩy dài 50 cm. Khoảng cách từ đầu A đến trục quay O là 20 cm. Vậy đầu B của đòn bẩy phải treo một vật khác có trọng lượng là bao nhiêu để đòn bẩy cân bằng như ban đầu?",
+      "options": [
+        "15 N.",
+        "20 N.",
+        "25 N.",
+        "30 N"
+      ],
+      "correctAnswer": "B",
+      "explanation": "Điều kiện để thanh cân bằng: MPA→ = MPB→ ⇔ PA.OA = PB.OB ⇒ PB = PA.OA/OB = 30×20/30 = 20N"
+    },
+    {
+      "question_number": 10,
+      "question": "Một người dùng búa để nhổ một chiếc đinh. Khi người ấy tác dụng một lực F = 100 N vào đầu búa thì đinh bắt đầu chuyển động. Lực cản của gỗ tác dụng vào đinh bằng",
+      "options": [
+        "500 N.",
+        "1000 N.",
+        "1500 N.",
+        "2000 N."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Để nhổ được cây đinh lên thì: Fc.d1 = F.d2 ⇒ Fc = F.d2/d1 = 100×20/2 = 1000N"
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 9: Chuyển động thẳng biến đổi đều",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton",
+      "Bài 15: Định luật 2 Newton",
+      "Bài 16: Định luật 3 Newton",
+      "Bài 17: Trọng lực và lực căng",
+      "Bài 18: Lực ma sát",
+      "Bài 19: Lực cản và lực nâng",
+      "Bài 20: Một số ví dụ về cách giải các bài toán thuộc phần động lực học"
+    ]
+  }
+}

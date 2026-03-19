@@ -26,7 +26,7 @@ export function NeumorphicCard({
     default: "neu-card",
     primary: "neu-card neu-shadow-primary",
     success: "neu-card neu-shadow-success",
-    gradient: "bg-gradient-to-br from-white via-gray-50 to-white shadow-lg",
+    gradient: "bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] shadow-[0_4px_16px_rgba(0,0,0,0.3)]",
   }
   
   const sizeStyles = {

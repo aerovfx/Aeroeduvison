@@ -6,7 +6,27 @@
 
 import { Redis } from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+let _redis: Redis | null = null;
+
+function getRedis(): Redis {
+  if (!_redis) {
+    _redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+    });
+    _redis.on('error', () => {}); // Suppress unhandled errors
+  }
+  return _redis;
+}
+
+const redis = new Proxy({} as Redis, {
+  get(_, prop) {
+    const r = getRedis();
+    const val = (r as any)[prop];
+    return typeof val === 'function' ? val.bind(r) : val;
+  },
+});
 
 interface CacheConfig {
   ttl: number;

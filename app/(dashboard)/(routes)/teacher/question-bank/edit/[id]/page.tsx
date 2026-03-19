@@ -25,17 +25,24 @@ const QUESTION_TYPES = [
   { value: "Tự luận", label: "Tự luận" },
 ]
 const DIFFICULTY_LEVELS = [
-  { value: "Dễ", label: "Dễ" },
-  { value: "Trung bình", label: "Trung bình" },
-  { value: "Khó", label: "Khó" },
+  { value: "EASY", label: "Dễ (NB)" },
+  { value: "MEDIUM", label: "Trung bình (TH)" },
+  { value: "HARD", label: "Khó (VD)" },
+  { value: "VERY_HARD", label: "Rất khó (VDC)" },
 ]
+
+const COGNITIVE_LEVEL_MAP: Record<string, string> = {
+  EASY: "Nhận biết",
+  MEDIUM: "Thông hiểu",
+  HARD: "Vận dụng",
+  VERY_HARD: "Vận dụng cao"
+}
+
 const COGNITIVE_LEVELS = [
-  { value: "Biết", label: "Biết" },
-  { value: "Hiểu", label: "Hiểu" },
+  { value: "Nhận biết", label: "Nhận biết" },
+  { value: "Thông hiểu", label: "Thông hiểu" },
   { value: "Vận dụng", label: "Vận dụng" },
-  { value: "Phân tích", label: "Phân tích" },
-  { value: "Đánh giá", label: "Đánh giá" },
-  { value: "Sáng tạo", label: "Sáng tạo" },
+  { value: "Vận dụng cao", label: "Vận dụng cao" },
 ]
 const SUBJECTS = ["Toán học", "Văn học", "Vật lý", "Hóa học", "Sinh học", "Lịch sử", "Địa lý", "Tiếng Anh", "GDCD", "Công nghệ"]
 const GRADES = ["Khối 6", "Khối 7", "Khối 8", "Khối 9", "Khối 10", "Khối 11", "Khối 12"]
@@ -47,9 +54,10 @@ const TYPE_DB_TO_UI: Record<string, string> = {
   ESSAY: "Tự luận",
 }
 const DIFFICULTY_DB_TO_UI: Record<string, string> = {
-  EASY: "Dễ",
-  MEDIUM: "Trung bình",
-  HARD: "Khó",
+  EASY: "EASY",
+  MEDIUM: "MEDIUM",
+  HARD: "HARD",
+  VERY_HARD: "VERY_HARD",
 }
 
 interface QuestionFormData {
@@ -72,8 +80,8 @@ const initialForm: QuestionFormData = {
   type: "",
   subject: "",
   grade: "",
-  difficulty: "Trung bình",
-  cognitiveLevel: "Hiểu",
+  difficulty: "EASY",
+  cognitiveLevel: "Nhận biết",
   topic: "",
   explanation: "",
   options: ["", "", "", ""],
@@ -274,7 +282,7 @@ export default function EditQuestionPage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/teacher/question-bank/list")}>
+        <Button className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg" size="icon" onClick={() => router.push("/teacher/question-bank/list")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -376,12 +384,12 @@ export default function EditQuestionPage() {
                     onChange={(e) => handleOptionChange(i, e.target.value)}
                     className="flex-1"
                   />
-                  <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(i)} disabled={formData.options.length <= 2}>
+                  <Button type="button" className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg" size="icon" onClick={() => removeOption(i)} disabled={formData.options.length <= 2}>
                     ×
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addOption}>+ Thêm phương án</Button>
+              <Button type="button" className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={addOption}>+ Thêm phương án</Button>
               <div className="space-y-2">
                 <Label>Đáp án đúng *</Label>
                 <Select value={formData.correctAnswer} onValueChange={(v) => handleInputChange("correctAnswer", v)}>
@@ -423,7 +431,7 @@ export default function EditQuestionPage() {
                   <Label>Đáp án / Hướng dẫn chấm *</Label>
                   <Button
                     type="button"
-                    variant="outline"
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                     size="sm"
                     onClick={handleGenerateAnswer}
                     disabled={generatingAnswer || !formData.content.trim()}
@@ -463,7 +471,7 @@ export default function EditQuestionPage() {
         </Card>
 
         <div className="flex items-center justify-end gap-4">
-          <Button variant="outline" onClick={() => router.push("/teacher/question-bank/list")} disabled={loading}>Hủy</Button>
+          <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => router.push("/teacher/question-bank/list")} disabled={loading}>Hủy</Button>
           <Button onClick={handleSubmit} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
             Cập nhật câu hỏi

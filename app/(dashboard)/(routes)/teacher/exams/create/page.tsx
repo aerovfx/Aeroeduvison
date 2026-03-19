@@ -158,7 +158,7 @@ export default function CreateExamPage() {
       <div className="max-w-2xl">
         <Button
           variant="ghost"
-          className="mb-4 -ml-2"
+          className="mb-4 -ml-2 text-gray-700 hover:bg-gray-100"
           onClick={() => router.push("/teacher/exams")}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

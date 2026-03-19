@@ -267,25 +267,23 @@ export default function MatrixReviewPage() {
                 </Button>
               )}
               {displayImageUrl && (
-                <Button variant="outline" onClick={handleDownload} className="gap-2">
+                <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2" onClick={handleDownload}>
                   <Download className="h-4 w-4" />
                   Tải xuống
                 </Button>
               )}
               {matrix.status === "Hoàn tất" && (
                 <Button
-                  variant="outline"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                   onClick={() => router.push(`/teacher/exam-matrix/${matrixId}/edit`)}
-                  className="gap-2"
                 >
                   <Edit className="h-4 w-4" />
                   Sửa
                 </Button>
               )}
               <Button
-                variant="outline"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                 onClick={() => router.push(`/teacher/exam-matrix/${matrixId}`)}
-                className="gap-2"
               >
                 <Eye className="h-4 w-4" />
                 Xem chi tiết
@@ -377,14 +375,14 @@ export default function MatrixReviewPage() {
                     </div>
                     <div className="flex gap-2">
                       {displayImageUrl && (
-                        <Button variant="outline" size="sm" onClick={handleDownload}>
+                        <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" size="sm" onClick={handleDownload}>
                           <Download className="h-4 w-4 mr-2" />
                           Tải xuống
                         </Button>
                       )}
                       {matrix.status === "Lỗi" && (
                         <Button
-                          variant="outline"
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                           size="sm"
                           onClick={handleReprocess}
                           disabled={processing}
@@ -425,29 +423,26 @@ export default function MatrixReviewPage() {
                             </Button>
                           )}
                           <Button
-                            variant="outline"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                             onClick={() => router.push(`/teacher/exam-matrix/${matrixId}`)}
                             size="lg"
-                            className="gap-2"
                           >
                             <Grid3x3 className="h-5 w-5" />
                             Xem ma trận chi tiết
                           </Button>
                           <Button
-                            variant="outline"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                             onClick={handleDownload}
                             size="lg"
-                            className="gap-2"
                           >
                             <Download className="h-5 w-5" />
                             Tải xuống file
                           </Button>
                           {matrix.status === "Hoàn tất" && (
                             <Button
-                              variant="outline"
+                              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                               onClick={() => router.push(`/teacher/exam-matrix/${matrixId}/edit`)}
                               size="lg"
-                              className="gap-2"
                             >
                               <Edit className="h-5 w-5" />
                               Chỉnh sửa ma trận
@@ -461,7 +456,7 @@ export default function MatrixReviewPage() {
                         <p className="text-sm text-gray-600 mb-4">
                           Không có hình ảnh để hiển thị
                         </p>
-                        <Button variant="outline" onClick={handleReprocess} disabled={processing}>
+                        <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={handleReprocess} disabled={processing}>
                           <RefreshCw className={cn("h-4 w-4 mr-2", processing && "animate-spin")} />
                           Số hóa lại
                         </Button>
@@ -615,7 +610,7 @@ export default function MatrixReviewPage() {
                               {topic.distributions.reduce((sum, d) => sum + d.count, 0)} câu
                             </span>
                             {topic.percentageScore && (
-                              <Badge variant="outline">
+                              <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                                 {topic.percentageScore.toFixed(1)}%
                               </Badge>
                             )}

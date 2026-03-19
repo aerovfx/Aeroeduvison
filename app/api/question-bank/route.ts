@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { db as prisma } from "@/lib/db"
+import {
+  QUESTION_TYPE_DISPLAY_TO_DB,
+  DIFFICULTY_DISPLAY_TO_DB,
+} from "@/lib/constants/question-bank"
 
 // GET /api/question-bank - List questions
 export async function GET(request: NextRequest) {
@@ -41,23 +45,18 @@ export async function GET(request: NextRequest) {
     }
     
     if (type && type !== "Tất cả loại") {
-      // Map UI type to database type
-      const typeMap: { [key: string]: string } = {
-        "TNKQ - Nhiều lựa chọn": "MCQ",
-        "TNKQ - Đúng/Sai": "TRUE_FALSE",
-        "TNKQ - Trả lời ngắn": "SHORT_ANSWER",
-        "Tự luận": "ESSAY",
-      }
-      where.questionType = typeMap[type] || type
+      where.questionType = QUESTION_TYPE_DISPLAY_TO_DB[type as keyof typeof QUESTION_TYPE_DISPLAY_TO_DB] || type
     }
     
     if (search) {
-      // Use OR for full-text search
+      // Full-text search across content, topic, subject, explanation, keywords, and tags
       where.OR = [
         { content: { contains: search, mode: "insensitive" } },
         { subject: { contains: search, mode: "insensitive" } },
         { topic: { contains: search, mode: "insensitive" } },
         { explanation: { contains: search, mode: "insensitive" } },
+        { keywords: { hasSome: [search] } },
+        { tags: { hasSome: [search] } },
       ]
     }
 
@@ -70,12 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (difficulty) {
-      const difficultyMap: { [key: string]: string } = {
-        "Dễ": "EASY",
-        "Trung bình": "MEDIUM",
-        "Khó": "HARD",
-      }
-      where.difficulty = difficultyMap[difficulty] || difficulty.toUpperCase()
+      where.difficulty = DIFFICULTY_DISPLAY_TO_DB[difficulty as keyof typeof DIFFICULTY_DISPLAY_TO_DB] || difficulty.toUpperCase()
     }
 
     // Use Prisma directly (QuestionBankManager requires Redis which may not be available)
@@ -192,28 +186,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Map UI type to database type
-    const typeMap: { [key: string]: string } = {
-      "TNKQ - Nhiều lựa chọn": "MCQ",
-      "TNKQ - Đúng/Sai": "TRUE_FALSE",
-      "TNKQ - Trả lời ngắn": "SHORT_ANSWER",
-      "Tự luận": "ESSAY",
-    }
-
-    const difficultyMap: { [key: string]: string } = {
-      "Dễ": "EASY",
-      "Trung bình": "MEDIUM",
-      "Khó": "HARD",
-    }
-
     // Create question directly with Prisma
     const question = await prisma.question.create({
       data: {
         topic: topic || subject,
         subject,
         grade,
-        questionType: typeMap[type] || type.toUpperCase(),
-        difficulty: difficultyMap[difficulty] || difficulty?.toUpperCase() || "MEDIUM",
+        questionType: QUESTION_TYPE_DISPLAY_TO_DB[type as keyof typeof QUESTION_TYPE_DISPLAY_TO_DB] || type.toUpperCase(),
+        difficulty: DIFFICULTY_DISPLAY_TO_DB[difficulty as keyof typeof DIFFICULTY_DISPLAY_TO_DB] || difficulty?.toUpperCase() || "MEDIUM",
         content,
         options: options || [],
         correctAnswer: correctAnswer?.toString(),

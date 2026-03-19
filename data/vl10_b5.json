@@ -1,0 +1,122 @@
+[
+  {
+    "question": "Người ta thường dùng quãng đường đi được trong cùng một đơn vị thời gian để xác định độ nhanh, chậm của chuyển động. Đại lượng này gọi là",
+    "options": {
+      "A": "Tốc độ trung bình.",
+      "B": "Tốc độ tức thời.",
+      "C": "Vận tốc trung bình.",
+      "D": "Vận tốc tức thời."
+    },
+    "answer": "A",
+    "explanation": "",
+    "correct_question": true
+  },
+  {
+    "question": "Công thức nào sau đây là công thức tính tốc độ trung bình?",
+    "options": {
+      "A": "v=st .",
+      "B": "v=ΔsΔt .",
+      "C": "v→ =d→t .",
+      "D": "Cả đáp án A và B."
+    },
+    "answer": "D",
+    "explanation": "A - đúng.\nB - đúng.\nC – sai vì đây là công thức vận tốc trung bình",
+    "correct_question": true
+  },
+  {
+    "question": "Tốc độ tức thời cho biết",
+    "options": {
+      "A": "Mức độ nhanh chậm của chuyển động tại một thời điểm xác định.",
+      "B": "Tốc độ tại một thời điểm xác định.",
+      "C": "Độ nhanh, chậm của một chuyển động theo một hướng xác định.",
+      "D": "Cả A và B."
+    },
+    "answer": "D",
+    "explanation": "A - đúng.\nB - đúng.\nC - sai vì đây là vận tốc tức thời",
+    "correct_question": true
+  },
+  {
+    "question": "Vận tốc trung bình là đại lượng được đo bởi:",
+    "options": {
+      "A": "Thương số của quãng đường đi được và khoảng thời gian đi hết quãng đường.",
+      "B": "Thương số của độ dịch chuyển và thời gian dịch chuyển.",
+      "C": "Tích của độ dịch chuyển và thời gian dịch chuyển.",
+      "D": "Tích của quãng đường đi được và thời gian dịch chuyển."
+    },
+    "answer": "B",
+    "explanation": "A – sai vì đây là công thức tốc độ trung bình.\nB - đúng vì v→ =d→t .\nC - sai.\nD - sai.",
+    "correct_question": true
+  },
+  {
+    "question": "Hai xe ô tô chạy cùng chiều trên một đoạn đường thẳng với vận tốc 100 km/h và 80 km/h. Tính vận tốc của xe thứ nhất so với xe thứ 2. Chọn chiều dương là chiều chuyển động của hai xe.",
+    "options": {
+      "A": "20 km/h.",
+      "B": "180 km/h.",
+      "C": "- 20 km/h.",
+      "D": "- 180 km/h."
+    },
+    "answer": "A",
+    "explanation": "Gọi v1,3 : là vận tốc của xe thứ nhất so với đường.\nv1,2: là vận tốc của xe thứ nhất so với xe thứ hai.\n: là vận tốc của xe thứ hai so với đường.\nv→1,3=v→1,2+v→2,3⇒v1,2→=v1,3→−v2,3→\nMà v→1,3↑↑v→2,3 và cùng chiều dương đã chọn, suy ra:\nv1,2=v1,3−v2,3=100−80=20 (km/h).",
+    "correct_question": true
+  },
+  {
+    "question": "Hai xe ô tô chạy ngược chiều trên một đoạn đường thẳng với vận tốc của xe thứ nhất là 100 km/h và xe thứ hai là 80 km/h. Tính vận tốc của xe thứ nhất so với xe thứ 2. Chọn chiều dương là chiều chuyển động của xe thứ nhất.",
+    "options": {
+      "A": "20 km/h.",
+      "B": "180 km/h.",
+      "C": "-20 km/h.",
+      "D": "-180 km/h."
+    },
+    "answer": "B",
+    "explanation": "Gọi v1,3 : là vận tốc của xe thứ nhất so với đường.\nv1,2 : là vận tốc của xe thứ nhất so với xe thứ hai.\nv2,3 : là vận tốc của xe thứ hai so với đường.\nv→1,3=v→1,2+v→2,3⇒v1,2→=v1,3→−v2,3→\nDo hai xe chạy ngược chiều nên v→1,3↑↓v→2,3 :\nv1,2=100−−80=180 (km/h).",
+    "correct_question": true
+  },
+  {
+    "question": "Hai bên sông AB cách nhau 70 km, một ca nô khi xuôi dòng AB sớm hơn 48 phút so với ca nô khi ngược dòng AB. Vận tốc của ca nô trong nước yên lặng là 30 km/h. Tính vận tốc của dòng nước .",
+    "options": {
+      "A": "5 km/h.",
+      "B": "10 km/h.",
+      "C": "12 km/h.",
+      "D": "100 km/h."
+    },
+    "answer": "A",
+    "explanation": "Đổi 48 phút = 0,8 giờ.\nGọi v1,3 : là vận tốc của ca nô so với bờ.\nv1,2 : là vận tốc của ca nô so với mặt nước.\nv2,3 : là vận tốc của nước chảy đối với bờ.\nCông thức cộng vận tốc: v→1,3=v→1,2+v→2,3\nKhi xuôi dòng: v1,3=v1,2+v2,3\nKhi ngược dòng: v1,3=v1,2−v2,3\nTa có: tn−tx=0,8⇒ABv1,2−v2,3−ABv1,2+v2,3=0,8\n⇔70/30−v2,3−70/30+v2,3=0,8.\n⇔v2,3=5(km/h)",
+    "correct_question": true
+  },
+  {
+    "question": "Một ca nô xuôi dòng từ A đến B rồi ngược dòng quay về A. Cho biết vận tốc của ca nô so với nước là 15 km/h, vận tốc của nước so với bờ là 3 km/h. Biết AB = 18 km. Tính thời gian chuyển động của ca nô.",
+    "options": {
+      "A": "2 giờ.",
+      "B": "2,5 giờ.",
+      "C": "3 giờ.",
+      "D": "4 giờ."
+    },
+    "answer": "B",
+    "explanation": "Công thức cộng vận tốc: v→1,3=v→1,2+v→2,3\nKhi xuôi dòng: v1,3x=v1,2+v2,3\nKhi ngược dòng: v1,3n=v1,2−v2,3\nThay số:\nThời gian xuôi dòng: tx=s/v1,3x=18/(15+3)=1 ( giờ).\nThời gian ngược dòng: tn=s/v1,3n=18/(15−3)=1,5 ( giờ ).\nt=tx+ tn=2,5 giờ.",
+    "correct_question": true
+  },
+  {
+    "question": "Một dòng sông rộng 100 m và dòng nước chảy với vận tốc 3 m/s so với bờ theo hướng Tây - Đông. Một chiếc thuyền đi sang ngang sông với vận tốc 4 m/s so với dòng nước. Tính độ lớn vận tốc của thuyền so với dòng sông.",
+    "options": {
+      "A": "5 m/s.",
+      "B": "7 m/s.",
+      "C": "1 m/s.",
+      "D": "2 m/s."
+    },
+    "answer": "A",
+    "explanation": "Gọi v1,3 : là vận tốc của ca nô so với bờ.\nv1,2 : là vận tốc của ca nô so với mặt nước.\nv2,3 : là vận tốc của nước chảy đối với bờ.\nTa có: v→1,3=v→1,2+v→2,3\nMà v→1,2⊥v→2,3 nên v1,3=v1,2²+v2,3²=4²+3²=5 (m/s).",
+    "correct_question": true
+  },
+  {
+    "question": "Một dòng sông rộng 100 m và dòng nước chảy với vận tốc 3 m/s so với bờ theo hướng Tây- Đông. Một chiếc thuyền đi sang ngang sông với vận tốc 4 m/s so với dòng nước. Tính quãng đường mà thuyền đã chuyển động được khi sang bên kia sông.",
+    "options": {
+      "A": "125 m.",
+      "B": "100 m .",
+      "C": "50 m.",
+      "D": "150 m."
+    },
+    "answer": "A",
+    "explanation": "Gọi v1,3 : là vận tốc của ca nô so với bờ.\nv1,2 : là vận tốc của ca nô so với mặt nước.\nv2,3 : là vận tốc của nước chảy đối với bờ.\nTa có: v→1,3=v→1,2+v→2,3\nMà v→1,2⊥v→2,3 nên v1,3=v1,2²+v2,3²=4²+3²=5 (m/s).\nThời gian thuyền đi từ A đến D với vận tốc v1,3 bằng thời gian một vật đi từ A đến B với vận tốc v1,2 nên t = 100/4=25 (s).\nSuy ra : s = AD = 25.5 = 125 (m).",
+    "correct_question": true
+  }
+]

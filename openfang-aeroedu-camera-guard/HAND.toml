@@ -1,0 +1,22 @@
+id = "aeroedu_camera_guard"
+name = "Aeroedu Camera Guard"
+version = "0.1.0"
+description = "Theo dõi camera lớp học và bản ghi để phát hiện offline/lỗi, tạo báo cáo sức khỏe hệ thống camera cho admin/teacher."
+
+[schedule]
+# Chạy mỗi giờ; có thể điều chỉnh qua config OpenFang
+cron = "0 * * * *"
+
+[tools.http]
+base_url = "http://localhost:3000"
+timeout_sec = 20
+
+[inputs]
+# Có thể thu hẹp phạm vi về sau (school_id, campus_id...)
+
+[outputs]
+dashboard_section = "Aeroedu / Camera"
+stores_markdown_reports = true
+webhook_enabled = true
+webhook_url_env = "AEROEDU_AGENT_WEBHOOK_URL"
+

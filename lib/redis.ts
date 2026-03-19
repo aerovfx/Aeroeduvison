@@ -32,6 +32,8 @@ export function getRedisClient(): Redis | null {
         enableOfflineQueue: false,
         connectTimeout: 5000,
         commandTimeout: 3000,
+        // Suppress error events during build/SSR
+        showFriendlyErrorStack: true,
       });
 
       redisClient.on('connect', () => {
@@ -39,7 +41,10 @@ export function getRedisClient(): Redis | null {
       });
 
       redisClient.on('error', (error) => {
-        apiLogger.error('Redis client error', { metadata: { error: error.message } });
+        // Silently handle errors during build
+        if (process.env.NEXT_PHASE !== 'phase-production-build') {
+          apiLogger.error('Redis client error', { metadata: { error: error.message } });
+        }
       });
 
       redisClient.on('close', () => {
@@ -72,6 +77,7 @@ export function getRedisSubscriber(): Redis | null {
         enableOfflineQueue: false,
         connectTimeout: 5000,
         commandTimeout: 3000,
+        showFriendlyErrorStack: true,
       });
 
       redisSubscriber.on('connect', () => {
@@ -79,7 +85,10 @@ export function getRedisSubscriber(): Redis | null {
       });
 
       redisSubscriber.on('error', (error) => {
-        apiLogger.error('Redis subscriber error', { metadata: { error: error.message } });
+        // Silently handle errors during build
+        if (process.env.NEXT_PHASE !== 'phase-production-build') {
+          apiLogger.error('Redis subscriber error', { metadata: { error: error.message } });
+        }
       });
     } catch (error) {
       apiLogger.error('Failed to create Redis subscriber', { metadata: { error: (error as Error).message } });

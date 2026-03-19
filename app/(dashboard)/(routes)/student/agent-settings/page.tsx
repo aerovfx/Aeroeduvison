@@ -1,9 +1,9 @@
 "use client";
 
-import "@/styles/neumorphic-theme.css";
 import { useState, useEffect } from "react";
-import { Settings, Brain, Calendar, BarChart3, FileQuestion, Briefcase, Save, Loader2 } from "lucide-react";
+import { Settings, Brain, Calendar, Save, Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
+
 const DEFAULT_AI_TUTOR = {
   explanationDepth: "medium",
   difficulty: "medium",
@@ -13,6 +13,10 @@ const DEFAULT_AI_TUTOR = {
   temperature: 0.7,
   maxTokens: 2048,
 } as const;
+
+const selectStyle = "w-full bg-black/25 backdrop-blur-sm border border-white/[0.06] rounded-xl px-3.5 py-3 text-sm text-white/85 focus:outline-none focus:border-[hsl(245,85%,65%)]/40 focus:shadow-[0_0_15px_rgba(120,100,255,0.1)] transition-all";
+const inputStyle = selectStyle;
+const labelStyle = "block text-xs font-semibold text-white/40 mb-2 uppercase tracking-wider";
 
 export default function StudentAgentSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -64,10 +68,7 @@ export default function StudentAgentSettingsPage() {
       const res = await fetch("/api/student/agent-settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          "ai-tutor": aiTutor,
-          "study-planner": studyPlanner,
-        }),
+        body: JSON.stringify({ "ai-tutor": aiTutor, "study-planner": studyPlanner }),
       });
       if (!res.ok) throw new Error("Save failed");
       const data = await res.json();
@@ -82,151 +83,58 @@ export default function StudentAgentSettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]" style={{ color: "var(--neu-text-secondary)" }}>
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-white/30" />
       </div>
     );
   }
 
   return (
-    <div
-      className="min-h-full"
-      style={{
-        background: "linear-gradient(135deg, var(--neu-bg-gradient-start) 0%, var(--neu-bg-gradient-mid) 50%, var(--neu-bg-gradient-end) 100%)",
-      }}
-    >
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div
-          className="flex items-center gap-4 mb-8"
-          style={{
-            background: "var(--neu-card-bg)",
-            borderRadius: "24px",
-            padding: "24px",
-            boxShadow: "10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light)",
-            border: "1px solid var(--neu-border)",
-          }}
-        >
-          <div
-            style={{
-              width: "56px",
-              height: "56px",
-              background: "linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)",
-              borderRadius: "16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "6px 6px 12px rgba(102, 126, 234, 0.4), -4px -4px 8px var(--neu-shadow-light)",
-            }}
-          >
-            <Settings className="h-7 w-7" style={{ color: "var(--neu-text-inverse)" }} />
+    <div className="min-h-full">
+      <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 bg-white/[0.02] backdrop-blur-xl rounded-2xl p-6 border border-white/[0.06]">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center shadow-[0_0_20px_rgba(120,100,255,0.3)]">
+            <Settings className="h-7 w-7 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--neu-text-primary)" }}>
-              Cài đặt Agents
-            </h1>
-            <p className="text-sm mt-1" style={{ color: "var(--neu-text-secondary)" }}>
-              Tùy chỉnh Trợ lý học tập, Kế hoạch học và các agent khác
-            </p>
+            <h1 className="text-xl font-bold text-white/90">Cài đặt Agents</h1>
+            <p className="text-sm text-white/40 mt-0.5">Tùy chỉnh Trợ lý học tập, Kế hoạch học và các agent khác</p>
           </div>
         </div>
 
-        {/* AI Tutor - Trợ lý học tập */}
-        <section
-          className="mb-8"
-          style={{
-            background: "var(--neu-card-bg)",
-            borderRadius: "24px",
-            padding: "28px",
-            boxShadow: "10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light)",
-            border: "1px solid var(--neu-border)",
-          }}
-        >
+        {/* AI Tutor */}
+        <section className="bg-white/[0.02] backdrop-blur-xl rounded-2xl p-7 border border-white/[0.06]">
           <div className="flex items-center gap-3 mb-6">
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                background: "linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)",
-                borderRadius: "14px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Brain className="h-5 w-5" style={{ color: "var(--neu-text-inverse)" }} />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center shadow-[0_0_16px_rgba(120,100,255,0.25)]">
+              <Brain className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold" style={{ color: "var(--neu-text-primary)" }}>
-                Gia Sư AI (Trợ lý học tập)
-              </h2>
-              <p className="text-sm" style={{ color: "var(--neu-text-secondary)" }}>
-                Độ sâu giải thích, độ khó, phong cách học
-              </p>
+              <h2 className="text-base font-bold text-white/90">Gia Sư AI (Trợ lý học tập)</h2>
+              <p className="text-xs text-white/40">Độ sâu giải thích, độ khó, phong cách học</p>
             </div>
           </div>
 
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Độ sâu giải thích
-              </label>
-              <select
-                value={aiTutor.explanationDepth}
-                onChange={(e) => setAiTutor((p) => ({ ...p, explanationDepth: e.target.value as typeof p.explanationDepth }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
-              >
+              <label className={labelStyle}>Độ sâu giải thích</label>
+              <select value={aiTutor.explanationDepth} onChange={(e) => setAiTutor((p) => ({ ...p, explanationDepth: e.target.value as typeof p.explanationDepth }))} className={selectStyle}>
                 <option value="short">Ngắn gọn</option>
                 <option value="medium">Vừa phải</option>
                 <option value="detailed">Chi tiết</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Độ khó mặc định
-              </label>
-              <select
-                value={aiTutor.difficulty}
-                onChange={(e) => setAiTutor((p) => ({ ...p, difficulty: e.target.value as typeof p.difficulty }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
-              >
+              <label className={labelStyle}>Độ khó mặc định</label>
+              <select value={aiTutor.difficulty} onChange={(e) => setAiTutor((p) => ({ ...p, difficulty: e.target.value as typeof p.difficulty }))} className={selectStyle}>
                 <option value="easy">Dễ</option>
                 <option value="medium">Trung bình</option>
                 <option value="hard">Khó</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Phong cách học
-              </label>
-              <select
-                value={aiTutor.learningStyle}
-                onChange={(e) => setAiTutor((p) => ({ ...p, learningStyle: e.target.value as typeof p.learningStyle }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
-              >
+              <label className={labelStyle}>Phong cách học</label>
+              <select value={aiTutor.learningStyle} onChange={(e) => setAiTutor((p) => ({ ...p, learningStyle: e.target.value as typeof p.learningStyle }))} className={selectStyle}>
                 <option value="visual">Trực quan</option>
                 <option value="auditory">Nghe</option>
                 <option value="kinesthetic">Thực hành</option>
@@ -234,22 +142,8 @@ export default function StudentAgentSettingsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Môn mặc định
-              </label>
-              <select
-                value={aiTutor.defaultSubject}
-                onChange={(e) => setAiTutor((p) => ({ ...p, defaultSubject: e.target.value }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
-              >
+              <label className={labelStyle}>Môn mặc định</label>
+              <select value={aiTutor.defaultSubject} onChange={(e) => setAiTutor((p) => ({ ...p, defaultSubject: e.target.value }))} className={selectStyle}>
                 <option value="Toán">Toán</option>
                 <option value="Lý">Vật Lý</option>
                 <option value="Hóa">Hóa Học</option>
@@ -258,178 +152,102 @@ export default function StudentAgentSettingsPage() {
                 <option value="Anh">Tiếng Anh</option>
               </select>
             </div>
-            <div className="sm:col-span-2 flex items-center gap-2">
+            <div className="sm:col-span-2 flex items-center gap-2.5 py-1">
               <input
                 type="checkbox"
                 id="socratic"
                 checked={aiTutor.useSocraticMethod}
                 onChange={(e) => setAiTutor((p) => ({ ...p, useSocraticMethod: e.target.checked }))}
-                style={{ accentColor: "var(--neu-accent-primary)" }}
+                className="accent-[hsl(245,85%,65%)] w-4 h-4"
               />
-              <label htmlFor="socratic" className="text-sm font-medium" style={{ color: "var(--neu-text-primary)" }}>
+              <label htmlFor="socratic" className="text-sm text-white/70">
                 Dùng phương pháp Socratic (hỏi gợi mở thay vì đưa đáp án ngay)
               </label>
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Nhiệt độ AI (0–1): {aiTutor.temperature}
-              </label>
+              <label className={labelStyle}>Nhiệt độ AI (0-1): {aiTutor.temperature}</label>
               <input
                 type="range"
-                min={0}
-                max={1}
-                step={0.1}
+                min={0} max={1} step={0.1}
                 value={aiTutor.temperature}
                 onChange={(e) => setAiTutor((p) => ({ ...p, temperature: parseFloat(e.target.value) }))}
-                style={{ width: "100%", accentColor: "var(--neu-accent-primary)" }}
+                className="w-full accent-[hsl(245,85%,65%)]"
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Số token tối đa: {aiTutor.maxTokens}
-              </label>
+              <label className={labelStyle}>Số token tối đa: {aiTutor.maxTokens}</label>
               <input
                 type="number"
-                min={512}
-                max={4096}
-                step={256}
+                min={512} max={4096} step={256}
                 value={aiTutor.maxTokens}
                 onChange={(e) => setAiTutor((p) => ({ ...p, maxTokens: parseInt(e.target.value, 10) || 2048 }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
+                className={inputStyle}
               />
             </div>
           </div>
         </section>
 
         {/* Study Planner */}
-        <section
-          className="mb-8"
-          style={{
-            background: "var(--neu-card-bg)",
-            borderRadius: "24px",
-            padding: "28px",
-            boxShadow: "10px 10px 20px var(--neu-shadow-dark), -10px -10px 20px var(--neu-shadow-light)",
-            border: "1px solid var(--neu-border)",
-          }}
-        >
+        <section className="bg-white/[0.02] backdrop-blur-xl rounded-2xl p-7 border border-white/[0.06]">
           <div className="flex items-center gap-3 mb-6">
-            <div
-              style={{
-                width: "44px",
-                height: "44px",
-                background: "linear-gradient(135deg, var(--neu-accent-success) 0%, #38a169 100%)",
-                borderRadius: "14px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Calendar className="h-5 w-5" style={{ color: "white" }} />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[hsl(175,80%,45%)] to-[hsl(160,70%,40%)] flex items-center justify-center shadow-[0_0_16px_rgba(0,210,180,0.25)]">
+              <Calendar className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold" style={{ color: "var(--neu-text-primary)" }}>
-                Trợ lý Kế hoạch học (Study Planner)
-              </h2>
-              <p className="text-sm" style={{ color: "var(--neu-text-secondary)" }}>
-                Giờ nhắc học, mục tiêu mỗi ngày
-              </p>
+              <h2 className="text-base font-bold text-white/90">Trợ lý Kế hoạch học (Study Planner)</h2>
+              <p className="text-xs text-white/40">Giờ nhắc học, mục tiêu mỗi ngày</p>
             </div>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Giờ nhắc học mỗi ngày
-              </label>
+              <label className={labelStyle}>Giờ nhắc học mỗi ngày</label>
               <input
                 type="time"
                 value={studyPlanner.reminderTime}
                 onChange={(e) => setStudyPlanner((p) => ({ ...p, reminderTime: e.target.value }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
+                className={inputStyle}
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Mục tiêu học mỗi ngày (phút)
-              </label>
+              <label className={labelStyle}>Mục tiêu học mỗi ngày (phút)</label>
               <input
                 type="number"
-                min={30}
-                max={480}
-                step={15}
+                min={30} max={480} step={15}
                 value={studyPlanner.dailyGoalMinutes}
                 onChange={(e) => setStudyPlanner((p) => ({ ...p, dailyGoalMinutes: parseInt(e.target.value, 10) || 120 }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
+                className={inputStyle}
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold mb-2" style={{ color: "var(--neu-text-secondary)" }}>
-                Nhắc trước giờ học (phút)
-              </label>
+              <label className={labelStyle}>Nhắc trước giờ học (phút)</label>
               <input
                 type="number"
-                min={5}
-                max={120}
+                min={5} max={120}
                 value={studyPlanner.reminderBeforeMinutes}
                 onChange={(e) => setStudyPlanner((p) => ({ ...p, reminderBeforeMinutes: parseInt(e.target.value, 10) || 30 }))}
-                style={{
-                  width: "100%",
-                  background: "var(--neu-input-bg)",
-                  border: "1px solid var(--neu-border)",
-                  borderRadius: "12px",
-                  padding: "12px 14px",
-                  color: "var(--neu-text-primary)",
-                  boxShadow: "inset 4px 4px 8px var(--neu-shadow-inset-dark), inset -4px -4px 8px var(--neu-shadow-inset-light)",
-                }}
+                className={inputStyle}
               />
             </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
+            <div className="flex items-center gap-2.5 sm:col-span-2 py-1">
               <input
                 type="checkbox"
                 id="weekdays"
                 checked={studyPlanner.weekdaysOnly}
                 onChange={(e) => setStudyPlanner((p) => ({ ...p, weekdaysOnly: e.target.checked }))}
-                style={{ accentColor: "var(--neu-accent-primary)" }}
+                className="accent-[hsl(245,85%,65%)] w-4 h-4"
               />
-              <label htmlFor="weekdays" className="text-sm font-medium" style={{ color: "var(--neu-text-primary)" }}>
-                Chỉ nhắc vào ngày thường (thứ 2 – thứ 6)
+              <label htmlFor="weekdays" className="text-sm text-white/70">
+                Chỉ nhắc vào ngày thường (thứ 2 - thứ 6)
               </label>
             </div>
           </div>
         </section>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end">
           <button
             onClick={save}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60"
-            style={{
-              background: "linear-gradient(135deg, var(--neu-accent-primary) 0%, var(--neu-accent-secondary) 100%)",
-              boxShadow: "8px 8px 16px rgba(102, 126, 234, 0.4), -6px -6px 12px var(--neu-shadow-light)",
-            }}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all disabled:opacity-60 bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] shadow-[0_0_20px_rgba(120,100,255,0.2)] hover:shadow-[0_0_30px_rgba(120,100,255,0.35)] hover:brightness-110"
           >
             {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
             Lưu cài đặt

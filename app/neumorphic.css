@@ -1,286 +1,287 @@
 /**
- * Neumorphic Gradient Minimalism Design System
- * 
- * Combines soft neumorphic shadows with subtle gradients
- * for a modern, minimal, and elegant UI.
+ * AI Native Design System
+ *
+ * Dark-first glassmorphism with ambient AI glow effects.
+ * Designed for an intelligent, conversational learning platform.
  */
 
 :root {
   /* ============================================
-   * BASE COLORS
+   * AI NATIVE COLOR PALETTE — DARK FIRST
    * ============================================ */
-  --background: 210 40% 98%;
-  --foreground: 222 47% 11%;
-  
-  /* Card backgrounds with subtle gradients */
-  --card: 210 40% 98%;
-  --card-foreground: 222 47% 11%;
-  
-  /* Popover backgrounds */
-  --popover: 210 40% 98%;
-  --popover-foreground: 222 47% 11%;
-  
-  /* Primary - Soft Blue Gradient */
-  --primary: 221 83% 53%;
-  --primary-light: 221 83% 63%;
-  --primary-dark: 221 83% 43%;
-  --primary-foreground: 210 40% 98%;
-  
-  /* Secondary - Soft Purple Gradient */
-  --secondary: 262 83% 58%;
-  --secondary-light: 262 83% 68%;
-  --secondary-dark: 262 83% 48%;
-  --secondary-foreground: 210 40% 98%;
-  
-  /* Accent - Soft Teal Gradient */
-  --accent: 174 72% 56%;
-  --accent-light: 174 72% 66%;
-  --accent-dark: 174 72% 46%;
-  --accent-foreground: 210 40% 98%;
-  
+  --background: 225 15% 6%;
+  --foreground: 210 20% 92%;
+
+  --card: 225 15% 9%;
+  --card-foreground: 210 20% 92%;
+
+  --popover: 225 15% 10%;
+  --popover-foreground: 210 20% 92%;
+
+  /* Primary — Electric Indigo */
+  --primary: 245 85% 65%;
+  --primary-light: 245 85% 75%;
+  --primary-dark: 245 85% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Secondary — Neon Violet */
+  --secondary: 280 75% 60%;
+  --secondary-light: 280 75% 70%;
+  --secondary-dark: 280 75% 45%;
+  --secondary-foreground: 0 0% 100%;
+
+  /* Accent — Cyber Teal */
+  --accent: 175 80% 50%;
+  --accent-light: 175 80% 65%;
+  --accent-dark: 175 80% 38%;
+  --accent-foreground: 225 15% 6%;
+
   /* Muted */
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  
+  --muted: 225 12% 14%;
+  --muted-foreground: 215 15% 55%;
+
   /* Destructive */
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  
+  --destructive: 0 75% 55%;
+  --destructive-foreground: 0 0% 100%;
+
   /* Success */
-  --success: 142 76% 36%;
-  --success-light: 142 76% 46%;
-  --success-dark: 142 76% 26%;
-  
+  --success: 155 75% 45%;
+  --success-light: 155 75% 55%;
+  --success-dark: 155 75% 35%;
+
   /* Warning */
-  --warning: 38 92% 50%;
-  --warning-light: 38 92% 60%;
-  --warning-dark: 38 92% 40%;
-  
+  --warning: 40 90% 55%;
+  --warning-light: 40 90% 65%;
+  --warning-dark: 40 90% 42%;
+
   /* Info */
-  --info: 199 89% 48%;
-  --info-light: 199 89% 58%;
-  --info-dark: 199 89% 38%;
-  
+  --info: 205 85% 55%;
+  --info-light: 205 85% 65%;
+  --info-dark: 205 85% 42%;
+
   /* Border */
-  --border: 214 32% 91%;
-  --border-light: 214 32% 95%;
-  
+  --border: 225 12% 16%;
+  --border-light: 225 12% 20%;
+
   /* Input */
-  --input: 214 32% 91%;
-  --input-background: 210 40% 98%;
-  
+  --input: 225 12% 16%;
+  --input-background: 225 15% 8%;
+
   /* Ring */
-  --ring: 221 83% 53%;
-  
+  --ring: 245 85% 65%;
+
   /* Radius */
-  --radius: 1rem;
+  --radius: 0.875rem;
   --radius-sm: 0.5rem;
-  --radius-lg: 1.5rem;
-  --radius-xl: 2rem;
-  
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.75rem;
+
   /* ============================================
-   * NEUMORPHIC SHADOWS
+   * GLASSMORPHISM
    * ============================================ */
-  
-  /* Light source: top-left */
-  --shadow-light-x: -6px;
-  --shadow-light-y: -6px;
-  --shadow-dark-x: 6px;
-  --shadow-dark-y: 6px;
-  --shadow-blur: 12px;
-  --shadow-spread: 0px;
-  
-  /* Shadow colors */
-  --shadow-light: rgba(255, 255, 255, 0.8);
-  --shadow-dark: rgba(166, 180, 200, 0.4);
-  --shadow-colored: rgba(37, 99, 235, 0.1);
-  
-  /* Shadow presets */
-  --neu-shadow-sm: 
-    var(--shadow-light-x) var(--shadow-light-y) var(--shadow-blur) var(--shadow-spread) var(--shadow-light),
-    var(--shadow-dark-x) var(--shadow-dark-y) var(--shadow-blur) var(--shadow-spread) var(--shadow-dark);
-  
-  --neu-shadow: 
-    -8px -8px 16px var(--shadow-light),
-    8px 8px 16px var(--shadow-dark);
-  
-  --neu-shadow-lg: 
-    -12px -12px 24px var(--shadow-light),
-    12px 12px 24px var(--shadow-dark);
-  
-  --neu-shadow-xl: 
-    -16px -16px 32px var(--shadow-light),
-    16px 16px 32px var(--shadow-dark);
-  
-  --neu-shadow-inner: 
-    inset -6px -6px 12px var(--shadow-light),
-    inset 6px 6px 12px var(--shadow-dark);
-  
-  --neu-shadow-pressed: 
-    inset -4px -4px 8px var(--shadow-light),
-    inset 4px 4px 8px var(--shadow-dark);
-  
-  /* Colored shadows */
-  --neu-shadow-primary: 
-    -8px -8px 16px var(--shadow-light),
-    8px 8px 16px var(--shadow-dark),
-    8px 8px 24px var(--shadow-colored);
-  
-  --neu-shadow-success: 
-    -8px -8px 16px var(--shadow-light),
-    8px 8px 16px var(--shadow-dark),
-    8px 8px 24px rgba(34, 197, 94, 0.15);
-  
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-bg-hover: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-border-hover: rgba(255, 255, 255, 0.12);
+  --glass-blur: 20px;
+  --glass-blur-lg: 40px;
+
+  /* ============================================
+   * AI GLOW EFFECTS
+   * ============================================ */
+  --glow-primary: 0 0 20px rgba(120, 100, 255, 0.15), 0 0 60px rgba(120, 100, 255, 0.05);
+  --glow-primary-intense: 0 0 20px rgba(120, 100, 255, 0.3), 0 0 60px rgba(120, 100, 255, 0.12);
+  --glow-accent: 0 0 20px rgba(0, 210, 190, 0.15), 0 0 60px rgba(0, 210, 190, 0.05);
+  --glow-accent-intense: 0 0 20px rgba(0, 210, 190, 0.3), 0 0 60px rgba(0, 210, 190, 0.12);
+  --glow-secondary: 0 0 20px rgba(180, 100, 255, 0.15), 0 0 60px rgba(180, 100, 255, 0.05);
+  --glow-success: 0 0 20px rgba(50, 210, 130, 0.15), 0 0 60px rgba(50, 210, 130, 0.05);
+  --glow-warning: 0 0 20px rgba(255, 180, 50, 0.15);
+  --glow-destructive: 0 0 20px rgba(255, 80, 80, 0.15);
+
+  /* Ambient glow for background */
+  --ambient-glow-1: radial-gradient(ellipse 600px 400px at 20% 20%, rgba(120, 100, 255, 0.06) 0%, transparent 70%);
+  --ambient-glow-2: radial-gradient(ellipse 500px 350px at 80% 80%, rgba(0, 210, 190, 0.04) 0%, transparent 70%);
+  --ambient-glow-3: radial-gradient(ellipse 400px 300px at 60% 30%, rgba(180, 100, 255, 0.03) 0%, transparent 70%);
+
+  /* ============================================
+   * SHADOWS (Soft elevation on dark)
+   * ============================================ */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+
   /* ============================================
    * GRADIENTS
    * ============================================ */
-  
-  /* Primary gradient */
-  --gradient-primary: linear-gradient(
-    135deg,
-    hsl(var(--primary)) 0%,
-    hsl(var(--primary-light)) 50%,
-    hsl(var(--primary-dark)) 100%
-  );
-  
-  /* Secondary gradient */
-  --gradient-secondary: linear-gradient(
-    135deg,
-    hsl(var(--secondary)) 0%,
-    hsl(var(--secondary-light)) 50%,
-    hsl(var(--secondary-dark)) 100%
-  );
-  
-  /* Accent gradient */
-  --gradient-accent: linear-gradient(
-    135deg,
-    hsl(var(--accent)) 0%,
-    hsl(var(--accent-light)) 50%,
-    hsl(var(--accent-dark)) 100%
-  );
-  
-  /* Background gradient */
-  --gradient-background: linear-gradient(
-    135deg,
-    hsl(var(--background)) 0%,
-    hsl(210 40% 96%) 50%,
-    hsl(var(--background)) 100%
-  );
-  
-  /* Card gradient */
-  --gradient-card: linear-gradient(
-    145deg,
-    hsl(var(--card)) 0%,
-    hsl(210 40% 96%) 100%
-  );
-  
-  /* Text gradient */
-  --gradient-text: linear-gradient(
-    135deg,
-    hsl(var(--primary)) 0%,
-    hsl(var(--secondary)) 50%,
-    hsl(var(--accent)) 100%
-  );
-  
+  --gradient-primary: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(var(--primary)) 100%);
+  --gradient-accent: linear-gradient(135deg, hsl(var(--accent)) 0%, hsl(var(--primary)) 100%);
+  --gradient-surface: linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+
+  --gradient-background:
+    var(--ambient-glow-1),
+    var(--ambient-glow-2),
+    var(--ambient-glow-3),
+    linear-gradient(180deg, hsl(225 15% 6%) 0%, hsl(225 18% 4%) 100%);
+
+  --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+
+  --gradient-text: linear-gradient(135deg, hsl(var(--primary-light)) 0%, hsl(var(--accent)) 50%, hsl(var(--secondary-light)) 100%);
+
   /* ============================================
-   * ANIMATIONS
+   * TRANSITIONS
    * ============================================ */
-  
-  /* Transition */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-  
-  /* Hover lift */
-  --hover-lift: translateY(-2px);
-  --hover-lift-lg: translateY(-4px);
-  
-  /* Press down */
-  --press-down: translateY(1px);
-}
+  --transition-slow: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
-/* Dark mode support */
-.dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 11%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 40% 98%;
-  
-  --shadow-light: rgba(30, 41, 59, 0.8);
-  --shadow-dark: rgba(0, 0, 0, 0.4);
-  --shadow-colored: rgba(37, 99, 235, 0.2);
-  
-  --gradient-background: linear-gradient(
-    135deg,
-    hsl(var(--background)) 0%,
-    hsl(222 47% 15%) 50%,
-    hsl(var(--background)) 100%
-  );
+  --hover-lift: translateY(-1px);
+  --hover-lift-lg: translateY(-3px);
+  --press-down: translateY(0.5px);
+
+  /* Neumorphic compatibility aliases */
+  --neu-shadow-sm: var(--shadow-sm);
+  --neu-shadow: var(--shadow-md);
+  --neu-shadow-lg: var(--shadow-lg);
+  --neu-shadow-xl: var(--shadow-xl);
+  --neu-shadow-inner: inset 0 2px 6px rgba(0, 0, 0, 0.3);
+  --neu-shadow-pressed: inset 0 1px 4px rgba(0, 0, 0, 0.4);
+  --neu-shadow-primary: var(--glow-primary);
+  --neu-shadow-success: var(--glow-success);
+  --neu-button-bg: var(--glass-bg);
+  --neu-border: var(--glass-border);
+  --neu-shadow-dark: rgba(0,0,0,0.3);
+  --neu-shadow-light: rgba(255,255,255,0.03);
+  --neu-shadow-inset-dark: rgba(0,0,0,0.2);
+
+  /* Semantic layout/sidebar tokens */
+  --neu-text-primary: hsl(var(--foreground));
+  --neu-text-secondary: hsl(var(--muted-foreground));
+  --neu-text-muted: rgba(255, 255, 255, 0.35);
+  --neu-bg-primary: hsl(var(--background));
+  --neu-bg-gradient-start: hsl(225, 15%, 9%);
+  --neu-bg-gradient-end: hsl(225, 18%, 7%);
+  --neu-accent-primary: hsl(var(--primary));
 }
 
 /* ============================================
- * UTILITY CLASSES
+ * GLASS CARD
  * ============================================ */
-
-/* Neumorphic card */
-.neu-card {
-  background: var(--gradient-card);
+.neu-card,
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--neu-shadow);
+  box-shadow: var(--shadow-sm);
   transition: all var(--transition-base);
 }
 
-.neu-card:hover {
-  box-shadow: var(--neu-shadow-lg);
+.neu-card:hover,
+.glass-card:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-md), var(--glow-primary);
   transform: var(--hover-lift);
 }
 
-/* Neumorphic button */
-.neu-button {
-  background: var(--gradient-primary);
-  color: var(--primary-foreground);
+/* Glass card variants */
+.glass-card-accent:hover {
+  box-shadow: var(--shadow-md), var(--glow-accent);
+}
+
+.glass-card-success:hover {
+  box-shadow: var(--shadow-md), var(--glow-success);
+}
+
+/* ============================================
+ * AI NATIVE BUTTON
+ * ============================================ */
+.neu-button,
+.ai-button {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: hsl(var(--foreground));
   border-radius: var(--radius);
-  border: none;
-  box-shadow: var(--neu-shadow);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-sm);
   transition: all var(--transition-fast);
   cursor: pointer;
 }
 
-.neu-button:hover {
-  box-shadow: var(--neu-shadow-lg);
+.neu-button:hover,
+.ai-button:hover {
+  background: var(--glass-bg-hover);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--shadow-md), var(--glow-primary);
   transform: var(--hover-lift);
 }
 
-.neu-button:active {
-  box-shadow: var(--neu-shadow-pressed);
+.neu-button:active,
+.ai-button:active {
   transform: var(--press-down);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Neumorphic input */
-.neu-input {
-  background: var(--input-background);
+/* Primary action button */
+.ai-button-primary {
+  background: var(--gradient-primary);
+  color: white;
+  border: none;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  box-shadow: var(--neu-shadow-inner);
+  box-shadow: var(--glow-primary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.ai-button-primary:hover {
+  box-shadow: var(--glow-primary-intense);
+  transform: var(--hover-lift);
+  filter: brightness(1.1);
+}
+
+/* ============================================
+ * AI NATIVE INPUT
+ * ============================================ */
+.neu-input,
+.ai-input {
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  color: hsl(var(--foreground));
   transition: all var(--transition-fast);
 }
 
-.neu-input:focus {
+.neu-input:focus,
+.ai-input:focus {
   outline: none;
-  box-shadow: 
-    var(--neu-shadow-inner),
-    0 0 0 3px hsl(var(--ring) / 0.2);
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: var(--glow-primary), inset 0 0 0 1px hsl(var(--primary) / 0.2);
 }
 
-/* Neumorphic container */
+.neu-input::placeholder,
+.ai-input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+
+/* ============================================
+ * CONTAINER
+ * ============================================ */
 .neu-container {
   background: var(--gradient-background);
+  background-color: hsl(var(--background));
   min-height: 100vh;
+  color: hsl(var(--foreground));
 }
 
-/* Gradient text */
+/* ============================================
+ * TEXT EFFECTS
+ * ============================================ */
 .gradient-text {
   background: var(--gradient-text);
   -webkit-background-clip: text;
@@ -288,55 +289,289 @@
   background-clip: text;
 }
 
-/* Gradient border */
-.gradient-border {
-  position: relative;
-  background: var(--card);
+/* AI status text with subtle pulse */
+.ai-status-text {
+  color: hsl(var(--accent));
+  text-shadow: 0 0 20px hsl(var(--accent) / 0.3);
+}
+
+/* ============================================
+ * GLASS OVERLAY / PANEL
+ * ============================================ */
+.glass-overlay {
+  background: rgba(10, 12, 20, 0.8);
+  backdrop-filter: blur(var(--glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
+  border: 1px solid var(--glass-border);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
 }
 
-.gradient-border::before {
+/* ============================================
+ * AI ACTIVITY INDICATORS
+ * ============================================ */
+@keyframes ai-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes ai-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(120, 100, 255, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(120, 100, 255, 0.4), 0 0 40px rgba(120, 100, 255, 0.1); }
+}
+
+@keyframes ai-thinking {
+  0% { opacity: 0.3; }
+  50% { opacity: 1; }
+  100% { opacity: 0.3; }
+}
+
+@keyframes ai-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ambient-shift {
+  0%, 100% { opacity: 0.6; transform: translate(0, 0) scale(1); }
+  33% { opacity: 0.8; transform: translate(5%, -3%) scale(1.05); }
+  66% { opacity: 0.5; transform: translate(-3%, 5%) scale(0.98); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes gradient-pulse {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-ai-pulse { animation: ai-pulse 2s ease-in-out infinite; }
+.animate-ai-glow { animation: ai-glow 2.5s ease-in-out infinite; }
+.animate-ai-thinking { animation: ai-thinking 1.5s ease-in-out infinite; }
+.animate-ai-orbit { animation: ai-orbit 8s linear infinite; }
+.animate-ambient-shift { animation: ambient-shift 20s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-gradient-pulse { background-size: 200% 200%; animation: gradient-pulse 3s ease infinite; }
+.animate-slide-in { animation: slide-in-right 0.3s ease-out; }
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+.animate-scale-in { animation: scale-in 0.2s ease-out; }
+
+/* AI thinking dots */
+.ai-thinking-dots span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  animation: ai-thinking 1.4s ease-in-out infinite;
+  margin: 0 2px;
+}
+
+.ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+.ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ============================================
+ * SCROLLBAR — AI NATIVE
+ * ============================================ */
+.neu-container ::-webkit-scrollbar,
+.glass-panel ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.neu-container ::-webkit-scrollbar-track,
+.glass-panel ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.neu-container ::-webkit-scrollbar-thumb,
+.glass-panel ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.neu-container ::-webkit-scrollbar-thumb:hover,
+.glass-panel ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+ * SECTION LABEL
+ * ============================================ */
+.section-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  padding: 1rem 1.5rem 0.4rem;
+}
+
+/* ============================================
+ * SIDEBAR GLOW NAV ITEM
+ * ============================================ */
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1.25rem;
+  margin: 1px 0.5rem;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  font-weight: 450;
+  color: hsl(var(--muted-foreground));
+  transition: all var(--transition-base);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  color: hsl(var(--foreground));
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.nav-item.active {
+  color: hsl(var(--foreground));
+  background: rgba(120, 100, 255, 0.08);
+  border-color: rgba(120, 100, 255, 0.15);
+  box-shadow: var(--glow-primary);
+}
+
+.nav-item.active .nav-icon {
+  color: hsl(var(--primary-light));
+  filter: drop-shadow(0 0 6px hsl(var(--primary) / 0.4));
+}
+
+.nav-item.highlighted {
+  color: hsl(var(--foreground));
+  background: linear-gradient(135deg, rgba(120, 100, 255, 0.06) 0%, rgba(0, 210, 190, 0.04) 100%);
+  border-color: rgba(120, 100, 255, 0.12);
+}
+
+.nav-item.highlighted .nav-icon {
+  color: hsl(var(--primary-light));
+}
+
+.nav-item .nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+/* Active indicator bar */
+.nav-item.active::before {
   content: '';
   position: absolute;
-  inset: -2px;
-  border-radius: var(--radius-lg);
+  left: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 2px;
   background: var(--gradient-primary);
-  z-index: -1;
+  border-radius: 1px;
+  box-shadow: 0 0 8px hsl(var(--primary) / 0.5);
 }
 
-/* Glassmorphism overlay */
-.glass-overlay {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+/* Badge */
+.nav-badge {
+  margin-left: auto;
+  padding: 0.125rem 0.4rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: var(--radius-sm);
+  background: var(--gradient-primary);
+  color: white;
+  box-shadow: 0 0 10px rgba(120, 100, 255, 0.3);
 }
 
-/* Floating animation */
-@keyframes float {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
+/* ============================================
+ * COMMAND PALETTE STYLES
+ * ============================================ */
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 15vh;
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+.command-palette {
+  width: 560px;
+  max-height: 420px;
+  background: hsl(225 15% 10%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl), var(--glow-primary);
+  overflow: hidden;
 }
 
-/* Gradient pulse */
-@keyframes gradient-pulse {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
+.command-palette input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--glass-border);
+  color: hsl(var(--foreground));
+  font-size: 0.9375rem;
+  outline: none;
 }
 
-.animate-gradient-pulse {
-  background-size: 200% 200%;
-  animation: gradient-pulse 3s ease infinite;
+.command-palette input::placeholder {
+  color: hsl(var(--muted-foreground));
 }
+
+/* ============================================
+ * STATUS DOT
+ * ============================================ */
+.ai-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  box-shadow: 0 0 8px hsl(var(--accent) / 0.5);
+  animation: ai-pulse 2s ease-in-out infinite;
+}
+
+.ai-status-dot.idle {
+  background: hsl(var(--muted-foreground));
+  box-shadow: none;
+  animation: none;
+}
+
+/* ============================================
+ * NEU-SHADOW COMPATIBILITY
+ * ============================================ */
+.neu-shadow-sm { box-shadow: var(--shadow-sm); }
+.neu-shadow { box-shadow: var(--shadow-md); }
+.neu-shadow-lg { box-shadow: var(--shadow-lg); }
+.neu-shadow-inner { box-shadow: var(--neu-shadow-inner); }

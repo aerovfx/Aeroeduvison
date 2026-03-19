@@ -40,9 +40,21 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    const pointsPerQuestion = result.selectedQuestions.length > 0
-      ? result.examData.totalScore / result.selectedQuestions.length
-      : 0
+    if (result.selectedQuestions.length === 0) {
+      return createSuccessResponse({
+        examId: null,
+        examData: result.examData,
+        selectedQuestions: [],
+        missingRequirements: result.missingRequirements,
+        stats: result.stats,
+        message:
+          "Không tìm thấy câu hỏi phù hợp trong ngân hàng đề. " +
+          "Vui lòng thêm câu hỏi vào ngân hàng hoặc kiểm tra lại cấu hình ma trận " +
+          `(loại: ${result.examData.examType}, khối: ${result.missingRequirements.map((r) => r.grade).join(", ")}).`,
+      })
+    }
+
+    const pointsPerQuestion = result.examData.totalScore / result.selectedQuestions.length
 
     if (typeof (prisma as any).exam?.create !== "function") {
       return createErrorResponse(
@@ -51,7 +63,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Tạo đề thi và gán câu hỏi vào DB
     const exam = await (prisma as any).exam.create({
       data: {
         title: result.examData.title,

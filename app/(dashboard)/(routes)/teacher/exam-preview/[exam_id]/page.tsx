@@ -108,7 +108,7 @@ export default function ExamPreviewPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+        <Button className="mb-4 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg" onClick={() => router.back()}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
@@ -157,13 +157,13 @@ export default function ExamPreviewPage() {
           </CardHeader>
           <CardContent>
             <div className="flex gap-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Badge className="px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
                 Easy: {preview.statistics.easy_count}
               </Badge>
-              <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+              <Badge className="px-2 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800">
                 Medium: {preview.statistics.medium_count}
               </Badge>
-              <Badge variant="secondary" className="bg-red-100 text-red-800">
+              <Badge className="px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800">
                 Hard: {preview.statistics.hard_count}
               </Badge>
             </div>
@@ -184,7 +184,7 @@ export default function ExamPreviewPage() {
               >
                 <div className="flex items-center gap-3">
                   <span className="font-medium">Q{idx + 1}</span>
-                  <Badge variant="outline">{q.question_type}</Badge>
+                  <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">{q.question_type}</Badge>
                   <span className="text-sm text-muted-foreground">
                     {q.question_id}
                   </span>

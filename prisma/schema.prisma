@@ -583,6 +583,7 @@ model LatexProjectCollaborator {
 model ExamMatrix {
   id                String                   @id @default(cuid())
   name              String
+  subject           String?
   grade             String
   examType          String
   duration          Int
@@ -676,8 +677,9 @@ model Exam {
   userId         String
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
-  User           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   examQuestions  ExamQuestion[]
+  roomSchedules  ExamRoomSchedule[]
 
   @@index([userId])
   @@index([matrixId])
@@ -771,6 +773,7 @@ model Question {
   updatedAt           DateTime                 @updatedAt
   tags                String[]
   metadata            Json?
+  imageUrl            String?
   matrixSelections    MatrixSelectedQuestion[]
   examQuestions       ExamQuestion[]
   examRoomQuestions   ExamRoomQuestion[]
@@ -852,11 +855,30 @@ model OnlineExamRoom {
   ExamMatrix   ExamMatrix?           @relation(fields: [examMatrixId], references: [id], onDelete: SetNull)
   participants ExamRoomParticipant[]
   questions    ExamRoomQuestion[]
+  schedules    ExamRoomSchedule[]
 
   @@index([teacherId])
   @@index([status])
   @@index([startTime])
   @@index([accessCode])
+}
+
+model ExamRoomSchedule {
+  id         String         @id @default(cuid())
+  examRoomId String
+  examId     String
+  label      String?
+  activeFrom DateTime
+  activeTo   DateTime
+  isActive   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  ExamRoom   OnlineExamRoom @relation(fields: [examRoomId], references: [id], onDelete: Cascade)
+  Exam       Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examRoomId])
+  @@index([examId])
+  @@index([activeFrom])
+  @@index([activeTo])
 }
 
 model ExamRoomParticipant {
@@ -1272,4 +1294,90 @@ model RateLimit {
   @@index([userId])
   @@index([endpoint])
   @@index([resetAt])
+}
+
+// Camera Recording Management
+model CameraRecording {
+  id          String   @id @default(cuid())
+  cameraId    String
+  cameraName  String
+  teacherId   String?  // null for admin recordings
+  classId     String?  // associated class if classroom camera
+  startTime   DateTime @default(now())
+  endTime     DateTime?
+  duration    Int?     // seconds
+  videoUrl    String   // path to recorded video file
+  thumbnailUrl String? // path to thumbnail image
+  fileSize    Int?     // bytes
+  status      String   @default("recording") // recording, completed, failed, processing
+  metadata    Json?    // additional info (resolution, fps, etc.)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([cameraId])
+  @@index([teacherId])
+  @@index([classId])
+  @@index([status])
+  @@index([startTime])
+  @@index([endTime])
+}
+
+// ===================== GRADING: Answer Keys & Graded Sheets =====================
+
+model GradingAnswerKey {
+  id             String   @id @default(cuid())
+  teacherId      String
+  examName       String   @default("")
+  examCode       String   @default("")
+  examDate       String   @default("")
+  studentName    String   @default("") // Template student info
+  studentId      String   @default("") // Số báo danh mẫu
+  examSite       String   @default("") // Hội đồng thi
+  examRoom       String   @default("") // Phòng thi số
+  dob            String   @default("") // Ngày sinh
+  part1          Json     // Record<number, 'A'|'B'|'C'|'D'|null> — 40 câu trắc nghiệm
+  part2          Json     // Record<number, Record<string, boolean|null>> — 8 câu đúng/sai
+  part3          Json     // Record<number, string> — 6 câu trả lời ngắn
+  essayQuestions Json     @default("[]") // EssayQuestion[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  gradedSheets   GradedSheet[]
+
+  @@index([teacherId])
+  @@index([examCode])
+  @@index([createdAt])
+}
+
+model GradedSheet {
+  id              String   @id @default(cuid())
+  answerKeyId     String
+  teacherId       String
+  studentName     String   @default("")
+  studentId       String   @default("") // Số báo danh
+  frontImageUrl   String?  // Mặt trước (trắc nghiệm)
+  backImageUrl    String?  // Mặt sau (tự luận)
+  detectedAnswers Json     // Record<number, 'A'|'B'|'C'|'D'|null>
+  detectedPart2   Json     // Record<number, Record<string, boolean|null>>
+  detectedPart3   Json     // Record<number, string>
+  essayScores     Json     @default("{}") // Record<string, number>
+  essayNotes      Json     @default("{}") // Record<string, string>
+  overrides       Json     @default("[]") // number[] — overridden question numbers
+  totalScore      Float    @default(0)
+  maxScore        Float    @default(10)
+  percentage      Float    @default(0)
+  gradeLabel      String   @default("") // A, B, C, D, F
+  reviewed        Boolean  @default(false)
+  published       Boolean  @default(false)
+  status          String   @default("scanned") // scanning, scanned, error
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  answerKey       GradingAnswerKey @relation(fields: [answerKeyId], references: [id], onDelete: Cascade)
+
+  @@index([answerKeyId])
+  @@index([teacherId])
+  @@index([studentId])
+  @@index([published])
+  @@index([createdAt])
 }

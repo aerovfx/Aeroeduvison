@@ -1,0 +1,18 @@
+id = "aeroedu_risk_watch"
+name = "Aeroedu Risk Watch"
+version = "0.1.0"
+description = "Kết hợp dữ liệu cảm xúc, hoạt động học và kết quả để phát hiện học sinh có nguy cơ, sinh danh sách ưu tiên can thiệp."
+
+[schedule]
+cron = "*/30 * * * *" # mỗi 30 phút; có thể nới ra 2h trong production
+
+[tools.http]
+base_url = "http://localhost:3000"
+timeout_sec = 25
+
+[outputs]
+dashboard_section = "Aeroedu / Students"
+stores_markdown_reports = true
+webhook_enabled = true
+webhook_url_env = "AEROEDU_AGENT_WEBHOOK_URL"
+

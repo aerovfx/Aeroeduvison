@@ -271,14 +271,14 @@ export function TeacherExamDashboard() {
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         size="sm"
                         onClick={() => handleExportPDF(exam.exam_id, exam.metadata.variant)}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         size="sm"
                         onClick={() => window.open(`/exam/${exam.exam_id}/preview`, '_blank')}
                       >

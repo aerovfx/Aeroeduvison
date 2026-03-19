@@ -25,8 +25,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { NeumorphicCard } from "@/components/ui/neumorphic-card";
-import { NeumorphicButton } from "@/components/ui/neumorphic-button";
 import { NeumorphicInput } from "@/components/ui/neumorphic-input";
 import { toast } from "react-hot-toast";
 
@@ -117,27 +115,26 @@ export default function LatexDocumentsPage() {
       {/* Header with Gradient Text */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold gradient-text mb-2">
+          <h1 className="text-4xl font-bold text-purple-600 mb-2">
             Tài Liệu LaTeX
           </h1>
           <p className="text-gray-600">
             Soạn thảo và quản lý tài liệu LaTeX chuyên nghiệp
           </p>
         </div>
-        <NeumorphicButton
-          variant="primary"
-          size="lg"
+        <Button
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           onClick={handleCreate}
-          loading={creating}
+          disabled={creating}
         >
-          <Plus className="w-5 h-5 mr-2" />
+          {creating ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Plus className="w-5 h-5 mr-2" />}
           Tạo Tài Liệu
-        </NeumorphicButton>
+        </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <NeumorphicCard variant="gradient" hover className="text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             <FileCode2 className="w-8 h-8 text-blue-500" />
             <div className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
@@ -145,9 +142,9 @@ export default function LatexDocumentsPage() {
             </div>
           </div>
           <div className="text-sm text-gray-600">Tổng tài liệu</div>
-        </NeumorphicCard>
+        </div>
 
-        <NeumorphicCard variant="gradient" hover className="text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             <Edit3 className="w-8 h-8 text-green-500" />
             <div className="text-4xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent">
@@ -155,9 +152,9 @@ export default function LatexDocumentsPage() {
             </div>
           </div>
           <div className="text-sm text-gray-600">Cập nhật tuần này</div>
-        </NeumorphicCard>
+        </div>
 
-        <NeumorphicCard variant="gradient" hover className="text-center">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
           <div className="flex items-center justify-center gap-3 mb-2">
             <Pencil className="w-8 h-8 text-purple-500" />
             <div className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-purple-600 bg-clip-text text-transparent">
@@ -165,22 +162,20 @@ export default function LatexDocumentsPage() {
             </div>
           </div>
           <div className="text-sm text-gray-600">Tài liệu cũ</div>
-        </NeumorphicCard>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <NeumorphicCard variant="default" size="md">
-        <NeumorphicInput
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <input className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           placeholder="Tìm kiếm tài liệu LaTeX..."
-          icon={<Search className="w-5 h-5" />}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-md"
         />
-      </NeumorphicCard>
+      </div>
 
       {/* Documents Table */}
-      <NeumorphicCard variant="gradient" size="lg">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -197,7 +192,7 @@ export default function LatexDocumentsPage() {
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8">
                     <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-500 neu-shadow" />
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-500 shadow-md" />
                       <p className="text-gray-600">Đang tải...</p>
                     </div>
                   </TableCell>
@@ -210,10 +205,10 @@ export default function LatexDocumentsPage() {
                       title="Chưa có tài liệu LaTeX"
                       description="Tạo tài liệu đầu tiên để bắt đầu soạn thảo"
                       action={
-                        <NeumorphicButton variant="primary" onClick={handleCreate}>
+                        <button className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700" onClick={handleCreate}>
                           <Plus className="w-4 h-4 mr-2" />
                           Tạo tài liệu
-                        </NeumorphicButton>
+                        </button>
                       }
                     />
                   </TableCell>
@@ -222,7 +217,7 @@ export default function LatexDocumentsPage() {
                 filtered.map((project) => (
                   <TableRow key={project.id} className="hover:bg-gray-50 transition-colors">
                     <TableCell>
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md-inner">
                         <FileCode2 className="w-5 h-5 text-blue-600" />
                       </div>
                     </TableCell>
@@ -246,7 +241,7 @@ export default function LatexDocumentsPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => router.push(`/teacher/latex-documents/${project.id}`)}
-                          className="neu-shadow-sm hover:neu-shadow text-blue-600"
+                          className="shadow-sm hover:shadow-md text-blue-600"
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -257,7 +252,7 @@ export default function LatexDocumentsPage() {
                             setProjectToDelete(project.id);
                             setDeleteDialogOpen(true);
                           }}
-                          className="neu-shadow-sm hover:neu-shadow text-red-600"
+                          className="shadow-sm hover:shadow-md text-red-600"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -269,13 +264,13 @@ export default function LatexDocumentsPage() {
             </TableBody>
           </Table>
         </div>
-      </NeumorphicCard>
+      </div>
 
       {/* Delete Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="neu-card">
           <AlertDialogHeader>
-            <AlertDialogTitle className="gradient-text">Xóa tài liệu LaTeX?</AlertDialogTitle>
+            <AlertDialogTitle className="text-purple-600">Xóa tài liệu LaTeX?</AlertDialogTitle>
             <AlertDialogDescription>
               Hành động này không thể hoàn tác. Tài liệu sẽ bị xóa vĩnh viễn khỏi hệ thống.
             </AlertDialogDescription>
@@ -299,7 +294,7 @@ export default function LatexDocumentsPage() {
 function EmptyState({ icon: Icon, title, description, action }: any) {
   return (
     <div className="text-center py-8">
-      <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+      <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md-inner">
         <Icon className="w-10 h-10 text-blue-600" />
       </div>
       <h3 className="text-lg font-semibold text-gray-700 mb-2">{title}</h3>

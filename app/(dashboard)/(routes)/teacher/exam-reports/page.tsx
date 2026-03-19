@@ -15,9 +15,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { NeumorphicCard } from "@/components/ui/neumorphic-card"
-import { NeumorphicButton } from "@/components/ui/neumorphic-button"
-import { NeumorphicInput } from "@/components/ui/neumorphic-input"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
 
@@ -137,7 +134,7 @@ export default function ExamReportsPage() {
   if (!session?.user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500 neu-shadow" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500 shadow-md" />
       </div>
     )
   }
@@ -145,27 +142,27 @@ export default function ExamReportsPage() {
   return (
     <div className="flex flex-col h-full neu-container">
       {/* Header with Gradient Text */}
-      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white neu-shadow-sm">
+      <div className="border-b bg-gradient-to-r from-white via-gray-50 to-white shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-4xl font-bold gradient-text mb-2">Báo Cáo Thi</h1>
+              <h1 className="text-4xl font-bold text-purple-600 mb-2">Báo Cáo Thi</h1>
               <p className="text-gray-600">Phân tích và báo cáo kết quả thi chi tiết</p>
             </div>
             {selectedExamId && (
               <div className="flex gap-2">
-                <NeumorphicButton variant="outline" size="sm" onClick={() => handleExport("csv")}>
-                  <Download className="h-4 w-4 mr-2" />
+                <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => handleExport("csv")}>
+                  <Download className="h-4 w-4" />
                   CSV
-                </NeumorphicButton>
-                <NeumorphicButton variant="outline" size="sm" onClick={() => handleExport("excel")}>
-                  <Download className="h-4 w-4 mr-2" />
+                </button>
+                <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => handleExport("excel")}>
+                  <Download className="h-4 w-4" />
                   Excel
-                </NeumorphicButton>
-                <NeumorphicButton variant="outline" size="sm" onClick={() => handleExport("pdf")}>
-                  <Download className="h-4 w-4 mr-2" />
+                </button>
+                <button className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => handleExport("pdf")}>
+                  <Download className="h-4 w-4" />
                   PDF
-                </NeumorphicButton>
+                </button>
               </div>
             )}
           </div>
@@ -179,7 +176,7 @@ export default function ExamReportsPage() {
                 { label: "Điểm trung bình", value: stats.average.toFixed(1), color: "from-purple-500 to-purple-600", icon: Award },
                 { label: "Tỷ lệ đạt", value: `${stats.passRate.toFixed(1)}%`, color: "from-orange-500 to-orange-600", icon: Target },
               ].map((stat) => (
-                <NeumorphicCard key={stat.label} variant="gradient" hover className="text-center p-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center" key={stat.label}>
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <stat.icon className={`w-6 h-6 bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`} style={{ WebkitTextFillColor: 'transparent' }} />
                     <div className={`text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent`}>
@@ -187,7 +184,7 @@ export default function ExamReportsPage() {
                     </div>
                   </div>
                   <div className="text-sm text-gray-600">{stat.label}</div>
-                </NeumorphicCard>
+                </div>
               ))}
             </div>
           )}
@@ -198,18 +195,17 @@ export default function ExamReportsPage() {
       <div className="flex-1 overflow-auto p-6">
         <div className="container mx-auto space-y-6">
           {/* Exam Selection */}
-          <NeumorphicCard variant="default" size="lg">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <div className="flex items-center gap-4 mb-4">
               <div className="flex-1">
-                <NeumorphicInput
+                <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   placeholder="Tìm kiếm đề thi..."
-                  icon={<Search className="w-4 h-4" />}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={selectedExamId} onValueChange={setSelectedExamId}>
-                <SelectTrigger className="w-[300px] neu-shadow-sm">
+                <SelectTrigger className="w-[300px] shadow-sm">
                   <SelectValue placeholder="Chọn đề thi để phân tích" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,22 +221,22 @@ export default function ExamReportsPage() {
                 </SelectContent>
               </Select>
             </div>
-          </NeumorphicCard>
+          </div>
 
           {/* Analytics Content */}
           {selectedExamId && (
             <>
               {analyticsLoading ? (
-                <NeumorphicCard variant="gradient" size="lg" className="text-center py-12">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-12">
                   <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-500 neu-shadow" />
+                    <Loader2 className="w-8 h-8 animate-spin text-blue-500 shadow-md" />
                     <p className="text-gray-600">Đang tải phân tích...</p>
                   </div>
-                </NeumorphicCard>
+                </div>
               ) : analytics ? (
-                <NeumorphicCard variant="gradient" size="lg">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100">
                   <Tabs defaultValue="overview" className="space-y-6">
-                    <TabsList className="neu-shadow">
+                    <TabsList className="shadow-md">
                       <TabsTrigger value="overview">Tổng quan</TabsTrigger>
                       <TabsTrigger value="questions">Phân tích câu hỏi</TabsTrigger>
                       <TabsTrigger value="distribution">Phân bố điểm</TabsTrigger>
@@ -250,52 +246,52 @@ export default function ExamReportsPage() {
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <NeumorphicCard variant="default" className="text-center p-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                           <div className={`text-4xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent mb-2`}>
                             {analytics.overview.highest_score.toFixed(1)}
                           </div>
                           <div className="text-sm text-gray-600">Điểm cao nhất</div>
-                        </NeumorphicCard>
-                        <NeumorphicCard variant="default" className="text-center p-4">
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                           <div className={`text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent mb-2`}>
                             {analytics.overview.average_score.toFixed(1)}
                           </div>
                           <div className="text-sm text-gray-600">Điểm trung bình</div>
-                        </NeumorphicCard>
-                        <NeumorphicCard variant="default" className="text-center p-4">
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 text-center">
                           <div className={`text-4xl font-bold bg-gradient-to-r from-red-500 to-red-600 bg-clip-text text-transparent mb-2`}>
                             {analytics.overview.lowest_score.toFixed(1)}
                           </div>
                           <div className="text-sm text-gray-600">Điểm thấp nhất</div>
-                        </NeumorphicCard>
+                        </div>
                       </div>
 
-                      <NeumorphicCard variant="default" className="p-4">
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div>
                             <div className="text-sm text-gray-600 mb-1">Độ tin cậy</div>
-                            <div className="text-2xl font-bold gradient-text">{analytics.reliability.cronbach_alpha.toFixed(2)}</div>
+                            <div className="text-2xl font-bold text-purple-600">{analytics.reliability.cronbach_alpha.toFixed(2)}</div>
                             <div className="text-xs text-gray-500">Cronbach's Alpha</div>
                           </div>
                           <div>
                             <div className="text-sm text-gray-600 mb-1">Độ lệch chuẩn</div>
-                            <div className="text-2xl font-bold gradient-text">{analytics.overview.std_deviation.toFixed(2)}</div>
+                            <div className="text-2xl font-bold text-purple-600">{analytics.overview.std_deviation.toFixed(2)}</div>
                             <div className="text-xs text-gray-500">Standard Deviation</div>
                           </div>
                         </div>
-                      </NeumorphicCard>
+                      </div>
                     </TabsContent>
 
                     {/* Questions Analysis Tab */}
                     <TabsContent value="questions" className="space-y-4">
                       {analytics.question_analysis.map((q) => (
-                        <NeumorphicCard key={q.question_id} variant="default" className="p-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6" key={q.question_id}>
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="neu-shadow-sm">Câu {q.question_number}</Badge>
+                              <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 shadow-sm">Câu {q.question_number}</Badge>
                               <span className="text-sm text-gray-600">Tỷ lệ đúng: {q.correct_percentage}%</span>
                             </div>
-                            <div className="text-sm font-semibold gradient-text">Điểm TB: {(q.average_score * 10).toFixed(1)}/10</div>
+                            <div className="text-sm font-semibold text-purple-600">Điểm TB: {(q.average_score * 10).toFixed(1)}/10</div>
                           </div>
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <div>
@@ -315,50 +311,50 @@ export default function ExamReportsPage() {
                               </span>
                             </div>
                           </div>
-                        </NeumorphicCard>
+                        </div>
                       ))}
                     </TabsContent>
 
                     {/* Distribution Tab */}
                     <TabsContent value="distribution" className="space-y-4">
-                      <NeumorphicCard variant="default" className="p-4">
+                      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                         <div className="space-y-4">
                           {Object.entries(analytics.grade_distribution)
                             .sort(([a], [b]) => parseFloat(b.split("-")[0]) - parseFloat(a.split("-")[0]))
                             .map(([range, count]) => (
                               <div key={range} className="space-y-2">
                                 <div className="flex items-center justify-between text-sm">
-                                  <span className="font-semibold gradient-text">{range} điểm</span>
+                                  <span className="font-semibold text-purple-600">{range} điểm</span>
                                   <span className="text-gray-600">{count} học sinh</span>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-3 neu-shadow-inner">
+                                <div className="w-full bg-gray-200 rounded-full h-3 shadow-md-inner">
                                   <div
-                                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full neu-shadow"
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full shadow-md"
                                     style={{ width: `${(count / analytics.overview.total_submissions) * 100}%` }}
                                   />
                                 </div>
                               </div>
                             ))}
                         </div>
-                      </NeumorphicCard>
+                      </div>
                     </TabsContent>
 
                     {/* Time Analysis Tab */}
                     <TabsContent value="time" className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <NeumorphicCard variant="default" className="p-4">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                           <div className="space-y-4">
                             <div>
                               <div className="text-sm text-gray-600 mb-1">Thời gian trung bình</div>
-                              <div className="text-3xl font-bold gradient-text">{analytics.time_analysis.average_time_minutes} phút</div>
+                              <div className="text-3xl font-bold text-purple-600">{analytics.time_analysis.average_time_minutes} phút</div>
                             </div>
                             <div>
                               <div className="text-sm text-gray-600 mb-1">Thời gian trung vị</div>
-                              <div className="text-3xl font-bold gradient-text">{analytics.time_analysis.median_time_minutes} phút</div>
+                              <div className="text-3xl font-bold text-purple-600">{analytics.time_analysis.median_time_minutes} phút</div>
                             </div>
                           </div>
-                        </NeumorphicCard>
-                        <NeumorphicCard variant="default" className="p-4">
+                        </div>
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                           <div className="space-y-4">
                             <div>
                               <div className="text-sm text-gray-600 mb-1">Nhanh nhất</div>
@@ -369,15 +365,15 @@ export default function ExamReportsPage() {
                               <div className="text-3xl font-bold text-red-600">{analytics.time_analysis.slowest_completion} phút</div>
                             </div>
                           </div>
-                        </NeumorphicCard>
+                        </div>
                       </div>
                     </TabsContent>
                   </Tabs>
-                </NeumorphicCard>
+                </div>
               ) : (
-                <NeumorphicCard variant="gradient" size="lg" className="text-center py-12">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-12">
                   <div className="flex flex-col items-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center neu-shadow-inner">
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center shadow-md-inner">
                       <AlertCircle className="w-8 h-8 text-orange-600" />
                     </div>
                     <div>
@@ -385,16 +381,16 @@ export default function ExamReportsPage() {
                       <p className="text-gray-500">Đề thi này chưa có dữ liệu phân tích</p>
                     </div>
                   </div>
-                </NeumorphicCard>
+                </div>
               )}
             </>
           )}
 
           {/* Empty State */}
           {!selectedExamId && (
-            <NeumorphicCard variant="gradient" size="lg" className="text-center py-12">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 text-center py-12">
               <div className="flex flex-col items-center gap-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center neu-shadow-inner">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md-inner">
                   <FileText className="w-10 h-10 text-blue-600" />
                 </div>
                 <div>
@@ -402,7 +398,7 @@ export default function ExamReportsPage() {
                   <p className="text-gray-500">Vui lòng chọn một đề thi từ danh sách ở trên</p>
                 </div>
               </div>
-            </NeumorphicCard>
+            </div>
           )}
         </div>
       </div>

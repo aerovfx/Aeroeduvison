@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { 
+import {
   MessageSquare, Send, Users, Bell, Brain, Mic, Video,
   Phone, Search, Filter, MoreVertical, Star, Clock,
-  CheckCircle, AlertCircle, Smile, Zap, Sparkles, Plus
+  CheckCircle, AlertCircle, Smile, Zap, Sparkles, Plus,
+  Image as ImageIcon, FileText, X
 } from 'lucide-react';
 
 interface Message {
@@ -28,13 +29,40 @@ interface AutoMessage {
   sent: boolean;
 }
 
+// AI Native Glass Card
+function GlassCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// AI Native Badge
+function AIBadge({ children, variant = 'default' }: { children: React.ReactNode; variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' }) {
+  const variants = {
+    default: 'bg-[hsl(var(--primary)/0.15)] text-purple-600 border-purple-200',
+    success: 'bg-[hsl(var(--success)/0.15)] text-green-600 border-green-200',
+    warning: 'bg-[hsl(var(--warning)/0.15)] text-yellow-600 border-[hsl(var(--warning)/0.3)]',
+    danger: 'bg-[hsl(var(--destructive)/0.15)] text-red-600 border-red-200',
+    info: 'bg-[hsl(var(--info)/0.15)] text-blue-600 border-[hsl(var(--info)/0.3)]',
+  };
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-bold border ${variants[variant]}`}>
+      {children}
+    </span>
+  );
+}
+
 export default function InteractionCenter() {
   const { t } = useLanguage();
-  
+
   const [activeTab, setActiveTab] = useState<'chat' | 'notifications' | 'ai-copilot'>('chat');
   const [selectedStudent, setSelectedStudent] = useState<string | null>('student-1');
   const [messageInput, setMessageInput] = useState('');
-  const [autoMessages, setAutoMessages] = useState<AutoMessage[]>([
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [autoMessages] = useState<AutoMessage[]>([
     {
       id: 'auto-1',
       type: 'reminder',
@@ -52,7 +80,7 @@ export default function InteractionCenter() {
     }
   ]);
 
-  const [chatHistory, setChatHistory] = useState<Message[]>([
+  const [chatHistory] = useState<Message[]>([
     {
       id: 'msg-1',
       studentId: 'student-1',
@@ -66,7 +94,7 @@ export default function InteractionCenter() {
     {
       id: 'msg-2',
       studentId: 'student-1',
-      studentName: t('emotion.teacher'),
+      studentName: 'Giáo viên',
       studentAvatar: '👨‍🏫',
       message: 'Em xem lại video bài 5 nhé. Có ví dụ chi tiết.',
       timestamp: '10:32 AM',
@@ -92,469 +120,339 @@ export default function InteractionCenter() {
     { id: 'student-4', name: 'Phạm Thị D', avatar: '👩‍🎓', online: true, unread: 0 },
   ];
 
-  const handlePhoneCall = () => {
-    const student = students.find(s => s.id === selectedStudent);
-    console.log(`📞 [Chat] Initiating phone call with: ${student?.name}`);
-    alert(`📞 Tính năng gọi điện sẽ được triển khai!\n\nGọi cho: ${student?.name}`);
-  };
+  const filteredStudents = students.filter(s =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const handleVideoCall = () => {
-    const student = students.find(s => s.id === selectedStudent);
-    console.log(`📹 [Chat] Initiating video call with: ${student?.name}`);
-    alert(`📹 Tính năng video call sẽ được triển khai!\n\nVideo call với: ${student?.name}`);
-  };
+  const selectedStudentData = students.find(s => s.id === selectedStudent);
+  const currentChat = chatHistory.filter(m =>
+    selectedStudent && (m.studentId === selectedStudent || m.studentId === 'student-1')
+  );
 
-  const handleVoiceMessage = () => {
-    console.log(`🎤 [Chat] Recording voice message...`);
-    alert('🎤 Tính năng ghi âm sẽ được triển khai!');
-  };
-
-  const handleNewNotification = () => {
-    console.log(`➕ [Notifications] Creating new auto notification...`);
-    alert('➕ Tính năng tạo thông báo tự động sẽ được triển khai!');
-  };
-
-  const handleTemplateSelect = (type: 'encouragement' | 'reminder' | 'congratulation') => {
-    const templates = {
-      encouragement: 'Hôm nay em làm tốt lắm! Cố gắng giữ vững phong độ nhé! 💪',
-      reminder: 'Em nhớ hoàn thành bài tập trước hạn chót ngày mai nhé! ⏰',
-      congratulation: 'Chúc mừng em đã đạt thành tích xuất sắc! Thầy rất tự hào! 🎉'
-    };
-    
-    setMessageInput(templates[type]);
-    console.log(`📋 [Chat] Template selected: ${type}`);
-  };
-
-  const handleAIFollowup = () => {
-    console.log(`🤖 [AI] Sending AI-generated follow-up messages...`);
-    alert('🤖 AI đang tạo tin nhắn follow-up tự động cho 3 học sinh!');
-  };
-
-  const sendMessage = async () => {
-    if (!messageInput.trim() || !selectedStudent) return;
-
-    const selectedStudentData = students.find(s => s.id === selectedStudent);
-    
-    console.log(`💬 [Chat] Sending message to: ${selectedStudentData?.name}`);
-    console.log(`📝 [Chat] Message: ${messageInput.substring(0, 50)}...`);
-
-    const newMessage: Message = {
-      id: `msg-${Date.now()}`,
-      studentId: selectedStudent,
-      studentName: t('emotion.teacher'),
-      studentAvatar: '👨‍🏫',
-      message: messageInput,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      type: 'teacher',
-      read: true
-    };
-
-    try {
-      // TODO: Save to database
-      // await fetch('/api/chat/send', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     recipientId: selectedStudent,
-      //     message: messageInput
-      //   })
-      // });
-
-      // Update local state
-      setChatHistory([...chatHistory, newMessage]);
-      setMessageInput('');
-
-      console.log(`✅ [Chat] Message sent successfully to ${selectedStudentData?.name}`);
-      
-      // Show visual feedback
-      const studentName = selectedStudentData?.name || 'học sinh';
-      setTimeout(() => {
-        alert(`✅ Tin nhắn đã gửi đến ${studentName}!\n\n"${messageInput}"`);
-      }, 100);
-
-    } catch (error) {
-      console.error('❌ [Chat] Error sending message:', error);
-      alert('❌ Lỗi khi gửi tin nhắn. Vui lòng thử lại.');
+  const getTypeBadge = (type: string) => {
+    switch (type) {
+      case 'encouragement': return <AIBadge variant="success">Động viên</AIBadge>;
+      case 'reminder': return <AIBadge variant="warning">Nhắc nhở</AIBadge>;
+      case 'congratulation': return <AIBadge variant="info">Chúc mừng</AIBadge>;
+      case 'warning': return <AIBadge className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600">Cảnh báo</AIBadge>;
+      default: return <AIBadge>Thông báo</AIBadge>;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            💬 Interaction Center
-          </h1>
-          <p className="text-gray-600">
-            Tương tác trực tiếp với học sinh • AI Copilot hỗ trợ 24/7
-          </p>
-        </div>
-
-        {/* Tabs */}
-        <div className="bg-white rounded-xl shadow-lg p-1 mb-6 inline-flex">
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'chat' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <MessageSquare className="h-4 w-4 inline mr-2" />
-            Chat
-          </button>
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'notifications' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Bell className="h-4 w-4 inline mr-2" />
-            Auto Notifications
-          </button>
-          <button
-            onClick={() => setActiveTab('ai-copilot')}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-              activeTab === 'ai-copilot' ? 'bg-purple-600 text-white' : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Brain className="h-4 w-4 inline mr-2" />
-            AI Copilot
-          </button>
-        
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50-to-br from-slate-50 to-blue-50 p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* AI Native Header */}
+        <GlassCard className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] opacity-50" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--secondary))] flex items-center justify-center text-white shadow-sm">
+                <MessageSquare className="w-8 h-8" />
               </div>
-
-        {/* Chat Tab */}
-        {activeTab === 'chat' && (
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Student List */}
-            <div className="bg-white rounded-xl shadow-lg p-4">
-              <div className="mb-4">
-                <input
-                  type="search"
-                  placeholder="Search students..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                {students.map((student) => (
-                  <button
-                    key={student.id}
-                    onClick={() => setSelectedStudent(student.id)}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                      selectedStudent === student.id
-                        ? 'bg-purple-100 border-2 border-purple-600'
-                        : 'hover:bg-gray-50 border-2 border-transparent'
-                    }`}
-                  >
-                    <div className="relative">
-                      <span className="text-2xl">{student.avatar}</span>
-                      {student.online && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="font-medium text-gray-900 text-sm">{student.name}</p>
-                      <p className="text-xs text-gray-600">
-                        {student.online ? 'Online' : 'Offline'}
-                      </p>
-                    </div>
-                    {student.unread > 0 && (
-                      <div className="bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                        {student.unread}
-                      </div>
-                    )}
-                  </button>
-                ))}
+              <div>
+                <h1 className="text-3xl font-bold text-purple-600">Trung tâm Tương tác</h1>
+                <p className="text-sm text-gray-600">Giao tiếp với học sinh và phụ huynh</p>
               </div>
             </div>
-
-            {/* Chat Window */}
-            <div className="lg:col-span-3 bg-white rounded-xl shadow-lg flex flex-col" style={{ height: '600px' }}>
-              {/* Chat Header */}
-              <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <span className="text-2xl">
-                    {students.find(s => s.id === selectedStudent)?.avatar}
+            <div className="flex gap-2 glass-panel rounded-xl px-3 py-2">
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'chat'
+                    ? 'ai-button-primary text-white'
+                    : 'ai-button text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <MessageSquare className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all relative ${
+                  activeTab === 'notifications'
+                    ? 'ai-button-primary text-white'
+                    : 'ai-button text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Bell className="w-4 h-4" />
+                {autoMessages.filter(m => !m.sent).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[hsl(var(--destructive))] rounded-full text-[10px] flex items-center justify-center text-white">
+                    {autoMessages.filter(m => !m.sent).length}
                   </span>
-                  <div>
-                    <p className="font-semibold text-gray-900">
-                      {students.find(s => s.id === selectedStudent)?.name}
-                    </p>
-                    <p className="text-sm text-green-600">Online</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button 
-                    onClick={handlePhoneCall}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Gọi điện"
-                  >
-                    <Phone className="h-5 w-5 text-gray-600" />
-                  </button>
-                  <button 
-                    onClick={handleVideoCall}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Video call"
-                  >
-                    <Video className="h-5 w-5 text-gray-600" />
-                  </button>
-                  <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                    <MoreVertical className="h-5 w-5 text-gray-600" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {chatHistory.filter(m => m.studentId === selectedStudent).map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.type === 'teacher' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div className={`max-w-[70%] ${
-                      message.type === 'teacher' ? 'order-2' : ''
-                    }`}>
-                      <div className="flex items-end space-x-2">
-                        {message.type !== 'teacher' && (
-                          <span className="text-2xl">{message.studentAvatar}</span>
-                        )}
-                        <div>
-                          <div className={`rounded-lg p-3 ${
-                            message.type === 'teacher'
-                              ? 'bg-purple-600 text-white'
-                              : message.type === 'ai'
-                              ? 'bg-blue-100 text-blue-900 border-2 border-blue-300'
-                              : 'bg-gray-100 text-gray-900'
-                          }`}>
-                            {message.type === 'ai' && (
-                              <p className="text-xs font-semibold mb-1 flex items-center">
-                                <Brain className="h-3 w-3 mr-1" />
-                                AI Suggestion
-                              </p>
-                            )}
-                            <p className="text-sm">{message.message}</p>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">{message.timestamp}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Input */}
-              <div className="p-4 border-t border-gray-200">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                    placeholder="Type a message..."
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <button 
-                    onClick={handleVoiceMessage}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors"
-                    title="Ghi âm"
-                  >
-                    <Mic className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={sendMessage}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors flex items-center"
-                  >
-                    <Send className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('ai-copilot')}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  activeTab === 'ai-copilot'
+                    ? 'ai-button-primary text-white'
+                    : 'ai-button text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        )}
+        </GlassCard>
 
-        {/* Notifications Tab */}
-        {activeTab === 'notifications' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              {/* Scheduled Messages */}
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    📅 Scheduled Messages
-                  </h3>
-                  <button 
-                    onClick={handleNewNotification}
-                    className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center transition-all"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Message
-                  </button>
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-280px)] min-h-[600px]">
+          {/* Students List */}
+          <GlassCard className="lg:col-span-1 flex flex-col overflow-hidden">
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ai-input w-full pl-10 pr-3 py-2 rounded-xl text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {filteredStudents.map(student => (
+                <button
+                  key={student.id}
+                  onClick={() => setSelectedStudent(student.id)}
+                  className={`w-full p-3 rounded-xl flex items-center gap-3 transition-all ${
+                    selectedStudent === student.id
+                      ? 'bg-[hsl(var(--primary))/20] border border-purple-200'
+                      : 'glass-panel hover:bg-white/5'
+                  }`}
+                >
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] flex items-center justify-center text-lg">
+                      {student.avatar}
+                    </div>
+                    {student.online && (
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-[hsl(var(--success))] rounded-full border-2 border-[hsl(var(--card))]" />
+                    )}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-900 text-sm">{student.name}</p>
+                    <p className="text-xs text-gray-600">
+                      {student.online ? 'Trực tuyến' : 'Ngoại tuyến'}
+                    </p>
+                  </div>
+                  {student.unread > 0 && (
+                    <div className="w-5 h-5 bg-[hsl(var(--destructive))] rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                      {student.unread}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </GlassCard>
+
+          {/* Chat Area */}
+          <GlassCard className="lg:col-span-2 flex flex-col overflow-hidden">
+            {selectedStudentData ? (
+              <>
+                {/* Chat Header */}
+                <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] flex items-center justify-center text-lg">
+                      {selectedStudentData.avatar}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{selectedStudentData.name}</h3>
+                      <p className="text-xs text-gray-600">
+                        {selectedStudentData.online ? '🟢 Trực tuyến' : '⚫ Ngoại tuyến'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="ai-button text-gray-900 p-2 rounded-xl">
+                      <Phone className="w-4 h-4" />
+                    </button>
+                    <button className="ai-button text-gray-900 p-2 rounded-xl">
+                      <Video className="w-4 h-4" />
+                    </button>
+                    <button className="ai-button text-gray-900 p-2 rounded-xl">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-4">
-                  {autoMessages.map((msg) => (
-                    <div key={msg.id} className={`border-l-4 rounded-lg p-4 ${
-                      msg.type === 'encouragement' ? 'border-green-500 bg-green-50' :
-                      msg.type === 'reminder' ? 'border-orange-500 bg-orange-50' :
-                      msg.type === 'congratulation' ? 'border-blue-500 bg-blue-50' :
-                      'border-red-500 bg-red-50'
-                    }`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {msg.type === 'encouragement' && '💪'}
-                            {msg.type === 'reminder' && '⏰'}
-                            {msg.type === 'congratulation' && '🎉'}
-                            {msg.type === 'warning' && '⚠️'}
-                            {' '}{msg.type.charAt(0).toUpperCase() + msg.type.slice(1)}
-                          </span>
-                        </div>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          msg.sent ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {msg.sent ? 'Sent' : 'Pending'}
-                        </span>
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto py-4 space-y-4">
+                  {currentChat.map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`flex items-start gap-3 ${msg.type === 'teacher' ? 'flex-row-reverse' : ''}`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] flex items-center justify-center text-sm">
+                        {msg.studentAvatar}
                       </div>
-                      <p className="text-sm text-gray-700 mb-2">{msg.message}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs text-gray-600">
-                          To: {msg.recipient === 'all' ? 'All students' : msg.recipient}
+                      <div className={`max-w-[70%] ${msg.type === 'teacher' ? 'items-end' : ''}`}>
+                        <div
+                          className={`p-3 rounded-2xl ${
+                            msg.type === 'teacher'
+                              ? 'bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--secondary))] text-white'
+                              : msg.type === 'ai'
+                              ? 'bg-[hsl(var(--primary))/10] border border-purple-200'
+                              : 'glass-panel'
+                          }`}
+                        >
+                          {msg.type === 'ai' && (
+                            <div className="flex items-center gap-1 text-xs text-purple-600 mb-1">
+                              <Brain className="w-3 h-3" />
+                              AI Copilot
+                            </div>
+                          )}
+                          <p className="text-sm">{msg.message}</p>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1 px-2">
+                          {msg.timestamp}
                         </p>
-                        {msg.scheduledFor && (
-                          <p className="text-xs text-gray-600">
-                            Schedule: {msg.scheduledFor}
-                          </p>
-                        )}
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
 
-            {/* Quick Templates */}
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl shadow-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  ⚡ Quick Templates
-                </h3>
+                {/* Message Input */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <button className="ai-button text-gray-900 p-2 rounded-xl">
+                      <ImageIcon className="w-4 h-4" />
+                    </button>
+                    <button className="ai-button text-gray-900 p-2 rounded-xl">
+                      <FileText className="w-4 h-4" />
+                    </button>
+                    <input
+                      type="text"
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      placeholder="Nhập tin nhắn..."
+                      className="ai-input flex-1 px-4 py-2.5 rounded-xl"
+                      onKeyPress={(e) => e.key === 'Enter' && setMessageInput('')}
+                    />
+                    <button className="ai-button-primary text-white p-2.5 rounded-xl">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] flex items-center justify-center mx-auto mb-4">
+                    <MessageSquare className="w-10 h-10 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Chọn học sinh để chat</h3>
+                  <p className="text-sm text-gray-600">Chọn một học sinh từ danh sách bên trái</p>
+                </div>
+              </div>
+            )}
+          </GlassCard>
+
+          {/* AI Copilot / Notifications */}
+          <GlassCard className="lg:col-span-1 overflow-y-auto">
+            {activeTab === 'notifications' && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-lg">
+                    <Bell className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900">Thông báo</h2>
+                </div>
+                <div className="space-y-3">
+                  {autoMessages.map(msg => (
+                    <div key={msg.id} className="p-4 rounded-xl glass-panel border border-gray-200">
+                      <div className="flex items-start justify-between mb-2">
+                        {getTypeBadge(msg.type)}
+                        <span className="text-xs text-gray-600">
+                          {msg.sent ? 'Đã gửi' : 'Chờ gửi'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-900 mb-2">{msg.message}</p>
+                      {msg.scheduledFor && (
+                        <p className="text-xs text-gray-600 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {msg.scheduledFor}
+                        </p>
+                      )}
+                      {!msg.sent && (
+                        <button className="ai-button-primary text-white px-3 py-1.5 rounded-lg text-xs font-semibold mt-2 flex items-center gap-1">
+                          <Send className="w-3 h-3" />
+                          Gửi ngay
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ai-copilot' && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                    <Brain className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900">AI Copilot</h2>
+                </div>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-[hsl(var(--primary))/10] to-[hsl(var(--secondary))/10] border border-[hsl(var(--primary)/0.2)]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Sparkles className="w-4 h-4 text-purple-600" />
+                      <h3 className="font-semibold text-gray-900 text-sm">Gợi ý hôm nay</h3>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      3 học sinh chưa hoàn thành bài tập tuần này. Nên gửi thông báo nhắc nhở.
+                    </p>
+                    <button className="ai-button-primary text-white px-3 py-1.5 rounded-lg text-xs font-semibold mt-3 flex items-center gap-1">
+                      <Send className="w-3 h-3" />
+                      Gửi nhắc nhở
+                    </button>
+                  </div>
+
+                  <div className="p-4 rounded-xl glass-panel border border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-green-600" />
+                      <h3 className="font-semibold text-gray-900 text-sm">Thành tích nổi bật</h3>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      Phạm Thị D đạt 100% hoàn thành bài học trong 5 ngày liên tiếp.
+                    </p>
+                    <button className="ai-button-primary text-white px-3 py-1.5 rounded-lg text-xs font-semibold mt-3 flex items-center gap-1">
+                      <Star className="w-3 h-3" />
+                      Khen thưởng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'chat' && (
+              <div>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center text-white shadow-lg">
+                    <Zap className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-900">Tác vụ nhanh</h2>
+                </div>
                 <div className="space-y-2">
-                  <button 
-                    onClick={() => handleTemplateSelect('encouragement')}
-                    className="w-full text-left p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
-                  >
-                    <p className="text-sm font-medium text-gray-900 mb-1">💪 Encouragement</p>
-                    <p className="text-xs text-gray-600">&quot;Hôm nay em làm tốt lắm!&quot;</p>
+                  <button className="w-full ai-button text-gray-900 p-3 rounded-xl flex items-center gap-3 text-sm">
+                    <Bell className="w-4 h-4" />
+                    Gửi thông báo cho tất cả
                   </button>
-                  <button 
-                    onClick={() => handleTemplateSelect('reminder')}
-                    className="w-full text-left p-3 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors"
-                  >
-                    <p className="text-sm font-medium text-gray-900 mb-1">⏰ Reminder</p>
-                    <p className="text-xs text-gray-600">&quot;Nhắc hoàn thành bài tập&quot;</p>
+                  <button className="w-full ai-button text-gray-900 p-3 rounded-xl flex items-center gap-3 text-sm">
+                    <FileText className="w-4 h-4" />
+                    Tạo báo cáo tuần
                   </button>
-                  <button 
-                    onClick={() => handleTemplateSelect('congratulation')}
-                    className="w-full text-left p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                  >
-                    <p className="text-sm font-medium text-gray-900 mb-1">🎉 Congratulation</p>
-                    <p className="text-xs text-gray-600">&quot;Chúc mừng đạt thành tích!&quot;</p>
+                  <button className="w-full ai-button text-gray-900 p-3 rounded-xl flex items-center gap-3 text-sm">
+                    <Users className="w-4 h-4" />
+                    Mời phụ huynh tham gia
                   </button>
                 </div>
               </div>
-
-              <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center mb-4">
-                  <Sparkles className="h-5 w-5 mr-2" />
-                  <h3 className="font-semibold">AI Tips</h3>
-                </div>
-                <p className="text-sm opacity-90 mb-3">
-                  &quot;3 học sinh chưa trả lời tin nhắn của thầy. AI gợi ý gửi follow-up sau 24h.&quot;
-                </p>
-                <button 
-                  onClick={handleAIFollowup}
-                  className="text-sm bg-white text-purple-600 px-3 py-1 rounded-lg hover:bg-purple-50 transition-colors"
-                >
-                  Send Follow-up
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* AI Copilot Tab */}
-        {activeTab === 'ai-copilot' && (
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
-              <Brain className="h-5 w-5 text-purple-600 mr-2" />
-              AI Copilot - Trợ lý Giáo viên Thông minh
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4">🤖 Auto-response to Students</h4>
-                <p className="text-sm text-gray-700 mb-4">
-                  AI Copilot tự động trả lời câu hỏi học sinh khi thầy không online. 
-                  Thầy sẽ được thông báo và có thể can thiệp bất cứ lúc nào.
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Status:</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4">💡 Smart Suggestions</h4>
-                <p className="text-sm text-gray-700 mb-4">
-                  AI phân tích cuộc hội thoại và đề xuất tài liệu, bài tập phù hợp với vấn đề của học sinh.
-                </p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Status:</span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4">📊 Conversation Analytics</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total messages:</span>
-                    <span className="font-semibold">127</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Avg response time:</span>
-                    <span className="font-semibold">2.5 min</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">AI handled:</span>
-                    <span className="font-semibold">45%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-br from-orange-50 to-yellow-50 rounded-lg p-6">
-                <h4 className="font-semibold text-gray-900 mb-4">⚠️ Alerts</h4>
-                <p className="text-sm text-gray-700">
-                  AI sẽ cảnh báo khi phát hiện học sinh gặp khó khăn hoặc có dấu hiệu bỏ học.
-                </p>
-                <div className="mt-3 bg-red-100 border border-red-300 rounded-lg p-2">
-                  <p className="text-xs text-red-800">
-                    <AlertCircle className="h-3 w-3 inline mr-1" />
-                    2 học sinh cần được quan tâm
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+            )}
+          </GlassCard>
+        </div>
       </div>
     </div>
   );
 }
-

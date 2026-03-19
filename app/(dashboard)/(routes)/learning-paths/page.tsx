@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Map, Target, Brain, Calendar, TrendingUp, Award, Clock, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Map, Target, Brain, Calendar, TrendingUp, Award, Clock,
   CheckCircle, Circle, Lock, Sparkles, ChevronRight, Play,
   BarChart, Zap, Star, BookOpen, MessageCircle, RefreshCw,
-  ArrowRight, Trophy, Flame, Heart, AlertCircle, Code
+  ArrowRight, Trophy, Flame, Heart, AlertCircle, Code, X
 } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -17,7 +17,7 @@ interface LearningPathLesson {
   subject: string;
   type: string;
   difficulty: 'beginner' | 'intermediate' | 'advanced';
-  duration: number; // minutes
+  duration: number;
   xpReward: number;
   status: 'completed' | 'in-progress' | 'locked' | 'available';
   day: number;
@@ -38,7 +38,6 @@ interface WeekData {
   completedLessons: number;
 }
 
-// AI Learning Path Algorithm Interfaces
 interface LearningPathFormData {
   experience: string;
   goal: string;
@@ -60,29 +59,19 @@ interface LearningPathResult {
 export default function LearningPathPage() {
   const { t } = useLanguage();
   const { data: session } = useSession();
-  
-  // Original learning path states
+
   const [pathData, setPathData] = useState<WeekData[]>([]);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [stats, setStats] = useState({
-    totalDays: 0,
-    completedDays: 0,
-    totalXP: 0,
-    earnedXP: 0,
-    currentStreak: 0,
-    longestStreak: 0
+    totalDays: 0, completedDays: 0, totalXP: 0, earnedXP: 0,
+    currentStreak: 0, longestStreak: 0
   });
   const [selectedLesson, setSelectedLesson] = useState<LearningPathLesson | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // AI Learning Path states
   const [showAIForm, setShowAIForm] = useState(false);
   const [formData, setFormData] = useState<LearningPathFormData>({
-    experience: '',
-    goal: '',
-    timeCommit: '',
-    interest: '',
-    budget: ''
+    experience: '', goal: '', timeCommit: '', interest: '', budget: ''
   });
   const [aiResult, setAiResult] = useState<LearningPathResult[] | null>(null);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -91,212 +80,111 @@ export default function LearningPathPage() {
   const [timeUntilNext, setTimeUntilNext] = useState<string>('');
 
   useEffect(() => {
-    // Load learning path from localStorage
     const savedPath = localStorage.getItem('learningPath');
     if (savedPath) {
-      const data = JSON.parse(savedPath);
-      generateWeeklyPath(data);
+      generateWeeklyPath(JSON.parse(savedPath));
     } else {
-      // Generate demo path
       generateDemoPath();
     }
-    
-    // Check and update lesson locks based on completion
     updateLessonLocks();
-    
-    // Check AI generation limit
     checkAIGenerationLimit();
-    
-    // Load last AI generation time from localStorage
     const lastGen = localStorage.getItem('learning-path-ai-last-generated');
-    if (lastGen) {
-      setLastGenerated(new Date(lastGen));
-    }
+    if (lastGen) setLastGenerated(new Date(lastGen));
   }, []);
 
   useEffect(() => {
-    // Update countdown timer for AI generation
     if (lastGenerated && !canGenerateAI) {
-      const interval = setInterval(() => {
-        updateCountdown();
-      }, 1000);
-      
+      const interval = setInterval(updateCountdown, 1000);
       return () => clearInterval(interval);
     }
   }, [lastGenerated, canGenerateAI]);
-  
+
   const updateLessonLocks = () => {
     const pathProgress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
-    
-    // Update pathData based on progress
-    setPathData(prevWeeks => {
-      return prevWeeks.map(week => ({
-        ...week,
-        lessons: week.lessons.map((lesson, index) => {
-          const progress = pathProgress[lesson.id];
-          
-          // If lesson is completed, update status
-          if (progress?.completed) {
-            return {
-              ...lesson,
-              status: 'completed',
-              completedAt: new Date(progress.completedAt),
-              progress: 100
-            };
-          }
-          
-          // Check if lesson should be unlocked
-          if (lesson.status === 'locked' && lesson.prerequisites) {
-            const allPrereqsPassed = lesson.prerequisites.every(prereqId => {
-              const prereqProgress = pathProgress[prereqId];
-              return prereqProgress?.passed === true; // Must pass with >= 60%
-            });
-            
-            if (allPrereqsPassed) {
-              return { ...lesson, status: 'available' };
-            }
-          }
-          
-          return lesson;
-        })
-      }));
-    });
+    setPathData(prevWeeks => prevWeeks.map(week => ({
+      ...week,
+      lessons: week.lessons.map((lesson) => {
+        const progress = pathProgress[lesson.id];
+        if (progress?.completed) {
+          return { ...lesson, status: 'completed' as const, completedAt: new Date(progress.completedAt), progress: 100 };
+        }
+        if (lesson.status === 'locked' && lesson.prerequisites) {
+          const allPrereqsPassed = lesson.prerequisites.every(prereqId => pathProgress[prereqId]?.passed === true);
+          if (allPrereqsPassed) return { ...lesson, status: 'available' as const };
+        }
+        return lesson;
+      })
+    })));
   };
 
   const checkAIGenerationLimit = () => {
     if (session?.user?.role === 'STUDENT') {
       const lastGen = localStorage.getItem('learning-path-ai-last-generated');
       if (lastGen) {
-        const lastGenDate = new Date(lastGen);
-        const now = new Date();
-        const diffInDays = (now.getTime() - lastGenDate.getTime()) / (1000 * 60 * 60 * 24);
-        
-        if (diffInDays < 7) {
-          setCanGenerateAI(false);
-          setLastGenerated(lastGenDate);
-        } else {
-          setCanGenerateAI(true);
-        }
+        const diffInDays = (Date.now() - new Date(lastGen).getTime()) / (1000 * 60 * 60 * 24);
+        if (diffInDays < 7) { setCanGenerateAI(false); setLastGenerated(new Date(lastGen)); }
+        else setCanGenerateAI(true);
       }
     } else {
-      // Teachers and admins can generate unlimited
       setCanGenerateAI(true);
     }
   };
 
-  const updateCountdown = () => {
+  const updateCountdown = useCallback(() => {
     if (!lastGenerated) return;
-    
-    const now = new Date();
-    const nextAvailable = new Date(lastGenerated.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const diffInMs = nextAvailable.getTime() - now.getTime();
-    
-    if (diffInMs <= 0) {
-      setCanGenerateAI(true);
-      setTimeUntilNext('');
-      return;
-    }
-    
+    const diffInMs = lastGenerated.getTime() + 7 * 24 * 60 * 60 * 1000 - Date.now();
+    if (diffInMs <= 0) { setCanGenerateAI(true); setTimeUntilNext(''); return; }
     const days = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diffInMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diffInMs % (1000 * 60 * 60)) / (1000 * 60));
-    
     setTimeUntilNext(`${days} ngày ${hours} giờ ${minutes} phút`);
-  };
+  }, [lastGenerated]);
 
   const generateDemoPath = () => {
     const today = new Date();
     const weeks: WeekData[] = [];
-
-    // Generate 4 weeks of learning path
     for (let week = 1; week <= 4; week++) {
-      const weekStart = new Date(today);
-      weekStart.setDate(today.getDate() + (week - 1) * 7);
-      
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-
+      const weekStart = new Date(today); weekStart.setDate(today.getDate() + (week - 1) * 7);
+      const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
       const lessons: LearningPathLesson[] = [];
-      
-      // Generate 5 lessons per week (Monday to Friday)
       for (let day = 1; day <= 5; day++) {
-        const lessonDate = new Date(weekStart);
-        lessonDate.setDate(weekStart.getDate() + day - 1);
-        
+        const lessonDate = new Date(weekStart); lessonDate.setDate(weekStart.getDate() + day - 1);
         const dayNumber = (week - 1) * 5 + day;
         const isCompleted = week === 1 && day <= 3;
         const isInProgress = week === 1 && day === 4;
         const isAvailable = week === 1 && day === 5;
-        
         lessons.push({
-          id: `lesson-w${week}-d${day}`,
-          title: getDemoLessonTitle(dayNumber),
-          subject: getDemoSubject(dayNumber),
-          type: 'lesson',
+          id: `lesson-w${week}-d${day}`, title: getDemoLessonTitle(dayNumber),
+          subject: getDemoSubject(dayNumber), type: 'lesson',
           difficulty: getDemoDifficulty(dayNumber),
           duration: 45 + Math.floor(Math.random() * 30),
           xpReward: 100 + Math.floor(Math.random() * 100),
           status: isCompleted ? 'completed' : isInProgress ? 'in-progress' : isAvailable ? 'available' : 'locked',
-          day: dayNumber,
-          date: lessonDate.toISOString().split('T')[0],
+          day: dayNumber, date: lessonDate.toISOString().split('T')[0],
           completedAt: isCompleted ? new Date(lessonDate) : undefined,
-          progress: isInProgress ? 65 : undefined,
-          aiGenerated: true,
-          objectives: [
-            `Hiểu khái niệm cơ bản`,
-            `Áp dụng công thức`,
-            `Giải bài tập thực tế`
-          ],
+          progress: isInProgress ? 65 : undefined, aiGenerated: true,
+          objectives: ['Hiểu khái niệm cơ bản', 'Áp dụng công thức', 'Giải bài tập thực tế'],
           prerequisites: day > 1 ? [`lesson-w${week}-d${day - 1}`] : week > 1 ? [`lesson-w${week - 1}-d5`] : undefined
         });
       }
-
-      const totalXP = lessons.reduce((sum, l) => sum + l.xpReward, 0);
-      const completedLessons = lessons.filter(l => l.status === 'completed').length;
-
       weeks.push({
-        weekNumber: week,
-        startDate: weekStart.toISOString().split('T')[0],
-        endDate: weekEnd.toISOString().split('T')[0],
-        lessons,
-        totalXP,
-        completedLessons
+        weekNumber: week, startDate: weekStart.toISOString().split('T')[0],
+        endDate: weekEnd.toISOString().split('T')[0], lessons,
+        totalXP: lessons.reduce((s, l) => s + l.xpReward, 0),
+        completedLessons: lessons.filter(l => l.status === 'completed').length
       });
     }
-
     setPathData(weeks);
     calculateStats(weeks);
   };
 
   const getDemoLessonTitle = (day: number): string => {
-    const titles = [
-      'Phương trình bậc hai cơ bản',
-      'Hệ phương trình tuyến tính',
-      'Hàm số và đồ thị',
-      'Đạo hàm cơ bản',
-      'Ứng dụng đạo hàm',
-      'Tích phân cơ bản',
-      'Ứng dụng tích phân',
-      'Phương trình vi phân',
-      'Chuỗi số',
-      'Giới hạn và liên tục',
-      'Hình học không gian',
-      'Vectơ và ma trận',
-      'Xác suất cơ bản',
-      'Thống kê mô tả',
-      'Phân phối xác suất',
-      'Kiểm định giả thuyết',
-      'Hồi quy tuyến tính',
-      'Phân tích phương sai',
-      'Chuỗi thời gian',
-      'Tối ưu hóa'
-    ];
+    const titles = ['Phương trình bậc hai cơ bản', 'Hệ phương trình tuyến tính', 'Hàm số và đồ thị', 'Đạo hàm cơ bản', 'Ứng dụng đạo hàm', 'Tích phân cơ bản', 'Ứng dụng tích phân', 'Phương trình vi phân', 'Chuỗi số', 'Giới hạn và liên tục', 'Hình học không gian', 'Vectơ và ma trận', 'Xác suất cơ bản', 'Thống kê mô tả', 'Phân phối xác suất', 'Kiểm định giả thuyết', 'Hồi quy tuyến tính', 'Phân tích phương sai', 'Chuỗi thời gian', 'Tối ưu hóa'];
     return titles[day - 1] || `Bài học ngày ${day}`;
   };
 
   const getDemoSubject = (day: number): string => {
-    const subjects = ['mathematics', 'physics', 'chemistry', 'biology', 'programming'];
-    return subjects[day % subjects.length];
+    return ['mathematics', 'physics', 'chemistry', 'biology', 'programming'][day % 5];
   };
 
   const getDemoDifficulty = (day: number): 'beginner' | 'intermediate' | 'advanced' => {
@@ -305,106 +193,55 @@ export default function LearningPathPage() {
     return 'advanced';
   };
 
-  const generateWeeklyPath = (savedData: any) => {
-    // Convert saved learning path to weekly format
-    // Implementation would depend on saved data structure
-    generateDemoPath(); // For now, use demo
-  };
+  const generateWeeklyPath = (savedData: any) => { generateDemoPath(); };
 
   const calculateStats = (weeks: WeekData[]) => {
-    let totalDays = 0;
-    let completedDays = 0;
-    let totalXP = 0;
-    let earnedXP = 0;
-
-    weeks.forEach(week => {
-      week.lessons.forEach(lesson => {
-        totalDays++;
-        totalXP += lesson.xpReward;
-        if (lesson.status === 'completed') {
-          completedDays++;
-          earnedXP += lesson.xpReward;
-        }
-      });
-    });
-
-    setStats({
-      totalDays,
-      completedDays,
-      totalXP,
-      earnedXP,
-      currentStreak: 3, // Demo value
-      longestStreak: 5  // Demo value
-    });
+    let totalDays = 0, completedDays = 0, totalXP = 0, earnedXP = 0;
+    weeks.forEach(w => w.lessons.forEach(l => {
+      totalDays++; totalXP += l.xpReward;
+      if (l.status === 'completed') { completedDays++; earnedXP += l.xpReward; }
+    }));
+    setStats({ totalDays, completedDays, totalXP, earnedXP, currentStreak: 3, longestStreak: 5 });
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-6 h-6 text-green-500" />;
-      case 'in-progress':
-        return <Circle className="w-6 h-6 text-blue-500 animate-pulse" />;
-      case 'available':
-        return <Play className="w-6 h-6 text-purple-500" />;
-      case 'locked':
-        return <Lock className="w-6 h-6 text-gray-400" />;
-      default:
-        return <Circle className="w-6 h-6 text-gray-300" />;
+      case 'completed': return <CheckCircle className="w-5 h-5 text-emerald-400" />;
+      case 'in-progress': return <Circle className="w-5 h-5 text-blue-400 animate-pulse" />;
+      case 'available': return <Play className="w-5 h-5 text-violet-400" />;
+      case 'locked': return <Lock className="w-5 h-5 text-white/20" />;
+      default: return <Circle className="w-5 h-5 text-white/10" />;
     }
   };
 
-  const getDifficultyColor = (difficulty: string) => {
+  const getDifficultyStyle = (difficulty: string) => {
     switch (difficulty) {
-      case 'beginner':
-        return 'bg-green-100 text-green-700';
-      case 'intermediate':
-        return 'bg-yellow-100 text-yellow-700';
-      case 'advanced':
-        return 'bg-red-100 text-red-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+      case 'beginner': return 'border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400';
+      case 'intermediate': return 'border-amber-500/20 bg-amber-500/[0.06] text-amber-400';
+      case 'advanced': return 'border-rose-500/20 bg-rose-500/[0.06] text-rose-400';
+      default: return 'border-white/10 bg-white/[0.04] text-white/50';
     }
   };
 
   const getSubjectIcon = (subject: string) => {
     switch (subject) {
-      case 'mathematics':
-        return '🧮';
-      case 'physics':
-        return '⚛️';
-      case 'chemistry':
-        return '🧪';
-      case 'biology':
-        return '🧬';
-      case 'programming':
-        return '💻';
-      default:
-        return '📚';
+      case 'mathematics': return '🧮'; case 'physics': return '⚛️';
+      case 'chemistry': return '🧪'; case 'biology': return '🧬';
+      case 'programming': return '💻'; default: return '📚';
     }
   };
 
-  const regenerateLessons = async () => {
-    const confirmed = confirm(
-      '🤖 AI sẽ tạo lộ trình học tập mới dựa trên:\n' +
-      '• Tiến độ hiện tại của bạn\n' +
-      '• Điểm số và performance\n' +
-      '• Mục tiêu học tập\n\n' +
-      'Bạn có muốn tiếp tục không?'
-    );
-    
+  const regenerateLessons = useCallback(async () => {
+    const confirmed = window.confirm('AI sẽ tạo lộ trình mới dựa trên tiến độ, điểm số và mục tiêu của bạn.\n\nBạn có muốn tiếp tục?');
     if (!confirmed) return;
-    
     setIsGenerating(true);
-    
     try {
-      console.log('🤖 Generating new learning path with AI...');
-      
-      // Get current progress
       const progress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
       const completedLessons = Object.keys(progress).filter(key => progress[key].completed);
-      const avgScore = Object.values(progress).reduce((sum: number, p: any) => sum + (p.percentage || 0), 0) / Object.keys(progress).length || 0;
-      
-      // Call AI API to generate new learning path
+      const keys = Object.keys(progress);
+      const avgScore = keys.length
+        ? Object.values(progress).reduce((sum: number, p: any) => sum + (p.percentage || 0), 0) / keys.length
+        : 0;
       const response = await fetch('/api/ai-intelligent/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -414,532 +251,310 @@ export default function LearningPathPage() {
           grade: '12',
           topic: 'Lộ trình học tập cá nhân hóa',
           difficulty: avgScore >= 80 ? 'advanced' : avgScore >= 60 ? 'intermediate' : 'beginner',
-          freeformPrompt: `Tạo lộ trình học tập 4 tuần (20 bài) cho học sinh lớp 12:
-          
-Tiến độ hiện tại:
-- Đã hoàn thành: ${completedLessons.length} bài
-- Điểm trung bình: ${avgScore.toFixed(1)}%
-- Chủ đề đã học: ${completedLessons.slice(0, 3).join(', ')}
-
-Yêu cầu:
-- Tạo 20 bài học (4 tuần × 5 ngày)
-- Mỗi bài 45-60 phút
-- Độ khó tăng dần
-- Có prerequisites logic (bài sau yêu cầu hoàn thành bài trước)
-- Phù hợp với học sinh Việt Nam
-- Đa dạng môn học: Toán, Vật lý, Hóa học
-- Format JSON với structure: { weeks: [{ lessons: [...] }] }`,
+          freeformPrompt: `Tạo lộ trình học tập 4 tuần (20 bài) cho học sinh lớp 12. Đã hoàn thành: ${completedLessons.length} bài, Điểm TB: ${avgScore.toFixed(1)}%`,
           priority: ['quality', 'speed'],
           useHybrid: true,
-          enableCache: false
-        })
+          enableCache: false,
+        }),
       });
-      
-      if (!response.ok) {
-        throw new Error('AI generation failed');
-      }
-      
-      const result = await response.json();
-      console.log('✅ AI generated path:', result);
-      
-      // Parse AI response and update path
-      // For now, regenerate demo path
+      if (!response.ok) throw new Error('AI generation failed');
       generateDemoPath();
-      
-      // Show success notification
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-white border-l-4 border-green-500 rounded-lg shadow-2xl p-6 z-50 animate-in slide-in-from-right max-w-md';
-      notification.innerHTML = `
-        <div class="flex items-start space-x-3">
-          <div class="flex-shrink-0">
-            <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h3 class="text-sm font-bold text-gray-900 mb-1">✅ Lộ trình mới đã tạo!</h3>
-            <p class="text-sm text-gray-700">
-              AI đã tạo 20 bài học được cá nhân hóa dựa trên tiến độ của bạn.
-            </p>
-            <p class="text-xs text-gray-500 mt-2">
-              Model: ${result.meta?.model || 'AI'} • Cost: $${(result.meta?.cost || 0).toFixed(4)}
-            </p>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => notification.remove(), 5000);
-      
-    } catch (error: any) {
-      console.error('❌ AI generation error:', error);
-      alert('❌ Không thể tạo lộ trình mới. Vui lòng thử lại sau.\n\nLỗi: ' + error.message);
+    } catch (error: unknown) {
+      console.error('AI generation error:', error);
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, []);
 
-  // AI Learning Path Algorithm Functions
   const calculateAIMatch = (data: LearningPathFormData) => {
-    const scores = {
-      openai: 0,
-      gemini: 0,
-      grok: 0,
-      claude: 0
-    };
-
-    // Experience scoring
-    if (data.experience === 'beginner') {
-      scores.gemini += 30;
-      scores.claude += 25;
-      scores.openai += 20;
-      scores.grok += 15;
-    } else if (data.experience === 'intermediate') {
-      scores.openai += 30;
-      scores.claude += 25;
-      scores.gemini += 20;
-      scores.grok += 15;
-    } else if (data.experience === 'advanced') {
-      scores.openai += 35;
-      scores.claude += 25;
-      scores.grok += 20;
-      scores.gemini += 15;
-    }
-
-    // Goal scoring
-    if (data.goal === 'chat') {
-      scores.claude += 25;
-      scores.openai += 20;
-      scores.gemini += 20;
-      scores.grok += 15;
-    } else if (data.goal === 'coding') {
-      scores.openai += 30;
-      scores.claude += 25;
-      scores.gemini += 15;
-      scores.grok += 10;
-    } else if (data.goal === 'research') {
-      scores.gemini += 30;
-      scores.claude += 25;
-      scores.openai += 20;
-      scores.grok += 10;
-    } else if (data.goal === 'realtime') {
-      scores.grok += 35;
-      scores.gemini += 20;
-      scores.openai += 15;
-      scores.claude += 10;
-    }
-
-    // Time commitment scoring
-    if (data.timeCommit === 'casual') {
-      scores.claude += 20;
-      scores.gemini += 15;
-      scores.openai += 10;
-      scores.grok += 10;
-    } else if (data.timeCommit === 'regular') {
-      scores.openai += 20;
-      scores.claude += 15;
-      scores.gemini += 15;
-      scores.grok += 10;
-    } else if (data.timeCommit === 'intensive') {
-      scores.openai += 25;
-      scores.gemini += 20;
-      scores.claude += 15;
-      scores.grok += 10;
-    }
-
-    // Interest scoring
-    if (data.interest === 'nlp') {
-      scores.openai += 25;
-      scores.claude += 20;
-      scores.gemini += 15;
-      scores.grok += 10;
-    } else if (data.interest === 'multimodal') {
-      scores.gemini += 30;
-      scores.openai += 20;
-      scores.claude += 15;
-      scores.grok += 10;
-    } else if (data.interest === 'social') {
-      scores.grok += 30;
-      scores.gemini += 15;
-      scores.claude += 15;
-      scores.openai += 10;
-    } else if (data.interest === 'creative') {
-      scores.claude += 25;
-      scores.openai += 20;
-      scores.gemini += 15;
-      scores.grok += 10;
-    }
-
-    // Budget scoring
-    if (data.budget === 'free') {
-      scores.gemini += 25;
-      scores.grok += 20;
-      scores.claude += 15;
-      scores.openai += 10;
-    } else if (data.budget === 'moderate') {
-      scores.claude += 20;
-      scores.openai += 20;
-      scores.gemini += 15;
-      scores.grok += 15;
-    } else if (data.budget === 'premium') {
-      scores.openai += 25;
-      scores.claude += 20;
-      scores.gemini += 15;
-      scores.grok += 10;
-    }
-
+    const scores = { openai: 0, gemini: 0, grok: 0, claude: 0 };
+    if (data.experience === 'beginner') { scores.gemini += 30; scores.claude += 25; scores.openai += 20; scores.grok += 15; }
+    else if (data.experience === 'intermediate') { scores.openai += 30; scores.claude += 25; scores.gemini += 20; scores.grok += 15; }
+    else if (data.experience === 'advanced') { scores.openai += 35; scores.claude += 25; scores.grok += 20; scores.gemini += 15; }
+    if (data.goal === 'chat') { scores.claude += 25; scores.openai += 20; scores.gemini += 20; scores.grok += 15; }
+    else if (data.goal === 'coding') { scores.openai += 30; scores.claude += 25; scores.gemini += 15; scores.grok += 10; }
+    else if (data.goal === 'research') { scores.gemini += 30; scores.claude += 25; scores.openai += 20; scores.grok += 10; }
+    else if (data.goal === 'realtime') { scores.grok += 35; scores.gemini += 20; scores.openai += 15; scores.claude += 10; }
+    // Học sinh THPT
+    else if (data.goal === 'exam_thpt') { scores.gemini += 28; scores.claude += 25; scores.openai += 22; scores.grok += 15; }
+    else if (data.goal === 'improve_grades') { scores.claude += 26; scores.gemini += 24; scores.openai += 22; scores.grok += 12; }
+    else if (data.goal === 'curriculum') { scores.gemini += 26; scores.claude += 24; scores.openai += 22; scores.grok += 12; }
+    else if (data.goal === 'career_orientation') { scores.claude += 28; scores.openai += 24; scores.gemini += 22; scores.grok += 14; }
+    else if (data.goal === 'foreign_lang_thpt') { scores.openai += 26; scores.claude += 24; scores.gemini += 22; scores.grok += 12; }
+    else if (data.goal === 'admission') { scores.claude += 26; scores.gemini += 24; scores.openai += 22; scores.grok += 12; }
+    else if (data.goal === 'soft_skills_thpt') { scores.claude += 26; scores.openai += 24; scores.gemini += 22; scores.grok += 14; }
+    // Sinh viên
+    else if (data.goal === 'major') { scores.gemini += 27; scores.claude += 25; scores.openai += 23; scores.grok += 12; }
+    else if (data.goal === 'internship') { scores.openai += 26; scores.claude += 25; scores.gemini += 22; scores.grok += 14; }
+    else if (data.goal === 'certificates') { scores.gemini += 26; scores.claude += 24; scores.openai += 23; scores.grok += 13; }
+    else if (data.goal === 'soft_skills_uni') { scores.claude += 27; scores.openai += 24; scores.gemini += 22; scores.grok += 14; }
+    else if (data.goal === 'grad_school') { scores.gemini += 28; scores.claude += 26; scores.openai += 22; scores.grok += 10; }
+    else if (data.goal === 'foreign_lang_uni') { scores.openai += 26; scores.claude += 24; scores.gemini += 22; scores.grok += 12; }
+    if (data.timeCommit === 'casual') { scores.claude += 20; scores.gemini += 15; scores.openai += 10; scores.grok += 10; }
+    else if (data.timeCommit === 'regular') { scores.openai += 20; scores.claude += 15; scores.gemini += 15; scores.grok += 10; }
+    else if (data.timeCommit === 'intensive') { scores.openai += 25; scores.gemini += 20; scores.claude += 15; scores.grok += 10; }
+    if (data.interest === 'nlp') { scores.openai += 25; scores.claude += 20; scores.gemini += 15; scores.grok += 10; }
+    else if (data.interest === 'multimodal') { scores.gemini += 30; scores.openai += 20; scores.claude += 15; scores.grok += 10; }
+    else if (data.interest === 'social') { scores.grok += 30; scores.gemini += 15; scores.claude += 15; scores.openai += 10; }
+    else if (data.interest === 'creative') { scores.claude += 25; scores.openai += 20; scores.gemini += 15; scores.grok += 10; }
+    if (data.budget === 'free') { scores.gemini += 25; scores.grok += 20; scores.claude += 15; scores.openai += 10; }
+    else if (data.budget === 'moderate') { scores.claude += 20; scores.openai += 20; scores.gemini += 15; scores.grok += 15; }
+    else if (data.budget === 'premium') { scores.openai += 25; scores.claude += 20; scores.gemini += 15; scores.grok += 10; }
     return scores;
   };
 
   const generateAILearningPath = (scores: any) => {
-    const sorted = Object.entries(scores)
-      .sort(([, a], [, b]) => b - a)
-      .map(([platform, score]) => ({ platform, score }));
-
-    const paths = {
-      openai: {
-        name: 'OpenAI (GPT-4, ChatGPT)',
-        weeks: [
-          'Tuần 1-2: Cơ bản về API, prompt engineering',
-          'Tuần 3-4: Function calling và embeddings',
-          'Tuần 5-6: Fine-tuning và optimization',
-          'Tuần 7-8: Xây dựng ứng dụng thực tế'
-        ],
-        resources: ['OpenAI Cookbook', 'Official Documentation', 'Community Forums'],
-        color: 'bg-emerald-50 border-emerald-200'
-      },
-      gemini: {
-        name: 'Google Gemini',
-        weeks: [
-          'Tuần 1-2: Khởi đầu với Gemini API',
-          'Tuần 3-4: Xử lý đa phương thức (text, image, video)',
-          'Tuần 5-6: Tích hợp với Google Workspace',
-          'Tuần 7-8: Dự án tổng hợp'
-        ],
-        resources: ['Google AI Studio', 'Gemini Documentation', 'Vertex AI Tutorials'],
-        color: 'bg-blue-50 border-blue-200'
-      },
-      grok: {
-        name: 'xAI Grok',
-        weeks: [
-          'Tuần 1-2: Làm quen với Grok và X Platform',
-          'Tuần 3-4: Real-time data processing',
-          'Tuần 5-6: Social media analysis',
-          'Tuần 7-8: Ứng dụng thời gian thực'
-        ],
-        resources: ['xAI Documentation', 'X Developer Portal', 'Community Guides'],
-        color: 'bg-purple-50 border-purple-200'
-      },
-      claude: {
-        name: 'Anthropic Claude',
-        weeks: [
-          'Tuần 1-2: Constitutional AI và cơ bản API',
-          'Tuần 3-4: Long context và document analysis',
-          'Tuần 5-6: Tool use và agentic workflows',
-          'Tuần 7-8: Ứng dụng nâng cao'
-        ],
-        resources: ['Claude Documentation', 'Anthropic Cookbook', 'Prompt Library'],
-        color: 'bg-amber-50 border-amber-200'
-      }
+    const sorted = Object.entries(scores).sort(([, a], [, b]) => (b as number) - (a as number)).map(([platform, score]) => ({ platform, score }));
+    const paths: Record<string, any> = {
+      openai: { name: 'OpenAI (GPT-4, ChatGPT)', weeks: ['Tuần 1-2: Cơ bản về API, prompt engineering', 'Tuần 3-4: Function calling và embeddings', 'Tuần 5-6: Fine-tuning và optimization', 'Tuần 7-8: Xây dựng ứng dụng thực tế'], resources: ['OpenAI Cookbook', 'Official Documentation', 'Community Forums'], gradient: 'from-emerald-500/10 to-teal-500/10', border: 'border-emerald-500/15', accent: 'text-emerald-400' },
+      gemini: { name: 'Google Gemini', weeks: ['Tuần 1-2: Khởi đầu với Gemini API', 'Tuần 3-4: Xử lý đa phương thức (text, image, video)', 'Tuần 5-6: Tích hợp với Google Workspace', 'Tuần 7-8: Dự án tổng hợp'], resources: ['Google AI Studio', 'Gemini Documentation', 'Vertex AI Tutorials'], gradient: 'from-blue-500/10 to-indigo-500/10', border: 'border-blue-500/15', accent: 'text-blue-400' },
+      grok: { name: 'xAI Grok', weeks: ['Tuần 1-2: Làm quen với Grok và X Platform', 'Tuần 3-4: Real-time data processing', 'Tuần 5-6: Social media analysis', 'Tuần 7-8: Ứng dụng thời gian thực'], resources: ['xAI Documentation', 'X Developer Portal', 'Community Guides'], gradient: 'from-violet-500/10 to-purple-500/10', border: 'border-violet-500/15', accent: 'text-violet-400' },
+      claude: { name: 'Anthropic Claude', weeks: ['Tuần 1-2: Constitutional AI và cơ bản API', 'Tuần 3-4: Long context và document analysis', 'Tuần 5-6: Tool use và agentic workflows', 'Tuần 7-8: Ứng dụng nâng cao'], resources: ['Claude Documentation', 'Anthropic Cookbook', 'Prompt Library'], gradient: 'from-amber-500/10 to-orange-500/10', border: 'border-amber-500/15', accent: 'text-amber-400' }
     };
-
     return sorted.map(({ platform, score }) => ({
-      ...paths[platform as keyof typeof paths],
-      platform,
-      score,
-      recommendation: score >= 80 ? 'Rất phù hợp' : score >= 60 ? 'Phù hợp' : 'Có thể xem xét'
+      ...paths[platform], platform, score,
+      recommendation: (score as number) >= 80 ? 'Rất phù hợp' : (score as number) >= 60 ? 'Phù hợp' : 'Có thể xem xét'
     }));
   };
 
-  const handleAISubmit = async () => {
-    if (!formData.experience || !formData.goal || !formData.timeCommit || !formData.interest || !formData.budget) {
-      alert('Vui lòng điền đầy đủ thông tin');
-      return;
-    }
-
-    if (!canGenerateAI) {
-      alert(`Bạn chỉ có thể tạo AI learning path mới sau ${timeUntilNext}`);
-      return;
-    }
-
+  const handleAISubmit = useCallback(async () => {
+    if (!formData.experience || !formData.goal || !formData.timeCommit || !formData.interest || !formData.budget) return;
+    if (!canGenerateAI) return;
     setIsGeneratingAI(true);
-    
     try {
-      // Simulate AI processing time
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       const scores = calculateAIMatch(formData);
       const path = generateAILearningPath(scores);
       setAiResult(path);
-      
-      // Save generation time
       const now = new Date();
       localStorage.setItem('learning-path-ai-last-generated', now.toISOString());
       setLastGenerated(now);
       setCanGenerateAI(false);
-      
-      // Show success notification
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-white border-l-4 border-green-500 rounded-lg shadow-2xl p-6 z-50 animate-in slide-in-from-right max-w-md';
-      notification.innerHTML = `
-        <div class="flex items-start space-x-3">
-          <div class="flex-shrink-0">
-            <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h3 class="text-sm font-bold text-gray-900 mb-1">✅ AI Learning Path đã tạo!</h3>
-            <p class="text-sm text-gray-700">
-              Thuật toán AI đã tạo lộ trình học tập cá nhân hóa dựa trên thông tin của bạn.
-            </p>
-            <p class="text-xs text-gray-500 mt-2">
-              ${session?.user?.role === 'STUDENT' ? 'Bạn có thể tạo lại sau 7 ngày' : 'Có thể tạo lại bất kỳ lúc nào'}
-            </p>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(notification);
-      setTimeout(() => notification.remove(), 5000);
-      
     } catch (error) {
       console.error('Error generating AI learning path:', error);
-      alert('Có lỗi xảy ra khi tạo AI learning path. Vui lòng thử lại.');
     } finally {
       setIsGeneratingAI(false);
     }
-  };
+  }, [formData, canGenerateAI]);
 
-  const handleAIChange = (field: keyof LearningPathFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleAIChange = useCallback((field: keyof LearningPathFormData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
+  const handleToggleAIForm = useCallback(() => {
+    setShowAIForm((prev) => !prev);
+  }, []);
+
+  const handleCloseAIForm = useCallback(() => {
+    setShowAIForm(false);
+  }, []);
+
+  const handleLessonSelect = useCallback((lesson: LearningPathLesson) => {
+    if (lesson.status !== 'locked') setSelectedLesson(lesson);
+  }, []);
+
+  const handleLessonKeyDown = useCallback((e: React.KeyboardEvent, lesson: LearningPathLesson) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (lesson.status !== 'locked') setSelectedLesson(lesson);
+    }
+  }, []);
+
+  const handleLinkClickStopPropagation = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  /* ── Shared select style ── */
+  const selectClass = "w-full p-3 rounded-lg bg-black/25 border border-white/[0.08] text-white/80 text-sm focus:outline-none focus:border-[hsl(245,85%,65%)]/50 focus:shadow-[0_0_15px_rgba(120,100,255,0.1)] transition-all [&>option]:bg-[hsl(225,15%,10%)] [&>option]:text-white/80";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-8 mb-6 text-white">
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* ── Hero Header ── */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-8">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-[hsl(245,85%,65%)] opacity-[0.04] rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-[hsl(280,75%,60%)] opacity-[0.03] rounded-full blur-[80px] pointer-events-none" />
+
+          <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h1 className="text-4xl font-bold mb-2">🗺️ Lộ trình học tập của bạn</h1>
-              <p className="text-purple-100">Theo dõi tiến độ và hoàn thành mục tiêu từng ngày</p>
+              <h1 className="text-2xl md:text-3xl font-bold gradient-text mb-2">
+                Lộ trình học tập của bạn
+              </h1>
+              <p className="text-sm text-white/40">Theo dõi tiến độ và hoàn thành mục tiêu từng ngày</p>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
-                onClick={() => setShowAIForm(!showAIForm)}
-                className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-colors flex items-center"
+                type="button"
+                onClick={handleToggleAIForm}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white text-sm font-medium shadow-[0_0_20px_rgba(120,100,255,0.2)] hover:shadow-[0_0_30px_rgba(120,100,255,0.3)] hover:brightness-110 transition-all"
+                aria-expanded={showAIForm}
+                aria-controls="ai-learning-path-form"
               >
-                <Sparkles className="w-5 h-5 mr-2" />
+                <Sparkles className="w-4 h-4" />
                 AI Learning Path
               </button>
               <button
+                type="button"
                 onClick={regenerateLessons}
                 disabled={isGenerating}
-                className="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-purple-50 transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/70 text-sm font-medium hover:bg-white/[0.06] hover:text-white/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <RefreshCw className={`w-5 h-5 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${isGenerating ? 'animate-spin' : ''}`} />
                 {isGenerating ? 'AI đang tạo...' : 'Tạo lộ trình mới'}
               </button>
             </div>
           </div>
         </div>
 
-        {/* AI Learning Path Form */}
+        {/* ── AI Learning Path Form ── */}
         {showAIForm && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+          <div id="ai-learning-path-form" className="rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-6 animate-scale-in" role="region" aria-labelledby="ai-form-heading">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                <Sparkles className="w-6 h-6 mr-2 text-purple-600" />
+              <h2 id="ai-form-heading" className="text-lg font-bold text-white/90 flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[hsl(245,85%,65%)]" />
                 AI Learning Path Algorithm
               </h2>
-              <button
-                onClick={() => setShowAIForm(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
+              <button type="button" onClick={handleCloseAIForm} className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-white/40 hover:text-white/70" aria-label="Đóng form AI Learning Path">
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Generation Limit Warning */}
             {session?.user?.role === 'STUDENT' && !canGenerateAI && (
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
-                <div className="flex items-start">
-                  <AlertCircle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h3 className="text-sm font-bold text-yellow-800 mb-1">
-                      ⏰ Giới hạn tạo AI Learning Path
-                    </h3>
-                    <p className="text-sm text-yellow-700 mb-2">
-                      Tài khoản Student chỉ được tạo AI learning path mới <strong>1 lần/tuần</strong> để đảm bảo chất lượng học tập.
-                    </p>
-                    <p className="text-sm text-yellow-700">
-                      Thời gian có thể tạo lại: <strong>{timeUntilNext}</strong>
-                    </p>
+              <div className="mb-5 p-4 rounded-lg border border-amber-500/15 bg-amber-500/[0.04]">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-white/50">
+                    <span className="font-medium text-amber-400">Giới hạn 1 lần/tuần.</span> Thời gian tạo lại: <span className="text-amber-400">{timeUntilNext}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <BookOpen className="inline w-4 h-4 mr-2" />
-                  Trình độ hiện tại
+                <label className="block text-xs font-medium text-white/50 mb-1.5 flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5" /> Trình độ hiện tại
                 </label>
-                <select
-                  value={formData.experience}
-                  onChange={(e) => handleAIChange('experience', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
+                <select value={formData.experience} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleAIChange('experience', e.target.value)} className={selectClass} aria-label="Trình độ hiện tại">
                   <option value="">Chọn trình độ</option>
-                  <option value="beginner">Mới bắt đầu - Chưa biết gì về AI</option>
+                  <option value="beginner">Mới bắt đầu</option>
                   <option value="intermediate">Trung cấp - Đã dùng chatbot AI</option>
                   <option value="advanced">Nâng cao - Đã code với AI API</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <Target className="inline w-4 h-4 mr-2" />
-                  Mục tiêu học tập
+                <label className="block text-xs font-medium text-white/50 mb-1.5 flex items-center gap-1.5">
+                  <Target className="w-3.5 h-3.5" /> Mục tiêu học tập
                 </label>
-                <select
-                  value={formData.goal}
-                  onChange={(e) => handleAIChange('goal', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
+                <select value={formData.goal} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleAIChange('goal', e.target.value)} className={selectClass} aria-label="Mục tiêu học tập">
                   <option value="">Chọn mục tiêu</option>
-                  <option value="chat">Sử dụng chatbot hiệu quả</option>
-                  <option value="coding">Lập trình với AI</option>
-                  <option value="research">Nghiên cứu và phân tích</option>
-                  <option value="realtime">Ứng dụng thời gian thực</option>
+                  <optgroup label="——— Công nghệ & AI ———">
+                    <option value="chat">Sử dụng chatbot hiệu quả</option>
+                    <option value="coding">Lập trình với AI</option>
+                    <option value="research">Nghiên cứu và phân tích</option>
+                    <option value="realtime">Ứng dụng thời gian thực</option>
+                  </optgroup>
+                  <optgroup label="——— Học sinh THPT ———">
+                    <option value="exam_thpt">Ôn thi THPT Quốc gia / Đại học</option>
+                    <option value="improve_grades">Nâng cao điểm số các môn</option>
+                    <option value="curriculum">Học theo chương trình phổ thông (Toán, Lý, Hóa, Văn, Anh…)</option>
+                    <option value="career_orientation">Định hướng nghề nghiệp</option>
+                    <option value="foreign_lang_thpt">Ngoại ngữ (Tiếng Anh, chứng chỉ)</option>
+                    <option value="admission">Chuẩn bị hồ sơ đại học / tuyển sinh</option>
+                    <option value="soft_skills_thpt">Kỹ năng mềm (thuyết trình, tư duy phản biện)</option>
+                  </optgroup>
+                  <optgroup label="——— Sinh viên ———">
+                    <option value="major">Chuyên ngành / môn chuyên ngành</option>
+                    <option value="internship">Thực tập & kỹ năng nghề nghiệp</option>
+                    <option value="certificates">Chứng chỉ (tin học, ngoại ngữ, chuyên môn)</option>
+                    <option value="soft_skills_uni">Kỹ năng mềm (làm việc nhóm, quản lý thời gian)</option>
+                    <option value="grad_school">Ôn thi sau đại học / cao học</option>
+                    <option value="foreign_lang_uni">Học thêm ngoại ngữ</option>
+                  </optgroup>
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  <Code className="inline w-4 h-4 mr-2" />
-                  Thời gian cam kết
+                <label className="block text-xs font-medium text-white/50 mb-1.5 flex items-center gap-1.5">
+                  <Code className="w-3.5 h-3.5" /> Thời gian cam kết
                 </label>
-                <select
-                  value={formData.timeCommit}
-                  onChange={(e) => handleAIChange('timeCommit', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
+                <select value={formData.timeCommit} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleAIChange('timeCommit', e.target.value)} className={selectClass} aria-label="Thời gian cam kết">
                   <option value="">Chọn thời gian</option>
-                  <option value="casual">1-2 giờ/tuần - Học nhẹ nhàng</option>
-                  <option value="regular">5-10 giờ/tuần - Học đều đặn</option>
-                  <option value="intensive">15+ giờ/tuần - Học chuyên sâu</option>
+                  <option value="casual">1-2 giờ/tuần</option>
+                  <option value="regular">5-10 giờ/tuần</option>
+                  <option value="intensive">15+ giờ/tuần</option>
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Lĩnh vực quan tâm
-                </label>
-                <select
-                  value={formData.interest}
-                  onChange={(e) => handleAIChange('interest', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Lĩnh vực quan tâm</label>
+                <select value={formData.interest} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleAIChange('interest', e.target.value)} className={selectClass} aria-label="Lĩnh vực quan tâm">
                   <option value="">Chọn lĩnh vực</option>
                   <option value="nlp">Xử lý ngôn ngữ tự nhiên</option>
-                  <option value="multimodal">Đa phương thức (text, image, video)</option>
-                  <option value="social">Mạng xã hội và real-time data</option>
+                  <option value="multimodal">Đa phương thức</option>
+                  <option value="social">Mạng xã hội & real-time</option>
                   <option value="creative">Sáng tạo nội dung</option>
                 </select>
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ngân sách
-                </label>
-                <select
-                  value={formData.budget}
-                  onChange={(e) => handleAIChange('budget', e.target.value)}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-white/50 mb-1.5">Ngân sách</label>
+                <select value={formData.budget} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleAIChange('budget', e.target.value)} className={selectClass} aria-label="Ngân sách">
                   <option value="">Chọn ngân sách</option>
-                  <option value="free">Miễn phí - Chỉ dùng free tier</option>
+                  <option value="free">Miễn phí - Free tier</option>
                   <option value="moderate">Vừa phải - $10-30/tháng</option>
                   <option value="premium">Cao - $30+/tháng</option>
                 </select>
               </div>
-
-              <button
-                onClick={handleAISubmit}
-                disabled={isGeneratingAI || !canGenerateAI}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-4 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {isGeneratingAI ? (
-                  <>
-                    <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
-                    AI đang tạo lộ trình...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-5 h-5 mr-2" />
-                    Tạo AI Learning Path
-                  </>
-                )}
-              </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleAISubmit}
+              disabled={isGeneratingAI || !canGenerateAI || !formData.experience || !formData.goal || !formData.timeCommit || !formData.interest || !formData.budget}
+              className="w-full py-3 rounded-lg bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white text-sm font-medium shadow-[0_0_20px_rgba(120,100,255,0.2)] hover:shadow-[0_0_30px_rgba(120,100,255,0.3)] hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              aria-busy={isGeneratingAI}
+            >
+              {isGeneratingAI ? <><RefreshCw className="w-4 h-4 animate-spin" /> AI đang tạo lộ trình...</> : <><Sparkles className="w-4 h-4" /> Tạo AI Learning Path</>}
+            </button>
           </div>
         )}
 
-        {/* AI Learning Path Results */}
+        {/* ── AI Learning Path Results ── */}
         {aiResult && (
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 text-center mb-6">
-              AI Learning Path Recommendations
-            </h2>
-            <div className="space-y-6">
-              {aiResult.map((path, index) => (
-                <div
-                  key={path.name}
-                  className={`${path.color} border-2 rounded-2xl p-6 transition-all hover:shadow-lg`}
-                >
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-6 animate-scale-in">
+            <h2 className="text-lg font-bold text-white/90 text-center mb-6">AI Learning Path Recommendations</h2>
+            <div className="space-y-4">
+              {aiResult.map((path: any, index: number) => (
+                <div key={path.name} className={`rounded-xl border ${path.border} bg-gradient-to-br ${path.gradient} p-5 transition-all hover:border-white/[0.1]`}>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`text-2xl font-bold ${
-                        index === 0 ? 'text-yellow-600' : 
-                        index === 1 ? 'text-gray-600' : 
-                        index === 2 ? 'text-orange-600' : 'text-gray-500'
-                      }`}>
+                      <span className={`text-lg font-bold ${index === 0 ? 'text-amber-400' : index === 1 ? 'text-white/40' : index === 2 ? 'text-orange-400' : 'text-white/30'}`}>
                         #{index + 1}
-                      </div>
+                      </span>
                       <div>
-                        <h3 className="text-xl font-bold text-gray-800">{path.name}</h3>
-                        <p className="text-sm text-gray-600">{path.recommendation} - {path.score}/100 điểm</p>
+                        <h3 className="text-base font-bold text-white/90">{path.name}</h3>
+                        <p className="text-xs text-white/40">{path.recommendation} - {path.score}/100</p>
                       </div>
                     </div>
-                    <div className="bg-white px-4 py-2 rounded-full text-sm font-semibold">
-                      {path.score >= 80 ? '⭐⭐⭐' : path.score >= 60 ? '⭐⭐' : '⭐'}
-                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/[0.06] border border-white/[0.06] text-white/50">
+                      {path.score >= 80 ? '★★★' : path.score >= 60 ? '★★' : '★'}
+                    </span>
                   </div>
 
                   <div className="mb-4">
-                    <h4 className="font-semibold text-gray-700 mb-2 flex items-center gap-2">
-                      <ChevronRight className="w-4 h-4" />
-                      Lộ trình 8 tuần:
+                    <h4 className="text-xs font-medium text-white/50 mb-2 flex items-center gap-1.5">
+                      <ChevronRight className="w-3 h-3" /> Lộ trình 8 tuần
                     </h4>
-                    <div className="space-y-2">
-                      {path.weeks.map((week, i) => (
-                        <div key={i} className="bg-white bg-opacity-60 p-3 rounded-lg text-sm">
-                          {week}
-                        </div>
+                    <div className="space-y-1.5">
+                      {path.weeks.map((week: string, i: number) => (
+                        <div key={i} className="p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.04] text-xs text-white/60">{week}</div>
                       ))}
                     </div>
                   </div>
 
-                  <div>
-                    <h4 className="font-semibold text-gray-700 mb-2">Tài nguyên học tập:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {path.resources.map((resource, i) => (
-                        <span key={i} className="bg-white px-3 py-1 rounded-full text-sm">
-                          {resource}
-                        </span>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {path.resources.map((resource: string, i: number) => (
+                      <span key={i} className="px-2.5 py-1 rounded-full bg-white/[0.04] border border-white/[0.06] text-[0.65rem] text-white/50">{resource}</span>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -947,218 +562,154 @@ Yêu cầu:
           </div>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Calendar className="w-8 h-8 text-blue-500" />
-              <span className="text-2xl font-bold text-gray-900">
-                {stats.completedDays}/{stats.totalDays}
-              </span>
+        {/* ── Stats Overview ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { icon: Calendar, label: 'Ngày hoàn thành', value: `${stats.completedDays}/${stats.totalDays}`, color: 'text-blue-400', glow: 'hover:shadow-[0_0_30px_rgba(96,165,250,0.08)]', barPct: stats.totalDays ? (stats.completedDays / stats.totalDays) * 100 : 0, barColor: 'from-blue-500 to-indigo-500', sub: '' },
+            { icon: Trophy, label: 'XP đã kiếm', value: stats.earnedXP.toLocaleString(), color: 'text-amber-400', glow: 'hover:shadow-[0_0_30px_rgba(245,158,11,0.08)]', barPct: 0, barColor: '', sub: `Mục tiêu: ${stats.totalXP.toLocaleString()} XP` },
+            { icon: Flame, label: 'Streak hiện tại', value: String(stats.currentStreak), color: 'text-orange-400', glow: 'hover:shadow-[0_0_30px_rgba(249,115,22,0.08)]', barPct: 0, barColor: '', sub: `Kỷ lục: ${stats.longestStreak} ngày` },
+            { icon: TrendingUp, label: 'Tiến độ tổng', value: `${stats.totalDays ? ((stats.completedDays / stats.totalDays) * 100).toFixed(0) : 0}%`, color: 'text-emerald-400', glow: 'hover:shadow-[0_0_30px_rgba(16,185,129,0.08)]', barPct: 0, barColor: '', sub: 'Đang tiến bộ tốt!' },
+          ].map((card) => (
+            <div key={card.label} className={`group rounded-xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm p-5 transition-all duration-300 hover:bg-white/[0.04] hover:border-white/[0.1] ${card.glow}`}>
+              <div className="flex items-center justify-between mb-2">
+                <card.icon className={`w-5 h-5 ${card.color}`} />
+                <span className={`text-xl font-bold ${card.color}`}>{card.value}</span>
+              </div>
+              <p className="text-xs text-white/50 mb-1">{card.label}</p>
+              {card.barPct > 0 && (
+                <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden mt-2">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${card.barColor}`} style={{ width: `${card.barPct}%` }} />
+                </div>
+              )}
+              {card.sub && <p className="text-[0.65rem] text-white/30 mt-1">{card.sub}</p>}
             </div>
-            <div className="text-gray-600">Ngày đã hoàn thành</div>
-            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all"
-                style={{ width: `${(stats.completedDays / stats.totalDays) * 100}%` }}
-              ></div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Trophy className="w-8 h-8 text-yellow-500" />
-              <span className="text-2xl font-bold text-gray-900">
-                {stats.earnedXP.toLocaleString()}
-              </span>
-            </div>
-            <div className="text-gray-600">XP đã kiếm được</div>
-            <div className="mt-2 text-sm text-gray-500">
-              Mục tiêu: {stats.totalXP.toLocaleString()} XP
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Flame className="w-8 h-8 text-orange-500" />
-              <span className="text-2xl font-bold text-gray-900">
-                {stats.currentStreak}
-              </span>
-            </div>
-            <div className="text-gray-600">Streak hiện tại</div>
-            <div className="mt-2 text-sm text-gray-500">
-              Kỷ lục: {stats.longestStreak} ngày
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingUp className="w-8 h-8 text-green-500" />
-              <span className="text-2xl font-bold text-gray-900">
-                {((stats.completedDays / stats.totalDays) * 100).toFixed(0)}%
-              </span>
-            </div>
-            <div className="text-gray-600">Tiến độ tổng thể</div>
-            <div className="mt-2 text-sm text-green-600 font-medium">
-              Đang tiến bộ tốt! 🎉
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Weekly Timeline */}
-        <div className="space-y-6">
+        {/* ── Weekly Timeline ── */}
+        <div className="space-y-4">
           {pathData.map((week) => (
-            <div key={week.weekNumber} className="bg-white rounded-xl shadow-lg p-6">
+            <div key={week.weekNumber} className="rounded-xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm overflow-hidden">
               {/* Week Header */}
-              <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-100">
+              <div className="flex items-center justify-between p-5 border-b border-white/[0.04]">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                    Tuần {week.weekNumber}
-                  </h2>
-                  <p className="text-gray-600">
+                  <h2 className="text-base font-bold text-white/90 mb-0.5">Tuần {week.weekNumber}</h2>
+                  <p className="text-xs text-white/30">
                     {new Date(week.startDate).toLocaleDateString('vi-VN')} - {new Date(week.endDate).toLocaleDateString('vi-VN')}
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {week.completedLessons}/{week.lessons.length}
-                  </div>
-                  <div className="text-sm text-gray-600">Bài học hoàn thành</div>
+                  <span className="text-lg font-bold text-violet-400">{week.completedLessons}/{week.lessons.length}</span>
+                  <p className="text-[0.65rem] text-white/30">Hoàn thành</p>
                 </div>
               </div>
 
-              {/* Lessons Timeline */}
-              <div className="space-y-4">
+              {/* Lessons */}
+              <div className="p-4 space-y-2">
                 {week.lessons.map((lesson, index) => (
                   <div
                     key={lesson.id}
+                    role="button"
+                    tabIndex={lesson.status === 'locked' ? -1 : 0}
                     className={`relative flex items-start gap-4 p-4 rounded-lg transition-all ${
                       lesson.status === 'locked'
-                        ? 'opacity-50 cursor-not-allowed'
-                        : 'hover:bg-gray-50 cursor-pointer'
+                        ? 'opacity-40 cursor-not-allowed'
+                        : 'hover:bg-white/[0.03] cursor-pointer group'
                     }`}
-                    onClick={() => lesson.status !== 'locked' && setSelectedLesson(lesson)}
+                    onClick={() => handleLessonSelect(lesson)}
+                    onKeyDown={(e) => handleLessonKeyDown(e, lesson)}
                   >
-                    {/* Timeline */}
-                    <div className="flex flex-col items-center">
+                    {/* Timeline line + icon */}
+                    <div className="flex flex-col items-center flex-shrink-0">
                       {getStatusIcon(lesson.status)}
                       {index < week.lessons.length - 1 && (
-                        <div className="w-0.5 h-12 bg-gray-200 mt-2"></div>
+                        <div className="w-px h-10 bg-white/[0.06] mt-1.5" />
                       )}
                     </div>
 
-                    {/* Lesson Card */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl">{getSubjectIcon(lesson.subject)}</span>
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {lesson.title}
-                            </h3>
-                            {lesson.aiGenerated && (
-                              <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium flex items-center">
-                                <Sparkles className="w-3 h-3 mr-1" />
-                                AI
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 text-sm text-gray-600">
-                            <span>Ngày {lesson.day}</span>
-                            <span>•</span>
-                            <span>{new Date(lesson.date).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                          </div>
+                    {/* Lesson content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3 mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-base flex-shrink-0">{getSubjectIcon(lesson.subject)}</span>
+                          <h3 className="text-sm font-semibold text-white/85 truncate">{lesson.title}</h3>
+                          {lesson.aiGenerated && (
+                            <span className="nav-badge flex-shrink-0 text-[0.55rem] px-1.5 py-0.5">AI</span>
+                          )}
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(lesson.difficulty)}`}>
-                            {lesson.difficulty === 'beginner' && 'Cơ bản'}
-                            {lesson.difficulty === 'intermediate' && 'Trung bình'}
-                            {lesson.difficulty === 'advanced' && 'Nâng cao'}
-                          </span>
-                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[0.6rem] font-medium border flex-shrink-0 ${getDifficultyStyle(lesson.difficulty)}`}>
+                          {lesson.difficulty === 'beginner' ? 'Cơ bản' : lesson.difficulty === 'intermediate' ? 'Trung bình' : 'Nâng cao'}
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {lesson.duration} phút
-                        </div>
-                        <div className="flex items-center text-green-600 font-medium">
-                          <Zap className="w-4 h-4 mr-1" />
-                          +{lesson.xpReward} XP
-                        </div>
+                      <div className="flex items-center gap-3 text-[0.7rem] text-white/30 mb-1.5">
+                        <span>Ngày {lesson.day}</span>
+                        <span className="w-px h-3 bg-white/10" />
+                        <span>{new Date(lesson.date).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                       </div>
 
+                      <div className="flex items-center gap-4 text-xs text-white/40">
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{lesson.duration} phút</span>
+                        <span className="flex items-center gap-1 text-emerald-400/70"><Zap className="w-3 h-3" />+{lesson.xpReward} XP</span>
+                      </div>
+
+                      {/* Progress bar for in-progress */}
                       {lesson.progress !== undefined && (
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-gray-600">Tiến độ</span>
-                            <span className="font-medium text-blue-600">{lesson.progress}%</span>
+                        <div className="mt-2.5">
+                          <div className="flex items-center justify-between text-[0.65rem] mb-1">
+                            <span className="text-white/30">Tiến độ</span>
+                            <span className="text-blue-400">{lesson.progress}%</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
-                              style={{ width: `${lesson.progress}%` }}
-                            ></div>
+                          <div className="h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500 shadow-[0_0_6px_rgba(99,102,241,0.4)]" style={{ width: `${lesson.progress}%` }} />
                           </div>
                         </div>
                       )}
 
-                      {lesson.status === 'available' && (
+                      {/* Action links */}
+                      {(lesson.status === 'available' || lesson.status === 'in-progress') && (
                         <Link
                           href={`/learning-paths/lesson/${lesson.id}`}
-                          className="inline-flex items-center mt-3 text-purple-600 hover:text-purple-700 font-medium text-sm"
+                          className="inline-flex items-center mt-2.5 text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors gap-1"
+                          onClick={handleLinkClickStopPropagation}
                         >
-                          <Play className="w-4 h-4 mr-1" />
-                          Bắt đầu học
-                          <ArrowRight className="w-4 h-4 ml-1" />
+                          <Play className="w-3 h-3" />
+                          {lesson.status === 'available' ? 'Bắt đầu học' : 'Tiếp tục học'}
+                          <ArrowRight className="w-3 h-3" />
                         </Link>
                       )}
 
-                      {lesson.status === 'in-progress' && (
-                        <Link
-                          href={`/learning-paths/lesson/${lesson.id}`}
-                          className="inline-flex items-center mt-3 text-blue-600 hover:text-blue-700 font-medium text-sm"
-                        >
-                          <Play className="w-4 h-4 mr-1" />
-                          Tiếp tục học
-                          <ArrowRight className="w-4 h-4 ml-1" />
-                        </Link>
-                      )}
-
+                      {/* Completed info */}
                       {lesson.status === 'completed' && lesson.completedAt && (
-                        <div className="mt-2 space-y-1">
-                          <div className="text-sm text-green-600 flex items-center">
-                            <CheckCircle className="w-4 h-4 mr-1" />
+                        <div className="mt-2 space-y-0.5">
+                          <div className="text-[0.7rem] text-emerald-400/70 flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3" />
                             Hoàn thành {lesson.completedAt.toLocaleDateString('vi-VN')}
                           </div>
                           {(() => {
-                            const progress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}')[lesson.id];
-                            if (progress) {
-                              return (
-                                <div className="text-sm flex items-center gap-2">
-                                  <span className={progress.passed ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
-                                    {progress.passed ? '✅' : '❌'} Điểm: {progress.score}/{progress.maxScore} ({progress.percentage}%)
+                            try {
+                              const progress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}')[lesson.id];
+                              if (progress) {
+                                return (
+                                  <span className={`text-[0.7rem] ${progress.passed ? 'text-emerald-400/70' : 'text-rose-400/70'}`}>
+                                    Điểm: {progress.score}/{progress.maxScore} ({progress.percentage}%)
                                   </span>
-                                </div>
-                              );
-                            }
+                                );
+                              }
+                            } catch { /* ignore */ }
                             return null;
                           })()}
                         </div>
                       )}
-                      
+
+                      {/* Locked message */}
                       {lesson.status === 'locked' && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <div className="flex items-start">
-                            <Lock className="w-4 h-4 text-yellow-600 mr-2 mt-0.5 flex-shrink-0" />
-                            <div className="text-sm">
-                              <div className="font-medium text-yellow-800 mb-1">🔒 Bài học bị khóa</div>
-                              <div className="text-yellow-700">
-                                Hoàn thành bài trước với điểm <span className="font-semibold">≥ 6/10 (60%)</span> để mở khóa
-                              </div>
-                            </div>
+                        <div className="mt-2.5 p-2.5 rounded-lg border border-amber-500/10 bg-amber-500/[0.03]">
+                          <div className="flex items-start gap-2">
+                            <Lock className="w-3 h-3 text-amber-400/60 flex-shrink-0 mt-0.5" />
+                            <p className="text-[0.65rem] text-white/35">
+                              Hoàn thành bài trước với điểm <span className="text-amber-400/70 font-medium">&ge; 60%</span> để mở khóa
+                            </p>
                           </div>
                         </div>
                       )}
@@ -1170,35 +721,24 @@ Yêu cầu:
           ))}
         </div>
 
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link
-            href="/ai-tutor"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <Brain className="w-12 h-12 text-purple-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">🤖 AI Tutor</h3>
-            <p className="text-gray-600 text-sm">Chat với AI để được hỗ trợ học tập</p>
-          </Link>
-
-          <Link
-            href="/ai-tutor/assignments"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <BookOpen className="w-12 h-12 text-blue-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">📝 Assignments</h3>
-            <p className="text-gray-600 text-sm">Xem tất cả bài tập và bài học</p>
-          </Link>
-
-          <Link
-            href="/dashboard/analytics"
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow"
-          >
-            <BarChart className="w-12 h-12 text-green-500 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">📈 Analytics</h3>
-            <p className="text-gray-600 text-sm">Phân tích chi tiết tiến độ học tập</p>
-          </Link>
+        {/* ── Quick Actions ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { href: '/student/ai-tutor', icon: Brain, label: 'AI Tutor', desc: 'Chat với AI để được hỗ trợ học tập', gradient: 'from-violet-600 to-purple-600', glow: 'hover:shadow-[0_0_40px_rgba(139,92,246,0.12)]' },
+            { href: '/dashboard/assignments', icon: BookOpen, label: 'Assignments', desc: 'Xem tất cả bài tập và bài học', gradient: 'from-blue-600 to-indigo-600', glow: 'hover:shadow-[0_0_40px_rgba(99,102,241,0.12)]' },
+            { href: '/dashboard/analytics', icon: BarChart, label: 'Analytics', desc: 'Phân tích chi tiết tiến độ học tập', gradient: 'from-emerald-600 to-teal-600', glow: 'hover:shadow-[0_0_40px_rgba(16,185,129,0.12)]' },
+          ].map((action) => (
+            <Link key={action.href} href={action.href} className={`group block rounded-xl bg-gradient-to-br ${action.gradient} p-5 transition-all duration-300 ${action.glow} hover:translate-y-[-2px]`}>
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                <action.icon className="w-8 h-8 text-white/70 mb-3" />
+                <h3 className="text-sm font-bold text-white mb-1">{action.label}</h3>
+                <p className="text-xs text-white/50">{action.desc}</p>
+              </div>
+            </Link>
+          ))}
         </div>
+
       </div>
     </div>
   );

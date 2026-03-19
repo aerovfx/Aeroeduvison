@@ -9,7 +9,18 @@ import { authOptions } from '@/lib/auth';
 import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+let _redis: InstanceType<typeof Redis> | null = null;
+function getRedis() {
+  if (!_redis) {
+    _redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+    });
+    _redis.on('error', () => {});
+  }
+  return _redis;
+}
 
 /**
  * GET /api/grading/dashboard
@@ -194,8 +205,8 @@ async function getAIPerformanceMetrics(since: Date) {
   let totalGraded = 0;
   let totalReviewRequired = 0;
   try {
-    totalGraded = parseInt(await redis.get('grading:total') || '0');
-    totalReviewRequired = parseInt(await redis.get('grading:review_required') || '0');
+    totalGraded = parseInt(await getRedis().get('grading:total') || '0');
+    totalReviewRequired = parseInt(await getRedis().get('grading:review_required') || '0');
   } catch (error) {
     console.error('Failed to get Redis metrics:', error);
   }
@@ -253,7 +264,7 @@ async function getReviewerMetrics(since: Date) {
       let accuracy = 0;
       try {
         const statsKey = `review:stats:${r.id}`;
-        const statsData = await redis.get(statsKey);
+        const statsData = await getRedis().get(statsKey);
         if (statsData) {
           const stats = JSON.parse(statsData);
           agreementWithAI = stats.agreementWithAI || 0;

@@ -4,18 +4,6 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { ArrowLeft, Plus, Trash2, Save, Loader2, HelpCircle, Sparkles } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "react-hot-toast"
 
 const QUESTION_TYPES = [
@@ -26,18 +14,24 @@ const QUESTION_TYPES = [
 ]
 
 const DIFFICULTY_LEVELS = [
-  { value: "Dễ", label: "Dễ" },
-  { value: "Trung bình", label: "Trung bình" },
-  { value: "Khó", label: "Khó" },
+  { value: "EASY", label: "Dễ (NB)" },
+  { value: "MEDIUM", label: "Trung bình (TH)" },
+  { value: "HARD", label: "Khó (VD)" },
+  { value: "VERY_HARD", label: "Rất khó (VDC)" },
 ]
 
+const COGNITIVE_LEVEL_MAP: Record<string, string> = {
+  EASY: "Nhận biết",
+  MEDIUM: "Thông hiểu",
+  HARD: "Vận dụng",
+  VERY_HARD: "Vận dụng cao"
+}
+
 const COGNITIVE_LEVELS = [
-  { value: "Biết", label: "Biết" },
-  { value: "Hiểu", label: "Hiểu" },
+  { value: "Nhận biết", label: "Nhận biết" },
+  { value: "Thông hiểu", label: "Thông hiểu" },
   { value: "Vận dụng", label: "Vận dụng" },
-  { value: "Phân tích", label: "Phân tích" },
-  { value: "Đánh giá", label: "Đánh giá" },
-  { value: "Sáng tạo", label: "Sáng tạo" },
+  { value: "Vận dụng cao", label: "Vận dụng cao" },
 ]
 
 const SUBJECTS = [
@@ -76,6 +70,57 @@ interface QuestionFormData {
   correctAnswer: string
   keywords: string[]
   learningObjectives: string[]
+}
+
+// AI Native Glass Card
+function GlassCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-6 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// AI Native Badge
+function AIBadge({ children, variant = 'default', className = '' }: { children: React.ReactNode; variant?: 'default' | 'success' | 'warning' | 'danger' | 'info'; className?: string; }) {
+  const variants = {
+    default: 'bg-[hsl(var(--primary)/0.15)] text-purple-600 border-purple-200',
+    success: 'bg-[hsl(var(--success)/0.15)] text-green-600 border-green-200',
+    warning: 'bg-[hsl(var(--warning)/0.15)] text-yellow-600 border-yellow-200',
+    danger: 'bg-[hsl(var(--destructive)/0.15)] text-red-600 border-red-200',
+    info: 'bg-[hsl(var(--info)/0.15)] text-blue-600 border-[hsl(var(--info)/0.3)]',
+  };
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold border ${variants[variant]} ${className}`}>
+      {children}
+    </span>
+  );
+}
+
+// AI Native Button
+function AIButton({ children, onClick, variant = 'default', size = 'default', disabled = false, className = '' }: {
+  children: React.ReactNode; onClick?: () => void;
+  variant?: 'default' | 'primary' | 'danger' | 'success' | 'outline' | 'ghost';
+  size?: 'default' | 'sm' | 'icon';
+  disabled?: boolean; className?: string;
+}) {
+  const sizeClass = size === 'sm' ? 'px-3 py-1.5 text-sm' : size === 'icon' ? 'p-2.5 flex items-center justify-center shrink-0' : 'px-4 py-2.5';
+  
+  let variantClass = '';
+  switch(variant) {
+    case 'primary': variantClass = 'ai-button-primary text-white'; break;
+    case 'danger': variantClass = 'bg-[hsl(var(--destructive)/0.1)] text-red-600 hover:bg-[hsl(var(--destructive)/0.2)] border border-red-200'; break;
+    case 'success': variantClass = 'bg-[hsl(var(--success)/0.1)] text-green-600 hover:bg-[hsl(var(--success)/0.2)] border border-green-200'; break;
+    case 'outline': variantClass = 'ai-button border border-gray-200 hover:border-purple-200 text-gray-900'; break;
+    case 'ghost': variantClass = 'hover:bg-gray-50 text-gray-900'; break;
+    default: variantClass = 'ai-button hover:bg-gray-50 text-gray-900'; break;
+  }
+  
+  return (
+    <button onClick={onClick} disabled={disabled} className={`${sizeClass} ${variantClass} ${className} rounded-xl font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed`}>
+      {children}
+    </button>
+  );
 }
 
 export default function CreateQuestionPage() {
@@ -208,7 +253,6 @@ export default function CreateQuestionPage() {
       return false
     }
 
-    // Validate options for MCQ
     if (formData.type === "TNKQ - Nhiều lựa chọn") {
       const validOptions = formData.options.filter((opt) => opt.trim())
       if (validOptions.length < 2) {
@@ -222,7 +266,6 @@ export default function CreateQuestionPage() {
       }
     }
 
-    // Validate for True/False
     if (formData.type === "TNKQ - Đúng/Sai") {
       if (!formData.correctAnswer || !["Đúng", "Sai"].includes(formData.correctAnswer)) {
         toast.error("Vui lòng chọn đáp án đúng (Đúng hoặc Sai)")
@@ -241,7 +284,6 @@ export default function CreateQuestionPage() {
     setLoading(true)
 
     try {
-      // Prepare options for MCQ
       let options = formData.options
       if (formData.type === "TNKQ - Nhiều lựa chọn") {
         options = formData.options.filter((opt) => opt.trim())
@@ -285,7 +327,6 @@ export default function CreateQuestionPage() {
         throw new Error(errorMessage)
       }
 
-      const data = await response.json()
       toast.success("Đã tạo câu hỏi thành công")
       router.push("/teacher/question-bank")
     } catch (error: any) {
@@ -310,328 +351,323 @@ export default function CreateQuestionPage() {
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => router.back()}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <HelpCircle className="h-8 w-8 text-blue-600" />
-            Tạo câu hỏi mới
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Thêm câu hỏi vào ngân hàng câu hỏi
-          </p>
+      <GlassCard className="relative overflow-hidden mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-[hsl(var(--primary))/20] to-[hsl(var(--secondary))/20] opacity-50" />
+        <div className="relative flex items-center gap-4">
+          <AIButton
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            size="icon"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </AIButton>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[hsl(var(--primary))] to-[hsl(var(--secondary))] flex items-center justify-center text-white shadow-sm">
+              <HelpCircle className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-purple-600">
+                Tạo câu hỏi mới
+              </h1>
+              <p className="text-sm text-gray-600 mt-1">
+                Thêm câu hỏi vào ngân hàng câu hỏi
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      </GlassCard>
 
       {/* Form */}
       <div className="space-y-6">
         {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin cơ bản</CardTitle>
-            <CardDescription>
+        <GlassCard>
+          <div className="mb-6 border-b border-gray-200 pb-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Thông tin cơ bản</h2>
+            <p className="text-sm text-gray-600">
               Nhập thông tin cơ bản của câu hỏi
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </p>
+          </div>
+          <div className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="content">Nội dung câu hỏi *</Label>
-              <Textarea
+              <label htmlFor="content" className="block text-sm font-semibold text-gray-900">Nội dung câu hỏi *</label>
+              <textarea
                 id="content"
                 placeholder="Nhập nội dung câu hỏi..."
                 value={formData.content}
                 onChange={(e) => handleInputChange("content", e.target.value)}
                 rows={4}
-                className="resize-none"
+                className="ai-input w-full px-4 py-3 rounded-xl resize-y"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="type">Loại câu hỏi *</Label>
-                <Select
+                <label htmlFor="type" className="block text-sm font-semibold text-gray-900">Loại câu hỏi *</label>
+                <select
+                  id="type"
                   value={formData.type}
-                  onValueChange={(value) => handleInputChange("type", value)}
+                  onChange={(e) => handleInputChange("type", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl appearance-none bg-transparent"
                 >
-                  <SelectTrigger id="type">
-                    <SelectValue placeholder="Chọn loại câu hỏi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {QUESTION_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn loại câu hỏi</option>
+                  {QUESTION_TYPES.map((type) => (
+                    <option key={type.value} value={type.value} className="bg-[hsl(var(--background))]">
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="subject">Môn học *</Label>
-                <Select
+                <label htmlFor="subject" className="block text-sm font-semibold text-gray-900">Môn học *</label>
+                <select
+                  id="subject"
                   value={formData.subject}
-                  onValueChange={(value) => handleInputChange("subject", value)}
+                  onChange={(e) => handleInputChange("subject", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl appearance-none bg-transparent"
                 >
-                  <SelectTrigger id="subject">
-                    <SelectValue placeholder="Chọn môn học" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUBJECTS.map((subject) => (
-                      <SelectItem key={subject} value={subject}>
-                        {subject}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn môn học</option>
+                  {SUBJECTS.map((subject) => (
+                    <option key={subject} value={subject} className="bg-[hsl(var(--background))]">
+                      {subject}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="grade">Khối *</Label>
-                <Select
+                <label htmlFor="grade" className="block text-sm font-semibold text-gray-900">Khối *</label>
+                <select
+                  id="grade"
                   value={formData.grade}
-                  onValueChange={(value) => handleInputChange("grade", value)}
+                  onChange={(e) => handleInputChange("grade", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl appearance-none bg-transparent"
                 >
-                  <SelectTrigger id="grade">
-                    <SelectValue placeholder="Chọn khối" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {GRADES.map((grade) => (
-                      <SelectItem key={grade} value={grade}>
-                        {grade}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn khối</option>
+                  {GRADES.map((grade) => (
+                    <option key={grade} value={grade} className="bg-[hsl(var(--background))]">
+                      {grade}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="difficulty">Độ khó</Label>
-                <Select
+                <label htmlFor="difficulty" className="block text-sm font-semibold text-gray-900">Độ khó</label>
+                <select
+                  id="difficulty"
                   value={formData.difficulty}
-                  onValueChange={(value) => handleInputChange("difficulty", value)}
+                  onChange={(e) => handleInputChange("difficulty", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl appearance-none bg-transparent"
                 >
-                  <SelectTrigger id="difficulty">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DIFFICULTY_LEVELS.map((level) => (
-                      <SelectItem key={level.value} value={level.value}>
-                        {level.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn độ khó</option>
+                  {DIFFICULTY_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value} className="bg-[hsl(var(--background))]">
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
+                {formData.difficulty && (
+                  <p className="text-xs text-gray-500">
+                    Mức độ nhận thức: <span className="font-medium text-purple-600">{COGNITIVE_LEVEL_MAP[formData.difficulty]}</span>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cognitiveLevel">Mức độ nhận thức</Label>
-                <Select
+                <label htmlFor="cognitiveLevel" className="block text-sm font-semibold text-gray-900">Mức độ nhận thức</label>
+                <select
+                  id="cognitiveLevel"
                   value={formData.cognitiveLevel}
-                  onValueChange={(value) => handleInputChange("cognitiveLevel", value)}
+                  onChange={(e) => handleInputChange("cognitiveLevel", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl appearance-none bg-transparent"
                 >
-                  <SelectTrigger id="cognitiveLevel">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COGNITIVE_LEVELS.map((level) => (
-                      <SelectItem key={level.value} value={level.value}>
-                        {level.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {COGNITIVE_LEVELS.map((level) => (
+                    <option key={level.value} value={level.value} className="bg-[hsl(var(--background))]">
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="topic">Chủ đề</Label>
-                <Input
+                <label htmlFor="topic" className="block text-sm font-semibold text-gray-900">Chủ đề</label>
+                <input
                   id="topic"
                   placeholder="Nhập chủ đề..."
                   value={formData.topic}
                   onChange={(e) => handleInputChange("topic", e.target.value)}
+                  className="ai-input w-full px-4 py-2.5 rounded-xl"
                 />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* Options for MCQ */}
         {isMCQ && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Phương án trả lời</CardTitle>
-              <CardDescription>
+          <GlassCard>
+            <div className="mb-6 border-b border-gray-200 pb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Phương án trả lời</h2>
+              <p className="text-sm text-gray-600">
                 Thêm các phương án trả lời cho câu hỏi nhiều lựa chọn
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               {formData.options.map((option, index) => (
-                <div key={index} className="flex items-center gap-2">
+                <div key={index} className="flex items-center gap-3">
                   <div className="flex-1">
-                    <Input
+                    <input
                       placeholder={`Phương án ${String.fromCharCode(65 + index)}`}
                       value={option}
                       onChange={(e) => handleOptionChange(index, e.target.value)}
+                      className="ai-input w-full px-4 py-2.5 rounded-xl"
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
+                  <AIButton
+                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                     size="icon"
                     onClick={() => removeOption(index)}
                     disabled={formData.options.length <= 2}
                   >
                     <Trash2 className="h-4 w-4" />
-                  </Button>
+                  </AIButton>
                 </div>
               ))}
-              <Button
-                type="button"
-                variant="outline"
+              <AIButton
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 onClick={addOption}
-                className="w-full"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Thêm phương án
-              </Button>
+              </AIButton>
 
-              <div className="space-y-2">
-                <Label htmlFor="correctAnswer">Đáp án đúng *</Label>
-                <Select
+              <div className="space-y-2 mt-6 p-4 bg-[hsl(var(--success)/0.05)] rounded-xl border border-[hsl(var(--success)/0.2)]">
+                <label htmlFor="correctAnswer" className="block text-sm font-semibold text-green-600">Đáp án đúng *</label>
+                <select
+                  id="correctAnswer"
                   value={formData.correctAnswer}
-                  onValueChange={(value) => handleInputChange("correctAnswer", value)}
+                  onChange={(e) => handleInputChange("correctAnswer", e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(var(--background))] border border-green-200 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[hsl(var(--success))]"
                 >
-                  <SelectTrigger id="correctAnswer">
-                    <SelectValue placeholder="Chọn đáp án đúng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {formData.options
-                      .map((opt, idx) => ({
-                        value: idx.toString(),
-                        label: `${String.fromCharCode(65 + idx)}. ${opt || `Phương án ${String.fromCharCode(65 + idx)}`}`,
-                      }))
-                      .filter((opt) => formData.options[parseInt(opt.value)]?.trim())
-                      .map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn đáp án đúng</option>
+                  {formData.options
+                    .map((opt, idx) => ({
+                      value: idx.toString(),
+                      label: `${String.fromCharCode(65 + idx)}. ${opt || `Phương án ${String.fromCharCode(65 + idx)}`}`,
+                    }))
+                    .filter((opt) => formData.options[parseInt(opt.value)]?.trim())
+                    .map((opt) => (
+                      <option key={opt.value} value={opt.value} className="bg-[hsl(var(--background))]">
+                        {opt.label}
+                      </option>
+                    ))}
+                </select>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         )}
 
         {/* Options for True/False */}
         {isTrueFalse && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Đáp án</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="correctAnswer">Đáp án đúng *</Label>
-                <Select
+          <GlassCard>
+            <div className="mb-6 border-b border-gray-200 pb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Đáp án</h2>
+            </div>
+            <div>
+              <div className="space-y-2 p-4 bg-[hsl(var(--success)/0.05)] rounded-xl border border-[hsl(var(--success)/0.2)]">
+                <label htmlFor="correctAnswer" className="block text-sm font-semibold text-green-600">Đáp án đúng *</label>
+                <select
+                  id="correctAnswer"
                   value={formData.correctAnswer}
-                  onValueChange={(value) => handleInputChange("correctAnswer", value)}
+                  onChange={(e) => handleInputChange("correctAnswer", e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[hsl(var(--background))] border border-green-200 text-gray-900 focus:outline-none focus:ring-1 focus:ring-[hsl(var(--success))]"
                 >
-                  <SelectTrigger id="correctAnswer">
-                    <SelectValue placeholder="Chọn đáp án đúng" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Đúng">Đúng</SelectItem>
-                    <SelectItem value="Sai">Sai</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled hidden>Chọn đáp án đúng</option>
+                  <option value="Đúng" className="bg-[hsl(var(--background))]">Đúng</option>
+                  <option value="Sai" className="bg-[hsl(var(--background))]">Sai</option>
+                </select>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         )}
 
         {/* Answer for Short Answer and Essay */}
         {(formData.type === "TNKQ - Trả lời ngắn" || formData.type === "Tự luận") && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Đáp án mẫu</CardTitle>
-              <CardDescription>
+          <GlassCard>
+            <div className="mb-6 border-b border-gray-200 pb-4">
+              <h2 className="text-xl font-bold text-gray-900 mb-1">Đáp án mẫu</h2>
+              <p className="text-sm text-gray-600">
                 Nhập đáp án mẫu hoặc hướng dẫn chấm điểm
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+            <div>
               <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <Label htmlFor="correctAnswer">Đáp án / Hướng dẫn chấm *</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <label htmlFor="correctAnswer" className="block text-sm font-semibold text-green-600">Đáp án / Hướng dẫn chấm *</label>
+                  <AIButton
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                     size="sm"
                     onClick={handleGenerateAnswer}
                     disabled={generatingAnswer || !formData.content.trim()}
-                    className="gap-1.5 shrink-0"
                   >
                     {generatingAnswer ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                     ) : (
-                      <Sparkles className="h-4 w-4" />
+                      <Sparkles className="h-4 w-4 mr-2" />
                     )}
-                    Gen đáp án
-                  </Button>
+                    Gen đáp án AI
+                  </AIButton>
                 </div>
-                <Textarea
+                <textarea
                   id="correctAnswer"
                   placeholder="Nhập đáp án mẫu hoặc hướng dẫn chấm điểm..."
                   value={formData.correctAnswer}
                   onChange={(e) => handleInputChange("correctAnswer", e.target.value)}
                   rows={4}
-                  className="resize-none"
+                  className="w-full px-4 py-3 rounded-xl bg-[hsl(var(--success)/0.05)] border border-[hsl(var(--success)/0.2)] text-gray-900 focus:outline-none focus:ring-1 focus:ring-[hsl(var(--success))] resize-y"
                 />
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         )}
 
         {/* Explanation */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Giải thích</CardTitle>
-            <CardDescription>
+        <GlassCard>
+          <div className="mb-6 border-b border-gray-200 pb-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Giải thích</h2>
+            <p className="text-sm text-gray-600">
               Giải thích chi tiết cho câu hỏi (tùy chọn)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </p>
+          </div>
+          <div>
             <div className="space-y-2">
-              <Label htmlFor="explanation">Giải thích</Label>
-              <Textarea
+              <label htmlFor="explanation" className="block text-sm font-semibold text-gray-900">Giải thích</label>
+              <textarea
                 id="explanation"
                 placeholder="Nhập giải thích chi tiết..."
                 value={formData.explanation}
                 onChange={(e) => handleInputChange("explanation", e.target.value)}
                 rows={4}
-                className="resize-none"
+                className="ai-input w-full px-4 py-3 rounded-xl resize-y"
               />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </GlassCard>
 
         {/* Keywords and Learning Objectives */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Từ khóa</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <GlassCard>
+            <div className="mb-4 border-b border-gray-200 pb-3">
+              <h2 className="text-lg font-bold text-gray-900">Từ khóa</h2>
+            </div>
+            <div className="space-y-4">
               <div className="flex gap-2">
-                <Input
+                <input
                   placeholder="Nhập từ khóa..."
                   value={newKeyword}
                   onChange={(e) => setNewKeyword(e.target.value)}
+                  className="ai-input w-full px-3 py-2 rounded-xl"
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault()
@@ -639,40 +675,41 @@ export default function CreateQuestionPage() {
                     }
                   }}
                 />
-                <Button type="button" onClick={addKeyword} size="icon">
+                <AIButton className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700" size="icon" onClick={addKeyword}>
                   <Plus className="h-4 w-4" />
-                </Button>
+                </AIButton>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mt-4">
                 {formData.keywords.map((keyword) => (
                   <div
                     key={keyword}
-                    className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm"
+                    className="flex items-center gap-2 bg-[hsl(var(--info)/0.15)] text-blue-600 border border-[hsl(var(--info)/0.3)] px-3 py-1.5 rounded-xl text-xs font-bold"
                   >
-                    {keyword}
+                    <span>{keyword}</span>
                     <button
                       type="button"
                       onClick={() => removeKeyword(keyword)}
-                      className="hover:text-blue-600"
+                      className="hover:text-red-600 transition-colors"
                     >
                       ×
                     </button>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Mục tiêu học tập</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <GlassCard>
+            <div className="mb-4 border-b border-gray-200 pb-3">
+              <h2 className="text-lg font-bold text-gray-900">Mục tiêu học tập</h2>
+            </div>
+            <div className="space-y-4">
               <div className="flex gap-2">
-                <Input
+                <input
                   placeholder="Nhập mục tiêu..."
                   value={newObjective}
                   onChange={(e) => setNewObjective(e.target.value)}
+                  className="ai-input w-full px-3 py-2 rounded-xl"
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault()
@@ -680,41 +717,41 @@ export default function CreateQuestionPage() {
                     }
                   }}
                 />
-                <Button type="button" onClick={addObjective} size="icon">
+                <AIButton className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700" size="icon" onClick={addObjective}>
                   <Plus className="h-4 w-4" />
-                </Button>
+                </AIButton>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mt-4">
                 {formData.learningObjectives.map((objective) => (
                   <div
                     key={objective}
-                    className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm"
+                    className="flex items-center gap-2 bg-[hsl(var(--success)/0.15)] text-green-600 border border-green-200 px-3 py-1.5 rounded-xl text-xs font-bold"
                   >
-                    {objective}
+                    <span>{objective}</span>
                     <button
                       type="button"
                       onClick={() => removeObjective(objective)}
-                      className="hover:text-green-600"
+                      className="hover:text-red-600 transition-colors"
                     >
                       ×
                     </button>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </GlassCard>
         </div>
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-4">
-          <Button
-            variant="outline"
+          <AIButton
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
             onClick={() => router.back()}
             disabled={loading}
           >
             Hủy
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+          </AIButton>
+          <AIButton className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700" onClick={handleSubmit} disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -726,7 +763,7 @@ export default function CreateQuestionPage() {
                 Lưu câu hỏi
               </>
             )}
-          </Button>
+          </AIButton>
         </div>
       </div>
     </div>

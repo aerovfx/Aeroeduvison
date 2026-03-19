@@ -14,7 +14,19 @@ import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
 // Initialize services
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+let _redis: InstanceType<typeof Redis> | null = null;
+function getRedis() {
+  if (!_redis) {
+    _redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+    });
+    _redis.on('error', () => {});
+  }
+  return _redis;
+}
+
 const aiOrchestrator = new AIServiceOrchestrator({
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
@@ -26,12 +38,12 @@ const aiOrchestrator = new AIServiceOrchestrator({
   ollama: {
     baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   },
-  redis,
+  redis: getRedis(),
 });
 
 const gradingService = createEnhancedGradingService(aiOrchestrator);
 const validator = createEnhancedGradingValidator();
-const reviewWorkflow = createEnhancedHumanReviewWorkflow(redis, 'intelligent');
+const reviewWorkflow = createEnhancedHumanReviewWorkflow(getRedis(), 'intelligent');
 
 /**
  * Request Body Interface
@@ -264,23 +276,23 @@ async function logGradingMetrics(metrics: {
   try {
     // Store in Redis for real-time analytics
     const metricsKey = `grading:metrics:${Date.now()}`;
-    await redis.setex(metricsKey, 60 * 60 * 24 * 30, JSON.stringify(metrics)); // 30 days
+    await getRedis().setex(metricsKey, 60 * 60 * 24 * 30, JSON.stringify(metrics)); // 30 days
 
     // Update counters
-    await redis.incr('grading:total');
+    await getRedis().incr('grading:total');
     if (metrics.needsReview) {
-      await redis.incr('grading:review_required');
+      await getRedis().incr('grading:review_required');
     }
     if (metrics.isOutlier) {
-      await redis.incr('grading:outliers');
+      await getRedis().incr('grading:outliers');
     }
 
     // Update subject stats
     const subjectKey = `grading:subject:${metrics.subject}`;
-    await redis.hincrby(subjectKey, 'count', 1);
-    await redis.hincrbyfloat(subjectKey, 'total_score', metrics.score);
-    await redis.hincrbyfloat(subjectKey, 'total_confidence', metrics.confidence);
-    await redis.hincrbyfloat(subjectKey, 'total_time', metrics.gradingTime);
+    await getRedis().hincrby(subjectKey, 'count', 1);
+    await getRedis().hincrbyfloat(subjectKey, 'total_score', metrics.score);
+    await getRedis().hincrbyfloat(subjectKey, 'total_confidence', metrics.confidence);
+    await getRedis().hincrbyfloat(subjectKey, 'total_time', metrics.gradingTime);
 
   } catch (error) {
     console.error('Failed to log metrics:', error);

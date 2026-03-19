@@ -281,7 +281,7 @@ export default function DocumentReviewPage() {
           <div className="flex items-center gap-2">
             {hasInvalidStatus && (
               <Button
-                variant="outline"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                 onClick={handleFixStatus}
                 disabled={processing}
                 className="border-orange-300 text-orange-700 hover:bg-orange-50"
@@ -307,7 +307,7 @@ export default function DocumentReviewPage() {
                 Tải kết quả số hóa
               </Button>
             )}
-            <Button variant="ghost" onClick={() => router.back()}>
+            <Button className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg" onClick={() => router.back()}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -391,7 +391,7 @@ export default function DocumentReviewPage() {
                     <CardTitle className="text-lg">Bản số hoá</CardTitle>
                     {document.status !== "Hoàn tất" && document.status !== "Đang xử lý" && (
                       <Button
-                        variant="outline"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         size="sm"
                         onClick={handleReprocess}
                         disabled={processing}
@@ -453,7 +453,7 @@ export default function DocumentReviewPage() {
                                 File đã được xử lý. Vui lòng tải xuống để xem nội dung.
                               </p>
                               <Button
-                                variant="outline"
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                                 size="sm"
                                 className="mt-4"
                                 onClick={handleDownload}
@@ -471,7 +471,7 @@ export default function DocumentReviewPage() {
                             <h3 className="font-semibold text-blue-900">Text đã trích xuất (OCR)</h3>
                             <div className="flex gap-2">
                               <Button
-                                variant="ghost"
+                                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                                 size="sm"
                                 onClick={handleCopyText}
                                 title="Copy text"
@@ -523,8 +523,7 @@ export default function DocumentReviewPage() {
                       <FileText className="h-12 w-12 mb-4 text-gray-400" />
                       <p>Bản số hoá chưa sẵn sàng</p>
                       <Button
-                        variant="outline"
-                        className="mt-4"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mt-4"
                         onClick={handleReprocess}
                         disabled={processing}
                       >
@@ -551,12 +550,12 @@ export default function DocumentReviewPage() {
                   </div>
                   {document.ocrText && (
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleCopyText}>
+                      <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" size="sm" onClick={handleCopyText}>
                         <Copy className="h-4 w-4 mr-2" />
                         Copy
                       </Button>
                       <Button 
-                        variant="outline" 
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" 
                         size="sm" 
                         onClick={handleDownload}
                         title="Tải kết quả số hóa cuối cùng (có metadata và văn bản tái cấu trúc)"
@@ -617,8 +616,7 @@ export default function DocumentReviewPage() {
                     <p>Chưa có text đã số hóa</p>
                     {document.status !== "Đang xử lý" && (
                       <Button
-                        variant="outline"
-                        className="mt-4"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mt-4"
                         onClick={handleReprocess}
                         disabled={processing}
                       >
@@ -649,7 +647,7 @@ export default function DocumentReviewPage() {
                   {document.metadata?.aiAnalysis?.restructuredText && (
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         size="sm"
                         onClick={() => {
                           navigator.clipboard.writeText(document.metadata.aiAnalysis.restructuredText)
@@ -660,7 +658,7 @@ export default function DocumentReviewPage() {
                         Copy
                       </Button>
                       <Button
-                        variant="outline"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                         size="sm"
                         onClick={() => {
                           const blob = new Blob([document.metadata.aiAnalysis.restructuredText], { type: "text/plain" })
@@ -743,8 +741,7 @@ export default function DocumentReviewPage() {
                     </p>
                     {document.status === "Hoàn tất" && !document.metadata?.aiAnalysis && (
                       <Button
-                        variant="outline"
-                        className="mt-4"
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mt-4"
                         onClick={handleReprocess}
                         disabled={processing}
                       >
@@ -834,7 +831,7 @@ export default function DocumentReviewPage() {
                         <CardTitle className="text-base">Loại tài liệu</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <Badge variant="outline" className="text-lg px-3 py-1">
+                        <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-lg px-3 py-1">
                           {document.metadata.aiAnalysis.type === "exam" && "📝 Đề thi"}
                           {document.metadata.aiAnalysis.type === "textbook" && "📚 Sách giáo khoa"}
                           {document.metadata.aiAnalysis.type === "question_bank" && "📚 Ngân hàng câu hỏi"}
@@ -851,7 +848,7 @@ export default function DocumentReviewPage() {
                         <CardContent>
                           <div className="flex flex-wrap gap-2">
                             {document.metadata.aiAnalysis.keyTopics.map((topic: string, index: number) => (
-                              <Badge key={index} variant="secondary">
+                              <Badge key={index} className="px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700">
                                 {topic}
                               </Badge>
                             ))}
@@ -908,7 +905,7 @@ export default function DocumentReviewPage() {
                             </div>
                             <div className="flex gap-2">
                               <Button
-                                variant="outline"
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                                 size="sm"
                                 onClick={() => {
                                   navigator.clipboard.writeText(document.metadata.aiAnalysis.restructuredText)
@@ -919,7 +916,7 @@ export default function DocumentReviewPage() {
                                 Copy
                               </Button>
                               <Button
-                                variant="outline"
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                                 size="sm"
                                 onClick={() => {
                                   const blob = new Blob([document.metadata.aiAnalysis.restructuredText], { type: "text/plain" })
@@ -969,7 +966,7 @@ export default function DocumentReviewPage() {
                               {document.metadata.aiAnalysis.layoutAnalysis.regions.map((region: any, index: number) => (
                                 <div key={index} className="p-3 bg-gray-50 rounded border">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <Badge variant="outline">
+                                    <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
                                       {region.type === "text" && "📝 Text"}
                                       {region.type === "image" && "🖼️ Hình ảnh"}
                                       {region.type === "table" && "📊 Bảng"}
@@ -977,7 +974,7 @@ export default function DocumentReviewPage() {
                                       {!["text", "image", "table", "formula"].includes(region.type) && region.type}
                                     </Badge>
                                     {region.position && (
-                                      <Badge variant="secondary" className="text-xs">
+                                      <Badge className="px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-700 text-xs">
                                         {region.position}
                                       </Badge>
                                     )}
@@ -1115,8 +1112,7 @@ export default function DocumentReviewPage() {
                             Phân tích AI sẽ tự động chạy khi bạn số hóa lại.
                           </p>
                           <Button
-                            variant="outline"
-                            className="mt-4"
+                            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 mt-4"
                             onClick={handleReprocess}
                             disabled={processing}
                           >
@@ -1199,7 +1195,7 @@ export default function DocumentReviewPage() {
             : `Tải lên: ${new Date(document.createdAt).toLocaleString("vi-VN")}`}
         </span>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.back()}>
+          <Button className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" onClick={() => router.back()}>
             Đóng
           </Button>
           {document.status === "Hoàn tất" && (

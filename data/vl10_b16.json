@@ -1,0 +1,144 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 16: Định luật 3 Newton",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "16",
+    "topic": "Định luật 3 Newton"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 16: Định luật 3 Newton có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về lực và phản lực.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Chọn câu đúng. Cặp \"lực và phản lực\" trong định luật III Niutơn:",
+      "options": [
+        "tác dụng vào cùng một vật.",
+        "tác dụng vào hai vật khác nhau.",
+        "không bằng nhau về độ lớn.",
+        "bằng nhau về độ lớn nhưng không cùng giá."
+      ],
+      "correctAnswer": "B",
+      "explanation": "B - đúng, theo định luật III Newton. Cặp \"lực và phản lực\" có đặc điểm: Cùng phương, Ngược chiều, Cùng độ lớn, Tác dụng vào hai vật khác nhau."
+    },
+    {
+      "question_number": 2,
+      "question": "Chọn câu phát biểu đúng. Người ta dùng búa đóng một cây đinh vào một khối gỗ:",
+      "options": [
+        "Lực của búa tác dụng vào đinh lớn hơn lực đinh tác dụng vào búa.",
+        "Lực của búa tác dụng vào đinh về độ lớn bằng lực của đinh tác dụng vào búa.",
+        "Lực của búa tác dụng vào đinh nhỏ hơn lực đinh tác dụng vào búa.",
+        "Tùy thuộc đinh di chuyển nhiều hay ít mà lực do đinh tác dụng vào búa lớn hơn hay nhỏ hơn lực do búa tác dụng vào đinh."
+      ],
+      "correctAnswer": "B",
+      "explanation": "B - đúng, theo định luật III Newton. Lực do búa tác dụng vào đinh và lực của đinh tác dụng vào búa là cặp lực và phản lực. Nên độ lớn của hai lực này phải bằng nhau."
+    },
+    {
+      "question_number": 3,
+      "question": "Trong một cơn lốc xoáy, một hòn đá bay trúng vào một cửa kính, làm vỡ kính.",
+      "options": [
+        "Lực của hòn đá tác dụng vào tấm kính lớn hơn lực tấm kính tác dụng vào hòn đá.",
+        "Lực của hòn đá tác dụng vào tấm kính bằng (về độ lớn) lực tấm kính tác dụng vào hòn đá.",
+        "Lực của hòn đá tác dụng vào tấm kính nhỏ hơn lực tấm kính tác dụng vào hòn đá.",
+        "Viên đá không tương tác với tấm kính khi làm vỡ kính."
+      ],
+      "correctAnswer": "B",
+      "explanation": "B - đúng, theo định luật III Newton. Lực của hòn đá tác dụng vào tấm kính và lực của tấm kính tác dụng hòn đá là cặp lực và phản lực. Hai lực này bằng nhau về độ lớn."
+    },
+    {
+      "question_number": 4,
+      "question": "Một người có trọng lượng 500 N đứng trên mặt đất. Lực mà mặt đất tác dụng lên người đó có độ lớn?",
+      "options": [
+        "bằng 500 N.",
+        "nhỏ hơn 500 N.",
+        "Lớn hơn 500 N.",
+        "phụ thuộc vào nơi mà người đó đứng trên Trái Đất."
+      ],
+      "correctAnswer": "A",
+      "explanation": "A - đúng, theo định luật III Newton cặp lực và phản lực có độ lớn bằng nhau."
+    },
+    {
+      "question_number": 5,
+      "question": "Một người thực hiện động tác nằm sấp, chống tay xuống sàn nhà để nâng người lên. Hỏi sàn nhà đẩy người đó như thế nào?",
+      "options": [
+        "Không đẩy gì cả.",
+        "Đẩy xuống.",
+        "Đẩy lên.",
+        "Đẩy sang bên."
+      ],
+      "correctAnswer": "C",
+      "explanation": "C - đúng, người này tác dụng vào đất một lực đi xuống, đất tác dụng ngược trở lại phản lực đi lên."
+    },
+    {
+      "question_number": 6,
+      "question": "Cặp lực – phản lực không có tính chất nào sau đây?",
+      "options": [
+        "là cặp lực trực đối.",
+        "tác dụng vào hai vật khác nhau.",
+        "xuất hiện thành từng cặp.",
+        "là cặp lực cân bằng."
+      ],
+      "correctAnswer": "D",
+      "explanation": "D - sai, lực và phản lực không cân bằng vì chúng tác dụng vào hai vật khác nhau."
+    },
+    {
+      "question_number": 7,
+      "question": "Hai đội A và B chơi kéo co và đội A thắng, nhận xét nào sau đây là đúng?",
+      "options": [
+        "Lực kéo của đội A lớn hơn đội B.",
+        "Đội A tác dụng vào mặt đất một lực có độ lớn lớn hơn đội B tác dụng vào mặt đất.",
+        "Đội A tác dụng vào mặt đất một lực có độ lớn nhỏ hơn đội B tác dụng vào mặt đất.",
+        "Lực của mặt đất tác dụng lên hai đội là như nhau."
+      ],
+      "correctAnswer": "B",
+      "explanation": "B - đúng, theo định luật III Newton. Đội A thắng đội B là do hợp lực tác dụng lên đội A lớn hơn hợp lực tác dụng lên đội B. Lực tác dụng lên đội A gồm lực kéo do đội B tác dụng lên, lực do mặt đất dụng lên. Lực tác dụng lên đội B gồm lực kéo do đội A tác dụng lên, lực do mặt đất dụng lên. Lực do đội A tác dụng lên đội B có độ lớn bằng với lực do đội B tác dụng lên đội A. Vậy đội A thắng đội B là do lực do mặt đất tác dụng lên đội A có độ lớn lớn hơn lực do mặt đất tác dụng lên đội B. Suy ra: Đội A tác dụng vào mặt đất một lực có độ lớn lớn hơn đội B tác dụng vào mặt đất."
+    },
+    {
+      "question_number": 8,
+      "question": "Biểu thức của định luật III Newton được viết cho hai vật tương tác A và B?",
+      "options": [
+        "F⇀AB=−F⇀BA .",
+        "F⇀AB=F⇀BA .",
+        "F⇀AB=FBA .",
+        "F⇀AB=−FBA ."
+      ],
+      "correctAnswer": "A",
+      "explanation": "A - đúng, theo định luật III Newton."
+    },
+    {
+      "question_number": 9,
+      "question": "Điều nào sau đây là sai khi nói về lực và phản lực?",
+      "options": [
+        "Lực và phản lực luôn xuất hiện và mất đi đồng thời.",
+        "Lực và phản lực luôn đặt vào hai vật khác nhau.",
+        "Lực và phản lực luôn cùng hướng với nhau.",
+        "Lực và phản lực không cân bằng nhau."
+      ],
+      "correctAnswer": "C",
+      "explanation": "C - sai, lực và phản lực luôn ngược hướng với nhau."
+    },
+    {
+      "question_number": 10,
+      "question": "Lực và phản lực của nó luôn",
+      "options": [
+        "khác nhau về bản chất.",
+        "xuất hiện và mất đi đồng thời.",
+        "cùng hướng với nhau.",
+        "cân bằng nhau."
+      ],
+      "correctAnswer": "B",
+      "explanation": "B - đúng, lực và phản lực của nó luôn xuất hiện và mất đi đồng thời."
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 9: Chuyển động thẳng biến đổi đều",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton",
+      "Bài 15: Định luật 2 Newton"
+    ]
+  }
+}

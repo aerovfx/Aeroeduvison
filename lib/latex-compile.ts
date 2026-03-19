@@ -47,6 +47,21 @@ export interface CompileResult {
   log?: string;
 }
 
+async function commandExists(command: string): Promise<boolean> {
+  try {
+    await execFileAsync(command, ["--version"], {
+      timeout: 5_000,
+      maxBuffer: 128 * 1024,
+      env: getTexEnv(),
+    });
+    return true;
+  } catch (err: any) {
+    if (err?.code === "ENOENT") return false;
+    // Command exists but returned non-zero or printed warnings.
+    return true;
+  }
+}
+
 async function runInDir(
   cwd: string,
   command: string,
@@ -166,13 +181,15 @@ export async function compileLatexToPdf(content: string): Promise<CompileResult>
       return { pdf, log };
     } catch {
       const hint = getInstallHint();
-      const isNotFound =
-        /not found|No such file|ENOENT|command not found/i.test(log) ||
-        (log.includes("tectonic") && /not found|No such file|ENOENT/i.test(log));
+      const [hasXelatex, hasTectonic] = await Promise.all([
+        commandExists("xelatex"),
+        commandExists("tectonic"),
+      ]);
+      const isNotFound = !hasXelatex && !hasTectonic;
       return {
         error: isNotFound
           ? `LaTeX engine not installed. ${hint}`
-          : `Compilation failed. ${hint}`,
+          : "Compilation failed. XeLaTeX is available but the document has compile errors.",
         code: "COMPILE_ERROR",
         log,
       };

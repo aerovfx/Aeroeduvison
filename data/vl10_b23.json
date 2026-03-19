@@ -1,0 +1,150 @@
+{
+  "meta": {
+    "title": "Trắc nghiệm Vật Lí 10 - Bài 23: Năng lượng. Công cơ học",
+    "provider": "Aeroedu Vision",
+    "subject": "Vật lý",
+    "grade": "10",
+    "chapter": "23",
+    "topic": "Năng lượng. Công cơ học"
+  },
+  "description": "Trắc nghiệm Vật Lí 10 Bài 23: Năng lượng. Công cơ học có đáp án và lời giải chi tiết, giúp học sinh ôn luyện và nắm vững kiến thức về năng lượng, công cơ học và đơn vị đo.",
+  "questions": [
+    {
+      "question_number": 1,
+      "question": "Đơn vị của công trong hệ SI là",
+      "options": [
+        "W.",
+        "kg.",
+        "J.",
+        "N."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Đơn vị của công trong hệ SI là J"
+    },
+    {
+      "question_number": 2,
+      "question": "Đáp án nào sau đây là đúng?",
+      "options": [
+        "Lực là đại lượng vectơ nên công cũng là đại lượng vectơ.",
+        "Trong chuyển động tròn, lực hướng tâm thực hiện công vì có cả hai yếu tố: lực và độ dời của vật.",
+        "Công của lực là đại lượng vô hướng và có giá trị đại số.",
+        "Một vật chuyển động thẳng đều, công của hợp lực là khác không vì có độ dời của vật."
+      ],
+      "correctAnswer": "C",
+      "explanation": "A sai vì công là đại lượng vô hướng. B sai vì trong trường hợp lực vuông góc với phương chuyển động, A = 0. D sai vì vật chuyển động thẳng đều, hợp lực bằng 0."
+    },
+    {
+      "question_number": 3,
+      "question": "Phát biểu nào sau đây đúng theo định nghĩa công của lực?",
+      "options": [
+        "Công thành danh toại.",
+        "Ngày công của một công nhân là 200000 đồng.",
+        "Có công mài sắt có ngày nên kim.",
+        "Công ty trách nhiệm hữu hạn ABC."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Tác dụng lực, sinh công để làm mòn dần sắt thành cây kim."
+    },
+    {
+      "question_number": 4,
+      "question": "Khi một vật trượt xuống trên một mặt phẳng nghiêng hợp với mặt phẳng ngang một góc α. Công do lực ma sát thực hiện trên chiều dài s của mặt phẳng nghiêng là",
+      "options": [
+        "AFms = μ.m.g.sinα.",
+        "AFms= - μm.g.cosα.",
+        "AFms= μ.m.g.sinα.s.",
+        "AFms= - μ.m.g.cosα.s."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Dựa vào kiến thức đã học ở những bài trước, sử dụng kiến thức về động lực học, phân tích lực, sử dụng định luật 2 Newton. Ta có: N=P.cosα=mg.cosα. Suy ra: Fms=μN=μmg.cosα. Do lực ma sát ngược hướng với chiều chuyển động nên: AFmst=-Fmst.s=-μ.mg.cosα.s"
+    },
+    {
+      "question_number": 5,
+      "question": "Một tàu thủy chạy trên sông theo đường thẳng kéo một sà lan chở hàng với lực không đổi 5.10³ N, thực hiện công là 15.10⁶ J. Sà lan đã dời chỗ theo phương của lực một quãng đường",
+      "options": [
+        "300 m.",
+        "3000 m.",
+        "1500 m.",
+        "2500 m."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Quãng đường: s = A/F = 15.10⁶ / 5.10³ = 3000 m"
+    },
+    {
+      "question_number": 6,
+      "question": "Một người dùng tay đẩy một cuốn sách một lực 5 N trượt một khoảng dài 0,5 m trên mặt bàn nằm ngang không ma sát, lực đẩy có phương trùng với phương chuyển động của cuốn sách. Người đó đã thực hiện một công là",
+      "options": [
+        "2,5 J.",
+        "– 2,5 J.",
+        "0.",
+        "5 J."
+      ],
+      "correctAnswer": "A",
+      "explanation": "Công của lực đẩy: A = F.s = 5.0,5 = 2.5 J"
+    },
+    {
+      "question_number": 7,
+      "question": "Khi đun nước bằng ấm điện thì có những quá trình chuyển hóa năng lượng chính nào xảy ra?",
+      "options": [
+        "Điện năng chuyển hóa thành động năng.",
+        "Điện năng chuyển hóa thành nhiệt năng.",
+        "Nhiệt năng chuyển hóa thành điện năng.",
+        "Nhiệt năng chuyển hóa thành cơ năng."
+      ],
+      "correctAnswer": "B",
+      "explanation": "Khi đun nước bằng ấm điện, điện năng đã chuyển hóa thành nhiệt năng để làm sôi nước."
+    },
+    {
+      "question_number": 8,
+      "question": "Một vật có khối lượng 100 g trượt từ đỉnh một mặt phẳng nghiêng dài 4 m, góc nghiêng 60° so với mặt phẳng nằm ngang. Hệ số ma sát giữa vật và mặt phẳng nghiêng là 0,1. Công của lực ma sát khi vật trượt từ đỉnh đến chân mặt phẳng nghiêng là",
+      "options": [
+        "- 0,02 J.",
+        "- 2,00 J.",
+        "- 0,20 J.",
+        "- 0,25 J."
+      ],
+      "correctAnswer": "C",
+      "explanation": "Dựa vào kiến thức đã học ở những bài trước, sử dụng kiến thức về động lực học, phân tích lực, sử dụng định luật 2 Newton. Ta có: N=P.cosα=mg.cosα. Suy ra: Fms=μN=μmg.cosα. Do lực ma sát ngược hướng với chiều chuyển động nên: A = -μmg.cosα.s = -0,1.0,1.10.cos60°.4 = -0,2 J"
+    },
+    {
+      "question_number": 9,
+      "question": "Một vật khối lượng 10 kg được kéo đều trên sàn nằm ngang bằng một lực 20 N hợp với phương ngang một góc 30°. Khi vật di chuyển 2 m trên sàn thì lực thực hiện một công",
+      "options": [
+        "20 J.",
+        "40 J.",
+        "20√3 J",
+        "40√3 J"
+      ],
+      "correctAnswer": "C",
+      "explanation": "A = F.s.cosα = 20.2.cos30° = 20√3 J"
+    },
+    {
+      "question_number": 10,
+      "question": "Một cần cẩu nâng một vật khối lượng 5 tấn. Lấy g = 9,8 m/s². Vật có gia tốc không đổi là 0,5 m/s². Công mà cần cẩu thực hiện được trong thời gian 3 s là:",
+      "options": [
+        "110050 J.",
+        "128400 J.",
+        "15080 J.",
+        "115875 J."
+      ],
+      "correctAnswer": "D",
+      "explanation": "Áp dụng định luật II Newton: F→ + P→ = ma→. Chiếu theo phương chuyển động ta có: F - P = ma => F = mg + ma = 5000.(9,8 + 0,5) = 51500 N. Quãng đường vật đi được sau 3s là: s = ½.a.t² = ½.0,5.3² = 2,25 m. Công do cần cẩu thực hiện bằng: A = F.s = 51500.2,25 = 115875 J"
+    }
+  ],
+  "resources": {
+    "related_topics": [
+      "Bài 8: Chuyển động biến đổi. Gia tốc",
+      "Bài 9: Chuyển động thẳng biến đổi đều",
+      "Bài 10: Sự rơi tự do",
+      "Bài 12: Chuyển động ném",
+      "Bài 13: Tổng hợp và phân tích lực. Cân bằng lực",
+      "Bài 14: Định luật 1 Newton",
+      "Bài 15: Định luật 2 Newton",
+      "Bài 16: Định luật 3 Newton",
+      "Bài 17: Trọng lực và lực căng",
+      "Bài 18: Lực ma sát",
+      "Bài 19: Lực cản và lực nâng",
+      "Bài 20: Một số ví dụ về cách giải các bài toán thuộc phần động lực học",
+      "Bài 21: Moment lực. Cân bằng của vật rắn"
+    ]
+  }
+}

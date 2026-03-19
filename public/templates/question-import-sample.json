@@ -1,0 +1,48 @@
+{
+  "questions": [
+    {
+      "content": "Đơn vị của vận tốc là gì?",
+      "options": ["m/s", "m/s²", "m", "s"],
+      "correctAnswer": "A",
+      "explanation": "Vận tốc là quãng đường đi được trong một đơn vị thời gian, đơn vị là m/s",
+      "subject": "Vật lý",
+      "grade": "Khối 10",
+      "topic": "Động học",
+      "difficulty": "Dễ",
+      "questionType": "MCQ"
+    },
+    {
+      "content": "Gia tốc là đại lượng:",
+      "options": ["Vô hướng", "Vectơ", "Cả hai", "Không có"],
+      "correctAnswer": "B",
+      "explanation": "Gia tốc có hướng và độ lớn nên là đại lượng vectơ",
+      "subject": "Vật lý",
+      "grade": "Khối 10",
+      "topic": "Động học",
+      "difficulty": "Trung bình",
+      "questionType": "MCQ"
+    },
+    {
+      "content": "2 + 2 = ?",
+      "options": ["3", "4", "5", "6"],
+      "correctAnswer": "B",
+      "explanation": "2 cộng 2 bằng 4",
+      "subject": "Toán học",
+      "grade": "Khối 10",
+      "topic": "Đại số",
+      "difficulty": "Dễ",
+      "questionType": "MCQ"
+    },
+    {
+      "content": "Nước có công thức hóa học là gì?",
+      "options": ["H2O", "CO2", "O2", "H2"],
+      "correctAnswer": "A",
+      "explanation": "Nước có công thức hóa học là H2O (2 nguyên tử Hydro và 1 nguyên tử Oxy)",
+      "subject": "Hóa học",
+      "grade": "Khối 10",
+      "topic": "Hóa vô cơ",
+      "difficulty": "Dễ",
+      "questionType": "MCQ"
+    }
+  ]
+}

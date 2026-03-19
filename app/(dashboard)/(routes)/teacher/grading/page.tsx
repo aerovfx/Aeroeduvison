@@ -1,495 +1,858 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import { Award, Star, CheckCircle, Clock, AlertCircle, TrendingUp, Brain, Upload, Sparkles, FileText, Eye, Send } from 'lucide-react';
-import { updateButtonHandlers } from '../update-event-handlers';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useState, useEffect, useCallback } from "react"
+import {
+  CheckCircle2, Clock, FileText, Sparkles,
+  ScanLine, ListChecks, Camera, RotateCcw,
+  Plus, Trash2, BookOpen, ChevronDown, ChevronUp, GripVertical,
+} from "lucide-react"
+import ScanGrading, { type AnswerKey, type EssayQuestion } from "./_components/ScanGrading"
 
-interface Grade {
-  id: string;
-  studentName: string;
-  assignment: string;
-  score: number;
-  maxScore: number;
-  status: 'graded' | 'pending' | 'late';
-  submittedDate: string;
-  gradeDate?: string;
+function newAnswerKey(): AnswerKey {
+  return {
+    examName: "", examCode: "", examDate: "",
+    studentName: "", studentId: "", examSite: "", examRoom: "", dob: "",
+    part1: {}, part2: {}, part3: {}, essayQuestions: [],
+  }
+}
+
+const OPTS = ["A", "B", "C", "D"] as const
+const SUBS = ["a", "b", "c", "d"] as const
+
+function EssayQuestionCard({
+  eq, idx, onChange, onRemove,
+}: {
+  eq: EssayQuestion
+  idx: number
+  onChange: (updated: EssayQuestion) => void
+  onRemove: () => void
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div className="border border-violet-200 dark:border-violet-800 rounded-lg overflow-hidden">
+      <div className="bg-violet-50/80 dark:bg-violet-950/30 px-4 py-2.5 flex items-center gap-3">
+        <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+        <span className="text-xs font-black text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/50 px-2 py-0.5 rounded shrink-0">
+          Câu {idx + 1}
+        </span>
+        <input
+          type="text"
+          value={eq.questionText}
+          onChange={e => onChange({ ...eq, questionText: e.target.value })}
+          placeholder={`Nội dung / tiêu đề câu ${idx + 1}...`}
+          className="flex-1 text-sm bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/40"
+        />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <label className="text-[10px] text-muted-foreground font-medium">Điểm tối đa:</label>
+          <input
+            type="number"
+            min={0}
+            step={0.25}
+            value={eq.maxScore}
+            onChange={e => onChange({ ...eq, maxScore: parseFloat(e.target.value) || 0 })}
+            className="w-14 text-center text-sm font-bold border border-input rounded-md px-1 py-0.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-violet-400"
+          />
+        </div>
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+        >
+          {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+        <button
+          onClick={onRemove}
+          className="p-1 text-muted-foreground hover:text-red-500 rounded transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="p-4 space-y-3 bg-card">
+          <div>
+            <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">
+              Đáp án mẫu / Hướng dẫn chấm
+            </label>
+            <textarea
+              value={eq.sampleAnswer}
+              onChange={e => onChange({ ...eq, sampleAnswer: e.target.value })}
+              placeholder="Nhập đáp án mẫu hoặc các bước giải chi tiết..."
+              rows={3}
+              className="w-full text-sm border border-input rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-y"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">
+                Thang điểm chi tiết (Rubric)
+              </label>
+              <textarea
+                value={eq.rubric}
+                onChange={e => onChange({ ...eq, rubric: e.target.value })}
+                placeholder={"VD:\n0.5đ — Nêu đúng công thức\n1.0đ — Thay số và tính đúng kết quả\n0.5đ — Kết luận"}
+                rows={3}
+                className="w-full text-sm border border-input rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-y"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1 block">
+                Ghi chú cho giám khảo
+              </label>
+              <textarea
+                value={eq.notes}
+                onChange={e => onChange({ ...eq, notes: e.target.value })}
+                placeholder="Những lưu ý khi chấm, cách tính điểm từng phần..."
+                rows={3}
+                className="w-full text-sm border border-input rounded-lg px-3 py-2 bg-background text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-violet-300 resize-y"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface GradedSheetRow {
+  id: string
+  studentName: string
+  studentId: string
+  totalScore: number
+  maxScore: number
+  percentage: number
+  gradeLabel: string
+  reviewed: boolean
+  published: boolean
+  frontImageUrl?: string | null
+  backImageUrl?: string | null
+  createdAt: string
+  answerKeyId: string
+}
+
+function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
+  const [rows, setRows] = useState<GradedSheetRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filterKeyId, setFilterKeyId] = useState<string>("all")
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const url = filterKeyId === "all"
+          ? "/api/grading/graded-sheets"
+          : `/api/grading/graded-sheets?answerKeyId=${filterKeyId}`
+        const res = await fetch(url)
+        if (!res.ok || cancelled) return
+        const { sheets } = await res.json()
+        if (!cancelled) setRows(sheets ?? [])
+      } catch (err) {
+        console.error("Failed to load graded sheets:", err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [filterKeyId])
+
+  const keyName = (keyId: string) => {
+    const k = savedKeys.find(k => k.dbId === keyId)
+    return k?.examName || keyId.slice(0, 8)
+  }
+
+  const gradeColor = (label: string) => {
+    switch (label) {
+      case 'A': return 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
+      case 'B': return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30'
+      case 'C': return 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30'
+      case 'D': return 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30'
+      default:  return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30'
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
+        <p className="text-sm text-muted-foreground animate-pulse">Đang tải kết quả chấm bài…</p>
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-card rounded-xl border border-border shadow-sm p-12 text-center">
+        <Clock className="w-10 h-10 text-muted-foreground/50 mx-auto mb-3" />
+        <p className="font-semibold text-foreground">Chưa có bài nào được chấm</p>
+        <p className="text-sm text-muted-foreground mt-1">Upload và chấm bài làm để xem kết quả tại đây</p>
+      </div>
+    )
+  }
+
+  const keysWithSheets = [...new Set(rows.map(r => r.answerKeyId))]
+
+  return (
+    <div className="space-y-4">
+      {/* Filter */}
+      {keysWithSheets.length > 1 && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground">Lọc theo đề:</span>
+          <select
+            value={filterKeyId}
+            onChange={e => { setFilterKeyId(e.target.value); setLoading(true) }}
+            className="text-sm border border-input rounded-lg px-3 py-1.5 bg-background text-foreground"
+          >
+            <option value="all">Tất cả ({rows.length})</option>
+            {keysWithSheets.map(kId => (
+              <option key={kId} value={kId}>{keyName(kId)}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-card rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-black text-foreground">{rows.length}</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">Bài đã chấm</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            {rows.length > 0 ? (rows.reduce((s, r) => s + r.percentage, 0) / rows.length).toFixed(1) : 0}%
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">Trung bình</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-black text-foreground">
+            {rows.length > 0 ? Math.max(...rows.map(r => r.totalScore)).toFixed(1) : 0}
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">Cao nhất</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-4 text-center">
+          <p className="text-2xl font-black text-foreground">
+            {rows.length > 0 ? Math.min(...rows.map(r => r.totalScore)).toFixed(1) : 0}
+          </p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-1">Thấp nhất</p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/50 border-b border-border">
+                <th className="text-left px-4 py-3 font-semibold text-muted-foreground">#</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Họ tên</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted-foreground">SBD</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Điểm</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted-foreground">%</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Loại</th>
+                <th className="text-center px-4 py-3 font-semibold text-muted-foreground">Ảnh</th>
+                <th className="text-left px-4 py-3 font-semibold text-muted-foreground">Đề thi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{r.studentName || "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground font-mono">{r.studentId || "—"}</td>
+                  <td className="px-4 py-3 text-center font-bold text-foreground">{r.totalScore}/{r.maxScore}</td>
+                  <td className="px-4 py-3 text-center text-muted-foreground">{r.percentage.toFixed(1)}%</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${gradeColor(r.gradeLabel)}`}>
+                      {r.gradeLabel || "—"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {r.frontImageUrl && <span className="text-[10px] text-emerald-500" title="Mặt trước">▣</span>}
+                      {r.backImageUrl && <span className="text-[10px] text-blue-500" title="Mặt sau">▣</span>}
+                      {!r.frontImageUrl && !r.backImageUrl && <span className="text-muted-foreground/30">—</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{keyName(r.answerKeyId)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function GradingPage() {
-  const { t } = useLanguage();
-  
-  const [showGradingModal, setShowGradingModal] = useState(false);
-  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isGrading, setIsGrading] = useState(false);
-  const [llmProvider, setLlmProvider] = useState<'auto' | 'gpt4' | 'gemini' | 'grok'>('auto');
-  const [gradingResult, setGradingResult] = useState<any>(null);
+  const [activeTab, setActiveTab]           = useState<"scan" | "answerkey" | "graded">("scan")
+  const [savedKeys, setSavedKeys]           = useState<AnswerKey[]>([])
+  const [selectedKeyIdx, setSelectedKeyIdx] = useState(0)
+  const [draftKey, setDraftKey]             = useState<AnswerKey>(newAnswerKey())
+  const [savingKey, setSavingKey]           = useState(false)
+  const [loadingKeys, setLoadingKeys]       = useState(true)
 
-  const [grades] = useState<Grade[]>([
-    {
-      id: '1',
-      studentName: 'Nguyễn Văn A',
-      assignment: 'Bài tập Toán - Đạo hàm',
-      score: 85,
-      maxScore: 100,
-      status: 'graded',
-      submittedDate: '2024-10-22',
-      gradeDate: '2024-10-23'
-    },
-    {
-      id: '2',
-      studentName: 'Trần Thị B',
-      assignment: 'Bài tập Toán - Đạo hàm',
-      score: 0,
-      maxScore: 100,
-      status: 'pending',
-      submittedDate: '2024-10-22'
-    },
-    {
-      id: '3',
-      studentName: 'Lê Văn C',
-      assignment: 'Bài tập Vật lý - Cơ học',
-      score: 92,
-      maxScore: 100,
-      status: 'graded',
-      submittedDate: '2024-10-21',
-      gradeDate: '2024-10-22'
-    },
-    {
-      id: '4',
-      studentName: 'Phạm Thị D',
-      assignment: 'Bài tập Vật lý - Cơ học',
-      score: 0,
-      maxScore: 100,
-      status: 'late',
-      submittedDate: '2024-10-20'
-    }
-  ]);
+  // Load saved answer keys from database on mount
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/grading/answer-keys")
+        if (!res.ok) throw new Error("Failed to load")
+        const { keys } = await res.json()
+        if (cancelled) return
+        const mapped: AnswerKey[] = (keys ?? []).map((k: any) => ({
+          dbId: k.id,
+          examName: k.examName ?? "",
+          examCode: k.examCode ?? "",
+          examDate: k.examDate ?? "",
+          studentName: k.studentName ?? "",
+          studentId: k.studentId ?? "",
+          examSite: k.examSite ?? "",
+          examRoom: k.examRoom ?? "",
+          dob: k.dob ?? "",
+          part1: k.part1 ?? {},
+          part2: k.part2 ?? {},
+          part3: k.part3 ?? {},
+          essayQuestions: k.essayQuestions ?? [],
+        }))
+        setSavedKeys(mapped)
+        if (mapped.length > 0) setSelectedKeyIdx(0)
+      } catch (err) {
+        console.error("Failed to load answer keys:", err)
+      } finally {
+        if (!cancelled) setLoadingKeys(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'graded': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'late': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'graded': return 'Đã chấm';
-      case 'pending': return 'Chờ chấm';
-      case 'late': return 'Nộp muộn';
-      default: return 'Không xác định';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'graded': return CheckCircle;
-      case 'pending': return Clock;
-      case 'late': return AlertCircle;
-      default: return Clock;
-    }
-  };
-
-  const handleGrade = (id: string) => {
-    const grade = grades.find(g => g.id === id);
-    if (grade) {
-      setSelectedGrade(grade);
-      setShowGradingModal(true);
-      console.log(`🏆 [Grading] Opening AI grading modal for: ${grade.studentName}`);
-    }
-  };
-
-  const handleViewDetails = (id: string) => {
-    console.log(`👀 [Grading] Viewing details for grade: ${id}`);
-    updateButtonHandlers.handleViewSubmission(id);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
-      setUploadedFile(file);
-      console.log(`📎 [Grading] File uploaded: ${file.name}`);
-    }
-  };
-
-  const handleAIGrading = async () => {
-    if (!uploadedFile || !selectedGrade) return;
-
-    setIsGrading(true);
-    setGradingResult(null);
-
+  const handleSaveKey = useCallback(async () => {
+    setSavingKey(true)
     try {
-      console.log('🤖 [AI Grading] Starting AI grading with real APIs...');
-      
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-      formData.append('assignmentId', selectedGrade.id);
-      formData.append('studentId', 'student_' + selectedGrade.id);
-      formData.append('answerKey', 'Đạo hàm của f(x) = x² là f\'(x) = 2x. Quy tắc: (x^n)\' = n*x^(n-1)');
-      formData.append('maxScore', selectedGrade.maxScore.toString());
-      formData.append('llmProvider', llmProvider);
+      const res = await fetch("/api/grading/answer-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draftKey),
+      })
+      if (!res.ok) throw new Error("Save failed")
+      const { key } = await res.json()
 
-      const response = await fetch('/api/assignments/grade-ocr', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'AI grading failed');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setGradingResult(result.data);
-        console.log(`✅ [AI Grading] Success! Score: ${result.data.score}/${result.data.maxScore}`);
-        console.log(`🤖 [AI Grading] Provider: ${result.data.aiProvider}`);
-        alert(`✅ Chấm bài thành công!\n\nĐiểm: ${result.data.score}/${result.data.maxScore}\nAI: ${result.data.aiProvider}`);
-      }
-    } catch (error) {
-      console.error('❌ [AI Grading] Error:', error);
-      alert('❌ Lỗi khi chấm bài. Vui lòng kiểm tra console để biết chi tiết.');
+      const saved: AnswerKey = { ...draftKey, dbId: key.id }
+      setSavedKeys(prev => {
+        const next = [...prev, saved]
+        setSelectedKeyIdx(next.length - 1)
+        return next
+      })
+      setDraftKey(newAnswerKey())
+      setActiveTab("scan")
+    } catch (err) {
+      console.error("Failed to save answer key:", err)
+      alert("Lưu đáp án thất bại. Vui lòng thử lại.")
     } finally {
-      setIsGrading(false);
+      setSavingKey(false)
     }
-  };
+  }, [draftKey])
 
-  const averageScore = grades
-    .filter(g => g.status === 'graded')
-    .reduce((sum, g) => sum + g.score, 0) / grades.filter(g => g.status === 'graded').length || 0;
+  const handleDeleteKey = useCallback(async (idx: number) => {
+    const key = savedKeys[idx]
+    if (!key) return
+    if (!confirm(`Xoá đáp án "${key.examName || `Đề #${idx + 1}`}"?`)) return
 
-  const pendingCount = grades.filter(g => g.status === 'pending').length;
-  const gradedCount = grades.filter(g => g.status === 'graded').length;
-  const lateCount = grades.filter(g => g.status === 'late').length;
+    if (key.dbId) {
+      try {
+        await fetch("/api/grading/answer-keys", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: key.dbId }),
+        })
+      } catch (err) {
+        console.error("Failed to delete answer key:", err)
+      }
+    }
+
+    setSavedKeys(prev => {
+      const next = prev.filter((_, i) => i !== idx)
+      if (selectedKeyIdx >= next.length) setSelectedKeyIdx(Math.max(0, next.length - 1))
+      return next
+    })
+  }, [savedKeys, selectedKeyIdx])
+
+  const TABS = [
+    { key: "scan",      label: "Quét & Chấm", Icon: ScanLine   },
+    { key: "answerkey", label: "Nhập đáp án", Icon: ListChecks },
+    { key: "graded",    label: "Đã chấm",     Icon: Clock      },
+  ] as const
+
+  const STATS = [
+    { label: "Tổng số bài",   Icon: FileText,     accent: "text-blue-500 dark:text-blue-400",    val: 0               },
+    { label: "Chưa chấm",     Icon: Clock,        accent: "text-amber-500 dark:text-amber-400",  val: 0               },
+    { label: "Đã chấm",       Icon: CheckCircle2, accent: "text-emerald-500 dark:text-emerald-400", val: 0            },
+    { label: "Đáp án đã lưu", Icon: Sparkles,     accent: "text-purple-500 dark:text-purple-400", val: savedKeys.length},
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-xl p-8 mb-8 text-white">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 bg-white/20 rounded-xl">
-              <Award className="w-8 h-8" />
-            
-              </div>
-            <div>
-              <h1 className="text-4xl font-bold mb-2">🏆 Chấm điểm & Đánh giá</h1>
-              <p className="text-purple-100">Quản lý điểm số và phản hồi cho học sinh</p>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-background">
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Điểm trung bình</p>
-                <p className="text-3xl font-bold text-blue-600">{averageScore.toFixed(1)}</p>
-              </div>
-              <TrendingUp className="w-12 h-12 text-blue-500" />
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Đã chấm</p>
-                <p className="text-3xl font-bold text-green-600">{gradedCount}</p>
-              </div>
-              <CheckCircle className="w-12 h-12 text-green-500" />
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Chờ chấm</p>
-                <p className="text-3xl font-bold text-yellow-600">{pendingCount}</p>
-              </div>
-              <Clock className="w-12 h-12 text-yellow-500" />
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Nộp muộn</p>
-                <p className="text-3xl font-bold text-red-600">{lateCount}</p>
-              </div>
-              <AlertCircle className="w-12 h-12 text-red-500" />
-            </div>
-          </div>
-        </div>
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="bg-card border-b border-border sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
 
-        {/* Grades List */}
-        <div className="bg-white rounded-xl shadow-lg p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Danh sách Chấm điểm</h2>
-          <div className="space-y-4">
-            {grades.map((grade) => {
-              const StatusIcon = getStatusIcon(grade.status);
-              return (
-                <div
-                  key={grade.id}
-                  className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+            {/* Title */}
+            <div className="flex items-center gap-3">
+              <Camera className="w-6 h-6 text-purple-500 dark:text-purple-400" />
+              <div>
+                <h1 className="text-xl font-bold text-foreground">Chấm Điểm</h1>
+                <p className="text-sm text-muted-foreground">Quét phiếu trả lời · Chấm tự động với AI</p>
+              </div>
+            </div>
+
+            {/* Pill tabs */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              {TABS.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === key
+                      ? "bg-card text-purple-600 dark:text-purple-400 shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {grade.studentName}
-                        </h3>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(grade.status)}`}>
-                          {getStatusText(grade.status)}
-                        </span>
-                      </div>
-                      <p className="text-gray-600 mb-3">{grade.assignment}</p>
-                      <div className="flex items-center space-x-6 text-sm text-gray-500">
-                        <div className="flex items-center space-x-2">
-                          <span>Nộp: {grade.submittedDate}</span>
-                        </div>
-                        {grade.gradeDate && (
-                          <div className="flex items-center space-x-2">
-                            <span>Chấm: {grade.gradeDate}</span>
-                          </div>
-                        )}
-                        {grade.status === 'graded' && (
-                          <div className="flex items-center space-x-2">
-                            <Star className="w-4 h-4 text-yellow-500" />
-                            <span className="font-semibold">{grade.score}/{grade.maxScore}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => handleViewDetails(grade.id)}
-                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        Xem chi tiết
-                      </button>
-                      {grade.status !== 'graded' && (
-                        <button
-                          onClick={() => handleGrade(grade.id)}
-                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-                        >
-                          <Brain className="w-4 h-4" />
-                          <span>Chấm với AI</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* AI Grading Modal */}
-        {showGradingModal && selectedGrade && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 rounded-t-2xl text-white">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-1">🤖 AI Grading System</h2>
-                    <p className="text-purple-100">{selectedGrade.studentName} - {selectedGrade.assignment}</p>
-                  </div>
+      {/* ── Main ───────────────────────────────────────────────────── */}
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {STATS.map(({ label, Icon, accent, val }) => (
+            <div key={label} className="bg-card rounded-xl border border-border shadow-sm p-4">
+              <div className="flex items-center gap-3">
+                <Icon className={`w-5 h-5 ${accent} shrink-0`} />
+                <div>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="text-xl font-semibold text-foreground">{val}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Tab: Quét & Chấm ─────────────────────────────────────── */}
+        {activeTab === "scan" && (
+          <ScanGrading
+            savedKeys={savedKeys}
+            selectedKeyIdx={selectedKeyIdx}
+            setSelectedKeyIdx={setSelectedKeyIdx}
+            onSwitchToAnswerKey={() => setActiveTab("answerkey")}
+          />
+        )}
+
+        {/* ── Tab: Nhập đáp án ─────────────────────────────────────── */}
+        {activeTab === "answerkey" && (
+          <div className="space-y-5">
+            {/* ── Thông tin đề ───────────────────────────────────────── */}
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <ListChecks className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                  <h2 className="font-semibold text-foreground">Tạo đáp án mới</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  {savedKeys.length > 0 && (
+                    <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                      {savedKeys.length} đã lưu
+                    </span>
+                  )}
                   <button
-                    onClick={() => {
-                      setShowGradingModal(false);
-                      setUploadedFile(null);
-                      setGradingResult(null);
-                    }}
-                    className="p-2 hover:bg-white/20 rounded-lg transition-colors text-2xl"
+                    onClick={() => setDraftKey(newAnswerKey())}
+                    className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                    title="Xoá hết"
                   >
-                    ✕
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-6 space-y-6">
-                {/* AI Provider Info */}
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-4 text-white">
-                  <div className="flex items-center space-x-3">
-                    <Sparkles className="w-6 h-6" />
-                    <div>
-                      <h3 className="font-semibold">AI-Powered Grading</h3>
-                      <p className="text-sm text-blue-100">OCR (Gemini Vision) + LLM (GPT-4, Grok, Gemini)</p>
-                    </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {([
+                  { field: "examName", label: "Tên đề thi",  placeholder: "VD: Vật lý 10 — GKII" },
+                  { field: "examCode", label: "Mã đề",       placeholder: "132"        },
+                  { field: "examDate", label: "Ngày thi",    placeholder: "15/04/2025" },
+                  { field: "examSite", label: "Địa điểm",   placeholder: "Trường THPT" },
+                ] as const).map(({ field, label, placeholder }) => (
+                  <div key={field}>
+                    <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">{label}</label>
+                    <input
+                      type="text"
+                      value={draftKey[field]}
+                      placeholder={placeholder}
+                      onChange={(e) => setDraftKey((k) => ({ ...k, [field]: e.target.value }))}
+                      className="w-full border border-input rounded-lg px-3 py-2 text-sm text-foreground bg-background placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition"
+                    />
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                {/* LLM Provider Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn AI Model:
-                  </label>
-                  <select
-                    value={llmProvider}
-                    onChange={(e) => {
-                      setLlmProvider(e.target.value as any);
-                      console.log(`🤖 [Grading] AI model changed to: ${e.target.value}`);
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base"
-                  >
-                    <option value="auto">🤖 Auto (Tự động chọn model tốt nhất)</option>
-                    <option value="gpt4">🌟 GPT-4 (OpenAI - Chất lượng cao nhất)</option>
-                    <option value="grok">🚀 Grok (xAI - Mạnh mẽ)</option>
-                    <option value="gemini">✨ Gemini (Google - Nhanh)</option>
-                  </select>
-                </div>
-
-                {/* File Upload */}
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload-grading"
-                  />
-                  <label
-                    htmlFor="file-upload-grading"
-                    className="cursor-pointer flex flex-col items-center space-y-3"
-                  >
-                    <Upload className="w-12 h-12 text-gray-400" />
-                    <div>
-                      <span className="text-purple-600 font-semibold">Click để tải ảnh bài làm</span>
-                      <p className="text-gray-500 text-sm mt-1">Hỗ trợ: JPG, PNG, PDF</p>
+            {/* ── PHẦN I — Trắc nghiệm 40 câu ──────────────────────── */}
+            <div className="bg-card rounded-xl border border-rose-200 dark:border-rose-900/40 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 bg-rose-50 dark:bg-rose-950/20 border-b border-rose-200 dark:border-rose-900/40 flex items-center justify-between">
+                <h3 className="font-bold text-foreground text-sm">PHẦN I — Trắc nghiệm nhiều lựa chọn <span className="text-muted-foreground font-normal">(40 câu · A B C D)</span></h3>
+                <span className="text-xs text-muted-foreground">
+                  {Object.values(draftKey.part1).filter(v => v !== null && v !== undefined).length}/40 đã nhập
+                </span>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-4 gap-x-4 gap-y-0">
+                  {[0, 1, 2, 3].map(col => (
+                    <div key={col}>
+                      {/* Column header */}
+                      <div className="grid grid-cols-[2rem_repeat(4,1fr)] gap-0 mb-1 px-1">
+                        <span className="text-[9px] font-bold text-muted-foreground"></span>
+                        {OPTS.map(o => (
+                          <span key={o} className="text-center text-[10px] font-black text-rose-500 dark:text-rose-400">{o}</span>
+                        ))}
+                      </div>
+                      {/* Questions */}
+                      {Array.from({ length: 10 }, (_, r) => {
+                        const q = col * 10 + r + 1
+                        const val = draftKey.part1[q] ?? null
+                        return (
+                          <div key={q} className="grid grid-cols-[2rem_repeat(4,1fr)] gap-0 items-center py-[3px] px-1 rounded hover:bg-muted/50 transition-colors">
+                            <span className="text-xs font-bold text-foreground tabular-nums">{q}</span>
+                            {OPTS.map(o => {
+                              const active = val === o
+                              return (
+                                <button
+                                  key={o}
+                                  type="button"
+                                  onClick={() => setDraftKey(k => ({
+                                    ...k,
+                                    part1: { ...k.part1, [q]: active ? null : o },
+                                  }))}
+                                  className={`mx-auto w-6 h-6 rounded-full border-2 text-[10px] font-bold transition-all ${
+                                    active
+                                      ? "bg-rose-500 border-rose-500 text-white shadow-sm scale-110"
+                                      : "border-rose-300 dark:border-rose-700 text-transparent hover:border-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                                  }`}
+                                >
+                                  {o}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
                     </div>
-                  </label>
-                  {uploadedFile && (
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                      <p className="text-green-800 font-medium">✅ {uploadedFile.name}</p>
-                      <p className="text-green-600 text-sm">{(uploadedFile.size / 1024).toFixed(2)} KB</p>
-                    </div>
-                  )}
+                  ))}
                 </div>
+              </div>
+            </div>
 
-                {/* Grade Button */}
+            {/* ── PHẦN II — Đúng / Sai (8 câu × 4 ý) ────────────────── */}
+            <div className="bg-card rounded-xl border border-blue-200 dark:border-blue-900/40 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 bg-blue-50 dark:bg-blue-950/20 border-b border-blue-200 dark:border-blue-900/40 flex items-center justify-between">
+                <h3 className="font-bold text-foreground text-sm">PHẦN II — Đúng / Sai <span className="text-muted-foreground font-normal">(8 câu × 4 ý a, b, c, d)</span></h3>
+                <span className="text-xs text-muted-foreground">
+                  {Object.values(draftKey.part2).reduce((n, sub) => n + Object.values(sub).filter(v => v !== null && v !== undefined).length, 0)}/32 đã nhập
+                </span>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-4 gap-4">
+                  {Array.from({ length: 8 }, (_, i) => {
+                    const q = i + 1
+                    const subVals = draftKey.part2[q] ?? {}
+                    return (
+                      <div key={q} className="border border-border rounded-lg overflow-hidden">
+                        <div className="bg-muted/50 px-3 py-1.5 border-b border-border flex items-center justify-between">
+                          <span className="text-xs font-bold text-foreground">Câu {q}</span>
+                          <div className="flex gap-3">
+                            <span className="text-[9px] font-black text-blue-500 dark:text-blue-400 w-6 text-center">Đ</span>
+                            <span className="text-[9px] font-black text-blue-500 dark:text-blue-400 w-6 text-center">S</span>
+                          </div>
+                        </div>
+                        <div className="px-3 py-1">
+                          {SUBS.map(s => {
+                            const v = subVals[s] ?? null
+                            return (
+                              <div key={s} className="flex items-center justify-between py-1">
+                                <span className="text-xs text-foreground font-medium">{s})</span>
+                                <div className="flex gap-3">
+                                  {/* Đúng */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setDraftKey(k => ({
+                                      ...k,
+                                      part2: {
+                                        ...k.part2,
+                                        [q]: { ...(k.part2[q] ?? {}), [s]: v === true ? null : true },
+                                      },
+                                    }))}
+                                    className={`w-6 h-6 rounded-full border-2 text-[9px] font-bold transition-all ${
+                                      v === true
+                                        ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
+                                        : "border-blue-300 dark:border-blue-700 text-transparent hover:border-blue-400"
+                                    }`}
+                                  >
+                                    Đ
+                                  </button>
+                                  {/* Sai */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setDraftKey(k => ({
+                                      ...k,
+                                      part2: {
+                                        ...k.part2,
+                                        [q]: { ...(k.part2[q] ?? {}), [s]: v === false ? null : false },
+                                      },
+                                    }))}
+                                    className={`w-6 h-6 rounded-full border-2 text-[9px] font-bold transition-all ${
+                                      v === false
+                                        ? "bg-red-500 border-red-500 text-white shadow-sm"
+                                        : "border-blue-300 dark:border-blue-700 text-transparent hover:border-blue-400"
+                                    }`}
+                                  >
+                                    S
+                                  </button>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ── PHẦN III — Trả lời ngắn (6 câu) ────────────────────── */}
+            <div className="bg-card rounded-xl border border-amber-200 dark:border-amber-900/40 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-900/40 flex items-center justify-between">
+                <h3 className="font-bold text-foreground text-sm">PHẦN III — Trả lời ngắn <span className="text-muted-foreground font-normal">(6 câu · điền số)</span></h3>
+                <span className="text-xs text-muted-foreground">
+                  {Object.values(draftKey.part3).filter(v => v && v.trim()).length}/6 đã nhập
+                </span>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                  {Array.from({ length: 6 }, (_, i) => {
+                    const q = i + 1
+                    return (
+                      <div key={q} className="border border-border rounded-lg overflow-hidden">
+                        <div className="bg-muted/50 px-3 py-1.5 border-b border-border text-center">
+                          <span className="text-xs font-bold text-foreground">Câu {q}</span>
+                        </div>
+                        <div className="p-2">
+                          <input
+                            type="text"
+                            value={draftKey.part3[q] ?? ""}
+                            onChange={(e) => setDraftKey(k => ({
+                              ...k,
+                              part3: { ...k.part3, [q]: e.target.value },
+                            }))}
+                            placeholder="—"
+                            className="w-full text-center border border-input rounded-lg px-2 py-2 text-sm font-mono font-bold text-foreground bg-background placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* ── PHẦN IV — Tự luận (Mặt sau) ─────────────────────── */}
+            <div className="bg-card rounded-xl border border-violet-200 dark:border-violet-900/40 shadow-sm overflow-hidden">
+              <div className="px-5 py-3 bg-violet-50 dark:bg-violet-950/20 border-b border-violet-200 dark:border-violet-900/40 flex items-center justify-between">
+                <h3 className="font-bold text-foreground text-sm">
+                  PHẦN IV — Tự luận <span className="text-muted-foreground font-normal">(Mặt sau · {draftKey.essayQuestions.length} câu · {draftKey.essayQuestions.reduce((s, q) => s + q.maxScore, 0)}đ)</span>
+                </h3>
                 <button
-                  onClick={handleAIGrading}
-                  disabled={!uploadedFile || isGrading}
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-4 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-3 text-lg"
+                  onClick={() => {
+                    const newQ: EssayQuestion = {
+                      id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                      questionText: "",
+                      maxScore: 2,
+                      rubric: "",
+                      sampleAnswer: "",
+                      notes: "",
+                    }
+                    setDraftKey(k => ({
+                      ...k,
+                      essayQuestions: [...k.essayQuestions, newQ],
+                    }))
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 text-white text-xs font-semibold rounded-lg hover:bg-violet-600 transition-colors"
                 >
-                  {isGrading ? (
-                    <>
-                      <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Đang chấm bài với AI...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Brain className="w-6 h-6" />
-                      <span>Chấm bài với AI</span>
-                    </>
-                  )}
+                  <Plus className="w-3.5 h-3.5" />
+                  Thêm câu tự luận
                 </button>
+              </div>
 
-                {/* Grading Result */}
-                {gradingResult && (
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border-2 border-green-200 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-xl font-bold text-gray-900 flex items-center space-x-2">
-                        <Award className="w-6 h-6 text-yellow-500" />
-                        <span>Kết quả chấm điểm</span>
-                      </h3>
-                      <div className="flex items-center space-x-2 bg-purple-100 px-3 py-1 rounded-full">
-                        <Sparkles className="w-4 h-4 text-purple-600" />
-                        <span className="text-sm text-purple-700 font-semibold">
-                          {gradingResult.aiProvider}
-                        </span>
-                      </div>
+              <div className="p-4">
+                {draftKey.essayQuestions.length === 0 ? (
+                  <div className="text-center py-10 space-y-3">
+                    <BookOpen className="w-10 h-10 text-violet-300 dark:text-violet-700 mx-auto" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Chưa có câu tự luận nào</p>
+                      <p className="text-xs text-muted-foreground mt-1">Nhấn "Thêm câu tự luận" để nhập đáp án & thang điểm cho phần mặt sau</p>
                     </div>
+                    <button
+                      onClick={() => {
+                        const presets: EssayQuestion[] = Array.from({ length: 4 }, (_, i) => ({
+                          id: `eq_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+                          questionText: `Câu ${i + 1}`,
+                          maxScore: i < 2 ? 1 : 1.5,
+                          rubric: "",
+                          sampleAnswer: "",
+                          notes: "",
+                        }))
+                        setDraftKey(k => ({ ...k, essayQuestions: [...k.essayQuestions, ...presets] }))
+                      }}
+                      className="text-xs text-violet-500 hover:text-violet-600 font-medium underline underline-offset-2"
+                    >
+                      + Tạo nhanh 4 câu mẫu
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {draftKey.essayQuestions.map((eq, idx) => (
+                      <EssayQuestionCard
+                        key={eq.id}
+                        eq={eq}
+                        idx={idx}
+                        onChange={(updated) => {
+                          setDraftKey(k => ({
+                            ...k,
+                            essayQuestions: k.essayQuestions.map(q => q.id === eq.id ? updated : q),
+                          }))
+                        }}
+                        onRemove={() => {
+                          setDraftKey(k => ({
+                            ...k,
+                            essayQuestions: k.essayQuestions.filter(q => q.id !== eq.id),
+                          }))
+                        }}
+                      />
+                    ))}
 
-                    {/* Score Display */}
-                    <div className="bg-white rounded-lg p-6 border border-gray-200">
-                      <div className="flex items-center justify-between mb-4">
-                        <span className="text-gray-700 font-medium text-lg">Điểm số:</span>
-                        <div className="flex items-center space-x-3">
-                          <span className="text-4xl font-bold text-green-600">
-                            {gradingResult.score}
-                          </span>
-                          <span className="text-2xl text-gray-400">/</span>
-                          <span className="text-2xl font-semibold text-gray-600">
-                            {gradingResult.maxScore}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div
-                          className="bg-gradient-to-r from-green-500 to-blue-500 h-4 rounded-full transition-all"
-                          style={{ width: `${(gradingResult.score / gradingResult.maxScore) * 100}%` }}
-                        ></div>
-                      </div>
-                      <p className="text-center text-gray-600 mt-2 font-semibold">
-                        {Math.round((gradingResult.score / gradingResult.maxScore) * 100)}%
-                      </p>
-                    </div>
-
-                    {/* OCR Text */}
-                    {gradingResult.ocrText && (
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
-                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                          <FileText className="w-5 h-5 text-blue-500" />
-                          <span>Văn bản trích xuất (OCR):</span>
-                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            Confidence: {(gradingResult.confidence * 100).toFixed(0)}%
-                          </span>
-                        </h4>
-                        <div className="bg-gray-50 rounded p-3">
-                          <p className="text-gray-700 whitespace-pre-wrap">{gradingResult.ocrText}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AI Feedback */}
-                    {gradingResult.feedback && (
-                      <div className="bg-white rounded-lg p-4 border border-gray-200">
-                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                          <Brain className="w-5 h-5 text-purple-500" />
-                          <span>Nhận xét từ AI:</span>
-                        </h4>
-                        <div className="bg-purple-50 rounded p-4 border border-purple-200">
-                          <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{gradingResult.feedback}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center space-x-3">
+                    {/* Total score summary */}
+                    <div className="flex items-center justify-between pt-3 border-t border-violet-100 dark:border-violet-900/30">
+                      <span className="text-xs text-muted-foreground">
+                        Tổng điểm tự luận: <span className="font-bold text-foreground">{draftKey.essayQuestions.reduce((s, q) => s + q.maxScore, 0)}đ</span>
+                      </span>
                       <button
                         onClick={() => {
-                          console.log(`💾 [Grading] Saving grade for: ${selectedGrade.studentName}`);
-                          alert('Tính năng lưu điểm sẽ được triển khai!');
+                          const newQ: EssayQuestion = {
+                            id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                            questionText: "",
+                            maxScore: 1,
+                            rubric: "",
+                            sampleAnswer: "",
+                            notes: "",
+                          }
+                          setDraftKey(k => ({ ...k, essayQuestions: [...k.essayQuestions, newQ] }))
                         }}
-                        className="flex-1 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                        className="text-xs text-violet-500 hover:text-violet-600 font-medium flex items-center gap-1"
                       >
-                        <CheckCircle className="w-5 h-5" />
-                        <span>Lưu điểm</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          console.log(`📧 [Grading] Sending feedback to: ${selectedGrade.studentName}`);
-                          alert('Tính năng gửi phản hồi sẽ được triển khai!');
-                        }}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
-                      >
-                        <Send className="w-5 h-5" />
-                        <span>Gửi phản hồi</span>
+                        <Plus className="w-3 h-3" /> Thêm câu
                       </button>
                     </div>
                   </div>
                 )}
+
+                <div className="mt-4 px-3 py-2 bg-violet-50/60 dark:bg-violet-950/10 rounded-lg border border-violet-100 dark:border-violet-900/20">
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <span className="font-bold text-violet-500">Hướng dẫn:</span> Lật phiếu bài thi và chụp mặt sau (phần tự luận), đính kèm ảnh ở danh sách phiếu khi chấm bài.
+                    Điểm tự luận sẽ được giáo viên chấm thủ công dựa trên đáp án mẫu & thang điểm (rubric) đã khai báo.
+                  </p>
+                </div>
               </div>
+            </div>
+
+            {/* ── Actions & saved list ────────────────────────────────── */}
+            <div className="bg-card rounded-xl border border-border shadow-sm p-5">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{Object.values(draftKey.part1).filter(v => v).length}</span> TN +{" "}
+                  <span className="font-medium text-foreground">{Object.values(draftKey.part2).reduce((n, s) => n + Object.values(s).filter(v => v !== null && v !== undefined).length, 0)}</span> Đ/S +{" "}
+                  <span className="font-medium text-foreground">{Object.values(draftKey.part3).filter(v => v && v.trim()).length}</span> ngắn +{" "}
+                  <span className="font-medium text-foreground">{draftKey.essayQuestions.length}</span> TL
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setActiveTab("scan")}
+                    className="px-4 py-2 text-sm text-muted-foreground hover:bg-muted rounded-lg transition-colors"
+                  >
+                    Huỷ
+                  </button>
+                  <button
+                    onClick={handleSaveKey}
+                    disabled={!draftKey.examName.trim() || savingKey}
+                    className="px-5 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingKey ? "Đang lưu…" : "Lưu đáp án"}
+                  </button>
+                </div>
+              </div>
+
+              {loadingKeys && (
+                <div className="mt-4 pt-4 border-t border-border text-center py-3">
+                  <p className="text-xs text-muted-foreground animate-pulse">Đang tải đáp án…</p>
+                </div>
+              )}
+              {savedKeys.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-border space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Đáp án đã lưu</p>
+                  {savedKeys.map((k, i) => (
+                    <div
+                      key={k.dbId || i}
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm cursor-pointer transition-colors ${
+                        i === selectedKeyIdx
+                          ? "border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-500/10 text-purple-900 dark:text-purple-200"
+                          : "border-border bg-muted/50 hover:bg-muted text-foreground"
+                      }`}
+                      onClick={() => { setSelectedKeyIdx(i); setActiveTab("scan") }}
+                    >
+                      <span className="font-medium">{k.examName || `Đề #${i + 1}`}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>Mã: {k.examCode || "—"}</span>
+                        <span>{Object.values(k.part1).filter(v => v).length} TN</span>
+                        {k.essayQuestions.length > 0 && (
+                          <span className="text-blue-500">{k.essayQuestions.length} TL</span>
+                        )}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDeleteKey(i) }}
+                          className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Xoá đáp án"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
+
+        {/* ── Tab: Đã chấm ─────────────────────────────────────────── */}
+        {activeTab === "graded" && (
+          <GradedResults savedKeys={savedKeys} />
+        )}
+
       </div>
     </div>
-  );
+  )
 }

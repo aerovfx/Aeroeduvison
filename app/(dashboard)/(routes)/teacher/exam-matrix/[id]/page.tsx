@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
   Copy,
   Loader2,
   CheckCircle2,
@@ -13,7 +13,8 @@ import {
   Clock,
   AlertCircle,
   FileText,
-  Sparkles
+  Sparkles,
+  FileCode2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { GenerateExamModal } from "@/components/exam-matrix/generate-exam-modal"
 import { MatrixTable } from "@/components/exam-matrix/matrix-table"
+import { MATRIX_TYPES, type MatrixSection } from "@/lib/constants/question-bank"
 
 interface ExamMatrix {
   id: string
@@ -43,6 +45,9 @@ interface ExamMatrix {
   totalQuestions: number
   type: string
   status: string
+  matrixType?: string
+  customSections?: MatrixSection[]
+  sectionScores?: Record<string, number>
   createdAt: string
   updatedAt: string
   topics?: Array<{
@@ -69,6 +74,7 @@ export default function MatrixDetailPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [generateExamModalOpen, setGenerateExamModalOpen] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [exportingLatex, setExportingLatex] = useState(false)
 
   useEffect(() => {
     fetchMatrix()
@@ -117,12 +123,12 @@ export default function MatrixDetailPage() {
       const response = await fetch(`/api/exam-matrices/${matrixId}/duplicate`, {
         method: "POST",
       })
-      
+
       if (!response.ok) {
         const error = await response.json()
         throw new Error(error.error || "Failed to duplicate matrix")
       }
-      
+
       const data = await response.json()
       toast.success("Đã nhân bản ma trận thành công")
       router.push(`/teacher/exam-matrix/${data.matrix.id}`)
@@ -131,6 +137,33 @@ export default function MatrixDetailPage() {
       toast.error(error.message || "Không thể nhân bản ma trận")
     } finally {
       setDuplicating(false)
+    }
+  }
+
+  const handleExportToLatex = async () => {
+    if (!matrix) return
+
+    try {
+      setExportingLatex(true)
+      const response = await fetch("/api/latex-projects/export-from-matrix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ matrixId }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to export to LaTeX")
+      }
+
+      const data = await response.json()
+      toast.success("Đã xuất đề thi sang LaTeX thành công")
+      router.push(`/teacher/latex-documents/${data.id}`)
+    } catch (error: any) {
+      console.error("Error exporting to LaTeX:", error)
+      toast.error(error.message || "Không thể xuất sang LaTeX")
+    } finally {
+      setExportingLatex(false)
     }
   }
 
@@ -155,6 +188,13 @@ export default function MatrixDetailPage() {
   }
 
   const canGenerateExam = matrix.status === "Hoàn tất" && matrix.topics && matrix.topics.length > 0
+
+  // Derive sections from matrixType / customSections
+  const activeSections: MatrixSection[] =
+    matrix.matrixType === "custom"
+      ? (matrix.customSections ?? [])
+      : (MATRIX_TYPES.find((t) => t.id === (matrix.matrixType ?? "type3"))?.sections
+          ?? MATRIX_TYPES[2].sections)
 
   // Convert matrix topics to MatrixTable format
   const tableTopics = (matrix.topics || []).map((topic) => ({
@@ -216,19 +256,31 @@ export default function MatrixDetailPage() {
               )}
               {matrix.status === "Hoàn tất" && (
                 <Button
-                  variant="outline"
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
+                  onClick={handleExportToLatex}
+                  disabled={exportingLatex}
+                >
+                  {exportingLatex ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <FileCode2 className="h-4 w-4" />
+                  )}
+                  Xuất LaTeX
+                </Button>
+              )}
+              {matrix.status === "Hoàn tất" && (
+                <Button
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                   onClick={() => router.push(`/teacher/exam-matrix/${matrixId}/edit`)}
-                  className="gap-2"
                 >
                   <Edit className="h-4 w-4" />
                   Sửa
                 </Button>
               )}
               <Button
-                variant="outline"
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 gap-2"
                 onClick={handleDuplicate}
                 disabled={duplicating}
-                className="gap-2"
               >
                 {duplicating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -287,7 +339,7 @@ export default function MatrixDetailPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Loại</p>
-                    <Badge variant="outline">{matrix.type}</Badge>
+                    <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">{matrix.type}</Badge>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Ngày tạo</p>
@@ -311,8 +363,10 @@ export default function MatrixDetailPage() {
                 <CardContent>
                   {matrix.topics && matrix.topics.length > 0 ? (
                     <MatrixTable
+                      sections={activeSections}
                       topics={tableTopics}
                       totalScore={matrix.totalScore}
+                      sectionScores={matrix.sectionScores ?? {}}
                       onUpdateTopic={() => {}}
                       onUpdateDistribution={() => {}}
                       onDeleteTopic={() => {}}
@@ -325,8 +379,7 @@ export default function MatrixDetailPage() {
                       </p>
                       {matrix.status === "Hoàn tất" && (
                         <Button
-                          variant="outline"
-                          className="mt-4"
+                          className="mt-4 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
                           onClick={() => router.push(`/teacher/exam-matrix/${matrixId}/edit`)}
                         >
                           <Edit className="h-4 w-4 mr-2" />

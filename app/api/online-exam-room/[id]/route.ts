@@ -58,6 +58,19 @@ export async function GET(
           },
           orderBy: { position: "asc" },
         },
+        schedules: {
+          include: {
+            Exam: {
+              select: {
+                id: true,
+                title: true,
+                totalQuestions: true,
+                examType: true,
+              },
+            },
+          },
+          orderBy: { activeFrom: "asc" },
+        },
       },
     })
 

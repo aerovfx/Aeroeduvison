@@ -12,7 +12,19 @@ import { createEnhancedGradingValidator } from '@/lib/ai/services/enhanced-gradi
 import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+let _redis: InstanceType<typeof Redis> | null = null;
+function getRedis() {
+  if (!_redis) {
+    _redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+    });
+    _redis.on('error', () => {});
+  }
+  return _redis;
+}
+
 const aiOrchestrator = new AIServiceOrchestrator({
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',
@@ -24,7 +36,7 @@ const aiOrchestrator = new AIServiceOrchestrator({
   ollama: {
     baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   },
-  redis,
+  redis: getRedis(),
 });
 
 const gradingService = createEnhancedGradingService(aiOrchestrator);
@@ -349,10 +361,10 @@ async function logBatchMetrics(metrics: {
 }) {
   try {
     const metricsKey = `grading:batch:${Date.now()}`;
-    await redis.setex(metricsKey, 60 * 60 * 24 * 30, JSON.stringify(metrics));
+    await getRedis().setex(metricsKey, 60 * 60 * 24 * 30, JSON.stringify(metrics));
 
-    await redis.incr('grading:batch:total');
-    await redis.incrby('grading:batch:submissions', metrics.count);
+    await getRedis().incr('grading:batch:total');
+    await getRedis().incrby('grading:batch:submissions', metrics.count);
 
   } catch (error) {
     console.error('Failed to log batch metrics:', error);

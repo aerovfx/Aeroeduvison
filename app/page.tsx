@@ -925,6 +925,183 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── Tech Stack Section ── */}
+      <section className="py-20 bg-gradient-to-b from-gray-950 via-slate-900 to-gray-950 relative overflow-hidden">
+        {/* Ambient glows */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-violet-600/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          {/* Heading */}
+          <div className="text-center mb-16">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold tracking-widest uppercase mb-4"
+              style={{ background: "rgba(120,100,255,0.15)", color: "hsl(245,85%,72%)", border: "1px solid rgba(120,100,255,0.25)" }}>
+              ⚙️ Công nghệ
+            </span>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              Được xây dựng với <span className="bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">công nghệ tốt nhất</span>
+            </h2>
+            <p className="text-lg text-gray-400 max-w-3xl mx-auto">
+              AeroEdu kết hợp sức mạnh của AI đám mây và AI cục bộ, chạy mượt trên Web, Desktop và Mobile.
+            </p>
+          </div>
+
+          {/* Platform tabs */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            {/* Web App */}
+            <div className="rounded-2xl p-6 border"
+              style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  style={{ background: "rgba(99,102,241,0.18)", border: "1px solid rgba(99,102,241,0.3)" }}>
+                  🌐
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Web App</h3>
+                  <p className="text-xs text-gray-500">Chạy trực tiếp trên trình duyệt</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { name: "Next.js 15", desc: "App Router + Server Components", color: "text-white", dot: "bg-white" },
+                  { name: "React 18", desc: "Concurrent rendering", color: "text-sky-300", dot: "bg-sky-400" },
+                  { name: "TypeScript", desc: "Type-safe codebase", color: "text-blue-300", dot: "bg-blue-400" },
+                  { name: "TailwindCSS", desc: "Utility-first styling", color: "text-cyan-300", dot: "bg-cyan-400" },
+                  { name: "Prisma + PostgreSQL", desc: "Database ORM", color: "text-emerald-300", dot: "bg-emerald-400" },
+                  { name: "NextAuth v4", desc: "Authentication", color: "text-purple-300", dot: "bg-purple-400" },
+                ].map((t) => (
+                  <div key={t.name} className="flex items-start gap-3 group">
+                    <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${t.dot}`} />
+                    <div>
+                      <span className={`text-sm font-semibold ${t.color}`}>{t.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">{t.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Desktop App */}
+            <div className="rounded-2xl p-6 border relative"
+              style={{ background: "rgba(120,100,255,0.06)", borderColor: "rgba(120,100,255,0.25)" }}>
+              <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                style={{ background: "rgba(120,100,255,0.25)", color: "hsl(245,85%,75%)", border: "1px solid rgba(120,100,255,0.35)" }}>
+                NEW
+              </div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  style={{ background: "rgba(120,100,255,0.2)", border: "1px solid rgba(120,100,255,0.35)" }}>
+                  🖥️
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Desktop App</h3>
+                  <p className="text-xs text-gray-500">Windows · macOS · Linux</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { name: "Tauri 2", href: "https://tauri.app/", desc: "Rust backend + WebView frontend", color: "text-orange-300", dot: "bg-orange-400" },
+                  { name: "ScreenCaptureKit", href: "https://developer.apple.com/documentation/screencapturekit", desc: "macOS system audio capture", color: "text-pink-300", dot: "bg-pink-400" },
+                  { name: "cpal", href: "https://github.com/RustAudio/cpal", desc: "Cross-platform microphone input", color: "text-yellow-300", dot: "bg-yellow-400" },
+                  { name: "Soniox", href: "https://soniox.com", desc: "Real-time STT + translation API", color: "text-sky-300", dot: "bg-sky-400" },
+                  { name: "ElevenLabs", href: "https://elevenlabs.io", desc: "Flash v2.5 TTS narration", color: "text-violet-300", dot: "bg-violet-400" },
+                  { name: "Vanilla HTML/CSS/JS", desc: "Lightweight WebView frontend", color: "text-gray-300", dot: "bg-gray-400" },
+                ].map((t) => (
+                  <div key={t.name} className="flex items-start gap-3">
+                    <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${t.dot}`} />
+                    <div>
+                      {t.href ? (
+                        <a href={t.href} target="_blank" rel="noopener noreferrer"
+                          className={`text-sm font-semibold ${t.color} hover:underline underline-offset-2`}>
+                          {t.name}
+                        </a>
+                      ) : (
+                        <span className={`text-sm font-semibold ${t.color}`}>{t.name}</span>
+                      )}
+                      <span className="text-xs text-gray-500 ml-2">{t.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Mobile + Local AI */}
+            <div className="rounded-2xl p-6 border"
+              style={{ background: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)" }}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                  style={{ background: "rgba(16,185,129,0.18)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                  📱
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Mobile App + Local AI</h3>
+                  <p className="text-xs text-gray-500">On-device inference · Privacy first</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { name: "Tauri 2 Mobile", href: "https://tauri.app/", desc: "iOS & Android packaging", color: "text-orange-300", dot: "bg-orange-400" },
+                  { name: "MLX", href: "https://github.com/ml-explore/mlx", desc: "Apple ML framework on-device", color: "text-pink-300", dot: "bg-pink-400" },
+                  { name: "Whisper", href: "https://github.com/openai/whisper", desc: "Local speech recognition model", color: "text-emerald-300", dot: "bg-emerald-400" },
+                  { name: "Gemma", href: "https://ai.google.dev/gemma", desc: "Local translation LLM", color: "text-blue-300", dot: "bg-blue-400" },
+                  { name: "cpal", href: "https://github.com/RustAudio/cpal", desc: "Cross-platform mic input", color: "text-yellow-300", dot: "bg-yellow-400" },
+                  { name: "Soniox Cloud", href: "https://soniox.com", desc: "Cloud STT fallback mode", color: "text-sky-300", dot: "bg-sky-400" },
+                ].map((t) => (
+                  <div key={t.name} className="flex items-start gap-3">
+                    <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${t.dot}`} />
+                    <div>
+                      {t.href ? (
+                        <a href={t.href} target="_blank" rel="noopener noreferrer"
+                          className={`text-sm font-semibold ${t.color} hover:underline underline-offset-2`}>
+                          {t.name}
+                        </a>
+                      ) : (
+                        <span className={`text-sm font-semibold ${t.color}`}>{t.name}</span>
+                      )}
+                      <span className="text-xs text-gray-500 ml-2">{t.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Local vs Cloud badge */}
+              <div className="mt-5 pt-4 border-t flex items-center justify-between"
+                style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                <span className="text-[11px] px-2 py-1 rounded-full font-medium"
+                  style={{ background: "rgba(16,185,129,0.15)", color: "rgb(52,211,153)", border: "1px solid rgba(16,185,129,0.25)" }}>
+                  🔒 Local mode — 100% offline
+                </span>
+                <span className="text-[11px] px-2 py-1 rounded-full font-medium"
+                  style={{ background: "rgba(99,102,241,0.15)", color: "rgb(165,180,252)", border: "1px solid rgba(99,102,241,0.25)" }}>
+                  ☁️ Cloud mode
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom badge row */}
+          <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
+            {[
+              { icon: "🦀", label: "Rust" },
+              { icon: "⚡", label: "WebAssembly" },
+              { icon: "🍎", label: "Apple Silicon" },
+              { icon: "🔒", label: "Privacy First" },
+              { icon: "🌐", label: "Cross Platform" },
+              { icon: "🤖", label: "On-device AI" },
+            ].map((b) => (
+              <div key={b.label} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <span>{b.icon}</span>
+                <span>{b.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Testimonials Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

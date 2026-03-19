@@ -21,8 +21,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DocumentUploadModal } from "@/components/document-digitization/upload-modal"
-import { NeumorphicCard } from "@/components/ui/neumorphic-card"
-import { NeumorphicButton } from "@/components/ui/neumorphic-button"
 import { NeumorphicInput } from "@/components/ui/neumorphic-input"
 import { toast } from "react-hot-toast"
 import { cn } from "@/lib/utils"
@@ -126,21 +124,20 @@ export default function DocumentDigitizationPage() {
       {/* Header with Gradient Text */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold gradient-text mb-2">
+          <h1 className="text-4xl font-bold text-purple-600 mb-2">
             Số Hóa Tài Liệu
           </h1>
           <p className="text-gray-600">
             Quản lý và số hóa tài liệu học tập với AI
           </p>
         </div>
-        <NeumorphicButton
-          variant="primary"
-          size="lg"
+        <Button
+          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           onClick={() => setIsUploadModalOpen(true)}
         >
           <Upload className="w-5 h-5 mr-2" />
           Tải Lên Tài Liệu
-        </NeumorphicButton>
+        </Button>
       </div>
 
       {/* Stats Cards with Neumorphic Design */}
@@ -152,28 +149,27 @@ export default function DocumentDigitizationPage() {
           { label: "Hoàn tất", value: stats.completed, color: "from-green-500 to-green-600" },
           { label: "Lỗi", value: stats.error, color: "from-red-500 to-red-600" },
         ].map((stat) => (
-          <NeumorphicCard key={stat.label} variant="gradient" hover className="text-center">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center" key={stat.label}>
             <div className={`text-4xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent mb-2`}>
               {stat.value}
             </div>
             <div className="text-sm text-gray-600">{stat.label}</div>
-          </NeumorphicCard>
+          </div>
         ))}
       </div>
 
       {/* Filters and Search */}
-      <NeumorphicCard variant="default" size="md">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <NeumorphicInput
+            <input className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               placeholder="Tìm kiếm tài liệu..."
-              icon={<Search className="w-5 h-5" />}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <Tabs value={selectedStatus} onValueChange={(v) => setSelectedStatus(v as DocumentStatus)}>
-            <TabsList className="neu-shadow">
+            <TabsList className="shadow-md">
               <TabsTrigger value="Tất cả">Tất cả</TabsTrigger>
               <TabsTrigger value="Hàng đợi">Hàng đợi</TabsTrigger>
               <TabsTrigger value="Đang xử lý">Đang xử lý</TabsTrigger>
@@ -182,10 +178,10 @@ export default function DocumentDigitizationPage() {
             </TabsList>
           </Tabs>
         </div>
-      </NeumorphicCard>
+      </div>
 
       {/* Documents Table */}
-      <NeumorphicCard variant="gradient" size="lg">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -253,12 +249,12 @@ export default function DocumentDigitizationPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="neu-shadow-sm">
+                      <Badge className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 shadow-sm">
                         {doc.type}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={cn("neu-shadow", statusColors[doc.status])}>
+                      <Badge className={cn("shadow-md", statusColors[doc.status])}>
                         {getStatusIcon(doc.status)}
                         <span className="ml-1">{doc.status}</span>
                       </Badge>
@@ -268,10 +264,10 @@ export default function DocumentDigitizationPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow">
+                        <Button variant="ghost" size="icon" className="shadow-sm hover:shadow-md">
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="neu-shadow-sm hover:neu-shadow">
+                        <Button variant="ghost" size="icon" className="shadow-sm hover:shadow-md">
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button
@@ -281,7 +277,7 @@ export default function DocumentDigitizationPage() {
                             setDocumentToDelete(doc.id)
                             setDeleteDialogOpen(true)
                           }}
-                          className="text-red-600 neu-shadow-sm hover:neu-shadow"
+                          className="text-red-600 shadow-sm hover:shadow-md"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -293,7 +289,7 @@ export default function DocumentDigitizationPage() {
             </TableBody>
           </Table>
         </div>
-      </NeumorphicCard>
+      </div>
 
       {/* Upload Modal */}
       <DocumentUploadModal
@@ -306,7 +302,7 @@ export default function DocumentDigitizationPage() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="neu-card">
           <AlertDialogHeader>
-            <AlertDialogTitle className="gradient-text">Xóa tài liệu?</AlertDialogTitle>
+            <AlertDialogTitle className="text-purple-600">Xóa tài liệu?</AlertDialogTitle>
             <AlertDialogDescription>
               Hành động này không thể hoàn tác. Tài liệu sẽ bị xóa vĩnh viễn.
             </AlertDialogDescription>
@@ -330,7 +326,7 @@ export default function DocumentDigitizationPage() {
 function EmptyState({ icon: Icon, title, description }: any) {
   return (
     <div className="text-center py-12">
-      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center neu-shadow-inner">
+      <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center shadow-md-inner">
         <Icon className="w-8 h-8 text-gray-400" />
       </div>
       <h3 className="text-lg font-semibold text-gray-700 mb-2">{title}</h3>

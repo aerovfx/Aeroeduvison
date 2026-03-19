@@ -22,10 +22,10 @@ export function NeumorphicButton({
   const baseStyles = "neu-button font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
   
   const variantStyles = {
-    primary: "bg-gradient-to-br from-blue-500 to-blue-600 text-white neu-shadow-primary",
-    secondary: "bg-gradient-to-br from-purple-500 to-purple-600 text-white neu-shadow",
-    accent: "bg-gradient-to-br from-teal-500 to-teal-600 text-white neu-shadow",
-    outline: "bg-white text-gray-700 border-2 border-gray-200 neu-shadow hover:border-blue-300",
+    primary: "bg-gradient-to-br from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white shadow-[0_0_20px_rgba(120,100,255,0.2)]",
+    secondary: "bg-gradient-to-br from-[hsl(280,75%,55%)] to-[hsl(320,70%,50%)] text-white shadow-[0_0_16px_rgba(160,80,255,0.15)]",
+    accent: "bg-gradient-to-br from-[hsl(175,80%,45%)] to-[hsl(160,70%,40%)] text-white shadow-[0_0_16px_rgba(0,210,180,0.15)]",
+    outline: "bg-white/[0.04] text-white/70 border border-white/[0.08] hover:bg-white/[0.06] hover:border-white/[0.12]",
   }
   
   const sizeStyles = {

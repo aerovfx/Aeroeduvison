@@ -13,8 +13,20 @@ import { createEnhancedGradingValidator } from '@/lib/ai/services/enhanced-gradi
 import { db as prisma } from '@/lib/db';
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
-const reviewWorkflow = createEnhancedHumanReviewWorkflow(redis, 'intelligent');
+let _redis: InstanceType<typeof Redis> | null = null;
+function getRedis() {
+  if (!_redis) {
+    _redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 3,
+      enableOfflineQueue: false,
+    });
+    _redis.on('error', () => {});
+  }
+  return _redis;
+}
+
+const reviewWorkflow = createEnhancedHumanReviewWorkflow(getRedis(), 'intelligent');
 const validator = createEnhancedGradingValidator();
 
 /**
@@ -386,7 +398,7 @@ async function getReviewerStats(reviewerId: string) {
   let agreementRate = 0;
   try {
     const statsKey = `review:stats:${reviewerId}`;
-    const statsData = await redis.get(statsKey);
+    const statsData = await getRedis().get(statsKey);
     if (statsData) {
       const stats = JSON.parse(statsData);
       agreementRate = stats.agreementWithAI || 0;
@@ -420,17 +432,17 @@ async function logReviewComparison(data: {
 }) {
   try {
     const key = `review:comparison:${Date.now()}:${data.submissionId}`;
-    await redis.setex(key, 60 * 60 * 24 * 90, JSON.stringify(data)); // 90 days
+    await getRedis().setex(key, 60 * 60 * 24 * 90, JSON.stringify(data)); // 90 days
 
     // Update global stats
-    await redis.incr('review:total');
-    await redis.hincrbyfloat('review:differences', 'total', data.difference);
-    await redis.hincrby('review:differences', 'count', 1);
+    await getRedis().incr('review:total');
+    await getRedis().hincrbyfloat('review:differences', 'total', data.difference);
+    await getRedis().hincrby('review:differences', 'count', 1);
 
     // Update subject stats
     const subjectKey = `review:subject:${data.subject}`;
-    await redis.hincrbyfloat(subjectKey, 'total_diff', data.difference);
-    await redis.hincrby(subjectKey, 'count', 1);
+    await getRedis().hincrbyfloat(subjectKey, 'total_diff', data.difference);
+    await getRedis().hincrby(subjectKey, 'count', 1);
 
   } catch (error) {
     console.error('Failed to log review comparison:', error);

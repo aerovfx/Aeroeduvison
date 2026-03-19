@@ -893,9 +893,61 @@ const PYTHON_LABS_DATA = {
             ],
             "tags": ["roll-call", "random", "classroom", "game"],
             "internal_link": "/dashboard/labtwin/labs/roll-call-wheel"
+        },
+        {
+            "id": "keo-co-app",
+            "name": "Kéo Co Kiến Thức",
+            "description": "Trò chơi đối kháng kiến thức theo format kéo co. Hai đội thi đấu trả lời câu hỏi để kéo dây về phía mình. Rèn luyện kiến thức và tinh thần đồng đội!",
+            "category": "Học qua trò chơi",
+            "level": "Dễ",
+            "difficulty": "Dễ",
+            "xp": 150,
+            "duration": "15-20 phút",
+            "icon": "Trophy",
+            "features": [
+                "Chơi 2 đội đối kháng trực tiếp",
+                "Hệ thống câu hỏi trắc nghiệm",
+                "Hình ảnh kéo co trực quan sinh động",
+                "Chỉnh sửa và thêm câu hỏi dễ dàng",
+                "Bấm giờ và tính điểm tự động"
+            ],
+            "learning_objectives": [
+                "Tăng cường kiến thức qua trò chơi",
+                "Phát triển tinh thần đồng đội",
+                "Rèn luyện phản xạ và tư duy nhanh",
+                "Tạo không khí lớp học sôi động"
+            ],
+            "tags": ["quiz", "tug-of-war", "team-game", "classroom", "trắc nghiệm"],
+            "internal_link": "/dashboard/labtwin/labs/keo-co-app"
+        },
+        {
+            "id": "pixel-agents",
+            "name": "Pixel Agents - AI RPG",
+            "description": "Game RPG pixel art với chủ đề AI agents. Khám phá bản đồ, điều khiển nhân vật, và tương tác với các agent thông qua chat. Trải nghiệm độc đáo kết hợp game và AI!",
+            "category": "Học qua trò chơi",
+            "level": "Dễ",
+            "difficulty": "Dễ",
+            "xp": 200,
+            "duration": "20-30 phút",
+            "icon": "Trophy",
+            "features": [
+                "Đồ họa pixel art retro đẹp mắt",
+                "Điều khiển nhân vật bằng WASD/Arrow keys",
+                "Hệ thống chat AI agent thông minh",
+                "Nhiều NPC agents với hành vi độc lập",
+                "Bản đồ tương tác với nhiều vật thể"
+            ],
+            "learning_objectives": [
+                "Hiểu khái niệm cơ bản về game development",
+                "Khám phá AI agents và subagents",
+                "Tương tác với hệ thống đa agent",
+                "Trải nghiệm learning qua gameplay"
+            ],
+            "tags": ["rpg", "pixel-art", "ai-agents", "game", "chat", "exploration"],
+            "internal_link": "/dashboard/labtwin/labs/pixel-agents"
         }
     ],
-    "total": 34,
+    "total": 36,
     "last_updated": "2024-12-19T12:00:00Z",
     "categories": [
         "Cơ học",
