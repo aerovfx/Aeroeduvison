@@ -5,6 +5,11 @@ import { ToastProvider } from '@/components/providers/toaster-provider'
 import { ConfettiProvider } from '@/components/providers/confetti-provider'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 
+// Force all pages to be server-rendered at request time (no SSG)
+// This prevents OOM during Docker build's "Collecting page data" phase
+// where Next.js tries to pre-render 240+ pages in a memory-constrained container
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: 'AeroEdu - Interactive Learning Platform',
   description: 'An innovative learning platform with virtual labs and AI-powered content generation',

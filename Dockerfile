@@ -37,9 +37,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV SKIP_ENV_VALIDATION=1
 ENV DISABLE_CONTENTLAYER=1
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 
 # Build with increased memory limit
+# Use generate-only for static pages to reduce memory during "Collecting page data"
 RUN npm run build 2>&1 || (echo "Build failed, checking for errors..." && exit 1)
 
 # Runner stage
