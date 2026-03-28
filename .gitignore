@@ -87,6 +87,12 @@ deployment.log
 cookies.txt
 cookies_new.txt
 
+# Large video files (use Git LFS or external storage)
+uploads/cameras/*.MP4
+uploads/cameras/*.mp4
+uploads/**/*.MP4
+uploads/**/*.mp4
+
 # Stale dev scripts (not needed for production)
 middleware-advanced.ts
 middleware-new.ts

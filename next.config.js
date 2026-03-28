@@ -291,6 +291,17 @@ const nextConfig = {
       config.resolve.conditionNames = ['import', 'module', 'require', 'node', 'default', ...config.resolve.conditionNames];
     }
 
+    // Fix: three-stdlib → fflate imports Node.js built-in 'module' which doesn't exist client-side.
+    // Provide empty fallbacks for Node.js built-ins used by fflate in browser context.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        module: false,
+        fs: false,
+        path: false,
+      };
+    }
+
     // Production client-side optimizations
     if (!dev && !isServer) {
       config.optimization = {
