@@ -1,0 +1,319 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-giao-thoa-anh-sang-1.jsp",
+  "title": "27 bài tập trắc nghiệm Giao thoa ánh sáng (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Yếu tố nào sau đây của ánh sáng đơn sắc quyết định màu của nó?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Bước sóng trong môi trường"
+          },
+          {
+            "option": "B",
+            "text": "Tần số"
+          },
+          {
+            "option": "C",
+            "text": "Tốc độ truyền sóng"
+          },
+          {
+            "option": "D",
+            "text": "Cường độ của chùm ánh sáng"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Khi một chùm sáng đơn sắc truyền qua các môi trường, đại lượng không thay đổi là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tần số"
+          },
+          {
+            "option": "B",
+            "text": "bước sóng"
+          },
+          {
+            "option": "C",
+            "text": "tốc độ"
+          },
+          {
+            "option": "D",
+            "text": "cường độ"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Chiết suất của môi trường trong suốt đối với các ánh sáng đơn sắc trong một chùm ánh sáng trắng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "nhỏ khi tần số ánh sáng lớn"
+          },
+          {
+            "option": "B",
+            "text": "lớn khi tần số ánh sáng lớn"
+          },
+          {
+            "option": "C",
+            "text": "tỉ lệ nghịch với tần số ánh sáng"
+          },
+          {
+            "option": "D",
+            "text": "tỉ lệ thuận với tần số ánh sáng"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Trong thí nghiệm Y – âng về giao thoa ánh sáng, hiệu đường đi của các sóng từ hai khe S1, S2đến vân tối thứ ba kể từ vân trung tâm có trị số là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2λ       \tB. 3λ"
+          },
+          {
+            "option": "C",
+            "text": "2,5λ     \tD. 1,5λ"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Tần số nào dưới đây ứng với tần số của bức xạ màu tím?",
+        "options": [
+          {
+            "option": "A",
+            "text": "7,3.1012Hz     \tB. 1,3.1013Hz"
+          },
+          {
+            "option": "C",
+            "text": "7,3.1014Hz     \tD. 1,3.1014Hz"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Trong thí nghiệm giao thoa Y – âng về giao thoa ánh sáng với ánh sáng đơn sắc, nếu tăng khoảng cách giữa hai khe S1và S2thì hệ vân giao thoa thu được trên màn có:",
+        "options": [
+          {
+            "option": "A",
+            "text": "khoảng vân tăng"
+          },
+          {
+            "option": "B",
+            "text": "số vân tăng"
+          },
+          {
+            "option": "C",
+            "text": "hệ vân chuyển động dãn ra hai phía so với vân sáng trung tâm"
+          },
+          {
+            "option": "D",
+            "text": "số vân giảm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một ánh sáng đơn sắc có bước sóng trong không khí là 0,651 µm và trong chất lỏng trong suốt là 0,465 µm. Chiết suất của chất lỏng trong thí nghiệm đối với ánh sáng đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,35     \tB. 1,40"
+          },
+          {
+            "option": "C",
+            "text": "1,45     \tD. 1,48"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Tiến hành thí nghiệm giao thoa ánh sáng Y – âng trong không khí, khoảng vân đo được là i. Nếu đặt toàn bộ thí nghiệm trong nước có chiết suất n thì khoảng vân là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "i     \tB. ni     \tC. i/n     \tD. n/i"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Chiếu ánh sáng đơn sắc vào hai khe của thí nghiệm giao thoa ánh sáng Y – âng cách nhau 1 mm thì trên màn phía sau hai khe, cách mặt phẳng chứa hai khe 1,3 m ta thu được hệ vân giao thoa, khoảng cách từ vân trung tâm đến vân sáng bậc 5 là 4,5 mm. Ánh sáng chiếu tới thuộc vùng màu:",
+        "options": [
+          {
+            "option": "A",
+            "text": "đỏ      \tB. vàng"
+          },
+          {
+            "option": "C",
+            "text": "lục     \tD. tím"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Trong thí nghiệm Y –âng về giao thoa ánh sáng với ánh sáng đơn sắc, khoảng cách từ mặt phẳng chứa hai khe đến màn quan sát D = 1,2 m. Khoảng vân đo được trên màn là i = 0,8 mm. Để khoảng vân đo được bằng 1,2 mm, ta cần dịch chuyển màn quan sát một khoảng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,2 m ra xa mặt phẳng chứa hai khe"
+          },
+          {
+            "option": "B",
+            "text": "0,6 m ra xa mặt phẳng chứa hai khe"
+          },
+          {
+            "option": "C",
+            "text": "0,3 m lại gần mặt phẳng chứa hai khe"
+          },
+          {
+            "option": "D",
+            "text": "0,9 m lại gần mặt phẳng chứa hai khe"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Trong thí nghiệm Y –âng về giao thoa ánh sáng, chiếu đồng thời hai bức xạ đơn sắc có λ1= 0,6 µ và λ2= 0,4 µm vào khe Y – âng. Khoảng giữa hai khe a = 1 mm. Khoảng cách từ hai khe đến màn D = 2 m. Khoảng cách ngắn nhất giữa các vị trí trên màn có hai vân sáng trùng nhau là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,8 mm     \tB. 3,2 mm"
+          },
+          {
+            "option": "C",
+            "text": "2,4 mm     \tD. 9,6 mm"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Trong một thí nghiệm giao thoa ánh sáng với hai khe Y – âng trong vùng MN trên màn quan sát, người ta đếm được 13 vân sáng với M và N là hai vân sáng ứng với bước sóng λ1= 0,42 µm. Giữ nguyên điều kiện thí nghiệm, thay nguồn sáng đơn sắc với bước sóng λ2= 0,63 µm thì số vân sáng trên đoạn có chiều dài bằng MN trên màn là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "12     \t\tB. 13"
+          },
+          {
+            "option": "C",
+            "text": "8      \tD. 9"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Trong thí nghiệm Y –âng về giao thoa ánh sáng, chiếu ánh sáng trắng (bước sóng từ 0,4 µm đến 0,76 µm) vào hai khe Y – âng. Biết khoảng các giữa hai khe là 0,5 mm và khoảng cách từ 2 khe đến màn là 1 m. Bức xạ đơn sắc nào dưới đâykhôngcho vân sáng tại điểm cách vân trung tâm 5,4 mm ?",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,450 µm     \tB. 0,540 µm"
+          },
+          {
+            "option": "C",
+            "text": "0,675 µm     \tD. 0,690 µm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Trong thí nghiệm giao thoa ánh sáng Y –âng với ánh sáng trắng (có bước sóng từ 0,4 µm đến 0,76 µm), khoảng cách từ hai khe đến màn là 2 m, bề rộng quang phổ bậc 2 thu được trên màn là 1,5 mm. Khoảng cách giữa hai khe là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,72 mm     \tB. 0,96 mm"
+          },
+          {
+            "option": "C",
+            "text": "1,11 mm     \tD. 1,15 mm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Trong thí nghiệm giao thoa ánh sáng như hình vẽ bên, hai lăng kính P, P’ được làm bằng cùng một chất, đều có góc chiết quang nhỏ và bằng α. Các khoảng cách từ nguồn, từ màn đến hệ hai thấu kính lần lượt là d1, d2. Kích thước của các lăng kính rất nhỏ so với các khoảng cách này. Nguồn S phát ánh sáng đơn sắc có bước sóng λ. Khoảng vân quan sát được trên màn là i. Chiết suất của lăng kính có giá trị xác định bằng công thức:",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

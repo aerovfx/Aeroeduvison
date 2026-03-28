@@ -1,8 +1,6 @@
 "use client"
 
 import { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import dynamic from 'next/dynamic';
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Brain, Command, Search, Sparkles, ArrowRight } from "lucide-react";
 import { XPProvider } from "@/contexts/XPContext";
@@ -14,7 +12,6 @@ import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 import { TranscriptSidebar } from '@/components/transcript/TranscriptSidebar';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 
-const ChatbotWidget = dynamic(() => import('@/components/chatbot/ChatbotWidget'), { ssr: false });
 
 /* ── Quick-navigate routes for Command Palette ── */
 const quickRoutes = [
@@ -150,12 +147,12 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               <header className="h-14 flex items-center justify-between px-5 border-b border-border bg-background/95 backdrop-blur-xl sticky top-0 z-50">
                 <div className="flex items-center gap-3">
                   {/* Logo */}
-                  <Link href="/dashboard" className="flex items-center gap-2 group">
+                  <a href="/dashboard" className="flex items-center gap-2 group">
                     <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center shadow-[0_0_12px_rgba(120,100,255,0.3)] group-hover:shadow-[0_0_20px_rgba(120,100,255,0.5)] transition-shadow">
                       <Brain className="w-4 h-4 text-white" />
                     </div>
-                    <span className="text-[0.9375rem] font-semibold gradient-text">AeroEdu</span>
-                  </Link>
+                    <span className="text-[0.9375rem] font-bold text-foreground">Aero<span className="text-[hsl(175,90%,65%)] dark:text-[hsl(175,90%,65%)]">Edu</span></span>
+                  </a>
 
                   {/* AI status */}
                   <div className="flex items-center gap-1.5 ml-2 px-2 py-1 rounded-full bg-muted/80 border border-border">
@@ -197,8 +194,6 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
               {/* Command Palette */}
               <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
 
-              <ChatbotWidget />
-              
               {/* Video Transcript Sidebar */}
               <TranscriptSidebar />
             </div>

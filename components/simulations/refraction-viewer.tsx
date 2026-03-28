@@ -17,7 +17,7 @@ export function RefractionViewer({ data }: RefractionViewerProps) {
   const [selectedScenario, setSelectedScenario] = useState(0);
   const [angle, setAngle] = useState([30]);
   const [isAnimating, setIsAnimating] = useState(false);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(undefined);
   
   const scenario = data.scenarios[selectedScenario];
   const currentFrame = scenario.frames[Math.floor((angle[0] - 10) / 70 * (scenario.frames.length - 1))];

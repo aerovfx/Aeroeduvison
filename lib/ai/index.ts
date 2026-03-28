@@ -44,5 +44,4 @@ export type { AIProvider, AIMessage, AICompletionOptions, AICompletionResponse }
 export { OpenAIProvider } from './providers/openai-provider';
 export { GeminiProvider } from './providers/gemini-provider';
 export { OllamaProvider } from './providers/ollama-provider';
-export { OllamaProvider } from './providers/ollama-provider';
 

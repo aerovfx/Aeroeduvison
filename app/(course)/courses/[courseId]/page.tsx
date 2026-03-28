@@ -1,9 +1,5 @@
-'use client';
-
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { useLanguage } from '@/contexts/LanguageContext';
-import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 const CourseIdPage = async ({
   params
@@ -16,7 +12,7 @@ const CourseIdPage = async ({
       id: courseId,
     },
     include: {
-      chapters: {
+      Chapter: {
         where: {
           isPublished: true,
         },
@@ -31,7 +27,7 @@ const CourseIdPage = async ({
     return redirect("/");
   }
 
-  return redirect(`/courses/${course.id}/chapters/${course.chapters[0].id}`);
+  return redirect(`/courses/${course.id}/chapters/${course.Chapter[0].id}`);
 }
  
 export default CourseIdPage;

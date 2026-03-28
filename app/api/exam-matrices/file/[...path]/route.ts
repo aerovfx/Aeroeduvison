@@ -11,16 +11,17 @@ import { authOptions } from "@/lib/auth"
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const filePath = params.path.join("/")
+    const { path } = await params
+    const filePath = path.join("/")
     
     // Security: Only allow files from uploads/matrices/
     if (!filePath.startsWith("matrices/")) {

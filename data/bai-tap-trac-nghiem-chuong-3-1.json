@@ -1,0 +1,270 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-chuong-3-1.jsp",
+  "title": "30 bài tập ôn tập Dòng điện xoay chiều (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một khung dây quay đều trong từ trường đều quanh trục nằm trong mặt phẳng của khung và vương góc với các đường sức từ. Nếu giảm chu kì quay đi 2 lần và giảm độ lớn cảm ứng của từ trường đi 3 lần thì suất điện động hiệu dụng trong khung sẽ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tăng 3 lần"
+          },
+          {
+            "option": "B",
+            "text": "Tăng 1,5 lần"
+          },
+          {
+            "option": "C",
+            "text": "Giảm 6 lần"
+          },
+          {
+            "option": "D",
+            "text": "Giảm 1,5 lần"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Nối hai đầu đoạn mạch R, L, C mắc nối tiếp vào mạng điện xoay chiều có tần số f1thì cảm kháng là 15 Ω và dung kháng là 60 Ω. Nếu mạng điện có tần số f2= 50 Hz thì dòng điện trong mạch cùng pha với điện áp ở hai đầu đoạn mạch. Tần số f1là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "25 Hz\t    \tB. 100 Hz"
+          },
+          {
+            "option": "C",
+            "text": "150 Hz     \tD. 200 Hz"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Cho đoạn mạch điện xoay chiều có R, L, C mắc nối tiếp, trong đó ZCbiến đổi được. Nếu cho ZCtăng thêm 30 Ω so với giá trị lúc có cộng hưởng điện thì điện áp ở hai đầu đoạn mạch lệch pha  π/3 so với dòng điện trong mạch. Điện  trở R có giá trị là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "15√2 Ω     \tB.10√3 Ω"
+          },
+          {
+            "option": "C",
+            "text": "15√3 Ω     \tD 10√2 Ω"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một đoạn mạch điện xoay chiều gồm hai cuộn dây mắc nối tiếp. Độ tự cảm và điện trở thuần của hai cuộn dây lần lượt là L1, r1; L2, r2. Điều kiện để điện áp hiệu dụng giữa hai đầu đoạn mạch bằng tổng điện áp hiệu dụng giữa hai đầu hai cuộn dây là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Cho đoạn mạch điện có R, L, C mắc nối tiếp, trong dố R là một biến trở. Đặt vào hai đầu đoạn mạch một điện áp xoay chiều có điện áp hiệu dụng là U = 120 V. Khi điện trở biến trở bằng 40 Ω hoặc 160 Ω thì đoạn mạch tiêu thụ cùng công suất. Khi điều chỉnh biến trở, công suất cực đại mà đoạn mạch có thể đạt được là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "180 W     \t\tB 144 W"
+          },
+          {
+            "option": "C",
+            "text": "72 W       \tD. 90 W"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Đặt điện áp u = 110√2 cosωt (V) (với ω không đổi) vào hai đầu đoạn mạch RLC nối tiếp. Biết độ tự cảm và điện dung của mạch điện được giữ không đổi. Điều chỉnh R ta thấy giá trị hiệu dụng của cường độ dòng điện trong mạch là I = 2 A thì công suất tiêu thụ của đoạn mạch cực đại. Công suất cực đại bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "110 W"
+          },
+          {
+            "option": "B",
+            "text": "220 W"
+          },
+          {
+            "option": "C",
+            "text": "110√2 W"
+          },
+          {
+            "option": "D",
+            "text": "110√3 W"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Đặt điện áp u = U√2 cosωt vào hai đầu đoạn mạch R, L, C mắc nối tiếp có điện dung C thay đổi được. Điện áp hiệu dụng U_R đạt cực đại khi ZCcó giá trị:",
+        "options": [
+          {
+            "option": "A",
+            "text": "ZC= R         \tB. ZC= ZL"
+          },
+          {
+            "option": "C",
+            "text": "ZC= ZL/2      \t\t\t\t\tD. ZC= R/2"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "có điện dung C thay đổi được. Điện áp hiệu dụng U_C đạt cực đại khi ZCmvà UCmaxcó biểu thức :",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Đặt điện áp áp u = U√2cosωt vào hai đầu đoạn mạch R, L, C mắc nối tiếp có độ tự cảm L thay đổi được. Điện áp hiệu dụng U_L đạt cực đại khi ZLmvà ULmaxcó biẻu thức:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Cho đoạn mạch xoay chiều có R, L, C mắc nối tiếp, trong đó R là một biến trở. Đặt vào hai đầu đoạn mạch một điện áp u = U√2cosωt. Khi điện trở của biến trở bằng  R1hoặc R2thì đoạn mạch tiêu thụ cùng công suất là P. Công suất đó có giá trị là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Cho đoạn mạch xoay chiều có R, L, C mắc nối tiếp, cuộn cảm thuần có độ tự cảm thay đổi.",
+        "options": [
+          {
+            "option": "A",
+            "text": "u trễ pha hơn i một góc π/4"
+          },
+          {
+            "option": "B",
+            "text": "u sớm pha hơn i một góc 3π/4"
+          },
+          {
+            "option": "C",
+            "text": "u trễ pha hơn i một góc π/2"
+          },
+          {
+            "option": "D",
+            "text": "u sớm pha hơn i một góc π/4"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Cho mạch điện xoay chiều gồm điện trở thuần R = 50 Ω, tụ điện có dung kháng là 50 Ω và một cuộn cảm thuần có cảm kháng là 100 Ω mắc nối tiếp. Điện áp giữa hai đầu đoạn mạch có biểu thức u = 200√2cos100πt (V) . Biểu thức của điện áp giữa hai đầu cuộn dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "uL= 400√2cos(100πt + π/4) (V)"
+          },
+          {
+            "option": "B",
+            "text": "uL= 200cos(100πt - π/6) (V)"
+          },
+          {
+            "option": "C",
+            "text": "uL= 400cos(100πt + π/4) (V)"
+          },
+          {
+            "option": "D",
+            "text": "uL= 220cos(100πt - π/6) (V)"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Đặt điện áp xoay chiều có giá trị hiệu dụng và tần số không đổi vào hai đầu đoạn mạch mắc nối tiếp gồm điện trở R, cuộn cảm thuần L và tụ điện C thì điện áp cực đại giữa hai đầu mỗi phần tử bằng nhau và bằng 40 V. Khi tụ bị nối tắt thì điện áp hiệu dụng hai đầu điện trở bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "20√2  V.     \t\tB. 10 V."
+          },
+          {
+            "option": "C",
+            "text": "20 V.       \tD. 40 V."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Đặt điện áp xoay chiều u = U0cos(2πft + φ) V (U0không đổi, f thay đổi được) vào hai đầu đoạn mạch RLC mắc nối tiếp. Khi điều chỉnh f = f1= 50 Hz thì cảm kháng của cuộn dây và dung kháng của tụ điện lần lượt là 45 Ω và 90 Ω. Để dòng điện cùng pha với điện áp giữa hai đầu mạch thì phải điều chỉnh tần số đến giá trị f2. Giá trị của f2là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Đặt điện áp u = U0cos(100πt + π/3)(V)  vào hai đầu một cuộn cảm thuần có độ tự cảm  L = 1/(2π)H.  Ở thời điểm điện áp giữa hai đầu cuộn ảm là 100√2 V thì cường độ dòng điện qua cuộn cảm là 2A. Biểu thức của cường độ dòng điện qua cuộn cảm này là:",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

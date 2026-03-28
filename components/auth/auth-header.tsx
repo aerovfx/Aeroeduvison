@@ -1,4 +1,4 @@
-import { Lock } from "lucide-react";
+import { Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AuthHeaderProps {
@@ -6,25 +6,15 @@ interface AuthHeaderProps {
   showIcon?: boolean;
 }
 
-export const AuthHeader = ({
-  label,
-  showIcon = true
-}: AuthHeaderProps) => {
+export const AuthHeader = ({ label, showIcon = true }: AuthHeaderProps) => {
   return (
-    <div className="w-full flex flex-col gap-y-4 items-center justify-center">
+    <div className="flex w-full flex-col items-center justify-center gap-y-3">
       {showIcon && (
-        <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center mb-2">
-          <Lock className="h-6 w-6 text-white" />
+        <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 shadow-md">
+          <Brain className="h-6 w-6 text-white" />
         </div>
       )}
-      <h1 className={cn(
-        "text-2xl font-bold text-gray-900"
-      )}>
-        Auth
-      </h1>
-      <p className="text-gray-600 text-sm">
-        {label}
-      </p>
+      <h1 className={cn("text-center text-2xl font-bold text-foreground")}>{label}</h1>
     </div>
   );
 };

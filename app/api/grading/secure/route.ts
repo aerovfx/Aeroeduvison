@@ -89,15 +89,19 @@ export async function POST(req: NextRequest) {
         }, 400);
       }
 
-      // Get or create submission
-      const submission = await prisma.studentSubmission.create({
+      // Get or create graded sheet
+      const submission = await prisma.gradedSheet.create({
         data: {
-          userId: userIdFromHeader,
-          rubricId,
-          content: redactPII(content), // Store redacted version
-          title: title || 'Submission',
-          status: 'pending',
-          submittedAt: new Date()
+          answerKeyId: rubricId,
+          teacherId: userIdFromHeader,
+          studentId: userIdFromHeader,
+          status: 'scanned',
+          detectedAnswers: {} as any,
+          detectedPart2: {} as any,
+          detectedPart3: {} as any,
+          essayNotes: { content: redactPII(content) } as any,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         }
       });
 
@@ -125,37 +129,36 @@ export async function POST(req: NextRequest) {
         }, 400);
       }
 
-      const submission = await prisma.studentSubmission.findUnique({
+      const submission = await prisma.gradedSheet.findUnique({
         where: { id: submissionId },
-        include: { grade: true }
       });
 
       if (!submission) {
         return createSecureResponse({
           success: false,
-          error: 'Submission not found'
+          error: 'Graded sheet not found'
         }, 404);
       }
 
       // Check if grading is complete
-      if (!submission.grade) {
+      if (!submission.reviewed) {
         return new NextResponse(null, { status: 204 }); // No content - still grading
       }
 
-      // Redact sensitive information from grade
-      const grade = submission.grade;
+      // Redact sensitive information from sheet
+      const essayNotes = (submission.essayNotes as any) || {};
       return createSecureResponse({
         success: true,
         grade: {
-          id: grade.id,
-          finalScore: grade.finalScore,
-          percentage: grade.percentage,
-          status: grade.status,
-          feedback: grade.feedback,
-          strengths: grade.strengths.filter(s => !detectPII(s).length),
-          improvements: grade.improvements.filter(i => !detectPII(i).length),
-          recommendations: grade.recommendedConcepts,
-          confidenceScore: grade.confidenceScore
+          id: submission.id,
+          finalScore: submission.totalScore,
+          percentage: submission.percentage,
+          status: submission.status,
+          feedback: essayNotes.feedback || '',
+          strengths: [],
+          improvements: [],
+          recommendations: [],
+          confidenceScore: 0.8
         }
       });
     }
@@ -188,32 +191,22 @@ export async function GET(req: NextRequest) {
     const userId = req.headers.get('x-user-id') || 'unknown';
 
     if (action === 'submission' && submissionId) {
-      const submission = await prisma.studentSubmission.findUnique({
+      const submission = await prisma.gradedSheet.findUnique({
         where: { id: submissionId },
-        include: {
-          grade: {
-            select: {
-              finalScore: true,
-              percentage: true,
-              status: true,
-              gradedAt: true
-            }
-          }
-        }
       });
 
       if (!submission) {
         return createSecureResponse({
           success: false,
-          error: 'Submission not found'
+          error: 'Graded sheet not found'
         }, 404);
       }
 
       // Allow access only to own submissions
-      if (submission.userId !== userId) {
+      if (submission.teacherId !== userId) {
         return createSecureResponse({
           success: false,
-          error: 'Unauthorized: Cannot access other users submissions'
+          error: 'Unauthorized: Cannot access other users sheets'
         }, 403);
       }
 
@@ -221,10 +214,15 @@ export async function GET(req: NextRequest) {
         success: true,
         submission: {
           id: submission.id,
-          title: submission.title,
-          submittedAt: submission.submittedAt,
+          studentId: submission.studentId,
+          createdAt: submission.createdAt,
           status: submission.status,
-          grade: submission.grade || null
+          grade: {
+            finalScore: submission.totalScore,
+            percentage: submission.percentage,
+            gradeLabel: submission.gradeLabel,
+            updatedAt: submission.updatedAt,
+          }
         }
       });
     }

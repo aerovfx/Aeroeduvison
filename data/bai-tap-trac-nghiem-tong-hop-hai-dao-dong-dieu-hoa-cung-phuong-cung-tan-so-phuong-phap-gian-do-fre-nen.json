@@ -1,0 +1,272 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-tong-hop-hai-dao-dong-dieu-hoa-cung-phuong-cung-tan-so-phuong-phap-gian-do-fre-nen.jsp",
+  "title": "29 bài tập trắc nghiệm Tổng hợp hai dao động điều hòa cùng phương, cùng tần số (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một vật tham gia đồng thời 2 dao động điều hoà cùng phương cùng tần số x1= 5cos(4t + φ1) cm, x2= 3cos(4t + φ2) cm. Biên độ dao động tổng hợp thoả mãn:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2 cm ≤ A≤ 4 cm.     \tB. 5 cm ≤ A≤ 8 cm."
+          },
+          {
+            "option": "C",
+            "text": "3 cm ≤ A≤ 5 cm.     \tD. 2 cm ≤ A≤ 8 cm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Hai dao động điều hòa cùng phương, cùng tần số có biên độ lần lượt là A1= 8 cm; A2= 15 cm và lệch pha nhau π/2. Dao động tổng hợp của hai dao động này có biên độ bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "23 cm.     \tB. 7 cm."
+          },
+          {
+            "option": "C",
+            "text": "11 cm.     \tD. 17 cm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Hai dao động điều hòa cùng phương cùng tần số có biên độ đều bằng 6 cm  và có pha ban đầu lần lượt là - π/6 và - π/2. Dao động tổng hợp của hai dao động này có biên độ là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một vật thực hiện đồng thời hai dao động điều hòa cùng phương x1= 4√3cos10πt (cm) và i, t đo bằng giây. Vận tốc của vật tại thời điểm t = 2s là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "20π (cm/s)     \tB. 40π (cm/s)"
+          },
+          {
+            "option": "C",
+            "text": "10π (cm/s)     \tD. 40π (cm/s)"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một vật thực hiện đồng thời 3 dao động điều hòa cùng phương cùng tần số có phương trình lần lượt là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "40 cm       \tB. 50 cm"
+          },
+          {
+            "option": "C",
+            "text": "40√3 cm     \tD. 60 cm"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Chuyển động của một vật là hai dao động điều hòa cùng phương. Hai dao động này có phương trình lần lượt là x1= 4cos(10t - π/6) (cm) và x2= A2cos(10t - π/6) (cm). Độ lớn của vận tốc ở vị trí cân bằng là 60 cm/s. Giá trị của A2bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 cm.\tB. 6 cm."
+          },
+          {
+            "option": "C",
+            "text": "2 cm.\tD. 8 cm."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Dao động của một chất điểm là tổng hợp của hai dao động điều hòa cùng phương, có phương trình li độ lần lượt là x1= 3cos(2πt/3 - π/2) (cm) và x2= 3√3cos(2πt/3) (cm) (x1và x2tính bằng cm, t tính bằng s). Tại các thời điểm x1= x2li độ dao động tổng hợp là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "± 7,59 cm.     \tB. ± 5,19 cm."
+          },
+          {
+            "option": "C",
+            "text": "± 6 cm.       \tD. ± 3 cm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Dao động của một vật là tổng hợp của hai dao động điều hòa cùng phương, có phương trình lần lượt là x1= 4cos(√3t/2 + π/3) (cm) và x2= 5cos(√3t/2 + 2π/3) (cm) (x1; x2tính bằng  , t tính bằng  ). Gia tốc của vật có độ lớn cực đại là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một vật thực hiện đồng thời 2 dao động điều hoà cùng phương, li độ x1và x2phụ thuộc thời gian như hình vẽ. Phương trình dao động tổng hợp là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "x = 2cos(ωt – π/3) cm."
+          },
+          {
+            "option": "B",
+            "text": "x = 2cos(ωt + 2π/3) cm."
+          },
+          {
+            "option": "C",
+            "text": "x = 2cos(ωt + 5π/6) cm."
+          },
+          {
+            "option": "D",
+            "text": "x = 2cos(ωt – π/6) cm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một vật có khối lượng không đổi thực hiện đồng thời hai dao động điều hòa có phương trình lần lượt là x1= 10cos(2πt + φ) cm; x2= A2cos(2πt − π/2) cm thì dao động tổng hợp là x = Acos(2πt − π/3) cm. Khi biên độ dao động của vật bằng nửa giá trị cực đại thì biên độ dao động A2có giá trị là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một chất điểm tham gia đồng thời hai dao động điều hòa trên cùng một trục Ox có phương trình: x1= 2√3sinωt cm, x2= A2cos(ωt + φ2) cm. Phương trình dao động tổng hợp x = 2cos(ωt + φ) cm. Biết φ2 – φ = π/3. Cặp giá trị nào của A2và φ2 sau đây là đúng?",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Tổng hợp hai dao động điều hoà cùng phương, cùng tần số, cùng biên độ a là một dao động có biên độ cũng bằng a thì 2 dao động thành phần có độ lệch pha là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "π/2     \tB. π/4"
+          },
+          {
+            "option": "C",
+            "text": "π/3     \tD. 2π/3"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một chất điểm thực hiện đồng thời hai dao động điều hòa cùng phương cùng chu kì T mà đồ thị x1và x2phụ thuộc thời gian biểu diễn trên hình vẽ.",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,56 s.     \tB. 2,99 s."
+          },
+          {
+            "option": "C",
+            "text": "2,75 s.     \tD. 2,64 s."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Hai dao động điều hoà: x1= A1cos(ωt + φ1) và x2= A2cos(ωt + φ2). Biên độ dao động tổng hợp của chúng đạt cực đại khi:",
+        "options": [
+          {
+            "option": "A",
+            "text": "φ2 – φ1 = (2k + 1)π."
+          },
+          {
+            "option": "B",
+            "text": "φ2 – φ1 = 2kπ."
+          },
+          {
+            "option": "C",
+            "text": "φ2 – φ1 = (2k + 1)π/2."
+          },
+          {
+            "option": "D",
+            "text": "φ2 – φ1 = π/4."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Tổng hợp hai dao động điều hoà cùng phương, cùng tần số, cùng biên độ a là một dao động có biên độ a√2 thì 2 dao động thành phần có độ lệch pha là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "π/2     \tB. π/4"
+          },
+          {
+            "option": "C",
+            "text": "0.       \tD. π"
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

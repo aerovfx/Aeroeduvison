@@ -13,7 +13,7 @@ import { db as prisma } from '@/lib/db';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Authentication
@@ -25,7 +25,7 @@ export async function GET(
       );
     }
 
-    const submissionId = params.id;
+    const { id: submissionId } = await params;
 
     // 2. Fetch submission
     const submission = await prisma.submission.findUnique({
@@ -137,7 +137,7 @@ export async function GET(
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Authentication
@@ -157,7 +157,7 @@ export async function PATCH(
       );
     }
 
-    const submissionId = params.id;
+    const { id: submissionId } = await params;
 
     // 3. Parse request body
     const body = await req.json();
@@ -226,7 +226,7 @@ export async function PATCH(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. Authentication
@@ -238,7 +238,7 @@ export async function DELETE(
       );
     }
 
-    const submissionId = params.id;
+    const { id: submissionId } = await params;
 
     // 2. Fetch submission
     const submission = await prisma.submission.findUnique({

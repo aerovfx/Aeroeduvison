@@ -1,0 +1,343 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-giua-ki-1-vat-li-12-chan-troi.jsp",
+  "title": "Bài tập trắc nghiệm Giữa kì 1 Vật Lí 12 Chân trời sáng tạo (có đúng sai, trả lời ngắn)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Phát biểu nào sau đây là đúng khi nói về mô hình động học phân tử?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Lực tương tác giữa các phân tử trong chất lỏng mạnh hơn so với các phân tử trong chất rắn."
+          },
+          {
+            "option": "B",
+            "text": "Khoảng cách giữa các phân tử trong chất lỏng lớn hơn khoảng cách giữa các phân tử trong chất rắn."
+          },
+          {
+            "option": "C",
+            "text": "Các phân tử trong chất rắn chuyển động hỗn độn hơn so với các phân tử trong chất lỏng."
+          },
+          {
+            "option": "D",
+            "text": "Các phân tử trong chất rắn có kích thước lớn hơn so với các phân tử trong chất lỏng."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Phát biểu nào sau đây là sai khi nói về mô hình động học phân tử đối với chất khí?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chất khí gồm các phân tử có kích thước rất nhỏ so với khoảng cách giữa chúng."
+          },
+          {
+            "option": "B",
+            "text": "Những phân tử này không có cùng khối lượng."
+          },
+          {
+            "option": "C",
+            "text": "Các phân tử chuyển động hỗn loạn, không ngừng."
+          },
+          {
+            "option": "D",
+            "text": "Các phân tử chuyển động nhanh, va chạm đàn hồi với nhau và với thành bình, tạo áp suất lên thành bình."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Chọn phát biểu đúng về sự nóng chảy của một chất nào đó.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Xảy ra ở cùng nhiệt độ với sự hoá hơi."
+          },
+          {
+            "option": "B",
+            "text": "Toả nhiệt ra môi trường."
+          },
+          {
+            "option": "C",
+            "text": "Cần cung cấp nhiệt lượng."
+          },
+          {
+            "option": "D",
+            "text": "Xảy ra ở 100 °C."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Vào mùa hè, nước trong hồ thường lạnh hơn không khí. Ví dụ, nước trong hồ bơi có thể ở 22 °C trong khi nhiệt độ không khí là 25 °C. Mặc dù không khí ấm hơn nhưng bạn vẫn cảm thấy lạnh khi ra khỏi nước. Điều này được giải thích là do:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Nước cách nhiệt tốt hơn không khí."
+          },
+          {
+            "option": "B",
+            "text": "Trong không khí có hơi nước."
+          },
+          {
+            "option": "C",
+            "text": "Nước trên da bạn đã bay hơi."
+          },
+          {
+            "option": "D",
+            "text": "Hơi nước trong không khí bị ngưng tụ trên da bạn."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một số chất ở thể rắn như iodine (i-ốt), băng phiến, đá khô (CO2ở thể rắn),... có thể chuyển trực tiếp sang ...(1)...khi nó ...(2). Hiện tượng trên gọi là sự thăng hoa. Ngược lại, với sự thăng hoa là sự ngưng kết. Điền cưm từ thích hợp vào chỗ trống.",
+        "options": [
+          {
+            "option": "A",
+            "text": "(1) thể lỏng; (2) toả nhiệt."
+          },
+          {
+            "option": "B",
+            "text": "(1) thể hơi; (2) toả nhiệt."
+          },
+          {
+            "option": "C",
+            "text": "(1) thể lỏng; (2) nhận nhiệt."
+          },
+          {
+            "option": "D",
+            "text": "(1) thể hơi; (2) nhận nhiệt."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Tính nhiệt lượng Q cần cung cấp để làm nóng chảy 500 g nước đá ở 0 °C. Biết nhiệt nóng chảy riêng của nước đá bằng 3,34.105J/kg.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Q = 7.107J."
+          },
+          {
+            "option": "B",
+            "text": "Q = 167 kJ."
+          },
+          {
+            "option": "C",
+            "text": "Q = 167 J."
+          },
+          {
+            "option": "D",
+            "text": "Q = 167.106J."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Nhiệt hóa hơi riêng của nước là 2,3.106J/kg. Câu nào sau đây đúng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Một lượng nước bất kì cần thu một lượng nhiệt là 2,3.106J để bay hơi hoàn toàn."
+          },
+          {
+            "option": "B",
+            "text": "Mỗi kilogam nước cần thu một lượng nhiệt là 2,3.106J để bay hơi hoàn toàn."
+          },
+          {
+            "option": "C",
+            "text": "Mỗi kilogam nước sẽ tỏa ra một lượng nhiệt là 2,3.106J khi bay hơi hoàn toàn ở nhiệt độ sôi."
+          },
+          {
+            "option": "D",
+            "text": "Mỗi kilogam nước cần thu một lượng nhiệt là 2,3.106J để bay hơi hoàn toàn ở nhiệt độ sôi và áp suất chuẩn."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Biết nhiệt hóa hơi riêng của nước là L = 2,3.106J/kg. Nhiệt lượng cần cung cấp để làm bay hơi hoàn toàn 100 g nước ở 100 °C là",
+        "options": [
+          {
+            "option": "A",
+            "text": "23.106J."
+          },
+          {
+            "option": "B",
+            "text": "2,3.105J."
+          },
+          {
+            "option": "C",
+            "text": "2,3.106J."
+          },
+          {
+            "option": "D",
+            "text": "0,23.104J."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Nhiệt nóng chảy riêng của nước đá là 334.103J/kg. Năng lượng được hấp thụ bởi 10,0 g nước đá để chuyển hoàn toàn từ thể rắn sang thể lỏng là",
+        "options": [
+          {
+            "option": "A",
+            "text": "3,34.103J."
+          },
+          {
+            "option": "B",
+            "text": "334.104J."
+          },
+          {
+            "option": "C",
+            "text": "334.101J."
+          },
+          {
+            "option": "D",
+            "text": "334.102J."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Ở nhiệt độ nào nước đá chuyển thành nước.",
+        "options": [
+          {
+            "option": "A",
+            "text": "-20oC."
+          },
+          {
+            "option": "B",
+            "text": "0oC."
+          },
+          {
+            "option": "C",
+            "text": "100oC."
+          },
+          {
+            "option": "D",
+            "text": "20oC."
+          }
+        ],
+        "answer": "Thí sinh trả lời từ câu 1 đến câu 2. Trong mỗi ý a), b), c), d) ở mỗi câu, thí sinh chọn đúng hoặc sai",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Các phát biểu sau đây đúng hay sai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chất khí không có hình dạng và thể tích riêng, luôn chiếm toàn bộ thể tích bình chứa và có thể nén được dễ dàng."
+          },
+          {
+            "option": "B",
+            "text": "Vật ở thể rắn có thể tích và hình dạng riêng, rất khó nén."
+          },
+          {
+            "option": "C",
+            "text": "Vật ở thể lỏng có thể tích riêng nhưng không có hình dạng riêng."
+          },
+          {
+            "option": "D",
+            "text": "Các chất không thể chuyển từ dạng này sang dạng khác."
+          },
+          {
+            "option": "A",
+            "text": "Đúngb) Đúngc) Đúng.d) Sai. Vì các chất có thể chuyển từ trạng thái này sang trạng thái khác.Đáp án:a) Đúng; b) Đúng; c) Đúng; d) Sai."
+          },
+          {
+            "option": "A",
+            "text": "Đúng"
+          },
+          {
+            "option": "B",
+            "text": "Đúng"
+          },
+          {
+            "option": "C",
+            "text": "Đúng."
+          },
+          {
+            "option": "D",
+            "text": "Sai. Vì các chất có thể chuyển từ trạng thái này sang trạng thái khác."
+          }
+        ],
+        "answer": "Thí sinh trả lời từ câu 1 đến câu 3",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một bình đựng nước ở 0,00°C.Người ta làm nước trong bình đông đặc lại bằng cách hút không khí và hơi nước trong bình ra ngoài. Lấy nhiệt nóng chảy riêng của nước là 3,3.105J/kg và nhiệt hoá hơi riêng ở nước là 2,48.106J/kg. Bỏ qua sự trao đổi nhiệt với môi trường bên ngoài. Tỉ số giữa khối lượng nước bị hoá hơi và khối lượng nước ở trong bình lúc đầu là bao nhiêu?",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 12
+}

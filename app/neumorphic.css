@@ -127,7 +127,7 @@
 
   --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
 
-  --gradient-text: linear-gradient(135deg, hsl(var(--primary-light)) 0%, hsl(var(--accent)) 50%, hsl(var(--secondary-light)) 100%);
+  --gradient-text: linear-gradient(135deg, hsl(220 100% 92%) 0%, hsl(175 100% 78%) 45%, hsl(270 100% 90%) 100%);
 
   /* ============================================
    * TRANSITIONS
@@ -575,3 +575,108 @@
 .neu-shadow { box-shadow: var(--shadow-md); }
 .neu-shadow-lg { box-shadow: var(--shadow-lg); }
 .neu-shadow-inner { box-shadow: var(--neu-shadow-inner); }
+
+/* ============================================
+ * LIGHT MODE OVERRIDES
+ * Override dark-first defaults when .dark is absent.
+ * ============================================ */
+html:not(.dark) {
+  /* Variable overrides for neumorphic design system */
+  --neu-text-muted: rgba(0, 0, 0, 0.40);
+  --neu-bg-gradient-start: hsl(210, 40%, 97%);
+  --neu-bg-gradient-end: hsl(210, 40%, 95%);
+  --neu-shadow-light: rgba(255, 255, 255, 0.7);
+  --neu-shadow-dark: rgba(0, 0, 0, 0.08);
+  --neu-shadow-inner: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+  --neu-shadow-pressed: inset 0 1px 4px rgba(0, 0, 0, 0.1);
+  --neu-shadow-inset-dark: rgba(0, 0, 0, 0.05);
+  --gradient-surface: linear-gradient(145deg, rgba(0,0,0,0.02) 0%, rgba(0,0,0,0.005) 100%);
+  --gradient-card: linear-gradient(145deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.5) 100%);
+  --gradient-text: linear-gradient(135deg, hsl(245 70% 45%) 0%, hsl(175 70% 35%) 45%, hsl(270 60% 45%) 100%);
+}
+
+/* Component overrides for light mode */
+html:not(.dark) .neu-input,
+html:not(.dark) .ai-input {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: hsl(var(--border));
+}
+
+html:not(.dark) .glass-overlay {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+html:not(.dark) .command-palette {
+  background: hsl(0 0% 100%);
+  border-color: hsl(var(--border));
+}
+
+html:not(.dark) .command-palette-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+html:not(.dark) .nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+html:not(.dark) .nav-item.active {
+  background: rgba(120, 100, 255, 0.06);
+  border-color: rgba(120, 100, 255, 0.12);
+}
+
+html:not(.dark) .nav-item.highlighted {
+  background: linear-gradient(135deg, rgba(120, 100, 255, 0.04) 0%, rgba(0, 180, 160, 0.03) 100%);
+  border-color: rgba(120, 100, 255, 0.08);
+}
+
+html:not(.dark) .neu-container ::-webkit-scrollbar-thumb,
+html:not(.dark) .glass-panel ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+html:not(.dark) .neu-container ::-webkit-scrollbar-thumb:hover,
+html:not(.dark) .glass-panel ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+/* ── Glass card/panel light overrides ──────────────────────── */
+html:not(.dark) .glass-card {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+html:not(.dark) .glass-panel {
+  background: rgba(255, 255, 255, 0.70) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+html:not(.dark) .glass-button {
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+  color: hsl(var(--foreground)) !important;
+}
+html:not(.dark) .glass-button:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* ── Stat cards, badges, data displays ────────────────────── */
+html:not(.dark) .neu-card,
+html:not(.dark) .ai-card {
+  background: rgba(255, 255, 255, 0.80) !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+html:not(.dark) .neu-badge {
+  color: hsl(var(--foreground) / 0.80) !important;
+}
+
+/* ── Sidebar section labels and icons ─────────────────────── */
+html:not(.dark) .nav-section-label {
+  color: hsl(var(--foreground) / 0.45) !important;
+}
+
+/* ── Neumorphic typography: only override UNSET text (not colored ones) ── */
+/* Removed blanket h1/h2/h3/h4/p overrides — they broke gradient text
+   (bg-clip-text text-transparent) and pages with specific Tailwind text
+   colors like text-purple-900, text-sky-700, etc.
+   Individual dark-first text classes (text-gray-50/100/200, text-white/XX,
+   text-slate-50/100/200 etc.) are already handled by globals.css overrides. */

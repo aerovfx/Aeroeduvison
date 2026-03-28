@@ -200,7 +200,7 @@ export default function LabTwinPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-50 dark:from-[hsl(260,30%,8%)] dark:via-[hsl(280,25%,10%)] dark:to-[hsl(240,30%,8%)]">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">

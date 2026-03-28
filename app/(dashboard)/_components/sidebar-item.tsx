@@ -50,7 +50,7 @@ export const SidebarItem = memo(function SidebarItem({
             ? "bg-[hsl(245,85%,65%)]/15 text-[hsl(245,85%,75%)] shadow-[0_0_12px_rgba(120,100,255,0.15)]"
             : isHighlighted
             ? "text-[hsl(245,85%,70%)] hover:bg-[hsl(245,85%,65%)]/10"
-            : "text-[hsl(215,15%,45%)] hover:bg-white/[0.06] hover:text-[hsl(210,20%,80%)]",
+            : "text-muted-foreground hover:bg-white/[0.06] dark:hover:bg-white/[0.06] hover:text-foreground",
           isPending && "opacity-50 cursor-wait"
         )}
       >
@@ -89,7 +89,7 @@ export const SidebarItem = memo(function SidebarItem({
           "nav-icon transition-all",
           isActive && "text-[hsl(245,85%,75%)]",
           isHighlighted && !isActive && "text-[hsl(245,85%,70%)]",
-          !isActive && !isHighlighted && "text-[hsl(215,15%,45%)]"
+          !isActive && !isHighlighted && "text-muted-foreground"
         )}
       />
       <span className="truncate flex-1">{label}</span>
@@ -100,7 +100,7 @@ export const SidebarItem = memo(function SidebarItem({
 
       {isPending && (
         <div className="ml-auto">
-          <div className="w-3.5 h-3.5 border-[1.5px] border-white/10 border-t-[hsl(245,85%,65%)] rounded-full animate-spin" />
+          <div className="w-3.5 h-3.5 border-[1.5px] border-border border-t-[hsl(245,85%,65%)] rounded-full animate-spin" />
         </div>
       )}
     </button>

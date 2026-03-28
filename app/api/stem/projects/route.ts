@@ -21,16 +21,16 @@ export async function GET(request: NextRequest) {
         userId: session.user.id
       },
       include: {
-        teamMembers: true,
-        milestones: {
+        STEMTeamMember: true,
+        STEMMilestone: {
           include: {
-            deliverables: true
+            STEMDeliverable: true
           },
           orderBy: {
             position: 'asc'
           }
         },
-        feedback: true
+        STEMFeedback: true
       },
       orderBy: {
         updatedAt: 'desc'
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       dueDate: project.dueDate?.toISOString(),
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
-      teamMembers: project.teamMembers.map(member => ({
+      teamMembers: project.STEMTeamMember.map(member => ({
         id: member.id,
         name: member.name,
         role: member.role,
@@ -64,14 +64,14 @@ export async function GET(request: NextRequest) {
         email: session.user.email || 'instructor@example.com'
       },
       tags: [], // TODO: Add tags field to schema
-      milestones: project.milestones.map(milestone => ({
+      milestones: project.STEMMilestone.map(milestone => ({
         id: milestone.id,
         title: milestone.title,
         description: milestone.description,
         status: milestone.status,
         dueDate: milestone.dueDate?.toISOString(),
         completedAt: milestone.completedAt?.toISOString(),
-        deliverables: milestone.deliverables.map(deliverable => ({
+        deliverables: milestone.STEMDeliverable.map(deliverable => ({
           id: deliverable.id,
           title: deliverable.title,
           description: deliverable.description,
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
           url: deliverable.url
         }))
       })),
-      feedback: project.feedback.map(feedback => ({
+      feedback: project.STEMFeedback.map(feedback => ({
         id: feedback.id,
         author: feedback.author,
         content: feedback.content,
@@ -238,18 +238,18 @@ export async function POST(request: NextRequest) {
     // Create project in database
     const newProject = await db.sTEMProject.create({
       data: {
-        title: projectData.title,
-        description: projectData.description,
-        category: projectData.category,
+        title: projectData.title || '',
+        description: projectData.description || '',
+        category: projectData.category || '',
         status: projectData.status || 'draft',
         difficulty: projectData.difficulty || 'beginner',
         progress: projectData.progress || 0,
         isPublic: projectData.isPublic || false,
-        thumbnail: projectData.thumbnail,
+        thumbnail: projectData.thumbnail || null,
         dueDate: projectData.dueDate ? new Date(projectData.dueDate) : null,
         userId: session.user.id,
         // Create team members if provided
-        teamMembers: projectData.teamMembers ? {
+        STEMTeamMember: projectData.teamMembers ? {
           create: projectData.teamMembers.map((member: any) => ({
             name: member.name,
             role: member.role,
@@ -258,14 +258,14 @@ export async function POST(request: NextRequest) {
           }))
         } : undefined,
         // Create milestones if provided
-        milestones: projectData.milestones ? {
+        STEMMilestone: projectData.milestones ? {
           create: projectData.milestones.map((milestone: any, index: number) => ({
             title: milestone.title,
             description: milestone.description,
             status: milestone.status || 'pending',
             dueDate: milestone.dueDate ? new Date(milestone.dueDate) : null,
             position: index,
-            deliverables: milestone.deliverables ? {
+            STEMDeliverable: milestone.deliverables ? {
               create: milestone.deliverables.map((deliverable: any) => ({
                 title: deliverable.title,
                 description: deliverable.description,
@@ -276,7 +276,7 @@ export async function POST(request: NextRequest) {
           }))
         } : undefined,
         // Create feedback if provided
-        feedback: projectData.feedback ? {
+        STEMFeedback: projectData.feedback ? {
           create: projectData.feedback.map((feedback: any) => ({
             author: feedback.author,
             content: feedback.content,
@@ -286,13 +286,13 @@ export async function POST(request: NextRequest) {
         } : undefined
       },
       include: {
-        teamMembers: true,
-        milestones: {
+        STEMTeamMember: true,
+        STEMMilestone: {
           include: {
-            deliverables: true
+            STEMDeliverable: true
           }
         },
-        feedback: true
+        STEMFeedback: true
       }
     });
 
@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
       dueDate: newProject.dueDate?.toISOString(),
       createdAt: newProject.createdAt.toISOString(),
       updatedAt: newProject.updatedAt.toISOString(),
-      teamMembers: newProject.teamMembers.map(member => ({
+      teamMembers: (newProject as any).STEMTeamMember.map((member: any) => ({
         id: member.id,
         name: member.name,
         role: member.role,
@@ -323,14 +323,14 @@ export async function POST(request: NextRequest) {
         email: session.user.email || 'instructor@example.com'
       },
       tags: projectData.tags || [],
-      milestones: newProject.milestones.map(milestone => ({
+      milestones: (newProject as any).STEMMilestone.map((milestone: any) => ({
         id: milestone.id,
         title: milestone.title,
         description: milestone.description,
         status: milestone.status,
         dueDate: milestone.dueDate?.toISOString(),
         completedAt: milestone.completedAt?.toISOString(),
-        deliverables: milestone.deliverables.map(deliverable => ({
+        deliverables: milestone.STEMDeliverable.map((deliverable: any) => ({
           id: deliverable.id,
           title: deliverable.title,
           description: deliverable.description,
@@ -338,7 +338,7 @@ export async function POST(request: NextRequest) {
           url: deliverable.url
         }))
       })),
-      feedback: newProject.feedback.map(feedback => ({
+      feedback: (newProject as any).STEMFeedback.map((feedback: any) => ({
         id: feedback.id,
         author: feedback.author,
         content: feedback.content,

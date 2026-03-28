@@ -1,0 +1,419 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/chuong-5-song-anh-sang.jsp",
+  "title": "115 bài tập trắc nghiệm Sóng ánh sáng (có lời giải)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Ánh sáng trắng",
+        "options": [
+          {
+            "option": "A",
+            "text": "không bị tán sắc khi truyền qua bản hai mặt song song"
+          },
+          {
+            "option": "B",
+            "text": "gồm vô số ánh sáng đơn sắc có màu biến thiên liên tục từ đỏ đến tím"
+          },
+          {
+            "option": "C",
+            "text": "gồm hai loại ánh sáng đơn sắc có màu khác nhau"
+          },
+          {
+            "option": "D",
+            "text": "được truyền qua một lăng kính, tia đỏ luôn bị lệch nhiều hơn tia tím"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Tìm phát biểusaivề kết quả thì nghiệm tán sắc của Niu-tơn đối với ánh sáng trắng qua lăng kính.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia tím có phường truyền lệch nhiều nhất so với các tia khác"
+          },
+          {
+            "option": "B",
+            "text": "Tia đổ lệch phương truyền ít nhất so với các tia khác"
+          },
+          {
+            "option": "C",
+            "text": "Chùm tia lõ có màu biến thiên liên tục"
+          },
+          {
+            "option": "D",
+            "text": "Tia tím bị lệch về phía đáy, tia đỏ bị lệch về phía ngược lại."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Hiện tượng tán sắc xảy ra là do:",
+        "options": [
+          {
+            "option": "A",
+            "text": "chiết xuất của một môi trường đối với các ánh sáng đơn sắc khác nhau có giá trị khác nhau"
+          },
+          {
+            "option": "B",
+            "text": "các ánh sáng đơn sắc khác nhau thì có màu khác nhau"
+          },
+          {
+            "option": "C",
+            "text": "chùm sáng trắng gồm vô số các chùm sáng có màu khác nhau"
+          },
+          {
+            "option": "D",
+            "text": "chùm sáng bị khúc xạ khi  truyền không vuông góc với mặt giới hạn"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Tìm phát biểu sai.",
+        "options": [
+          {
+            "option": "A",
+            "text": "có một màu xác định"
+          },
+          {
+            "option": "B",
+            "text": "đều bị lệch đường truyền khi khúc xạ"
+          },
+          {
+            "option": "C",
+            "text": "không bị lệch đường truyền khi đi qua lăng kính"
+          },
+          {
+            "option": "D",
+            "text": "không bị tán sắc khi đi qua lăng kính"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Tìm phát biểusaivề hiện tượng tán săc ánh sáng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chiết suất của lăng kính đối với các ánh sáng đơn sắc khác nhau có giá trị khác nhau."
+          },
+          {
+            "option": "B",
+            "text": "Khi chiều chùm ánh sáng trăng qua lăng kính, tia tím lệch ít nhất, tia đổ lệch nhiều nhất."
+          },
+          {
+            "option": "C",
+            "text": "Ánh sáng đơn sắc là ánhn sáng khôn gbị tán sắc khi qua lăng kính"
+          },
+          {
+            "option": "D",
+            "text": "Ánh sáng trắng là tập hợp của vô số ánh sáng đơn sắc có màu biến thiên lien tục từ đỏ đến tím."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Trong máy quang phổ lăng kính, lăng kính có tác dụng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng cường độ chùm sáng"
+          },
+          {
+            "option": "B",
+            "text": "tán sắc ánh sáng"
+          },
+          {
+            "option": "C",
+            "text": "nhiễu xạ ánh sáng"
+          },
+          {
+            "option": "D",
+            "text": "giao thoa ánh sáng"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Chiều chùm sáng hẹp gồm hai bức xạ đổ và tím tới lăng kính tam giác đều thì tia tím có góc lệchn cực tiểu. Biết chiết suất của lăng kính đối với tia màu đỏ là  nđ= 1,414 ; chiết suất của lăng kính đối với tia màu tím là nt= 1,452. Để tia đỏ có góc lệch cực tiểu, cần giảm góc tới của tia sáng một lượng bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,21°      B. 1,56°"
+          },
+          {
+            "option": "C",
+            "text": "2,45°      D. 15°"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Chiếu một chùm sáng trắng hẹp đi từ không khí đến để gặp mặt tấm thủy tinh theo phương hợp với mặt này một góc 30°. Thủy tinh có chiết suất đối ánh sáng đỏ và ánh sáng tím lần lượt là nđ= 1,49 và nt= 1,53. Góc hợp bởi tia khúc xạ màu đỏ và tia khúc xạ màu tímgần nhất với giá trịnào dưới đây?",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,5°     \tB. 0,6°"
+          },
+          {
+            "option": "C",
+            "text": "1,1°     \tD. 1,3°"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một lăng kính có góc chiết quang A = 5°. Biết chiết suất của lăng kính đối với tia tím là 1,58 và góc tới i nhỏ. Góc lệch của tia tới khi qua lăng kính là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "7,9°     \tB. 0,79 rad"
+          },
+          {
+            "option": "C",
+            "text": "2,9°     \tD. 0,029 rad"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một lăng kính thủy tinh có góc chiết quang A = 60°. Chiếu tia sáng trắng SI vào mặt bên của lăng kính sao cho tia tới nằm phía dưới pháp tuyến tại I. Chiết suất của môi trường là lăng kính đối với ánh sáng là n = √3. Để cho tia tím có góc lệch cực tiểu thì góc tới phải bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "60°     \tB. 45°"
+          },
+          {
+            "option": "C",
+            "text": "30°     \tD. 55°"
+          }
+        ],
+        "answer": "Trắc nghiệm Tán sắc ánh sáng (có đáp án - phần 2)",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Một lăng kính có góc chiết quang A = 45°. Chiếu chùm tia sáng hẹp đa sắc SI gồm 4 ánh sáng đơn sắc: đỏ, vàng, lục và tím đến gặp mặt bên AB theo phương vuông góc. Biết chiết suất của lăng kính đối với ánh sáng màu lam là √2. Các tia ló ra khỏi mặt bên AC gồm các ánh sáng đơn sắc:",
+        "options": [
+          {
+            "option": "A",
+            "text": "đỏ, vàng, lục và tím."
+          },
+          {
+            "option": "B",
+            "text": "đỏ, vàng và tím."
+          },
+          {
+            "option": "C",
+            "text": "đỏ, lục và tím."
+          },
+          {
+            "option": "D",
+            "text": "đỏ, vàng và lục."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Chiếu một chùm tia sáng trắng hẹp vào mặt bên của lăng kính, theo phương vuông góc với mặt phẳng phân giác của góc chiết quang. Sau lăng kính, đặt một màn quan sát song song với mặt phân giác của lăng kính và cách mặt phân giác này một đoạn 2m. Chiết suất của lăng kính đối với tia đỏ nđ= 1,5 và đối với tia tím là nt= 1,54. Góc chiết quang của lăng kính bằng 5°. Độ rộng của quang phổ liên tục trên màn quan sát (khoảng cách từ mép tím đến mép đỏ) bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "7,0 mm      \tB. 8,0 mm"
+          },
+          {
+            "option": "C",
+            "text": "6,25 mm     \t\tD. 9,2 mm"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Chiếu chùm ánh sáng trắng hẹp vào đỉnh của một lăng kính theo phương vuông góc với mặt phẳng phân giác của góc chiết quang. Biết góc chiết quang 4°, chiết suất của lăng kính đối với ánh sáng đỏ và tím lần lượt là 1,468 và 1,868. Bề rộng quang phổ thu được trên màn quan sát đặt song song với mặt phẳng phân giác và cách mặt phẳng phân giác 2m là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "6 cm      \tB. 6,4 m"
+          },
+          {
+            "option": "C",
+            "text": "6,4 cm     \t\tD. 56,3 mm"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Một lăng kính có góc chiết quang (góc ở đỉnh) A = 8° đặt trong không khí. Đặt màn quan sát E song song với mặt phẳng phân giác của A và cách nó 1,5m. Chiếu đến lăng kính một chùm sáng trắng hẹp, song song theo phương vuông góc với mặt phân giác của A và gần A. Biết chiết suất của chất làm lăng kính đối với ánh sáng đỏ bằng 1,61 và với ánh sáng tím bằng 1,68. Xác định khoảng cách từ vệt đỏ đến vệt tím trên màn E?",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,47 mm.     \tB. 0,73 cm."
+          },
+          {
+            "option": "C",
+            "text": "0,73 mm.     \tD. 1,47 cm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Chiếu một chùm ánh sáng trắng vào mặt bên của một lăng kính có góc chiết quang 6° theo phương vuông góc mặt phân giác góc chiết quang. Trên màn quan sát E đặt song song và cách mặt phân giác của lăng kính một đoạn 1,5m ta thu được dải màu có bề rộng là 6 mm. Biết chiết suất của lăng kính đối với ánh sáng đỏ là 1,5015. Chiết suất của lăng kính đối với ánh sáng tím sẽ là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,5004     \tB. 1,5397"
+          },
+          {
+            "option": "C",
+            "text": "1,5543     \tD. 1,496"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Một lăng kính thủy tinh có góc chiết quang A = 5°, được coi là nhỏ, có chiết suất đối với ánh sáng đỏ và tím lần lượt là nđ= 1,578 và nt= 1,618. Cho một chùm sáng trắng hẹp rọi vào mặt bên của lăng kính theo phương vuông góc với mặt phẳng phân giác của góc chiết quang. Góc tạo bởi tia đỏ và tia tím sau khi ló ra khỏi lăng kính là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,3°     \tB. 0,5°"
+          },
+          {
+            "option": "C",
+            "text": "0,2°     \tD. 0,12°"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Một lăng kính thủy tinh có góc chiết quang A = 5°, cho ánh sáng đỏ và tím truyền qua với tốc độ lần lượt là 1,826.108m/s và 1,780108m/s. Chiếu vào mặt bên của lăng kính một chùm sáng trắng hẹp (xem là một tia) theo phương vuông góc với mặt phẳng phân giác của góc chiết quang, điểm tới gần A. Góc lệch giữa tia ló đỏ và tia ló tím là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Chiếu một chùm tia sáng trắng hẹp vào mặt bên của lăng kính, theo phương vuông góc với mặt phẳng phân giác của góc chiết quang. Sau lăng kính, đặt một màn quan sát song song với mặt phân giác của lăng kính và cách mặt phân giác này một đoạn 2m. Chiết suất của lăng kính đối với tia đỏ nđ= 1,50 và đối với tia tím là nt= 1,54. Góc chiết quang của lăng kính bằng 5°. Độ rộng của quang phổ liên tục trên màn quan sát (khoảng cách từ mép tím đến mép đỏ) bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "9,2 mm      \tB. 8,0 mm"
+          },
+          {
+            "option": "C",
+            "text": "6,25 mm     \t\tD. 7,0 mm"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Một lăng kính thủy tinh có góc chiết quang A = 6° đặt trong không khí. Chiết suất của lăng kính đối với ánh sáng đỏ và tím lần lượt là 1,64 và 1,68. Chiếu một chùm tia sáng song song, hẹp gồm hai bức xạ đỏ và tím nói trên vào mặt bên của lăng kính theo phương vuông góc với mặt này. Góc tạo bởi tia màu đỏ và tia màu tím sau khi ló ra khỏi mặt bên còn lại của lăng kính bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,16°     \tB. 0,36°"
+          },
+          {
+            "option": "C",
+            "text": "0,24°     \tD. 0,12°"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Chiếu vào mặt bên của lăng kính có góc chiết quang A = 45° một chùm ánh sáng trắng hẹp coi như một tia sáng. Biết chiết suất của lăng kính đối với ánh sáng vàng là nv= 1,52 và đối với ánh sáng đỏ là nđ= 1,5. Biết tia vàng có góc lệch cực tiểu. Góc ló của tia đỏ gần đúng bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "35,49°     \tB. 34,49°"
+          },
+          {
+            "option": "C",
+            "text": "33,24°     \tD. 30,49°"
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 20
+}

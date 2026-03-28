@@ -1,0 +1,324 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-song-dung-2.jsp",
+  "title": "29 bài tập trắc nghiệm Sóng dừng (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Trong hiện tượng sóng dừng, khoảng cách giữa hai nút sóng cạnh nhau bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "một phần tư bước sóng."
+          },
+          {
+            "option": "B",
+            "text": "hai lần bước sóng."
+          },
+          {
+            "option": "C",
+            "text": "nửa bước sóng."
+          },
+          {
+            "option": "D",
+            "text": "4 lần bước sóng."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Trên một sợi dây đàn hồi dài có sóng dừng với bước sóng 0,6 cm. Trên dây có hai điểm A và B cách nhau 2,05 cm, tại A là một bụng sóng. Số bụng sóng trên đoạn dây AB là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "8     \tB. 7"
+          },
+          {
+            "option": "C",
+            "text": "6     \tD. 4"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Một sợi dây dài 2L được kéo căng hai đầu cố định. Kích thích để trên dây có sóng dừng ngoài hai đầu là hai nút chỉ còn điểm chính giữa C của sợi dây là nút. M và N là hai điểm trên dây đối xứng nhau qua C. Dao động tại các điểm M và N sẽ có biên độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "như nhau và cùng pha."
+          },
+          {
+            "option": "B",
+            "text": "khác nhau và cùng pha."
+          },
+          {
+            "option": "C",
+            "text": "như nhau và ngược pha nhau."
+          },
+          {
+            "option": "D",
+            "text": "khác nhau và ngược pha nhau."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Hãy chọn phát biểu đúng. Để tạo sóng dừng giữa hai đầu dây cố định thì độ dài của dây phải bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "một số nguyên lần bước sóng."
+          },
+          {
+            "option": "B",
+            "text": "một số nguyên lần nửa bước sóng."
+          },
+          {
+            "option": "C",
+            "text": "một số lẻ lần nửa bước sóng."
+          },
+          {
+            "option": "D",
+            "text": "một số lẻ lần bước sóng."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Một sợi dây đàn hồi dài 90 cm một đầu gắn với nguồn dao động một đầu tự do. Khi dây rung với tần số f = 10 Hz thì trên dây xuất hiện sóng dừng ổn định với 5 điểm nút trên dây. Nếu đầu tự do của dây được giữ cố định và tốc độ truyền sóng trên dây không đổi thì phải thay đổi tần số rung của dây một lượng nhỏ nhất bằng bao nhiêu để trên dây tiếp tục xẩy ra hiện tượng sóng dừng ổn định:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10/9 Hz.     \t\t\tB. 10/3 Hz."
+          },
+          {
+            "option": "C",
+            "text": "20/9Hz.      \tD. 7/3Hz."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Một lò xo ống dài 1,2 m có đầu trên gắn vào một nhánh âm thoa dao động với biên độ nhỏ, đầu dưới treo quả cân. Dao động âm thoa có tần số 50 Hz, khi đó trên lò xo có một hệ sóng dừng và trên lò xo chỉ có một nhóm vòng dao động có biên độ cực đại. Tốc độ truyền sóng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "40 m/s.      \tB. 120 m/s."
+          },
+          {
+            "option": "C",
+            "text": "100 m/s.     \t\t\tD. 240 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Đầu A của một sợi dây AB được nối với nguồn dao động nhỏ để tạo ra sóng dừng trên dây với A xem là nút. Khi thay đổi tần số của nguồn, thấy rằng tần số nhỏ nhất để tạo sóng dừng là 100 Hz, tần số liền kề để vẫn tạo sóng dừng là 200 Hz. Chọn câu đúng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Đầu B cố định."
+          },
+          {
+            "option": "B",
+            "text": "Đầu B tự do."
+          },
+          {
+            "option": "C",
+            "text": "Đề bài đưa ra không thể xẩy ra."
+          },
+          {
+            "option": "D",
+            "text": "Đề bài chưa đủ dữ kiện để kết luận."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Trong hệ sóng dừng trên một sợi dây, khoảng cách giữa hai nút hoặc hai bụng liên tiếp bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "một bước sóng."
+          },
+          {
+            "option": "B",
+            "text": "hai bước sóng."
+          },
+          {
+            "option": "C",
+            "text": "một phần tư bước sóng."
+          },
+          {
+            "option": "D",
+            "text": "một nửa bước sóng."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Một dây đàn có chiều dài 80 cm được giữ cố định ở hai đầu. Âm do dây đàn đó phát ra có bước sóng dài nhất bằng bao nhiêu để trên dây có sóng dừng với 2 đầu là 2 nút?",
+        "options": [
+          {
+            "option": "A",
+            "text": "200 cm.     \t\t\tB.  160 cm."
+          },
+          {
+            "option": "C",
+            "text": "80 cm.      \tD.  40 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Trên một sợi dây đàn hồi dài 1m, hai đầu cố định, đang có sóng dừng với 5 nút sóng (kể cả hai đầu dây). Bước sóng của sóng truyền trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,5 m.     \t\tB. 2 m."
+          },
+          {
+            "option": "C",
+            "text": "1 m.       \tD. 1,5 m."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Một dây đàn có chiều dài 70 cm, khi gảy nó phát ra âm cơ bản có tần số f. Người chơi bấm phím đàn cho dây ngắn lại để nó phát ra âm mới có họa âm bậc 3 với tần số 3,5f. Chiều dài của dây còn lại là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "60 cm.     \tB. 30 cm."
+          },
+          {
+            "option": "C",
+            "text": "10 cm.     \tD. 20 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Một ống sáo dài 0,6 m được bịt kín một đầu một đầu để hở. Cho rằng vận tốc truyền âm trong không khí là 300 m/s. Hai tần số cộng hưởng thấp nhất khi thổi vào ống sáo là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "125 Hz và 250 Hz."
+          },
+          {
+            "option": "B",
+            "text": "125 Hz và 375 Hz."
+          },
+          {
+            "option": "C",
+            "text": "250 Hz và 750 Hz."
+          },
+          {
+            "option": "D",
+            "text": "250Hz và 500Hz."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Sóng dừng trên sợi dây đàn hồi, biên độ tại bụng sóng là A. Biên độ tại hai điểm C và D trên dây lần lượt là 0,5A và 0,5A√3  chỉ ba điểm nút và hai điểm bụng. Độ lệch pha dao động của C và D là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "π.       \tB. 2π."
+          },
+          {
+            "option": "C",
+            "text": "1,5π.     \tD. 0,75π."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Trên một sợi dây căng ngang với hai đầu cố định đang có sóng dừng. Không xét các điểm bụng hoặc nút, quan sát thấy những điểm có cùng biên độ và ở gần nhau nhất thì đều cách đều nhau 15 cm. Bước sóng trên dây có giá trị bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "30 cm.     \tB. 60 cm."
+          },
+          {
+            "option": "C",
+            "text": "90 cm.     \tD. 45 cm."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 14
+}

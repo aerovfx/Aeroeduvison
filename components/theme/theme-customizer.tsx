@@ -33,7 +33,9 @@ import {
   RotateCcw,
   Check
 } from 'lucide-react';
-import { useTheme, ThemeMode, ColorScheme } from '@/contexts/ThemeContext';
+import { useTheme, ThemeMode } from '@/contexts/ThemeContext';
+
+type ColorScheme = 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'pink' | 'indigo' | 'teal';
 import { cn } from '@/lib/utils';
 
 interface ThemeCustomizerProps {
@@ -42,7 +44,8 @@ interface ThemeCustomizerProps {
 
 export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
   const theme = useTheme();
-  
+  const [isOpen, setIsOpen] = useState(false);
+
   // Fallback if theme context is not available
   if (!theme) {
     return (
@@ -52,9 +55,8 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
       </Button>
     );
   }
-  
+
   const { settings, updateSettings, toggleMode, resetToDefault } = theme;
-  const [isOpen, setIsOpen] = useState(false);
 
   const colorSchemes: { value: ColorScheme; label: string; color: string }[] = [
     { value: 'blue', label: 'Xanh dương', color: '#1976d2' },
@@ -67,7 +69,7 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
     { value: 'teal', label: 'Xanh ngọc', color: '#00796b' }
   ];
 
-  const modeOptions: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+  const modeOptions: { value: ThemeMode | string; label: string; icon: React.ReactNode }[] = [
     { value: 'light', label: 'Sáng', icon: <Sun className="w-4 h-4" /> },
     { value: 'dark', label: 'Tối', icon: <Moon className="w-4 h-4" /> },
     { value: 'auto', label: 'Tự động', icon: <Monitor className="w-4 h-4" /> }
@@ -127,7 +129,7 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
                   <Button
                     key={option.value}
                     variant={settings.mode === option.value ? "default" : "outline"}
-                    onClick={() => updateSettings({ mode: option.value })}
+                    onClick={() => updateSettings({ mode: (option.value as ThemeMode) })}
                     className="flex flex-col items-center gap-2 h-auto py-4"
                   >
                     {option.icon}
@@ -165,16 +167,16 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
                 {colorSchemes.map((scheme) => (
                   <Button
                     key={scheme.value}
-                    variant={settings.colorScheme === scheme.value ? "default" : "outline"}
-                    onClick={() => updateSettings({ colorScheme: scheme.value })}
+                    variant={(settings as any).colorScheme === scheme.value ? "default" : "outline"}
+                    onClick={() => updateSettings({ colorScheme: scheme.value } as any)}
                     className="flex flex-col items-center gap-2 h-auto py-4 relative"
                   >
-                    <div 
+                    <div
                       className="w-6 h-6 rounded-full border-2 border-white shadow-sm"
                       style={{ backgroundColor: scheme.color }}
                     />
                     <span className="text-xs">{scheme.label}</span>
-                    {settings.colorScheme === scheme.value && (
+                    {(settings as any).colorScheme === scheme.value && (
                       <Check className="w-3 h-3 absolute top-1 right-1 text-white" />
                     )}
                   </Button>
@@ -196,9 +198,9 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
             </CardHeader>
             <CardContent>
               <Select
-                value={settings.fontSize}
-                onValueChange={(value: 'small' | 'medium' | 'large') => 
-                  updateSettings({ fontSize: value })
+                value={(settings as any).fontSize || 'medium'}
+                onValueChange={(value: string) =>
+                  updateSettings({ fontSize: value } as any)
                 }
               >
                 <SelectTrigger>
@@ -228,9 +230,9 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
             </CardHeader>
             <CardContent>
               <Select
-                value={settings.borderRadius}
-                onValueChange={(value: 'none' | 'small' | 'medium' | 'large') => 
-                  updateSettings({ borderRadius: value })
+                value={(settings as any).borderRadius || 'medium'}
+                onValueChange={(value: string) =>
+                  updateSettings({ borderRadius: value } as any)
                 }
               >
                 <SelectTrigger>
@@ -263,8 +265,8 @@ export function ThemeCustomizer({ className }: ThemeCustomizerProps) {
                 {densityOptions.map((option) => (
                   <Button
                     key={option.value}
-                    variant={settings.density === option.value ? "default" : "outline"}
-                    onClick={() => updateSettings({ density: option.value as "comfortable" | "compact" | "spacious" })}
+                    variant={(settings as any).density === option.value ? "default" : "outline"}
+                    onClick={() => updateSettings({ density: option.value } as any)}
                     className="flex flex-col items-center gap-2 h-auto py-4"
                   >
                     <div className={cn(

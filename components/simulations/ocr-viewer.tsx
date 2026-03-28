@@ -58,7 +58,7 @@ export function OCRViewer({ data, onProgressUpdate }: OCRViewerProps) {
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(undefined);
 
   // Handle both data structures:
   // 1. Array of scenarios (from build.py): [{scenario_id, data}, ...]

@@ -3,10 +3,6 @@ generator client {
   previewFeatures = ["fullTextIndex", "fullTextSearch"]
 }
 
-generator seed {
-  provider = "prisma-client-js"
-}
-
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -40,21 +36,22 @@ model AIGeneratedContent {
 }
 
 model Account {
-  id                String  @id
+  id                String  @id @default(cuid())
   userId            String
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
-  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Attachment {
@@ -323,7 +320,7 @@ model Session {
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model StripeCustomer {
@@ -332,6 +329,69 @@ model StripeCustomer {
   stripeCustomerId String   @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime
+}
+
+// ─── Subscription & AI Access Control ───────────────────────────────
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  plan                 String    @default("FREE") // FREE | TEACHER_PRO | STUDENT_PRO | SCHOOL
+  status               String    @default("active") // active | canceled | past_due | trialing
+  gateway              String    @default("sepay") // sepay | stripe
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  billingCycle         String?   // monthly | yearly
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments             Payment[]
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
+  @@index([status])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  orderId         String    @unique  // SUB-PLAN-USERID-TIMESTAMP
+  userId          String
+  subscriptionId  String?
+  gateway         String    @default("sepay") // sepay | stripe
+  method          String?   // BANK_TRANSFER | CREDIT_CARD | E_WALLET
+  amount          Int       // VND (integer, no decimals)
+  currency        String    @default("VND")
+  status          String    @default("pending") // pending | completed | failed | canceled | refunded
+  plan            String    // STUDENT_PRO | TEACHER_PRO | SCHOOL
+  billingCycle    String    // monthly | yearly
+  gatewayRef      String?   // SePay transaction reference / Stripe payment intent
+  gatewayData     Json?     // Raw response from gateway (IPN payload)
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AiUsageLog {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String   // ai_chat | ai_question_bank | ai_content_validation | ai_vision
+  action    String   // e.g. "chat_message", "generate_question", "validate_content"
+  count     Int      @default(1)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, feature, createdAt])
+  @@index([createdAt])
 }
 
 model User {
@@ -378,6 +438,13 @@ model User {
   ExamRoomParticipant      ExamRoomParticipant[]      @relation(name: "ExamRoomParticipants")
   DigitizedResource        DigitizedResource[]
   UserAgentSettings        UserAgentSettings?
+  Subscription             Subscription?
+  AiUsageLog               AiUsageLog[]
+  Payment                  Payment[]
+  SurveyResponse           SurveyResponse[]           @relation("StudentSurveys")
+  StudentLearningPaths     LearningPath[]             @relation("StudentLearningPaths")
+  TeacherApprovals         LearningPathApproval[]     @relation("TeacherApprovals")
+  CreatedTemplates         LearningPathTemplate[]     @relation("TemplateCreator")
 
   @@index([schoolId])
   @@index([email])
@@ -1226,6 +1293,24 @@ model CareerRecommendation {
   @@index([createdAt])
 }
 
+// Personality test results history
+model PersonalityTestResult {
+  id             String   @id @default(cuid())
+  studentId      String
+  mbtiType       String   // e.g. "INTJ"
+  mbtiScores     Json     // { E: 41, I: 59, S: 57, N: 43, T: 62, F: 38, J: 45, P: 55 }
+  hollandCode    String   // e.g. "RIA"
+  hollandScores  Json     // { R: 85, I: 72, A: 60, S: 45, E: 30, C: 20 }
+  personalityName String  // e.g. "Nhà Chiến Lược"
+  careers        Json     @default("[]") // recommended careers
+  answers        Json     @default("{}") // raw answers for re-analysis
+  createdAt      DateTime @default(now())
+
+  @@index([studentId])
+  @@index([mbtiType])
+  @@index([createdAt])
+}
+
 // Lesson plans for teachers
 model LessonPlan {
   id          String   @id @default(cuid())
@@ -1380,4 +1465,129 @@ model GradedSheet {
   @@index([studentId])
   @@index([published])
   @@index([createdAt])
+}
+
+// ===== LEARNING PATH SYSTEM =====
+
+// Kết quả khảo sát của học sinh
+model SurveyResponse {
+  id              String   @id @default(cuid())
+  studentId       String
+  surveyData      Json     // StudentProfileSurvey data
+  assessmentScore Json?    // CompositeAssessment result
+  status          String   @default("completed") // completed | processing | error
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  student       User           @relation("StudentSurveys", fields: [studentId], references: [id], onDelete: Cascade)
+  learningPaths LearningPath[]
+
+  @@index([studentId])
+  @@index([createdAt])
+}
+
+// Learning path được sinh ra cho từng học sinh (từ AI hoặc từ template)
+model LearningPath {
+  id               String   @id @default(cuid())
+  studentId        String
+  title            String
+  description      String?
+  surveyResponseId String?
+  templateId       String?  // null = AI-generated, có giá trị = clone từ template
+
+  // Nội dung learning path (JSON vì linh hoạt cấu trúc)
+  goals            Json     @default("[]")  // string[] - mục tiêu
+  domains          Json     @default("[]")  // SubjectDomain[]
+  segments         Json     @default("[]")  // LearningPathSegment[]
+  weeklyPlan       Json     @default("[]")  // week plan
+  metadata         Json     @default("{}")  // thông tin thêm
+
+  // Trạng thái tổng thể
+  status           String   @default("pending_review")
+  // pending_review | in_review | approved | rejected | needs_revision | active | completed | archived
+
+  progress         Float    @default(0)  // 0-100
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  student          User                    @relation("StudentLearningPaths", fields: [studentId], references: [id], onDelete: Cascade)
+  surveyResponse   SurveyResponse?         @relation(fields: [surveyResponseId], references: [id])
+  template         LearningPathTemplate?   @relation(fields: [templateId], references: [id])
+  approvalSteps    LearningPathApproval[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([templateId])
+  @@index([surveyResponseId])
+}
+
+// Từng bước duyệt của giáo viên (duyệt từng phần)
+model LearningPathApproval {
+  id             String   @id @default(cuid())
+  learningPathId String
+  teacherId      String
+  section        String   // goals | domains | segments | weekly_plan | overall
+  sectionLabel   String   // tên hiển thị: "Mục tiêu", "Môn học", "Nội dung bài học", "Kế hoạch tuần", "Tổng thể"
+  status         String   @default("pending")
+  // pending | approved | needs_revision | rejected
+
+  teacherNotes   String?  // ghi chú của GV
+  modifications  Json?    // chỉnh sửa của GV (nếu có)
+  originalData   Json?    // dữ liệu gốc trước khi sửa
+  reviewedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+  teacher        User         @relation("TeacherApprovals", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  @@index([learningPathId])
+  @@index([teacherId])
+  @@index([status])
+  @@unique([learningPathId, section]) // mỗi section chỉ 1 approval record
+}
+
+// Learning path mẫu có sẵn (template) - không cần duyệt khi HS chọn
+model LearningPathTemplate {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  imageUrl         String?
+  createdById      String   // giáo viên/admin tạo
+
+  // Nội dung template
+  goals            Json     @default("[]")
+  domains          Json     @default("[]")  // SubjectDomain[]
+  segments         Json     @default("[]")
+  weeklyPlan       Json     @default("[]")
+  metadata         Json     @default("{}")
+
+  // Matching criteria - dùng để auto-match với khảo sát
+  targetAcademicLevels Json @default("[]")  // AcademicLevel[]
+  targetGoalTypes      Json @default("[]")  // GoalType[]
+  targetDomains        Json @default("[]")  // SubjectDomain[] - môn phù hợp
+  difficultyLevel      String @default("balanced") // easy_start | balanced | challenging
+  estimatedWeeks       Int    @default(4)
+  weeklyHoursRequired  String @default("moderate") // light | moderate | intensive | fulltime
+
+  // Status & stats
+  isPublished      Boolean  @default(false)
+  rating           Float    @default(0)
+  enrollmentCount  Int      @default(0)
+  completionRate   Float    @default(0)
+
+  category         String?  // phân loại: "STEM", "Thi đại học", "Kỹ năng mềm"...
+  tags             Json     @default("[]")  // string[]
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdBy        User           @relation("TemplateCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  learningPaths    LearningPath[] // các LP clone từ template này
+
+  @@index([isPublished])
+  @@index([createdById])
+  @@index([category])
 }

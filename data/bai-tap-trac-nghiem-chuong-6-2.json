@@ -1,0 +1,264 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-chuong-6-2.jsp",
+  "title": "30 bài tập ôn tập Lượng tử ánh sáng (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Một nguồn sáng có công suất 3,58 W, phát ra ánh sáng tỏa ra đều theo mọi hướng mà mỗi phô tôn có năng lượng 3,975.10–19J. Một người quan sát đứng cách nguồn sáng 300 km. Bỏ qua sự hấp thụ ánh sáng bởi khí quyển. Tính số phôtôn lọt vào mắt người quan sát trong mỗi giây. Coi bán kính con ngươi là 2 mm.",
+        "options": [
+          {
+            "option": "A",
+            "text": "70.     \tB. 80."
+          },
+          {
+            "option": "C",
+            "text": "90.     \tD. 100."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Hai tấm kim loại phẳng A và B đặt song song đối diện nhau và được nối kín bằng một ămpe kế. Chiếu chùm bức xạ công suất là 3 mW mà mỗi phôtôn có năng lượng 9,9.10-19(J) vào tấm kim loại A, làm bứt các quang electron. Cứ 10000 phôtôn chiếu vào A thì có 94 electron bị bứt ra và chỉ một số đến được bản B. Nếu số chỉ của ampe kế là 3,375 μA thì có bao nhiêu phần trăm electron không đến được bản B?",
+        "options": [
+          {
+            "option": "A",
+            "text": "74%.     \tB. 30%."
+          },
+          {
+            "option": "C",
+            "text": "26%.     \tD. 19%."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Chiếu bức xạ có tần số f vào một kim loại có công thoát A gây ra hiện tượng quang điện. Giả sử một êlectron hấp thụ phôtôn sử dụng một phần năng lượng làm công thoát, phần còn lại biến thành động năng K của nó. Nếu tàn số của bức xạ chiếu tới là 2f thì động năng của êlectron quang điện đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "K – A.     \tB. K + A."
+          },
+          {
+            "option": "C",
+            "text": "2K – A.    \tD. 2K + A."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Khi nguyên tử hiđrô chuyển từ trạng thái dùng có năng lượng EM= –1,51eV sang trạng thái dùng có năng lượng EK= –13,6 eV thì nguyên tử phát ra một phôtôn ứng với bức xạ có bước sóng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,1210 μm.     \tB. 0,1027 μm."
+          },
+          {
+            "option": "C",
+            "text": "0,6563 μm.     \tD. 0,4861 μm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Ở trạng thái cơ bản electron trong nguyên tử Hidro chuyển động trên quỹ đạo K có bán kính r0= 5,3.10–11(m). Tính cường độ dòng điện do chuyển động đó gây ra:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,05 mA.     \tB. 0,95 mA."
+          },
+          {
+            "option": "C",
+            "text": "1,05 mA.     \tD. 1,55 mA."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Các mức năng lượng của các trạng thái dừng của nguyên tử hidro được xác định bằng biểu thức En= –13,6/n2(eV) (n = 1, 2, 3…). Nếu nguyên tử hidro hấp thụ một photon có năng lượng 2,856 eV thì bước sóng nhỏ nhất của bức xạ mà nguyên tử hidro có thể phát ra là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "9,74.10–8m.     \tB. 9,51.10–8m."
+          },
+          {
+            "option": "C",
+            "text": "1,22.10–8m.     \tD. 4,87.10–8m."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Hai tấm kim loại phẳng A và B đặt song song đối diện nhau và được nối kín bằng một ămpe kế. Chiếu chùm bức xạ vào tấm kim loại A, làm bứt các quang electron và chỉ có 25% bay về tấm B. Nếu số chỉ của ampe kế là 1,4 μA thì electron bứt ra khỏi tấm A trong 1 giây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,25.1012.     \tB. 35.1011."
+          },
+          {
+            "option": "C",
+            "text": "35.1012.       \tD. 35.1013."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Mức năng lượng trong nguyên tử hiđrô được xác định bằng E = –13,6/n2(eV) với n ∈ N*, trạng thái cơ bản ứng với n = 1. Khi nguyên tử chuyển từ mức năng lượng O về N thì phát ra một phôtôn có bước sóng λ0. Khi nguyên tử hấp thụ một phôtôn có bước sóng λ nó chuyển từ mức năng lượng K lên mức năng lượng M. So với λ0thì λ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "nhỏ hơn 3200/81 lần."
+          },
+          {
+            "option": "B",
+            "text": "lớn hơn 81/1600 lần."
+          },
+          {
+            "option": "C",
+            "text": "nhỏ hơn 50 lần."
+          },
+          {
+            "option": "D",
+            "text": "lớn hơn 25 lần."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Một chùm sáng song song, gồm hai ánh sáng đơn sắc là ánh sáng đỏ (0,75 μm) và ánh sáng vàng (0,55 μm). Cường độ chùm sáng là 1 W/m2. Cho rằng, cường độ của thành phần ánh sáng đỏ và của thành phần ánh sáng vàng là như nhau. Gọi Nd và Nv lần lượt là số photon ánh sáng đỏ và photon ánh sáng vàng chuyển qua một diện tích 1 cm2, trong 1s. Chọn phương án đúng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Nd = 1,88.1018.     \tB. Nv = 1,38.1018."
+          },
+          {
+            "option": "C",
+            "text": "Nd = 1,88.1014.     \tD. Nv = 1,38.1014."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Hai vạch quang phổ ứng với các dịch chuyển từ quỹ đạo L về K và từ M về L của nguyên tử hiđro có bước sóng lần lượt là λ1= 1216 (Ao), λ2= 6563 (Ao). Biết mức năng lượng của trạng thái kích thích thứ hai là –1,51 (eV). Cho eV = 1,6.10–19J, hằng số Plăng h = 6,625.10–34J.s và tốc độ ánh sáng trong chân không c = 3.108m/s. Tính mức năng lượng của trạng thái cơ bản theo đơn vị (eV).",
+        "options": [
+          {
+            "option": "A",
+            "text": "–13,6 eV.      \tB. –13,62 eV."
+          },
+          {
+            "option": "C",
+            "text": "–13,64 eV.     \tD. –13,43 eV."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Chất lỏng fluorexein hấp thụ ánh sáng kích thích có bước sóng λ = 0,48μm  và phát ra ánh sáng có bước sóng  λ' = 0,64μm . Biết hiệu suất của sự phát quang này là 90% (hiệu suất của sự phát quang là tỉ số giữa năng lượng của ánh sáng phát quang và năng lượng của ánh sáng kích thích trong một đơn vị thời gian), số photon của ánh sáng kích thích chiếu đến trong 1s là 2018.1010hạt. Số photon của chùm sáng phát quang phát ra trong 1s là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Trong nguyên tử hidro, khi êlêctrôn chuyển động trên quỹ đạo K với bán kính r0= 5,3.10-11m thì tốc độ của electron chuyển động trên quỹ đạo đó là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Công suất bức xạ của Mặt Trời là  3,9.1026. Năng lượng Mặt Trời tỏa ra trong một ngày là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Một nguồn sáng có công suất 2 W phát ra chùm sóng ánh sáng có bước sóng   tỏa ra đều theo mọi hướng. Một người đứng từ xa quan sát nguồn sáng. Biết rằng con ngươi mắt có đường kính khoảng 4 mm và mắt còn thấy nguồn sáng khi có ít nhất 80 photon phát ra từ nguồn này lọt vào con ngươi trong mỗi dây. Bỏ qua sự hấp thụ ánh sáng của khí quyển. Khoảng cách xa nhất mà người này còn trông thấy được nguồn sáng là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "Một tế bào quang điện có catốt được làm bằng asen có công thoát electron 5,15eV. Chiếu vào catốt chùm bức xạ điện từ có bước sóng 0,2 μm  và nối tế bào quang điện với nguồn điện một chiều. Mỗi dây catốt nhận được năng lượng của chùm sáng là  0,3 mJ, thì cường độ dòng quang điện bão hòa là 4,5.10-6A. Hiệu suất năng lượng tử là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "9,4%         \tB. 0,186%"
+          },
+          {
+            "option": "C",
+            "text": "0,094%     \tD. 0,94%"
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

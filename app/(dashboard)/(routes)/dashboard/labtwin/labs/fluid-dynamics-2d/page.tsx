@@ -408,7 +408,7 @@ function FluidGridCanvas({
       // Draw legend labels
       ctx.fillStyle = '#000000';
       ctx.font = 'bold 12px Arial';
-      ctx.fillText(t('physics-motion.velocity'), legendX - 5, legendY - 10);
+      ctx.fillText('Velocity', legendX - 5, legendY - 10);
       ctx.font = '10px Arial';
       ctx.fillText('[m/s]', legendX - 5, legendY + legendHeight + 15);
       

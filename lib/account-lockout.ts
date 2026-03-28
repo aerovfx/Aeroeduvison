@@ -41,36 +41,36 @@ export async function isAccountLocked(email: string): Promise<{
     //   return { isLocked: false };
     // }
     
-    // Check if lockout expired
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const remainingMs = user.lockedUntil.getTime() - Date.now();
-      const remainingMinutes = Math.ceil(remainingMs / 60000);
-      
-      return {
-        isLocked: true,
-        lockedUntil: user.lockedUntil,
-        remainingMinutes
-      };
-    }
-    
-    // Reset lockout if expired
-    if (user.lockedUntil && user.lockedUntil <= new Date()) {
-      await db.user.update({
-        where: { email: normalizedEmail },
-        data: {
-          lockedUntil: null,
-          failedLoginAttempts: 0
-        }
-      });
-      
-      await logAuthEvent({
-        email: normalizedEmail,
-        action: 'account_unlocked',
-        status: 'success',
-        metadata: { reason: 'Lockout period expired' }
-      });
-    }
-    
+    // // Check if lockout expired
+    // if (user.lockedUntil && user.lockedUntil > new Date()) {
+    //   const remainingMs = user.lockedUntil.getTime() - Date.now();
+    //   const remainingMinutes = Math.ceil(remainingMs / 60000);
+    //
+    //   return {
+    //     isLocked: true,
+    //     lockedUntil: user.lockedUntil,
+    //     remainingMinutes
+    //   };
+    // }
+    //
+    // // Reset lockout if expired
+    // if (user.lockedUntil && user.lockedUntil <= new Date()) {
+    //   await db.user.update({
+    //     where: { email: normalizedEmail },
+    //     data: {
+    //       lockedUntil: null,
+    //       failedLoginAttempts: 0
+    //     }
+    //   });
+    //
+    //   await logAuthEvent({
+    //     email: normalizedEmail,
+    //     action: 'account_unlocked',
+    //     status: 'success',
+    //     metadata: { reason: 'Lockout period expired' }
+    //   });
+    // }
+    //
     return { isLocked: false };
   } catch (error) {
     console.error('[LOCKOUT] Error checking lock status:', error);
@@ -109,18 +109,17 @@ export async function recordFailedLogin(
       shouldLock: false,
       attemptsRemaining: 5
     };
-    
+
     /* Temporarily disabled until schema is fully synced
     // Increment failed attempts
     const newAttempts = user.failedLoginAttempts + 1;
-    */
-    
+
     // Check if should lock
     const shouldLock = newAttempts >= LOCKOUT_CONFIG.maxFailedAttempts;
-    const lockedUntil = shouldLock 
+    const lockedUntil = shouldLock
       ? new Date(Date.now() + LOCKOUT_CONFIG.lockoutDurationMinutes * 60 * 1000)
       : null;
-    
+
     // Update user
     await db.user.update({
       where: { email: normalizedEmail },
@@ -130,7 +129,7 @@ export async function recordFailedLogin(
         updatedAt: new Date()
       }
     });
-    
+
     // Log the event
     await logAuthEvent({
       userId: user.id,
@@ -144,12 +143,13 @@ export async function recordFailedLogin(
         lockedUntil: lockedUntil?.toISOString()
       }
     });
-    
+
     return {
       shouldLock,
       attemptsRemaining: Math.max(0, LOCKOUT_CONFIG.maxFailedAttempts - newAttempts),
       lockedUntil: lockedUntil || undefined
     };
+    */
   } catch (error) {
     console.error('[LOCKOUT] Error recording failed login:', error);
     return {

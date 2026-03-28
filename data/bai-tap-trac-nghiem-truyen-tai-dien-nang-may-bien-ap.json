@@ -1,0 +1,299 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-truyen-tai-dien-nang-may-bien-ap.jsp",
+  "title": "28 bài tập trắc nghiệm Truyền tải điện năng - Máy biến áp (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Trạm phát điện truyền đi công suất 550 kW, điện áp nơi phát bằng 10 kV. Muốn độ giảm điện áp trên dây tải không vượt quá 10% điện áp nơi phát thì điện trở của dây tải điện không được vượt quá giá trị:",
+        "options": [
+          {
+            "option": "A",
+            "text": "18 Ω      B. 11 Ω"
+          },
+          {
+            "option": "C",
+            "text": "55 Ω      D. 5,5 Ω"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Một học sinh quấn một máy biến áp với lõi sắt không phân nhánh, có số vòng dây cuộn thứ cấp gấp hai lần số vòng dây cuộn sơ cấp. Khi đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều có giá trị hiệu dụng U thì điện áp hiệu dụng ở hai đầu cuộn thứ cấp để hở là 1,9 U. Khi kiểm tra thì phát hiện trong cuộn thứ cấp có 50 vòng dây bị quấn ngược chiều so với đa số các vòng dây trong đó. Bỏ qua mọi hao phí trong máy biến áp. Tổng số vòng dây đã được quấn trong máy biến áp này là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1900 vòng     \t\tB. 3000 vòng"
+          },
+          {
+            "option": "C",
+            "text": "1950 vòng     \t\tD. 2900 vòng"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Điện năng được tải từ một máy phát điện đến nơi tiêu thụ bằng đường dây có điện trở R = 50 Ω. Biết điện áp giữa hai đầu cuộn sơ cấp và cuộn thứ cấp máy hạ thế lần lượt là U1= 2000 V, U2= 200 V. Cường độ dòng điện chạy trong cuộn thứ cấp máy hạ thế I2= 200A. Hiệu suất truyền tải điện là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "85%     \tB. 90%"
+          },
+          {
+            "option": "C",
+            "text": "87%     \tD. 95%"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Có hai máy biến áp lí tưởng (bỏ qua mọi hao phí) các cuộn sơ cáp có cùng số vòng dây nhưng các cuộn thứ cấp có số vòng dây khác nhau.",
+        "options": [
+          {
+            "option": "A",
+            "text": "100 vòng      B. 150 vòng"
+          },
+          {
+            "option": "C",
+            "text": "250 vòng     \tD. 200 vòng"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Nguời ta cần truyền đi xa một công suất điện 1 MW dưới điện áp 6 kV, mạch có hệ số công suất cosφ = 0,9. Để hiệu suất truyền tải điện không nhỏ hơn 80% thì điện trở R của đường dây phải thỏa mãn:",
+        "options": [
+          {
+            "option": "A",
+            "text": "R ≤ 5,8 Ω             B. R ≤ 3,6 Ω"
+          },
+          {
+            "option": "C",
+            "text": "R ≤ 36 Ω              D. R ≤ 72 Ω"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Điện năng được truyền đi với công suất P trên một đường dây tải điện với một điện áp ở trạm truyền là U, hiệu suất của quá trình truyền tải là H. Giữ nguyên điện áp trạm truyền trải điện nhưng tăng công suất truyền tải lên k lần thì công suất hao phí trên đường dây tải điện là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Điện năng được truyền đi với công suất P trên một đường dây tải điện với một điện áp ở trạm truyền là U, hiệu suất của quá trình truyền tải là 90%. Nếu giữ nguyên điện áp trạm truyền trải điện nhưng giảm công suất truyền tải đi 2 lần thì hiệu suất truyền tải điện khi đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "80%     \tB. 85%"
+          },
+          {
+            "option": "C",
+            "text": "90%     \tD. 95%"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một đường dây có điện trở R = 2 Ω, dẫn một dòng điện xoay chiều một pha từ nơi sản xuất đến nơi tiêu thụ. Điện áp hiệu dụng ở nguồn điện lúc phát ra là 5000 V, công suất cần truyền tải là 500 kW. Hệ số công suất của mạch điện là 0,8. Có bao nhiêu phần trăm công suất bị mất trên đường dây do tỏa nhiệt?",
+        "options": [
+          {
+            "option": "A",
+            "text": "6,25%     \tB. 10%"
+          },
+          {
+            "option": "C",
+            "text": "3,25%     \tD. 8%"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Điện năng ở một trạm điện được truyền đi dưới điện áp 2 kV, hiệu suất trong quá trình truyền tải là 80%. Biết công suất truyền đi là không đổi. Muốn hiệu suất trong quá trình truyền tải tăng đến 95% thì ta phải:",
+        "options": [
+          {
+            "option": "A",
+            "text": "giảm điện áp xuống còn 1 kV"
+          },
+          {
+            "option": "B",
+            "text": "tăng điện áp lên đến 8 kV"
+          },
+          {
+            "option": "C",
+            "text": "giảm điện áp xuống còn 0,5 kV"
+          },
+          {
+            "option": "D",
+            "text": "tăng điện áp lên đến 4 kV"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một máy biến áp lý tưởng có tỉ số giữa số vòng dây của cuộn sơ cấp và số vòng dây của cuộn thứ cấp bằng 10. Mắc một bóng đèn sợi đốt loại 24 V – 24 W vào hai đầu cuộn thứ cấp thì đèn sáng bình thường. Cường độ dòng điện hiệu dụng trong cuộn sơ cấp bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,2 A.     \tB. 0,5 A."
+          },
+          {
+            "option": "C",
+            "text": "0,1 A.     \tD. 2 A."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một người định quấn một máy hạ áp từ điện áp U1= 220 V xuông U2= 90 V với lõi không phân nhánh, xem máy biến áp là lí tưởng, khi máy làm việc thì suất điện động hiệu dụng xuất hiện trên mỗi vòng dây là 2 Vôn/vòng. Người đó quấn đúng hoàn toàn cuộn thứ cấp nhưng lại quấn ngược chiều những vòng cuối của cuộn sơ cấp. Khi thử máy với điện áp U1= 220 V thì điện áp hai đầu cuộn thứ cấp đo được là 110 V. Số vòng dây bị quấn ngược là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "20 vòng.     \tB. 15 vòng."
+          },
+          {
+            "option": "C",
+            "text": "30 vòng.     \tD. 10 vòng."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một máy tăng áp có tỉ số vòng dây giữa hai cuộn dây là 2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều có tần số 50 Hz. Tần số dòng điện hai đầu cuộn thứ cấp bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "50 Hz.     \tB. 25 Hz."
+          },
+          {
+            "option": "C",
+            "text": "100 Hz.     \tD. 50√2 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một máy biến áp có số vòng dây của cuộn sơ cấp lớn hơn số vòng dây của cuộn thứ cấp. Máy biến áp này có tác dụng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng cường độ dòng điện, giảm điện áp."
+          },
+          {
+            "option": "B",
+            "text": "giảm cường độ dòng điện, tăng điện áp."
+          },
+          {
+            "option": "C",
+            "text": "tăng cường độ dòng điện, tăng điện áp."
+          },
+          {
+            "option": "D",
+            "text": "giảm cường độ dòng điện, giảm điện áp."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Trong truyền tải điện năng đi xa bằng máy biến áp. Biết cường độ dòng điện luôn cùng pha so với điện áp hai đầu nơi truyền đi. Nếu điện áp ở nơi phát tăng 20 lần thì công suất hao phí trên đường dây giảm:",
+        "options": [
+          {
+            "option": "A",
+            "text": "200 lần     \tB. 40 lần"
+          },
+          {
+            "option": "C",
+            "text": "400 lần     \tD. 20 lần"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Đặt vào hai đầu cuộn sơ cấp của máy biến áp lí tưởng điện áp xoay chiều có giá trị hiệu dụng không đổi. Nếu tăng số vòng dây của cuộn thứ cấp thêm 20% thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở tăng thêm 40 V so với lúc đầu. Điện áp hiệu dụng ban đầu của cuộn thứ cấp để hở là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "220 V     \t\tB. 200 V"
+          },
+          {
+            "option": "C",
+            "text": "60 V      \tD. 48 V"
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

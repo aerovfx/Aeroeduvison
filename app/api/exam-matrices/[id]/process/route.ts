@@ -11,7 +11,7 @@ import { apiLogger } from "@/lib/logging-simple"
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -26,7 +26,7 @@ export async function POST(
       )
     }
 
-    const matrixId = params.id
+    const { id: matrixId } = await params
 
     // Process matrix
     const result = await MatrixProcessService.processMatrix({

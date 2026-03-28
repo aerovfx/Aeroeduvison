@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server"
 import { spawn } from "child_process"
 import path from "path"
 
+interface TranscribeRequest {
+  audio?: File
+  sourceLanguage?: string
+  targetLanguage?: string
+  generateQuiz?: boolean
+  quizSubject?: string
+  quizGrade?: string
+  quizQuestionCount?: number
+}
+
 // POST /api/transcript/local/transcribe - Full audio file transcription
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +19,10 @@ export async function POST(req: NextRequest) {
     const audioFile = formData.get('audio') as File | null
     const sourceLanguage = (formData.get('sourceLanguage') || 'auto') as string
     const targetLanguage = (formData.get('targetLanguage') || 'vi') as string
+    const generateQuiz = formData.get('generateQuiz') === 'true'
+    const quizSubject = formData.get('quizSubject') as string | null
+    const quizGrade = formData.get('quizGrade') as string | null
+    const quizQuestionCount = parseInt(formData.get('quizQuestionCount') as string) || 5
 
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
@@ -138,7 +152,49 @@ export async function POST(req: NextRequest) {
     // Cleanup
     await fs.unlink(audioPath).catch(() => {})
 
-    return NextResponse.json({ segments })
+    // Build response
+    const response: any = { segments }
+
+    // Generate quiz from transcript if requested
+    if (generateQuiz) {
+      try {
+        // Combine all segments into full transcript
+        const fullTranscript = segments.map(s => s.original).join(' ')
+        
+        // Determine subject and grade from form data or default
+        const subject = quizSubject || 'Vật lý'
+        const grade = quizGrade || 'Khối 12'
+        
+        // Call quiz generation API
+        const quizResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/quiz/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: `Nội dung bài giảng từ audio`,
+            subject,
+            grade,
+            questionCount: Math.min(Math.max(quizQuestionCount, 1), 10),
+            difficulty: 'medium',
+            additionalContext: `Dựa trên nội dung transcript sau: ${fullTranscript.substring(0, 2000)}`,
+            language: targetLanguage,
+          }),
+        })
+
+        const quizData = await quizResponse.json()
+        
+        if (quizData.success) {
+          response.quiz = quizData.data.quiz
+          response.quizQuality = quizData.data.quality
+        } else {
+          response.quizError = quizData.error || 'Không thể tạo quiz'
+        }
+      } catch (quizError: any) {
+        console.error('Quiz generation error:', quizError)
+        response.quizError = quizError.message || 'Lỗi khi tạo quiz'
+      }
+    }
+
+    return NextResponse.json(response)
   } catch (error: any) {
     console.error('Transcription error:', error)
     return NextResponse.json(

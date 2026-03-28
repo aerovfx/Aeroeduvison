@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { SidebarRoutes } from "./sidebar-routes"
 import { SidebarSearch } from "./sidebar-search"
-import { Sparkles, ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { ThemeToggle } from "@/components/theme/theme-toggle"
 
 interface SidebarProps {
@@ -61,21 +61,6 @@ export const Sidebar = ({ isOpen, setSidebarOpen }: SidebarProps) => {
         <SidebarRoutes collapsed={collapsed} />
       </nav>
 
-      {/* AI Status footer - only when expanded */}
-      {!collapsed && (
-        <div className="px-3 pb-3 border-t border-gray-200 dark:border-white/[0.06]">
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-white/[0.02] dark:to-white/[0.01] border border-purple-100 dark:border-white/[0.06]">
-            <div className="relative flex-shrink-0">
-              <Sparkles className="w-4 h-4 text-purple-600 dark:text-[hsl(245,85%,65%)]" />
-              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300">AI Assistant</span>
-              <span className="text-[9px] text-gray-500 dark:text-gray-400">Always ready to help</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bottom controls: Theme toggle + Collapse button */}
       <div

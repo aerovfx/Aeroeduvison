@@ -5,7 +5,7 @@ import { db } from "@/lib/db"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,8 +13,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const examRoom = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         ExamMatrix: true,
         Teacher: {
@@ -94,7 +95,7 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -102,6 +103,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await request.json()
     const {
       name,
@@ -115,7 +117,7 @@ export async function PUT(
     } = body
 
     const existingRoom = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingRoom) {
@@ -127,7 +129,7 @@ export async function PUT(
     }
 
     const updatedRoom = await db.onlineExamRoom.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name,
         description,
@@ -152,7 +154,7 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -160,8 +162,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const existingRoom = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingRoom) {
@@ -173,7 +176,7 @@ export async function DELETE(
     }
 
     await db.onlineExamRoom.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ message: "Exam room deleted" })

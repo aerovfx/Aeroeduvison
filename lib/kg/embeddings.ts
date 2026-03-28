@@ -1,16 +1,26 @@
 /**
  * Knowledge Graph Embeddings Service
  * Generates and manages vector embeddings for concepts using OpenAI
- * 
+ *
  * Phase 3 Component: Enables semantic search through vector similarity
  */
 
 import { OpenAI } from "openai";
 import { prisma } from "@/lib/prisma";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy initialization of OpenAI client
+let _openai: OpenAI | null = null;
+
+function getOpenAIClient(): OpenAI | null {
+  if (!_openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return null;
+    }
+    _openai = new OpenAI({ apiKey });
+  }
+  return _openai;
+}
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
@@ -19,6 +29,12 @@ export const EMBEDDING_DIMENSION = 1536;
  * Generates embedding for a text string
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
+  const openai = getOpenAIClient();
+  
+  if (!openai) {
+    throw new Error("OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.");
+  }
+  
   try {
     const response = await openai.embeddings.create({
       model: EMBEDDING_MODEL,

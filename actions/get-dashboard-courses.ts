@@ -21,10 +21,10 @@ export const getDashboardCourses = async (userId: string): Promise<DashboardCour
         userId: userId,
       },
       select: {
-        course: {
+        Course: {
           include: {
-            category: true,
-            chapters: {
+            Category: true,
+            Chapter: {
               where: {
                 isPublished: true,
               }
@@ -34,7 +34,7 @@ export const getDashboardCourses = async (userId: string): Promise<DashboardCour
       }
     });
 
-    const courses = purchasedCourses.map((purchase) => purchase.course) as CourseWithProgressWithCategory[];
+    const courses = purchasedCourses.map((purchase) => purchase.Course) as CourseWithProgressWithCategory[];
 
     for (let course of courses) {
       const progress = await getProgress(userId, course.id);

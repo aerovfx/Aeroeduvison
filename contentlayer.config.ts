@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm"
 
 export const Doc = defineDocumentType(() => ({
   name: "Doc",
-  filePathPattern: `docs/**/*.md`,
+  filePathPattern: `**/*.md`,
   contentType: "mdx",
   fields: {
     title: {
@@ -50,17 +50,9 @@ export default makeSource({
   contentDirPath: "./docs",
   documentTypes: [Doc],
   disableImportAliasWarning: true,
-  // Ignore markdown files in root directory and other non-docs folders
-  ignore: [
-    "**/node_modules/**",
-    "**/.git/**",
-    "**/.claude/**",
-    "**/.contentlayer/**",
-    "**/desktop-current-app/**",
-    "**/*.mdx",
-    // Ignore root-level markdown files (only process docs/**/*.md)
-    "*.md",
-  ],
+  // Only process docs in beginner/ (the only subdir with proper frontmatter).
+  // All other .md files are technical notes without required 'title' field.
+  contentDirInclude: ["beginner"],
   mdx: {
     remarkPlugins: [remarkGfm],
     rehypePlugins: [

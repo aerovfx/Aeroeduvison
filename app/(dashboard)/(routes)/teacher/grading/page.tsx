@@ -189,7 +189,7 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
     )
   }
 
-  const keysWithSheets = [...new Set(rows.map(r => r.answerKeyId))]
+  const keysWithSheets = Array.from(new Set(rows.map(r => r.answerKeyId)))
 
   return (
     <div className="space-y-4">
@@ -284,7 +284,12 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 }
 
 export default function GradingPage() {
-  const [activeTab, setActiveTab]           = useState<"scan" | "answerkey" | "graded">("scan")
+  const [activeTab, setActiveTab_]           = useState<"scan" | "answerkey" | "graded">("answerkey")
+  const [gradedRefreshKey, setGradedRefreshKey] = useState(0)
+  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "graded") => {
+    setActiveTab_(tab)
+    if (tab === "graded") setGradedRefreshKey(k => k + 1)
+  }, [])
   const [savedKeys, setSavedKeys]           = useState<AnswerKey[]>([])
   const [selectedKeyIdx, setSelectedKeyIdx] = useState(0)
   const [draftKey, setDraftKey]             = useState<AnswerKey>(newAnswerKey())
@@ -378,9 +383,9 @@ export default function GradingPage() {
   }, [savedKeys, selectedKeyIdx])
 
   const TABS = [
-    { key: "scan",      label: "Quét & Chấm", Icon: ScanLine   },
-    { key: "answerkey", label: "Nhập đáp án", Icon: ListChecks },
-    { key: "graded",    label: "Đã chấm",     Icon: Clock      },
+    { key: "answerkey", label: "① Nhập đáp án", Icon: ListChecks },
+    { key: "scan",      label: "② Quét & Chấm", Icon: ScanLine   },
+    { key: "graded",    label: "③ Đã chấm",     Icon: Clock      },
   ] as const
 
   const STATS = [
@@ -448,12 +453,28 @@ export default function GradingPage() {
 
         {/* ── Tab: Quét & Chấm ─────────────────────────────────────── */}
         {activeTab === "scan" && (
-          <ScanGrading
-            savedKeys={savedKeys}
-            selectedKeyIdx={selectedKeyIdx}
-            setSelectedKeyIdx={setSelectedKeyIdx}
-            onSwitchToAnswerKey={() => setActiveTab("answerkey")}
-          />
+          savedKeys.length === 0 ? (
+            <div className="bg-card rounded-xl border border-amber-200 dark:border-amber-900/40 shadow-sm p-10 text-center">
+              <ListChecks className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-foreground mb-2">Chưa có đáp án nào</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Bạn cần nhập đáp án chuẩn trước khi quét và chấm bài. Hãy chuyển sang tab "① Nhập đáp án" để bắt đầu.
+              </p>
+              <button
+                onClick={() => setActiveTab("answerkey")}
+                className="px-6 py-2.5 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                ① Nhập đáp án ngay
+              </button>
+            </div>
+          ) : (
+            <ScanGrading
+              savedKeys={savedKeys}
+              selectedKeyIdx={selectedKeyIdx}
+              setSelectedKeyIdx={setSelectedKeyIdx}
+              onSwitchToAnswerKey={() => setActiveTab("answerkey")}
+            />
+          )
         )}
 
         {/* ── Tab: Nhập đáp án ─────────────────────────────────────── */}
@@ -849,7 +870,7 @@ export default function GradingPage() {
 
         {/* ── Tab: Đã chấm ─────────────────────────────────────────── */}
         {activeTab === "graded" && (
-          <GradedResults savedKeys={savedKeys} />
+          <GradedResults key={`graded-${gradedRefreshKey}`} savedKeys={savedKeys} />
         )}
 
       </div>

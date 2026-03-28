@@ -21,7 +21,7 @@ export function MotionTrackingViewer({ data }: MotionTrackingViewerProps) {
   const [selectedDistance, setSelectedDistance] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(undefined);
   
   const scenario = data.scenarios[selectedScenario];
   const currentData = scenario.scenarios[selectedDistance].data;

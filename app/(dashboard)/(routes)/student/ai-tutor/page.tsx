@@ -70,7 +70,7 @@ function NeuBadge({ children, variant = "default" }: { children: React.ReactNode
         background: variants[variant].bg,
         color: variants[variant].color,
         border: `1px solid ${variants[variant].border}`,
-        boxShadow: "inset 2px 2px 4px rgba(0,0,0,0.1), inset -2px -2px 4px rgba(255,255,255,0.5)",
+        boxShadow: "inset 2px 2px 4px rgba(0,0,0,0.1), inset -2px -2px 4px var(--glass-border)",
       }}
     >
       {children}
@@ -305,7 +305,29 @@ export default function AITutorPage() {
         }),
       })
 
-      if (!response.ok) throw new Error("Failed to get response")
+      if (!response.ok) {
+        // Try to parse error response as JSON
+        let data: any = {}
+        try {
+          data = await response.json()
+        } catch {
+          data = { error: `Server error: ${response.status} ${response.statusText}` }
+        }
+
+        // Handle subscription required error
+        if (response.status === 403 && data.error === "SUBSCRIPTION_REQUIRED") {
+          const subscriptionMessage: Message = {
+            id: `msg-${Date.now()}`,
+            role: "assistant",
+            content: `⚠️ **Yêu cầu đăng ký gói dịch vụ**\n\n${data.message}\n\n👉 [Đăng ký ngay tại đây](/dashboard/billing) để sử dụng AI Tutor và các tính năng AI khác.`,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, subscriptionMessage])
+          toast.error("Bạn cần đăng ký gói hàng tháng để sử dụng AI")
+          return
+        }
+        throw new Error(data.error || "Failed to get response")
+      }
 
       const data = await response.json()
 
@@ -318,8 +340,23 @@ export default function AITutorPage() {
 
       setMessages(prev => [...prev, assistantMessage])
     } catch (error: any) {
+      console.error("[AI_TUTOR] Error:", error)
+      const errorMsg = error.message || "Unknown error"
+      // Show error as assistant message so user sees what happened
+      const errorMessage: Message = {
+        id: `msg-${Date.now()}`,
+        role: "assistant",
+        content: `⚠️ **Không thể kết nối AI**\n\n${
+          errorMsg.includes("SUBSCRIPTION")
+            ? "Bạn cần đăng ký gói dịch vụ để sử dụng AI Tutor."
+            : errorMsg.includes("Cannot connect") || errorMsg.includes("fetch")
+            ? "Không thể kết nối đến dịch vụ AI. Hãy kiểm tra:\n- Ollama đang chạy (`ollama serve`)\n- Hoặc OPENROUTER_API_KEY trong .env.local"
+            : `Lỗi: ${errorMsg}`
+        }\n\nHãy thử lại sau hoặc kiểm tra cấu hình server.`,
+        timestamp: new Date(),
+      }
+      setMessages(prev => [...prev, errorMessage])
       toast.error("Không thể kết nối với Gia Sư AI")
-      console.error("Error:", error)
     } finally {
       setLoading(false)
     }
@@ -494,7 +531,7 @@ export default function AITutorPage() {
                         boxShadow: `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `,
                         border: "1px solid var(--neu-border)",
                       }}
@@ -512,7 +549,7 @@ export default function AITutorPage() {
                         e.currentTarget.style.boxShadow = `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `
                       }}
                     >
@@ -551,7 +588,7 @@ export default function AITutorPage() {
                         boxShadow: `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `,
                         border: "1px solid var(--neu-border)",
                       }}
@@ -569,7 +606,7 @@ export default function AITutorPage() {
                         e.currentTarget.style.boxShadow = `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `
                       }}
                     >
@@ -608,7 +645,7 @@ export default function AITutorPage() {
                         boxShadow: `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `,
                         border: "1px solid var(--neu-border)",
                       }}
@@ -626,7 +663,7 @@ export default function AITutorPage() {
                         e.currentTarget.style.boxShadow = `
                           8px 8px 16px var(--neu-shadow-dark),
                           -8px -8px 16px var(--neu-shadow-light),
-                          inset 1px 1px 2px rgba(255,255,255,0.3)
+                          inset 1px 1px 2px var(--glass-border)
                         `
                       }}
                     >
@@ -695,7 +732,7 @@ export default function AITutorPage() {
                       ) : (
                         <NeuBadge variant="info">Gia Sư AI</NeuBadge>
                       )}
-                      <span className="text-xs" style={{ color: message.role === "user" ? "rgba(255,255,255,0.8)" : "var(--neu-text-muted)" }}>
+                      <span className="text-xs" style={{ color: message.role === "user" ? "hsl(var(--foreground) / 0.8)" : "var(--neu-text-muted)" }}>
                         {message.timestamp.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>

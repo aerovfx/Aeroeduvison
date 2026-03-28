@@ -1,0 +1,596 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-song-dung.jsp",
+  "title": "29 bài tập trắc nghiệm Sóng dừng (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một sợi dây dài 2L được kéo căng hai đầu cố định A và B. Kích thích để trên dây có sóng dừng ngoài hai đầu là hai nút chỉ còn điểm chính giữa C của sợi dây là nút. M và N là hai điểm trên dây đối xứng nhau qua C. Dao động tại các điểm M và N sẽ có biên độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "như nhau và cùng pha."
+          },
+          {
+            "option": "B",
+            "text": "khác nhau và cùng pha."
+          },
+          {
+            "option": "C",
+            "text": "như nhau và ngược pha nhau."
+          },
+          {
+            "option": "D",
+            "text": "khác nhau và ngược pha nhau."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Trên một sợi dây đàn hồi căng ngang, đang có sóng dừng ổn định. Trên dây, A là một điểm nút, B là điểm bụng gần A nhất với AB = 18 cm, M là một điểm trên dây cách B một khoảng 12 cm. Biết rằng trong một chu kỳ sóng, khoảng thời gian mà độ lớn vận tốc dao động của phần tử B nhỏ hơn vận tốc cực đại của phần tử M là 0,1s. Tốc độ truyền sóng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "3,2 m/s.     \tB. 5,6 m/s."
+          },
+          {
+            "option": "C",
+            "text": "2,4 m/s.     \tD. 4,8 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Người ta tạo sóng dừng trên một sợi dây căng giữa 2 điểm cố định. Hai tần số gần nhau nhất cùng tạo ra sóng dừng trên dây là 525 Hz và 600 Hz. Tần số nhỏ nhất tạo ra sóng dừng trên dây đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "75 Hz.     \tB. 125 Hz."
+          },
+          {
+            "option": "C",
+            "text": "50 Hz.     \tD. 100 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Các tần số có thể tạo sóng dừng trên sợi dây hai đầu cố định theo thứ tự tăng dần là f1, f2, f3, f4,…Tỉ số hai tần số liên tiếp bằng tỉ số:",
+        "options": [
+          {
+            "option": "A",
+            "text": "hai số nguyên liên tiếp."
+          },
+          {
+            "option": "B",
+            "text": "tỉ số hai số nguyên lẻ liên tiếp."
+          },
+          {
+            "option": "C",
+            "text": "tỉ số hai nguyên chẵn liên tiếp."
+          },
+          {
+            "option": "D",
+            "text": "tỉ số hai số nguyên tố liên tiếp."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Sóng truyền trên một sợi dây hai đầu cố định có bước sóng λ. Để có sóng dừng trên dây thì chiều dài L của dây phải thỏa mãn điều kiện là (với k = 1, 2, 3, ...)",
+        "options": [
+          {
+            "option": "A",
+            "text": "L = kλ/2.     \tB. L = kλ."
+          },
+          {
+            "option": "C",
+            "text": "L = λ/k.      \tD. L = λ2."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Trên một sợi dây dài 30 cm, hai đầu cố định đang có sóng dừng. Trên dây có tất cả 2 điêm M, N luôn dao động với biên độ cực đại là 2 cm. Chọn phương án chính xác nhất.",
+        "options": [
+          {
+            "option": "A",
+            "text": "15 cm ≤ MN < 15,6 cm."
+          },
+          {
+            "option": "B",
+            "text": "MN = 30 cm."
+          },
+          {
+            "option": "C",
+            "text": "MN > 15,l cm."
+          },
+          {
+            "option": "D",
+            "text": "MN = 15 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Khi có sóng dừng trên dây khoảng cách giữa hai nút sóng liên tiếp là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "một bước sóng."
+          },
+          {
+            "option": "B",
+            "text": "một phần ba bước sóng."
+          },
+          {
+            "option": "C",
+            "text": "một nửa bước sóng."
+          },
+          {
+            "option": "D",
+            "text": "một phần tư bước sóng."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Trên một sợi dây đàn hồi dài có sóng dừng với bước sóng 0,6 cm. Trên dây có hai điểm A và B cách nhau 2,05 cm, tại A là một bụng sóng. Số nút sóng trên đoạn dây AB là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "8     \tB. 7"
+          },
+          {
+            "option": "C",
+            "text": "6     \tD. 4"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Sóng dừng trên dây thép dài 1,2 m hai đầu P, Q cố định, được kích thích bởi nam châm điện. Nút A cách bụng B liền kề là 10 cm và I là trung điểm của AB. Biết khoảng thời gian giữa 2 lần liên tiếp I và B có cùng li độ là 0,01 (s). Tính tần số của dòng điện và tốc độ truyền sóng trên dây.",
+        "options": [
+          {
+            "option": "A",
+            "text": "25 Hz và 50 m/s."
+          },
+          {
+            "option": "B",
+            "text": "50 Hz và 50 m/s."
+          },
+          {
+            "option": "C",
+            "text": "50 Hz và 20 m/s."
+          },
+          {
+            "option": "D",
+            "text": "25 Hz và 20 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Trên sợi dây căng theo phương thẳng đứng hai đầu cố định, sau đó kích thích để có sóng dừng thì:",
+        "options": [
+          {
+            "option": "A",
+            "text": "không tồn tại thời điểm mà sợi dây duỗi thẳng."
+          },
+          {
+            "option": "B",
+            "text": "trên dây có thể tồn tại hai điểm mà dao động tại hai điểm đó lệch pha nhau một góc là π/3."
+          },
+          {
+            "option": "C",
+            "text": "hai điểm trên dây đối xứng nhau qua một nút sóng thì dao động ngược pha nhau."
+          },
+          {
+            "option": "D",
+            "text": "khi giữ nguyên các điều kiện khác nhưng thả tự do đầu dưới thì không có sóng dừng ổn định"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Trên một dây có sóng dừng mà các tần số trên dây theo quy luật: f1:f2:f3:........:fn= 1:2:3:.........:n. Số nút và số bụng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Số nút bằng số bụng trừ 1."
+          },
+          {
+            "option": "B",
+            "text": "Số nút bằng số bụng cộng 1."
+          },
+          {
+            "option": "C",
+            "text": "Số nút bằng số bụng."
+          },
+          {
+            "option": "D",
+            "text": "Số nút bằng số bụng trừ 2."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Sóng dừng trên một sợi dây dài, hai điểm A và B cách nhau 10 cm với A là nút và B là bụng đồng thời giữa A và B không còn nút và bụng nào khác. Gọi I là trung điểm của AB. Biết khoảng thời gian giữa 2 lần liên tiếp I và B có cùng li độ là 0,1 (s). Tốc độ truyền sóng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,5 (m/s).     \tB. 4 (m/s)."
+          },
+          {
+            "option": "C",
+            "text": "2 (m/s).       \tD. 1 (m/s)."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một sợi dây căng ngang với hai đầu cố định, đang có sóng dừng. Biết khoảng cách xa nhất giữa hai phần tử đây dao động với cùng biên độ 5 mm là 80 cm, còn khoảng cách xa nhất giữa hai phần tử dây dao động cùng pha với cùng biên độ 5 mm là 65 cm. Tỉ số giữa tốc độ cực đại của một phần tử dây tại bụng sóng và tốc độ truyền sóng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,12.     \tB. 0,41."
+          },
+          {
+            "option": "C",
+            "text": "0,21.     \tD. 0,14."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Trên một sợi dây đàn hồi dài 1,6 m hai đầu cố định, đang có sóng dừng. Biết tần số của sóng là 20 Hz, tốc độ truyền sóng trên dây là 4 m/s. Số bụng sóng trên dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "15.     \tB. 32."
+          },
+          {
+            "option": "C",
+            "text": "8.      \tD. 16."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Tại điểm phản xạ thì sóng phản xạ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "luôn ngược pha với sóng tới."
+          },
+          {
+            "option": "B",
+            "text": "ngược pha với sóng tới nếu vật cản là cố định."
+          },
+          {
+            "option": "C",
+            "text": "ngược pha với sóng tới nếu vật cản là tự do."
+          },
+          {
+            "option": "D",
+            "text": "cùng pha với sóng tới nếu vật cản là cố định."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Trên một sợi dây dài 1 m, hai đầu cố định, có sóng dừng với 2 bụng sóng. Bước sóng của sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 m."
+          },
+          {
+            "option": "B",
+            "text": "2 m."
+          },
+          {
+            "option": "C",
+            "text": "0,5 m."
+          },
+          {
+            "option": "D",
+            "text": "0,25 m."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Trên một sợi dây đàn hồi dài 1,2 m, hai đầu cố định, đang có sóng dừng. Biết sóng trên dây có tần số 100 Hz và tốc độ 80 m/s. Số bụng sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "5."
+          },
+          {
+            "option": "B",
+            "text": "4."
+          },
+          {
+            "option": "C",
+            "text": "3."
+          },
+          {
+            "option": "D",
+            "text": "2."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Một sợi dây AB có chiều dài 1 m căng ngang, đầu A cố định, đầu B gắn với một nhánh của âm thoa dao động điều hoà với tần số 20 Hz. Trên dây AB có một sóng dừng ổn định với 4 bụng sóng, B được coi là nút sóng. Tốc độ truyền sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "50 m/s."
+          },
+          {
+            "option": "B",
+            "text": "2 cm/s."
+          },
+          {
+            "option": "C",
+            "text": "10 m/s."
+          },
+          {
+            "option": "D",
+            "text": "2,5 cm/s."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một sợi dây chiều dài l căng ngang, hai đầu cố định. Trên dây đang có sóng dừng với n bụng sóng, tốc độ truyền sóng trên dây là v. Khoảng thời gian giữa hai lần liên tiếp sợi dây duỗi thẳng là",
+        "options": [
+          {
+            "option": "A",
+            "text": "vnl."
+          },
+          {
+            "option": "B",
+            "text": "nvl."
+          },
+          {
+            "option": "C",
+            "text": "l2nv."
+          },
+          {
+            "option": "D",
+            "text": "lnv."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Quan sát sóng dừng trên sợi dây AB, đầu A dao động điều hòa theo phương vuông góc với sợi dây (coi A là nút). Với đầu B tự do và tần số dao động của đầu A là 22 Hz thì trên dây có 6 nút. Nếu đầu B cố định và coi tốc độ truyền sóng của dây như cũ, để vẫn có 6 nút thì tần số dao động của đầu A phải bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "18 Hz."
+          },
+          {
+            "option": "B",
+            "text": "25 Hz."
+          },
+          {
+            "option": "C",
+            "text": "23 Hz."
+          },
+          {
+            "option": "D",
+            "text": "20 Hz."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một sợi dây AB dài 100 cm căng ngang, đầu B cố định, đầu A gắn với một nhánh của âm thoa dao động điều hòa với tần số 40 Hz. Trên dây AB có một sóng dừng ổn định, A được coi là nút sóng. Tốc độ truyền sóng trên dây là 20 m/s. Kể cả A và B, trên dây có",
+        "options": [
+          {
+            "option": "A",
+            "text": "5 nút và 4 bụng."
+          },
+          {
+            "option": "B",
+            "text": "3 nút và 2 bụng."
+          },
+          {
+            "option": "C",
+            "text": "9 nút và 8 bụng."
+          },
+          {
+            "option": "D",
+            "text": "7 nút và 6 bụng."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một sợi dây đàn hồi căng ngang, hai đầu cố định. Trên dây có sóng dừng, tốc độ truyền sóng không đổi. Khi tần số sóng trên dây là 42 Hz thì trên dây có 4 điểm bụng. Nếu trên dây có 6 điểm bụng thì tần số sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "252 Hz."
+          },
+          {
+            "option": "B",
+            "text": "126 Hz."
+          },
+          {
+            "option": "C",
+            "text": "28 Hz."
+          },
+          {
+            "option": "D",
+            "text": "63 Hz."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một sợi dây đàn hồi căng ngang, đang có sóng dừng ổn định. Trên dây, A là 1 điểm nút, B là 1 điểm bụng gần A nhất, C là trung điểm của AB, với AB = 10 cm. Biết khoảng thời gian ngắn nhất giữa hai lần mà li độ dao động của phần tử tại B bằng biên độ dao động của phần tử tại C là 0,2 s. Tốc độ truyền sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "2 m/s."
+          },
+          {
+            "option": "B",
+            "text": "0,5 m/s."
+          },
+          {
+            "option": "C",
+            "text": "1 m/s."
+          },
+          {
+            "option": "D",
+            "text": "0,25 m/s."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Trên một sợi dây đàn hồi dài 100 cm với hai đầu A và B cố định đang có sóng dừng, tần số sóng là 50 Hz. Không kể hai đầu A và B, trên dây có 3 nút sóng. Tốc độ truyền sóng trên dây là",
+        "options": [
+          {
+            "option": "A",
+            "text": "15 m/s."
+          },
+          {
+            "option": "B",
+            "text": "30 m/s."
+          },
+          {
+            "option": "C",
+            "text": "20 m/s."
+          },
+          {
+            "option": "D",
+            "text": "25 m/s."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Trên một sợi dây đàn hồi đang có sóng dừng ổn định với khoảng cách giữa hai nút sóng liên tiếp là 6 cm. Trên dây có những phần tử sóng dao động với tần số 5 Hz và biên độ lớn nhất là 3 cm. Gọi N là vị trí của một nút sóng; C và D là hai phần tử trên dây ở hai bên của N và có vị trí cân bằng cách N lần lượt là 10,5 cm và 7 cm. Tại thời điểm t1, phần tử C có li độ 1,5 cm và đang hướng về vị trí cân bằng. Vào thời điểmt2=t1+7940(s) , phần tử D có li độ là",
+        "options": [
+          {
+            "option": "A",
+            "text": "-0,75 cm."
+          },
+          {
+            "option": "B",
+            "text": "1,50 cm."
+          },
+          {
+            "option": "C",
+            "text": "-1,50 cm."
+          },
+          {
+            "option": "D",
+            "text": "0,75 cm."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 25
+}

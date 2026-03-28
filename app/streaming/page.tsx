@@ -1,5 +1,3 @@
-'use client';
-
 import { Suspense } from "react";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
@@ -8,12 +6,12 @@ import { redirect } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  BookOpen, 
-  Users, 
-  FileText, 
-  Brain, 
-  Clock, 
+import {
+  BookOpen,
+  Users,
+  FileText,
+  Brain,
+  Clock,
   TrendingUp,
   CheckCircle,
   AlertCircle,
@@ -25,8 +23,6 @@ import {
 } from "lucide-react";
 import InstantComponent from "@/components/InstantComponent";
 import SlowComponent from "@/components/SlowComponent";
-import { useLanguage } from '@/contexts/LanguageContext';
-import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
 
 /**
  * Streaming Page: /streaming
@@ -44,7 +40,6 @@ import { LanguageSwitcherCompact } from '@/components/ui/language-switcher';
  */
 
 export default async function StreamingPage() {
-  const { t } = useLanguage();
   const session = await getServerSession(authOptions);
   
   if (!session?.user?.email) {
@@ -78,8 +73,7 @@ export default async function StreamingPage() {
           <p className="text-muted-foreground">
             Real-time data with progressive loading
           </p>
-        
-              <LanguageSwitcherCompact /></div>
+        </div>
         <div className="flex items-center space-x-2">
           <Badge variant={user.role === 'ADMIN' ? 'destructive' : 'secondary'}>
             {user.role}
@@ -104,12 +98,12 @@ export default async function StreamingPage() {
           user={user}
         />
         <InstantComponent 
-          title={t('dashboard.notifications')}
+          title="Notifications"
           description="System alerts"
           user={user}
         />
         <InstantComponent 
-          title={t('dashboard.quick-actions')}
+          title="Quick Actions"
           description="Common tasks"
           user={user}
         />

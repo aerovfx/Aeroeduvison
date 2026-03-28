@@ -1,0 +1,428 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/chuong-6-luong-tu-anh-sang.jsp",
+  "title": "139 bài tập trắc nghiệm Lượng tử ánh sáng (có lời giải)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Tất cả cá phôtôn trong chân không có cùng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tốc độ        B. bước sóng"
+          },
+          {
+            "option": "C",
+            "text": "năng lượng        D. tần số"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Chọn phát biểu đúng về hiện tượng quang điện:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hiện tượng quang điện chỉ xảy ra khi tần số của ánh sáng kích thích nhỏ hơn tần số giới hạn fonào đó."
+          },
+          {
+            "option": "B",
+            "text": "Các phôtôn quang điện luôn bắn ra khỏi kim loại theo phương vuông góc với bề mặt kim loại."
+          },
+          {
+            "option": "C",
+            "text": "Giới hạn quang điện phụ thuộc vào bản chất kim loại."
+          },
+          {
+            "option": "D",
+            "text": "Giới hạn quang điện của kim loại tỉ lệ với công thoát êlectron của kim loại."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Hiện tượng quang điện là hiện tượng êlectron bị bứt ra khỏi bề mặt tấm kim loại:",
+        "options": [
+          {
+            "option": "A",
+            "text": "khi tấm kim loại bị nung nóng."
+          },
+          {
+            "option": "B",
+            "text": "nhiễm điện do tiếp xúc với một vật nhiễm điện khác."
+          },
+          {
+            "option": "C",
+            "text": "do bất kì nguyên nhân nào."
+          },
+          {
+            "option": "D",
+            "text": "khi có ánh sáng thích hợp chiếu vào nó."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Công thoát êlectron của kim loại phụ thuộc vào:",
+        "options": [
+          {
+            "option": "A",
+            "text": "bước sóng của ánh sáng kích thích và bản chất của kim loại"
+          },
+          {
+            "option": "B",
+            "text": "bản chất của kim loại"
+          },
+          {
+            "option": "C",
+            "text": "cường độ của chùm sáng kích thích"
+          },
+          {
+            "option": "D",
+            "text": "bước sóng của ánh sáng kích thích"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Tìm phát biểu sai khi nói về thuyết lượng tử ánh sáng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Nguyên tử hay phân tử vật chất không hấp thụ hay bức xạ ánh sáng một cách liên tục mà thành từng phần riêng biệt, đứt quãng."
+          },
+          {
+            "option": "B",
+            "text": "Ánh sáng được tạo bởi các hạt gọi là phôtôn."
+          },
+          {
+            "option": "C",
+            "text": "Năng lượng của các phôtôn ánh sáng là như nhau, không phụ thuộc vào bước sóng ánh sáng."
+          },
+          {
+            "option": "D",
+            "text": "Khi ánh sáng truyền đi, các lượng tử ánh sáng không thay đổi và không phụ thuộc vào khoảng cách tới nguồn sáng."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Công thoát của êlectron khỏi bề mặt nhôm là 3,46 eV. Điều kiện xảy ra hiện tượng quang điện đối với nhôm là ánh sáng kích thích phải có bước sóng thỏa mãn:",
+        "options": [
+          {
+            "option": "A",
+            "text": "λ≤ 0,18 μm        B. λ > 0,18 μm"
+          },
+          {
+            "option": "C",
+            "text": "λ ≤0,36 μm        D. λ > 0,36 μm"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một nguồn phát ra ánh sáng đơn sắc bước sóng λ = 0,50 μm. Số photon mà nguồn phát ra trong 1 phút là N=2,5.1018. Công suất phát xạ của nguồn là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "16,6 mW        B. 8,9 mW"
+          },
+          {
+            "option": "C",
+            "text": "5,72 mW        D. 0,28 mW"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Chiếu ánh sáng có bước sóng λ = 0,542 μm vào catôt của một tế bào quang điện (một dụng cụ chân không có hai điện cực là catôt nối với cực âm và anôt nối với cực dương của nguồn điện) thì có hiện tượng quang điện. Công suất của chùm sáng chiếu tới là 0,625 W, biết rằng cứ 100 photon tới catôt thì có 1 êlectron bứt ra khỏi catôt. Khi đó cường độ dòng quang điện bão hòa có giá trị là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,72 mA        B. 2,04 mA"
+          },
+          {
+            "option": "C",
+            "text": "4,26 mA        D. 2,57 mA"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Cho hằng số Plăng  h = 6,625.10-34J.s ; tốc độ ánh sáng trong chân không c=3.108m/s. Một nguồn phát ánh sáng đơn sắc có bước sóng 0,51 μm. Công suất bức xạ của nguồn là 2,65 W. Số photon mà nguồn phát ra trong 1 giây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "6,8.1018B. 2,04.1019"
+          },
+          {
+            "option": "C",
+            "text": "1,33.1025D. 2,57.1017"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Công thoát êlectron của một kim loại 2 eV. Trong số bốn bức xạ sau đây, bức xạ không gây ra được hiện tượng quang điện khi chiếu vào tấm kim loại nói trên có",
+        "options": [
+          {
+            "option": "A",
+            "text": "bước sóng 450 nm"
+          },
+          {
+            "option": "B",
+            "text": "bước sóng 350 nm"
+          },
+          {
+            "option": "C",
+            "text": "tần số 6,5.1014Hz"
+          },
+          {
+            "option": "D",
+            "text": "tần số 4,8.1014Hz"
+          }
+        ],
+        "answer": "Trắc nghiệm Hiện tượng quang điện; Thuyết lượng tử ánh sáng (có đáp án - phần 2)",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Công thoát của êlectron khỏi đồng là 6,625.10-19J. Cho h = 6,625.10-34J.s; c = 3.108m / s,giới hạn quang điện của đồng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,30 µm.      B. 0,65 µm."
+          },
+          {
+            "option": "C",
+            "text": "0,15 µm.     \tD. 0,55 µm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Chiếu ánh sáng đơn sắc có bước sóng 0,4µm vào chất phát quang thì ánh sáng phát quang phát ra có bước sóng 0,6µm. Biết rằng cứ 100 photôn chiếu vào thì có 5 photôn phát quang bật ra. Tỉ số giữa công suất của chùm sáng phát quang và công suất của chùm sáng kích thích bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,013.      \tB. 0,067."
+          },
+          {
+            "option": "C",
+            "text": "0,033.      \tD. 0,075."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Một kim loại có công thoát 4,14 eV. Chiếu lần lượt vào kim loại này các bức xạ có bước sóng λ1= 0,18 µm, λ2= 0,21 µm, λ3= 0,32 µm và λ4= 0,35 µm. Những bức xạ có thể gây ra hiện tượng quang điện ở kim loại này có bước sóng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "λ1, λ2và λ3B. λ1và λ2"
+          },
+          {
+            "option": "C",
+            "text": "λ2, λ3và λ4D. λ3và λ4"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Chiếu ánh sáng có bước sóng 0,3 µm vào một chất thì chất đó phát quang ánh sáng có bước sóng 0,5 µm. Cho rằng công suất của ánh sáng phát quang chỉ bằng 0,01 công suất của chùm sáng kích thích. Để có một phôtôn ánh sáng phát quang phát ra thì số phôtôn ánh sáng kích thích chiếu vào là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "600.     \t\t\tB. 60."
+          },
+          {
+            "option": "C",
+            "text": "25.      \tD. 133."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Trong chân không, bức xạ đơn sắc màu vàng có bước sóng 0,589 µm. Năng lượng của phôtôn ứng với bức xạ này là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,21 eV.     \tB. 2,11 eV."
+          },
+          {
+            "option": "C",
+            "text": "4,22 eV.     \tD. 0,42 eV."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Biết công thoát êlectron của các kim loại: canxi, kali, bạc và đồng lần lượt là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Kali và đồng."
+          },
+          {
+            "option": "B",
+            "text": "Canxi và bạc."
+          },
+          {
+            "option": "C",
+            "text": "Bạc và đồng."
+          },
+          {
+            "option": "D",
+            "text": "Kali và canxi."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Một nguồn phát ra ánh sáng có bước sóng 662,5 nm với công suất phát sáng là 1,5.10–4W. Lấy h = 6,625.10–34J.s; c = 3.108m/s. Số phôtôn được nguồn phát ra trong 1s là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "5.1014.\tB. 6.1014."
+          },
+          {
+            "option": "C",
+            "text": "4.1014.\tD. 3.1014."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Phôtôn của một bức xạ có năng lượng 6,625.10–19J. Bức xạ này thuộc miền:",
+        "options": [
+          {
+            "option": "A",
+            "text": "sóng vô tuyến."
+          },
+          {
+            "option": "B",
+            "text": "hồng ngoại."
+          },
+          {
+            "option": "C",
+            "text": "tử ngoại."
+          },
+          {
+            "option": "D",
+            "text": "ánh sáng nhìn thấy."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Chiếu một chùm bức xạ có bước sóng λ vào bề mặt một tấm nhôm có giới hạn quang điện 0,36µm. Hiện tượng quang điện không xảy ra nếu λ bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,24 µm.     \tB. 0,42 µm."
+          },
+          {
+            "option": "C",
+            "text": "0,30 µm.     \tD. 0,28 µm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Chiếu bức xạ có bước sóng λ1= 276 nm vào catot của một tế bào quang điện làm bằng nhôm thì hiệu điện thế hãm để triệt tiêu dòng quang điện là 1,08 V. Thay bức xạ trên bằng bức xạ λ2= 248 nm và catot làm bằng đồng thì hiệu điện thế hãm để triệt tiêu dòng quang điện là 0,86 V.",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,58 V.     \tB. 1,91 V."
+          },
+          {
+            "option": "C",
+            "text": "0,86 V.     \tD. 1,05 V."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 20
+}

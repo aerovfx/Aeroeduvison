@@ -10,6 +10,12 @@ import {
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSession } from 'next-auth/react';
+import LearnerSurveyForm from '@/components/learning-path/LearnerSurveyForm';
+import AssessmentResults from '@/components/learning-path/AssessmentResults';
+import ReAssessmentDashboard from '@/components/learning-path/ReAssessmentDashboard';
+import { assessmentEngine } from '@/lib/learning-path/assessment-engine';
+import type { StudentProfileSurvey } from '@/lib/learning-path/assessment-types';
+import type { CompositeAssessment, ReassessmentResult } from '@/lib/learning-path/assessment-types';
 
 interface LearningPathLesson {
   id: string;
@@ -79,12 +85,118 @@ export default function LearningPathPage() {
   const [canGenerateAI, setCanGenerateAI] = useState(true);
   const [timeUntilNext, setTimeUntilNext] = useState<string>('');
 
+  // Assessment System States
+  const [showSurvey, setShowSurvey] = useState(false);
+  const [currentAssessment, setCurrentAssessment] = useState<CompositeAssessment | null>(null);
+  const [showAssessmentResults, setShowAssessmentResults] = useState(false);
+  const [showReAssessment, setShowReAssessment] = useState(false);
+  const [reassessmentHistory, setReassessmentHistory] = useState<ReassessmentResult[]>([]);
+  const [performanceData, setPerformanceData] = useState({
+    avgScore: 0, streak: 0, completionRate: 0, weeklyHoursActual: 0
+  });
+
+  // Load AI-generated path or fallback to demo
+  const loadAIPath = useCallback(async () => {
+    const savedAIPath = localStorage.getItem('learning-path-ai-generated');
+    if (savedAIPath) {
+      try {
+        const parsed = JSON.parse(savedAIPath);
+        convertAIPathToWeekData(parsed);
+        return;
+      } catch { /* fallthrough to demo */ }
+    }
+
+    // Try to generate from API
+    try {
+      const savedAssessment = localStorage.getItem('learning-path-assessment');
+      const savedSurvey = localStorage.getItem('learning-path-survey');
+      const assessmentData = savedAssessment ? JSON.parse(savedAssessment) : null;
+      const surveyData = savedSurvey ? JSON.parse(savedSurvey) : null;
+
+      const res = await fetch('/api/learning-path/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domains: surveyData?.interestedDomains || ['math'],
+          grade: surveyData?.academicLevel?.replace('thpt_', '') || '12',
+          difficulty: assessmentData?.studentProfile?.recommendedStartingDifficulty > 6
+            ? 'advanced' : assessmentData?.studentProfile?.recommendedStartingDifficulty > 3
+            ? 'intermediate' : 'beginner',
+          weeks: 4,
+          lessonsPerWeek: 5,
+          assessmentData,
+          surveyData,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.path) {
+          localStorage.setItem('learning-path-ai-generated', JSON.stringify(data.path));
+          convertAIPathToWeekData(data.path);
+          console.log('[LEARNING_PATH] AI path loaded:', data.meta);
+          return;
+        }
+        console.warn('[LEARNING_PATH] API returned ok but no path:', data);
+      } else {
+        const errText = await res.text().catch(() => 'unknown');
+        console.warn(`[LEARNING_PATH] API returned ${res.status}:`, errText);
+      }
+    } catch (err) {
+      console.warn('[LEARNING_PATH] API failed, using demo:', err);
+    }
+
+    generateDemoPath();
+  }, []);
+
+  // Convert AI-generated path format to WeekData[]
+  const convertAIPathToWeekData = useCallback((aiPath: any) => {
+    if (!aiPath?.weeks) { generateDemoPath(); return; }
+    const today = new Date();
+    const weeks: WeekData[] = aiPath.weeks.map((aiWeek: any, wi: number) => {
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() + wi * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      const lessons: LearningPathLesson[] = (aiWeek.lessons || []).map((l: any, li: number) => {
+        const lessonDate = new Date(weekStart);
+        lessonDate.setDate(weekStart.getDate() + li);
+        const dayNumber = wi * 5 + li + 1;
+        return {
+          id: l.id || `lesson-w${wi + 1}-d${li + 1}`,
+          title: l.title || `Bài học ${dayNumber}`,
+          subject: l.subject || 'mathematics',
+          type: l.type || 'lesson',
+          difficulty: l.difficulty || 'intermediate',
+          duration: l.duration || 45,
+          xpReward: l.xpReward || 100,
+          status: wi === 0 && li === 0 ? 'available' as const : 'locked' as const,
+          day: dayNumber,
+          date: lessonDate.toISOString().split('T')[0],
+          aiGenerated: true,
+          objectives: l.objectives || ['Hoàn thành bài học'],
+          prerequisites: li > 0 ? [aiWeek.lessons[li - 1]?.id || `lesson-w${wi + 1}-d${li}`] : wi > 0 ? [aiPath.weeks[wi - 1]?.lessons?.slice(-1)[0]?.id] : undefined,
+        } as LearningPathLesson;
+      });
+      return {
+        weekNumber: wi + 1,
+        startDate: weekStart.toISOString().split('T')[0],
+        endDate: weekEnd.toISOString().split('T')[0],
+        lessons,
+        totalXP: lessons.reduce((s: number, l: LearningPathLesson) => s + l.xpReward, 0),
+        completedLessons: 0,
+      };
+    });
+    setPathData(weeks);
+    calculateStats(weeks);
+  }, []);
+
   useEffect(() => {
     const savedPath = localStorage.getItem('learningPath');
     if (savedPath) {
       generateWeeklyPath(JSON.parse(savedPath));
     } else {
-      generateDemoPath();
+      loadAIPath();
     }
     updateLessonLocks();
     checkAIGenerationLimit();
@@ -139,6 +251,142 @@ export default function LearningPathPage() {
     const minutes = Math.floor((diffInMs % (1000 * 60 * 60)) / (1000 * 60));
     setTimeUntilNext(`${days} ngày ${hours} giờ ${minutes} phút`);
   }, [lastGenerated]);
+
+  // ── Assessment System Handlers ──
+  useEffect(() => {
+    // Load saved assessment from localStorage
+    const savedAssessment = localStorage.getItem('learning-path-assessment');
+    if (savedAssessment) {
+      try {
+        const parsed = JSON.parse(savedAssessment);
+        parsed.createdAt = new Date(parsed.createdAt);
+        parsed.nextReassessmentDate = new Date(parsed.nextReassessmentDate);
+        setCurrentAssessment(parsed);
+      } catch { /* ignore */ }
+    }
+    const savedHistory = localStorage.getItem('learning-path-reassessment-history');
+    if (savedHistory) {
+      try { setReassessmentHistory(JSON.parse(savedHistory)); } catch { /* ignore */ }
+    }
+    // Calculate performance from progress data
+    const progress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
+    const keys = Object.keys(progress);
+    if (keys.length > 0) {
+      const scores = keys.map(k => progress[k].percentage || 0);
+      const completed = keys.filter(k => progress[k].completed).length;
+      setPerformanceData({
+        avgScore: scores.reduce((a: number, b: number) => a + b, 0) / scores.length,
+        streak: stats.currentStreak,
+        completionRate: (completed / Math.max(keys.length, 1)) * 100,
+        weeklyHoursActual: 5, // estimated from activity
+      });
+    }
+  }, [stats.currentStreak]);
+
+  const handleSurveyComplete = useCallback(async (surveyData: StudentProfileSurvey) => {
+    const assessment = assessmentEngine.generateCompositeAssessment(surveyData);
+    setCurrentAssessment(assessment);
+    setShowSurvey(false);
+    setShowAssessmentResults(true);
+    localStorage.setItem('learning-path-assessment', JSON.stringify(assessment));
+    localStorage.setItem('learning-path-survey', JSON.stringify(surveyData));
+
+    // Trigger AI path regeneration based on new assessment
+    try {
+      const res = await fetch('/api/learning-path/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domains: surveyData.interestedDomains || ['math'],
+          grade: surveyData.academicLevel?.replace('thpt_', '') || '12',
+          difficulty: assessment.studentProfile.recommendedStartingDifficulty > 6
+            ? 'advanced' : assessment.studentProfile.recommendedStartingDifficulty > 3
+            ? 'intermediate' : 'beginner',
+          weeks: 4,
+          lessonsPerWeek: 5,
+          assessmentData: assessment,
+          surveyData,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.path) {
+          localStorage.setItem('learning-path-ai-generated', JSON.stringify(data.path));
+          localStorage.removeItem('learningPath');
+          convertAIPathToWeekData(data.path);
+
+          // Submit to approval workflow - tạo learning path chờ GV duyệt
+          try {
+            const submitRes = await fetch('/api/learning-path/survey/submit', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                surveyData,
+                assessmentScore: assessment,
+                generatedPath: {
+                  title: `Lộ trình học tập - ${surveyData.fullName || 'Học sinh'}`,
+                  description: `Lộ trình được tạo dựa trên khảo sát ngày ${new Date().toLocaleDateString('vi-VN')}`,
+                  goals: data.path.goals || assessment.recommendedPath?.domains?.map((d: string) => `Nắm vững kiến thức ${d}`) || [],
+                  domains: surveyData.interestedDomains || [],
+                  segments: data.path.weeks || data.path.segments || [],
+                  weeklyPlan: data.path.weeklyPlan || assessment.recommendedPath?.weeklyPlan || [],
+                  metadata: {
+                    academicLevel: surveyData.academicLevel,
+                    learningStyle: surveyData.learningStyle,
+                    primaryGoal: surveyData.primaryGoal,
+                    compositeScore: assessment.compositeScore,
+                  },
+                },
+              }),
+            });
+            if (submitRes.ok) {
+              const submitData = await submitRes.json();
+              console.log('[LEARNING_PATH] Submitted to approval workflow:', submitData.learningPathId);
+              localStorage.setItem('learning-path-pending-id', submitData.learningPathId);
+            }
+          } catch (submitErr) {
+            console.warn('[LEARNING_PATH] Submit to approval workflow failed:', submitErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[LEARNING_PATH] Auto-generate after survey failed:', err);
+    }
+  }, [convertAIPathToWeekData]);
+
+  const handleStartLearning = useCallback(() => {
+    setShowAssessmentResults(false);
+    updateLessonLocks();
+  }, []);
+
+  const handleRetakeSurvey = useCallback(() => {
+    setShowAssessmentResults(false);
+    setShowSurvey(true);
+  }, []);
+
+  const handleTriggerReassessment = useCallback(() => {
+    if (!currentAssessment) return;
+    const savedSurvey = localStorage.getItem('learning-path-survey');
+    if (!savedSurvey) return;
+    const survey = JSON.parse(savedSurvey) as StudentProfileSurvey;
+    const newAssessment = assessmentEngine.generateCompositeAssessment(survey);
+    const trigger = {
+      type: 'scheduled_periodic' as const,
+      triggeredAt: new Date(),
+      reason: 'Người học yêu cầu đánh giá lại',
+      priority: 'medium' as const,
+      autoTriggered: false,
+      metrics: [],
+    };
+    const result = assessmentEngine.generateReassessmentResult(currentAssessment, newAssessment, trigger);
+    const newHistory = [...reassessmentHistory, result];
+    setReassessmentHistory(newHistory);
+    setCurrentAssessment(newAssessment);
+    localStorage.setItem('learning-path-assessment', JSON.stringify(newAssessment));
+    localStorage.setItem('learning-path-reassessment-history', JSON.stringify(newHistory));
+    setShowReAssessment(false);
+    setShowAssessmentResults(true);
+  }, [currentAssessment, reassessmentHistory]);
 
   const generateDemoPath = () => {
     const today = new Date();
@@ -237,34 +485,54 @@ export default function LearningPathPage() {
     setIsGenerating(true);
     try {
       const progress = JSON.parse(localStorage.getItem('learning-path-progress') || '{}');
-      const completedLessons = Object.keys(progress).filter(key => progress[key].completed);
       const keys = Object.keys(progress);
       const avgScore = keys.length
         ? Object.values(progress).reduce((sum: number, p: any) => sum + (p.percentage || 0), 0) / keys.length
         : 0;
-      const response = await fetch('/api/ai-intelligent/generate', {
+
+      const savedAssessment = localStorage.getItem('learning-path-assessment');
+      const savedSurvey = localStorage.getItem('learning-path-survey');
+      const assessmentData = savedAssessment ? JSON.parse(savedAssessment) : null;
+      const surveyData = savedSurvey ? JSON.parse(savedSurvey) : null;
+
+      const response = await fetch('/api/learning-path/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'lesson',
-          subject: 'Toán học',
-          grade: '12',
-          topic: 'Lộ trình học tập cá nhân hóa',
+          domains: surveyData?.interestedDomains || ['math'],
+          grade: surveyData?.academicLevel?.replace('thpt_', '') || '12',
           difficulty: avgScore >= 80 ? 'advanced' : avgScore >= 60 ? 'intermediate' : 'beginner',
-          freeformPrompt: `Tạo lộ trình học tập 4 tuần (20 bài) cho học sinh lớp 12. Đã hoàn thành: ${completedLessons.length} bài, Điểm TB: ${avgScore.toFixed(1)}%`,
-          priority: ['quality', 'speed'],
-          useHybrid: true,
-          enableCache: false,
+          weeks: 4,
+          lessonsPerWeek: 5,
+          assessmentData,
+          surveyData,
         }),
       });
-      if (!response.ok) throw new Error('AI generation failed');
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.path) {
+          localStorage.setItem('learning-path-ai-generated', JSON.stringify(data.path));
+          localStorage.removeItem('learningPath'); // Clear old path
+          convertAIPathToWeekData(data.path);
+          updateLessonLocks();
+          console.log('[LEARNING_PATH] Regenerated successfully:', data.meta);
+          return;
+        }
+        console.warn('[LEARNING_PATH] Regenerate: API ok but no path:', data);
+      } else {
+        const errText = await response.text().catch(() => 'unknown');
+        console.warn(`[LEARNING_PATH] Regenerate: API returned ${response.status}:`, errText);
+      }
+      // Fallback if API fails
       generateDemoPath();
     } catch (error: unknown) {
-      console.error('AI generation error:', error);
+      console.error('[LEARNING_PATH] Regenerate error:', error);
+      generateDemoPath();
     } finally {
       setIsGenerating(false);
     }
-  }, []);
+  }, [convertAIPathToWeekData]);
 
   const calculateAIMatch = (data: LearningPathFormData) => {
     const scores = { openai: 0, gemini: 0, grok: 0, claude: 0 };
@@ -322,20 +590,83 @@ export default function LearningPathPage() {
     if (!canGenerateAI) return;
     setIsGeneratingAI(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Map form data to API params
+      const goalToDomain: Record<string, string[]> = {
+        exam_thpt: ['math', 'physics', 'chemistry'],
+        improve_grades: ['math', 'physics', 'chemistry', 'biology'],
+        curriculum: ['math', 'physics', 'chemistry'],
+        coding: ['computer_science'],
+        research: ['math', 'computer_science'],
+        chat: ['language'],
+        realtime: ['computer_science'],
+        career_orientation: ['computer_science', 'economics'],
+        foreign_lang_thpt: ['language'],
+        foreign_lang_uni: ['language'],
+        admission: ['math', 'physics', 'chemistry'],
+        soft_skills_thpt: ['language', 'history'],
+        major: ['math', 'computer_science'],
+        internship: ['computer_science', 'economics'],
+        certificates: ['computer_science', 'language'],
+        soft_skills_uni: ['language', 'economics'],
+        grad_school: ['math', 'computer_science'],
+      };
+
+      const domains = goalToDomain[formData.goal] || ['math'];
+      const difficulty = formData.experience === 'beginner' ? 'beginner' : formData.experience === 'advanced' ? 'advanced' : 'intermediate';
+      const lessonsPerWeek = formData.timeCommit === 'casual' ? 3 : formData.timeCommit === 'intensive' ? 7 : 5;
+
+      // 1. Call real API to generate lesson content
+      const res = await fetch('/api/learning-path/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domains,
+          grade: '12',
+          difficulty,
+          weeks: 4,
+          lessonsPerWeek,
+          surveyData: {
+            interestedDomains: domains,
+            primaryGoal: formData.goal,
+            weeklyHours: formData.timeCommit === 'casual' ? 2 : formData.timeCommit === 'intensive' ? 15 : 7,
+            learningStyle: formData.interest,
+            preferredContentType: [formData.interest],
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.path) {
+          // Save AI-generated path
+          localStorage.setItem('learning-path-ai-generated', JSON.stringify(data.path));
+          localStorage.removeItem('learningPath');
+          convertAIPathToWeekData(data.path);
+          updateLessonLocks();
+        }
+      }
+
+      // 2. Also show platform recommendation cards
       const scores = calculateAIMatch(formData);
       const path = generateAILearningPath(scores);
       setAiResult(path);
+
+      // 3. Save generation time
       const now = new Date();
       localStorage.setItem('learning-path-ai-last-generated', now.toISOString());
+      localStorage.setItem('learning-path-ai-form', JSON.stringify(formData));
       setLastGenerated(now);
       setCanGenerateAI(false);
     } catch (error) {
       console.error('Error generating AI learning path:', error);
+      // Fallback to platform recommendations only
+      const scores = calculateAIMatch(formData);
+      const path = generateAILearningPath(scores);
+      setAiResult(path);
     } finally {
       setIsGeneratingAI(false);
     }
-  }, [formData, canGenerateAI]);
+  }, [formData, canGenerateAI, convertAIPathToWeekData]);
 
   const handleAIChange = useCallback((field: keyof LearningPathFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -369,6 +700,86 @@ export default function LearningPathPage() {
 
   return (
     <div className="min-h-screen">
+      {/* ── Assessment Survey Overlay ── */}
+      {showSurvey && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="max-w-4xl mx-auto py-8 px-4">
+            <LearnerSurveyForm
+              onComplete={handleSurveyComplete}
+              onCancel={() => setShowSurvey(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Assessment Results Overlay ── */}
+      {showAssessmentResults && currentAssessment && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="max-w-5xl mx-auto py-8 px-4">
+            <AssessmentResults
+              assessment={currentAssessment}
+              onStartLearning={handleStartLearning}
+              onRetakeSurvey={handleRetakeSurvey}
+            />
+            {/* Thông báo learning path chờ duyệt & gợi ý LP có sẵn */}
+            <div className="mt-6 p-6 rounded-2xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Target className="w-6 h-6 text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    Lộ trình AI của bạn đang chờ giáo viên duyệt
+                  </h3>
+                  <p className="text-white/60 text-sm mb-4">
+                    Giáo viên sẽ xem xét và phê duyệt lộ trình học tập được tạo từ khảo sát của bạn.
+                    Trong thời gian chờ, bạn có thể bắt đầu học ngay với các lộ trình có sẵn phù hợp!
+                  </p>
+                  <div className="flex gap-3 flex-wrap">
+                    <Link href="/learning-paths/recommended">
+                      <button className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium text-sm hover:opacity-90 transition-opacity flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Xem lộ trình gợi ý cho bạn
+                      </button>
+                    </Link>
+                    <button
+                      onClick={handleStartLearning}
+                      className="px-5 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.1] text-white/80 font-medium text-sm hover:bg-white/[0.1] transition-all flex items-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Tiếp tục học lộ trình hiện tại
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Re-Assessment Dashboard Overlay ── */}
+      {showReAssessment && currentAssessment && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">
+          <div className="max-w-5xl mx-auto py-8 px-4">
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={() => setShowReAssessment(false)}
+                className="p-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-white/60 hover:text-white/90 hover:bg-white/[0.1] transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ReAssessmentDashboard
+              currentAssessment={currentAssessment}
+              reassessmentHistory={reassessmentHistory}
+              onTriggerReassessment={handleTriggerReassessment}
+              performanceData={performanceData}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ── Hero Header ── */}
@@ -383,7 +794,35 @@ export default function LearningPathPage() {
               </h1>
               <p className="text-sm text-white/40">Theo dõi tiến độ và hoàn thành mục tiêu từng ngày</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSurvey(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium shadow-[0_0_20px_rgba(16,185,129,0.2)] hover:shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:brightness-110 transition-all"
+              >
+                <Target className="w-4 h-4" />
+                {currentAssessment ? 'Khảo sát lại' : 'Khảo sát người học'}
+              </button>
+              {currentAssessment && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssessmentResults(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] text-emerald-400 text-sm font-medium hover:bg-emerald-500/[0.12] transition-all"
+                  >
+                    <Award className="w-4 h-4" />
+                    Kết quả đánh giá
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowReAssessment(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] text-amber-400 text-sm font-medium hover:bg-amber-500/[0.12] transition-all"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    Đánh giá lại
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 onClick={handleToggleAIForm}
@@ -521,6 +960,20 @@ export default function LearningPathPage() {
         {/* ── AI Learning Path Results ── */}
         {aiResult && (
           <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-6 animate-scale-in">
+            {/* Success banner */}
+            <div className="mb-6 p-4 rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04]">
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <div>
+                  <p className="text-sm font-medium text-emerald-400">Lộ trình học tập đã được tạo thành công!</p>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    {pathData.length > 0 ? `${pathData.length} tuần × ${pathData[0]?.lessons?.length || 0} bài/tuần đã được cập nhật vào timeline bên dưới.` : 'Đang tải...'}
+                    {' '}Nội dung được tạo bởi AI và tham chiếu từ ngân hàng đề.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <h2 className="text-lg font-bold text-white/90 text-center mb-6">AI Learning Path Recommendations</h2>
             <div className="space-y-4">
               {aiResult.map((path: any, index: number) => (
@@ -558,6 +1011,70 @@ export default function LearningPathPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Assessment Prompt (First-time users) ── */}
+        {!currentAssessment && (
+          <div className="rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/[0.04] to-teal-500/[0.04] backdrop-blur-xl p-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <Target className="w-8 h-8 text-emerald-400" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-base font-bold text-white/90 mb-1">Khảo sát người học</h2>
+                <p className="text-sm text-white/50 mb-4">
+                  Hoàn thành khảo sát để AI đánh giá hồ sơ của bạn và tạo lộ trình học tập cá nhân hóa dựa trên 4 yếu tố: hồ sơ người học, xác nhận chuyên gia, đánh giá liên môn, và ma trận AI.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSurvey(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium hover:brightness-110 transition-all shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Bắt đầu khảo sát (3-5 phút)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Current Assessment Summary (if exists) ── */}
+        {currentAssessment && (
+          <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <svg className="w-14 h-14 -rotate-90 text-foreground/[0.08]">
+                    <circle cx="28" cy="28" r="24" fill="none" stroke="currentColor" strokeWidth="4" />
+                    <circle cx="28" cy="28" r="24" fill="none"
+                      stroke={currentAssessment.compositeScore >= 75 ? '#10b981' : currentAssessment.compositeScore >= 50 ? '#f59e0b' : '#ef4444'}
+                      strokeWidth="4" strokeLinecap="round"
+                      strokeDasharray={`${(currentAssessment.compositeScore / 100) * 150.8} 150.8`}
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white/90">
+                    {Math.round(currentAssessment.compositeScore)}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white/90">Điểm đánh giá tổng hợp</h3>
+                  <p className="text-xs text-white/40">
+                    Đánh giá lần cuối: {new Date(currentAssessment.createdAt).toLocaleDateString('vi-VN')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setShowAssessmentResults(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white/90 hover:bg-white/[0.06] transition-all">
+                  Chi tiết
+                </button>
+                <button type="button" onClick={() => setShowReAssessment(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-amber-500/20 bg-amber-500/[0.06] text-amber-400 hover:bg-amber-500/[0.1] transition-all">
+                  Đánh giá lại
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -669,7 +1186,7 @@ export default function LearningPathPage() {
                       {/* Action links */}
                       {(lesson.status === 'available' || lesson.status === 'in-progress') && (
                         <Link
-                          href={`/learning-paths/lesson/${lesson.id}`}
+                          href={`/learning-paths/lesson/${lesson.id}?title=${encodeURIComponent(lesson.title || '')}&subject=${encodeURIComponent(lesson.subject || '')}&difficulty=${encodeURIComponent(lesson.difficulty || '')}`}
                           className="inline-flex items-center mt-2.5 text-xs font-medium text-violet-400 hover:text-violet-300 transition-colors gap-1"
                           onClick={handleLinkClickStopPropagation}
                         >

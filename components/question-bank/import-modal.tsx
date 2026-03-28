@@ -5,7 +5,7 @@ import { Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Edit2, Trash2 }
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { toast } from "react-hot-toast"
-import * as XLSX from "xlsx"
+import * as XLSX from "xlsx-js-style"
 
 interface ImportModalProps {
   isOpen: boolean
@@ -18,19 +18,23 @@ interface QuestionRow {
   question?: string
   nội_dung?: string
   câu_hỏi?: string
-  options?: string[]
+  options?: string[] | Record<string, string>
   phương_án?: string[]
   A?: string
   B?: string
   C?: string
   D?: string
   correctAnswer?: string
+  correct_answer?: string
+  correct_answer_multiple?: string
   đáp_án?: string
-  answer?: string
+  answer?: string | Record<string, string>
   answers?: string  // For multiple true/false: "AB" means A and B are correct
   true_false?: string  // For multiple true/false: "TFTF" means A=true, B=false, C=true, D=false
   explanation?: string
   giải_thích?: string
+  explanationText?: string
+  solution?: string
   subject?: string
   môn?: string
   grade?: string
@@ -39,8 +43,13 @@ interface QuestionRow {
   chủ_đề?: string
   difficulty?: string
   độ_khó?: string
+  difficultyLevel?: string
+  question_text?: string
+  questionText?: string
+  statement?: string
   questionType?: string
   type?: string
+  [key: string]: any
 }
 
 interface ParsedQuestion {
@@ -59,33 +68,129 @@ interface ParsedQuestion {
 }
 
 const SUBJECT_MAPPING: Record<string, string> = {
+  // Toán
   "toán": "Toán học",
   "toán học": "Toán học",
   "đại số": "Toán học",
   "hình học": "Toán học",
+  // Vật lý
   "vật": "Vật lý",
   "vật lý": "Vật lý",
   "lí": "Vật lý",
+  "ly": "Vật lý",
+  // Hóa học
   "hóa": "Hóa học",
+  "hoá": "Hóa học",
   "hóa học": "Hóa học",
+  "hoá học": "Hóa học",
+  // Sinh học
   "sinh": "Sinh học",
   "sinh học": "Sinh học",
+  // Ngữ văn
   "văn": "Ngữ văn",
   "ngữ văn": "Ngữ văn",
+  "ngu van": "Ngữ văn",
+  // Tiếng Việt
+  "tiếng việt": "Tiếng Việt",
+  "tieng viet": "Tiếng Việt",
+  "viet van": "Tiếng Việt",
+  // Tiếng Anh
   "anh": "Tiếng Anh",
   "tiếng anh": "Tiếng Anh",
+  "tieng anh": "Tiếng Anh",
+  "english": "Tiếng Anh",
+  // Lịch sử
   "lịch sử": "Lịch sử",
+  "lich su": "Lịch sử",
   "sử": "Lịch sử",
+  "su": "Lịch sử",
+  // Địa lý
   "địa": "Địa lý",
+  "dia": "Địa lý",
   "địa lý": "Địa lý",
+  "dia ly": "Địa lý",
+  // Lịch sử và Địa lý
+  "lịch sử và địa lý": "Lịch sử và Địa lý",
+  "lich su va dia ly": "Lịch sử và Địa lý",
+  "ls và địa": "Lịch sử và Địa lý",
+  "lsvađia": "Lịch sử và Địa lý",
+  // GDCD
   "gdcd": "GDCD",
+  "giáo dục công dân": "GDCD",
+  "giao duc cong dan": "GDCD",
   "công dân": "GDCD",
-  "công nghệ": "Công nghệ",
+  // Đạo đức
+  "đạo đức": "Đạo đức",
+  "dao duc": "Đạo đức",
+  // Tin học
   "tin": "Tin học",
   "tin học": "Tin học",
+  "tin hoc": "Tin học",
+  "informatics": "Tin học",
+  // Khoa học máy tính
+  "khoa học máy tính": "Khoa học máy tính",
+  "khoa hoc may tinh": "Khoa học máy tính",
+  "khmt": "Khoa học máy tính",
+  "computer science": "Khoa học máy tính",
+  // KHTN
+  "khtn": "KHTN",
+  "khoa học tự nhiên": "KHTN",
+  "khoa hoc tu nhien": "KHTN",
+  // Khoa học
+  "khoa học": "Khoa học",
+  "khoa hoc": "Khoa học",
+  // Tự nhiên và Xã hội
+  "tự nhiên và xã hội": "Tự nhiên và Xã hội",
+  "tu nhien va xa hoi": "Tự nhiên và Xã hội",
+  "tn&xh": "Tự nhiên và Xã hội",
+  "tnxh": "Tự nhiên và Xã hội",
+  // Công nghệ
+  "công nghệ": "Công nghệ",
+  "cong nghe": "Công nghệ",
+  "technology": "Công nghệ",
+  // Kinh tế pháp luật
+  "kinh tế pháp luật": "Kinh tế pháp luật",
+  "kinh te phap luat": "Kinh tế pháp luật",
+  "ktpl": "Kinh tế pháp luật",
+  // Âm nhạc
+  "âm nhạc": "Âm nhạc",
+  "am nhac": "Âm nhạc",
+  "nhạc": "Âm nhạc",
+  "nhac": "Âm nhạc",
+  "music": "Âm nhạc",
+  // Mĩ thuật
+  "mĩ thuật": "Mĩ thuật",
+  "mỹ thuật": "Mĩ thuật",
+  "mi thuat": "Mĩ thuật",
+  "my thuat": "Mĩ thuật",
+  "art": "Mĩ thuật",
+  // Thể dục
+  "thể dục": "Thể dục",
+  "the duc": "Thể dục",
+  "thể thao": "Thể dục",
+  "the thao": "Thể dục",
+  "physical": "Thể dục",
+  // Hoạt động trải nghiệm
+  "hoạt động trải nghiệm": "Hoạt động trải nghiệm",
+  "hoat dong trai nghiem": "Hoạt động trải nghiệm",
+  "hđtn": "Hoạt động trải nghiệm",
+  "hđtnhn": "Hoạt động trải nghiệm",
+  "trải nghiệm": "Hoạt động trải nghiệm",
+  "trai nghiem": "Hoạt động trải nghiệm",
+  // Quốc phòng
+  "quốc phòng": "Quốc phòng",
+  "quoc phong": "Quốc phòng",
+  "qp": "Quốc phòng",
+  "qp-an": "Quốc phòng",
+  "an ninh": "Quốc phòng",
 }
 
 const GRADE_MAPPING: Record<string, string> = {
+  "1": "Khối 1",
+  "2": "Khối 2",
+  "3": "Khối 3",
+  "4": "Khối 4",
+  "5": "Khối 5",
   "6": "Khối 6",
   "7": "Khối 7",
   "8": "Khối 8",
@@ -93,6 +198,11 @@ const GRADE_MAPPING: Record<string, string> = {
   "10": "Khối 10",
   "11": "Khối 11",
   "12": "Khối 12",
+  "khối 1": "Khối 1",
+  "khối 2": "Khối 2",
+  "khối 3": "Khối 3",
+  "khối 4": "Khối 4",
+  "khối 5": "Khối 5",
   "khối 6": "Khối 6",
   "khối 7": "Khối 7",
   "khối 8": "Khối 8",
@@ -100,6 +210,30 @@ const GRADE_MAPPING: Record<string, string> = {
   "khối 10": "Khối 10",
   "khối 11": "Khối 11",
   "khối 12": "Khối 12",
+  "lớp 1": "Khối 1",
+  "lớp 2": "Khối 2",
+  "lớp 3": "Khối 3",
+  "lớp 4": "Khối 4",
+  "lớp 5": "Khối 5",
+  "lớp 6": "Khối 6",
+  "lớp 7": "Khối 7",
+  "lớp 8": "Khối 8",
+  "lớp 9": "Khối 9",
+  "lớp 10": "Khối 10",
+  "lớp 11": "Khối 11",
+  "lớp 12": "Khối 12",
+  "lop 1": "Khối 1",
+  "lop 2": "Khối 2",
+  "lop 3": "Khối 3",
+  "lop 4": "Khối 4",
+  "lop 5": "Khối 5",
+  "lop 6": "Khối 6",
+  "lop 7": "Khối 7",
+  "lop 8": "Khối 8",
+  "lop 9": "Khối 9",
+  "lop 10": "Khối 10",
+  "lop 11": "Khối 11",
+  "lop 12": "Khối 12",
 }
 
 const DIFFICULTY_MAPPING: Record<string, string> = {
@@ -285,13 +419,14 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
         // Handle both array and object formats for options
         if (Array.isArray(q.options)) {
           options = q.options
-        } else if (typeof q.options === 'object') {
+        } else if (typeof q.options === 'object' && q.options !== null) {
           // Object format: { "A": "text", "B": "text", ... }
+          const optObj = q.options as Record<string, string>
           options = [
-            q.options.A || "",
-            q.options.B || "",
-            q.options.C || "",
-            q.options.D || ""
+            optObj.A || "",
+            optObj.B || "",
+            optObj.C || "",
+            optObj.D || ""
           ].filter(Boolean)
         } else if (Array.isArray(q.phương_án)) {
           options = q.phương_án
@@ -314,8 +449,13 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
         // Handle answer field - could be string "A" or object
         if (typeof q.answer === "string" && q.answer.length === 1) {
           correctAnswer = q.answer.toUpperCase()
-        } else if (typeof q.answer === "object" && q.answer.label) {
-          correctAnswer = String(q.answer.label).toUpperCase()
+        } else if (typeof q.answer === "object" && q.answer !== null) {
+          const answerObj = q.answer as Record<string, any>
+          if (answerObj.label) {
+            correctAnswer = String(answerObj.label).toUpperCase()
+          } else {
+            correctAnswer = String(q.answer).toUpperCase()
+          }
         } else {
           correctAnswer = String(q.answer).toUpperCase()
         }
@@ -328,7 +468,10 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
         questionType = "MCQ"
       } else {
         // Fallback
-        correctAnswer = q.correctAnswer || q.đáp_án || q.answer || q.correct_answer || ""
+        correctAnswer = (typeof q.correctAnswer === "string" ? q.correctAnswer : "") ||
+                       (typeof q.đáp_án === "string" ? q.đáp_án : "") ||
+                       (typeof q.answer === "string" ? q.answer : "") ||
+                       (typeof q.correct_answer === "string" ? q.correct_answer : "") || ""
         if (!questionType || questionType === "MCQ") {
           questionType = options.length >= 4 ? "MCQ" : options.length === 2 ? "TRUE_FALSE" : "SHORT_ANSWER"
         }
@@ -342,7 +485,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
       // Override questionType if explicitly provided
       if (q.questionType || q.type) {
-        const typeMap: { [key: string]: string } = {
+        const typeMap: Record<string, string> = {
           "MCQ": "MCQ",
           "MULTIPLE_TF": "MULTIPLE_TF",
           "MULTIPLE_TRUE_FALSE": "MULTIPLE_TF",
@@ -350,7 +493,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
           "SHORT_ANSWER": "SHORT_ANSWER",
           "ESSAY": "ESSAY"
         }
-        const explicitType = q.questionType || q.type
+        const explicitType = String(q.questionType || q.type)
         questionType = typeMap[explicitType] || questionType
       }
 
@@ -359,7 +502,10 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
         content,
         options,
         correctAnswer,
-        explanation: q.explanation || q.giải_thích || q.explanationText || q.solution || "",
+        explanation: (typeof q.explanation === "string" ? q.explanation : "") ||
+                    (typeof q.giải_thích === "string" ? q.giải_thích : "") ||
+                    (typeof q.explanationText === "string" ? q.explanationText : "") ||
+                    (typeof q.solution === "string" ? q.solution : "") || "",
         subject: questionSubject,
         grade: questionGrade,
         topic: topic || questionSubject,
@@ -638,12 +784,25 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                         <option value="Hóa học">Hóa học</option>
                         <option value="Sinh học">Sinh học</option>
                         <option value="Ngữ văn">Ngữ văn</option>
+                        <option value="Tiếng Việt">Tiếng Việt</option>
                         <option value="Tiếng Anh">Tiếng Anh</option>
                         <option value="Lịch sử">Lịch sử</option>
                         <option value="Địa lý">Địa lý</option>
+                        <option value="Lịch sử và Địa lý">Lịch sử và Địa lý</option>
                         <option value="GDCD">GDCD</option>
-                        <option value="Công nghệ">Công nghệ</option>
+                        <option value="Đạo đức">Đạo đức</option>
                         <option value="Tin học">Tin học</option>
+                        <option value="Khoa học máy tính">Khoa học máy tính</option>
+                        <option value="KHTN">KHTN</option>
+                        <option value="Khoa học">Khoa học</option>
+                        <option value="Tự nhiên và Xã hội">Tự nhiên và Xã hội</option>
+                        <option value="Công nghệ">Công nghệ</option>
+                        <option value="Kinh tế pháp luật">Kinh tế pháp luật</option>
+                        <option value="Âm nhạc">Âm nhạc</option>
+                        <option value="Mĩ thuật">Mĩ thuật</option>
+                        <option value="Thể dục">Thể dục</option>
+                        <option value="Hoạt động trải nghiệm">Hoạt động trải nghiệm</option>
+                        <option value="Quốc phòng">Quốc phòng</option>
                       </select>
                     </div>
                     <div>
@@ -656,6 +815,11 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                         disabled={processing}
                       >
+                        <option value="Khối 1">Khối 1</option>
+                        <option value="Khối 2">Khối 2</option>
+                        <option value="Khối 3">Khối 3</option>
+                        <option value="Khối 4">Khối 4</option>
+                        <option value="Khối 5">Khối 5</option>
                         <option value="Khối 6">Khối 6</option>
                         <option value="Khối 7">Khối 7</option>
                         <option value="Khối 8">Khối 8</option>

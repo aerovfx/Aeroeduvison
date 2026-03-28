@@ -1,0 +1,494 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-cac-loai-quang-pho-1.jsp",
+  "title": "17 bài tập trắc nghiệm Các loại quang phổ (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Máy quang phổ là dụng cụ dùng để:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tổng hợp ánh sáng trắng từ các ánh sáng đơn sắc"
+          },
+          {
+            "option": "B",
+            "text": "phân tích chùm sáng phức tạp ra các thành phần đơn sắc"
+          },
+          {
+            "option": "C",
+            "text": "đo bước sóng của các ánh sáng đơn sắc"
+          },
+          {
+            "option": "D",
+            "text": "nhận biết thành phần cấu tạo của một nguồn phát quang phổ liên tục"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Tìm phát biểusai:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Thấu kính L1dặt trước lăng kinh có tác dụng tạo ra các chùm sáng song song, thấu kính L2dặt sau lăng kinh có tác dụng hội tụ các chùm tia song song,"
+          },
+          {
+            "option": "B",
+            "text": "Lăng kinh có tác dụng chính là làm lệch các tia sáng về phía đáy sao cho chúng đi gần trục chính của thấu kinh"
+          },
+          {
+            "option": "C",
+            "text": "Khe sáng S đặt tại tiêu diện của thấu kinh L1"
+          },
+          {
+            "option": "D",
+            "text": "Màn quan sát E đặt tại tiêu diện của thấu kính L2"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Chiếu ánh sáng Mặt Trời tới khe hẹp F của máy quang phổ lăng kính thì chùm sáng thu được khi ra khỏ hẹ tán sác là",
+        "options": [
+          {
+            "option": "A",
+            "text": "chùm ánh sáng trăng song song"
+          },
+          {
+            "option": "B",
+            "text": "nhiều chùm ánh sáng đơn sắc song song nhau truyền theo các phương khác nhau"
+          },
+          {
+            "option": "C",
+            "text": "nhiều chùm ánh sáng đơn sắc song song nhau truyền theo cùng một phương"
+          },
+          {
+            "option": "D",
+            "text": "gồm nhiều chùm ánh sáng đơn sắc hội tụ"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Cho ánh sáng từ một nguồn qua máy quang phổ thì ở buồng ảnh ta thu được dải sáng có màu biến đổi liên tục từ đỏ đến vàng. Quang phổ của nguồn đó là quang phổ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "liên tục"
+          },
+          {
+            "option": "B",
+            "text": "vạch phát xạ"
+          },
+          {
+            "option": "C",
+            "text": "vạch hấp thụ"
+          },
+          {
+            "option": "D",
+            "text": "vạch phát xạ và quang phổ vạch hấp thụ"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một lượng khí bị nung nóng có thể phát ra quang phổ liên tục khi có:",
+        "options": [
+          {
+            "option": "A",
+            "text": "khối lượng riêng nhỏ"
+          },
+          {
+            "option": "B",
+            "text": "mật độ thấp"
+          },
+          {
+            "option": "C",
+            "text": "áp suất thấp"
+          },
+          {
+            "option": "D",
+            "text": "khối lượng riêng lớn"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Chất nào dưới đâykhôngphát ra quang phổ liên tục khi bị nung nóng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "chất rắn"
+          },
+          {
+            "option": "B",
+            "text": "chất lỏng"
+          },
+          {
+            "option": "C",
+            "text": "chất khí ở áp suất thấp"
+          },
+          {
+            "option": "D",
+            "text": "chất khí ở áp suất cao"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Chọn phát biểu đúng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Nguồn phát ra quang phổ liên tục là vật rắn, lỏng hoặc khí có tỉ khối lớn"
+          },
+          {
+            "option": "B",
+            "text": "Nguồn phát ra quang phổ vạch phát xạ là các chất khi hoặc hơi có tỉ khối nhỏ bị nung nóng."
+          },
+          {
+            "option": "C",
+            "text": "Nguồn phát ra quang phổ vạch hấp thụ là các chất hơi hoặc khí có tỉ khối nhỏ bị nung nóng."
+          },
+          {
+            "option": "D",
+            "text": "Nguồn phát ra quang phổ vạch phát xạ là các chất hơi hoặc khí có tỉ khối nhỏ được chiếu sáng."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Quang phổ liên tục:",
+        "options": [
+          {
+            "option": "A",
+            "text": "phụ thuộc nhiệt độ của nguồn sáng"
+          },
+          {
+            "option": "B",
+            "text": "phụ thuộc bản chất của nguồn sáng"
+          },
+          {
+            "option": "C",
+            "text": "phụ thuộc đồng thời vào nhiệt độ và bản chất của nguồn sáng"
+          },
+          {
+            "option": "D",
+            "text": "không phụ thuộc vào nhiệt độ và bản chất của nguồn sáng"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Biết quang phổ vạch phát xạ của một chất hơi có hai cjahc màu đơn sắc, ứng với các bước sóng λ1và λ2(với λ1< λ2) thì quang phổ hấp thụ của chất hơi ấy sẽ là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "quang phổ liên tục bị thiếu hai vạch ứng với các bước sóng λ1và λ2"
+          },
+          {
+            "option": "B",
+            "text": "quang phổ liên tục bị thiếu mọi vạch ứng với các bước sóng nhỏ hơn  λ1"
+          },
+          {
+            "option": "C",
+            "text": "quang phổ liên tục bị thiếu mọi vạch ứng với các bước sóng trong khoảng từ  λ1đến λ2"
+          },
+          {
+            "option": "D",
+            "text": "quang phổ liên tục bị thiếu mọi vạch ứng với các bước sóng lớn hơn  λ2"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Chọn phát biểu đúng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Quang phổ vạch phát xạ không phụ thuộc vào thành phần cấu tạo, không phụ thuộc vào nhiệt độ của nguồn sáng."
+          },
+          {
+            "option": "B",
+            "text": "Quang phổ liên tục phụ thuộc vào nhiệt độ, không phụ thuộc vào thành phần cấu tạo của nguồn sáng."
+          },
+          {
+            "option": "C",
+            "text": "Quang phổ vạch hấp thụ là hệ thống cách vạch màu riêng rẽ nằm trên nền tối."
+          },
+          {
+            "option": "D",
+            "text": "Quang phổ vạch cho ta biết được thành phần hóa học của một chất và nhiệt độ của chúng."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Tìm phát biểusai.",
+        "options": [
+          {
+            "option": "A",
+            "text": "của hai chất khác nhau không thể có các vạch có vị trí trùng nhau."
+          },
+          {
+            "option": "B",
+            "text": "của các nguyên tố khác nhau thì khác nhau về: số lượng, vị trí màu sác và độ sáng của các vạch quang phổ."
+          },
+          {
+            "option": "C",
+            "text": "do các chất khí hay hơi có tỉ khối nhỏ, bị nung nóng phát ra."
+          },
+          {
+            "option": "D",
+            "text": "phụ thuộc vào nhiệt độ của vật."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Có các nguồn phát sáng sau:",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "1.",
+        "question_text": "Bếp than đang cháy sáng.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "2.",
+        "question_text": "Ống chưa khí hyđrô loãng đang phóng điện.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "3.",
+        "question_text": "Ngọn lửa đèn cồn có pha muối.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "4.",
+        "question_text": "Hơi kim loại nóng sáng trong lò luyện kim.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "5.",
+        "question_text": "Khối kim loại nóng chảy trong lò luyện kim.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "6.",
+        "question_text": "Dây tóc của đèn điện đang nóng sáng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 ; 2 ; 4     \tB.\t1 ; 5 ; 6"
+          },
+          {
+            "option": "C",
+            "text": "4 ; 3 ; 6     \tD.\t3 ; 5 ; 6"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Điều kiện để thu được quang phổ hấp thụ là khối khí hay hơi:",
+        "options": [
+          {
+            "option": "A",
+            "text": "ở áp suất thấp được nung nóng."
+          },
+          {
+            "option": "B",
+            "text": "ở nhiệt độ bất kì được chiếu bởi ánh sáng trắng."
+          },
+          {
+            "option": "C",
+            "text": "được chiếu bởi nguồn phát ánh sáng trắng có nhiệt độ lớn hơn nhiệt độ của khối khí."
+          },
+          {
+            "option": "D",
+            "text": "được chiếu bởi nguồn phát quang phổ vạch. Nhiệt độ của nguồn nhỏ hơn nhiệt độ của khối khí."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Hiện tượng đảo sắc của các vạch quang phổ chứng tỏ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "trong cùng một điều kiện, vật chất đồng thời hấp thụ và bức xạ ánh sáng."
+          },
+          {
+            "option": "B",
+            "text": "mọi vật đều hấp thụ và bức xạ cùng một loại ánh sáng như nhau."
+          },
+          {
+            "option": "C",
+            "text": "các vạch tối xuất hiện trên quang phổ liên tục chứng tỏ ánh sáng là sóng."
+          },
+          {
+            "option": "D",
+            "text": "nguyên tử phát xạ ánh sáng nào thì cũng có khả năng hấp thụ ánh sáng đó."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Nếu chiếu ánh sáng trắng qua lớp hơi natri nung nóng rồi cho qua khe của kính quang phổ, nhiệt độ của nguồn sáng bằng nhiệt độ của hơi natri thì trên màn của kính quang phổ ta thu được:",
+        "options": [
+          {
+            "option": "A",
+            "text": "quang phổ liên tục"
+          },
+          {
+            "option": "B",
+            "text": "quang phổ vạch phát xạ"
+          },
+          {
+            "option": "C",
+            "text": "quang phổ vạch hấp thụ"
+          },
+          {
+            "option": "D",
+            "text": "đồng thời quang phổ liên tục và quang phổ vạch hấp thụ"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Quang phổ vạch phát xạ của natri có hai vạch càng với bước sóng 0,5890 µm và 0,5896 µm. Quang phổ vạch hấp thụ của natri sẽ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "thiếu hai vạch có bước sóng 0,5890 µm và 0,5896 µm."
+          },
+          {
+            "option": "B",
+            "text": "thiếu mọi ánh sáng có bước sóng nhỏ hơn 0,5890 µm."
+          },
+          {
+            "option": "C",
+            "text": "thiếu mọi ánh sáng có bước sóng lớn hơn 0,5896 µm."
+          },
+          {
+            "option": "D",
+            "text": "thiếu mọi ánh sáng có bước sóng trong khoảng từ 0,5890 µm và 0,5896 µm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Quang phổ vạch phát xạ và quang phổ vạch hấp thụ của cùng một nguyên tố giống nhau về:",
+        "options": [
+          {
+            "option": "A",
+            "text": "cách tạo ra quang phổ"
+          },
+          {
+            "option": "B",
+            "text": "màu của các vạch quang phổ"
+          },
+          {
+            "option": "C",
+            "text": "vị trí của các vạch quang phổ"
+          },
+          {
+            "option": "D",
+            "text": "tính chất không phụ thuộc vào nhiệt độ."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 23
+}

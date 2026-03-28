@@ -1,0 +1,297 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-dai-cuong-ve-dong-dien-xoay-chieu.jsp",
+  "title": "28 bài tập trắc nghiệm Đại cương về dòng điện xoay chiều (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Trong các biểu thức của giá trị hiệu dụng của dòng điện xoay chiều sau, hãy chọn công thức sai ?",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Cho điện áp hai đầu đọan mạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "P = 120 W.     \tB. P = 100 W."
+          },
+          {
+            "option": "C",
+            "text": "P = 180 W.     \tD. P = 50 W."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Dòng điện chạy qua một đoạn mạch có cường độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tần số góc của dòng điện."
+          },
+          {
+            "option": "B",
+            "text": "chu kì của dòng điện."
+          },
+          {
+            "option": "C",
+            "text": "tần số của dòng điện."
+          },
+          {
+            "option": "D",
+            "text": "pha ban đầu của dòng điện."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Biểu thức cường độ dòng điện trong đoạn mạch xoay chiều là i = 2cos100πt (A). Tần số của dòng điện là bao nhiêu?",
+        "options": [
+          {
+            "option": "A",
+            "text": "rad/s.     \tB. 100 Hz."
+          },
+          {
+            "option": "C",
+            "text": "rad/s.     \tD. 50 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Cường độ dòng điện tức thời chạy qua một đoạn mạch xoay chiều là i = 2sin(100πt) A. Tại thời điểm t1nào đó, dòng điện đang giảm và có cường độ bằng 1A. Đến thời điểm t = t1+ 0,005 s, cường độ dòng điện bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "√3A.     \tB. -√3A."
+          },
+          {
+            "option": "C",
+            "text": "√2A.     \tD. -√2A"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Khi đặt điện áp có biểu thức u = U0.cos(ωt - π/3) V vào hai đầu một đoạn mạch thì cường độ dòng điện chạy trong mạch đó có biểu thức i = I0cos(ωt - π/6) A. Hệ số công suất của mạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,5√3     \tB. 0,5"
+          },
+          {
+            "option": "C",
+            "text": "0,5√2     \tD. 0,75"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Số chỉ của ampe kế khi mắc nối tiếp vào đoạn mạch điện xoay chiều cho ta biết giá trị cường độ dòng điện:",
+        "options": [
+          {
+            "option": "A",
+            "text": "cực đại.     \tB. hiệu dụng."
+          },
+          {
+            "option": "C",
+            "text": "trung bình.     \tD. tức thời."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một dòng điện xoay chiều có cường độ tức thời i = 2√2 cos(100πt) , (trong đó i tính bằng A còn t tính bằng s). Phát biểu nào sau đây đúng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Cường độ hiệu dụng của dòng điện là 2A"
+          },
+          {
+            "option": "B",
+            "text": "Tần số góc của dòng điện là 100 Hz"
+          },
+          {
+            "option": "C",
+            "text": "Tần số của dòng điện là 100 Hz"
+          },
+          {
+            "option": "D",
+            "text": "Dòng điện đổi chiều 314 lần trong một giây"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một bạn cắm hai que đo của một vôn kế xoay chiều vào ổ cắm điện trong phòng thí nghiệm, thấy vôn kế chỉ 220 V. Ý nghĩa của con số đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Điện áp hiệu dụng của mạng điện trong phòng thí nghiệm."
+          },
+          {
+            "option": "B",
+            "text": "Biên độ của điện áp của mạng điện trong phòng thí nghiệm."
+          },
+          {
+            "option": "C",
+            "text": "Điện áp tức thời của mạng điện tại thời điểm đó."
+          },
+          {
+            "option": "D",
+            "text": "Nhiệt lượng tỏa ra trên vôn kế."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Cường độ dòng điện tức thời chạy qua một đoạn mạch xoay chiều có biểu thức:",
+        "options": [
+          {
+            "option": "A",
+            "text": "cực đại"
+          },
+          {
+            "option": "B",
+            "text": "cực tiểu"
+          },
+          {
+            "option": "C",
+            "text": "2√2 A và đang tăng"
+          },
+          {
+            "option": "D",
+            "text": "2√2 A và đang giảm"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Kết luận đúng khi so sánh chu kì biến đổi  T1của công suất tỏa nhiệt tức thời của dòng điện xoay chiều với chu kì biển đổi T2của dòng điện đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "T2= 2T1B. T2> T1"
+          },
+          {
+            "option": "C",
+            "text": "T2< T1D. T2= T1"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Điện áp hai đầu một đoạn mạch có biểu thức u = 60cos120πt (V). Trong 1 s, số lần điện áp u có độ lớn bằng 30 V là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "30 lần       B. 120 lần"
+          },
+          {
+            "option": "C",
+            "text": "240 lần      \t\tD. 60 lần"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Trong các biểu thức sau đây, biểu thức biểu diễn dòng điện biến đổi tuần hoàn với chu kì 0,01 s là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Một đèn ống được mắc vào mạch điện xoay chiều có điện áp hiệu dụng là U. Biết đèn sáng khi điện áp giữa hai cực của đèn không nhỏ hơn (U√2)/2 . Tỉ số giữa thời gian đèn tắt và thời gian đèn sáng trong một chu kì dòng điện là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1\t       \tB. 1/2"
+          },
+          {
+            "option": "C",
+            "text": "1/3     \t\t\t\tD. 2"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Từ thông qua một cuộn dây có biểu thức:",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

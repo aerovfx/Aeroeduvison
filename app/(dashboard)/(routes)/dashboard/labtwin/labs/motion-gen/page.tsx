@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
 
 import React, { useState, useRef, useEffect } from 'react';

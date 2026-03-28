@@ -6,8 +6,10 @@ import { FcGoogle } from "react-icons/fc";
 import { Button } from "@/components/ui/button";
 import { Suspense, useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 function SocialLoginContent() {
+  const { t } = useLanguage();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
   const [isLoading, setIsLoading] = useState(false);
@@ -24,31 +26,29 @@ function SocialLoginContent() {
         callbackUrl: callbackUrl,
         redirect: true,
       });
-      
-      // The redirect happens before we get here in most cases
+
       if (result?.error) {
-        toast.error("Lỗi khi đăng nhập với Google. Vui lòng thử lại.");
+        toast.error(t("auth.login.googleError"));
         setIsLoading(false);
       }
     } catch (error) {
       console.error("Google sign in error:", error);
-      toast.error("Không thể kết nối với Google. Vui lòng kiểm tra cấu hình.");
+      toast.error(t("auth.login.googleConfigError"));
       setIsLoading(false);
     }
-  }
+  };
 
-  // Prevent hydration mismatch by only rendering after mount
   if (!isMounted) {
     return (
       <div className="w-full">
         <Button
           size="lg"
-          className="w-full gap-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+          className="w-full gap-2 border border-border bg-card text-foreground hover:bg-muted"
           variant="outline"
           disabled
         >
           <FcGoogle className="h-5 w-5" />
-          <span>Tiếp tục với Google</span>
+          <span>{t("auth.login.googleContinue")}</span>
         </Button>
       </div>
     );
@@ -58,20 +58,20 @@ function SocialLoginContent() {
     <div className="w-full">
       <Button
         size="lg"
-        className="w-full gap-2 bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+        className="w-full gap-2 border border-border bg-card text-foreground hover:bg-muted"
         variant="outline"
         onClick={() => onClick("google")}
         disabled={isLoading}
       >
         {isLoading ? (
           <>
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
-            <span>Đang kết nối...</span>
+            <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-primary" />
+            <span>{t("auth.login.googleConnecting")}</span>
           </>
         ) : (
           <>
             <FcGoogle className="h-5 w-5" />
-            <span>Tiếp tục với Google</span>
+            <span>{t("auth.login.googleContinue")}</span>
           </>
         )}
       </Button>
@@ -81,11 +81,13 @@ function SocialLoginContent() {
 
 export const SocialLogin = () => {
   return (
-    <Suspense fallback={
-      <div className="w-full">
-        <div className="w-full h-10 bg-gray-100 animate-pulse rounded"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="w-full">
+          <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+        </div>
+      }
+    >
       <SocialLoginContent />
     </Suspense>
   );

@@ -6,7 +6,7 @@ import {
   MessageSquare, Send, Users, Bell, Brain, Mic, Video,
   Phone, Search, Filter, MoreVertical, Star, Clock,
   CheckCircle, AlertCircle, Smile, Zap, Sparkles, Plus,
-  Image as ImageIcon, FileText, X
+  Image as ImageIcon, FileText, X, TrendingUp
 } from 'lucide-react';
 
 interface Message {

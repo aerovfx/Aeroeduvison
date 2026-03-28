@@ -1,0 +1,277 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-chuong-2-phan-1.jsp",
+  "title": "30 bài tập ôn tập Sóng cơ và sóng âm (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một sóng ngang có chu kì 0,025 s, lan truyền trên mặt nước với vận tốc 1,5 m/s. Hai điểm M và N trên phương truyền sóng và cách nhau một đoạn 0,625 cm thì dao động lệch pha nhau một góc:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Để phân loại sóng dọc hay sóng ngang người ta dựa vào:",
+        "options": [
+          {
+            "option": "A",
+            "text": "phương truyền sóng trong môi trường."
+          },
+          {
+            "option": "B",
+            "text": "phương dao động của các phần tử môi trường."
+          },
+          {
+            "option": "C",
+            "text": "phương dao động của các phần tử môi trường và phương truyền sóng."
+          },
+          {
+            "option": "D",
+            "text": "sự biến dạng của môi trường khi có sóng truyền qua."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Trên sợi dây có chiều dài l, hai đầu cố định, đang có sóng dừng. Trên dây có một bụng sóng. Biết tốc độ truyền sóng trên dây là v không đối. Tần số của sóng là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Trong một thí nghiệm về giao thoa sóng trên mặt nước, hai nguồn kết hợp A, B dao động với tần số f = 15Hz và cùng pha. Tại một điểm M cách A, B những khoảng d1= 16cm; d2= 20cm, sóng có biên độ cực tiểu. Giữa M và đường trung trực của AB có hai dãy cực đại. Vận tốc truyền sóng trên mặt nước là:",
+        "options": [
+          {
+            "option": "C",
+            "text": "20 cm/s     \tD. 60 cm/s"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Xét hiện tượng sóng dừng trên dây đàn hồi nhẹ AB. Đầu A dao động theo phương vuông góc sợi dây với biên độ A. Khi đầu B cố định, sóng phản xạ tại B:",
+        "options": [
+          {
+            "option": "A",
+            "text": "cùng pha với sóng tới tại B."
+          },
+          {
+            "option": "B",
+            "text": "ngược pha với sóng tới tại B."
+          },
+          {
+            "option": "C",
+            "text": "vuông pha với sóng tới tại B."
+          },
+          {
+            "option": "D",
+            "text": "lệch pha 0,25π với sóng tới tại B."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Ở bề mặt một chất lỏng có hai nguồn phát sóng kết hợp A và B cách nhau 20 cm. Hai nguồn này dao động theo phương thẳng đứng có phương trình lần lượt là: uA= 5cos(40πt) mm và uB= 5cos(40πt + π) mm. Tốc độ truyền sóng trên mặt chất lỏng là 70 cm/s. Số điểm dao động với biên độ cực tiểu trên đoạn thẳng AB là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "8.      \tB. 9."
+          },
+          {
+            "option": "C",
+            "text": "11.     \t\tD. 10."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một sóng âm có dạng hình cầu được phát ra từ nguồn có công suất P. Tại một điểm cách nguồn một khoảng d có cường độ âm là I. Hệ thức đúng là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một sóng dừng trên một sợi dây có dạng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "8 cm.      \tB. 6 cm."
+          },
+          {
+            "option": "C",
+            "text": "4 cm.     \tD. 2 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một sóng âm truyền trong không khí với tốc độ 340 m/s và bước sóng 34 cm. Tần số của sóng âm này là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "500 Hz.      \tB. 2000 Hz."
+          },
+          {
+            "option": "C",
+            "text": "1000 Hz.     \tD. 1500 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Hai nguồn kết hợp A và B dao động theo phương vuông góc với bề mặt chất lỏng với phương trình: uA= uB= 4cos(40πt) cm, t tính bằng s. Tốc độ truyền sóng là 50 cm/s. Biên độ sóng coi như không đổi. Tại điểm M trên bề mặt chất lỏng với:",
+        "options": [
+          {
+            "option": "A",
+            "text": "120π  cm/s.     \tB. 100π  cm/s."
+          },
+          {
+            "option": "C",
+            "text": "80π  cm/s.     \tD.  160π cm/s."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Sóng dừng trên dây OB dài l = 120 cm có hai đầu cố định. Trên dây có bốn điểm bụng, các phần tử ở đó dao động với biên độ 2 cm. Biên độ dao động của điểm M cách O một khoảng 65 cm là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 cm.      \tB. 0,9 cm."
+          },
+          {
+            "option": "C",
+            "text": "0,7 cm.     \t\tD. 0,5 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một sóng ngang trền dọc theo một sợi dây dài, nguồn sóng O dao động với phương trình:",
+        "options": [
+          {
+            "option": "A",
+            "text": "16 cm.     \tB. 5 cm."
+          },
+          {
+            "option": "C",
+            "text": "10 cm.     \tD. 8 cm."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một nguồn âm đặt tại O trong môi trường đẳng hướng. Hai điểm M và N trong môi trường tạo với O thành một tam giác đều. Mức cường độ âm tại M và N đều bằng 24,77 dB, mức cường độ âm lớn nhất mà một máy thu thu được đặt tại một điểm trên đoạn MN là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "28 dB.     \tB. 27 dB."
+          },
+          {
+            "option": "C",
+            "text": "25 dB.     \tD. 26 dB."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Ở bề mặt một chất lỏng có hai nguồn phát sóng kết hợp S1và S2cách nhau 20 cm. Hai nguồn này dao động theo phương thẳng đứng có phương trình lần lượt là u1= 5cos40πt (mm) và u2= 5cos(40πt + π) mm. Tốc độ truyền sóng trên mặt chất lỏng là 80 cm/s. Xét các điểm trên S1S2, gọi I là trung điểm của S1S2, M nằm cách I một đoạn 3 cm sẽ dao động với biên độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0 mm.      \tB. 5 mm."
+          },
+          {
+            "option": "C",
+            "text": "10 mm.     \t\tD. 2,5 mm."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Hai nguồn sóng giống nhau S1, S2có biên độ 2 cm đặt lần lượt tại hai điểm A, B cách nhau 40 cm. Cho bước sóng bằng 0,6 cm. Điểm C thuộc miền giao thoa cách B một đoạn 30 cm dao động với biên độ cực đại. Giữa C và đường trung trực của đoạn AB còn có 2 dãy cực đại khác. Nếu dịch chuyển nguồn S1đến điểm C thì tại A biên độ dao động của sóng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 cm.     \tB. 0."
+          },
+          {
+            "option": "C",
+            "text": "4 cm.     \tD. 2 cm."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

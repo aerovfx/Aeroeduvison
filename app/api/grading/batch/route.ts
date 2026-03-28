@@ -97,15 +97,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check assignment exists
-    const assignment = await prisma.assignment.findUnique({
+    // Check answer key exists
+    const answerKey = await prisma.gradingAnswerKey.findUnique({
       where: { id: assignmentId },
-      include: { course: true },
     });
 
-    if (!assignment) {
+    if (!answerKey) {
       return NextResponse.json(
-        { error: 'Assignment not found' },
+        { error: 'Answer key not found' },
         { status: 404 }
       );
     }
@@ -120,10 +119,10 @@ export async function POST(req: NextRequest) {
         submission: s.submission,
       })),
       subject,
-      grade: gradeLevel || assignment.course.gradeLevel || '10',
+      grade: gradeLevel || '10',
       assignmentType: assignmentType || 'essay',
       maxScore: 10,
-      rubricId: assignment.rubricId || undefined,
+      rubricId: undefined,
     });
 
     const gradingTime = Date.now() - startTime;
@@ -147,34 +146,36 @@ export async function POST(req: NextRequest) {
         const result = batchResult.results[index];
         const isOutlier = consistencyReport.outliers.includes(sub.studentId);
 
-        const submissionData = {
-          assignmentId,
+        const sheetData = {
+          answerKeyId: assignmentId,
+          teacherId: session.user.id,
           studentId: sub.studentId,
-          content: sub.submission,
-          status: result.confidence < 0.7 || isOutlier ? 'PENDING_REVIEW' : 'GRADED',
-          score: result.totalScore,
-          feedback: result.overallFeedback,
-          aiGradingResult: result as any,
-          confidence: result.confidence,
-          gradedAt: result.confidence >= 0.7 && !isOutlier ? new Date() : null,
-          submittedAt: new Date(),
+          detectedAnswers: {} as any,
+          detectedPart2: {} as any,
+          detectedPart3: {} as any,
+          status: result.confidence < 0.7 || isOutlier ? 'error' : 'scanned',
+          totalScore: result.totalScore,
+          essayNotes: { feedback: result.overallFeedback } as any,
+          reviewed: result.confidence >= 0.7 && !isOutlier,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         };
 
         // Check if exists
-        const existing = await prisma.submission.findFirst({
+        const existing = await prisma.gradedSheet.findFirst({
           where: {
-            assignmentId,
+            answerKeyId: assignmentId,
             studentId: sub.studentId,
           },
         });
 
         return existing
-          ? await prisma.submission.update({
+          ? await prisma.gradedSheet.update({
               where: { id: existing.id },
-              data: submissionData,
+              data: sheetData,
             })
-          : await prisma.submission.create({
-              data: submissionData,
+          : await prisma.gradedSheet.create({
+              data: sheetData,
             });
       })
     );
@@ -221,13 +222,13 @@ export async function POST(req: NextRequest) {
         gradingTime,
         recommendations: consistencyReport.recommendations,
         submissions: savedSubmissions.map((s, i) => ({
-          submissionId: s.id,
+          sheetId: s.id,
           studentId: s.studentId,
-          score: s.score,
-          grade: scoreToGrade(s.score || 0),
-          confidence: s.confidence,
+          score: s.totalScore,
+          grade: s.gradeLabel || scoreToGrade(s.totalScore || 0),
+          reviewed: s.reviewed,
           status: s.status,
-          needsReview: s.status === 'PENDING_REVIEW',
+          needsReview: !s.reviewed,
         })),
       },
     });
@@ -278,26 +279,17 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 3. Fetch submissions
-    const submissions = await prisma.submission.findMany({
-      where: { assignmentId },
-      include: {
-        student: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+    // 3. Fetch graded sheets
+    const submissions = await prisma.gradedSheet.findMany({
+      where: { answerKeyId: assignmentId },
       orderBy: {
-        submittedAt: 'desc',
+        createdAt: 'desc',
       },
     });
 
     // 4. Calculate statistics
-    const gradedSubmissions = submissions.filter(s => s.status === 'GRADED');
-    const scores = gradedSubmissions.map(s => s.score || 0);
+    const gradedSubmissions = submissions.filter(s => s.reviewed);
+    const scores = gradedSubmissions.map(s => s.totalScore || 0);
 
     const statistics = scores.length > 0 ? {
       total: submissions.length,
@@ -321,13 +313,13 @@ export async function GET(req: NextRequest) {
       data: {
         submissions: submissions.map(s => ({
           id: s.id,
-          student: s.student,
-          score: s.score,
-          grade: s.score ? scoreToGrade(s.score) : null,
-          confidence: s.confidence,
+          studentId: s.studentId,
+          score: s.totalScore,
+          grade: s.gradeLabel || (s.totalScore ? scoreToGrade(s.totalScore) : null),
+          reviewed: s.reviewed,
           status: s.status,
-          submittedAt: s.submittedAt,
-          gradedAt: s.gradedAt,
+          createdAt: s.createdAt,
+          updatedAt: s.updatedAt,
         })),
         statistics,
       },

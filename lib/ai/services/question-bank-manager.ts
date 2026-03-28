@@ -482,10 +482,11 @@ export class QuestionBankManager {
    */
   async getStatistics(): Promise<QuestionBankStats> {
     try {
+      const cacheKey = 'question-bank:stats';
+
       // Try cache first (if Redis is available)
       if (this.redis && this.redis.status === 'ready') {
         try {
-          const cacheKey = 'question-bank:stats';
           const cached = await this.redis.get(cacheKey);
           if (cached) {
             return JSON.parse(cached);
@@ -551,7 +552,13 @@ export class QuestionBankManager {
       };
 
       // Cache for 5 minutes
-      await this.redis.setex(cacheKey, 300, JSON.stringify(stats));
+      if (this.redis && this.redis.status === 'ready') {
+        try {
+          await this.redis.setex(cacheKey, 300, JSON.stringify(stats));
+        } catch (error) {
+          console.warn('Redis cache write failed, continuing without cache');
+        }
+      }
 
       return stats;
     } catch (error: any) {

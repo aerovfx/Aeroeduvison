@@ -74,3 +74,19 @@ desktop-current-app/dist/
 *.dmg
 *.exe
 *.AppImage
+
+# Secrets & credentials (NEVER commit)
+sa-ci-deployer-key.json
+gen-lang-client-*.json
+*.pem
+*.key
+
+# Dev logs & temp
+next-dev.log
+deployment.log
+cookies.txt
+cookies_new.txt
+
+# Stale dev scripts (not needed for production)
+middleware-advanced.ts
+middleware-new.ts

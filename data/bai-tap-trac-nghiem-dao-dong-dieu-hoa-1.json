@@ -1,0 +1,315 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-dao-dong-dieu-hoa-1.jsp",
+  "title": "30 bài tập trắc nghiệm Dao động điều hòa (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Phương trình dao động của một vật dao động điều hòa là: x = - 5cos(10πt + π/6) cm. Chọn đáp án đúng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Biên độ A = -5 cm"
+          },
+          {
+            "option": "B",
+            "text": "Pha ban đầu φ = π/6 (rad)"
+          },
+          {
+            "option": "C",
+            "text": "Chu kì T = 0,2 s"
+          },
+          {
+            "option": "D",
+            "text": "Li độ ban đầu x0= 5 cm"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Một vật dao động điều hòa với phương trình: x = 6cos2(4πt + π/6) cm. Quãng đường vật đi được trong 0,125 s kể từ thời điểm t = 0 là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "6cm     \t\tB. 4,5cm"
+          },
+          {
+            "option": "C",
+            "text": "7,5cm     \tD. 9cm"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Một chất điểm dao động điều hoà với chu kì 1,25 s và biên độ 5 cm. Tốc độ lớn nhất của chất điểm là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "25,1 cm/s.     \tB. 2,5 cm/s."
+          },
+          {
+            "option": "C",
+            "text": "63,5 cm/s.     \tD. 6,3 cm/s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một vật dao động điều hoà với chu kì T, biên độ bằng 5 cm. Quãng đường vật đi được trong 2,5T là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10 cm.     \tB. 50 cm."
+          },
+          {
+            "option": "C",
+            "text": "45 cm.     \tD. 25 cm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một vật nhỏ dao động điều hòa trên trục Ox theo phương trình x = Acos (ωt + φ). Vận tốc của vật có biểu thức là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "v = ωAcos (ωt +φ)."
+          },
+          {
+            "option": "B",
+            "text": "v = –ωAsin (ωt +φ)."
+          },
+          {
+            "option": "C",
+            "text": "v = –Asin (ωt +φ)."
+          },
+          {
+            "option": "D",
+            "text": "v = ωAsin (ωt +φ)."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một chất điểm dao động điều hòa dọc trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10 cm.     \tB. 30 cm."
+          },
+          {
+            "option": "C",
+            "text": "40 cm.     \tD. 20 cm."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một vật nhỏ dao động điều hòa theo phương trình x = Acos10t (t tính bằng s). Tại t = 2 s, pha của dao động là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10 rad.     \tB. 40 rad."
+          },
+          {
+            "option": "C",
+            "text": "20 rad.     \tD. 5 rad."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một vật dao động điều hòa theo phương trình x = 5cosπt (cm,s). Tốc độ của vật có giá trị cực đại là bao nhiêu?",
+        "options": [
+          {
+            "option": "A",
+            "text": "–5π cm/s.     \tB. 5π cm/s."
+          },
+          {
+            "option": "C",
+            "text": "5 cm/s.     \tD. 5/π cm/s."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Chọn một chất điểm dao động điều hòa trên đoạn thẳng MN dài 6 cm với tần số 2 Hz. Chọn gốc thời gian là lúc chất điểm có li độ 3√3/2 cm và chuyển động ngược chiều với chiều dương mà mình đã chọn. Phương trình dao động của chất điểm là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "x = 3sin(4πt + π/3) cm"
+          },
+          {
+            "option": "B",
+            "text": "x = 3cos(4πt + π/6) cm"
+          },
+          {
+            "option": "C",
+            "text": "x = 3sin(4πt + π/6) cm"
+          },
+          {
+            "option": "D",
+            "text": "x = 3cos(4πt + 5π/6) cm"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Vật dao động điều hòa theo phương trình x = Acosωt (cm). Sau khi dao động được 1/6 chu kì vật có li độ √3/2 cm. Biên độ dao động của vật là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2√2 cm      \tB. √3 cm"
+          },
+          {
+            "option": "C",
+            "text": "2 cm      \tD. 4√2 cm"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Vật dao động điều hòa với phương trình gia tốc a = 40π2cos(2πt + π/2) cm/s2. Phương trình dao động của vật là",
+        "options": [
+          {
+            "option": "A",
+            "text": "x = 6cos(2πt - π/4) cm"
+          },
+          {
+            "option": "B",
+            "text": "x = 10cos(2πt - π/2) cm"
+          },
+          {
+            "option": "C",
+            "text": "x = 10cos(2πt) cm"
+          },
+          {
+            "option": "D",
+            "text": "x = 20cos(2πt - π/2) cm"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một vật dao động điều hòa với phương trình dạng cos. Chọn gốc tính thời gian khi vật đổi chiều chuyển động và khi đó gia tốc của vật đang có giá trị dương. Pha ban đầu là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "-π/2       \tB. -π/3"
+          },
+          {
+            "option": "C",
+            "text": "π         \t\tD. π/2"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một vật dao động điều hòa với vận tốc góc 5 rad/s. Khi vật đi qua li độ 5 cm thì nó có tốc độ là 25 cm/s. Biên độ dao động của vật là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "5√2 cm      \tB. 10 cm"
+          },
+          {
+            "option": "C",
+            "text": "5,24 cm\t     \tD. 5√3  cm"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Một vật dao động điều hòa với biên độ 5 cm. Khi vật có tốc độ 10 cm/s thì có gia tốc 40√3 cm/s2. Tần số góc của dao động là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 rad/s     \tB. 4 rad/s"
+          },
+          {
+            "option": "C",
+            "text": "2 rad/s     \tD. 8 rad/s"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Chất điểm dao động điểu hòa trên đoạn MN = 4 cm, với chu kì T = 2s. Chọn gốc thời gian khi chất điểm có li độ x = -1 cm, đang chuyển động theo chiều dương. Phương trình dao động là:",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

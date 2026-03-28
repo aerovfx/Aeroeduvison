@@ -379,7 +379,7 @@ export function AerodynamicsViewer({ simulationData, onSimulationComplete }: Aer
               <div className="text-sm text-gray-600">
                 Hệ số lực cản (Cd)
               </div>
-              <Badge variant={Math.abs(forces.drag_coefficient) < 0.5 ? "success" : "warning"}>
+              <Badge variant={Math.abs(forces.drag_coefficient) < 0.5 ? "default" : "destructive"}>
                 {Math.abs(forces.drag_coefficient) < 0.5 ? "Tốt" : "Cao"}
               </Badge>
             </div>
@@ -401,7 +401,7 @@ export function AerodynamicsViewer({ simulationData, onSimulationComplete }: Aer
               <div className="text-sm text-gray-600">
                 Hệ số lực nâng (Cl)
               </div>
-              <Badge variant={Math.abs(forces.lift_coefficient) > 0.1 ? "success" : "secondary"}>
+              <Badge variant={Math.abs(forces.lift_coefficient) > 0.1 ? "default" : "secondary"}>
                 {Math.abs(forces.lift_coefficient) > 0.1 ? "Có lực nâng" : "Đối xứng"}
               </Badge>
             </div>

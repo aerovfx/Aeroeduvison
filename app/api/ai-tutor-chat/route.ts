@@ -19,7 +19,7 @@ const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
 
 // OpenRouter for AI Tutor (ưu tiên khi có key)
 const AI_TUTOR_OPENROUTER_API_KEY = process.env.AI_TUTOR_OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY;
-const AI_TUTOR_OPENROUTER_MODEL = process.env.AI_TUTOR_OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'anthropic/claude-3.5-sonnet';
+const AI_TUTOR_OPENROUTER_MODEL = process.env.AI_TUTOR_OPENROUTER_MODEL ?? process.env.OPENROUTER_MODEL ?? 'openai/gpt-4o-mini';
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 interface Message {
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
 
     try {
       // 1) OpenRouter (AI Tutor) – ưu tiên khi có AI_TUTOR_OPENROUTER_API_KEY hoặc OPENROUTER_API_KEY
-      if (AI_TUTOR_OPENROUTER_API_KEY?.trim() && AI_TUTOR_OPENROUTER_API_KEY.startsWith('sk-or-')) {
+      if (AI_TUTOR_OPENROUTER_API_KEY?.trim() && (AI_TUTOR_OPENROUTER_API_KEY.startsWith('sk-or-') || AI_TUTOR_OPENROUTER_API_KEY.startsWith('ysk-or-'))) {
         console.log('[AI_TUTOR_CHAT] Using OpenRouter...', AI_TUTOR_OPENROUTER_MODEL);
         const openRouterRes = await fetch(OPENROUTER_CHAT_URL, {
           method: 'POST',

@@ -1,5 +1,58 @@
 /** @type {import('next').NextConfig} */
-const { withContentlayer } = require("next-contentlayer")
+
+// Fix: Node.js 22+ broken localStorage global (--localstorage-file without valid path)
+// This must run before ANY module that might touch localStorage during SSR
+if (typeof globalThis !== 'undefined' && globalThis.localStorage && typeof globalThis.localStorage.getItem !== 'function') {
+  const _store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => _store.get(k) ?? null,
+    setItem: (k, v) => _store.set(k, String(v)),
+    removeItem: (k) => _store.delete(k),
+    clear: () => _store.clear(),
+    get length() { return _store.size; },
+    key: (i) => [..._store.keys()][i] ?? null,
+  };
+}
+
+// NOTE: withContentlayer() wrapper removed — incompatible with Next.js 15.3.x
+// Instead, we inline the contentlayer webpack plugin directly.
+// The package exports don't expose dist/plugin.js, so we resolve the path manually.
+let _ContentlayerPlugin = null
+try {
+  const _path = require('path')
+  const _pluginPath = _path.join(
+    _path.dirname(require.resolve('next-contentlayer/package.json')),
+    'dist', 'plugin.js'
+  )
+  // Verify the file exists before defining the plugin class
+  require('fs').accessSync(_pluginPath)
+  const _devServerStartedRef = { current: false }
+  const { pathToFileURL } = require('url')
+  const _pluginURL = pathToFileURL(_pluginPath).href
+  _ContentlayerPlugin = class ContentlayerWebpackPlugin {
+    apply(compiler) {
+      compiler.hooks.beforeCompile.tapPromise('ContentlayerWebpackPlugin', async () => {
+        try {
+          const plugin = await import(/* webpackIgnore: true */ _pluginURL)
+          await plugin.runBeforeWebpackCompile({
+            pluginOptions: {},
+            devServerStartedRef: _devServerStartedRef,
+            mode: compiler.options.mode,
+          })
+        } catch (e) {
+          // Contentlayer compilation error — log once and continue
+          if (!this._errorLogged) {
+            console.warn('[Contentlayer] Plugin error (non-fatal):', e.message || e)
+            this._errorLogged = true
+          }
+        }
+      })
+    }
+  }
+} catch {
+  // next-contentlayer not installed or dist/plugin.js missing — skip
+}
+
 
 const nextConfig = {
   // Output configuration for Cloud Run
@@ -33,6 +86,16 @@ const nextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     unoptimized: false,
   },
+
+  // Transpile ESM packages that need it
+  // NOTE: Do NOT transpile 'three' here — it interferes with webpack alias
+  // resolution for subpath exports (three/webgpu, three/tsl) used by three-globe.
+  // Three.js ESM is handled via webpack aliases + resolve.conditionNames instead.
+  // Do NOT transpile @react-three/* packages — they ship pre-built bundles
+  // and transpiling them causes react-reconciler resolution issues.
+  transpilePackages: [
+    'postprocessing',
+  ],
 
   // Disable ESLint during build
   eslint: {
@@ -164,17 +227,13 @@ const nextConfig = {
 
   // Experimental features for better performance
   experimental: {
+    // Fix: Disable PPR to prevent "Cannot read properties of undefined (reading 'PPR')" in Link component
+    ppr: false,
     optimizePackageImports: [
       'lucide-react',
       '@mui/material',
       '@mui/icons-material',
-      '@radix-ui/react-dialog',
-      '@radix-ui/react-select',
-      '@radix-ui/react-tabs',
       'recharts',
-      'three',
-      'deck.gl',
-      'maplibre-gl',
       'date-fns',
     ],
     // Optimize server actions
@@ -182,25 +241,55 @@ const nextConfig = {
       bodySizeLimit: '2mb',
       allowedOrigins: ['*'],
     },
-    // Optimize CSS
-    optimizeCss: true,
+    // optimizeCss disabled — critters consumes too much memory during SSG
+    // optimizeCss: true,
+    // Limit build workers to prevent OOM during "Collecting page data"
+    workerThreads: false,
+    cpus: 1,
   },
 
   // Webpack optimization
   webpack: (config, { dev, isServer }) => {
+    // Contentlayer webpack plugin (inlined from withContentlayer wrapper)
+    if (_ContentlayerPlugin) {
+      config.plugins.push(new _ContentlayerPlugin())
+    }
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: ['**/node_modules/!(.contentlayer)/**/*'],
+    };
+
     if (dev) {
-      config.watchOptions = {
-        poll: 1000,
-        aggregateTimeout: 300,
-      };
+      config.watchOptions.poll = 1000;
+      config.watchOptions.aggregateTimeout = 300;
     }
 
-    // Alias contentlayer/generated
+    // Alias contentlayer/generated + force single Three.js/R3F instance
     const path = require("path")
+
+    // Fix: three-globe v2.45+ imports three/webgpu and three/tsl (WebGPU renderer modules).
+    // Webpack alias "three" without "$" suffix catches ALL subpath imports (three/webgpu, three/tsl)
+    // and resolves them as node_modules/three/webgpu (doesn't exist), bypassing package.json exports.
+    // Solution: use "three$" for exact match only, then explicit aliases for subpaths.
     config.resolve.alias = {
       ...config.resolve.alias,
       "contentlayer/generated": path.resolve(__dirname, ".contentlayer/generated/index.mjs"),
+      "three/webgpu": path.resolve(__dirname, "node_modules/three/build/three.webgpu.js"),
+      "three/tsl": path.resolve(__dirname, "node_modules/three/build/three.tsl.js"),
+      "three$": path.resolve(__dirname, "node_modules/three"),
+      "@react-three/fiber": path.resolve(__dirname, "node_modules/@react-three/fiber"),
+      "@react-three/drei": path.resolve(__dirname, "node_modules/@react-three/drei"),
+      "@react-three/postprocessing": path.resolve(__dirname, "node_modules/@react-three/postprocessing"),
+      // Fix: force ESM entry for @floating-ui/dom so re-exports (getOverflowAncestors) resolve correctly
+      "@floating-ui/dom": path.resolve(__dirname, "node_modules/@floating-ui/dom/dist/floating-ui.dom.mjs"),
     };
+
+    // Ensure webpack resolves Node.js subpath exports (package.json "exports" field)
+    // This is critical for three/webgpu and three/tsl which are defined in three's exports map
+    config.resolve.conditionNames = config.resolve.conditionNames || [];
+    if (!config.resolve.conditionNames.includes('import')) {
+      config.resolve.conditionNames = ['import', 'module', 'require', 'node', 'default', ...config.resolve.conditionNames];
+    }
 
     // Production client-side optimizations
     if (!dev && !isServer) {
@@ -226,10 +315,10 @@ const nextConfig = {
             },
             // Isolate heavy libraries into separate chunks
             three: {
-              test: /[\\/]node_modules[\\/]three[\\/]/,
+              test: /[\\/]node_modules[\\/](three|@react-three)[\\/]/,
               name: 'three-vendor',
               priority: 30,
-              chunks: 'async', // Only load when dynamically imported
+              chunks: 'async',
               reuseExistingChunk: true,
             },
             mui: {
@@ -281,4 +370,5 @@ const nextConfig = {
   },
 }
 
-module.exports = withContentlayer(nextConfig)
+module.exports = nextConfig
+// cache-bust: force rebuild

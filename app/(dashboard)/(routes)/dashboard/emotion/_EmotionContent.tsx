@@ -1,1135 +1,1031 @@
 'use client';
 
-import VisionThemeWrapper from '@/components/theme/vision-theme-wrapper';
-
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Heart, TrendingUp, Calendar, Smile, Frown, Meh, Zap, Target, Users, Eye, Activity, MapPin, Brain, Camera, Focus } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useToast } from '@/hooks/use-toast';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import {
+  Heart, Smile, Frown, Meh, Zap, Target, Users, Eye, Activity,
+  Brain, Camera, Focus, TrendingUp, TrendingDown, AlertTriangle,
+  Sparkles, Timer, BarChart3, ArrowUpRight, ArrowDownRight,
+  ChevronRight, ChevronDown, Layers, Shield, BookOpen, Star,
+  Volume2, Monitor, Wifi
+} from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { EMOTION_CONFIG, EmotionType } from '../vision-tracker/advanced-emotion-recognition';
 
-export default function EmotionTrackerPage() {
-  const { t } = useLanguage();
-  const { toast } = useToast();
-  const [selectedPeriod, setSelectedPeriod] = useState('7days');
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedStudent, setDraggedStudent] = useState<number | null>(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [students, setStudents] = useState([
-    // Dòng 1 (gần bảng nhất) - 8 học sinh
-    { id: 1, name: 'Alice Nguyen', emotion: 'happy', performance: 85, energy: 90, x: 10, y: 10 },
-    { id: 2, name: 'Bao Tran', emotion: 'focused', performance: 92, energy: 75, x: 20, y: 10 },
-    { id: 3, name: 'Carol Le', emotion: 'stressed', performance: 65, energy: 45, x: 30, y: 10 },
-    { id: 4, name: 'Daniel Pham', emotion: 'motivated', performance: 88, energy: 85, x: 40, y: 10 },
-    { id: 5, name: 'Emma Vu', emotion: 'happy', performance: 78, energy: 80, x: 50, y: 10 },
-    { id: 6, name: 'Frank Do', emotion: 'focused', performance: 95, energy: 70, x: 60, y: 10 },
-    { id: 7, name: 'Grace Hoang', emotion: 'stressed', performance: 58, energy: 35, x: 70, y: 10 },
-    { id: 8, name: 'Henry Bui', emotion: 'motivated', performance: 82, energy: 88, x: 80, y: 10 },
-    
-    // Dòng 2 - 8 học sinh
-    { id: 9, name: 'Ivy Dang', emotion: 'happy', performance: 76, energy: 65, x: 10, y: 25 },
-    { id: 10, name: 'Jack Truong', emotion: 'focused', performance: 89, energy: 72, x: 20, y: 25 },
-    { id: 11, name: 'Kelly Huynh', emotion: 'happy', performance: 83, energy: 78, x: 30, y: 25 },
-    { id: 12, name: 'Liam Le', emotion: 'motivated', performance: 91, energy: 82, x: 40, y: 25 },
-    { id: 13, name: 'Mia Phan', emotion: 'focused', performance: 87, energy: 68, x: 50, y: 25 },
-    { id: 14, name: 'Noah Vo', emotion: 'stressed', performance: 62, energy: 42, x: 60, y: 25 },
-    { id: 15, name: 'Olivia Doan', emotion: 'happy', performance: 79, energy: 73, x: 70, y: 25 },
-    { id: 16, name: 'Peter Dinh', emotion: 'motivated', performance: 86, energy: 79, x: 80, y: 25 },
-    
-    // Dòng 3 - 8 học sinh
-    { id: 17, name: 'Quinn Tran', emotion: 'focused', performance: 93, energy: 76, x: 10, y: 40 },
-    { id: 18, name: 'Ryan Nguyen', emotion: 'happy', performance: 81, energy: 71, x: 20, y: 40 },
-    { id: 19, name: 'Sophia Pham', emotion: 'stressed', performance: 59, energy: 38, x: 30, y: 40 },
-    { id: 20, name: 'Thomas Le', emotion: 'motivated', performance: 84, energy: 77, x: 40, y: 40 },
-    { id: 21, name: 'Uyen Ho', emotion: 'happy', performance: 77, energy: 69, x: 50, y: 40 },
-    { id: 22, name: 'Victor Bui', emotion: 'focused', performance: 88, energy: 74, x: 60, y: 40 },
-    { id: 23, name: 'Wendy Dang', emotion: 'motivated', performance: 90, energy: 81, x: 70, y: 40 },
-    { id: 24, name: 'Xuan Truong', emotion: 'happy', performance: 82, energy: 76, x: 80, y: 40 },
-    
-    // Dòng 4 - 8 học sinh
-    { id: 25, name: 'Yen Vo', emotion: 'stressed', performance: 61, energy: 41, x: 10, y: 55 },
-    { id: 26, name: 'Zack Doan', emotion: 'focused', performance: 86, energy: 73, x: 20, y: 55 },
-    { id: 27, name: 'Amy Tran', emotion: 'happy', performance: 80, energy: 75, x: 30, y: 55 },
-    { id: 28, name: 'Brian Nguyen', emotion: 'motivated', performance: 89, energy: 83, x: 40, y: 55 },
-    { id: 29, name: 'Chloe Pham', emotion: 'focused', performance: 91, energy: 77, x: 50, y: 55 },
-    { id: 30, name: 'David Le', emotion: 'happy', performance: 78, energy: 72, x: 60, y: 55 },
-    { id: 31, name: 'Ella Dinh', emotion: 'stressed', performance: 63, energy: 43, x: 70, y: 55 },
-    { id: 32, name: 'Felix Ho', emotion: 'motivated', performance: 87, energy: 80, x: 80, y: 55 },
-    
-    // Dòng 5 (cuối lớp) - 8 học sinh
-    { id: 33, name: 'Gina Truong', emotion: 'focused', performance: 85, energy: 71, x: 10, y: 70 },
-    { id: 34, name: 'Harry Bui', emotion: 'happy', performance: 81, energy: 74, x: 20, y: 70 },
-    { id: 35, name: 'Isabel Do', emotion: 'motivated', performance: 92, energy: 84, x: 30, y: 70 },
-    { id: 36, name: 'Jason Nguyen', emotion: 'focused', performance: 84, energy: 70, x: 40, y: 70 },
-    { id: 37, name: 'Katie Pham', emotion: 'happy', performance: 79, energy: 73, x: 50, y: 70 },
-    { id: 38, name: 'Leo Vo', emotion: 'stressed', performance: 60, energy: 40, x: 60, y: 70 },
-    { id: 39, name: 'May Tran', emotion: 'motivated', performance: 88, energy: 82, x: 70, y: 70 },
-    { id: 40, name: 'Nick Le', emotion: 'focused', performance: 83, energy: 69, x: 80, y: 70 },
-  ]);
+// ───────────────────────────────────────────────
+// TYPES
+// ───────────────────────────────────────────────
+interface EmotionBucket {
+  periodStart: string; sampleCount: number; avgConfidence: number;
+  dominantEmotion: string | null; distribution: Record<string, number>;
+}
+interface EmotionSummary {
+  from: string; to: string; totalSamples: number; avgConfidence: number;
+  emotionDistribution: Record<string, number>; dominantEmotion: string | null;
+}
+interface Student {
+  id: number; name: string; emotion: string; performance: number;
+  energy: number; x: number; y: number; seatLabel?: string;
+}
+interface ClassData {
+  id: string; name: string; teacher: string; room: string;
+  students: Student[]; camera: string; schedule: string;
+}
 
-  const [currentMood, setCurrentMood] = useState({
-    primary: 'Happy & Focused 😊',
-    score: 85,
-    energy: 80,
-    stress: 25,
-    motivation: 85,
+// ───────────────────────────────────────────────
+// PALETTE
+// ───────────────────────────────────────────────
+const C = {
+  teal: 'hsl(175,80%,50%)', blue: 'hsl(210,90%,60%)', purple: 'hsl(245,85%,65%)',
+  violet: 'hsl(280,75%,60%)', amber: 'hsl(35,90%,55%)', red: 'hsl(0,70%,55%)',
+  green: 'hsl(145,70%,45%)', pink: 'hsl(330,80%,60%)', cyan: 'hsl(190,85%,55%)',
+};
+const EMOTION_CLR: Record<string, string> = {
+  happy: C.green, very_happy: C.teal, laughing: C.teal, excited: C.amber,
+  energetic: C.amber, confident: C.blue, grateful: C.pink, hopeful: C.green,
+  humble: C.purple, concentrating: C.blue, thinking: C.purple,
+  neutral: 'hsl(220,15%,50%)', confused: C.amber, surprised: C.amber,
+  worried: C.violet, sad: C.blue, crying: C.blue, angry: C.red, annoyed: C.red,
+  fearful: C.violet, stressed: C.red, bored: 'hsl(220,10%,45%)',
+  sleepy: 'hsl(220,10%,40%)', exhausted: C.red, desperate: C.red,
+};
+const eClr = (e: string) => EMOTION_CLR[e] || C.purple;
+const glass = "bg-white/[0.02] backdrop-blur-xl border border-white/[0.06] rounded-2xl";
+const glassH = "hover:bg-white/[0.04] hover:border-white/[0.1] hover:-translate-y-0.5 transition-all duration-300";
+
+// ───────────────────────────────────────────────
+// STUDENT ROSTERS — Lớp 11A2 & 10A6
+// ───────────────────────────────────────────────
+const NAMES_11A2 = [
+  'Nguyễn Minh Anh','Trần Đức Bảo','Lê Thị Cẩm','Phạm Hoàng Duy','Vũ Ngọc Hà',
+  'Đỗ Quốc Hưng','Hoàng Thị Lan','Bùi Văn Long','Đặng Thu Mai','Ngô Thanh Nam',
+  'Trịnh Hải Phong','Lý Quỳnh Như','Cao Minh Quân','Đinh Thùy Trang','Hồ Anh Tuấn',
+  'Phan Bích Ngọc','Dương Công Vinh','Võ Thị Yến','Tạ Đình Khoa','Mai Hương Giang',
+  'Lương Thanh Sơn','Châu Thị Bích','Nghiêm Đức Thắng','Tô Minh Châu','Kiều Thị Hồng',
+  'Hà Quốc Đạt','Thái Văn Hùng','Lâm Ngọc Diệp','Sơn Thị Thảo','Trương Minh Đức',
+  'Huỳnh Thị Linh','Phùng Văn Tài','Đoàn Thị Nhung','Nguyễn Hữu Phát','Lê Thị Mỹ Duyên',
+  'Trần Quang Hải','Phạm Thị Kim Chi','Vũ Đình Toàn','Đỗ Thị Thanh Huyền','Hoàng Minh Trí',
+];
+const NAMES_10A6 = [
+  'Bùi Thị An','Cao Văn Bình','Đặng Minh Châu','Đinh Thị Dung','Dương Quốc Em',
+  'Hà Thị Phương','Hoàng Đức Giang','Huỳnh Thị Hoa','Kiều Văn Khải','Lâm Thị Lệ',
+  'Lê Công Minh','Lương Thị Nga','Lý Đình Phúc','Mai Thị Quyên','Ngô Anh Sáng',
+  'Nguyễn Thị Tâm','Nghiêm Văn Uy','Phạm Thị Vân','Phan Đức Anh','Sơn Thị Bảo',
+  'Tạ Minh Cường','Thái Thị Diễm','Tô Văn Hiếu','Trần Thị Khánh','Trịnh Đình Lâm',
+  'Trương Thị Mến','Võ Đức Nghĩa','Vũ Thị Oanh','Châu Minh Phát','Đoàn Thị Thanh',
+  'Hồ Quốc Trung','Lê Thị Uyên','Nguyễn Văn Vinh','Phạm Thị Xuân','Cao Đình Yên',
+  'Đặng Thị Ánh','Đinh Văn Bách','Hoàng Thị Cúc','Huỳnh Minh Đạt','Kiều Thị Hằng',
+];
+
+function makeStudents(names: string[], seed: number): Student[] {
+  const emos = ['happy','concentrating','neutral','sad','stressed','excited','bored','thinking','worried','confident'];
+  return names.map((name, i) => {
+    const row = Math.floor(i / 8);
+    const col = i % 8;
+    const s = (seed + i * 7 + 13) % 100;
+    return {
+      id: i + 1, name, emotion: emos[(i + seed) % emos.length],
+      performance: 50 + (s % 45), energy: 35 + (s % 55),
+      x: 7 + col * 11.8, y: 10 + row * 17,
+      seatLabel: `${String.fromCharCode(65 + col)}${row + 1}`,
+    };
   });
+}
 
-  const [liveStats, setLiveStats] = useState<any>(null);
+const CLASSES: ClassData[] = [
+  { id: '11a2', name: 'Lớp 11A2', teacher: 'Cô Nguyễn Thị Hương', room: 'P.301', students: makeStudents(NAMES_11A2, 3), camera: 'CAM-301-A', schedule: 'Tiết 1-2 (7:00-8:30)' },
+  { id: '10a6', name: 'Lớp 10A6', teacher: 'Thầy Trần Văn Minh', room: 'P.205', students: makeStudents(NAMES_10A6, 7), camera: 'CAM-205-A', schedule: 'Tiết 3-4 (8:45-10:15)' },
+];
 
-  // Demo data for student@example.com
-  const emotionTrendDataMock = [
-    { date: '18/10', happy: 85, focused: 75, stressed: 30, motivated: 80 },
-    { date: '17/10', happy: 70, focused: 80, stressed: 45, motivated: 70 },
-    { date: '16/10', happy: 90, focused: 85, stressed: 20, motivated: 90 },
-    { date: '15/10', happy: 65, focused: 60, stressed: 50, motivated: 60 },
-    { date: '14/10', happy: 80, focused: 75, stressed: 35, motivated: 75 },
-    { date: '13/10', happy: 75, focused: 70, stressed: 40, motivated: 70 },
-    { date: '12/10', happy: 85, focused: 80, stressed: 25, motivated: 85 },
-  ];
+// ───────────────────────────────────────────────
+// SVG: Radial Progress
+// ───────────────────────────────────────────────
+function Radial({ value, size = 96, sw = 7, color = C.teal, icon: Icon, sub }: {
+  value: number; size?: number; sw?: number; color?: string; sub?: string; icon?: any;
+}) {
+  const r = (size - sw) / 2, circ = r * 2 * Math.PI, off = circ - (Math.min(value, 100) / 100) * circ;
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90 text-foreground/[0.06]">
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="currentColor" strokeWidth={sw} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={sw}
+          strokeDasharray={circ} strokeDashoffset={off} strokeLinecap="round"
+          className="transition-all duration-1000 ease-out" style={{ filter: `drop-shadow(0 0 6px ${color}40)` }} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {Icon && <Icon className="h-3.5 w-3.5 mb-0.5" style={{ color }} />}
+        <span className="text-sm font-bold text-white/90">{value}%</span>
+        {sub && <span className="text-[0.5rem] text-white/25 mt-0.5">{sub}</span>}
+      </div>
+    </div>
+  );
+}
 
-  const emotionDistributionMock = [
-    { name: 'Happy 😊', value: 45, color: '#10B981' },
-    { name: 'Focused 🎯', value: 30, color: '#3B82F6' },
-    { name: 'Motivated 🚀', value: 15, color: '#8B5CF6' },
-    { name: 'Stressed 😰', value: 10, color: '#EF4444' },
-  ];
+// ───────────────────────────────────────────────
+// SVG: Stacked Area Wave
+// ───────────────────────────────────────────────
+function WaveChart({ data, h = 140 }: { data: { label: string; vals: Record<string, number> }[]; h?: number }) {
+  if (!data || data.length < 2) return <div className="text-white/15 text-xs text-center py-10">Chưa có dữ liệu camera</div>;
+  const w = 600, pad = { t: 8, b: 22, l: 0, r: 0 }, pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const emos = ['happy','concentrating','neutral','sad','angry'];
+  const cols = [C.green, C.blue, 'hsl(220,15%,50%)', C.violet, C.red];
+  const norm = data.map(d => {
+    const tot = Object.values(d.vals).reduce((s, v) => s + v, 0) || 1;
+    const m: Record<string, number> = {};
+    emos.forEach(e => {
+      let v = d.vals[e] || 0;
+      if (e === 'happy') v += (d.vals.very_happy||0)+(d.vals.laughing||0)+(d.vals.excited||0)+(d.vals.grateful||0)+(d.vals.hopeful||0)+(d.vals.energetic||0)+(d.vals.confident||0);
+      if (e === 'concentrating') v += (d.vals.thinking||0);
+      if (e === 'neutral') v += (d.vals.confused||0)+(d.vals.surprised||0)+(d.vals.bored||0)+(d.vals.sleepy||0);
+      if (e === 'sad') v += (d.vals.worried||0)+(d.vals.crying||0)+(d.vals.fearful||0)+(d.vals.desperate||0)+(d.vals.exhausted||0);
+      if (e === 'angry') v += (d.vals.annoyed||0)+(d.vals.stressed||0);
+      m[e] = (v / tot) * 100;
+    });
+    return { ...d, pct: m };
+  });
+  const step = pw / (norm.length - 1);
+  const areas: { path: string; color: string }[] = [];
+  const bases = norm.map(() => 0);
+  emos.forEach((emo, ei) => {
+    const tops = norm.map((d, i) => bases[i] + (d.pct[emo] || 0));
+    let up = '', dn = '';
+    tops.forEach((v, i) => { const x = pad.l + i * step, y = pad.t + ph - (v / 100) * ph; up += (i === 0 ? 'M' : 'L') + `${x},${y}`; });
+    for (let i = norm.length - 1; i >= 0; i--) { const x = pad.l + i * step, y = pad.t + ph - (bases[i] / 100) * ph; dn += `L${x},${y}`; }
+    areas.push({ path: up + dn + 'Z', color: cols[ei] });
+    tops.forEach((v, i) => { bases[i] = v; });
+  });
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" style={{ height: h }}>
+      <defs>{areas.map((a, i) => <linearGradient key={i} id={`wg${i}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={a.color} stopOpacity="0.55" /><stop offset="100%" stopColor={a.color} stopOpacity="0.1" /></linearGradient>)}</defs>
+      {areas.map((a, i) => <path key={i} d={a.path} fill={`url(#wg${i})`} stroke={a.color} strokeWidth="1" strokeOpacity="0.35" />)}
+      {norm.filter((_, i) => i % Math.max(1, Math.floor(norm.length / 8)) === 0 || i === norm.length - 1).map((d, idx, arr) => {
+        const oi = norm.indexOf(d);
+        return <text key={oi} x={pad.l + oi * step} y={h - 3} textAnchor="middle" fill="rgba(255,255,255,0.25)" fontSize="8">{d.label}</text>;
+      })}
+    </svg>
+  );
+}
 
-  const weeklyEngagement = [
-    { day: 'Mon', engagement: 85, energy: 75 },
-    { day: 'Tue', engagement: 80, energy: 80 },
-    { day: 'Wed', engagement: 90, energy: 85 },
-    { day: 'Thu', engagement: 70, energy: 65 },
-    { day: 'Fri', engagement: 85, energy: 80 },
-    { day: 'Sat', engagement: 95, energy: 90 },
-    { day: 'Sun', engagement: 88, energy: 85 },
-  ];
+// ───────────────────────────────────────────────
+// SVG: Donut
+// ───────────────────────────────────────────────
+function Donut({ segs, size = 130, thick = 16, centerLabel, centerSub }: {
+  segs: { label: string; value: number; color: string; emoji?: string }[];
+  size?: number; thick?: number; centerLabel?: string; centerSub?: string;
+}) {
+  const total = segs.reduce((s, sg) => s + sg.value, 0) || 1;
+  const r = (size - thick) / 2, circ = r * 2 * Math.PI;
+  let off = 0;
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90 text-foreground/[0.06]">
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="currentColor" strokeWidth={thick} />
+        {segs.map((sg, i) => {
+          const pct = sg.value / total, dash = pct * circ, gap = circ - dash, cur = off; off += dash;
+          return <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={sg.color} strokeWidth={thick}
+            strokeDasharray={`${dash} ${gap}`} strokeDashoffset={-cur}
+            className="transition-all duration-700" style={{ filter: `drop-shadow(0 0 4px ${sg.color}30)` }} />;
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold text-white/90">{centerLabel || total}</span>
+        <span className="text-[0.5rem] text-white/25">{centerSub || 'mẫu'}</span>
+      </div>
+    </div>
+  );
+}
 
-  const aiInsights = [
-    {
-      id: 1,
-      type: 'positive',
-      title: '🎉 Learning Peak Performance',
-      description: 'Your best learning time is between 9-11 AM when focus is highest (85%).',
-      action: 'Schedule difficult topics during this time.',
-    },
-    {
-      id: 2,
-      type: 'warning',
-      title: '⚠️ Stress Pattern Detected',
-      description: 'Stress levels increase on Thursdays (50% avg). This might be due to quiz schedules.',
-      action: 'Consider taking short breaks every 25 minutes on Thursdays.',
-    },
-    {
-      id: 3,
-      type: 'success',
-      title: '✨ Motivation Streak',
-      description: '7-day motivation streak! Average 75% - excellent consistency.',
-      action: 'Keep up the great work! Reward yourself this weekend.',
-    },
-    {
-      id: 4,
-      type: 'info',
-      title: '💡 Study Tip',
-      description: 'Your engagement peaks on Saturdays (95%). Perfect for tackling challenging projects.',
-      action: 'Plan STEM projects or difficult homework for weekends.',
-    },
-  ];
+// ───────────────────────────────────────────────
+// Interactive Heatmap (DOM-based, drag-and-drop)
+// ───────────────────────────────────────────────
+function Heatmap({ students, height = 280, onStudentMove, onStudentClick, editMode = false }: {
+  students: Student[]; height?: number;
+  onStudentMove?: (id: number, x: number, y: number) => void;
+  onStudentClick?: (s: Student) => void;
+  editMode?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Fetch real data from the vision tracker
-  const fetchLiveStats = useCallback(async () => {
+  // Draw heatmap blobs on canvas (background layer)
+  const drawBlobs = useCallback(() => {
+    const cv = canvasRef.current; if (!cv) return;
+    const ctx = cv.getContext('2d'); if (!ctx) return;
+    const rc = cv.getBoundingClientRect();
+    const dp = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+    cv.width = rc.width * dp; cv.height = rc.height * dp;
+    ctx.scale(dp, dp);
+    ctx.clearRect(0, 0, rc.width, rc.height);
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
+    for (let r = 0; r <= 5; r++) { const y = (r / 5) * rc.height; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(rc.width, y); ctx.stroke(); }
+    for (let c = 0; c <= 8; c++) { const x = (c / 8) * rc.width; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, rc.height); ctx.stroke(); }
+    // Seat grid dots
+    for (let r = 0; r <= 5; r++) {
+      for (let c = 0; c <= 8; c++) {
+        const x = (c / 8) * rc.width, y = (r / 5) * rc.height;
+        ctx.fillStyle = 'rgba(255,255,255,0.015)';
+        ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    // Radial glow blobs (screen mode)
+    ctx.globalCompositeOperation = 'screen';
+    students.forEach(s => {
+      const x = (s.x / 100) * rc.width, y = (s.y / 100) * rc.height;
+      const rgb = s.emotion === 'happy' || s.emotion === 'very_happy' || s.emotion === 'excited' ? [56, 200, 120]
+        : s.emotion === 'concentrating' || s.emotion === 'thinking' || s.emotion === 'confident' ? [80, 140, 240]
+        : s.emotion === 'stressed' || s.emotion === 'angry' || s.emotion === 'annoyed' ? [230, 80, 80]
+        : s.emotion === 'sad' || s.emotion === 'worried' || s.emotion === 'crying' ? [140, 100, 220]
+        : [120, 120, 140];
+      const int = s.performance / 100;
+      const rad = 35 + (s.energy / 100) * 30;
+      const isHov = s.id === hoveredId || s.id === dragId;
+      const mult = isHov ? 1.4 : 1;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad * mult);
+      g.addColorStop(0, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${int * (isHov ? 0.8 : 0.5)})`);
+      g.addColorStop(0.4, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${int * (isHov ? 0.35 : 0.15)})`);
+      g.addColorStop(1, `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0)`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rad * mult, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  }, [students, hoveredId, dragId]);
+
+  useEffect(() => {
+    drawBlobs();
+    const h = () => drawBlobs();
+    window.addEventListener('resize', h);
+    return () => window.removeEventListener('resize', h);
+  }, [drawBlobs]);
+
+  // Snap position to grid
+  const snapToGrid = (val: number) => {
+    const step = 11.8;
+    return Math.round(val / step) * step;
+  };
+
+  // Mouse handlers for drag-and-drop
+  const handleMouseDown = (e: React.MouseEvent, s: Student) => {
+    if (!editMode) return;
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setDragId(s.id);
+    setDragOffset({
+      x: e.clientX - (s.x / 100) * rect.width,
+      y: e.clientY - (s.y / 100) * rect.height,
+    });
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (dragId === null || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    let newX = ((e.clientX - dragOffset.x) / rect.width) * 100;
+    let newY = ((e.clientY - dragOffset.y) / rect.height) * 100;
+    newX = Math.max(3, Math.min(97, newX));
+    newY = Math.max(3, Math.min(97, newY));
+    onStudentMove?.(dragId, newX, newY);
+  }, [dragId, dragOffset, onStudentMove]);
+
+  const handleMouseUp = useCallback(() => {
+    if (dragId === null) return;
+    // Snap to grid on release
+    const student = students.find(s => s.id === dragId);
+    if (student && onStudentMove) {
+      onStudentMove(dragId, snapToGrid(student.x), snapToGrid(student.y));
+    }
+    setDragId(null);
+  }, [dragId, students, onStudentMove]);
+
+  useEffect(() => {
+    if (dragId !== null) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [dragId, handleMouseMove, handleMouseUp]);
+
+  const hoveredStudent = students.find(s => s.id === hoveredId);
+
+  return (
+    <div ref={containerRef} className="relative w-full rounded-xl overflow-hidden"
+      style={{ height, background: 'radial-gradient(ellipse at 50% 30%, rgba(120,100,255,0.04) 0%, rgba(0,0,0,0.3) 100%)' }}>
+      {/* Canvas background blobs */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ mixBlendMode: 'screen' }} />
+
+      {/* Teacher desk indicator */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-white/[0.03] border border-white/[0.06] z-10">
+        <span className="text-[0.5rem] text-white/20 tracking-wider uppercase">Bảng giáo viên</span>
+      </div>
+
+      {/* Student nodes (DOM elements) */}
+      {students.map(s => {
+        const cfg = EMOTION_CONFIG[s.emotion as EmotionType];
+        const col = cfg?.color || '#6b7280';
+        const isHov = s.id === hoveredId;
+        const isDrag = s.id === dragId;
+        const isNeg = cfg?.category === 'negative';
+        return (
+          <div
+            key={s.id}
+            className="absolute group"
+            style={{
+              left: `${s.x}%`, top: `${s.y}%`,
+              transform: `translate(-50%, -50%) scale(${isDrag ? 1.3 : isHov ? 1.15 : 1})`,
+              zIndex: isDrag ? 100 : isHov ? 50 : 10,
+              transition: isDrag ? 'none' : 'transform 0.25s cubic-bezier(0.4,0,0.2,1), box-shadow 0.3s ease',
+              cursor: editMode ? (isDrag ? 'grabbing' : 'grab') : 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              setHoveredId(s.id);
+              const rect = containerRef.current?.getBoundingClientRect();
+              if (rect) setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+            }}
+            onMouseLeave={() => { if (dragId === null) { setHoveredId(null); setTooltipPos(null); } }}
+            onMouseDown={(e) => handleMouseDown(e, s)}
+            onClick={() => { if (!editMode && onStudentClick) onStudentClick(s); }}
+          >
+            {/* Pulse ring for negative emotions */}
+            {isNeg && (
+              <div className="absolute inset-[-6px] rounded-full animate-ping opacity-20" style={{ background: col }} />
+            )}
+            {/* Glow ring */}
+            <div className="absolute inset-[-4px] rounded-full opacity-40" style={{
+              background: `radial-gradient(circle, ${col}60 0%, transparent 70%)`,
+              animation: isHov ? 'none' : undefined,
+              transform: isHov ? 'scale(1.5)' : 'scale(1)',
+              transition: 'transform 0.3s ease',
+            }} />
+            {/* Main dot */}
+            <div className="w-[22px] h-[22px] rounded-full flex items-center justify-center relative border border-white/20"
+              style={{
+                background: `radial-gradient(circle at 35% 35%, ${col}dd, ${col}88)`,
+                boxShadow: `0 0 ${isHov ? 16 : 8}px ${col}${isHov ? '80' : '40'}, inset 0 1px 2px rgba(255,255,255,0.2)`,
+              }}>
+              <span className="text-[11px] leading-none select-none" style={{ filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}>
+                {cfg?.emoji || '😐'}
+              </span>
+            </div>
+            {/* Seat label */}
+            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[6px] text-white/15 font-medium whitespace-nowrap select-none">
+              {s.seatLabel}
+            </div>
+            {/* Edit mode handle indicator */}
+            {editMode && (
+              <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white/40 border border-white/60" />
+            )}
+          </div>
+        );
+      })}
+
+      {/* Floating tooltip */}
+      {hoveredStudent && tooltipPos && !dragId && (
+        <div className="absolute z-[200] pointer-events-none"
+          style={{
+            left: `${Math.min(tooltipPos.x, (containerRef.current?.offsetWidth || 400) - 180)}px`,
+            top: `${tooltipPos.y - 85}px`,
+          }}>
+          <div className="bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 p-2.5 shadow-2xl min-w-[150px]"
+            style={{ boxShadow: `0 4px 24px rgba(0,0,0,0.5), 0 0 12px ${eClr(hoveredStudent.emotion)}20` }}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-base">{EMOTION_CONFIG[hoveredStudent.emotion as EmotionType]?.emoji || '😐'}</span>
+              <div>
+                <div className="text-[0.65rem] font-semibold text-white/90">{hoveredStudent.name}</div>
+                <div className="text-[0.5rem] text-white/35">
+                  {EMOTION_CONFIG[hoveredStudent.emotion as EmotionType]?.labelVi} &middot; {hoveredStudent.seatLabel}
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="flex items-center gap-1">
+                <div className="w-1 h-1 rounded-full" style={{ background: C.blue }} />
+                <span className="text-[0.5rem] text-white/40">Hiệu suất</span>
+                <span className="text-[0.55rem] font-bold ml-auto" style={{ color: C.blue }}>{hoveredStudent.performance}%</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-1 h-1 rounded-full" style={{ background: C.amber }} />
+                <span className="text-[0.5rem] text-white/40">Năng lượng</span>
+                <span className="text-[0.55rem] font-bold ml-auto" style={{ color: C.amber }}>{hoveredStudent.energy}%</span>
+              </div>
+            </div>
+            {/* Mini performance bar */}
+            <div className="mt-1.5 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${hoveredStudent.performance}%`, background: `linear-gradient(90deg, ${eClr(hoveredStudent.emotion)}, ${C.teal})` }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drag indicator */}
+      {dragId && (
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/[0.08] border border-white/[0.12] z-[200]">
+          <span className="text-[0.55rem] text-white/50">Thả để đặt vị trí mới</span>
+        </div>
+      )}
+
+      {/* Edit mode overlay text */}
+      {editMode && !dragId && (
+        <div className="absolute bottom-2 right-3 px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/25 z-[200]">
+          <span className="text-[0.5rem] text-amber-400/70">Kéo thả học sinh để sắp xếp</span>
+        </div>
+      )}
+
+      {/* Legend row */}
+      <div className="absolute bottom-2 left-3 flex gap-2 z-[100]">
+        {[
+          { c: 'rgba(56,200,120,0.6)', l: 'Tích cực' },
+          { c: 'rgba(80,140,240,0.6)', l: 'Tập trung' },
+          { c: 'rgba(120,120,140,0.5)', l: 'Trung tính' },
+          { c: 'rgba(140,100,220,0.6)', l: 'Buồn' },
+          { c: 'rgba(230,80,80,0.6)', l: 'Căng thẳng' },
+        ].map(x => (
+          <div key={x.l} className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full" style={{ background: x.c, boxShadow: `0 0 4px ${x.c}` }} />
+            <span className="text-[0.45rem] text-white/15">{x.l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────
+// Helpers
+// ───────────────────────────────────────────────
+function classStats(students: Student[]) {
+  const dist: Record<string, number> = {};
+  students.forEach(s => { dist[s.emotion] = (dist[s.emotion] || 0) + 1; });
+  const total = students.length || 1;
+  let pos = 0, neg = 0;
+  Object.entries(dist).forEach(([k, v]) => {
+    const cat = EMOTION_CONFIG[k as EmotionType]?.category;
+    if (cat === 'positive') pos += v; else if (cat === 'negative') neg += v;
+  });
+  const sorted = Object.entries(dist).sort((a, b) => b[1] - a[1]);
+  const dominant = sorted[0]?.[0] || 'neutral';
+  const avgPerf = Math.round(students.reduce((s, st) => s + st.performance, 0) / total);
+  const avgEnergy = Math.round(students.reduce((s, st) => s + st.energy, 0) / total);
+  return {
+    dist, total, pos, neg, neutral: total - pos - neg,
+    posRate: Math.round((pos / total) * 100),
+    negRate: Math.round((neg / total) * 100),
+    dominant, dominantCfg: EMOTION_CONFIG[dominant as EmotionType],
+    sorted: sorted.slice(0, 8), avgPerf, avgEnergy,
+    engagement: Math.min(100, Math.round((pos / total) * 100) + Math.round(((total - pos - neg) / total) * 50)),
+    alerts: students.filter(s => ['stressed','sad','angry','crying','worried','desperate','exhausted','annoyed'].includes(s.emotion)),
+  };
+}
+
+// ───────────────────────────────────────────────
+// MAIN COMPONENT
+// ───────────────────────────────────────────────
+export default function EmotionTrackerPage() {
+  const { data: session } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<EmotionSummary | null>(null);
+  const [buckets, setBuckets] = useState<EmotionBucket[]>([]);
+  const [classes, setClasses] = useState<ClassData[]>(CLASSES);
+  const [activeClass, setActiveClass] = useState<string>('11a2');
+  const [period, setPeriod] = useState<'1h' | '6h' | '24h' | '7d'>('24h');
+  const [isLive, setIsLive] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  // Handler for drag-and-drop repositioning
+  const handleStudentMove = useCallback((studentId: number, x: number, y: number) => {
+    setClasses(prev => prev.map(cl => ({
+      ...cl,
+      students: cl.students.map(s => s.id === studentId ? { ...s, x, y } : s),
+    })));
+  }, []);
+
+  const cls = classes.find(c => c.id === activeClass) || classes[0];
+  const stats = useMemo(() => classStats(cls.students), [cls.students]);
+
+  // Fetch
+  const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch('/api/vision-tracker/emotion/stats?groupBy=hour&limit=24');
+      const now = new Date();
+      const hrs = period === '1h' ? 1 : period === '6h' ? 6 : period === '24h' ? 24 : 168;
+      const from = new Date(now.getTime() - hrs * 3600000);
+      const groupBy = period === '1h' ? 'minute' : period === '6h' ? 'hour' : period === '24h' ? 'hour' : 'day';
+      const res = await fetch(`/api/vision-tracker/emotion/stats?from=${from.toISOString()}&to=${now.toISOString()}&groupBy=${groupBy}&limit=100`);
       const data = await res.json();
-      if (data.success && data.summary) {
-        setLiveStats(data);
-        
-        const dominant = data.summary.dominantEmotion || 'neutral';
-        const config = EMOTION_CONFIG[dominant as EmotionType];
-        
-        setCurrentMood({
-          primary: `${config?.labelVi || 'Bình thường'} ${config?.emoji || '😊'}`,
-          score: Math.round(data.summary.avgConfidence * 100),
-          energy: 82, 
-          stress: Math.round((data.summary.emotionDistribution.sad || 0) * 100 / (data.summary.totalSamples || 1)),
-          motivation: Math.round((data.summary.emotionDistribution.happy || 0) * 100 / (data.summary.totalSamples || 1)) || 75,
-        });
-
-        if (data.summary.totalSamples > 0) {
-          const distribution = data.summary.emotionDistribution;
-          const emotionsList: string[] = [];
-          Object.entries(distribution).forEach(([type, count]) => {
-            for (let i = 0; i < Number(count); i++) emotionsList.push(type);
-          });
-          if (emotionsList.length > 0) {
-            setStudents(prev => prev.map((s, idx) => ({
-              ...s,
-              emotion: emotionsList[idx % emotionsList.length] as any
+      if (data.success) {
+        setSummary(data.summary); setBuckets(data.buckets || []);
+        if (data.summary?.totalSamples > 0) {
+          const dist = data.summary.emotionDistribution;
+          const emoList: string[] = [];
+          Object.entries(dist).forEach(([t, c]) => { for (let i = 0; i < Number(c); i++) emoList.push(t); });
+          if (emoList.length > 0) {
+            setClasses(prev => prev.map(cl => ({
+              ...cl, students: cl.students.map((s, idx) => ({ ...s, emotion: emoList[(idx + (cl.id === '10a6' ? 5 : 0)) % emoList.length] }))
             })));
           }
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch live stats:', err);
-    }
-  }, []);
+    } catch (err) { console.error('Emotion stats error:', err); }
+    finally { setLoading(false); }
+  }, [period]);
 
   useEffect(() => {
-    fetchLiveStats();
-    const interval = setInterval(fetchLiveStats, 30000);
-    return () => clearInterval(interval);
-  }, [fetchLiveStats]);
+    fetchStats();
+    if (isLive) { const iv = setInterval(fetchStats, 30000); return () => clearInterval(iv); }
+  }, [fetchStats, isLive]);
 
-  const emotionDistribution = liveStats?.summary?.emotionDistribution 
-    ? Object.entries(liveStats.summary.emotionDistribution as Record<string, number>)
-        .filter(([, v]) => v > 0)
-        .map(([k, v]) => ({
-          name: EMOTION_CONFIG[k as EmotionType]?.labelVi || k,
-          value: v,
-          color: EMOTION_CONFIG[k as EmotionType]?.color || '#6b7280',
-        }))
-    : emotionDistributionMock;
+  const waveData = buckets.map(b => ({
+    label: period === '7d'
+      ? new Date(b.periodStart).toLocaleDateString('vi-VN', { weekday: 'short' })
+      : new Date(b.periodStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+    vals: b.distribution,
+  }));
 
-  const emotionTrendData = liveStats?.buckets?.length > 0 
-    ? liveStats.buckets.map((b: any) => ({
-        date: new Date(b.periodStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        happy: b.distribution.happy || 0,
-        focused: b.distribution.concentrating || 0,
-        stressed: b.distribution.sad || 0,
-        motivated: b.distribution.very_happy || 0,
-      }))
-    : emotionTrendDataMock;
+  const donutSegs = stats.sorted.map(([emo, cnt]) => ({
+    label: EMOTION_CONFIG[emo as EmotionType]?.labelVi || emo,
+    value: cnt, color: eClr(emo),
+    emoji: EMOTION_CONFIG[emo as EmotionType]?.emoji || '😐',
+  }));
 
-  // Drag and Drop Functions
-  const handleMouseDown = (e: React.MouseEvent, studentId: number) => {
-    if (!isEditMode) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const student = students.find(s => s.id === studentId);
-    if (!student) return;
-    
-    const x = (e.clientX - rect.left) / rect.width * 100;
-    const y = (e.clientY - rect.top) / rect.height * 100;
-    
-    setIsDragging(true);
-    setDraggedStudent(studentId);
-    setDragOffset({
-      x: x - student.x,
-      y: y - student.y
-    });
-  };
+  // Compare stats for both classes
+  const stats11 = useMemo(() => classStats(classes[0].students), [classes]);
+  const stats10 = useMemo(() => classStats(classes[1].students), [classes]);
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !draggedStudent || !isEditMode) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = Math.max(5, Math.min(95, (e.clientX - rect.left) / rect.width * 100 - dragOffset.x));
-    const y = Math.max(5, Math.min(95, (e.clientY - rect.top) / rect.height * 100 - dragOffset.y));
-    
-    setStudents(prev => prev.map(student => 
-      student.id === draggedStudent 
-        ? { ...student, x, y }
-        : student
-    ));
-  };
+  if (loading) return (
+    <div className="min-h-[80vh] flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-12 h-12 border-2 border-white/10 border-t-[hsl(330,80%,60%)] rounded-full animate-spin mx-auto mb-3" />
+        <p className="text-white/30 text-xs">Đang kết nối camera lớp học...</p>
+      </div>
+    </div>
+  );
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setDraggedStudent(null);
-    setDragOffset({ x: 0, y: 0 });
-  };
-
-  const snapToGrid = (value: number) => {
-    // Snap to nearest 10% grid
-    return Math.round(value / 10) * 10;
-  };
-
-  // Randomize classroom layout - all students moved to front rows
-  const randomizeLayout = () => {
-    // Shuffle students randomly
-    const shuffledStudents = [...students].sort(() => Math.random() - 0.5);
-    
-    // Define classroom positions (8 columns x 5 rows) - prioritize front rows
-    const positions = [];
-    
-    // First, add all front row positions (rows 1-2: y = 10%, 25%)
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 8; col++) {
-        positions.push({
-          x: 10 + col * 10, // 10%, 20%, 30%, ..., 80%
-          y: 10 + row * 15   // 10%, 25%
-        });
-      }
-    }
-    
-    // Then add middle rows (rows 3-4: y = 40%, 55%)
-    for (let row = 2; row < 4; row++) {
-      for (let col = 0; col < 8; col++) {
-        positions.push({
-          x: 10 + col * 10,
-          y: 10 + row * 15   // 40%, 55%
-        });
-      }
-    }
-    
-    // Finally add back row (row 5: y = 70%)
-    for (let col = 0; col < 8; col++) {
-      positions.push({
-        x: 10 + col * 10,
-        y: 10 + 4 * 15       // 70%
-      });
-    }
-    
-    // Assign positions - all students get positions from front to back
-    const newStudents = shuffledStudents.map((student, index) => {
-      const position = positions[index] || positions[positions.length - 1];
-      return { ...student, ...position };
-    });
-    
-    setStudents(newStudents);
-    
-    // Show success toast
-    toast({
-      title: `🔄 {t('emotion.refresh-success')}`,
-      description: t('emotion.refresh-description'),
-      duration: 3000,
-    });
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (!isEditMode || !draggedStudent) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = snapToGrid((e.clientX - rect.left) / rect.width * 100);
-    const y = snapToGrid((e.clientY - rect.top) / rect.height * 100);
-    
-    setStudents(prev => prev.map(student => 
-      student.id === draggedStudent 
-        ? { ...student, x, y }
-        : student
-    ));
-  };
-
-  // Vision Tracker Data - AI Attention
-  const attentionData = [
-    { time: '09:00', focus: 85, eyeMovement: 12, posture: 90, engagement: 88 },
-    { time: '09:15', focus: 78, eyeMovement: 18, posture: 85, engagement: 82 },
-    { time: '09:30', focus: 92, eyeMovement: 8, posture: 95, engagement: 94 },
-    { time: '09:45', focus: 65, eyeMovement: 25, posture: 70, engagement: 68 },
-    { time: '10:00', focus: 88, eyeMovement: 15, posture: 88, engagement: 85 },
-    { time: '10:15', focus: 75, eyeMovement: 22, posture: 75, engagement: 78 },
-    { time: '10:30', focus: 95, eyeMovement: 6, posture: 92, engagement: 96 },
-  ];
-
-  const currentAttention = {
-    focus: 88,
-    eyeMovement: 15,
-    posture: 85,
-    engagement: 87,
-    status: 'Highly Focused',
-  };
-
-  // Canvas drawing function for heatmap
-  const drawHeatmap = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas size
-    const rect = canvas.getBoundingClientRect();
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    // Clear canvas
-    ctx.clearRect(0, 0, rect.width, rect.height);
-
-    // Set blending mode for smooth gradients
-    ctx.globalCompositeOperation = 'screen';
-
-    // Draw each student's gradient
-    students.forEach((student) => {
-      const x = (student.x / 100) * rect.width;
-      const y = (student.y / 100) * rect.height;
-      
-      // Get emotion color
-      const getEmotionColor = (emotion: string) => {
-        switch (emotion) {
-          case 'happy': return { r: 34, g: 197, b: 94 }; // green-500
-          case 'focused': return { r: 59, g: 130, b: 246 }; // blue-500
-          case 'stressed': return { r: 239, g: 68, b: 68 }; // red-500
-          case 'motivated': return { r: 139, g: 92, b: 246 }; // purple-500
-          default: return { r: 107, g: 114, b: 128 }; // gray-500
-        }
-      };
-
-      const color = getEmotionColor(student.emotion);
-      const intensity = student.performance / 100; // Use performance as intensity
-      const radius = 80 + (student.energy / 100) * 40; // Radius based on energy
-
-      // Create radial gradient
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      gradient.addColorStop(0, `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.8})`);
-      gradient.addColorStop(0.3, `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.4})`);
-      gradient.addColorStop(0.6, `rgba(${color.r}, ${color.g}, ${color.b}, ${intensity * 0.2})`);
-      gradient.addColorStop(1, `rgba(${color.r}, ${color.g}, ${color.b}, 0)`);
-
-      // Draw gradient circle
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Reset composite operation
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Draw seating grid (8 columns x 5 rows with center aisle)
-    const rows = 5;
-    const colsPerSide = 4;
-    const cellWidth = rect.width / 9; // 4 left + 1 aisle + 4 right
-    const cellHeight = rect.height / rows;
-    const aisleWidth = cellWidth;
-
-    // Draw grid lines
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-
-    // Horizontal lines
-    for (let i = 0; i <= rows; i++) {
-      const y = i * cellHeight;
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(rect.width, y);
-      ctx.stroke();
-    }
-
-    // Vertical lines - Left block (A)
-    for (let i = 0; i <= colsPerSide; i++) {
-      const x = i * cellWidth;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
-      ctx.stroke();
-    }
-
-    // Vertical lines - Right block (B)
-    for (let i = 0; i <= colsPerSide; i++) {
-      const x = (colsPerSide + 1) * cellWidth + i * cellWidth;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, rect.height);
-      ctx.stroke();
-    }
-
-    // Draw aisle (center vertical space)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-    ctx.fillRect(colsPerSide * cellWidth, 0, aisleWidth, rect.height);
-
-    // Draw seat labels
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-
-    let seatIndex = 1;
-    for (let row = 0; row < rows; row++) {
-      // Left side (A)
-      for (let col = 0; col < colsPerSide; col++) {
-        const x = col * cellWidth + cellWidth / 2;
-        const y = row * cellHeight + 8;
-        ctx.fillText(`A${seatIndex}`, x, y);
-        seatIndex++;
-      }
-    }
-
-    seatIndex = 1;
-    for (let row = 0; row < rows; row++) {
-      // Right side (B)
-      for (let col = 0; col < colsPerSide; col++) {
-        const x = (colsPerSide + 1) * cellWidth + col * cellWidth + cellWidth / 2;
-        const y = row * cellHeight + 8;
-        ctx.fillText(`B${seatIndex}`, x, y);
-        seatIndex++;
-      }
-    }
-
-    // Draw student centers
-    students.forEach((student) => {
-      const x = (student.x / 100) * rect.width;
-      const y = (student.y / 100) * rect.height;
-      
-      const getEmotionColor = (emotion: string) => {
-        switch (emotion) {
-          case 'happy': return '#10B981';
-          case 'focused': return '#3B82F6';
-          case 'stressed': return '#EF4444';
-          case 'motivated': return '#8B5CF6';
-          default: return '#6B7280';
-        }
-      };
-
-      // Draw center dot
-      ctx.fillStyle = getEmotionColor(student.emotion);
-      ctx.beginPath();
-      ctx.arc(x, y, 12, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw white border
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Draw performance text
-      ctx.fillStyle = 'white';
-      ctx.font = 'bold 10px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${student.performance}%`, x, y + 3);
-    });
-  }, [students]);
-
-  // Draw heatmap on mount and resize
-  useEffect(() => {
-    const handleResize = () => {
-      drawHeatmap();
-    };
-
-    drawHeatmap();
-    typeof window !== 'undefined' && window.addEventListener('resize', handleResize);
-    return () => {
-      typeof window !== 'undefined' && window.removeEventListener('resize', handleResize);
-    };
-  }, [drawHeatmap]);
-
+  // ═══════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════
   return (
-    <VisionThemeWrapper title="Emotion" subtitle="Hệ thống học tập thông minh">
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-pink-500 to-purple-500 rounded-2xl shadow-xl p-6 mb-6 text-white">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen px-3 py-5 max-w-[1440px] mx-auto space-y-3">
+
+      {/* ── HERO HEADER ── */}
+      <div className={`${glass} p-4 relative overflow-hidden`}>
+        <div className="absolute inset-0 bg-gradient-to-r from-[hsl(330,80%,60%)]/8 via-[hsl(280,75%,60%)]/4 to-transparent pointer-events-none" />
+        <div className="relative flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(330,80%,60%)] to-[hsl(280,75%,60%)] flex items-center justify-center shadow-lg shadow-pink-500/20">
+              <Heart className="h-6 w-6 text-white" />
+            </div>
             <div>
-              <h1 className="text-3xl font-bold mb-2">💝 {t('emotion.title')}</h1>
-              <p className="text-pink-100">{t('emotion.subtitle')}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-4xl font-bold">{currentMood.score}%</div>
-                <div className="text-pink-100">{t('emotion.overall-mood')}</div>
-              </div>
-                          </div>
-          </div>
-        </div>
-
-        {/* Current Mood Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-100">{t('emotion.happiness')}</p>
-                <p className="text-2xl font-bold">{currentMood.score}%</p>
-                <p className="text-xs text-green-200">{t('emotion.excellent')}</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Smile className="w-6 h-6" />
-              </div>
+              <h1 className="text-lg font-bold text-white/90 tracking-tight">Bản đồ Cảm xúc Lớp học</h1>
+              <p className="text-[0.65rem] text-white/35">Camera AI Tracking &middot; Giáo viên theo dõi biểu cảm thời gian thực</p>
             </div>
           </div>
-
-          <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-100">{t('emotion.energy-level')}</p>
-                <p className="text-2xl font-bold">{currentMood.energy}%</p>
-                <p className="text-xs text-blue-200">{t('emotion.very-good')}</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Zap className="w-6 h-6" />
-              </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Class selector tabs */}
+            <div className="flex bg-white/[0.03] rounded-xl p-0.5 border border-white/[0.06]">
+              {classes.map(c => (
+                <button key={c.id} onClick={() => { setActiveClass(c.id); setSelectedStudent(null); setCompareMode(false); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeClass === c.id && !compareMode ? 'bg-white/[0.08] text-white/90 shadow-sm' : 'text-white/30 hover:text-white/50'}`}>
+                  {c.name}
+                </button>
+              ))}
+              <button onClick={() => setCompareMode(!compareMode)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${compareMode ? 'bg-gradient-to-r from-[hsl(330,80%,60%)]/30 to-[hsl(245,85%,65%)]/30 text-white/90 border border-white/[0.08]' : 'text-white/25 hover:text-white/40'}`}>
+                So sánh
+              </button>
             </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-100">{t('emotion.motivation')}</p>
-                <p className="text-2xl font-bold">{currentMood.motivation}%</p>
-                <p className="text-xs text-purple-200">{t('emotion.high')}</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Target className="w-6 h-6" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-orange-500 to-red-500 rounded-xl shadow-lg p-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-100">{t('emotion.stress-level')}</p>
-                <p className="text-2xl font-bold">{currentMood.stress}%</p>
-                <p className="text-xs text-orange-200">{t('emotion.low')}</p>
-              </div>
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <Heart className="w-6 h-6" />
-              </div>
+            {/* Live */}
+            <button onClick={() => setIsLive(!isLive)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all ${isLive ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-white/[0.04] text-white/35 border border-white/[0.06]'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-white/20'}`} />
+              {isLive ? 'LIVE' : 'Tạm dừng'}
+            </button>
+            {/* Period */}
+            <div className="flex bg-white/[0.03] rounded-xl p-0.5 border border-white/[0.06]">
+              {(['1h','6h','24h','7d'] as const).map(p => (
+                <button key={p} onClick={() => setPeriod(p)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${period === p ? 'bg-white/[0.08] text-white/90' : 'text-white/25 hover:text-white/40'}`}>{p}</button>
+              ))}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Emotion Trend */}
-          <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl shadow-lg p-6 border border-blue-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="text-2xl mr-2">📈</span>
-              Emotion Trend (7 days)
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={emotionTrendData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="happy" stroke="#10B981" strokeWidth={2} name={t('emotion.happy')} />
-                <Line type="monotone" dataKey="focused" stroke="#3B82F6" strokeWidth={2} name={t('emotion.focused')} />
-                <Line type="monotone" dataKey="stressed" stroke="#EF4444" strokeWidth={2} name={t('emotion.stressed')} />
-                <Line type="monotone" dataKey="motivated" stroke="#8B5CF6" strokeWidth={2} name={t('emotion.motivated')} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Emotion Distribution */}
-          <div className="bg-gradient-to-br from-white to-pink-50 rounded-xl shadow-lg p-6 border border-pink-100">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-              <span className="text-2xl mr-2">🎯</span>
-              Emotion Distribution
-            </h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={emotionDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {emotionDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+      {/* ═══ COMPARE MODE ═══ */}
+      {compareMode ? (
+        <div className="space-y-3">
+          {/* Side-by-side KPI comparison */}
+          <div className="grid grid-cols-2 gap-3">
+            {[{ cl: classes[0], st: stats11 }, { cl: classes[1], st: stats10 }].map(({ cl, st }) => (
+              <div key={cl.id} className={`${glass} p-4`}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(330,80%,60%)] to-[hsl(280,75%,60%)] flex items-center justify-center">
+                    <Monitor className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-white/80">{cl.name}</div>
+                    <div className="text-[0.55rem] text-white/30">{cl.teacher} &middot; {cl.room} &middot; {cl.camera}</div>
+                  </div>
+                  <span className="ml-auto text-3xl">{st.dominantCfg?.emoji || '😐'}</span>
+                </div>
+                {/* Mini KPI row */}
+                <div className="grid grid-cols-4 gap-2 mb-3">
+                  {[
+                    { label: 'Tích cực', val: `${st.posRate}%`, color: C.green },
+                    { label: 'Tiêu cực', val: `${st.negRate}%`, color: C.red },
+                    { label: 'Tương tác', val: `${st.engagement}%`, color: C.blue },
+                    { label: 'Năng lượng', val: `${st.avgEnergy}%`, color: C.amber },
+                  ].map(k => (
+                    <div key={k.label} className="text-center p-2 rounded-xl bg-white/[0.02]">
+                      <div className="text-sm font-bold" style={{ color: k.color }}>{k.val}</div>
+                      <div className="text-[0.5rem] text-white/25">{k.label}</div>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Weekly Engagement */}
-        <div className="bg-gradient-to-br from-white to-purple-50 rounded-xl shadow-lg p-6 mb-6 border border-purple-100">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="text-2xl mr-2">📊</span>
-            Weekly Engagement & Energy
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={weeklyEngagement}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="engagement" fill="#8B5CF6" name="Engagement %" />
-              <Bar dataKey="energy" fill="#10B981" name="Energy Level %" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* AI Insights */}
-        <div className="bg-gradient-to-br from-white to-indigo-50 rounded-xl shadow-lg p-6 border border-indigo-100 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <span className="text-2xl mr-2">🤖</span>
-            AI Insights & Recommendations
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {aiInsights.map((insight) => (
-              <div
-                key={insight.id}
-                className={`p-4 rounded-lg border-l-4 ${
-                  insight.type === 'positive'
-                    ? 'bg-green-50 border-green-500'
-                    : insight.type === 'warning'
-                    ? 'bg-yellow-50 border-yellow-500'
-                    : insight.type === 'success'
-                    ? 'bg-blue-50 border-blue-500'
-                    : 'bg-purple-50 border-purple-500'
-                }`}
-              >
-                <h4 className="font-semibold text-gray-900 mb-2">{insight.title}</h4>
-                <p className="text-sm text-gray-700 mb-2">{insight.description}</p>
-                <p className="text-xs font-medium text-gray-600 bg-white px-2 py-1 rounded inline-block">
-                  💡 {insight.action}
-                </p>
+                </div>
+                {/* Emotion bars */}
+                <div className="space-y-1.5">
+                  {st.sorted.slice(0, 5).map(([emo, cnt]) => {
+                    const cfg = EMOTION_CONFIG[emo as EmotionType]; const mx = st.sorted[0]?.[1] || 1;
+                    return (
+                      <div key={emo} className="flex items-center gap-2">
+                        <span className="text-sm">{cfg?.emoji || '😐'}</span>
+                        <span className="text-[0.6rem] text-white/40 w-16 truncate">{cfg?.labelVi || emo}</span>
+                        <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(cnt / mx) * 100}%`, background: eClr(emo) }} />
+                        </div>
+                        <span className="text-[0.55rem] text-white/30 w-6 text-right">{cnt}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Alerts */}
+                {st.alerts.length > 0 && (
+                  <div className="mt-3 p-2 rounded-xl bg-red-500/5 border border-red-500/10">
+                    <div className="flex items-center gap-1 mb-1.5">
+                      <AlertTriangle className="h-3 w-3 text-red-400" />
+                      <span className="text-[0.6rem] text-red-400/70 font-medium">{st.alerts.length} HS cần chú ý</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {st.alerts.slice(0, 6).map(s => (
+                        <span key={s.id} className="px-1.5 py-0.5 rounded-md bg-white/[0.03] text-[0.55rem] text-white/40 border border-white/[0.04]">
+                          {EMOTION_CONFIG[s.emotion as EmotionType]?.emoji} {s.name.split(' ').slice(-2).join(' ')}
+                        </span>
+                      ))}
+                      {st.alerts.length > 6 && <span className="text-[0.55rem] text-white/20">+{st.alerts.length - 6}</span>}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
+
+          {/* Side-by-side heatmaps */}
+          <div className="grid grid-cols-2 gap-3">
+            {classes.map(cl => (
+              <div key={cl.id} className={`${glass} p-4`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-3.5 w-3.5 text-white/30" />
+                  <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">{cl.name} — Sơ đồ chỗ ngồi</span>
+                </div>
+                <Heatmap students={cl.students} height={220} onStudentClick={s => setSelectedStudent(s)} />
+              </div>
+            ))}
+          </div>
+
+          {/* Comparison summary */}
+          <div className={`${glass} p-4`}>
+            <div className="flex items-center gap-2 mb-3">
+              <Brain className="h-4 w-4" style={{ color: C.purple }} />
+              <span className="text-[0.65rem] uppercase tracking-wider text-white/35 font-semibold">Phân tích so sánh AI</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <div className="text-xs font-medium text-white/50 mb-1">Lớp tích cực hơn</div>
+                <div className="text-sm font-bold" style={{ color: stats11.posRate >= stats10.posRate ? C.teal : C.pink }}>
+                  {stats11.posRate >= stats10.posRate ? classes[0].name : classes[1].name}
+                </div>
+                <div className="text-[0.6rem] text-white/25 mt-0.5">Chênh lệch: {Math.abs(stats11.posRate - stats10.posRate)}%</div>
+              </div>
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <div className="text-xs font-medium text-white/50 mb-1">Lớp cần chú ý hơn</div>
+                <div className="text-sm font-bold" style={{ color: C.amber }}>
+                  {stats11.negRate >= stats10.negRate ? classes[0].name : classes[1].name}
+                </div>
+                <div className="text-[0.6rem] text-white/25 mt-0.5">{Math.max(stats11.alerts.length, stats10.alerts.length)} HS tiêu cực</div>
+              </div>
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <div className="text-xs font-medium text-white/50 mb-1">Tương tác tổng</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-sm font-bold" style={{ color: C.blue }}>{stats11.engagement}%</span>
+                  <span className="text-[0.6rem] text-white/20">vs</span>
+                  <span className="text-sm font-bold" style={{ color: C.violet }}>{stats10.engagement}%</span>
+                </div>
+                <div className="text-[0.6rem] text-white/25 mt-0.5">{classes[0].name} vs {classes[1].name}</div>
+              </div>
+            </div>
+          </div>
         </div>
+      ) : (
+        <>
+          {/* ═══ SINGLE CLASS VIEW ═══ */}
 
-        {/* Heart Map - Classroom Progress Map */}
-        <div className="bg-gradient-to-br from-white to-pink-50 rounded-xl shadow-lg p-6 border border-pink-100 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <span className="text-2xl mr-2">💝</span>{t('emotion.heart-map-title')}<span className="ml-2 text-sm bg-pink-100 text-pink-800 px-2 py-1 rounded-full">Heatmap Visualization</span>
-            </h3>
-            <div className="flex gap-3">
-              <button
-                onClick={randomizeLayout}
-                className="px-4 py-2 rounded-lg font-medium transition-all bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg hover:shadow-xl"
-                title={t('emotion.language-toggle')}
-              >
-                🔄 {t('emotion.refresh-layout')}
-              </button>
-              <button
-                onClick={() => setIsEditMode(!isEditMode)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  isEditMode 
-                    ? 'bg-red-500 hover:bg-red-600 text-white' 
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
-                }`}
-              >
-                {isEditMode ? `🔒 ${t('emotion.exit-edit-mode')}` : `✏️ ${t('emotion.edit-layout')}`}
-              </button>
+          {/* Class info bar */}
+          <div className={`${glass} px-4 py-2.5 flex items-center gap-4 flex-wrap`}>
+            <div className="flex items-center gap-2">
+              <Monitor className="h-4 w-4 text-white/25" />
+              <span className="text-xs text-white/50 font-medium">{cls.teacher}</span>
+            </div>
+            <div className="w-px h-4 bg-white/[0.06]" />
+            <div className="flex items-center gap-1.5">
+              <Camera className="h-3.5 w-3.5 text-white/25" />
+              <span className="text-[0.65rem] text-white/35">{cls.camera}</span>
+            </div>
+            <div className="w-px h-4 bg-white/[0.06]" />
+            <div className="flex items-center gap-1.5">
+              <Timer className="h-3.5 w-3.5 text-white/25" />
+              <span className="text-[0.65rem] text-white/35">{cls.schedule}</span>
+            </div>
+            <div className="w-px h-4 bg-white/[0.06]" />
+            <div className="flex items-center gap-1.5">
+              <Users className="h-3.5 w-3.5 text-white/25" />
+              <span className="text-[0.65rem] text-white/35">{cls.students.length} học sinh &middot; {cls.room}</span>
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <Wifi className="h-3 w-3 text-emerald-400" />
+              <span className="text-[0.55rem] text-emerald-400/70">Camera đang hoạt động</span>
             </div>
           </div>
-          <p className="text-sm text-gray-600 mb-6">
-            Bản đồ &quot;cảm xúc & tiến bộ&quot; của cả lớp: hiển thị từng học sinh như một &quot;chấm sáng&quot; thể hiện năng lượng học tập
-          </p>
-          
-          {/* Algorithm Info */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start">
-              <span className="text-blue-600 text-lg mr-2">💡</span>
-              <div>
-                <h4 className="font-semibold text-blue-800 mb-2">Thuật toán sắp xếp dồn lên phía trước</h4>
-                <div className="text-sm text-blue-700 space-y-1">
-                  <p>• <strong>Ưu tiên hàng đầu:</strong> Tất cả học sinh được sắp xếp từ hàng đầu tiên</p>
-                  <p>• <strong>Thứ tự ngẫu nhiên:</strong> Vị trí cụ thể được xếp ngẫu nhiên</p>
-                  <p>• <strong>Dồn lên trước:</strong> Hàng đầu (2 dòng) được ưu tiên trước</p>
-                  <p>• <strong>Sau đó hàng giữa:</strong> Dòng 3-4 được sử dụng tiếp theo</p>
-                  <p>• <strong>Cuối cùng hàng sau:</strong> Dòng cuối chỉ dùng khi cần thiết</p>
-                </div>
+
+          {/* ── ROW 1: 6 KPI CARDS ── */}
+          <div className="grid grid-cols-6 gap-2.5">
+            {/* Dominant Emotion */}
+            <div className={`${glass} ${glassH} p-3.5`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Cảm xúc chính</span>
+                <span className="text-xl">{stats.dominantCfg?.emoji || '😐'}</span>
               </div>
+              <div className="text-base font-bold text-white/85">{stats.dominantCfg?.labelVi || 'Bình thường'}</div>
+              <div className="text-[0.55rem] text-white/25 mt-0.5">Tin cậy: {summary?.avgConfidence ? Math.round(summary.avgConfidence * 100) : 78}%</div>
+            </div>
+            {/* Positive */}
+            <div className={`${glass} ${glassH} p-3.5`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Tích cực</span>
+                <Smile className="h-3.5 w-3.5" style={{ color: C.green }} />
+              </div>
+              <div className="text-xl font-bold" style={{ color: C.green }}>{stats.posRate}%</div>
+              <div className="flex items-center gap-1 mt-0.5"><ArrowUpRight className="h-2.5 w-2.5 text-emerald-400/60" /><span className="text-[0.55rem] text-emerald-400/50">{stats.pos} HS</span></div>
+            </div>
+            {/* Negative */}
+            <div className={`${glass} ${glassH} p-3.5`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Tiêu cực</span>
+                <Frown className="h-3.5 w-3.5" style={{ color: C.red }} />
+              </div>
+              <div className="text-xl font-bold" style={{ color: C.red }}>{stats.negRate}%</div>
+              <div className="flex items-center gap-1 mt-0.5">
+                {stats.negRate > 25 ? <AlertTriangle className="h-2.5 w-2.5 text-amber-400/60" /> : <ArrowDownRight className="h-2.5 w-2.5 text-emerald-400/60" />}
+                <span className="text-[0.55rem] text-white/25">{stats.neg} HS</span>
+              </div>
+            </div>
+            {/* Engagement */}
+            <div className={`${glass} ${glassH} p-3.5`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Tương tác</span>
+                <Activity className="h-3.5 w-3.5" style={{ color: C.blue }} />
+              </div>
+              <div className="text-xl font-bold" style={{ color: C.blue }}>{stats.engagement}%</div>
+              <div className="text-[0.55rem] text-white/25 mt-0.5">Hiệu suất TB: {stats.avgPerf}%</div>
+            </div>
+            {/* Energy */}
+            <div className={`${glass} ${glassH} p-3.5`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Năng lượng</span>
+                <Zap className="h-3.5 w-3.5" style={{ color: C.amber }} />
+              </div>
+              <div className="text-xl font-bold" style={{ color: C.amber }}>{stats.avgEnergy}%</div>
+              <div className="text-[0.55rem] text-white/25 mt-0.5">Trung bình lớp</div>
+            </div>
+            {/* Alerts */}
+            <div className={`${glass} ${glassH} p-3.5 ${stats.alerts.length > 0 ? 'border-red-500/15' : ''}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold">Cảnh báo</span>
+                <Shield className="h-3.5 w-3.5" style={{ color: stats.alerts.length > 0 ? C.red : C.green }} />
+              </div>
+              <div className="text-xl font-bold" style={{ color: stats.alerts.length > 0 ? C.red : C.green }}>{stats.alerts.length}</div>
+              <div className="text-[0.55rem] text-white/25 mt-0.5">HS cần chú ý</div>
             </div>
           </div>
-          
-          {isEditMode && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center">
-                <span className="text-yellow-600 text-lg mr-2">⚠️</span>
-                <div>
-                  <h4 className="font-semibold text-yellow-800">Edit Mode Active</h4>
-                  <p className="text-sm text-yellow-700">
-                    Click and drag any student to move them to a new position. Students will snap to the grid automatically.
-                  </p>
+
+          {/* ── ROW 2: WAVE + DONUT + ALERT LIST ── */}
+          <div className="grid grid-cols-12 gap-2.5">
+            <div className={`col-span-7 ${glass} p-4`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[hsl(330,80%,60%)] to-[hsl(280,75%,60%)] flex items-center justify-center"><TrendingUp className="h-3 w-3 text-white" /></div>
+                  <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">Dòng cảm xúc</span>
+                </div>
+                <div className="flex gap-1.5">
+                  {[{l:'Vui',c:C.green},{l:'Tập trung',c:C.blue},{l:'Trung tính',c:'hsl(220,15%,50%)'},{l:'Buồn',c:C.violet},{l:'Tức',c:C.red}].map(x => (
+                    <div key={x.l} className="flex items-center gap-0.5"><div className="w-1.5 h-1.5 rounded-full" style={{ background: x.c }} /><span className="text-[0.5rem] text-white/20">{x.l}</span></div>
+                  ))}
                 </div>
               </div>
+              <WaveChart data={waveData} h={150} />
             </div>
-          )}
-          
-          {/* Classroom Map - Canvas Heatmap */}
-          <div className="relative bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-8 mb-6 border-2 border-dashed border-purple-200">
-            <div className="text-center mb-4">
-              <h4 className="font-semibold text-gray-800">Lớp 10A1 - Bản đồ cảm xúc & tiến bộ</h4>
-              <p className="text-sm text-gray-600">Bố cục lớp học: 8 cột x 5 dòng, dòng cuối có thể không đầy đủ</p>
-            </div>
-            
-            {/* Canvas Heatmap */}
-            <div className="relative h-80 w-full">
-              <canvas
-                ref={canvasRef}
-                className={`w-full h-full rounded-lg ${isEditMode ? 'cursor-move' : 'cursor-pointer'}`}
-                style={{ background: 'transparent' }}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onClick={handleCanvasClick}
-              />
-              
-              {/* Student Info Overlay */}
-              <div className="absolute inset-0 pointer-events-none">
-                {students.map((student) => {
-                  const getEmotionIcon = (emotion: string) => {
-                    switch (emotion) {
-                      case 'happy': return '😊';
-                      case 'focused': return '🎯';
-                      case 'stressed': return '😰';
-                      case 'motivated': return '🚀';
-                      default: return '😐';
-                    }
-                  };
 
+            <div className={`col-span-2 ${glass} p-3 flex flex-col items-center justify-center`}>
+              <span className="text-[0.55rem] uppercase tracking-wider text-white/25 font-semibold mb-2">Phân bổ</span>
+              <Donut segs={donutSegs} size={110} thick={14} centerLabel={`${stats.total}`} centerSub="học sinh" />
+              <div className="mt-2 space-y-0.5 w-full">
+                {donutSegs.slice(0, 3).map(s => (
+                  <div key={s.label} className="flex items-center gap-1 justify-center">
+                    <span className="text-xs">{s.emoji}</span>
+                    <span className="text-[0.5rem] text-white/30">{s.label}: {s.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className={`col-span-3 ${glass} p-3`}>
+              <div className="flex items-center gap-1.5 mb-2">
+                <AlertTriangle className="h-3.5 w-3.5" style={{ color: C.amber }} />
+                <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">Cần chú ý</span>
+                {stats.alerts.length > 0 && <span className="ml-auto px-1.5 py-0.5 rounded-full text-[0.5rem] font-bold bg-red-500/20 text-red-400 border border-red-500/25">{stats.alerts.length}</span>}
+              </div>
+              <div className="space-y-1.5 max-h-[180px] overflow-y-auto pr-1 cscroll">
+                {stats.alerts.length === 0 ? (
+                  <div className="text-center py-8"><Sparkles className="h-5 w-5 text-emerald-400/30 mx-auto mb-1" /><p className="text-[0.6rem] text-white/20">Tất cả HS đều ổn!</p></div>
+                ) : stats.alerts.map(s => {
+                  const cfg = EMOTION_CONFIG[s.emotion as EmotionType];
                   return (
-                    <div
-                      key={student.id}
-                      className={`absolute group ${isEditMode ? 'pointer-events-auto cursor-move' : 'pointer-events-auto'}`}
-                      style={{ left: `${student.x}%`, top: `${student.y}%` }}
-                      onMouseDown={(e) => handleMouseDown(e, student.id)}
-                    >
-                      {/* Hover Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10">
-                        <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                          <div className="font-semibold">{student.name}</div>
-                          <div>Performance: {student.performance}%</div>
-                          <div>Energy: {student.energy}%</div>
-                          <div>Mood: {student.emotion}</div>
-                          {isEditMode && (
-                            <div className="text-yellow-300 mt-1">🖱️ Drag to move</div>
-                          )}
-                        </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+                    <div key={s.id} className="flex items-center gap-1.5 p-1.5 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] transition-all cursor-pointer"
+                      onClick={() => setSelectedStudent(s)}>
+                      <span className="text-sm">{cfg?.emoji || '😐'}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[0.65rem] text-white/60 truncate">{s.name}</div>
+                        <div className="text-[0.5rem] text-white/25">{cfg?.labelVi} &middot; {s.seatLabel}</div>
                       </div>
+                      <span className="text-[0.55rem] font-medium" style={{ color: eClr(s.emotion) }}>{s.performance}%</span>
                     </div>
                   );
                 })}
               </div>
             </div>
-            
-            {/* Legend */}
-            <div className="flex flex-wrap justify-center gap-4 mt-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded-full bg-green-500"></div>
-                <span className="text-sm text-gray-700">😊 Happy (85%+)</span>
+          </div>
+
+          {/* ── ROW 3: HEATMAP + RADIALS ── */}
+          <div className="grid grid-cols-12 gap-2.5">
+            <div className={`col-span-8 ${glass} p-4`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[hsl(330,80%,60%)] to-[hsl(280,75%,60%)] flex items-center justify-center"><Users className="h-3 w-3 text-white" /></div>
+                  <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">Sơ đồ lớp {cls.name}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setIsEditMode(!isEditMode)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[0.6rem] font-medium transition-all ${isEditMode ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-white/[0.03] text-white/30 border border-white/[0.06] hover:text-white/50'}`}>
+                    <Layers className="h-3 w-3" />
+                    {isEditMode ? 'Đang sắp xếp' : 'Sắp xếp chỗ'}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded-full bg-blue-500"></div>
-                <span className="text-sm text-gray-700">🎯 Focused (80%+)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded-full bg-purple-500"></div>
-                <span className="text-sm text-gray-700">🚀 Motivated (75%+)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 rounded-full bg-red-500"></div>
-                <span className="text-sm text-gray-700">😰 Stressed (&lt;70%)</span>
-              </div>
+              <Heatmap students={cls.students} height={290} editMode={isEditMode}
+                onStudentMove={handleStudentMove}
+                onStudentClick={s => setSelectedStudent(s)} />
             </div>
-            
-            {/* Heatmap Info */}
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">
-                💡 <strong>Heatmap:</strong> Gradient radius = Energy level, Color intensity = Performance score
-              </p>
-              <p className="text-xs text-gray-500">
-                🔥 Các gradient trộn lẫn tạo hiệu ứng nhiệt có thể quan sát từ xa
-              </p>
-              <p className="text-xs text-gray-500">
-                📐 <strong>Bố cục:</strong> 8 cột (10-80%), 5 dòng (10-70%), mỗi vị trí cách nhau 10%
-              </p>
+
+            <div className={`col-span-4 ${glass} p-4 flex flex-col`}>
+              <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold mb-3">Chỉ số tổng quan</span>
+              <div className="flex-1 grid grid-cols-2 gap-2 place-items-center">
+                <Radial value={stats.posRate} color={C.green} icon={Smile} sub="Tích cực" />
+                <Radial value={stats.engagement} color={C.blue} icon={Focus} sub="Tương tác" />
+                <Radial value={Math.max(0, 100 - stats.negRate)} color={C.teal} icon={Heart} sub="Sức khỏe TT" />
+                <Radial value={stats.avgEnergy} color={C.amber} icon={Zap} sub="Năng lượng" />
+              </div>
+              {/* Mood Pulse mini */}
+              <div className="mt-3 p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-sm">{stats.dominantCfg?.emoji || '😐'}</span>
+                  <span className="text-xs text-white/50 font-medium">Nhịp cảm xúc</span>
+                </div>
+                <div className="flex gap-0.5">
+                  {stats.sorted.slice(0, 6).map(([emo, cnt], i) => {
+                    const w = Math.max(8, (cnt / stats.total) * 100);
+                    return <div key={emo} className="h-1.5 rounded-full transition-all duration-500" style={{ width: `${w}%`, background: eClr(emo), opacity: 1 - i * 0.12 }} />;
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Classroom Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg p-4 text-white text-center">
-              <div className="text-2xl font-bold">16</div>
-              <div className="text-sm text-green-100">Happy Students</div>
+          {/* ── ROW 4: BREAKDOWN + AI INSIGHTS ── */}
+          <div className="grid grid-cols-12 gap-2.5">
+            {/* Breakdown */}
+            <div className={`col-span-5 ${glass} p-4`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center"><BarChart3 className="h-3 w-3 text-white" /></div>
+                <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">Chi tiết cảm xúc</span>
+              </div>
+              <div className="space-y-2">
+                {stats.sorted.map(([emo, cnt]) => {
+                  const cfg = EMOTION_CONFIG[emo as EmotionType]; const mx = stats.sorted[0]?.[1] || 1;
+                  return (
+                    <div key={emo} className="flex items-center gap-2">
+                      <span className="text-sm w-5 text-center">{cfg?.emoji || '😐'}</span>
+                      <span className="text-[0.6rem] text-white/40 w-16 truncate">{cfg?.labelVi || emo}</span>
+                      <div className="flex-1 h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(cnt / mx) * 100}%`, background: eClr(emo), boxShadow: `0 0 6px ${eClr(emo)}30` }} />
+                      </div>
+                      <span className="text-[0.6rem] text-white/35 w-8 text-right font-medium">{cnt}</span>
+                      <span className="text-[0.5rem] text-white/20 w-8 text-right">{Math.round((cnt / stats.total) * 100)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg p-4 text-white text-center">
-              <div className="text-2xl font-bold">10</div>
-              <div className="text-sm text-blue-100">Focused Students</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-500 to-violet-500 rounded-lg p-4 text-white text-center">
-              <div className="text-2xl font-bold">10</div>
-              <div className="text-sm text-purple-100">Motivated Students</div>
-            </div>
-            <div className="bg-gradient-to-br from-red-500 to-pink-500 rounded-lg p-4 text-white text-center">
-              <div className="text-2xl font-bold">4</div>
-              <div className="text-sm text-red-100">Need Support</div>
-            </div>
-          </div>
-        </div>
 
-        {/* Vision Tracker - AI Attention - Neumorphic Design */}
-        <div 
-          className="rounded-3xl p-8 mb-6"
-          style={{
-            background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-            boxShadow: `
-              14px 14px 28px rgba(163, 177, 198, 0.7),
-              -14px -14px 28px rgba(255, 255, 255, 0.95),
-              inset 2px 2px 4px rgba(163, 177, 198, 0.1)
-            `,
-            border: '1px solid rgba(255, 255, 255, 0.3)'
-          }}
-        >
-          <h3 
-            className="text-xl font-bold mb-2 flex items-center"
-            style={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}
-          >
-            <span 
-              className="text-2xl mr-3 flex items-center justify-center"
-              style={{
-                width: '40px',
-                height: '40px',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '12px',
-                color: 'white',
-                boxShadow: `
-                  6px 6px 12px rgba(102, 126, 234, 0.4),
-                  -4px -4px 8px rgba(255, 255, 255, 0.9),
-                  inset 2px 2px 4px rgba(0, 0, 0, 0.1)
-                `
-              }}
-            >
-              👁️
-            </span>
-            Vision Tracker - AI Attention
-            <span 
-              className="ml-3 text-xs px-3 py-1 rounded-full font-semibold"
-              style={{
-                background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-                color: '#667eea',
-                boxShadow: `
-                  4px 4px 8px rgba(163, 177, 198, 0.5),
-                  -4px -4px 8px rgba(255, 255, 255, 0.8),
-                  inset 1px 1px 2px rgba(163, 177, 198, 0.1)
-                `,
-                border: '1px solid rgba(255, 255, 255, 0.3)'
-              }}
-            >
-              Computer Vision
-            </span>
-          </h3>
-          <p className="text-sm mb-6" style={{ color: '#718096' }}>
-            Theo dõi ánh mắt, chuyển động, mức độ tập trung khi học trực tuyến hoặc trong lớp học thật
-          </p>
-
-          {/* Current Attention Status - Neumorphic Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-6">
-            <div 
-              className="rounded-2xl p-5 text-center transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(102, 126, 234, 0.5),
-                  -4px -4px 8px rgba(255, 255, 255, 0.2),
-                  inset 2px 2px 4px rgba(0, 0, 0, 0.1)
-                `,
-                color: 'white'
-              }}
-            >
-              <div className="flex items-center justify-center mb-3">
-                <Focus className="w-6 h-6 mr-2" />
-                <span className="text-sm font-semibold">Focus Level</span>
+            {/* AI Insights */}
+            <div className={`col-span-7 ${glass} p-4`}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[hsl(175,80%,50%)] to-[hsl(210,90%,60%)] flex items-center justify-center"><Brain className="h-3 w-3 text-white" /></div>
+                <span className="text-[0.6rem] uppercase tracking-wider text-white/35 font-semibold">Phân tích AI — {cls.name}</span>
               </div>
-              <div className="text-3xl font-bold mb-1">{currentAttention.focus}%</div>
-              <div className="text-xs opacity-90">Highly Focused</div>
-            </div>
-            
-            <div 
-              className="rounded-2xl p-5 text-center transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(16, 185, 129, 0.5),
-                  -4px -4px 8px rgba(255, 255, 255, 0.2),
-                  inset 2px 2px 4px rgba(0, 0, 0, 0.1)
-                `,
-                color: 'white'
-              }}
-            >
-              <div className="flex items-center justify-center mb-3">
-                <Eye className="w-6 h-6 mr-2" />
-                <span className="text-sm font-semibold">{t('vision.eye-movement')}</span>
+              <div className="grid grid-cols-2 gap-2.5">
+                {[
+                  { icon: Smile, color: C.green, title: 'Tâm trạng chung',
+                    text: stats.posRate >= 60 ? `${cls.name} có tâm trạng rất tích cực (${stats.posRate}%). ${stats.dominantCfg?.labelVi || 'Bình thường'} là cảm xúc chủ đạo — giáo viên có thể tận dụng để giảng bài khó.`
+                    : stats.posRate >= 40 ? `Tâm trạng ở mức trung bình (${stats.posRate}% tích cực). Nên tạo thêm hoạt động tương tác nhóm để kích thích sự hứng thú.`
+                    : `Cần lưu ý: chỉ ${stats.posRate}% học sinh có cảm xúc tích cực. Đề xuất ${cls.teacher} điều chỉnh nhịp bài giảng.` },
+                  { icon: Eye, color: C.blue, title: 'Mức tập trung',
+                    text: stats.engagement >= 70 ? `Tương tác cao (${stats.engagement}%). Camera ghi nhận phần lớn học sinh đang tập trung — thời điểm tốt để kiểm tra nhanh.`
+                    : stats.engagement >= 50 ? `Tập trung trung bình (${stats.engagement}%). Nên xen kẽ 2-3 phút hoạt động (đố vui, thảo luận nhóm) mỗi 15 phút.`
+                    : `Tập trung thấp (${stats.engagement}%). Camera phát hiện nhiều HS mất tập trung — nên cho giải lao hoặc đổi hình thức.` },
+                  { icon: AlertTriangle, color: C.amber, title: 'Cảnh báo',
+                    text: stats.alerts.length === 0 ? 'Không có HS nào cần chú ý đặc biệt. Không khí lớp rất ổn định — tuyệt vời!'
+                    : `${stats.alerts.length} HS đang có biểu cảm tiêu cực: ${stats.alerts.slice(0, 3).map(s => s.name.split(' ').slice(-2).join(' ')).join(', ')}${stats.alerts.length > 3 ? '...' : ''}. Giáo viên nên quan tâm riêng.` },
+                  { icon: Sparkles, color: C.purple, title: `Gợi ý cho ${cls.teacher.split(' ').slice(-2).join(' ')}`,
+                    text: stats.negRate > 30 ? 'Nên dành 5 phút cho hoạt động thư giãn (mindfulness, trò chơi ngắn) trước khi tiếp tục bài giảng.'
+                    : stats.avgEnergy < 50 ? 'Năng lượng lớp đang thấp. Thử cho HS đứng dậy vận động hoặc chuyển sang thảo luận nhóm.'
+                    : 'Tiếp tục duy trì nhịp hiện tại — lớp đang phản hồi tốt! Có thể thử thêm câu hỏi tương tác.' },
+                ].map((card, i) => (
+                  <div key={i} className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                      <span className="w-4.5 h-4.5 rounded-md flex items-center justify-center" style={{ background: `${card.color}15`, color: card.color }}><card.icon className="h-2.5 w-2.5" /></span>
+                      <span className="text-[0.65rem] font-medium text-white/50">{card.title}</span>
+                    </div>
+                    <p className="text-[0.6rem] text-white/35 leading-relaxed">{card.text}</p>
+                  </div>
+                ))}
               </div>
-              <div className="text-3xl font-bold mb-1">{currentAttention.eyeMovement}</div>
-              <div className="text-xs opacity-90">Movements/min</div>
-            </div>
-            
-            <div 
-              className="rounded-2xl p-5 text-center transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(139, 92, 246, 0.5),
-                  -4px -4px 8px rgba(255, 255, 255, 0.2),
-                  inset 2px 2px 4px rgba(0, 0, 0, 0.1)
-                `,
-                color: 'white'
-              }}
-            >
-              <div className="flex items-center justify-center mb-3">
-                <Activity className="w-6 h-6 mr-2" />
-                <span className="text-sm font-semibold">{t('vision.posture')}</span>
-              </div>
-              <div className="text-3xl font-bold mb-1">{currentAttention.posture}%</div>
-              <div className="text-xs opacity-90">Good Posture</div>
-            </div>
-            
-            <div 
-              className="rounded-2xl p-5 text-center transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(245, 158, 11, 0.5),
-                  -4px -4px 8px rgba(255, 255, 255, 0.2),
-                  inset 2px 2px 4px rgba(0, 0, 0, 0.1)
-                `,
-                color: 'white'
-              }}
-            >
-              <div className="flex items-center justify-center mb-3">
-                <Brain className="w-6 h-6 mr-2" />
-                <span className="text-sm font-semibold">{t('vision.engagement')}</span>
-              </div>
-              <div className="text-3xl font-bold mb-1">{currentAttention.engagement}%</div>
-              <div className="text-xs opacity-90">Very Engaged</div>
             </div>
           </div>
 
-          {/* Attention Timeline Chart - Neumorphic Container */}
-          <div 
-            className="rounded-2xl p-6 mb-6"
-            style={{
-              background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-              boxShadow: `
-                inset 8px 8px 16px rgba(163, 177, 198, 0.5),
-                inset -8px -8px 16px rgba(255, 255, 255, 0.7),
-                2px 2px 4px rgba(163, 177, 198, 0.2)
-              `,
-              border: '1px solid rgba(255, 255, 255, 0.3)'
-            }}
-          >
-            <h4 
-              className="font-bold mb-4 flex items-center"
-              style={{ color: '#4a5568' }}
-            >
-              <Camera 
-                className="w-5 h-5 mr-2"
-                style={{ color: '#667eea' }}
-              />
-              Real-time Attention Monitoring
-            </h4>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={attentionData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(113, 128, 150, 0.2)" />
-                <XAxis dataKey="time" stroke="#718096" />
-                <YAxis stroke="#718096" />
-                <Tooltip 
-                  contentStyle={{
-                    background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '12px',
-                    boxShadow: '4px 4px 8px rgba(163, 177, 198, 0.4)'
-                  }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="focus" stroke="#667eea" strokeWidth={3} name="Focus %" />
-                <Line type="monotone" dataKey="engagement" stroke="#10b981" strokeWidth={3} name="Engagement %" />
-                <Line type="monotone" dataKey="posture" stroke="#8b5cf6" strokeWidth={3} name="Posture %" />
-                <Line type="monotone" dataKey="eyeMovement" stroke="#f59e0b" strokeWidth={2} name={t('vision.eye-movement')} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* AI Analysis - Neumorphic Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div 
-              className="rounded-2xl p-5 transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(163, 177, 198, 0.5),
-                  -8px -8px 16px rgba(255, 255, 255, 0.8),
-                  inset 1px 1px 2px rgba(163, 177, 198, 0.1)
-                `,
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderLeft: '5px solid #10b981'
-              }}
-            >
-              <h5 
-                className="font-bold mb-3 flex items-center"
-                style={{ color: '#059669' }}
-              >
-                <span className="text-lg mr-2">✅</span>
-                Attention Strengths
-              </h5>
-              <ul className="text-sm space-y-2" style={{ color: '#047857' }}>
-                <li>• Excellent focus during 9:30-10:30 period</li>
-                <li>• Consistent good posture (85%+ average)</li>
-                <li>• Low eye movement indicates deep concentration</li>
-                <li>• High engagement correlates with performance</li>
-              </ul>
+          {/* ── STUDENT DETAIL PANEL ── */}
+          {selectedStudent && (
+            <div className={`${glass} p-4`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: `${eClr(selectedStudent.emotion)}15` }}>
+                    {EMOTION_CONFIG[selectedStudent.emotion as EmotionType]?.emoji || '😐'}
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-white/80">{selectedStudent.name}</div>
+                    <div className="text-[0.55rem] text-white/25">{EMOTION_CONFIG[selectedStudent.emotion as EmotionType]?.labelVi} &middot; Chỗ {selectedStudent.seatLabel} &middot; {cls.name}</div>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedStudent(null)} className="text-white/25 hover:text-white/50 transition text-[0.65rem] px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.05]">Đóng</button>
+              </div>
+              <div className="grid grid-cols-5 gap-2.5">
+                {[
+                  { label: 'Hiệu suất', val: `${selectedStudent.performance}%`, color: eClr(selectedStudent.emotion) },
+                  { label: 'Năng lượng', val: `${selectedStudent.energy}%`, color: C.amber },
+                  { label: 'Vị trí', val: selectedStudent.seatLabel || '—', color: C.blue },
+                  { label: 'Trạng thái', val: EMOTION_CONFIG[selectedStudent.emotion as EmotionType]?.category === 'positive' ? 'Tốt' : EMOTION_CONFIG[selectedStudent.emotion as EmotionType]?.category === 'negative' ? 'Cần chú ý' : 'Ổn', color: EMOTION_CONFIG[selectedStudent.emotion as EmotionType]?.category === 'negative' ? C.red : C.green },
+                  { label: 'Camera', val: cls.camera, color: C.cyan },
+                ].map(k => (
+                  <div key={k.label} className="text-center p-2.5 rounded-xl bg-white/[0.02]">
+                    <div className="text-sm font-bold" style={{ color: k.color }}>{k.val}</div>
+                    <div className="text-[0.5rem] text-white/25 mt-0.5">{k.label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-            
-            <div 
-              className="rounded-2xl p-5 transition-all duration-300 hover:scale-105"
-              style={{
-                background: 'linear-gradient(145deg, #e0e5ec 0%, #d8dee8 100%)',
-                boxShadow: `
-                  8px 8px 16px rgba(163, 177, 198, 0.5),
-                  -8px -8px 16px rgba(255, 255, 255, 0.8),
-                  inset 1px 1px 2px rgba(163, 177, 198, 0.1)
-                `,
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderLeft: '5px solid #f59e0b'
-              }}
-            >
-              <h5 
-                className="font-bold mb-3 flex items-center"
-                style={{ color: '#d97706' }}
-              >
-                <span className="text-lg mr-2">⚠️</span>
-                Areas for Improvement
-              </h5>
-              <ul className="text-sm space-y-2" style={{ color: '#b45309' }}>
-                <li>• Focus drops around 9:45 (65%)</li>
-                <li>• Increased eye movement during breaks</li>
-                <li>• Posture slightly declines after 1 hour</li>
-                <li>• Consider 5-minute breaks every 45 minutes</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
+      )}
 
-        {/* Quick Actions */}
-        <div className="mt-6 flex flex-wrap gap-4">
-          <button className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-6 py-3 rounded-lg font-medium transition-all shadow-lg">
-            📝 Log Today&apos;s Mood
-          </button>
-          <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-6 py-3 rounded-lg font-medium transition-all">
-            📊 View Full Report
-          </button>
-          <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-6 py-3 rounded-lg font-medium transition-all">
-            🎯 Set Mood Goals
-          </button>
-          <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-6 py-3 rounded-lg font-medium transition-all">
-            🧘 Relaxation Tips
-          </button>
-        </div>
-      </div>
+      <style jsx global>{`
+        .cscroll::-webkit-scrollbar { width: 3px; }
+        .cscroll::-webkit-scrollbar-track { background: transparent; }
+        .cscroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius: 3px; }
+        .cscroll::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+      `}</style>
     </div>
-    </VisionThemeWrapper>
   );
 }
-

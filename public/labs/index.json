@@ -972,9 +972,63 @@
         "Thiết kế xe tối ưu lực cản"
       ],
       "tags": ["CFD", "xe hơi", "streamlines", "áp suất", "wake", "aerodynamics", "ôtô", "hầm gió"]
+    },
+    {
+      "id": "wokwi-sim",
+      "name": "Electronics Simulator",
+      "description": "Mô phỏng mạch điện tử kiểu Wokwi với ESP32, Arduino, LED, cảm biến và các linh kiện. Kéo thả linh kiện, nối dây và chạy mô phỏng ngay trên trình duyệt!",
+      "category": "Điện tử",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 200,
+      "duration": "30 phút",
+      "port": null,
+      "icon": "Zap",
+      "features": [
+        "Kéo thả linh kiện điện tử (ESP32, Arduino, LED, cảm biến)",
+        "Vẽ dây nối giữa các chân linh kiện với 8 màu",
+        "Code editor với 5 sketch Arduino mẫu",
+        "Serial Monitor mô phỏng 115200 baud",
+        "Mô phỏng LED nhấp nháy, servo quay, cảm biến DHT22/HC-SR04"
+      ],
+      "learning_objectives": [
+        "Hiểu cách kết nối linh kiện điện tử cơ bản",
+        "Lập trình Arduino/ESP32 với C++",
+        "Sử dụng cảm biến nhiệt độ, siêu âm, ánh sáng",
+        "Thiết kế mạch IoT với WiFi và NTP"
+      ],
+      "tags": ["điện tử", "ESP32", "Arduino", "IoT", "mạch", "LED", "cảm biến", "Wokwi"],
+      "internal_link": "/dashboard/labtwin/labs/wokwi-sim"
+    },
+    {
+      "id": "r3f-sandbox",
+      "name": "3D Simulation Sandbox",
+      "description": "Sandbox giả lập 3D với React Three Fiber. Khám phá phân tử H₂O, phòng thí nghiệm hóa học, con lắc, hệ mặt trời và Newton's Cradle trong không gian 3D tương tác!",
+      "category": "Hóa học",
+      "level": "Trung bình",
+      "difficulty": "Trung bình",
+      "xp": 180,
+      "duration": "25 phút",
+      "port": null,
+      "icon": "Atom",
+      "features": [
+        "Xoay/zoom mô hình 3D tương tác với OrbitControls",
+        "5 giả lập: H₂O, Phòng thí nghiệm, Con lắc, Hệ mặt trời, Newton's Cradle",
+        "Code editor hiển thị source code React Three Fiber",
+        "Hiệu ứng Bloom, Sparkles, ContactShadows",
+        "Sandbox phong cách CodeSandbox"
+      ],
+      "learning_objectives": [
+        "Hiểu cấu trúc phân tử nước H₂O (liên kết cộng hóa trị)",
+        "Quan sát dao động điều hòa con lắc đơn",
+        "Mô hình hệ mặt trời với quỹ đạo hành tinh",
+        "Tìm hiểu va chạm đàn hồi Newton's Cradle"
+      ],
+      "tags": ["3D", "R3F", "phân tử", "hóa học", "vật lý", "con lắc", "hệ mặt trời", "Three.js"],
+      "internal_link": "/dashboard/aura"
     }
   ],
-  "total": 37,
+  "total": 39,
   "last_updated": "2024-12-19T12:00:00Z",
   "categories": [
     "Cơ học",
@@ -987,6 +1041,7 @@
     "Khí tượng",
     "Computer Vision",
     "Sóng",
-    "Học qua trò chơi"
+    "Học qua trò chơi",
+    "Điện tử"
   ]
 }

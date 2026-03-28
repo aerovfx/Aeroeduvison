@@ -11,7 +11,7 @@ import {
   Scissors, Mic, Volume2, Circle, Play, Square,
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
   Minus, Layout, Sidebar as SidebarIcon, History,
-  Database, UserCheck, ShieldAlert
+  Database, UserCheck, ShieldAlert, Copy
 } from "lucide-react"
 
 interface CameraItem {

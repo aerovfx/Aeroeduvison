@@ -193,7 +193,7 @@ export async function PUT(
           const questionIdRaw =
             typeof q.questionId === "string" && q.questionId.trim()
               ? q.questionId.trim()
-              : byId?.questionId
+              : (byId as any)?.questionId
 
           if (!questionIdRaw || seenQuestionIds.has(questionIdRaw)) return null
           seenQuestionIds.add(questionIdRaw)
@@ -201,32 +201,32 @@ export async function PUT(
           const old = byId || examQuestionByQuestionId.get(questionIdRaw)
           const points = Number(q.points)
           return {
-            id: old?.id as string | undefined,
+            id: (old as any)?.id as string | undefined,
             order: index + 1,
-            points: Number.isFinite(points) ? Math.max(0, points) : Number(old?.points || 0),
+            points: Number.isFinite(points) ? Math.max(0, points) : Number((old as any)?.points || 0),
             content:
               typeof q.content === "string"
                 ? q.content.trim()
-                : String(old?.Question?.content || ""),
+                : String((old as any)?.Question?.content || ""),
             options: Array.isArray(q.options)
               ? q.options.map((v: any) => String(v).trim()).filter(Boolean)
-              : Array.isArray(old?.Question?.options)
-                ? old.Question.options
+              : Array.isArray((old as any)?.Question?.options)
+                ? (old as any).Question.options
                 : [],
             correctAnswer:
               q.correctAnswer === null
                 ? null
                 : typeof q.correctAnswer === "string"
                   ? q.correctAnswer.trim()
-                  : (old?.Question?.correctAnswer ?? null),
+                  : ((old as any)?.Question?.correctAnswer ?? null),
             explanation:
               typeof q.explanation === "string"
                 ? q.explanation
-                : String(old?.Question?.explanation || ""),
+                : String((old as any)?.Question?.explanation || ""),
             questionType:
               typeof q.questionType === "string" && q.questionType.trim()
                 ? q.questionType.trim()
-                : String(old?.Question?.questionType || "MCQ"),
+                : String((old as any)?.Question?.questionType || "MCQ"),
             questionId: String(questionIdRaw),
             isNew: false,
           }

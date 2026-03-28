@@ -1,0 +1,353 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-chuong-6-1.jsp",
+  "title": "30 bài tập ôn tập Lượng tử ánh sáng (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Tìm phát biểusaivề ánh sáng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Ánh sáng vừa có tính chất sóng vừa có tính chất hạt."
+          },
+          {
+            "option": "B",
+            "text": "Tần số của ánh sáng càng lớn thì tính chất hạt của ánh sáng càng thể hiện rõ."
+          },
+          {
+            "option": "C",
+            "text": "Bước sóng của ánh sáng càng lớn thì tính chất hạt của ánh sáng càn rõ."
+          },
+          {
+            "option": "D",
+            "text": "Tính chất hạt của ánh sáng thể hiện càng rõ thì tính chất sóng thể hiện càng yếu."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Hiện tượngkhôngchứng tỏ tính chất hạt của ánh sáng là hiện tượng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Quang điện ngoài"
+          },
+          {
+            "option": "B",
+            "text": "Quang điện trong"
+          },
+          {
+            "option": "C",
+            "text": "Phát quang"
+          },
+          {
+            "option": "D",
+            "text": "Tán sắc"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Tìm phát biểu sai khi so sánh hiện tượng quang điện trong và quang điện ngoài",
+        "options": [
+          {
+            "option": "A",
+            "text": "Đều do êlectron nhận năng lựng của photon gây ra"
+          },
+          {
+            "option": "B",
+            "text": "Đều do bước sóng giới hạn λo"
+          },
+          {
+            "option": "C",
+            "text": "Bước sóng giới hạn đều phụ thuộc vào bản chất của từng khối chất"
+          },
+          {
+            "option": "D",
+            "text": "Bước sóng giới hạn ứng với hiện tượng quang điện ngoài thường lớn hơn đối với hiện tượng quang điện"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Tìm phát biểusaivề hiện tượng quang điện ngoài và hiện tượng quang dẫn.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Trong hiện tượng quang dẫn, điện trở của khối chất bán dẫn giảm khi khối bán dẫn được chiếu ánh sáng thích hợp."
+          },
+          {
+            "option": "B",
+            "text": "Trong hiện tượng quang dẫn, các êlectron bị bứt ra khỏi liên kết với hạt nhân của khối chất bán dẫn nhưng vẫn nằm trong khối bán dẫn khi khối bán dẫn được chiếu ánh sáng."
+          },
+          {
+            "option": "C",
+            "text": "Trong hiện tượng quang điện ngoài, độ dẫn điện của khối kim loại tăng khi khối kim loại được chiếu bằng ánh sáng thích hợp."
+          },
+          {
+            "option": "D",
+            "text": "Hiện tượng quang dẫn chỉ có thể xảy ra khi bước sóng của bức xạ kích thích nhỏ hơn một giá trị nào đó đối với mỗi chất bán dẫn"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Hiện tượng nào sau dâykhôngliên quan đến tính chất lượng tử của ánh sáng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hiện tượng quang phát quang"
+          },
+          {
+            "option": "B",
+            "text": "Hiện tượng phát xạ nhiệt điện từ"
+          },
+          {
+            "option": "C",
+            "text": "Hiện tượng quang điện"
+          },
+          {
+            "option": "D",
+            "text": "Hiện tượng phát quang phổ vạch"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Hiện tượng quang điện trong và hiện tượng quang điện ngoài đều:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Làm các êlectron bứt ra khỏi vật được chiếu sáng"
+          },
+          {
+            "option": "B",
+            "text": "Làm cho điện trở vaạt giảm xuống khi vật được chiếu sáng"
+          },
+          {
+            "option": "C",
+            "text": "Được ứng dụng để chế tạo pin quang điện"
+          },
+          {
+            "option": "D",
+            "text": "Xảy ra khi bước sóng của ánh sáng kích thích nhỏ hơn hoặc bằng một bước sóng giới hạn nào đó."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Thuyết sóng ánh sángkhôngthể giải thích được:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hiện tượng giao thoa ánh sáng"
+          },
+          {
+            "option": "B",
+            "text": "Hiện tượng quang điện"
+          },
+          {
+            "option": "C",
+            "text": "Hiện tượng nhiễu xạ ánh sáng"
+          },
+          {
+            "option": "D",
+            "text": "Hiện tượng tán sắc ánh sáng"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": "- Thuyết sóng ánh sángkhôngthể giải thích được hiện tượng quang điện."
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Dụng cụ nào sau đây có nguyên tắc hoạt động dựa vào hiện tượng quang điện trong?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tế bào quang điện"
+          },
+          {
+            "option": "B",
+            "text": "Máy quang phổ"
+          },
+          {
+            "option": "C",
+            "text": "Điôt phát quang"
+          },
+          {
+            "option": "D",
+            "text": "Quang điện trở"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Tìm phát biểusai:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hiện tượng giao thoa ánh sáng chứng tỏ ánh sáng có tính chất sóng"
+          },
+          {
+            "option": "B",
+            "text": "Hiện tượng quang điện chứng tỏ ánh sáng có tính chất hạt"
+          },
+          {
+            "option": "C",
+            "text": "Photon ánh sáng không thể hiện tính chất sóng khi truyền trong chân khôngD.\tPhoton ánh sáng luôn mang đồng thời cả tính chất sóng và tính chất hạtHiển thị đáp án- Photon ánh sáng thể hiện tính chất sóng khi truyền trong chân không.Chọn đáp án CCâu 10:Một quả cầu kim loại được đặt cô lấp về điện và cách xa các vật dẫn khác. Chiếu lần lượt vào quả cầu hai bức xạ có bước sóng λ1và λ2(λ1< λ2) thì đều xảy ra hiện tượng quang điện và điện thế cực đại mà quả cầu đạt được tương ứng là V1,V2. Nếu chiếu đồng thời hai bức xạ điện từ nói trên vào quả cầu thì điện thế cực đại của quả cầu làHiển thị đáp án- Hiện tượng quang điện xảy ra khi được chiếu đồng thời nhiều bức xạ thì khi tính các đại lượng: Vận tốc ban đầu cực đại v0max, hiệu điện thế hãm Uh, điện thế cực đại Vmax,… đều được tính ứng với bức xạ có λmin(hoặc fmax)Chọn đáp án CCâu 11:Tốc độ của êlectron trong nguyên tử hiđrô trên quỹ đạo có số lượng tử n có giá trịA.\tTỉ lệ thuận với nB.\tTỉ lệ nghịch với nC.\tTỉ lệ thuận với √nD.\tTỉ lệ nghịch với √nHiển thị đáp án- Ta có:Câu 12:Một quang êlectron có khối lượng m và điện tích – e, sau khi bứt ra khỏi bề mặt kim loại có tốc độ ban đầu cực đại vomax, nó bay thẳng vào từ trường đều có cảm ứng từ B, theo hướng vuông góc với đường sức từ. Quỹ đạo của êlectron trong từ trường là đường tròn có bán kínhHiển thị đáp án- Elêctron chuyển động trong từ trường sẽ chịu tác của lực Lo-re-xơ, lực này đóng vai trò lực hướng tâm:Chọn đáp án ACâu 13:Một quang êlectron khi bay vào từ trường đều có cảm ứng từ B =10-4theo phương vuông góc với các đường sức từ có bán kính quỹ đạo là 23,32 cm. Tốc độ của êlectron khi bay vào từ trường làA.\t4,1.106m/sB.\t4,1.105m/sC.\t4,1.105mm/sD.\t6,2.105m/sHiển thị đáp ánChọn đáp án ACâu 14:Trong quang phổ của nguyên tử hiđrô, nếu biết bước sóng λ21của bức xạ phát ra ứng với sự chuyển êlectron từ quỹ đạo L sang quỹ đạo K và bước sóng λ32của bức xạ phát ra ứng với sự chuyển êlectron từ quỹ đạo M sáng quỹ đạo K sẽ làHiển thị đáp án- Ta có:Chọn đáp án CCâu 15:Một điện cực phẳng làm bằng kim loại có công thoát 3,2.10–19(J) được chiếu bởi bức xạ photon có năng lượng 4,8.10–19(J). Cho điện tích của electron là –1,6.10–19(C). Hỏi electron quang điện có thể rời xa bề mặt một khoảng tối đa bao nhiêu nếu bên ngoài điện cực có một điện trường cản là 5 (V/m).A. 0,2 m.     \tB. 0,4 m.C. 0,1 m.     \tD. 0,3 m.Hiển thị đáp ánChọn đáp án A(199k) Học Vật Lí 12 KNTTHọc Vật Lí 12 CDHọc Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập ôn tập Lượng tử ánh sáng (có đáp án - phần 2)30 bài tập trắc nghiệm Tính chất và cấu tạo hạt nhân (có lời giải)30 bài tập trắc nghiệm Tính chất và cấu tạo hạt nhân (có đáp án - phần 2)30 bài tập trắc nghiệm Năng lượng liên kết của hạt nhân - Phản ứng hạt nhân (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "D",
+            "text": "Photon ánh sáng luôn mang đồng thời cả tính chất sóng và tính chất hạt"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một quả cầu kim loại được đặt cô lấp về điện và cách xa các vật dẫn khác. Chiếu lần lượt vào quả cầu hai bức xạ có bước sóng λ1và λ2(λ1< λ2) thì đều xảy ra hiện tượng quang điện và điện thế cực đại mà quả cầu đạt được tương ứng là V1,V2. Nếu chiếu đồng thời hai bức xạ điện từ nói trên vào quả cầu thì điện thế cực đại của quả cầu là",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Tốc độ của êlectron trong nguyên tử hiđrô trên quỹ đạo có số lượng tử n có giá trị",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tỉ lệ thuận với n"
+          },
+          {
+            "option": "B",
+            "text": "Tỉ lệ nghịch với n"
+          },
+          {
+            "option": "C",
+            "text": "Tỉ lệ thuận với √n"
+          },
+          {
+            "option": "D",
+            "text": "Tỉ lệ nghịch với √n"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một quang êlectron có khối lượng m và điện tích – e, sau khi bứt ra khỏi bề mặt kim loại có tốc độ ban đầu cực đại vomax, nó bay thẳng vào từ trường đều có cảm ứng từ B, theo hướng vuông góc với đường sức từ. Quỹ đạo của êlectron trong từ trường là đường tròn có bán kính",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một quang êlectron khi bay vào từ trường đều có cảm ứng từ B =10-4theo phương vuông góc với các đường sức từ có bán kính quỹ đạo là 23,32 cm. Tốc độ của êlectron khi bay vào từ trường là",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,1.106m/s"
+          },
+          {
+            "option": "B",
+            "text": "4,1.105m/s"
+          },
+          {
+            "option": "C",
+            "text": "4,1.105mm/s"
+          },
+          {
+            "option": "D",
+            "text": "6,2.105m/s"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Trong quang phổ của nguyên tử hiđrô, nếu biết bước sóng λ21của bức xạ phát ra ứng với sự chuyển êlectron từ quỹ đạo L sang quỹ đạo K và bước sóng λ32của bức xạ phát ra ứng với sự chuyển êlectron từ quỹ đạo M sáng quỹ đạo K sẽ là",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Một điện cực phẳng làm bằng kim loại có công thoát 3,2.10–19(J) được chiếu bởi bức xạ photon có năng lượng 4,8.10–19(J). Cho điện tích của electron là –1,6.10–19(C). Hỏi electron quang điện có thể rời xa bề mặt một khoảng tối đa bao nhiêu nếu bên ngoài điện cực có một điện trường cản là 5 (V/m).",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,2 m.     \tB. 0,4 m."
+          },
+          {
+            "option": "C",
+            "text": "0,1 m.     \tD. 0,3 m."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

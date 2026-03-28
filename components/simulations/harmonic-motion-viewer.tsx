@@ -25,7 +25,7 @@ export function HarmonicMotionViewer({ data, selectedPreset }: HarmonicMotionVie
   const [selectedVariation, setSelectedVariation] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationProgress, setAnimationProgress] = useState(0);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(undefined);
   
   // Custom parameters input
   const [customA, setCustomA] = useState("2.0");

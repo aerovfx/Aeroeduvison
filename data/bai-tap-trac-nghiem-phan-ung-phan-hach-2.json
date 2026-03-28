@@ -1,0 +1,308 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-phan-ung-phan-hach-2.jsp",
+  "title": "23 bài tập trắc nghiệm Phản ứng phân hạch (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Phần lớn năng lượng giải phóng trong phân hạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "động năng các nơtron phát ra."
+          },
+          {
+            "option": "B",
+            "text": "động năng các mảnh."
+          },
+          {
+            "option": "C",
+            "text": "năng lượng tỏa ra do phóng xạ của các mảnh"
+          },
+          {
+            "option": "D",
+            "text": "năng lượng các phôtôn của tia γ."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": "- Sự phân hạch của các nguyên tố nặng là một phản ứng toả nhiệt và có thể giải phóng một lượng năng lượng đáng kể dưới dạng tia gama và động năng của các hạt được giải phóng (đốt nóng vật chất tại nơi xảy ra phản ứng phân hạch)."
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Điểm giống nhau giữa sự phóng xạ và phản ứng phân hạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Đều là phản ứng toả năng lượng."
+          },
+          {
+            "option": "B",
+            "text": "Có thể thay đổi do các yếu tố bên ngoài."
+          },
+          {
+            "option": "C",
+            "text": "Các hạt nhân sinh ra có thể biết trước."
+          },
+          {
+            "option": "D",
+            "text": "Cả ba điểm nêu trong A, B, C."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Chọn câusai. Những điều kiện cần phải có để tạo nên phản ứng hạt nhân dây chuyền là gì?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Phải có nguồn tạo ra nơtron."
+          },
+          {
+            "option": "B",
+            "text": "Sau mỗi phân hạch, số nơtron giải phóng phải lớn hơn hoặc bằng 1."
+          },
+          {
+            "option": "C",
+            "text": "Nhiệt độ phải đưa lên cao."
+          },
+          {
+            "option": "D",
+            "text": "Lượng nhiên liệu (urani, plutôni) phải đủ lớn."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Phát biểu nào sau đây làsai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hệ số nhân nơtrôn s là số nơtrôn trung bình còn lại sau mỗi phân hạch, gây được phân hạch tiếp theo."
+          },
+          {
+            "option": "B",
+            "text": "Hệ số nhân nguồn s > 1 thì hệ thống vượt hạn, phản ứng dây chuyền không kiểm soát được, đó là trường hợp xảy ra trong các vụ nổ bom nguyên tử."
+          },
+          {
+            "option": "C",
+            "text": "Hệ số nhân nguồn s = 1 thì hệ thống tới hạn, phản ứng dây chuyền kiểm soát được, đó là trường hợp xảy ra trong các nhà máy điện nguyên tử."
+          },
+          {
+            "option": "D",
+            "text": "Hệ số nhân nguồn s < 1 thì hệ thống dưới hạn, phản ứng dây chuyền xảy ra chậm, ít được sử dụng."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Phản ứng phân hạch U235 dùng trong lò phản ứng hạt nhân và cả trong bom nguyên tử. Tìm sự khác biệt căn bản giữa lò phản ứng và bom nguyên tử.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Số nơtron được giải phóng trong mỗi phản ứng phân hạch ở bom nguyên tử nhiều hơn ở lò phản ứng."
+          },
+          {
+            "option": "B",
+            "text": "Năng lượng trung bình được mỗi nguyên tử urani giải phóng ra ở bom nguyên tử nhiều hơn hơn ở lò phản ứng"
+          },
+          {
+            "option": "C",
+            "text": "Trong lò phản ứng số nơtron có thể gây ra phản ứng phân hạch tiếp theo được khống chế."
+          },
+          {
+            "option": "D",
+            "text": "Trong lò phản ứng số nơtron cần để gây phản ứng phân hạch tiếp theo thì nhỏ hơn ở bom nguyên tử."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Tìm phát biểu đúng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Phản ứng phân hạch dây chuyền chỉ xảy ra nếu tổng khối lượng của khối chất tham gia phản ứng nhỏ hơn hoặc bằng một giá trị tới hạn nào đó (m ≤ m0)."
+          },
+          {
+            "option": "B",
+            "text": "Phản ứng phân hạch dây chuyền chỉ xảy ra nếu tổng khối lượng của khối chất tham gia phản ứng lớn hơn hoặc bằng một giá trị tới hạn nào đó (m > m0)."
+          },
+          {
+            "option": "C",
+            "text": "Phản ứng phân hạch dây chuyền luôn xảy ra, không phụ thuộc vào khối lượng của khối chất tham gia phản ứng."
+          },
+          {
+            "option": "D",
+            "text": "Khối lượng tới hạn của các nguyên tố hóa học khác nhau là như nhau."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Các thanh Cađimi trong lò phản ứng hạt nhân có tác dụng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hấp thụ các nơtron tạo ra từ sự phân hạch"
+          },
+          {
+            "option": "B",
+            "text": "Như chất xúc tác để phản ứng xảy ra"
+          },
+          {
+            "option": "C",
+            "text": "Làm cho sự phân hạch nhanh hơn"
+          },
+          {
+            "option": "D",
+            "text": "Tạo ra các nơtron duy trì phản ứng phân hạch"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Nơtron nhiệt là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "nơtron ở trong môi trường có nhiệt độ cao."
+          },
+          {
+            "option": "B",
+            "text": "nơtron có năng lượng cỡ 0,01eV."
+          },
+          {
+            "option": "C",
+            "text": "nơtron chuyển động với vận tốc rất lớn và tỏa nhiệt."
+          },
+          {
+            "option": "D",
+            "text": "nơtron có động năng rất lớn."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Đặc điểm nào sau đây là một trong các đặc điểm khác nhau giữa sự phân hạch và sự phóng xạ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Sự phân hạch là phản ứng hạt nhân có điều khiển còn sự phóng xạ có tính tự phát và không điều khiển được."
+          },
+          {
+            "option": "B",
+            "text": "Sự phân hạch là phản ứng hạt nhân tỏa năng lượng còn sự phòng xạ là phản ứng hạt nhân thu năng lượng."
+          },
+          {
+            "option": "C",
+            "text": "Sản phẩm của phản ứng hạt nhân có tính ngẫu nhiên còn sản phẩm của sự phóng xạ đã biết trước."
+          },
+          {
+            "option": "D",
+            "text": "Trong quá trình phân hạch động lượng được bảo toàn còn trong quá trình phóng xạ thì động lượng thay đổi."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Biết U235 có thể bị phân hạch theo phản ứng sau:",
+        "options": [
+          {
+            "option": "A",
+            "text": "175,85 MeV"
+          },
+          {
+            "option": "B",
+            "text": "11,08.1012MeV"
+          },
+          {
+            "option": "C",
+            "text": "5,45.1013MeV"
+          },
+          {
+            "option": "D",
+            "text": "8,79.1012MeV"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Trong phản ứng dây chuyền của hạt nhân U235, phản ứng thứ nhất có 100 hạt nhân U235 bị phân rã và hệ số nhân notron là k = 1,6. Tính tổng số hạt nhân bị phân rã đến phản ứng thứ 101.",
+        "options": [
+          {
+            "option": "A",
+            "text": "5,45.1023.      B. 3,24.1022."
+          },
+          {
+            "option": "C",
+            "text": "6,88.1022.      D. 6,22.1023."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 11
+}

@@ -153,15 +153,15 @@ function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title
 const chartTooltipStyle = {
   contentStyle: {
     background: 'hsl(225 15% 10%)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    border: '1px solid hsl(var(--border))',
     borderRadius: '12px',
     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-    color: 'rgba(255,255,255,0.9)',
+    color: 'hsl(var(--foreground))',
     fontSize: '12px',
     padding: '10px 14px',
   },
-  itemStyle: { color: 'rgba(255,255,255,0.7)' },
-  labelStyle: { color: 'rgba(255,255,255,0.5)', fontWeight: 600 },
+  itemStyle: { color: 'hsl(var(--muted-foreground))' },
+  labelStyle: { color: 'hsl(var(--muted-foreground))', fontWeight: 600 },
 };
 
 /* ───────────────────────────────────────────────
@@ -499,9 +499,9 @@ export default function TeacherEmotionMapPage() {
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
                   <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
-                    <PolarGrid stroke="rgba(255,255,255,0.08)" />
-                    <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.6)' }} />
-                    <PolarRadiusAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.3)' }} domain={[0, 100]} axisLine={false} />
+                    <PolarGrid stroke="hsl(var(--border))" />
+                    <PolarAngleAxis dataKey="category" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                    <PolarRadiusAxis tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }} domain={[0, 100]} axisLine={false} />
                     <Radar name="Mức độ (%)" dataKey="value" stroke="hsl(245 85% 65%)" fill="hsl(245 85% 65%)" fillOpacity={0.2} strokeWidth={2} />
                     <Tooltip {...chartTooltipStyle} formatter={(value: number) => [`${value}%`, 'Tỷ lệ']} />
                   </RadarChart>
@@ -531,11 +531,11 @@ export default function TeacherEmotionMapPage() {
                       <stop offset="95%" stopColor="hsl(155 75% 45%)" stopOpacity={0.02} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="period" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.45)' }} stroke="rgba(255,255,255,0.08)" />
-                  <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.45)' }} stroke="rgba(255,255,255,0.08)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="period" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
                   <Tooltip {...chartTooltipStyle} />
-                  <Legend wrapperStyle={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }} />
+                  <Legend wrapperStyle={{ color: 'hsl(var(--muted-foreground))', fontSize: '12px' }} />
                   <Area type="monotone" dataKey="sampleCount" name="Số mẫu" stroke="hsl(245 85% 65%)" fill="url(#gradientSample)" strokeWidth={2} />
                   <Area type="monotone" dataKey="confidence" name="Độ tin cậy (%)" stroke="hsl(155 75% 45%)" fill="url(#gradientConfidence)" strokeWidth={1.5} />
                 </AreaChart>
@@ -552,9 +552,9 @@ export default function TeacherEmotionMapPage() {
               </h3>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={timelineData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.45)' }} stroke="rgba(255,255,255,0.08)" />
-                  <YAxis tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.45)' }} stroke="rgba(255,255,255,0.08)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="period" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
+                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
                   <Tooltip
                     {...chartTooltipStyle}
                     formatter={(value: number, _name: string, props: any) => {
@@ -638,9 +638,9 @@ export default function TeacherEmotionMapPage() {
                   layout="vertical"
                   margin={{ left: 80, right: 24 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.45)' }} stroke="rgba(255,255,255,0.08)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.6)' }} stroke="rgba(255,255,255,0.08)" width={78} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} stroke="hsl(var(--border))" width={78} />
                   <Tooltip {...chartTooltipStyle} formatter={(value: number) => [value, 'Điểm TB']} labelFormatter={(_: any, payload: any) => payload?.[0]?.payload?.fullName} />
                   <Bar dataKey="score" name="Điểm TB" fill="hsl(245 85% 65%)" radius={[0, 8, 8, 0]} />
                 </BarChart>

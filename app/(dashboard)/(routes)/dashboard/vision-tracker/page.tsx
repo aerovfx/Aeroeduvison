@@ -633,7 +633,7 @@ export default function VisionTrackerPage() {
                     position: absolute; top: 24px; left: 50%; transform: translateX(-50%);
                     background: rgba(15, 16, 20, 0.85); backdrop-filter: blur(12px);
                     padding: 8px 24px; border-radius: 100px;
-                    border: 1px solid rgba(255,255,255,0.1);
+                    border: 1px solid var(--glass-border);
                     display: flex; align-items: center; gap: 12px;
                     box-shadow: 0 4px 20px rgba(0,0,0,0.2);
                 }
@@ -642,10 +642,10 @@ export default function VisionTrackerPage() {
                 .rec-conf { color: #10b981; font-weight: 600; font-size: 0.9rem; }
 
                 .overlay-stats { position: absolute; top: 24px; right: 24px; display: flex; gap: 8px; }
-                .stat-pill { background: rgba(15,16,20, 0.8); backdrop-filter: blur(8px); padding: 6px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); text-align: center; min-width: 80px; }
+                .stat-pill { background: rgba(15,16,20, 0.8); backdrop-filter: blur(8px); padding: 6px 12px; border-radius: 12px; border: 1px solid var(--glass-bg); text-align: center; min-width: 80px; }
                 .stat-val { font-size: 1.1rem; font-weight: 700; color: #fff; display: block; }
                 .stat-lbl { font-size: 0.6rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-                .fs-btn { position: absolute; bottom: 24px; right: 24px; width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.1); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
+                .fs-btn { position: absolute; bottom: 24px; right: 24px; width: 48px; height: 48px; border-radius: 50%; background: var(--glass-bg); backdrop-filter: blur(4px); border: 1px solid var(--glass-border); color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
                 .fs-btn:hover { background: white; color: black; }
 
                 /* Stats Dashboard */

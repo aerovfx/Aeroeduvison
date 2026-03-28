@@ -6,18 +6,19 @@ import { db as prisma } from "@/lib/db"
 // DELETE /api/classes/[id]/students/[studentId] - Remove student from class
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; studentId: string } }
+  { params }: { params: Promise<{ id: string; studentId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id, studentId } = await params
     // Verify class ownership
     const classData = await prisma.class.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!classData) {
@@ -37,8 +38,8 @@ export async function DELETE(
     // Find and delete ClassStudent record
     const classStudent = await prisma.classStudent.findFirst({
       where: {
-        classId: params.id,
-        studentId: params.studentId,
+        classId: id,
+        studentId,
       },
     })
 

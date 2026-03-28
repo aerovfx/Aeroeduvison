@@ -83,23 +83,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if assignment exists
-    const assignment = await prisma.assignment.findUnique({
+    // Check if answer key exists
+    const answerKey = await prisma.gradingAnswerKey.findUnique({
       where: { id: assignmentId },
-      include: { course: true },
     });
 
-    if (!assignment) {
+    if (!answerKey) {
       return NextResponse.json(
-        { error: 'Assignment not found' },
+        { error: 'Answer key not found' },
         { status: 404 }
       );
     }
 
-    // 4. Check for existing submission
-    const existingSubmission = await prisma.submission.findFirst({
+    // 4. Check for existing graded sheet
+    const existingSubmission = await prisma.gradedSheet.findFirst({
       where: {
-        assignmentId,
+        answerKeyId: assignmentId,
         studentId: session.user.id,
       },
     });
@@ -111,10 +110,10 @@ export async function POST(req: NextRequest) {
     const gradingResult = await gradingService.gradeSingle({
       submission,
       subject,
-      grade: gradeLevel || assignment.course.gradeLevel || '10',
+      grade: gradeLevel || '10',
       assignmentType: assignmentType || 'essay',
       maxScore: 10,
-      rubricId: assignment.rubricId || undefined,
+      rubricId: undefined,
       additionalContext: context,
     });
 
@@ -122,22 +121,22 @@ export async function POST(req: NextRequest) {
     console.log(`✅ Grading completed in ${gradingTime}ms`);
 
     // 6. Validate result
-    const historicalGrades = await prisma.submission.findMany({
+    const historicalGrades = await prisma.gradedSheet.findMany({
       where: {
-        assignmentId,
-        status: 'GRADED',
+        answerKeyId: assignmentId,
+        reviewed: true,
       },
       select: {
-        score: true,
+        totalScore: true,
       },
     });
 
     let outlierAnalysis = null;
     if (historicalGrades.length >= 10) {
       const historicalResults = historicalGrades.map(g => ({
-        totalScore: g.score || 0,
-        percentage: (g.score || 0) * 10,
-        grade: validator['scoreToGrade'](g.score || 0),
+        totalScore: g.totalScore || 0,
+        percentage: (g.totalScore || 0) * 10,
+        grade: validator['scoreToGrade'](g.totalScore || 0),
         confidence: 0.8,
         criteriaScores: [],
         overallFeedback: '',
@@ -161,24 +160,27 @@ export async function POST(req: NextRequest) {
 
     // 8. Save to database
     const submissionData = {
-      assignmentId,
+      answerKeyId: assignmentId,
+      teacherId: session.user.id,
       studentId: session.user.id,
-      content: submission,
-      status: needsReview ? 'PENDING_REVIEW' : 'GRADED',
-      score: gradingResult.totalScore,
-      feedback: gradingResult.overallFeedback,
-      aiGradingResult: gradingResult as any,
-      confidence: gradingResult.confidence,
-      gradedAt: needsReview ? null : new Date(),
-      submittedAt: new Date(),
+      detectedAnswers: {} as any,
+      detectedPart2: {} as any,
+      detectedPart3: {} as any,
+      status: needsReview ? 'error' : 'scanned',
+      totalScore: gradingResult.totalScore,
+      gradeLabel: gradingResult.grade,
+      essayNotes: { feedback: gradingResult.overallFeedback } as any,
+      reviewed: !needsReview,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const savedSubmission = existingSubmission
-      ? await prisma.submission.update({
+      ? await prisma.gradedSheet.update({
           where: { id: existingSubmission.id },
           data: submissionData,
         })
-      : await prisma.submission.create({
+      : await prisma.gradedSheet.create({
           data: submissionData,
         });
 
@@ -190,10 +192,10 @@ export async function POST(req: NextRequest) {
         studentId: session.user.id,
         studentName: session.user.name || 'Unknown',
         assignmentId,
-        assignmentName: assignment.title,
+        assignmentName: answerKey.examName,
         subject,
         gradeLevel: gradeLevel || '10',
-        question: assignment.description || '',
+        question: '',
         studentAnswer: submission,
         aiGrading: gradingResult,
         aiConfidence: gradingResult.confidence,
@@ -222,7 +224,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        submissionId: savedSubmission.id,
+        sheetId: savedSubmission.id,
         score: gradingResult.totalScore,
         percentage: gradingResult.percentage,
         grade: gradingResult.grade,
@@ -236,6 +238,7 @@ export async function POST(req: NextRequest) {
         criteriaScores: gradingResult.criteriaScores,
         needsReview,
         reviewTaskId,
+        reviewed: savedSubmission.reviewed,
         status: savedSubmission.status,
         gradingTime,
         outlierAnalysis: outlierAnalysis ? {

@@ -5,7 +5,7 @@ import { db } from "@/lib/db"
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,8 +13,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const room = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { teacherId: true },
     })
     if (!room) {
@@ -47,7 +48,7 @@ export async function POST(
       },
     })
 
-    if (!schedule || schedule.examRoomId !== params.id) {
+    if (!schedule || schedule.examRoomId !== id) {
       return NextResponse.json({ error: "Schedule not found" }, { status: 404 })
     }
 
@@ -59,7 +60,7 @@ export async function POST(
       if (schedule.Exam.examQuestions.length > 0) {
         await tx.examRoomQuestion.createMany({
           data: schedule.Exam.examQuestions.map((eq, idx) => ({
-            examRoomId: params.id,
+            examRoomId: id,
             questionId: eq.questionId,
             position: idx + 1,
             points: Number(eq.points) || 1.0,
@@ -69,7 +70,7 @@ export async function POST(
       }
 
       await tx.examRoomSchedule.updateMany({
-        where: { examRoomId: params.id },
+        where: { examRoomId: id },
         data: { isActive: false },
       })
 

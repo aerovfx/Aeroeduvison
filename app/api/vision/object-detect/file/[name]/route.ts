@@ -13,16 +13,16 @@ const UPLOAD_DIR = '/Users/pixibox/Aeroeduvison/uploads/mediapipe';
  */
 export async function GET(
   request: Request,
-  { params }: { params: { name: string } }
+  { params }: { params: Promise<{ name: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { name } = params;
+    const { name } = await params;
     const filePath = join(UPLOAD_DIR, name);
 
     // Security check

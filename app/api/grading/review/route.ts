@@ -79,44 +79,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Fetch submission
-    const submission = await prisma.submission.findUnique({
+    // 4. Fetch graded sheet
+    const submission = await prisma.gradedSheet.findUnique({
       where: { id: submissionId },
       include: {
-        assignment: {
-          include: {
-            course: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        answerKey: true,
       },
     });
 
     if (!submission) {
       return NextResponse.json(
-        { error: 'Submission not found' },
+        { error: 'Graded sheet not found' },
         { status: 404 }
       );
     }
 
-    console.log(`👤 ${session.user.name} reviewing submission ${submissionId}...`);
+    console.log(`👤 ${session.user.name} reviewing sheet ${submissionId}...`);
 
-    // 5. Get AI grading result
-    const aiGrading = submission.aiGradingResult as any;
-
-    if (!aiGrading) {
-      return NextResponse.json(
-        { error: 'AI grading result not found' },
-        { status: 400 }
-      );
-    }
-
-    // 6. Compare human vs AI
+    // 5. Compare human vs sheet
     const humanGrade = {
       submissionId,
       teacherId: session.user.id,
@@ -131,52 +111,50 @@ export async function POST(req: NextRequest) {
     const comparison = validator.validateAgainstHuman(
       submissionId,
       {
-        totalScore: aiGrading.totalScore,
-        percentage: aiGrading.percentage,
-        grade: aiGrading.grade,
-        criteriaScores: aiGrading.criteriaScores,
-        overallFeedback: aiGrading.overallFeedback || submission.feedback || '',
-        strengths: aiGrading.strengths || [],
-        improvements: aiGrading.improvements || [],
-        suggestions: aiGrading.suggestions || [],
-        confidence: submission.confidence || 0,
+        totalScore: submission.totalScore,
+        percentage: submission.percentage,
+        grade: submission.gradeLabel,
+        criteriaScores: [],
+        overallFeedback: feedback || '',
+        strengths: [],
+        improvements: [],
+        suggestions: [],
+        confidence: 0.8,
       },
       humanGrade
     );
 
-    console.log(`📊 Human vs AI: ${comparison.agreement.overall} (Δ${comparison.scoreDifference.toFixed(1)})`);
+    console.log(`📊 Human vs Sheet: ${comparison.agreement.overall} (Δ${comparison.scoreDifference.toFixed(1)})`);
 
-    // 7. Update submission
-    const updatedSubmission = await prisma.submission.update({
+    // 7. Update graded sheet
+    const updatedSubmission = await prisma.gradedSheet.update({
       where: { id: submissionId },
       data: {
-        score,
-        feedback,
-        status: 'GRADED',
-        reviewedBy: session.user.id,
-        reviewNotes: notes,
-        gradedAt: new Date(),
-        humanReviewData: {
-          ...humanGrade,
-          comparison,
+        totalScore: score,
+        gradeLabel: scoreToGrade(score),
+        reviewed: true,
+        essayNotes: {
+          feedback,
+          notes,
+          ...((submission.essayNotes as any) || {}),
         } as any,
+        updatedAt: new Date(),
       },
     });
 
     // 8. Submit review to workflow (for stats tracking)
     try {
-      // This would integrate with the review workflow
-      // For now, just log the review
+      // Log the review
       await logReviewComparison({
         submissionId,
-        assignmentId: submission.assignmentId,
-        subject: submission.assignment.course.subject || 'unknown',
+        answerKeyId: submission.answerKeyId,
+        subject: 'general',
         teacherId: session.user.id,
-        aiScore: aiGrading.totalScore,
+        sheetScore: submission.totalScore,
         humanScore: score,
         difference: comparison.scoreDifference,
         agreement: comparison.agreement.overall,
-        confidence: submission.confidence || 0,
+        confidence: 0.8,
         timeSpent: timeSpent || 0,
       });
     } catch (error) {
@@ -187,9 +165,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        submissionId: updatedSubmission.id,
+        sheetId: updatedSubmission.id,
         humanScore: score,
-        aiScore: aiGrading.totalScore,
+        sheetScore: submission.totalScore,
         comparison: {
           scoreDifference: comparison.scoreDifference,
           percentageDifference: comparison.percentageDifference,
@@ -199,8 +177,8 @@ export async function POST(req: NextRequest) {
           gradeLevelMatch: comparison.gradeLevelMatch,
           feedbackSimilarity: comparison.feedback.similarity,
         },
-        status: updatedSubmission.status,
-        gradedAt: updatedSubmission.gradedAt,
+        reviewed: updatedSubmission.reviewed,
+        updatedAt: updatedSubmission.updatedAt,
       },
     });
 
@@ -256,39 +234,26 @@ export async function GET(req: NextRequest) {
       whereClause.reviewedBy = session.user.id;
     }
 
-    const submissions = await prisma.submission.findMany({
+    const submissions = await prisma.gradedSheet.findMany({
       where: whereClause,
       include: {
-        assignment: {
-          include: {
-            course: true,
-          },
-        },
-        student: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
+        answerKey: true,
       },
       orderBy: [
-        { submittedAt: 'asc' }, // Oldest first
+        { createdAt: 'asc' }, // Oldest first
       ],
       take: limit,
     });
 
     // 4. Format as review tasks
     const reviewTasks = submissions.map(s => {
-      const aiGrading = s.aiGradingResult as any;
-
-      // Calculate priority based on confidence and score
+      // Calculate priority based on score
       let taskPriority: 'critical' | 'high' | 'medium' | 'low' = 'medium';
-      if ((s.confidence || 0) < 0.5 || (s.score || 0) >= 9.5 || (s.score || 0) <= 1) {
+      if ((s.totalScore || 0) >= 9.5 || (s.totalScore || 0) <= 1) {
         taskPriority = 'critical';
-      } else if ((s.confidence || 0) < 0.7 || Math.abs((s.score || 5) - 5) < 1) {
+      } else if ((s.totalScore || 0) >= 7 && (s.totalScore || 0) < 9.5) {
         taskPriority = 'high';
-      } else if ((s.confidence || 0) < 0.85) {
+      } else if ((s.totalScore || 0) >= 5 && (s.totalScore || 0) < 7) {
         taskPriority = 'medium';
       } else {
         taskPriority = 'low';
@@ -296,26 +261,22 @@ export async function GET(req: NextRequest) {
 
       return {
         id: s.id,
-        submissionId: s.id,
-        student: s.student,
-        assignment: {
-          id: s.assignment.id,
-          title: s.assignment.title,
-          subject: s.assignment.course.subject,
-          gradeLevel: s.assignment.course.gradeLevel,
+        sheetId: s.id,
+        studentName: s.studentName,
+        studentId: s.studentId,
+        answerKey: {
+          id: s.answerKey.id,
+          examName: s.answerKey.examName,
+          examCode: s.answerKey.examCode,
         },
-        content: s.content,
-        aiGrading: {
-          score: s.score,
-          grade: s.score ? scoreToGrade(s.score) : null,
-          confidence: s.confidence,
-          feedback: s.feedback,
-          criteriaScores: aiGrading?.criteriaScores || [],
-        },
+        detectedAnswers: s.detectedAnswers,
+        score: s.totalScore,
+        grade: s.gradeLabel || scoreToGrade(s.totalScore),
+        reviewed: s.reviewed,
         priority: taskPriority,
         status: s.status,
-        submittedAt: s.submittedAt,
-        waitTime: Math.floor((Date.now() - new Date(s.submittedAt).getTime()) / 1000), // seconds
+        createdAt: s.createdAt,
+        waitTime: Math.floor((Date.now() - new Date(s.createdAt).getTime()) / 1000), // seconds
       };
     });
 
@@ -368,29 +329,29 @@ export async function GET(req: NextRequest) {
  * Get reviewer stats
  */
 async function getReviewerStats(reviewerId: string) {
-  const totalReviews = await prisma.submission.count({
+  const totalReviews = await prisma.gradedSheet.count({
     where: {
-      reviewedBy: reviewerId,
-      status: 'GRADED',
+      teacherId: reviewerId,
+      reviewed: true,
     },
   });
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const reviewsToday = await prisma.submission.count({
+  const reviewsToday = await prisma.gradedSheet.count({
     where: {
-      reviewedBy: reviewerId,
-      status: 'GRADED',
-      gradedAt: {
+      teacherId: reviewerId,
+      reviewed: true,
+      updatedAt: {
         gte: todayStart,
       },
     },
   });
 
-  const pendingTasks = await prisma.submission.count({
+  const pendingTasks = await prisma.gradedSheet.count({
     where: {
-      status: 'PENDING_REVIEW',
+      reviewed: false,
     },
   });
 
@@ -420,10 +381,10 @@ async function getReviewerStats(reviewerId: string) {
  */
 async function logReviewComparison(data: {
   submissionId: string;
-  assignmentId: string;
+  answerKeyId: string;
   subject: string;
   teacherId: string;
-  aiScore: number;
+  sheetScore: number;
   humanScore: number;
   difference: number;
   agreement: string;

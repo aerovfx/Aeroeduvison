@@ -10,6 +10,7 @@ import {
   SkillNode,
   MasteryLevel,
   EmotionState,
+  EmotionTimeline,
   InteractionSignals,
   XPVectors,
   AttemptHistory,

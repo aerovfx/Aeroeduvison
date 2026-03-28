@@ -5,7 +5,7 @@ import { db } from "@/lib/db"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -13,8 +13,9 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const room = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { teacherId: true },
     })
     if (!room) {
@@ -25,7 +26,7 @@ export async function GET(
     }
 
     const schedules = await db.examRoomSchedule.findMany({
-      where: { examRoomId: params.id },
+      where: { examRoomId: id },
       include: {
         Exam: {
           select: {
@@ -48,7 +49,7 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -56,8 +57,9 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const room = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { teacherId: true },
     })
     if (!room) {
@@ -96,7 +98,7 @@ export async function POST(
 
     const schedule = await db.examRoomSchedule.create({
       data: {
-        examRoomId: params.id,
+        examRoomId: id,
         examId,
         label: label || exam.title,
         activeFrom: from,
@@ -118,7 +120,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -126,8 +128,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const room = await db.onlineExamRoom.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { teacherId: true },
     })
     if (!room) {

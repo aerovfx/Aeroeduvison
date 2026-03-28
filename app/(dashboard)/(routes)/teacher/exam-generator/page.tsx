@@ -44,7 +44,7 @@ interface ExamMetadata {
   llm_model: string;
 }
 
-export function TeacherExamDashboard() {
+export default function TeacherExamDashboard() {
   const [matrixId, setMatrixId] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [variantCount, setVariantCount] = useState(1);

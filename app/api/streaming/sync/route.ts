@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const operation = searchParams.get('operation') || 'export';
-    const moduleNameName = searchParams.get('moduleName') || 'all';
+    const moduleName = searchParams.get('moduleName') || 'all';
 
     // Create streaming response
     const encoder = new TextEncoder();

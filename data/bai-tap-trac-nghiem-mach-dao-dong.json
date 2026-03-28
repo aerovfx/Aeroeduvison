@@ -1,0 +1,210 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-mach-dao-dong.jsp",
+  "title": "30 bài tập trắc nghiệm Mạch dao động (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Trong mạch dao động điện từ lí tưởng với tần số góc ω. Khi điện tích tức thời của tụ điện là q thì dòng điện tức thời trong mạch là i. Cường độ dòng điện trong mạch dao động với biên độ là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Một tụ điện có điện dung C = 10 µF được tích điện áp U0= 20 V. Sau đó cho tụ phóng điện qua một cuộn cảm L = 0,01 H, điện trở thuần không đáng kể. (Lấy π=√10). Điện tích của tụ điện ở thời điểm t1= 2,5.10-4s kể từ lúc tụ điện bắt đầu phóng điện là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Một tụ điện có điện dung C = 0,02 µF được tích điện áp U0= 6 V. Lúc t = 0, người ta nối tụ điện này với một cuộn cảm thuần có độ tự cảm L = 0,2 mH. Biểu thức điện áp giữa hai bản tụ là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Khi mắc cuộn cảm L với tụ điện C1thành mạch dao động thì tần số dao động riêng của mạch là f1, khi mắc L với tụ điện C2thì tần số dao động riêng của mạch là f2. Muốn tần số dao động của mạch là (f1+ f2)/2 thì điện dung của tụ điện trong mạch có giá trị là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một mạch điện dao động điện từ lí tưởng có L = 5 mH; C = 0,0318 mF. Điện áp cực đại trên tụ điện là 8 V. Khi điện áp trên tụ điện là 4 V thì cường độ dòng điện tức thời trong mạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,55 A     \tB. 0,45 A"
+          },
+          {
+            "option": "C",
+            "text": "0,55 mA     \tD. 0,45 mA"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một mạch dao động từ LC lí tưởng. Khi điện áp giữa hai đầu bản tụ điện là 2 V thì cường độ dòng điện đi qua cuộn dây là i, khi điện áp giữa hai đầu bản tụ điện là 4 V thì cường độ dòng điện qua cuộn dây là  i/2. Điện áp cực đại giữa hai đầu cuộn dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 V       \tB. 2√5 V"
+          },
+          {
+            "option": "C",
+            "text": "2√3 V     \tD. 6 V"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Cho mạch dao động LC, cuộn dây có độ tự cảm  L = 2mH và tụ điện có điện dung C = 2pF. Lấy π2= 10. Tần số dao động f của mạch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,5 MHz      \t\tB. 25 Hz"
+          },
+          {
+            "option": "C",
+            "text": "10 Hz\t        D. 2,5 MHz"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một mạch dao động điện từ lí tưởng đang dao động điện từ tự do. Biết điện tích cực đại trên một bản tụ điện là 4√2 µC và cường độ dòng điện cực đại là  0,5π√2 A. Thời gian ngắn nhất để điện tích trên một bản tụ giảm từ giá trị cực đại đến một nửa giá trị cực đại là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một mạch dao động lí tưởng gồm một cuộn cảm có độ tự cảm L và tụ điện có điện dung C thực hiện dao động điện từ. Giá trị cực đại của điện áp giữa hai bản tụ bằng U0. Giá trị cực đại của cường độ dòng điện trong mạch là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Khung dao động điện từ gồm một cuộn dây thuần cảm có độ tự cảm L = 0,1 H và tụ điện có điện dung C = 10µF. Dao động điện từ trong khung là dao động điều hòa với cường độ dòng điện cực đại I0= 0,05 A. Tính điện áp giữa hai bản tụ ở thời điểm i = 0,03 A và cường độ dòng điện trong mạch lúc điện tích trên tụ có giá trị q = 30 µC.",
+        "options": [
+          {
+            "option": "A",
+            "text": "u = 4 V, i = 0,4 A."
+          },
+          {
+            "option": "B",
+            "text": "u = 5 V, i = 0,04 A."
+          },
+          {
+            "option": "C",
+            "text": "u = 4 V, i = 0,04 A."
+          },
+          {
+            "option": "D",
+            "text": "u = 5 V, i = 0,4 A."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một mạch dao động điện từ gồm một tụ điện có điện dung 0,125µF và một cuộn cảm có độ tự cảm 50µF . Điện trở thuần của mạch không đáng kể. Hiệu điện thế cực đại giữa hai bản tụ điện là 3V. Cường độ dòng điện cực đại trong mạch là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một mạch dao động LC lý tưởng, gồm cuộn cảm thuần có độ tự cảm L và tụ điện có điện dung C. Trong mạch có dao động điện từ tự do. Gọi U0, I0lần lượt là điện áp cực đại giữa hai đầu tụ điện và cường độ dòng điện cực đại trong mạch thì:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Trong mạch dao động lý tưởng gồm tụ điện có điện dung C và cuộn cảm thuần có độ tự cảm L đang có dao động điện từ tự do. Biết hiệu điện thế cực đại giữa hai bản tụ là U0. Khi hiệu điện thế giữa hai bản tụ là 0,5U0thì cường độ dòng điện trong mạch có độ lớn bằng:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Cho một mạch dao động LC lý tưởng, gọi Δt là chu kỳ biến thiên tuần hoàn của năng lượng từ trường trong cuộn cảm. Tại thời điểm t thì độ lớn điện tích trên tụ là 15√3.10-6C và dòng điện trong mạch là 0,03 A. Tại thời điểm (t + Δt/2)  thì dòng điện trong mạch là 0,03√3 A. Điện tích cực đại trên tụ là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Trong một mạch dao động điện từ LC với L = 25 mH và C = 1,6 µF. đang có dao động điện từ. Ở thời điểm t, cường độ dòng điện trong mạch có độ lớn bằng 6,93 mA và điện tích trên tụ điện bằng 0,8 µC. Năng lượng của mạch dao động bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,6 mJ.     \tB. 800 nJ."
+          },
+          {
+            "option": "C",
+            "text": "1,2 mJ.     \tD. 0,8 mJ."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

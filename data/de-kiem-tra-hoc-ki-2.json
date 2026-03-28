@@ -1,0 +1,590 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/de-kiem-tra-hoc-ki-2.jsp",
+  "title": "Đề thi Vật Lí 12 Học kì 2 năm 2026 (có lời giải)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Gọi nđ, nvvà nllần lượt là chiết suất của thủy tinh đới với ánh sáng đỏ, ánh sáng vàng và ánh sáng lam. Hệ thức vào dưới đây đúng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "nđ> nv> nlB.\tnđ< nv< nl"
+          },
+          {
+            "option": "C",
+            "text": "nđ> nl> nvD.\tnđ< nl< nv"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Hiện tượng khẳng định ánh sáng có tính song là hiện tượng",
+        "options": [
+          {
+            "option": "A",
+            "text": "Phản xạ ánh sáng        B.\tKhúc xạ ánh sáng"
+          },
+          {
+            "option": "C",
+            "text": "Tán sắc ánh sáng        D.\tGiao thoa ánh sáng"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Tần số dao động riên của một mạch dao động phụ thuộc vào độ tự cảm L của cuộn cảm trong mạch như thế nào?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tỉ lệ thuận với L        B.\tTỉ lệ nghịch với L"
+          },
+          {
+            "option": "C",
+            "text": "Tỉ lệ thuận với √L        D.\tTỉ lệ nghịch với √L"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Chỉ ra câu có nội dung sai",
+        "options": [
+          {
+            "option": "A",
+            "text": "Điện trường tĩnh tồn tại xung quanh điện tích"
+          },
+          {
+            "option": "B",
+            "text": "Từ truòng tồn tại xung quanh dòng điện"
+          },
+          {
+            "option": "C",
+            "text": "Điện từ trường tĩnh tồn tại xung quanh điện trường biến thiên"
+          },
+          {
+            "option": "D",
+            "text": "Điện từ truòng chỉ tồn tại trong trạng thái lan truyền"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Tia nào dưới đây có khả năng đâm xuyên mạnh nhất?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia hồng ngoại        B.\tTia tử ngoại"
+          },
+          {
+            "option": "C",
+            "text": "Tia tím                D.\tTia X"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Ánh sáng có bước sóng 3.10-7m thuộc loại tia nào?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia hồng ngoại        B.\tTia tử ngoại"
+          },
+          {
+            "option": "C",
+            "text": "Tia tím                D.\tTia X"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Khi hoạt động, vật nào dưới đây có thể phát ra tia hồng ngoại mạnh nhất?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Đèn LED đỏ        B.\tBóng đèn pin"
+          },
+          {
+            "option": "C",
+            "text": "Đèn ống        D.\tChiếc bàn là"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Tia nào dưới đây được dùng để chữa bệnh còi xương?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia hồng ngoại        B.\tTia tử ngoại"
+          },
+          {
+            "option": "C",
+            "text": "Tia đỏ                D.\tTia X"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Hiện tượng quang điện sẽ không xảy ra nếu chiếu ánh sáng hồ quang cào một tấm kẽm",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tích điện âm"
+          },
+          {
+            "option": "B",
+            "text": "Tích điện dương"
+          },
+          {
+            "option": "C",
+            "text": "Không tích điện"
+          },
+          {
+            "option": "D",
+            "text": "Được che chắn bằng một tấm thủy tinh dày"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Ban đầu có Nohạt nhân của một đồng vị phóng xạ. Sau 9 giờ kể từ thời điểm ban đầu, có 87,5% số hạt nhân của đồng vị này đã bị phân rã. Chu kì bán rã của đồng vị này là",
+        "options": [
+          {
+            "option": "A",
+            "text": "24 giờ        B.\t3 giờ        C.\t30 giờ        D.\t47 giờ"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Công thức tính năng lượng của một lượng tử năng lượng theo bước sóng ánh sáng là",
+        "options": [
+          {
+            "option": "A",
+            "text": "ε = hλ        B.\tε = hcλ        C.\tε = h/λ        D.\tε = hc/λ"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Sóng điện từ và sóng cơ không có chung nhau đặc điểm nào dưới đầy?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Là sóng ngang"
+          },
+          {
+            "option": "B",
+            "text": "Có thể truyền được trong chân không"
+          },
+          {
+            "option": "C",
+            "text": "Có thể phản xạ, khúc xạ, nhiễu xạ"
+          },
+          {
+            "option": "D",
+            "text": "Mang năng lượng"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Sóng vô tuyến có bước sóng 31 m là",
+        "options": [
+          {
+            "option": "A",
+            "text": "Sóng dài        B.\tSóng ngắn"
+          },
+          {
+            "option": "C",
+            "text": "Sóng trung        D.\tSóng cực ngắn"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Tia nào dưới đây không phải là sóng điện từ?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia catôt        B.\tTia tử ngoại"
+          },
+          {
+            "option": "C",
+            "text": "Tia hồng ngoại        D.\tTia X"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Trên thang sóng điện từ, vùng nào nằm tiếp giáp với vùng sóng vô tuyến?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia hồng ngoại         B.\tTia X"
+          },
+          {
+            "option": "C",
+            "text": "Tia tử ngoại        D.\tTia gamma"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Một nguyên tử hay phân tử có thể phát ra bào nhiều loại lượng tử năng lượng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Một loại        B.\tBa loại        C.\tHai loại        D.\tNhiều loại"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Hiện tượng quang dẫn có thể xảy ra khi chất nào dưới đây bị chiếu sáng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Cu         B.\tGe        C.\tZn        D.\tCs"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Dụng cụ nào dưới đây có thể biến quang năng thành điện năng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Pin mặt trời                B.\tAcquy"
+          },
+          {
+            "option": "C",
+            "text": "Pin Vôn – ta         D.\tĐinamô xe đạp"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Sự phát sáng của vật (hay con vật) nào dưới đây là hiện tượng quang – phát quang?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Một miếng nhựa phát quang        B.\tBóng bút thử điện"
+          },
+          {
+            "option": "C",
+            "text": "Con đom đóm        D.\tMàn hình vô tuyến"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Cho khối lượng của hạt proton ; nơtron và hạt nhân đơteri12D lần lượt là 1,0073 u ; 1,0087 u và 2,0136 u. Biết 1 u = 931,5 MeV/c2. Năng lượng liên kết riêng của hạt nhân đơteri12D là",
+        "options": [
+          {
+            "option": "A",
+            "text": "3,06 MeV/nuclôn        B.\t1,12 MeV/nuclôn"
+          },
+          {
+            "option": "C",
+            "text": "2,24 MeV/nuclôn        D.\t4,48 MeV/nuclôn"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Trong thì nhiệm về giao thoa ánh sáng với khe Y – âng, nếu dùng ánh sáng đỏ (λđ= 0,7 μm) thì khoảng vân đo được là 1,4 mm. Nếu dùng ánh sáng tím (λt= 0,4 μm) thì khoảng vân đo được là",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,2 mm        B.\t0,8 mm        C.\t0,4 mm        D.\t1,2 mm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Hạt nhân612C",
+        "options": [
+          {
+            "option": "A",
+            "text": "Mang điện tích -6|e|        B.\tMang điện tích +6|e|"
+          },
+          {
+            "option": "C",
+            "text": "Mang điện tích 12|e|        D.\tKhông mang điện tích"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Tìm câu sai. Cho hạt nhân92235U",
+        "options": [
+          {
+            "option": "A",
+            "text": "Số proton bằng 92        B.\tSố nuclôn bằng 235"
+          },
+          {
+            "option": "C",
+            "text": "Số nơtron bằng 235        D.\tSố nơtron bằng 143"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Một chất phóng xạ có hằng số phóng xạ λ. Ở thời điểm ban đầu có Nohạt nhân. Số hạt nhân đã bị phân rã sau thời gian t là",
+        "options": [
+          {
+            "option": "A",
+            "text": "Noe-λtB.\tNo(1-λt)"
+          },
+          {
+            "option": "C",
+            "text": "No(1-eλt)        D.\tNo(1-e-λt)"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Biết công thoát của êlectron khỏ một kim loại là 4,14 eV. Giới hạn quang điện của kim loại đó là",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,50 μm        B.\t0,26 μm        C.\t0,30 μm        D.\t0,35 μm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Trong nguyên tử hiđrô, với rolà bán kính Bo thì bán kính quỹ đạo dừng của êlectron không thể là",
+        "options": [
+          {
+            "option": "A",
+            "text": "12roB.\t25roC.\t9roD.\t16ro"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Trong thí nghiệm Y – âng về giao thoa ánh sáng, người ta dùng ánh sáng đơn sắc có bước sóng 600 nm, khoảng cách giữa hai khe là 1,5 mm, khoảng cách từ mặt phẳng chứa hai khe đến màn quan sát là 3 m. Trên màn, khoảng cách giữa hai vân sáng bậc 5 ở hai phía của vân sáng trung tâm là",
+        "options": [
+          {
+            "option": "A",
+            "text": "9,6 mm        B.\t24,0 mm        C.\t6,0 mm        D.\t12,0 mm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Khi một hạt nhân92235U phân hạch thì tỏa ra năng lượng 200 MeV. Cho số A – vô – ga – đrô NA=6,02.1023mol-1. Nếu 1 g92235U phân hạch hoàn toàn thì năng lượng tỏa ra xấp xỉ bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "5,1.1016J        B.\t8,2.1010J"
+          },
+          {
+            "option": "C",
+            "text": "5,1.1010J        D.\t8,2.1016J"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Trong chân không, ánh sáng tím có bước sóng 0,4 μm. Mỗi photon của ánh sáng này mang năng lượng xấp xỉ bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,97.10-31J        B.\t4,97.10-19J"
+          },
+          {
+            "option": "C",
+            "text": "2,49.10-19J        D.\t2,49.10-31J"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "Một mạch điện dao động gồm một cuộn cảm có độ tự cảm 0,1 mH và một tụ điện có điện dung 1 pF. Tần số dao động riêng của mạch là",
+        "options": [
+          {
+            "option": "A",
+            "text": "16 MHz        B.\t160 MHz        C.\t1,6 MHz        D.\t0,16 MHz"
+          }
+        ],
+        "answer": "Đáp án & Hướng dẫn giải",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "C",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "A",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "A",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 40
+}

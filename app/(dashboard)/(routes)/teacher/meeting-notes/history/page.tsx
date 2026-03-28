@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Clock, FileText, Trash2, Eye, Download, Users } from 'lucide-react';
+import { Clock, FileText, Trash2, Eye, Download, Users, Mic } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface Transcript {

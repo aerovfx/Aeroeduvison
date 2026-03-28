@@ -1,18 +1,107 @@
-node_modules
-.next
+# === Git ===
 .git
 .gitignore
-README.md
-.env.local
-.env.local.backup*
+
+# === Build/Runtime artifacts ===
+node_modules
+.next
+dist
+.contentlayer
+
+# === Environment & secrets ===
+.env
+.env.*
+!.env.example
+sa-ci-deployer-key.json
+gen-lang-client-*.json
+*.pem
+*.key
+cookies.txt
+cookies_new.txt
+
+# === Separate projects (NOT part of Next.js app) ===
+worldmonitor/
+openfang/
+openfang-core/
+openfang-env/
+openfang-aeroedu-camera-guard/
+openfang-aeroedu-exam-analytics/
+openfang-aeroedu-risk-watch/
+desktop-bun-electron/
+desktop-current-app/
+latex-compiler/
+rust-services/
+python-ocr/
+python-simulations/
+python-vision-server/
+aero-agent-os/
+transcript-video/
+
+# === Documentation & guides ===
+Guide/
+docs/*.md
+*.md
+!README.md
+
+# === Scripts & tooling ===
+scripts/
+.claude/
+.github/
+.vscode/
+.ruff_cache/
+.cache/
+.data/
+tools/
+
+# === Logs & temp ===
 *.log
+logs/
+*.tmp
+tmp/
+temp/
+next-dev.log
+deployment.log
+
+# === OS files ===
 .DS_Store
-coverage
-.nyc_output
-.vscode
+Thumbs.db
+
+# === IDE ===
 .idea
 *.swp
 *.swo
 *~
-scripts
-*.md
+
+# === Test files ===
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+test-*.ts
+check-*.js
+list-*.js
+fix-*.js
+
+# === Dev config & deployment docs ===
+docker-compose*.yml
+Dockerfile.dev
+cloud-run.yaml
+*.txt
+cookies*.txt
+bun.lock
+
+# === Uploads & data ===
+uploads/
+Collection_Skill_Tmp/
+
+# === Reference projects ===
+next-auth-v5-advanced-guide-master/
+.skills/
+
+# === Misc dev files ===
+*.bak
+*.backup
+coverage/
+.nyc_output/
+autocannon/

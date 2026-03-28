@@ -5,15 +5,12 @@ interface AuthBackButtonProps {
   href: string;
 }
 
-export const AuthBackButton = ({
-  label,
-  href
-}: AuthBackButtonProps) => {
+export const AuthBackButton = ({ label, href }: AuthBackButtonProps) => {
   return (
-    <div className="text-center w-full">
+    <div className="w-full text-center">
       <Link
         href={href}
-        className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+        className="text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         {label}
       </Link>

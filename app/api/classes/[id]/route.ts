@@ -6,17 +6,18 @@ import { db as prisma } from "@/lib/db"
 // GET /api/classes/[id] - Get class details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const classData = await prisma.class.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!classData) {
@@ -60,17 +61,18 @@ export async function GET(
 // DELETE /api/classes/[id] - Delete class
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const classData = await prisma.class.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!classData) {
@@ -89,7 +91,7 @@ export async function DELETE(
 
     // Delete class (cascade will delete ClassStudent records)
     await prisma.class.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({ success: true })

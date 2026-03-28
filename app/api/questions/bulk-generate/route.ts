@@ -314,7 +314,7 @@ function generateTrueFalse(topic: string, subject: string, grade: string, index:
   const isCorrect = index % 2 === 0
   
   return {
-    content: `Câu {index}: Trong {subject} ({grade}), về chủ đề {topic}: "Phát biểu này là {status}"`.replace("{index}", String(index + 1)).replace("{topic}", topic).replace("{subject}", subject).replace("{grade}", grade).replace("{status}", isCorrect ? "đúng" : "sai"),
+    content: `Câu ${index + 1}: Trong ${subject} (${grade}), về chủ đề ${topic}: "Phát biểu này là ${isCorrect ? "đúng" : "sai"}"`,
     correctAnswer: isCorrect ? "Đúng" : "Sai",
     explanation: isCorrect 
       ? "Phát biểu này đúng vì..." 
@@ -324,7 +324,7 @@ function generateTrueFalse(topic: string, subject: string, grade: string, index:
 
 function generateShortAnswer(topic: string, subject: string, grade: string, index: number) {
   return {
-    content: `Câu {index}: Hãy trình bày ngắn gọn về {topic} trong {subject} ({grade}).`.replace("{index}", String(index + 1)).replace("{topic}", topic).replace("{subject}", subject).replace("{grade}", grade),
+    content: `Câu ${index + 1}: Hãy trình bày ngắn gọn về ${topic} trong ${subject} (${grade}).`,
     correctAnswer: "Câu trả lời mẫu: " + topic + " là...",
     explanation: "Hướng dẫn trả lời chi tiết.",
   }
@@ -332,7 +332,7 @@ function generateShortAnswer(topic: string, subject: string, grade: string, inde
 
 function generateEssay(topic: string, subject: string, grade: string, index: number) {
   return {
-    content: `Câu {index}: Phân tích và chứng minh các tính chất của {topic} trong {subject} ({grade}). Trình bày đầy đủ các bước giải và lập luận.`.replace("{index}", String(index + 1)).replace("{topic}", topic).replace("{subject}", subject).replace("{grade}", grade),
+    content: `Câu ${index + 1}: Phân tích và chứng minh các tính chất của ${topic} trong ${subject} (${grade}). Trình bày đầy đủ các bước giải và lập luận.`,
     explanation: "Hướng dẫn chấm bài tự luận chi tiết với các tiêu chí đánh giá.",
   }
 }

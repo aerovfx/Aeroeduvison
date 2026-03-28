@@ -93,7 +93,7 @@ export const getChapter = async ({
         isPublished: true,
       },
       include: {
-        userProgress: {
+        UserProgress: {
           where: {
             userId: userId,
           }

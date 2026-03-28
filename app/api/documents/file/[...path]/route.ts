@@ -8,17 +8,18 @@ import { existsSync } from "fs"
 // GET /api/documents/file/[...path] - Serve document files
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { path } = await params
     // Reconstruct the file path
-    const filePath = Array.isArray(params.path) ? params.path.join("/") : params.path
+    const filePath = Array.isArray(path) ? path.join("/") : path
     
     // Security: Only allow access to user's own files (documents or results)
     const isDocumentsPath = filePath.startsWith(`documents/${session.user.id}/`)

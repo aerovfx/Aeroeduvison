@@ -5,7 +5,7 @@
 
 "use client"
 
-import { Copy, Download, Mic } from 'lucide-react';
+import { Copy, Download, Mic, Loader2 } from 'lucide-react';
 
 interface Props {
   transcript: string;

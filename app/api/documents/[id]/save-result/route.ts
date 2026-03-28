@@ -9,17 +9,18 @@ import { existsSync } from "fs"
 // POST /api/documents/[id]/save-result - Save final digitized result to file
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const document = await prisma.document.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!document) {
@@ -126,7 +127,7 @@ export async function POST(
 
     // Update document with result file URL
     await prisma.document.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         digitizedUrl: fileUrl,
         metadata: {

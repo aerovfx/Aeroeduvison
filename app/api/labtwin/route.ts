@@ -945,9 +945,62 @@ const PYTHON_LABS_DATA = {
             ],
             "tags": ["rpg", "pixel-art", "ai-agents", "game", "chat", "exploration"],
             "internal_link": "/dashboard/labtwin/labs/pixel-agents"
+        },
+        {
+            "id": "wokwi-sim",
+            "name": "Electronics Simulator",
+            "description": "Mô phỏng mạch điện tử kiểu Wokwi với ESP32, Arduino, LED, cảm biến và các linh kiện. Kéo thả linh kiện, nối dây và chạy mô phỏng ngay trên trình duyệt!",
+            "category": "Điện tử",
+            "level": "Trung bình",
+            "difficulty": "Trung bình",
+            "xp": 200,
+            "duration": "30 phút",
+            "port": null,
+            "icon": "Zap",
+            "features": [
+                "Kéo thả linh kiện điện tử (ESP32, Arduino, LED, cảm biến)",
+                "Vẽ dây nối giữa các chân linh kiện",
+                "Code editor với 5 sketch Arduino mẫu",
+                "Serial Monitor mô phỏng",
+                "Mô phỏng LED nhấp nháy, servo quay, cảm biến"
+            ],
+            "learning_objectives": [
+                "Hiểu cách kết nối linh kiện điện tử",
+                "Lập trình Arduino/ESP32 cơ bản",
+                "Sử dụng cảm biến và actuator",
+                "Thiết kế mạch IoT đơn giản"
+            ],
+            "tags": ["điện tử", "ESP32", "Arduino", "IoT", "mạch", "LED", "cảm biến", "Wokwi"],
+            "internal_link": "/dashboard/labtwin/labs/wokwi-sim"
+        },
+        {
+            "id": "r3f-sandbox",
+            "name": "3D Simulation Sandbox",
+            "description": "Sandbox giả lập 3D với React Three Fiber. Khám phá phân tử H₂O, phòng thí nghiệm hóa học, con lắc, hệ mặt trời và va chạm Newton trong không gian 3D tương tác!",
+            "category": "Hóa học",
+            "level": "Trung bình",
+            "difficulty": "Trung bình",
+            "xp": 180,
+            "duration": "25 phút",
+            "port": null,
+            "icon": "Atom",
+            "features": [
+                "Xoay/zoom mô hình 3D tương tác",
+                "5 giả lập: H₂O, phòng thí nghiệm, con lắc, hệ mặt trời, Newton's Cradle",
+                "Code editor hiển thị source code R3F",
+                "Hiệu ứng Bloom, Environment, Grid"
+            ],
+            "learning_objectives": [
+                "Hiểu cấu trúc phân tử nước H₂O",
+                "Quan sát chuyển động con lắc và lò xo",
+                "Khám phá hệ mặt trời mô phỏng",
+                "Tìm hiểu va chạm đàn hồi Newton's Cradle"
+            ],
+            "tags": ["3D", "R3F", "phân tử", "hóa học", "vật lý", "con lắc", "hệ mặt trời"],
+            "internal_link": "/dashboard/aura"
         }
     ],
-    "total": 36,
+    "total": 38,
     "last_updated": "2024-12-19T12:00:00Z",
     "categories": [
         "Cơ học",
@@ -960,7 +1013,8 @@ const PYTHON_LABS_DATA = {
         "Khí tượng",
         "Computer Vision",
         "Sóng",
-        "Học qua trò chơi"
+        "Học qua trò chơi",
+        "Điện tử"
     ]
 };
 

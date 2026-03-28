@@ -381,7 +381,7 @@ Provide objective, detailed analysis with constructive feedback.`;
       criteriaScores: {
         content: criteriaScores.content || criteriaScores.noidung || 7,
         structure: criteriaScores.structure || criteriaScores.cautruc || 7,
-        language: criterion.scopes.language || criteriaScores.ngonngu || 7,
+        language: criteriaScores.language || criteriaScores.ngonngu || 7,
         mechanics: criteriaScores.mechanics || criteriaScores.chinhta || 7,
       },
       confidence,

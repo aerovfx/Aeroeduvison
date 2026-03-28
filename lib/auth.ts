@@ -239,43 +239,44 @@ export const authOptions: NextAuthOptions = {
 
       // Update token with fresh data from database
       if (trigger === "update" || (token.email && Date.now() - (token.lastUpdated as number) > 5 * 60 * 1000)) {
-        // console.log("🔄 [JWT] Refreshing token data from database")
-        const normalizedEmail = token.email!.toLowerCase().trim()
-        const dbUser = await db.user.findUnique({
-          where: { email: normalizedEmail },
-          select: { id: true, email: true, role: true, name: true, image: true }
-        })
+        try {
+          const normalizedEmail = token.email!.toLowerCase().trim()
+          const dbUser = await db.user.findUnique({
+            where: { email: normalizedEmail },
+            select: { id: true, email: true, role: true, name: true, image: true }
+          })
 
-        if (dbUser) {
-          token.role = dbUser.role
-          token.id = dbUser.id
-          token.email = dbUser.email
-          token.name = dbUser.name || ""
-          token.image = dbUser.image || ""
-          token.lastUpdated = Date.now()
-          // console.log("✅ [JWT] Token refreshed with DB data:", { id: token.id, email: token.email, role: token.role })
-        } else {
-          // console.log("❌ [JWT] User not found in database")
-          // Returning null is not allowed by types. 
-          // We can return the token as is, or an empty token?
-          // Returning token is safest.
+          if (dbUser) {
+            token.role = dbUser.role
+            token.id = dbUser.id
+            token.email = dbUser.email
+            token.name = dbUser.name || ""
+            token.image = dbUser.image || ""
+            token.lastUpdated = Date.now()
+          }
+        } catch (error) {
+          console.error("❌ [JWT] Error refreshing token from DB:", error)
+          // Return existing token when DB is unavailable
           return token
         }
       }
 
       // Đảm bảo role được cập nhật từ database cho Google OAuth
       if (account?.provider === "google" && token.email) {
-        const normalizedEmail = token.email.toLowerCase().trim()
-        const dbUser = await db.user.findUnique({
-          where: { email: normalizedEmail },
-          select: { id: true, email: true, role: true, name: true, image: true }
-        })
-        if (dbUser) {
-          token.role = dbUser.role
-          token.id = dbUser.id
-          token.name = dbUser.name || ""
-          token.image = dbUser.image || ""
-          // console.log("✅ [JWT] Updated token for Google OAuth user:", { id: token.id, email: token.email, role: token.role })
+        try {
+          const normalizedEmail = token.email.toLowerCase().trim()
+          const dbUser = await db.user.findUnique({
+            where: { email: normalizedEmail },
+            select: { id: true, email: true, role: true, name: true, image: true }
+          })
+          if (dbUser) {
+            token.role = dbUser.role
+            token.id = dbUser.id
+            token.name = dbUser.name || ""
+            token.image = dbUser.image || ""
+          }
+        } catch (error) {
+          console.error("❌ [JWT] Error updating Google OAuth token:", error)
         }
       }
 

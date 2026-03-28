@@ -1,7 +1,5 @@
 'use client';
 
-"use client"
-
 import { useState, useEffect } from "react";
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useSearchParams } from "next/navigation";
@@ -112,7 +110,7 @@ export default function LabsIndexPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-[hsl(260,30%,8%)] dark:via-[hsl(280,25%,10%)] dark:to-[hsl(240,30%,8%)]">
         <div className="text-center">
           <div className="text-lg text-gray-700">Đang tải...</div>
         </div>
@@ -121,7 +119,7 @@ export default function LabsIndexPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-pink-50 to-purple-50 dark:from-[hsl(260,30%,8%)] dark:via-[hsl(280,25%,10%)] dark:to-[hsl(240,30%,8%)]">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">

@@ -41,8 +41,8 @@ const NeuCard = ({ children, className = '', hover = true, variant = 'flat', sty
 const MetricGauge = ({ label, value, unit, color, icon: Icon }: any) => (
   <NeuCard variant="pressed" className="flex flex-col items-center justify-center gap-2">
     <div className="relative w-20 h-20 flex items-center justify-center">
-       <svg className="w-full h-full -rotate-90">
-         <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
+       <svg className="w-full h-full -rotate-90 text-foreground/[0.06]">
+         <circle cx="40" cy="40" r="34" fill="none" stroke="currentColor" strokeWidth="6" />
          <circle 
            cx="40" cy="40" r="34" fill="none" stroke={color} strokeWidth="6" 
            strokeDasharray={213.6} 

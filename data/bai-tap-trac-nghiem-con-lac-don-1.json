@@ -1,0 +1,322 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-con-lac-don-1.jsp",
+  "title": "30 bài tập trắc nghiệm Con lắc đơn (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Tại một nơi trên mặt đất, một con lắc đơn dao động điều hòa với chu kì 2,2 s. Lấy g = 10 m/s2, π2= 10. Khi giảm chiều dài dây treo của con lắc 21 cm thì con lắc mới dao động điều hòa với chu kì là",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,0 s.     \tB. 2,5 s."
+          },
+          {
+            "option": "C",
+            "text": "1,0 s.     \tD. 1,5 s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Một học sinh làm thí nghiệm đo gia tốc trọng trường bằng con lắc đơn. Khi đo chiều dài con lắc bằng một thước có chia độ đến milimet, kết quả đo 3 lần chiều dài sợi dây đều cho cùng một kết quả là 2,345m. Lấy sai số dụng cụ là một độ chia nhỏ nhất. Kết quả đo được viết là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "L = (2,345 ± 0,005) m."
+          },
+          {
+            "option": "B",
+            "text": "L = (2345 ± 0,001) mm."
+          },
+          {
+            "option": "C",
+            "text": "L = (2,345 ± 0,001) m."
+          },
+          {
+            "option": "D",
+            "text": "L = (2,345 ± 0,0005) m."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Một con lắc đơn có chiều dài 40 cm dao động điều hòa tại nơi có gia tốc trọng trường g = 10 m/s2với biên độ góc 0,02 rad. Tốc độ của con lắc khi dây treo thẳng đứng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 cm/s.\tB. 4 m/s."
+          },
+          {
+            "option": "C",
+            "text": "10 cm/s.\tD. 10 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một con lắc đơn có chiều dài 121 cm, dao động điều hòa tại nơi có gia tốc trọng trường g. Lấy π2= 10. Chu kì dao động của con lắc là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,5 s.     \tB. 2 s."
+          },
+          {
+            "option": "C",
+            "text": "1 s.       \tD. 2,2 s."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một con lắc đơn dao động với biên độ góc nhỏ ( α0< 15°). Ý nào sau đây là sai đối với chu kì của con lắc?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chu kì phụ thuộc chiều dài con lắc."
+          },
+          {
+            "option": "B",
+            "text": "Chu kì phụ thuộc gia tốc trọng trường nơi có con lắc."
+          },
+          {
+            "option": "C",
+            "text": "Chu kì phụ thuộc biên độ dao động."
+          },
+          {
+            "option": "D",
+            "text": "Chu kì không phụ thuộc vào khối lượng của con lắc."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một con lắc đơn gồm một dây kim loại nhẹ dài 1 m, dao động điều hoà với biên độ góc 0,2 rad trong một từ trường đều mà cảm ứng từ có hướng vuông góc với mặt phẳng dao động của con lắc và có độ lớn 1T. lấy gia tốc trọng trường 10 m/s2.  Tính suất điện động cực đại xuất hiện trên thanh treo con lắc:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,45 V.     \tB. 0,63 V."
+          },
+          {
+            "option": "C",
+            "text": "0,32 V.     \tD. 0,22 V."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Tại cùng một nơi trên mặt đất, nếu chu kì dao động điều hòa của con lắc đơn chiều dàillà 2 s thì chu kì dao động điều hòa của con lắc đơn chiều dài 2llà:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Hai con lắc đơn (với tần số góc dao động điều hòa lần lượt là 10π/9 rad/s và 10π/8 rad/s) được treo ở trần một căn phòng. Khi các vật nhỏ của hai con lắc đang ở vị trí cân bằng, đồng thời truyền cho chúng các vận tốc cùng hướng sao cho hai con lắc dao động điều hòa với cùng biên độ góc, trong hai mặt phẳng song song với nhau. Tìm khoảng thời gian kể từ lúc truyền vận tốc đến lúc hai dây treo song song nhau lần thứ 2014.",
+        "options": [
+          {
+            "option": "A",
+            "text": "1611,5 s.      \tB. 14486,4 s."
+          },
+          {
+            "option": "C",
+            "text": "14486,8 s.     \tD. 14501,2 s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Khi đưa một con lắc đơn lên cao theo phương thẳng đứng (coi chiều dài của con lắc không đổi) thì tần số dao động điều hoà của nó sẽ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng vì tần số dao động điều hoà của nó tỉ lệ nghịch với gia tốc trọng trường."
+          },
+          {
+            "option": "B",
+            "text": "giảm vì gia tốc trọng trường giảm theo độ cao."
+          },
+          {
+            "option": "C",
+            "text": "không đổi vì chu kỳ dao động điều hoà của nó không phụ thuộc vào gia tốc trọng trường."
+          },
+          {
+            "option": "D",
+            "text": "tăng vì chu kỳ dao động điều hoà của nó giảm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một con lắc đơn dao động với biên độ góc nhỏ. Chu kì của con lắckhôngthay đổi khi:",
+        "options": [
+          {
+            "option": "A",
+            "text": "thay đổi chiều dài con lắc."
+          },
+          {
+            "option": "B",
+            "text": "thay đổi gia tốc trọng trường."
+          },
+          {
+            "option": "C",
+            "text": "tăng biên độ góc đến 30°."
+          },
+          {
+            "option": "D",
+            "text": "thay đổi khối lượng của con lắc."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một con lắc đơn dao động điều hòa với chu kì T = 4 s, thời gian để con lắc đi từ vị trí cân bằng đến vị trí có li độ cực đại là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2 s.     \tB. 1,5 s."
+          },
+          {
+            "option": "C",
+            "text": "1 s.     \tD. 0,5 s."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một con lắc đơn treo vào đầu một sợi dây mảnh bằng kim loại, vật nặng có khối lượng riêng D. Khi dao động nhỏ trong bình chân không thì chu kì dao động là T. Bỏ qua mọi ma sát, khi dao động nhỏ trong một chất khí có khối lượng riêng εD (ε << 1) thì chu kỳ dao động là.",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Trong quá trình dao động điều hòa của con lắc đơn. Nhận định nào sau đây làsai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Khi quả nặng ở điểm giới hạn, lực căng dây treo có độ lớn nhỏ hơn trọng lượng của vật."
+          },
+          {
+            "option": "B",
+            "text": "Độ lớn của lực căng dây treo con lắc luôn lớn hơn trọng lượng vật."
+          },
+          {
+            "option": "C",
+            "text": "Chu kỳ dao động của con lắc không phụ thuộc vào biên độ dao động của nó."
+          },
+          {
+            "option": "D",
+            "text": "Khi khi góc hợp bởi phương dây treo con lắc và phương thẳng đứng giảm, tốc độ của quả năng sẽ tăng."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Hai con lắc đơn dao động điều hòa tại cùng một vị trí trên Trái Đất. Chiều dài và chu kì dao động của con lắc đơn lần lượt là l1, l2và T1, T2. Biết T2= 2T1. Hệ thức đúng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "l1= 2l2.\tB. l1= 4l2."
+          },
+          {
+            "option": "C",
+            "text": "l2= 4l1.\tD. l2= 2l1."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Con lắc đơn dao động nhỏ trong một điện trường đều có phương thẳng đứng hướng xuống, vật nặng có điện tích dương; biên độ A và chu kỳ dao động T. Vào thời điểm vật đi qua vị trí cân bằng thì đột ngột tắt điện trường. Chu kỳ và biên độ của con lắc khi đó thay đổi như thế nào? Bỏ qua mọi lực cản.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chu kỳ tăng; biên độ giảm."
+          },
+          {
+            "option": "B",
+            "text": "Chu kỳ giảm biên độ giảm."
+          },
+          {
+            "option": "C",
+            "text": "Chu kỳ giảm; biên độ tăng."
+          },
+          {
+            "option": "D",
+            "text": "Chu kỳ tăng; biên độ tăng."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

@@ -1,5 +1,16 @@
 [
   {
+    "id": "008786ca-f75e-483c-b499-219eca408134",
+    "userId": "teacher-user",
+    "type": "lecture",
+    "title": "Transcript 2026-03-28 17:08:25",
+    "transcript": "Xin chào.",
+    "summary": "",
+    "duration": 4,
+    "createdAt": "2026-03-28T10:10:28.463Z",
+    "updatedAt": "2026-03-28T10:10:28.463Z"
+  },
+  {
     "id": "a466fc9b-ae83-4b18-804a-aed5c784bca2",
     "userId": "teacher-user",
     "type": "lecture",

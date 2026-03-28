@@ -1,0 +1,306 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-may-phat-dien-xoay-chieu-dong-co-khong-dong-bo-ba-pha-1.jsp",
+  "title": "26 bài tập trắc nghiệm Máy phát điện xoay chiều, động cơ không đồng bộ ba pha (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một máy phát điện xoay chiều một pha có roto gồm 4 cặp cực từ, muốn tần số của dòng điện xoay chiều mà máy phát ra là 50 Hz thì roto phải quay với tốc độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "500 vòng/ phút"
+          },
+          {
+            "option": "B",
+            "text": "750 vòng/phút"
+          },
+          {
+            "option": "C",
+            "text": "1500 vòng/phút"
+          },
+          {
+            "option": "D",
+            "text": "3000 vòng/phút"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Trong mạch điện xoay chiều ba pha, tải mắc hình sao có dây trung hòa, khi một pha tiêu thụ điện bị hở thì cường độ dòng điện trong hai pha còn lại:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Đều tăng lên"
+          },
+          {
+            "option": "B",
+            "text": "Đều giảm xuống"
+          },
+          {
+            "option": "C",
+            "text": "Không thay đổi"
+          },
+          {
+            "option": "D",
+            "text": "Đều bằng 0"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Một máy phát điện xoay chiều tạo nên suất điện động e = 220√2 cos100πt (V). Tốc độ quay của roto là 1500 vòng/ phút. Số cặp cực của roto là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2     \tB.\t4"
+          },
+          {
+            "option": "C",
+            "text": "5     \tD.\t6"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Một mạch tiêu thụ điện là cuộn dây có điện trở thuần r = 8 Ω, tiêu thụ công suất P = 32 W với hệ số công suất cosφ = 0,8. Điện năng được đưa từ máy phát điện xoay chiều một pha nhờ dây dẫn có điện trở R = 4 Ω. Điện áp hiệu dụng giữa hai đầu đường dây nơi máy phát là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10√5  V     \tB.\t28 V"
+          },
+          {
+            "option": "C",
+            "text": "12√5  V      \tD.\t24 V"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một động cơ không đồng bộ ba pha đang hoạt động có tải. Biết roto quay với tần số là f và chu kì của dòng điện là T. So sánh T và f ta thấy:",
+        "options": [
+          {
+            "option": "A",
+            "text": "T = 1/f     \tB. T < 1/f"
+          },
+          {
+            "option": "C",
+            "text": "T > 1/f     \tD. T > 1/(2f)"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một động cơ điện xoay chiều có điện trở dây quấn là 20 Ω. Mắc động cơ vao mạng điện xoay chiều ó điện áp hiệu dụng là 220 V. Giả sử hệ số công suất của động cơ là cosφ = 0,85 không thay đổi, hao phí trong động cơ chỉ dol tỏa nhiệt. Công suất cơ cực đại mà động cơ có thể sinh ra là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "437 W     \tB.\t242 W"
+          },
+          {
+            "option": "C",
+            "text": "371 W     \tD.\t650 W"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Khi máy phát điện ba pha hoạt động, ở thời điểm suất điện động ở một cuộn dây đạt giá trị cực đại e1 = Eo thì suất điện động ở hai đầu cuộn dây còn lại là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một máy phát điện xoay chiều một pha có điện trở không đáng kể. Nối 2 cực của máy với cuộn dây thuần cảm. Khi roto quay với tốc độ n vòng/s thì cường độ dòng điện hiệu dụng qua cuộn cảm là I. Hỏi khi roto quay với tốc độ 3n vòng/s thì cường độ dòng điện hiệu dụng qua cuộn cảm bao nhiêu?",
+        "options": [
+          {
+            "option": "A",
+            "text": "I\t      \tB. 2I"
+          },
+          {
+            "option": "C",
+            "text": "3I     \tD.  I/3"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Trong máy phát điện xoay chiều 3 pha:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Stato là phần cảm, rôto là phần ứng."
+          },
+          {
+            "option": "B",
+            "text": "Phần nào quay là phần ứng."
+          },
+          {
+            "option": "C",
+            "text": "Stato là phần ứng, rôto là phần cảm."
+          },
+          {
+            "option": "D",
+            "text": "Phần nào đứng yên là phần tạo ra từ trường."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Một máy phát điện xoay chiều có điện trở không đáng kể. Mạch ngoài là tụ điện nối tiếp với ampe kế có điện trở không đáng kể. Khi rôto quay với tốc độ góc 25 rad/s thì ampe kế chỉ 0,1A. Khi tăng tốc độ quay của rôto lên gấp đôi thì ampe kế chỉ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,1 A.     \tB. 0,05 A."
+          },
+          {
+            "option": "C",
+            "text": "0,2 A.     \tD. 0,4 A."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một máy phát điện xoay chiều một pha (kiểu cảm ứng) có p cặp cực, quay đều với tốc độ n vòng/phút, với số cặp cực bằng số cuộn dây của phần ứng thì tần số của dòng điện do máy tạo ra là f Hz. Hệ thức nào sau đây đúng?",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một máy phát điện xoay chiều 1 pha có rôto gồm 4 cặp cực từ, muốn tần số dòng điện xoay chiều mà máyphát ra là 50 Hz thì rôto phải quay với tốc độ là bao nhiêu?",
+        "options": [
+          {
+            "option": "A",
+            "text": "3000 vòng/phút"
+          },
+          {
+            "option": "B",
+            "text": "1500 vòng/phút"
+          },
+          {
+            "option": "C",
+            "text": "750 vòng/ phút"
+          },
+          {
+            "option": "D",
+            "text": "500 vòng/phút."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một máy phát điện xoay chiều một pha có phần cảm là rôto gồm 10 cặp cực (10 cực nam và 10 cực bắc). Rô to quay với tốc độ 300 vòng/phút. Suất điện động do máy sinh ra có tần số bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "5 Hz.       \tB. 30 Hz."
+          },
+          {
+            "option": "C",
+            "text": "300 Hz.     \t\t\t\tD. 50 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Rô to của một máy phát điện xoay chiều một pha có 4 cực từ và quay với tốc độ n vòng/phút. Hai cực phần ứng của máy mắc với một tụ điện có điện dung C = 10 µF. Điện trở trong của máy không đáng kể.",
+        "options": [
+          {
+            "option": "A",
+            "text": "400 V.     \tB. 100 V."
+          },
+          {
+            "option": "C",
+            "text": "200 V.     \tD. 300 V."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Một máy phát điện xoay chiều một pha có phần ứng gồm bốn cuộn dây giống nhau mắc nối tiếp. Suất điện động xoay chiều do máy phát sinh ra có tần số 50 Hz và giá trị hiệu dụng 100√2 V.Từ thông cực đại qua mỗi vòng của phần ứng là 5/π mWB. Số vòng dây trong mỗi cuộn dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "71 vòng.     \tB. 200 vòng."
+          },
+          {
+            "option": "C",
+            "text": "100 vòng.     \tD. 400 vòng."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

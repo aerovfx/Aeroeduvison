@@ -157,8 +157,8 @@ async function fixCompletedWithoutOcr() {
 
     if (fixedCount > 0) {
       console.log("\n✅ Fixed documents:")
-      console.log(`   - ${errorCount} documents marked as "Lỗi" (need manual review)")
-      console.log(`   - ${queueCount} documents reset to "Hàng đợi" (can be reprocessed)")
+      console.log(`   - ${errorCount} documents marked as "Lỗi" (need manual review)`)
+      console.log(`   - ${queueCount} documents reset to "Hàng đợi" (can be reprocessed)`)
       console.log("\n💡 Next steps:")
       console.log("   - Documents with status 'Hàng đợi' can be reprocessed by clicking 'Số hóa với AI'")
       console.log("   - Documents with status 'Lỗi' may need manual review or OCR service configuration")

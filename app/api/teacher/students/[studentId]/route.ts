@@ -6,16 +6,16 @@ import { db as prisma } from "@/lib/db"
 // GET /api/teacher/students/[studentId] - Get single student detail
 export async function GET(
   request: NextRequest,
-  { params }: { params: { studentId: string } }
+  { params }: { params: Promise<{ studentId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { studentId } = params
+    const { studentId } = await params
 
     // Get student data
     const student = await prisma.user.findUnique({

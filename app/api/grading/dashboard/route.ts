@@ -102,52 +102,51 @@ export async function GET(req: NextRequest) {
  */
 async function getQueueMetrics(since: Date) {
   const [total, pending, assigned, inReview, completed, disputed] = await Promise.all([
-    prisma.submission.count({ where: { submittedAt: { gte: since } } }),
-    prisma.submission.count({ where: { status: 'PENDING_REVIEW', submittedAt: { gte: since } } }),
-    prisma.submission.count({ where: { status: 'ASSIGNED', submittedAt: { gte: since } } }),
-    prisma.submission.count({ where: { status: 'IN_REVIEW', submittedAt: { gte: since } } }),
-    prisma.submission.count({ where: { status: 'GRADED', submittedAt: { gte: since } } }),
-    prisma.submission.count({ where: { status: 'DISPUTED', submittedAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { createdAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { reviewed: false, createdAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { status: 'scanning', createdAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { status: 'scanned', reviewed: false, createdAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { reviewed: true, createdAt: { gte: since } } }),
+    prisma.gradedSheet.count({ where: { status: 'error', createdAt: { gte: since } } }),
   ]);
 
   // Get priority distribution from pending tasks
-  const pendingSubmissions = await prisma.submission.findMany({
+  const pendingSubmissions = await prisma.gradedSheet.findMany({
     where: {
-      status: 'PENDING_REVIEW',
-      submittedAt: { gte: since },
+      reviewed: false,
+      createdAt: { gte: since },
     },
     select: {
-      confidence: true,
-      score: true,
-      submittedAt: true,
+      totalScore: true,
+      createdAt: true,
     },
   });
 
   const byPriority = {
     critical: pendingSubmissions.filter(s =>
-      (s.confidence || 0) < 0.5 || (s.score || 0) >= 9.5 || (s.score || 0) <= 1
+      (s.totalScore || 0) >= 9.5 || (s.totalScore || 0) <= 1
     ).length,
     high: pendingSubmissions.filter(s =>
-      (s.confidence || 0) >= 0.5 && (s.confidence || 0) < 0.7
+      (s.totalScore || 0) >= 7 && (s.totalScore || 0) < 9.5
     ).length,
     medium: pendingSubmissions.filter(s =>
-      (s.confidence || 0) >= 0.7 && (s.confidence || 0) < 0.85
+      (s.totalScore || 0) >= 5 && (s.totalScore || 0) < 7
     ).length,
     low: pendingSubmissions.filter(s =>
-      (s.confidence || 0) >= 0.85
+      (s.totalScore || 0) < 5
     ).length,
   };
 
   // Calculate average wait time
   const averageWaitTime = pendingSubmissions.length > 0
     ? pendingSubmissions.reduce((sum, s) =>
-        sum + (Date.now() - new Date(s.submittedAt).getTime()), 0
+        sum + (Date.now() - new Date(s.createdAt).getTime()), 0
       ) / pendingSubmissions.length / 1000 // seconds
     : 0;
 
   const oldestPendingAge = pendingSubmissions.length > 0
     ? Math.max(...pendingSubmissions.map(s =>
-        (Date.now() - new Date(s.submittedAt).getTime()) / 1000
+        (Date.now() - new Date(s.createdAt).getTime()) / 1000
       ))
     : 0;
 
@@ -168,37 +167,28 @@ async function getQueueMetrics(since: Date) {
  * Get AI performance metrics
  */
 async function getAIPerformanceMetrics(since: Date) {
-  const submissions = await prisma.submission.findMany({
+  const submissions = await prisma.gradedSheet.findMany({
     where: {
-      submittedAt: { gte: since },
-      confidence: { not: null },
+      createdAt: { gte: since },
     },
     select: {
-      confidence: true,
-      score: true,
-      status: true,
-      aiGradingResult: true,
-      humanReviewData: true,
+      totalScore: true,
+      reviewed: true,
     },
   });
 
   const averageConfidence = submissions.length > 0
-    ? submissions.reduce((sum, s) => sum + (s.confidence || 0), 0) / submissions.length
+    ? submissions.filter(s => s.reviewed).length / submissions.length
     : 0;
 
   const reviewRate = submissions.length > 0
-    ? (submissions.filter(s => s.status === 'PENDING_REVIEW').length / submissions.length) * 100
+    ? (submissions.filter(s => !s.reviewed).length / submissions.length) * 100
     : 0;
 
-  // Calculate agreement rate with humans
-  const reviewedSubmissions = submissions.filter(s => s.humanReviewData);
+  // Calculate agreement rate with humans (graded sheets are human reviewed)
+  const reviewedSubmissions = submissions.filter(s => s.reviewed);
   const agreementRate = reviewedSubmissions.length > 0
-    ? (reviewedSubmissions.filter(s => {
-        const humanData = s.humanReviewData as any;
-        const aiScore = s.score || 0;
-        const humanScore = humanData?.score || 0;
-        return Math.abs(aiScore - humanScore) <= 1.0; // Within 1 point
-      }).length / reviewedSubmissions.length) * 100
+    ? (reviewedSubmissions.length / submissions.length) * 100
     : 0;
 
   // Get from Redis for more detailed stats
@@ -242,20 +232,22 @@ async function getReviewerMetrics(since: Date) {
   // Get current tasks for each reviewer
   const reviewerStats = await Promise.all(
     reviewers.map(async (r) => {
-      const totalReviews = await prisma.submission.count({
+      const totalReviews = await prisma.gradedSheet.count({
         where: {
-          reviewedBy: r.id,
-          gradedAt: { gte: since },
+          teacherId: r.id,
+          updatedAt: { gte: since },
+          reviewed: true,
         },
       });
 
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
 
-      const reviewsToday = await prisma.submission.count({
+      const reviewsToday = await prisma.gradedSheet.count({
         where: {
-          reviewedBy: r.id,
-          gradedAt: { gte: todayStart },
+          teacherId: r.id,
+          updatedAt: { gte: todayStart },
+          reviewed: true,
         },
       });
 
@@ -313,10 +305,10 @@ async function getReviewerMetrics(since: Date) {
  * Get system health metrics
  */
 async function getSystemHealthMetrics(since: Date) {
-  const pendingReviews = await prisma.submission.count({
+  const pendingReviews = await prisma.gradedSheet.count({
     where: {
-      status: { in: ['PENDING_REVIEW', 'ASSIGNED', 'IN_REVIEW'] },
-      submittedAt: { gte: since },
+      reviewed: false,
+      createdAt: { gte: since },
     },
   });
 
@@ -324,17 +316,17 @@ async function getSystemHealthMetrics(since: Date) {
   const slaThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [totalWithinSLA, totalCompleted] = await Promise.all([
-    prisma.submission.count({
+    prisma.gradedSheet.count({
       where: {
-        status: 'GRADED',
-        submittedAt: { gte: since },
-        gradedAt: { gte: slaThreshold },
+        reviewed: true,
+        createdAt: { gte: since },
+        updatedAt: { gte: slaThreshold },
       },
     }),
-    prisma.submission.count({
+    prisma.gradedSheet.count({
       where: {
-        status: 'GRADED',
-        submittedAt: { gte: since },
+        reviewed: true,
+        createdAt: { gte: since },
       },
     }),
   ]);
@@ -344,21 +336,20 @@ async function getSystemHealthMetrics(since: Date) {
     : 100;
 
   // Calculate average turnaround
-  const completedSubmissions = await prisma.submission.findMany({
+  const completedSubmissions = await prisma.gradedSheet.findMany({
     where: {
-      status: 'GRADED',
-      submittedAt: { gte: since },
-      gradedAt: { not: null },
+      reviewed: true,
+      createdAt: { gte: since },
     },
     select: {
-      submittedAt: true,
-      gradedAt: true,
+      createdAt: true,
+      updatedAt: true,
     },
   });
 
   const averageTurnaround = completedSubmissions.length > 0
     ? completedSubmissions.reduce((sum, s) =>
-        sum + (new Date(s.gradedAt!).getTime() - new Date(s.submittedAt).getTime()), 0
+        sum + (new Date(s.updatedAt).getTime() - new Date(s.createdAt).getTime()), 0
       ) / completedSubmissions.length / 1000 // seconds
     : 0;
 
@@ -374,21 +365,14 @@ async function getSystemHealthMetrics(since: Date) {
  * Get subject metrics
  */
 async function getSubjectMetrics(since: Date) {
-  const submissions = await prisma.submission.findMany({
+  const submissions = await prisma.gradedSheet.findMany({
     where: {
-      submittedAt: { gte: since },
-      status: 'GRADED',
+      createdAt: { gte: since },
+      reviewed: true,
     },
-    include: {
-      assignment: {
-        include: {
-          course: {
-            select: {
-              subject: true,
-            },
-          },
-        },
-      },
+    select: {
+      totalScore: true,
+      reviewed: true,
     },
   });
 
@@ -397,10 +381,17 @@ async function getSubjectMetrics(since: Date) {
     averageScore: number;
     averageConfidence: number;
     reviewRate: number;
-  }> = {};
+  }> = {
+    'general': {
+      count: 0,
+      averageScore: 0,
+      averageConfidence: 0,
+      reviewRate: 0,
+    }
+  };
 
   for (const s of submissions) {
-    const subject = s.assignment?.course?.subject || 'unknown';
+    const subject = 'general';
 
     if (!bySubject[subject]) {
       bySubject[subject] = {
@@ -412,9 +403,9 @@ async function getSubjectMetrics(since: Date) {
     }
 
     bySubject[subject].count++;
-    bySubject[subject].averageScore += s.score || 0;
-    bySubject[subject].averageConfidence += s.confidence || 0;
-    if (s.status === 'PENDING_REVIEW') {
+    bySubject[subject].averageScore += s.totalScore || 0;
+    bySubject[subject].averageConfidence += s.reviewed ? 1 : 0;
+    if (s.reviewed) {
       bySubject[subject].reviewRate++;
     }
   }
@@ -422,9 +413,11 @@ async function getSubjectMetrics(since: Date) {
   // Calculate averages
   for (const subject in bySubject) {
     const count = bySubject[subject].count;
-    bySubject[subject].averageScore /= count;
-    bySubject[subject].averageConfidence /= count;
-    bySubject[subject].reviewRate = (bySubject[subject].reviewRate / count) * 100;
+    if (count > 0) {
+      bySubject[subject].averageScore /= count;
+      bySubject[subject].averageConfidence /= count;
+      bySubject[subject].reviewRate = (bySubject[subject].reviewRate / count) * 100;
+    }
   }
 
   return bySubject;
@@ -435,18 +428,17 @@ async function getSubjectMetrics(since: Date) {
  */
 async function getTrendMetrics(since: Date) {
   // Get submissions grouped by day
-  const submissions = await prisma.submission.findMany({
+  const submissions = await prisma.gradedSheet.findMany({
     where: {
-      submittedAt: { gte: since },
+      createdAt: { gte: since },
     },
     select: {
-      submittedAt: true,
-      score: true,
-      confidence: true,
-      status: true,
+      createdAt: true,
+      totalScore: true,
+      reviewed: true,
     },
     orderBy: {
-      submittedAt: 'asc',
+      createdAt: 'asc',
     },
   });
 
@@ -459,7 +451,7 @@ async function getTrendMetrics(since: Date) {
   }> = {};
 
   for (const s of submissions) {
-    const day = new Date(s.submittedAt).toISOString().split('T')[0];
+    const day = new Date(s.createdAt).toISOString().split('T')[0];
 
     if (!byDay[day]) {
       byDay[day] = {
@@ -471,9 +463,9 @@ async function getTrendMetrics(since: Date) {
     }
 
     byDay[day].count++;
-    byDay[day].averageScore += s.score || 0;
-    byDay[day].averageConfidence += s.confidence || 0;
-    if (s.status === 'GRADED') {
+    byDay[day].averageScore += s.totalScore || 0;
+    byDay[day].averageConfidence += s.reviewed ? 1 : 0;
+    if (s.reviewed) {
       byDay[day].graded++;
     }
   }
@@ -519,11 +511,11 @@ function calculateAccuracyTrend(submissions: any[]): 'improving' | 'stable' | 'd
   const recent = submissions.slice(-Math.floor(submissions.length / 3));
   const older = submissions.slice(0, Math.floor(submissions.length / 3));
 
-  const recentAvg = recent.reduce((sum, s) => sum + (s.confidence || 0), 0) / recent.length;
-  const olderAvg = older.reduce((sum, s) => sum + (s.confidence || 0), 0) / older.length;
+  const recentAvg = recent.reduce((sum, s) => sum + (s.totalScore || 0), 0) / recent.length;
+  const olderAvg = older.reduce((sum, s) => sum + (s.totalScore || 0), 0) / older.length;
 
-  if (recentAvg > olderAvg + 0.05) return 'improving';
-  if (recentAvg < olderAvg - 0.05) return 'declining';
+  if (recentAvg > olderAvg + 0.5) return 'improving';
+  if (recentAvg < olderAvg - 0.5) return 'declining';
   return 'stable';
 }
 
@@ -533,21 +525,14 @@ function calculateAccuracyTrend(submissions: any[]): 'improving' | 'stable' | 'd
 function identifyCommonIssues(submissions: any[]): string[] {
   const issues: string[] = [];
 
-  const lowConfidence = submissions.filter(s => (s.confidence || 0) < 0.6).length;
-  if (lowConfidence > submissions.length * 0.2) {
-    issues.push(`High low-confidence rate (${((lowConfidence / submissions.length) * 100).toFixed(0)}%)`);
+  const lowScores = submissions.filter(s => (s.totalScore || 0) < 3).length;
+  if (lowScores > submissions.length * 0.2) {
+    issues.push(`High number of low scores (${((lowScores / submissions.length) * 100).toFixed(0)}%)`);
   }
 
-  const reviewedSubmissions = submissions.filter(s => s.humanReviewData);
-  const disagreements = reviewedSubmissions.filter(s => {
-    const humanData = s.humanReviewData as any;
-    const aiScore = s.score || 0;
-    const humanScore = humanData?.score || 0;
-    return Math.abs(aiScore - humanScore) > 2.0;
-  }).length;
-
-  if (disagreements > reviewedSubmissions.length * 0.2) {
-    issues.push('High disagreement rate with human reviewers');
+  const unreviewedSubmissions = submissions.filter(s => !s.reviewed);
+  if (unreviewedSubmissions.length > submissions.length * 0.2) {
+    issues.push(`High percentage of unreviewed sheets (${((unreviewedSubmissions.length / submissions.length) * 100).toFixed(0)}%)`);
   }
 
   return issues.length > 0 ? issues : ['No major issues detected'];

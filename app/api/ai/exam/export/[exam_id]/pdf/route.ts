@@ -11,7 +11,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { exam_id: string } }
+  { params }: { params: Promise<{ exam_id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -19,7 +19,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const examId = params.exam_id;
+    const { exam_id } = await params;
+    const examId = exam_id;
     const body = await request.json();
     const { variant = 'A' } = body;
 
@@ -74,14 +75,15 @@ export async function POST(
 
     // Questions
     let y = height - 160;
+    let currentPage = examPage;
     exam.questions.forEach((q: any, idx: number) => {
       if (y < 100) {
         // New page
-        const newPage = pdfDoc.addPage([595.28, 841.89]);
+        currentPage = pdfDoc.addPage([595.28, 841.89]);
         y = height - 50;
       }
 
-      newPage.drawText(`Question ${idx + 1} (${q.question_type}) - ${q.assigned_score} points`, {
+      currentPage.drawText(`Question ${idx + 1} (${q.question_type}) - ${q.assigned_score} points`, {
         x: 50,
         y,
         size: 12,

@@ -1,0 +1,209 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-cac-mach-dien-xoay-chieu-2.jsp",
+  "title": "30 bài tập trắc nghiệm Các mạch điện xoay chiều (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Để tăng dung kháng của một tụ phẳng có điện môi là không khí, ta có thể:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng tần số của điện áp đặt vào hai bản tụ điện."
+          },
+          {
+            "option": "B",
+            "text": "giảm điện áp hiệu dụng giữa hai bản tụ điện."
+          },
+          {
+            "option": "C",
+            "text": "đưa bản điện môi vào trong lòng tụ điện."
+          },
+          {
+            "option": "D",
+            "text": "tăng khoảng cách giữa hai bản tụ điện."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Đặt điện áp xoay chiều u = 311cos100πt (V) vào 2 đầu của một cuộn cảm thuần có độ tự cảm L = 1/π(H). Cường độ dòng điện hiệu dụng qua cuộn cảm có giá trị bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "3,1 A\t     \tB. 2,2 A"
+          },
+          {
+            "option": "C",
+            "text": "0,31 A     \t\tD. 0,22 A"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Cường độ dòng điện chạy qua tụ điện có biểu thức i = 2,5√2 cos100πt (A). Biết tụ điện có điện dung C = 250/π  (µF). Điện áp giữa hai bản tụ điện có biểu thức là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Một cuộn cảm thuần có độ tự cảm L = 1/π (H). Đặt vào hai đầu cuộn cảm một điện áp xoay chiều:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Một tụ điện có điện dung C = 10-4/(4π) µF được mắc vào một điện áp xoay chiều có biểu thức là u = 200√2 cos(100πt) (V) . Điện trở dây nối không đáng kể. Biểu thức của dòng điện tức thời qua mạch là:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Cho dòng điện xoay chiều i = 2cos100πt (A) qua điện trở R = 50 Ω trong thời gian 1 phút. Nhiệt lượng tỏa ra trên điện trở là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "6000 J     \t\tB. 1000 J"
+          },
+          {
+            "option": "C",
+            "text": "800 J\t      \tD. 1200 J"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Mắc một cuộn cảm vào một điện áp xoay chiều có tần số f, cuộn cảm có cảm kháng là ZL. Nếu giảm độ tự cảm của cuộn cảm đi một nửa và tần số tăng lên 4 lần thì cảm kháng ZLsẽ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng 8 lần"
+          },
+          {
+            "option": "B",
+            "text": "giảm 8 lần"
+          },
+          {
+            "option": "C",
+            "text": "tăng 2 lần"
+          },
+          {
+            "option": "D",
+            "text": "giảm 2 lần."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Một đoạn mạch điện gồm điện trở R = 50 Ω mắc nối tiếp với cuộn thuần cảm có 0,5/π H. Đặt vào hai đầu đoạn mạch một điện áp xoay chiều:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Cho đoạn mạch điện xoay chiều chỉ có cuộn dây thuần cảm có hệ số tự cảm L với L = 1/2π H. Đặt điện áp xoay chiều có tần số 50 Hz vào hai đầu đoạn mạch. Tại thời điểm mà điện áp hai đầu mạch có giá trị u= 100√3 V  thì cường độ dòng điện trong mạch là i = 2 A. Điện áp hiệu dụng hai đầu cuộn cảm có giá trị là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Đặt điện áp u = 120√2 cos(100πt + π/3)(V) vào hai đầu điện trở có R = 50 Ω. Biểu thức cường độ dòng điện chạy qua điện trở là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Trong đoạn mạch điện xoay chiều chỉ có cuộn dây thuần cảm có độ tự cảm L, điện áp giữa hai đầu cuộn dây có biểu thức u = U0cos(ωt + φu)V thì cường độ điện chạy qua đoạn mạch có biểu thức i = I√2 cosωt (A)  trong đó I và φuđược xác định bởi các hệ thức:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Đặt điện áp u = U0cos(100πt + π/3)(V)  vào hai đầu một cuộn cảm thuần có độ tự cảm 1/(2π) H .  Ở thời điểm điện áp giữa hai đầu cuộn cảm là 100√2  V thì cường độ dòng điện qua cuộn cảm là 2 A. Biểu thức của cường độ dòng điện qua cuộn cảm này là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Đặt điện áp xoay chiều u = U√2 cos(ωt) (V)  vào hai đầu một điện trở thuần R = 110 Ω thì cường độ dòng điện hiệu dụng qua mạch có giá trị 2 A. Giá trị của U bằng:",
+        "options": [],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Mạch điện xoay chiều chỉ có tụ điện với điện dung C. Đặt vào hai đầu tụ điện một điện áp xoay chiều có biểu thức u = U0cos(ωt + φ) V. Cường độ dòng điện tức thời của mạch có biểu thức là:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "Cho điện áp hai đầu tụ có điện dung C = 10-4/π F là:",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

@@ -6,13 +6,7 @@ import {
   updateTranscriptRecord,
 } from "@/lib/transcript/transcript-repository"
 
-interface RouteParams {
-  params: {
-    id: string
-  }
-}
-
-export async function DELETE(_req: NextRequest, { params }: RouteParams) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -20,8 +14,9 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const deleted = await deleteTranscriptRecord({
-      id: params.id,
+      id,
       userId: session.user.id,
     })
 
@@ -39,7 +34,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: RouteParams) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -47,6 +42,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const body = await req.json().catch(() => ({}))
     const title =
       typeof body?.title === "string" && body.title.trim().length > 0
@@ -62,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
     }
 
     const updated = await updateTranscriptRecord({
-      id: params.id,
+      id,
       userId: session.user.id,
       title,
       summary,

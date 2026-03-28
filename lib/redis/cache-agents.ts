@@ -20,6 +20,20 @@ const TTL = {
 
 export const agentCache = {
   /**
+   * Generic getJson - delegates to redisClient
+   */
+  async getJson<T = any>(key: string): Promise<T | null> {
+    return redisClient.getJson<T>(`agent:${key}`);
+  },
+
+  /**
+   * Generic setJson - delegates to redisClient
+   */
+  async setJson(key: string, value: any, ttl?: number): Promise<void> {
+    await redisClient.setJson(`agent:${key}`, value, ttl);
+  },
+
+  /**
    * Cache agent usage
    */
   async cacheUsage(userId: string, agentId: string, usage: any): Promise<void> {

@@ -39,7 +39,7 @@ export function MotionSimulator({ apiEndpoint }: MotionSimulatorProps) {
   const [airResistance, setAirResistance] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(undefined);
 
   // Run simulation
   const runSimulation = async () => {
@@ -662,12 +662,12 @@ export function MotionSimulator({ apiEndpoint }: MotionSimulatorProps) {
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={simulationData.energy.potential.map((_, i) => ({
+                  <AreaChart data={simulationData.energy.potential.map((_: number, i: number) => ({
                     time: simulationData.trajectory.time[i],
                     PE: simulationData.energy.potential[i].toFixed(2),
                     KE: simulationData.energy.kinetic[i].toFixed(2),
                     Total: simulationData.energy.total[i].toFixed(2)
-                  })).filter((_, i) => i % 5 === 0)}>
+                  })).filter((_: unknown, i: number) => i % 5 === 0)}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="time" />
                     <YAxis />

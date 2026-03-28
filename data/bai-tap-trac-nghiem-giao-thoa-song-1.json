@@ -1,0 +1,220 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-giao-thoa-song-1.jsp",
+  "title": "19 bài tập trắc nghiệm Giao thoa sóng (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Thực hiện giao thoa trên bề mặt chất lỏng với hai nguồn kết hợp A, B cách nhau 8√2  cm dao động theo phương thẳng đứng với cùng phương trình uA= uB= 2cos30πt (mm, s). Tốc độ truyền sóng trên mặt chất lỏng là 0,6 m/s. Gọi (C) là đường tròn trên mặt chất lỏng có đường kính AB. Số điểm trên (C) dao động với biên độ cực đại và cùng pha với hai nguồn là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10 điểm.     \tB. 5 điểm."
+          },
+          {
+            "option": "C",
+            "text": "12 điểm.     \tD. 2 điểm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": "- Giải hệ phương trình trên ta được:"
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Ở mặt thoáng của một chất lỏng có hai nguồn sóng kết hợp A và B cách nhau 20 cm, dao động theo phương thẳng đứng với phương trình uA= a1cos(40πt + π/3) và uB= a2cos(40πt – π/6) (uAvà uBtính bằng cm, t tính bằng s). Dao động của phần tử vật chất tại M cách A và B lần lượt 12 cm và 16 cm có biên độ cực tiểu. Biết giữa M và đường trung trực còn có hai dãy cực đại khác. Tốc độ truyền sóng trên mặt chất lỏng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "35,56 cm/s.     \tB. 29,09 cm/s."
+          },
+          {
+            "option": "C",
+            "text": "45,71 cm/s.     \tD. 60,32 cm/s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Trong một thí nghiệm về giao thoa sóng nước, hai nguồn kết hợp O1và O2cách nhau 6 cm, dao động cùng pha, cùng biên độ. Chọn hệ trục tọa độ vuông góc xOy thuộc mặt nước với gốc tọa độ là vị trí đặt nguồn O1còn nguồn O2nằm trên trục Oy. Hai điểm P và Q nằm trên Ox có OP = 4,5 cm và OQ = 8 cm. Biết phần tử nước tại P không dao động còn phần tử nước tại Q dao động với biên độ cực đại. Giữa P và Q còn có một cực đại. Trên đoạn OP, điểm gần P nhất mà các phần tử nước dao động với biên độ cực tiểu cách P một đoạngần giá trị nào nhấtsau đây?",
+        "options": [
+          {
+            "option": "A",
+            "text": "1,4 cm.     \tB. 2,0 cm."
+          },
+          {
+            "option": "C",
+            "text": "2,5 cm.     \tD. 3,1 cm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Ở mặt nước, có hai nguồn kêt hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB= 2cos20πt (mm). Tốc độ truyền sóng là 30 cm/s. Coi biên độ sóng không đổi khi sóng truyền đi. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 mm.     \tB. 2 mm."
+          },
+          {
+            "option": "C",
+            "text": "1 mm.     \tD. 0 mm."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Hai nguồn phát sóng đặt tại hai điểm A, B cách nhau 10,4 cm (nguồn A sớm pha hơn nguồn B là π/2), cùng tần số là 20 Hz cùng biên độ là 5√2 cm với bước sóng 2 cm. Số điểm có biên độ 5 cm trên đường nối hai nguồn là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "19     \tB. 21"
+          },
+          {
+            "option": "C",
+            "text": "22     \tD. 30"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Trên mặt nước tại hai điểm A, B cách nhau 26 cm, người ta đặt hai nguồn đồng bộ, dao động điều hòa theo phương thẳng đứng tạo ra sóng kết hợp với bước sóng 2 cm, coi biên độ sóng không đổi khi truyền sóng. Gọi M là điểm trên mặt nước sao cho MA = 24 cm, và M thuộc đường tròn đường kính AB. Phải dịch B dọc theo phương AB và hướng ra xa A một khoảng nhỏ nhất bao nhiêu để M là cực đại?",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,83 cm.     \tB. 9,8 cm."
+          },
+          {
+            "option": "C",
+            "text": "3,8 cm.      \tD. 9,47 cm."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Ở mặt nước có hai nguồn dao động cùng pha theo phương thẳng đứng, tạo ra hai sóng kết hợp có bước sóng λ. Tại những điểm có cực đại giao thoa thì hiệu khoảng cách từ điểm đó tới hai nguồn bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "kλ (với k = 0, ± 1, ± 2,…)."
+          },
+          {
+            "option": "B",
+            "text": "kλ/2 (với k = 0, ± 1, ± 2,…)."
+          },
+          {
+            "option": "C",
+            "text": "(k + 0,5)λ/2 (với k = 0, ± 1, ± 2,…)."
+          },
+          {
+            "option": "D",
+            "text": "(k + 0,5)λ (với k = 0, ± 1, ± 2,…)."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Hai nguồn phát sóng điểm M, N cách nhau 10 cm dao động ngược pha nhau, cùng tần số là 20 Hz cùng biên độ là 5 mm và tạo ra một hệ vân giao thoa trên mặt nước. Tốc độ truyền sóng là 0,4 m/s. Số các điểm có biên độ 5 mm trên MN là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "10.     \tB. 21."
+          },
+          {
+            "option": "C",
+            "text": "20.     \tD. 11."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Hai nguồn A và B trên mặt nước dao động cùng pha, O là trung điểm AB dao động với biên độ 2a. Các điểm trên đoạn AB dao động với biên độ A0(0 < A0< 2a) cách đều nhau những khoảng không đổi λx nhỏ hơn bước sóng λ. Giá trị λx là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "λ/8.     \tB. λ/12."
+          },
+          {
+            "option": "C",
+            "text": "λ/4.     \tD. λ/6."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Cho hai nguồn kết hợp A, B dao động cùng pha trên mặt nước cách nhau 5 lần bước sóng. Ax là tia thuộc mặt nước hợp với véc tơ AB góc 60°. Trên Ax có số điểm dao động với biên độ cực đại là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "9.     \tB. 6."
+          },
+          {
+            "option": "C",
+            "text": "7.     \tD. 8."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 10
+}

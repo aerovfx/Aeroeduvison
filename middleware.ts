@@ -362,7 +362,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/images/") ||
     pathname.startsWith("/fonts/") ||
     pathname.startsWith("/models/") ||
-    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot|tflite|task|wasm|mp4|webm)$/i)
+    pathname.startsWith("/gltf/") ||
+    pathname.startsWith("/textures/") ||
+    pathname.startsWith("/lut/") ||
+    pathname.match(/\.(ico|png|jpg|jpeg|svg|gif|webp|woff|woff2|ttf|eot|tflite|task|wasm|mp4|webm|glb|gltf|obj|fbx|hdr|exr|cube|bin)$/i)
   ) {
     return NextResponse.next()
   }
@@ -523,7 +526,10 @@ export async function middleware(request: NextRequest) {
   const testRoutes = [
     "/test", "/test-simple", "/test-db", "/test-nextauth",
     "/test-all", "/test-signup", "/test-form", "/test-s3-upload",
-    "/test-gcs-video", "/test-auth"
+    "/test-gcs-video", "/test-auth",
+    "/dashboard/labtwin/labs/wokwi-sim",
+    "/dashboard/aura",
+    "/labtwin-circuit"
   ]
   const isTestRoute = testRoutes.some(route => pathname.startsWith(route))
   if (isTestRoute && process.env.NODE_ENV === 'development') {
@@ -626,6 +632,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|gltf/|textures/|lut/|.*\\.glb$|.*\\.gltf$|.*\\.cube$).*)',
   ],
 }

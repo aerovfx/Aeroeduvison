@@ -203,6 +203,19 @@ export function getDebounceTimerCount(): number {
 }
 
 /**
+ * Get performance metrics summary
+ */
+export function getPerformanceMetrics() {
+  return {
+    pendingRequests: pendingRequests.size,
+    debounceTimers: debounceTimers.size,
+    throttledKeys: throttleState.size,
+    queueLength: globalRequestQueue?.getQueueLength?.() ?? 0,
+    activeRequests: globalRequestQueue?.getActiveCount?.() ?? 0,
+  };
+}
+
+/**
  * Request priority queue for better resource management
  */
 interface QueuedRequest {

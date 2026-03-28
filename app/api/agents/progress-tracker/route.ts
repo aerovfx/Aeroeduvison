@@ -2,12 +2,26 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { progressTracker } from "@/lib/agents/progress-tracker"
+import { checkAISubscription } from "@/lib/subscription-check"
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Subscription check for AI features
+    const subscriptionCheck = await checkAISubscription(session.user.id)
+    if (!subscriptionCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: "SUBSCRIPTION_REQUIRED",
+          message: subscriptionCheck.message,
+          plan: subscriptionCheck.plan,
+        },
+        { status: 403 }
+      )
     }
 
     const { searchParams } = new URL(req.url)
@@ -36,6 +50,19 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    // Subscription check for AI features
+    const subscriptionCheck = await checkAISubscription(session.user.id)
+    if (!subscriptionCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: "SUBSCRIPTION_REQUIRED",
+          message: subscriptionCheck.message,
+          plan: subscriptionCheck.plan,
+        },
+        { status: 403 }
+      )
     }
 
     // Chỉ teacher/admin mới có thể chạy daily update

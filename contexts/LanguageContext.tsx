@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { landingVi, landingEn } from '@/contexts/translations/landing';
 
 type Language = 'vi' | 'en';
 
@@ -193,7 +194,8 @@ const translations = {
     "footer.copyright": "Bản quyền",
     "footer.privacy": "Chính sách riêng tư",
     "footer.terms": "Điều khoản sử dụng",
-    "footer.cookies": "Cookie"
+    "footer.cookies": "Cookie",
+    ...landingVi,
   },
   "en": {
     "nav.home": "Home",
@@ -374,19 +376,26 @@ const translations = {
     "footer.copyright": "Copyright",
     "footer.privacy": "Privacy Policy",
     "footer.terms": "Terms of Service",
-    "footer.cookies": "Cookie Policy"
-  }
+    "footer.cookies": "Cookie Policy",
+    ...landingEn,
+  },
 };
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>('vi');
 
   useEffect(() => {
-      const savedLanguage = localStorage.getItem('language') as Language;
-    if (savedLanguage) {
-        setLanguage(savedLanguage);
+    const savedLanguage = localStorage.getItem('language') as Language;
+    if (savedLanguage === 'vi' || savedLanguage === 'en') {
+      setLanguage(savedLanguage);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = language === 'vi' ? 'vi' : 'en';
+    }
+  }, [language]);
 
   const toggleLanguage = () => {
     setLanguage(prevLang => {

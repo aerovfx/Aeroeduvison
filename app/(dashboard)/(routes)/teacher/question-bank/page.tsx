@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   Plus, Upload, Sparkles, Database,
   Search, CheckCircle2, ChevronDown, ChevronUp, Edit2,
-  Save, X, Loader2, Trash2, PenLine, CirclePlus, Check
+  Save, X, Loader2, Trash2, PenLine, PlusCircle, Check
 } from "lucide-react"
 import { BulkGenerateModal } from "@/components/question-bank/bulk-generate-modal"
 import { ImportModal } from "@/components/question-bank/import-modal"
@@ -40,11 +40,25 @@ const SUBJECT_CATEGORIES: SubjectCategory[] = [
   { id: "hoa-hoc", name: "Hóa học", dbValue: "Hóa học", description: "Hóa vô cơ, Hóa hữu cơ" },
   { id: "sinh-hoc", name: "Sinh học", dbValue: "Sinh học", description: "Tế bào, Di truyền, Sinh thái" },
   { id: "ngu-van", name: "Ngữ văn", dbValue: "Ngữ văn", description: "Văn học, Tiếng Việt" },
+  { id: "tieng-viet", name: "Tiếng Việt", dbValue: "Tiếng Việt", description: "Vần, Chính tả, Tập đọc" },
   { id: "tieng-anh", name: "Tiếng Anh", dbValue: "Tiếng Anh", description: "Grammar, Vocabulary, Reading" },
   { id: "lich-su", name: "Lịch sử", dbValue: "Lịch sử", description: "Sử Việt Nam, Sử Thế giới" },
   { id: "dia-ly", name: "Địa lý", dbValue: "Địa lý", description: "Địa lý tự nhiên, Kinh tế" },
+  { id: "lich-su-dia-ly", name: "LS & Địa lý", dbValue: "Lịch sử và Địa lý", description: "Lịch sử, Địa lý tiểu học" },
   { id: "gdcd", name: "GDCD", dbValue: "GDCD", description: "Giáo dục công dân" },
-  { id: "tin-hoc", name: "Tin học", dbValue: "Tin học", description: "Lập trình, Ứng dụng" }
+  { id: "dao-duc", name: "Đạo đức", dbValue: "Đạo đức", description: "Đạo đức tiểu học" },
+  { id: "tin-hoc", name: "Tin học", dbValue: "Tin học", description: "Lập trình, Ứng dụng" },
+  { id: "khoa-hoc-may-tinh", name: "KHMT", dbValue: "Khoa học máy tính", description: "Khoa học máy tính" },
+  { id: "khtn", name: "KHTN", dbValue: "KHTN", description: "Khoa học tự nhiên" },
+  { id: "khoa-hoc", name: "Khoa học", dbValue: "Khoa học", description: "Khoa học tiểu học" },
+  { id: "tnxh", name: "TN&XH", dbValue: "Tự nhiên và Xã hội", description: "TN&XH tiểu học" },
+  { id: "cong-nghe", name: "Công nghệ", dbValue: "Công nghệ", description: "Công nghệ, Kỹ thuật" },
+  { id: "kinh-te-phap-luat", name: "KTPL", dbValue: "Kinh tế pháp luật", description: "Kinh tế, Pháp luật" },
+  { id: "am-nhac", name: "Âm nhạc", dbValue: "Âm nhạc", description: "Âm nhạc, Hát" },
+  { id: "mi-thuat", name: "Mĩ thuật", dbValue: "Mĩ thuật", description: "Vẽ, Tạo hình" },
+  { id: "the-duc", name: "Thể dục", dbValue: "Thể dục", description: "Thể thao, Sức khỏe" },
+  { id: "hoat-dong-trai-nghiem", name: "HĐTN", dbValue: "Hoạt động trải nghiệm", description: "Trải nghiệm, Hướng nghiệp" },
+  { id: "quoc-phong", name: "QPAN", dbValue: "Quốc phòng", description: "Quốc phòng, An ninh" }
 ]
 
 const getSubjectDbValue = (subjectId: string): string => {
@@ -80,6 +94,7 @@ const DIFFICULTY_OPTIONS = [
 ]
 
 const GRADE_OPTIONS = [
+  "Khối 1", "Khối 2", "Khối 3", "Khối 4", "Khối 5",
   "Khối 6", "Khối 7", "Khối 8", "Khối 9",
   "Khối 10", "Khối 11", "Khối 12",
 ]
@@ -394,7 +409,7 @@ export default function QuestionBankPage() {
             <div className="px-6 py-4 bg-gradient-to-r from-purple-50 to-blue-50 border-b border-purple-100 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-600 flex items-center justify-center">
-                  <CirclePlus className="w-5 h-5 text-white" />
+                  <PlusCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900">Tạo câu hỏi thủ công</h3>

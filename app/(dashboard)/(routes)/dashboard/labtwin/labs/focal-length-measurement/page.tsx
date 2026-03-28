@@ -227,11 +227,13 @@ export default function FocalLengthMeasurementPage() {
     ctx.fillText('F', focalPointLeft - 5, centerY - 12);
     ctx.fillText('F', focalPointRight - 5, centerY - 12);
     
+    // Calculate image properties
+    const imageMagnification = imageDistance > 0 ? -imageDistance / objectDistance : 0;
+    const imageHeight = objectHeight * Math.abs(imageMagnification);
+
     // Image position (if valid)
     if (imageDistance > 0 && imageDistance < 150) {
       const imageX = lensX + (imageDistance * scale);
-      const imageMagnification = -imageDistance / objectDistance;
-      const imageHeight = objectHeight * Math.abs(imageMagnification);
       
       // Draw image (inverted arrow)
       ctx.strokeStyle = '#3B82F6';

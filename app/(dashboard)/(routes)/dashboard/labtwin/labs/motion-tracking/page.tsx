@@ -83,6 +83,7 @@ export default function MotionTrackingPage() {
   const [rulerFirstClick, setRulerFirstClick] = useState<{x: number, y: number} | null>(null);
   const [pixelToMeterScale, setPixelToMeterScale] = useState(0); // pixels per meter
   const [rulerRealLength, setRulerRealLength] = useState(1.0); // meters
+  const [isCalibrating, setIsCalibrating] = useState(false);
   
   // For backward compatibility
   const [focalLength, setFocalLength] = useState(0);

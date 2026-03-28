@@ -25,17 +25,18 @@ interface QuestionInput {
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const question = await db.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!question) {
@@ -69,20 +70,21 @@ export async function GET(
  */
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const body: Partial<QuestionInput> & { status?: string } = await req.json()
 
     // Check if question exists and user has permission
     const existingQuestion = await db.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingQuestion) {
@@ -97,7 +99,7 @@ export async function PUT(
     }
 
     const question = await db.question.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...body,
         updatedAt: new Date(),
@@ -132,18 +134,19 @@ export async function PUT(
  */
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if question exists and user has permission
     const existingQuestion = await db.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingQuestion) {
@@ -158,7 +161,7 @@ export async function DELETE(
     }
 
     await db.question.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     apiLogger.info("Question deleted", {

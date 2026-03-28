@@ -1,0 +1,350 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-nguyen-tac-thong-tin-lien-lac-bang-song-vo-tuyen.jsp",
+  "title": "18 bài tập trắc nghiệm Nguyên tắc thông tin liên lạc bằng sóng vô tuyến (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Hoạt động của mạch chọn sóng của máy thu thanh dựa vào hiện tượng",
+        "options": [
+          {
+            "option": "A",
+            "text": "truyền sóng điện từ"
+          },
+          {
+            "option": "B",
+            "text": "hấp thụ sóng điện từ"
+          },
+          {
+            "option": "C",
+            "text": "Giao thoa sóng điện từ"
+          },
+          {
+            "option": "D",
+            "text": "cộng dưởng điện từ"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Kí hiệu các mạch trong máy thu thanh và phát thanh như sau: (1) mạch tách sóng ; (2) mạch khuếch đại âm tần ; (3) mạch khuếch đại cao tần ; (4) mạch biến điệu.",
+        "options": [
+          {
+            "option": "A",
+            "text": "(1) và (2)      B. (3)"
+          },
+          {
+            "option": "C",
+            "text": "(3) và (4)      D. (4)"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Kí hiệu các mạch trong máy thu vô tuyến điện như sau: : (1) mạch tách sóng ; (2) mạch khuếch đại ; (3) mạch biến điệu ; (4) mạch chọn sóng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "(1)     B. (4)     C. (2) và (3)        D.(1) và (4)"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Trong sơ đồ khối của máy phát thanh vô tuyến đơn giản không có mạch:",
+        "options": [
+          {
+            "option": "A",
+            "text": "phát sóng điện từ cao tần."
+          },
+          {
+            "option": "B",
+            "text": "tách sóng."
+          },
+          {
+            "option": "C",
+            "text": "khuếch đại."
+          },
+          {
+            "option": "D",
+            "text": "biến điệu."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Mạch chọn sóng của máy thu vô tuyến điện gồm cuộn cảm thuần có độ tự cảm 0,1 mH và tụ điện có điện dung biến thiên từ 2,5 nF đến 10 nF. Cho tốc độ ánh sáng trong chân không là c = 3.108m/s. Máy thu này có thể thu được sóng điện từ có bước sóng nằm trong khoảng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "từ 18,84 m đến 56,52 m"
+          },
+          {
+            "option": "B",
+            "text": "từ 56,52 m đến 94,2 m"
+          },
+          {
+            "option": "C",
+            "text": "từ 942 m đến 1885 m"
+          },
+          {
+            "option": "D",
+            "text": "từ 188,4 m đến 565,2 m"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Khi mắc tụ điện có điện dung C1với cuộn cảm L thì tạo mạch dao động điện từ có thể thu được sóng điện từ có bước sóng 30 m; khi mắc tụ điện có điện dung C2với cuộn cảm L thì tạo ra mạch dao động điện từ có thể thu được sóng điện từ có bước sóng 40 m. Khi mắc (C1song song C2) rồi mắc với cuộn L thì tạo ra mạch dao động thu được sóng điện từ có bước sóng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "50 m     \tB. 10 m"
+          },
+          {
+            "option": "C",
+            "text": "70 m     \tD. 35 m"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một mạch chọn sóng của một máy thu vô tuyến điện  gồm một cuộn dây có độ tự cảm L và một bộ tụ điện gồm một tụ điện cố định C0mắc song song với một tụ điện C. Tụ điện C có điện dung thay đổi từ 10 nF đến 170 nF. Nhờ vậy mà mạch có thể thu được các sóng vô tuyến có bước sóng từ λ đến 3λ. Điện dung của tụ điện C0là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "30 nF     \tB. 10 nF"
+          },
+          {
+            "option": "C",
+            "text": "25 nF     \tD. 45 nF"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một mạch dao động điện từ dùng để chọn sóng của máy thu vô tuyến điện gồm một tụ điện có điện dung C và cuộn cảm thuần có độ tự cảm L thay đổi được. Khi điều chỉnh L = L0máy thu được sóng điện từ có bước sóng λ, để máy thu được sóng điện từ có bước sóng 2λ thì phải điều chỉnh độ tự cảm L đến giá trị:",
+        "options": [
+          {
+            "option": "A",
+            "text": "3L0B. L0"
+          },
+          {
+            "option": "C",
+            "text": "2L0D. 4L0"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một mạch dao động điện từ gồm một cuộn cảm L khi mắc nối tiếp với tụ điện C1thì thu được sóng điện từ có bước sóng λ1, còn khi thay bằng tụ trên bằng tụ C2thì mạch thu được sóng điện từ có bước sóng λ2. Nếu mắc đồng thời hai tụ nối tiếp với nhau rồi nối với cuộn dây thì mạch thu được sóng điện từ có bước sóng bằng:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Mạch chọn sóng của một máy thu vô tuyến điện gồm bộ tụ điện và cuộn cảm thuần L. Khi L = L1; C = C1thì mạch thu được bước sóng λ. Khi L = 3L1; C = C2thì mạch thu được bước sóng là 2λ. Khi điều chỉnh cho L = 2L1; C = C1+ 2C2thì mạch thu được bước sóng là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Mạch dao động LC trong máy thu vô tuyến có điện dung C0= 8.10–8F và độ tự cảm L = 2.10–6H, thu được sóng điện từ có bước sóng 240π m. Để thu được sóng điện từ có bước sóng 18π m người ta phải mắc thêm vào mạch một tụ điện có điện dung C bằng bao nhiêu và mắc như thế nào?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Mắc nối tiếp và C = 4,53.10–10F."
+          },
+          {
+            "option": "B",
+            "text": "Mắc song song và C = 4,53.10–10F."
+          },
+          {
+            "option": "C",
+            "text": "Mắc song song và C = 4,53.10–8F."
+          },
+          {
+            "option": "D",
+            "text": "Mắc nối tiếp và C = 4,53.10–8F."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Mạch dao động LC có tụ phẳng không khí hình tròn bán kính 48 cm cách nhau 4 cm phát ra sóng điện từ có bước sóng 100 m. Nếu đưa vào giữa hai bản tụ một tấm điện môi phẳng song song và cùng kích thước với hai bản có hằng số điện môi ε = 7, bề dày 2 cm ghép sát vào một bản thì phát ra sóng có bước sóng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "100 m.      \t\tB. 100√2 m."
+          },
+          {
+            "option": "C",
+            "text": "50√7 m.     \tD. 175 m."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Mạch thu sóng có lối vào là mạch dao động LC, tụ điện C là tụ phẳng không khí thì khi đó bước sóng mà mạch thu được là 60 m. Nếu nhúng một nửa diện tích các bản tụ vào trong điện môi có hằng số điện môi ε = 2 thì bước sóng mà mạch thu được khi đó bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "89,6 m      \tB. 54,3 m"
+          },
+          {
+            "option": "C",
+            "text": "98,4 m      \tD. 73,5 m"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Mạch chọn sóng của một máy thu vô tuyến điện gồm tụ xoay không khí và cuộn cảm thuần L = 4,5 mH. Tụ xoay không khí gồm 16 tấm kim loại phẳng giống nhau đặt song song cách đều nhau 1 mm, các tấm cách điện với nhau, diện tích đối diện giữa hai tấm là 3,14 (cm2). Mạch dao động này thu được sóng điện từ có bước sóng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "51 m      \tB. 54,4 m"
+          },
+          {
+            "option": "C",
+            "text": "842 m     \t\tD. 816 m"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Mạch dao động của một máy phát sóng vô tuyến gồm cuộn cảm và một tụ điện phẳng mà khoảng cách giữa hai bản tụ có thể thay đổi. Khi khoảng cách giữa hai bản tụ là 4,8mm thì máy phát ra sóng có bước sóng 300 m, để máy phát ra có bước sóng 240 m thì khoảng cách giữa hai bản tụ phải tăng thêm:",
+        "options": [
+          {
+            "option": "A",
+            "text": "6,0 mm      \tB. 7,5 mm"
+          },
+          {
+            "option": "C",
+            "text": "2,7 mm      \tD. 1,2 mm"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Mạch thu sóng có lối vào là mạch dao động LC, tụ điện C là tụ phẳng không khí thì khi đó bước sóng mà mạch thu được là 40 m. Nếu nhúng 2/3 diện tích các bản tụ vào trong điện môi có hằng số điện môi ε = 2,5 thì bước sóng mà mạch thu được khi đó bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "66 m      \tB. 56 m"
+          },
+          {
+            "option": "C",
+            "text": "58 m      \tD. 69 m"
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Mạch thu sóng có lối vào là mạch dao động LC. Khi mắc tụ điện có điện dung C với cuộn cảm thuần có độ tự cảm L1thì bước sóng mà mạch thu được là λ1= 10m. Khi mắc tụ C với cuộn cầm thuần L2thì bước sóng mà mạch thu được là λ2= 30m. Nếu mắc tụ C với cuộn cảm thuần có độ tự cảm L3= 20L1+ 19L2thì bước sóng mà mạch thu được là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "138,20 m       \tB. 156,1 m"
+          },
+          {
+            "option": "C",
+            "text": "58,98 m      \t\t\tD. 27,75 m"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Một tụ điện xoay có điện dung tỉ lệ thuận với góc quay các bản tụ. Tụ có giá trị điện dung C biến đổi giá trị C1= 10pF đến C2= 490pF ứng với góc quay của các bản tụ là α các bản tăng dần từ 0° đến 180°. Tụ điện được mắc với một cuộn dây có hệ số tự cảm L = 2µH để làm thành mạch dao động ở lối vào của 1 một máy thu vô tuyến điện.",
+        "options": [
+          {
+            "option": "A",
+            "text": "51,9°     \tB. 19,1°"
+          },
+          {
+            "option": "C",
+            "text": "15,7°     \tD. 17,5°"
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 18
+}

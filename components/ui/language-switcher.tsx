@@ -46,9 +46,9 @@ export function LanguageSwitcher({
       className={`
         flex items-center gap-2 
         ${getVariantStyles()}
-        bg-gray-100 hover:bg-gray-200 
-        rounded-lg transition-all backdrop-blur-sm
-        text-gray-800 font-medium
+        rounded-lg bg-muted font-medium text-foreground
+        transition-all backdrop-blur-sm hover:bg-muted/80
+        dark:border dark:border-border dark:bg-secondary/50 dark:hover:bg-secondary
         ${className}
       `}
       title={t('emotion.language-toggle')}

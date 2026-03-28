@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { FileText, Clock, ChevronRight, Mic, X, Users } from 'lucide-react';
+import { FileText, Clock, ChevronRight, Mic, X } from 'lucide-react';
 
 interface TranscriptItem {
   id: string;
@@ -27,6 +27,7 @@ export function TranscriptSidebar() {
 
   useEffect(() => {
     if (isOpen) {
+      setLoading(true);
       loadTranscripts();
     }
   }, [isOpen, filter]);
@@ -48,16 +49,13 @@ export function TranscriptSidebar() {
     }
   };
 
-  const handleNavigate = (id: string, type: string) => {
-    const basePath = type === 'lecture' 
-      ? '/student/video-transcript' 
-      : '/teacher/meeting-notes';
-    router.push(`${basePath}/${id}`);
+  const handleNavigate = (id: string, _type: string) => {
+    router.push(`/teacher/transcript/library`);
     setIsOpen(false);
   };
 
-  // Don't show sidebar on transcript pages
-  if (pathname.includes('video-transcript') || pathname.includes('meeting-notes')) {
+  // Don't show sidebar on transcript pages (all transcript-related routes)
+  if (pathname?.includes('/transcript') || pathname?.includes('video-transcript') || pathname?.includes('meeting-notes')) {
     return null;
   }
 
@@ -137,7 +135,7 @@ export function TranscriptSidebar() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {
-                router.push('/student/video-transcript');
+                router.push('/teacher/transcript/recording');
                 setIsOpen(false);
               }}
               className="px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs font-medium flex items-center justify-center gap-1"
@@ -147,13 +145,13 @@ export function TranscriptSidebar() {
             </button>
             <button
               onClick={() => {
-                router.push('/teacher/meeting-notes');
+                router.push('/teacher/transcript/library');
                 setIsOpen(false);
               }}
               className="px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors text-xs font-medium flex items-center justify-center gap-1"
             >
               <FileText className="w-3 h-3" />
-              Cuộc họp
+              Thư viện
             </button>
           </div>
         </div>
@@ -218,7 +216,7 @@ export function TranscriptSidebar() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
           <button
             onClick={() => {
-              router.push(filter === 'meeting' ? '/teacher/meeting-notes/history' : '/student/video-transcript/history');
+              router.push('/teacher/transcript/library');
               setIsOpen(false);
             }}
             className="w-full px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center gap-2"

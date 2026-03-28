@@ -28,12 +28,12 @@ const CourseLayout = async ({
       id: courseId,
     },
     include: {
-      chapters: {
+      Chapter: {
         where: {
           isPublished: true,
         },
         include: {
-          userProgress: {
+          UserProgress: {
             where: {
               userId: session.user.id,
             }

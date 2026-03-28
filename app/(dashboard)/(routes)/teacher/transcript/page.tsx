@@ -280,7 +280,7 @@ export default function TranscriptPage() {
                 <CardTitle className="text-base">Chức năng</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => router.push('/teacher/transcript/recording')}>
                   <CardHeader>
                     <Mic className="w-6 h-6 text-purple-600 mb-2" />
                     <CardTitle className="text-sm">Ghi âm</CardTitle>

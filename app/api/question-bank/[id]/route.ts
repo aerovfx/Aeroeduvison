@@ -6,19 +6,20 @@ import { db as prisma } from "@/lib/db"
 // GET /api/question-bank/[id] - Get question details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if Question model exists
     if (!prisma.question) {
       return NextResponse.json(
-        { 
+        {
           error: "Database schema not synced. Please run: npx prisma generate && npx prisma db push",
           code: "PRISMA_SCHEMA_NOT_SYNCED"
         },
@@ -27,7 +28,7 @@ export async function GET(
     }
 
     const question = await prisma.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!question) {
@@ -86,7 +87,7 @@ export async function GET(
 // PUT /api/question-bank/[id] - Update question
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -100,8 +101,9 @@ export async function PUT(
       )
     }
 
+    const { id } = await params
     const question = await prisma.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
     if (!question) {
       return NextResponse.json({ error: "Question not found" }, { status: 404 })
@@ -146,7 +148,7 @@ export async function PUT(
     }
 
     const updated = await prisma.question.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         topic: topic || subject,
         subject,
@@ -191,19 +193,20 @@ export async function PUT(
 // DELETE /api/question-bank/[id] - Delete question
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     // Check if Question model exists
     if (!prisma.question) {
       return NextResponse.json(
-        { 
+        {
           error: "Database schema not synced. Please run: npx prisma generate && npx prisma db push",
           code: "PRISMA_SCHEMA_NOT_SYNCED"
         },
@@ -213,7 +216,7 @@ export async function DELETE(
 
     // Check if question exists and belongs to user (or user is admin/teacher)
     const question = await prisma.question.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!question) {
@@ -233,7 +236,7 @@ export async function DELETE(
 
     // Delete question
     await prisma.question.delete({
-      where: { id: params.id },
+      where: { id },
     })
 
     return NextResponse.json({

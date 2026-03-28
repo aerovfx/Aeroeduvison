@@ -18,16 +18,16 @@ const UPLOAD_BASE_DIR = process.env.UPLOAD_BASE_DIR || '/uploads/cameras';
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: recordingId } = params;
+    const { id: recordingId } = await params;
 
     // Get recording from database
     const recording = await prisma.cameraRecording.findUnique({
@@ -111,16 +111,16 @@ export async function POST(
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: recordingId } = params;
+    const { id: recordingId } = await params;
 
     const recording = await prisma.cameraRecording.findUnique({
       where: { id: recordingId }
@@ -155,16 +155,16 @@ export async function GET(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: recordingId } = params;
+    const { id: recordingId } = await params;
 
     const recording = await prisma.cameraRecording.findUnique({
       where: { id: recordingId }

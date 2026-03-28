@@ -68,7 +68,7 @@ function NeuBadge({ children, variant = "default" }: { children: React.ReactNode
         background: variants[variant].bg,
         color: variants[variant].color,
         border: `1px solid ${variants[variant].border}`,
-        boxShadow: "inset 2px 2px 4px rgba(0,0,0,0.1), inset -2px -2px 4px rgba(255,255,255,0.5)",
+        boxShadow: "inset 2px 2px 4px rgba(0,0,0,0.1), inset -2px -2px 4px var(--glass-border)",
       }}
     >
       {children}
@@ -365,7 +365,7 @@ export default function StudentExamsPage() {
                         className="flex items-center gap-2 p-2 rounded-lg"
                         style={{
                           background: "rgba(102, 126, 234, 0.08)",
-                          boxShadow: "inset 2px 2px 4px rgba(102, 126, 234, 0.1), inset -2px -2px 4px rgba(255,255,255,0.5)",
+                          boxShadow: "inset 2px 2px 4px rgba(102, 126, 234, 0.1), inset -2px -2px 4px var(--glass-border)",
                         }}
                       >
                         <User className="h-4 w-4" style={{ color: "var(--neu-accent-primary)" }} />
@@ -377,7 +377,7 @@ export default function StudentExamsPage() {
                         className="flex items-center gap-2 p-2 rounded-lg"
                         style={{
                           background: "rgba(72, 187, 120, 0.08)",
-                          boxShadow: "inset 2px 2px 4px rgba(72, 187, 120, 0.1), inset -2px -2px 4px rgba(255,255,255,0.5)",
+                          boxShadow: "inset 2px 2px 4px rgba(72, 187, 120, 0.1), inset -2px -2px 4px var(--glass-border)",
                         }}
                       >
                         <Clock className="h-4 w-4" style={{ color: "var(--neu-accent-success)" }} />
@@ -389,7 +389,7 @@ export default function StudentExamsPage() {
                         className="flex items-center gap-2 p-2 rounded-lg"
                         style={{
                           background: "rgba(237, 137, 54, 0.08)",
-                          boxShadow: "inset 2px 2px 4px rgba(237, 137, 54, 0.1), inset -2px -2px 4px rgba(255,255,255,0.5)",
+                          boxShadow: "inset 2px 2px 4px rgba(237, 137, 54, 0.1), inset -2px -2px 4px var(--glass-border)",
                         }}
                       >
                         <Calendar className="h-4 w-4" style={{ color: "var(--neu-accent-warning)" }} />

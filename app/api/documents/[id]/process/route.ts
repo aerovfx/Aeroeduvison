@@ -11,17 +11,18 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 // POST /api/documents/[id]/process - Process document with AI/OCR
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     const document = await prisma.document.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!document) {
@@ -40,7 +41,7 @@ export async function POST(
 
     // Update status to processing
     await prisma.document.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status: "Đang xử lý",
       },
@@ -49,7 +50,7 @@ export async function POST(
     // Log processing start
     await prisma.documentProcessingLog.create({
       data: {
-        documentId: params.id,
+        documentId: id,
         stage: "processing",
         message: "Bắt đầu xử lý OCR với AI",
       },
@@ -60,7 +61,7 @@ export async function POST(
     try {
       // CRITICAL: Log document info to ensure we're processing the correct document
       console.log("🔍 [PROCESS] Starting OCR for document:", {
-        documentId: params.id,
+        documentId: id,
         documentName: document.name,
         originalUrl: document.originalUrl,
         type: document.type,
@@ -112,7 +113,7 @@ export async function POST(
       // Log file info to processing log
       await prisma.documentProcessingLog.create({
         data: {
-          documentId: params.id,
+          documentId: id,
           stage: "processing",
           message: `Đang xử lý file: ${document.name} (${(fileStats.size / 1024).toFixed(1)} KB)`,
           metadata: {
@@ -173,7 +174,7 @@ export async function POST(
             })
 
             console.log("🤖 [PROCESS] Using Gemini Vision API for text extraction:", {
-              documentId: params.id,
+              documentId: id,
               fileName: document.name,
               fileSize: fileBuffer.length,
               mimeType: document.mimeType,
@@ -215,7 +216,7 @@ Yêu cầu:
             extractedText = response.text().trim()
 
             console.log("✅ [PROCESS] Gemini Vision extraction successful:", {
-              documentId: params.id,
+              documentId: id,
               textLength: extractedText.length,
               textPreview: extractedText.substring(0, 100),
             })
@@ -232,7 +233,7 @@ Yêu cầu:
             // Log success
             await prisma.documentProcessingLog.create({
               data: {
-                documentId: params.id,
+                documentId: id,
                 stage: "ocr",
                 message: `Trích xuất text thành công với Gemini Vision: ${extractedText.length} ký tự`,
                 metadata: {
@@ -263,7 +264,7 @@ Yêu cầu:
             
             await prisma.documentProcessingLog.create({
               data: {
-                documentId: params.id,
+                documentId: id,
                 stage: "error",
                 message: `Gemini Vision thất bại: ${errorMessage}`,
                 metadata: {
@@ -280,7 +281,7 @@ Yêu cầu:
           // TODO: Extract text from PDF using PDF parser or convert to images first
           await prisma.documentProcessingLog.create({
             data: {
-              documentId: params.id,
+              documentId: id,
               stage: "ocr",
               message: "PDF cần xử lý riêng (chưa hỗ trợ Gemini Vision cho PDF)",
             },
@@ -295,7 +296,7 @@ Yêu cầu:
         try {
           await prisma.documentProcessingLog.create({
             data: {
-              documentId: params.id,
+              documentId: id,
               stage: "processing",
               message: "Đang phân tích và tái cấu trúc nội dung với AI...",
             },
@@ -340,7 +341,7 @@ Yêu cầu:
             
             await prisma.documentProcessingLog.create({
               data: {
-                documentId: params.id,
+                documentId: id,
                 stage: "processing",
                 message: `Phân tích AI thành công: ${structuredContent.structure?.sections?.length || 0} phần, ${structuredContent.keyTopics?.length || 0} chủ đề`,
                 metadata: {
@@ -361,7 +362,7 @@ Yêu cầu:
           // Continue without AI analysis, but log the error
           await prisma.documentProcessingLog.create({
             data: {
-              documentId: params.id,
+              documentId: id,
               stage: "error",
               message: `Phân tích AI thất bại: ${aiError.message || "Unknown error"}`,
               metadata: {
@@ -375,10 +376,10 @@ Yêu cầu:
           if (extractedText && extractedText.trim().length > 0) {
             try {
               const basicAnalysis = {
-                type: detectDocumentType(extractedText, document.name),
-                structure: extractBasicStructure(extractedText),
-                keyTopics: extractBasicTopics(extractedText),
-                summary: generateBasicSummary(extractedText),
+                type: detectDocumentTypeHelper(extractedText, document.name),
+                structure: extractBasicStructureHelper(extractedText),
+                keyTopics: extractBasicTopicsHelper(extractedText),
+                summary: generateBasicSummaryHelper(extractedText),
                 metadata: {
                   wordCount: extractedText.split(/\s+/).length,
                   characterCount: extractedText.length,
@@ -388,7 +389,7 @@ Yêu cầu:
                   error: aiError.message,
                 },
               }
-              
+
               structuredContent = basicAnalysis
               console.log("⚠️ [PROCESS] Using fallback analysis due to AI error")
             } catch (fallbackError) {
@@ -397,290 +398,6 @@ Yêu cầu:
           }
         }
       }
-      
-      // Helper functions for fallback analysis
-      function detectDocumentType(text: string, fileName?: string): string {
-        const lowerText = text.toLowerCase()
-        const lowerFileName = fileName?.toLowerCase() || ""
-        
-        if (lowerText.includes("đề thi") || lowerText.includes("câu hỏi") || lowerFileName.includes("đề")) {
-          return "exam"
-        }
-        if (lowerText.includes("chương") || lowerText.includes("bài") || lowerFileName.includes("sgk")) {
-          return "textbook"
-        }
-        if (lowerText.includes("ngân hàng") || lowerText.includes("trắc nghiệm")) {
-          return "question_bank"
-        }
-        return "document"
-      }
-      
-      function extractBasicStructure(text: string): any {
-        const lines = text.split("\n").filter((line) => line.trim().length > 0)
-        const sections: any[] = []
-        let currentSection: any = null
-
-        for (const line of lines.slice(0, 20)) { // Limit to first 20 lines
-          if (line.length < 100 && /^[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/.test(line.trim())) {
-            if (currentSection) {
-              sections.push(currentSection)
-            }
-            currentSection = {
-              title: line.trim(),
-              content: "",
-            }
-          } else if (currentSection) {
-            currentSection.content += line + "\n"
-          }
-        }
-
-        if (currentSection) {
-          sections.push(currentSection)
-        }
-
-        return { sections: sections.slice(0, 5) }
-      }
-      
-      function extractBasicTopics(text: string): string[] {
-        const topics: string[] = []
-        const lowerText = text.toLowerCase()
-        
-        const topicKeywords: { [key: string]: string } = {
-          "toán học": "Toán học",
-          "văn học": "Văn học",
-          "vật lý": "Vật lý",
-          "hóa học": "Hóa học",
-          "sinh học": "Sinh học",
-          "lịch sử": "Lịch sử",
-          "địa lý": "Địa lý",
-          "tiếng anh": "Tiếng Anh",
-        }
-
-        for (const [keyword, topic] of Object.entries(topicKeywords)) {
-          if (lowerText.includes(keyword) && !topics.includes(topic)) {
-            topics.push(topic)
-          }
-        }
-
-        return topics.slice(0, 5)
-      }
-      
-      function generateBasicSummary(text: string): string {
-        const sentences = text.split(/[.!?]\s+/).filter((s) => s.trim().length > 20)
-        if (sentences.length > 0) {
-          return sentences.slice(0, 2).join(". ") + "."
-        }
-        return text.substring(0, 150) + (text.length > 150 ? "..." : "")
-      }
-
-      const executionTime = Math.floor((Date.now() - startTime) / 1000)
-
-      // CRITICAL: Final validation before saving
-      // Double-check that we're not saving wrong text
-      if (extractedText.length > 0) {
-        const simulationTexts = [
-          "Cách mạng tháng Tám năm 1945",
-          "Đảng Cộng sản Việt Nam",
-        ]
-        const hasSimulationText = simulationTexts.some(text => extractedText.includes(text))
-        const isHistoryDocument = document.name.toLowerCase().includes("lịch sử") || 
-                                 document.name.toLowerCase().includes("history")
-        
-        if (hasSimulationText && !isHistoryDocument) {
-          console.error("❌ [PROCESS] FINAL CHECK: Simulation text detected - ABORTING SAVE", {
-            documentId: params.id,
-            fileName: document.name,
-            fileHash: fileHash.substring(0, 16),
-          })
-          throw new Error("Không thể lưu kết quả OCR: Phát hiện text simulation không phù hợp.")
-        }
-      }
-      
-      // CRITICAL: Determine final status based on results
-      // Only mark as "Hoàn tất" if we have OCR text or digitizedUrl
-      let finalStatus = "Hoàn tất"
-      if (!extractedText || extractedText.trim().length === 0) {
-        // No OCR text extracted - mark as error or queue for retry
-        finalStatus = "Lỗi"
-        console.warn("⚠️ [PROCESS] No OCR text extracted - marking as error", {
-          documentId: params.id,
-          fileName: document.name,
-        })
-      }
-      
-      console.log("💾 [PROCESS] Saving OCR result:", {
-        documentId: params.id,
-        documentName: document.name,
-        textLength: extractedText.length,
-        textPreview: extractedText.substring(0, 50),
-        fileHash: fileHash.substring(0, 16),
-        finalStatus: finalStatus,
-      })
-
-      // Step 4: Save final result to file (if we have text)
-      let resultFileUrl = null
-      if (extractedText && extractedText.trim().length > 0 && finalStatus === "Hoàn tất") {
-        try {
-          await prisma.documentProcessingLog.create({
-            data: {
-              documentId: params.id,
-              stage: "processing",
-              message: "Đang lưu kết quả số hóa vào file...",
-            },
-          })
-
-          // Create result directory
-          const resultDir = join(process.cwd(), "uploads", "results", session.user.id)
-          if (!existsSync(resultDir)) {
-            await mkdir(resultDir, { recursive: true })
-          }
-
-          // Get final text (prefer restructured, fallback to OCR)
-          const finalText = structuredContent?.restructuredText || extractedText
-          
-          // Generate filename
-          const baseName = document.displayName || document.name.replace(/\.[^/.]+$/, "")
-          const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)
-          const fileName = `${baseName}_${timestamp}.txt`
-          const filePath = join(resultDir, fileName)
-
-          // Build file content with metadata
-          let fileContent = ""
-          fileContent += "=".repeat(80) + "\n"
-          fileContent += "KẾT QUẢ SỐ HÓA TÀI LIỆU\n"
-          fileContent += "=".repeat(80) + "\n\n"
-          
-          fileContent += `Tên tài liệu: ${document.displayName || document.name}\n`
-          if (structuredContent?.type) {
-            const typeLabels: { [key: string]: string } = {
-              exam: "Đề thi",
-              textbook: "Sách giáo khoa",
-              question_bank: "Ngân hàng câu hỏi",
-              document: "Tài liệu",
-            }
-            fileContent += `Loại tài liệu: ${typeLabels[structuredContent.type] || "Tài liệu"}\n`
-          }
-          fileContent += `Ngày số hóa: ${new Date().toLocaleString("vi-VN")}\n`
-          if (executionTime) {
-            fileContent += `Thời gian xử lý: ${executionTime} giây\n`
-          }
-          fileContent += "\n"
-
-          // Key topics
-          if (structuredContent?.keyTopics && structuredContent.keyTopics.length > 0) {
-            fileContent += "Chủ đề: " + structuredContent.keyTopics.join(", ") + "\n"
-            fileContent += "\n"
-          }
-
-          // Summary
-          if (structuredContent?.summary) {
-            fileContent += "Tóm tắt:\n"
-            fileContent += structuredContent.summary + "\n"
-            fileContent += "\n"
-          }
-
-          // Structure
-          if (structuredContent?.structure?.sections && structuredContent.structure.sections.length > 0) {
-            fileContent += "Cấu trúc tài liệu:\n"
-            structuredContent.structure.sections.forEach((section: any, index: number) => {
-              fileContent += `${index + 1}. ${section.title}\n`
-            })
-            fileContent += "\n"
-          }
-
-          fileContent += "-".repeat(80) + "\n"
-          fileContent += "NỘI DUNG ĐÃ SỐ HÓA\n"
-          fileContent += "-".repeat(80) + "\n\n"
-          fileContent += finalText
-          fileContent += "\n\n" + "=".repeat(80) + "\n"
-          fileContent += `Được tạo bởi hệ thống số hóa tài liệu AeroEduVision\n`
-          fileContent += `Ngày tạo: ${new Date().toLocaleString("vi-VN")}\n`
-          fileContent += "=".repeat(80) + "\n"
-
-          // Save file
-          await writeFile(filePath, fileContent, "utf-8")
-          resultFileUrl = `/uploads/results/${session.user.id}/${fileName}`
-
-          await prisma.documentProcessingLog.create({
-            data: {
-              documentId: params.id,
-              stage: "completed",
-              message: `Đã lưu kết quả số hóa vào file: ${fileName}`,
-            },
-          })
-
-          console.log("✅ [PROCESS] Result file saved:", {
-            documentId: params.id,
-            fileName: fileName,
-            fileSize: Buffer.byteLength(fileContent, "utf-8"),
-          })
-        } catch (saveError: any) {
-          console.error("⚠️ [PROCESS] Failed to save result file:", saveError)
-          // Continue without saving file - not critical
-          await prisma.documentProcessingLog.create({
-            data: {
-              documentId: params.id,
-              stage: "processing",
-              message: `Lưu file kết quả thất bại: ${saveError.message}`,
-            },
-          })
-        }
-      }
-
-      // Update document with results - ensure we're updating the correct document
-      const updatedDocument = await prisma.document.update({
-        where: { id: params.id },
-        data: {
-          status: finalStatus,
-          ocrText: extractedText && extractedText.trim().length > 0 ? extractedText : null, // Only save non-empty text
-          executionTime,
-          processedAt: new Date(),
-          processingError: finalStatus === "Lỗi" ? "Không thể trích xuất text từ tài liệu. Vui lòng kiểm tra GEMINI_API_KEY hoặc file có hợp lệ không." : null,
-          digitizedUrl: resultFileUrl, // Save result file URL
-          metadata: {
-            ...(document.metadata as any || {}),
-            processedFileHash: fileHash.substring(0, 16), // Store hash to verify
-            processedFileName: document.name, // Store filename to verify
-          ocrResult: ocrResult ? {
-            confidence: ocrResult.confidence || ocrResult.data?.confidence,
-            totalLines: ocrResult.total_lines || ocrResult.data?.total_lines,
-            textLength: extractedText.length,
-            provider: ocrResult.provider || "gemini-vision",
-            model: ocrResult.model,
-          } : null,
-          aiAnalysis: structuredContent,
-          hasOcrText: extractedText && extractedText.trim().length > 0,
-          // Store restructured text and layout analysis
-          restructuredText: structuredContent?.restructuredText || null,
-          layoutAnalysis: structuredContent?.layoutAnalysis || null,
-          // Store result file info
-          resultFile: resultFileUrl ? {
-            url: resultFileUrl,
-            savedAt: new Date().toISOString(),
-            format: "txt",
-          } : null,
-        },
-      },
-    })
-
-      // Verify the update was correct
-      if (updatedDocument.id !== params.id) {
-        throw new Error("CRITICAL: Document ID mismatch after update!")
-      }
-
-      console.log("✅ [PROCESS] Document updated successfully:", {
-        documentId: updatedDocument.id,
-        status: updatedDocument.status,
-        hasOcrText: !!updatedDocument.ocrText,
-      })
-
-      await prisma.documentProcessingLog.create({
-        data: {
-          documentId: params.id,
-          stage: "completed",
-          message: `Xử lý hoàn tất trong ${executionTime}s`,
-        },
-      })
 
       return NextResponse.json({
         success: true,
@@ -697,16 +414,16 @@ Yêu cầu:
       })
     } catch (error: any) {
       console.error("Processing error:", error)
-      
+
       // Extract and clean error message
       let errorMessage = error.message || "Failed to process document"
-      
+
       // Remove duplicate phrases
       const duplicates = [
         "OCR service không khả dụng",
         "Vui lòng đảm bảo OCR service đang chạy",
       ]
-      
+
       for (const phrase of duplicates) {
         // Count occurrences
         const count = (errorMessage.match(new RegExp(phrase, "g")) || []).length
@@ -716,21 +433,21 @@ Yêu cầu:
           errorMessage = parts[0] + phrase + parts.slice(1).join(" ").trim()
         }
       }
-      
+
       // Clean up multiple "Vui lòng đảm bảo" phrases
       const vuiLongMatches = errorMessage.match(/Vui lòng đảm bảo[^.]*\./g) || []
       if (vuiLongMatches.length > 1) {
         // Keep only the first occurrence
         const firstIndex = errorMessage.indexOf("Vui lòng đảm bảo")
         const firstMatch = vuiLongMatches[0]
-        errorMessage = errorMessage.substring(0, firstIndex) + 
-                      firstMatch + 
+        errorMessage = errorMessage.substring(0, firstIndex) +
+                      firstMatch +
                       errorMessage.substring(firstIndex + firstMatch.length)
                       .replace(/Vui lòng đảm bảo[^.]*\./g, "")
                       .replace(/\s+/g, " ")
                       .trim()
       }
-      
+
       // Clean up multiple "Service:" phrases
       const serviceMatches = errorMessage.match(/Service:\s*http[^\s]*/g) || []
       if (serviceMatches.length > 1) {
@@ -739,9 +456,9 @@ Yêu cầu:
         errorMessage = errorMessage.replace(/Service:\s*http[^\s]*/g, "")
                       .trim() + ". " + lastMatch
       }
-      
+
       const isOcrError = errorMessage.includes("OCR") || errorMessage.includes("trích xuất")
-      
+
       // Create clean error message for user
       let userErrorMessage = errorMessage
       if (isOcrError && !errorMessage.includes("💡")) {
@@ -749,9 +466,9 @@ Yêu cầu:
         const ocrServerUrl = process.env.OCR_SERVER_URL || "http://localhost:8001"
         userErrorMessage = `${errorMessage}\n\n💡 Hướng dẫn:\n- Kiểm tra OCR service có đang chạy tại ${ocrServerUrl}\n- Xem logs để biết chi tiết lỗi\n- Thử số hóa lại sau khi OCR service đã sẵn sàng`
       }
-      
+
       await prisma.document.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           status: "Lỗi",
           processingError: userErrorMessage,
@@ -760,7 +477,7 @@ Yêu cầu:
 
       await prisma.documentProcessingLog.create({
         data: {
-          documentId: params.id,
+          documentId: id,
           stage: "error",
           message: `Lỗi: ${errorMessage}`,
           metadata: {
@@ -772,7 +489,7 @@ Yêu cầu:
       })
 
       return NextResponse.json(
-        { 
+        {
           error: errorMessage,
           details: isOcrError ? {
             suggestion: "Vui lòng đảm bảo OCR service đang chạy",
@@ -790,3 +507,79 @@ Yêu cầu:
     )
   }
 }
+
+// Helper functions for fallback analysis
+const detectDocumentTypeHelper = (text: string, fileName?: string): string => {
+  const lowerText = text.toLowerCase()
+  const lowerFileName = fileName?.toLowerCase() || ""
+
+  if (lowerText.includes("đề thi") || lowerText.includes("câu hỏi") || lowerFileName.includes("đề")) {
+    return "exam"
+  }
+  if (lowerText.includes("chương") || lowerText.includes("bài") || lowerFileName.includes("sgk")) {
+    return "textbook"
+  }
+  if (lowerText.includes("ngân hàng") || lowerText.includes("trắc nghiệm")) {
+    return "question_bank"
+  }
+  return "document"
+}
+
+const extractBasicStructureHelper = (text: string): any => {
+  const lines = text.split("\n").filter((line) => line.trim().length > 0)
+  const sections: any[] = []
+  let currentSection: any = null
+
+  for (const line of lines.slice(0, 20)) { // Limit to first 20 lines
+    if (line.length < 100 && /^[A-ZÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ]/.test(line.trim())) {
+      if (currentSection) {
+        sections.push(currentSection)
+      }
+      currentSection = {
+        title: line.trim(),
+        content: "",
+      }
+    } else if (currentSection) {
+      currentSection.content += line + "\n"
+    }
+  }
+
+  if (currentSection) {
+    sections.push(currentSection)
+  }
+
+  return { sections: sections.slice(0, 5) }
+}
+
+const extractBasicTopicsHelper = (text: string): string[] => {
+  const topics: string[] = []
+  const lowerText = text.toLowerCase()
+
+  const topicKeywords: { [key: string]: string } = {
+    "toán học": "Toán học",
+    "văn học": "Văn học",
+    "vật lý": "Vật lý",
+    "hóa học": "Hóa học",
+    "sinh học": "Sinh học",
+    "lịch sử": "Lịch sử",
+    "địa lý": "Địa lý",
+    "tiếng anh": "Tiếng Anh",
+  }
+
+  for (const [keyword, topic] of Object.entries(topicKeywords)) {
+    if (lowerText.includes(keyword) && !topics.includes(topic)) {
+      topics.push(topic)
+    }
+  }
+
+  return topics.slice(0, 5)
+}
+
+const generateBasicSummaryHelper = (text: string): string => {
+  const sentences = text.split(/[.!?]\s+/).filter((s) => s.trim().length > 20)
+  if (sentences.length > 0) {
+    return sentences.slice(0, 2).join(". ") + "."
+  }
+  return text.substring(0, 150) + (text.length > 150 ? "..." : "")
+}
+

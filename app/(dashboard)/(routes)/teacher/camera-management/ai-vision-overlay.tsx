@@ -494,7 +494,7 @@ export const AIVisionOverlay = ({ videoRef, isActive, cameraId, studentNames, cl
                     // Student name (top line)
                     ctx.textAlign = 'center'
                     if (sName) {
-                      ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
+                      ctx.fillStyle = 'hsl(var(--foreground) / 0.95)'
                       ctx.font = 'bold 11px sans-serif'
                       ctx.fillText(nameLabel, lx, boxY + 14)
                     }

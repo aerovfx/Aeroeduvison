@@ -1,0 +1,260 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-hien-tuong-quang-dien-trong-2.jsp",
+  "title": "20 bài tập trắc nghiệm Hiện tượng quang điện trong (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Hiện tượng quang điện trong:",
+        "options": [
+          {
+            "option": "A",
+            "text": "là hiện tượng êlectron hấp thụ photon có năng lựng đủ lớn để bứt ra khỏi khối chất."
+          },
+          {
+            "option": "B",
+            "text": "hiện tượng êlectron chuyển động nhanh hơn khi hấp thụ photon."
+          },
+          {
+            "option": "C",
+            "text": "xảy ra với chất bán dẫn khi ánh sáng kích thích có tần số lớn hơn một tần số giới hạn."
+          },
+          {
+            "option": "D",
+            "text": "xảy ra với ánh sáng có bước sóng lớn hơn một giá trị nào đó."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": "- Hiện tượng quang điện trong cũng là sự giải phóng e (giống quang điện ngoài) nhưng cần ít năng lượng hơn từ đó ta:"
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Giới hạn quang dẫn của chất CdS là 0,9 μm. Năng lượng tối thiểu của photon ánh sáng có thể gây ra hiện tượng quang dẫn CdS là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,56 eV     \tB. 1,12 eV"
+          },
+          {
+            "option": "C",
+            "text": "1,38 eV     \tD. 2,20 eV"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Một chất quang dẫn có giới hạn quang dẫn là 4μm. Năng lượng kích hoạt của chất đó là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,97.10-20J"
+          },
+          {
+            "option": "B",
+            "text": "3,26.10-20J"
+          },
+          {
+            "option": "C",
+            "text": "4,97.10-19J"
+          },
+          {
+            "option": "D",
+            "text": "3,261.10-19J"
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Một chất bán dẫn có giới hạn quang dẫn là 5 µm. Biết tốc độ ánh sáng trong chân không là 3.108m/s và hằng số Plank là 6,625.10-34Js. Tính năng lượng kích hoạt của chất đó.",
+        "options": [
+          {
+            "option": "A",
+            "text": "4.10-19J.      \tB. 3,97 eV."
+          },
+          {
+            "option": "C",
+            "text": "0,35 eV.       \t\tD. 0,25 eV."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Khi chiếu bức xạ điện từ thích hợp vào chất bán dẫn thì giải phóng ra các electron dẫn và để lại các lỗ trống. Chọn phát biểu đúng.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chỉ các lỗ trống đóng vai trò là các hạt tải điện."
+          },
+          {
+            "option": "B",
+            "text": "Chỉ các electron đóng vai trò là các hạt tải điện."
+          },
+          {
+            "option": "C",
+            "text": "Cả các lỗ trống và các electron đóng vai trò là các hạt tải điện."
+          },
+          {
+            "option": "D",
+            "text": "Cả các lỗ trống và các electron đều không phải là các hạt tải điện."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Nguyên tắc hoạt động của pin quang điện dựa vào hiện tượng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Quang điện trong"
+          },
+          {
+            "option": "B",
+            "text": "quang phát quang"
+          },
+          {
+            "option": "C",
+            "text": "cảm ứng điện từ"
+          },
+          {
+            "option": "D",
+            "text": "tán sắc ánh sáng"
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Trong hiện tượng quang dẫn, năng lượng cần thiết để giải phóng một êlectron liên kết thành êlectron dẫn gọi là năng lượng kích hoạt. Biết năng lượng kích hoạt của PbS là 0,3 eV, lấy h = 6,625.10-34J.s, c = 3.108m/s, e = 1,6.10-19C, giới hạn quang dẫn của PbS là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,06 µm.     \tB. 4,14 µm."
+          },
+          {
+            "option": "C",
+            "text": "1,51 µm.     \tD. 4,97 µm."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Quang dẫn có giới hạn quang dẫn 4,8.1014Hz. Chiếu vào chất bán dẫn đó lần lượt các chùm bức xạ đơn sắc có tần số f1= 4,5.1014Hz; f2= 5,0.1013Hz; f3= 6,5.1013Hz; f1= 6,0.1014Hz thì hiện tượng quang dẫn xảy ra với bức xạ nào?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chùm bức xạ 1"
+          },
+          {
+            "option": "B",
+            "text": "Chùm bức xạ 2"
+          },
+          {
+            "option": "B",
+            "text": "Chùm bức xạ 3"
+          },
+          {
+            "option": "B",
+            "text": "Chùm bức xạ 4"
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Pin quang điện là nguồn điện, trong đó,",
+        "options": [
+          {
+            "option": "A",
+            "text": "quang năng được biến đổi trực tiếp thành điện năng."
+          },
+          {
+            "option": "B",
+            "text": "cơ năng được biến đổi trực tiếp thành điện năng."
+          },
+          {
+            "option": "C",
+            "text": "hóa năng được biến đổi trực tiếp thành điện năng."
+          },
+          {
+            "option": "D",
+            "text": "nhiệt năng được biến đổi trực tiếp thành điện năng."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Một bộ pin quang điện gồm nhiều pin mắc nối tiếp. Diện tích tổng cộng của các pin là 0,4 m2. Dòng ánh sáng chiếu vào bộ pin có cường độ 1000 W/m2. Khi cường độ dòng điện mà bộ pin cung cấp cho mạch ngoài là 2,5A thì điện áp đo được hai cực của bộ pin là 20 V. Hiệu suất của bộ pin là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "43,6%.     \tB. 14,25%."
+          },
+          {
+            "option": "C",
+            "text": "12,5%.     \tD. 28,5%."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 10
+}

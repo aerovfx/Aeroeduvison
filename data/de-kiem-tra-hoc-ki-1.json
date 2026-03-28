@@ -1,0 +1,1225 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/de-kiem-tra-hoc-ki-1.jsp",
+  "title": "Đề thi Vật Lí 12 Học kì 1 năm 2022 (có lời giải)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Mạch điện xoay chiều gổm R, L, C mắc nối tiếp có hệ số công suất bằng 1 khi",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Tốc độ truyền sóng âm lớn nhất trong môi trường",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chất rắn                B.\tChất lỏng"
+          },
+          {
+            "option": "C",
+            "text": "Chất khi ở áp suất thấp        D.\tChất khí ở áp suất cao"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Phương trình nào dưới đây là phương trình sóng?",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Sóng ngang truyền được trong các môi trường",
+        "options": [
+          {
+            "option": "A",
+            "text": "Chất rắn        B.\tChất lỏng"
+          },
+          {
+            "option": "C",
+            "text": "Chất khí        D.\tChất rắn, chất lỏng và chất khí"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Một con lắc đơn dao động với biên độ nhỏ. Khoảng thời gian giữa hai lần liên tiếp quả cầu của con lắc ở vị trí cao nhất là 1 s. Chu kì dao động của con lắc là",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 s        B.\t0,5 s        C.\t2 s        D.\t4 s"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Một chất điểm dao động điều hòa theo phươlng trình x = – 4cos5πt (cm). Biên độ, chu kì và pha ban đầu của dao động lần lượt là",
+        "options": [
+          {
+            "option": "A",
+            "text": "– 4 cm ; 0,4 s ; 0        B.\t4 cm ; 0,4 s ; 0"
+          },
+          {
+            "option": "C",
+            "text": "4 cm ; 2,5 s ; π        D.\t4 cm ; 0,4 s ; π"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Một con lắc lò xo dao động điều hòa. Lò xo có độ cứng k = 40 N/m. Khi quả cầu con lắc qua vị trí có li độ x = – 2 cm thì thế năng của con lắc là",
+        "options": [
+          {
+            "option": "A",
+            "text": "– 0,016 J        B.\t0,008 J        C.\t– 0,80 J        D.\t0,016 J"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Một con lắc lò xo treo thẳng đứng. Quả cầu con lắc có khổi lượng 100g. Khi cân bằng, lò xo dãn ra một đoạn bằng 4 cm so với chiều dài tự nhiên của nó. Cho con lắc dao động theo phương thẳng đứng. Lấy g=π2(m/s2). Chu kì dao động cỉa con lắc bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 s        B.\t0,4 s        C.\t0,07 s        D.\t1 s"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Một con lắc đơn có khối lượng m = 100 g và chiều dài l = 1,4 m. Con lắc dao động nhỏ tại một nơi có gia tốc rơi tự do là g = 9,8 m/s2. Chu kì dao động của con lắc bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,37 s        B.\t16,6 s        C.\t0,63 s        D.\t20 s"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Hai nguồn phát sóng kết hợp là hai nguồn có",
+        "options": [
+          {
+            "option": "A",
+            "text": "Pha dao động bằng nhau."
+          },
+          {
+            "option": "B",
+            "text": "Cùng biên độ dao động."
+          },
+          {
+            "option": "C",
+            "text": "Cùng tần số giao động"
+          },
+          {
+            "option": "D",
+            "text": "Cùng tần số dao động và có hiệu số pha dao động không đổi"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Hai nguồn phát sóng có cùng tần số, nằm tại hai điểm S1và S2. Tại các điểm nằm trên đường trung trực của S1S2sẽ luôn luôn có cực đại giao thoa nếu hiệu số pha dao động của hai nguồn bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "π/2        B.\tΠ        C.\t3π/2        D.\t2π"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Có hai nguồn phát sóng kết hợp cùng pha. Tại điểm M sẽ có cực tiểu giao thoa nếu hiệu đường đi từ điểm đó đến hai nguồn bằng",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Khi nói về dao động cơ cưỡng bức, phát biểu nào sau đây là sai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tần số của dao động cưỡng bức bằng tần số của lực cưỡng bức"
+          },
+          {
+            "option": "B",
+            "text": "Biên độ của dao động cưỡng bức phụ thuộc vào biên độ của lực cưỡng bức"
+          },
+          {
+            "option": "C",
+            "text": "Biên đọ của dao động cưỡng bức càng lớn khi tần số của lực cưỡng bức càng gần tần số riêng của hệ dao động"
+          },
+          {
+            "option": "D",
+            "text": "Tần số của dao động cưỡng bức lớn hơn tần số của lực cưỡng bức"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Một sóng cơ truyền dọc theo trục Ox có phương trình u = 5cos(6πt – πx) (cm), với t đo bằng s, x đo bằng m. Tốc độ truyền sóng là",
+        "options": [
+          {
+            "option": "A",
+            "text": "3 m/s        B.\t60 m/s        C.\t6 m/s        D.\t30 m/s"
+          },
+          {
+            "option": "A",
+            "text": "0,50        B.\t0,71        C.\t1,00        D.\t0,86"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Một sóng âm truyền trong một môi trường. Biết cường độ âm tại một điểm gấp 100 lần cường độ âm chuẩn. Mức cường độ âm tại điểm đó là",
+        "options": [
+          {
+            "option": "A",
+            "text": "50 dB        B.\t20 dB        C.\t100 dB        D.\t10 dBCâu 17:Một con lắc lò xo gồm vật nhỏ gắn với lò xo nhẹ dao động điều hòa theo phương ngang. Lực kéo về tác dụng vào vật luônA.\tCùng chiều với chiều chuyển động của vậtB.\tHướng về vị trí cân bằngC.\tCùng chiều với chiều biến dạng của lò xoD.\tHướng về vị trí biênCâu 18:Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằngA.\tMột số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Một con lắc lò xo gồm vật nhỏ gắn với lò xo nhẹ dao động điều hòa theo phương ngang. Lực kéo về tác dụng vào vật luôn",
+        "options": [
+          {
+            "option": "A",
+            "text": "Cùng chiều với chiều chuyển động của vậtB.\tHướng về vị trí cân bằngC.\tCùng chiều với chiều biến dạng của lò xoD.\tHướng về vị trí biênCâu 18:Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằngA.\tMột số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "B",
+            "text": "Hướng về vị trí cân bằngC.\tCùng chiều với chiều biến dạng của lò xoD.\tHướng về vị trí biênCâu 18:Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằngA.\tMột số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "C",
+            "text": "Cùng chiều với chiều biến dạng của lò xoD.\tHướng về vị trí biênCâu 18:Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằngA.\tMột số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "D",
+            "text": "Hướng về vị trí biênCâu 18:Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằngA.\tMột số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Sóng truyền trên một sợi dây có một đầu cố định, một đầu tự do. Muốn có sóng dừng trên dây thì chiều dài của sợi dây phải bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "Một số chẵn lần một phần tư bước sóngB.\tMột số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "B",
+            "text": "Một số lẻ lần nửa bước sóngC.\tMột số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "C",
+            "text": "Một số lẻ lần một phần tư bước sóngD.\tMột số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          },
+          {
+            "option": "D",
+            "text": "Một số nguyên lần bước sóngCâu 19:Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm làCâu 20:Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằngCâu 21:Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số làA.\t60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 HzCâu 22:Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động làA.\t4 mm        B.\t2 mm        C.\t1 mm        D.\t0Câu 23:Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động làA.\t10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cmCâu 24:Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở làCâu 25:Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì làA.\t2 s        B.\t2√2  s        C.\t√2  s        D.\t4 sCâu 26:Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?A.\tHệ số công suất của đoạn mạch bằng 0B.\tCông suất tiêu thụ của đoạn mạch khác 0C.\tTần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏD.\tĐiện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạchCâu 27:Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện làCông suất tiêu thụ của đoạn mạch AB bằngA.\t200 W        B.\t100 W        C.\t400 W        D.\t300 WCâu 28:Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này làQuảng cáoCâu 29:Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằngA.\t0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 JCâu 30:Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng làA.\t100 cm/s        B.\t40 cm/sC.\t80 cm/s         D.\t60 cm/sĐáp án & Hướng dẫn giảiCâu12345678910Đáp ánBADACDBBADCâu11121314151617181920Đáp ánDBDCABBCADCâu21222324252627282930Đáp ánAACBBBCBDCCâu 6:Dx = –4cos5πt  = 4cos(5πt + π) (cm)Câu 7:BCâu 8:BCâu 14:CCâu 15:ACâu 16:BCâu 19:ACâu 20:DCâu 21:Af = np = 60 HzCâu 22:Ad2-d1=3=λ ⇒ tại M có cực đại giao thoa với biên độ 2 + 2 = 4 mm.Câu 23:Cs = 4A = 40 cmCâu 24:BCâu 25:BCâu 27:CCâu 28:BCâu 29:DCâu 30:Cω2A2=ω2x2+v2⇒v=80 cm/sPhòng Giáo dục và Đào tạo .....Đề khảo sát chất lượng Học kì 1Năm học 2022 - 2023Môn: Vật Lí 12Thời gian làm bài: 45 phútCâu 1.hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?A. Tại M và N đều là vân sáng.B. Tại M và N đều là vân tối.C. Tại M là vân sáng, ở N là vân tối.D. Tại M là vân tối, ở N là vân sáng.Câu 2.Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:A. hồng ngoại\t   B. tử ngoạiC. màu tím\t\t   D. màu đỏCâu 3.Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:A. 0,5 MeV\t   B. 1 MeVC. 2MeV\t   D. 2,5 MeVCâu 4.Độ phóng xạ của 3mglà 3,41 Ci.Cho NA= 6,023.1023hạt/mol; 1 năm = 365 ngày. Chu kỳ bán rã T củalàA. 32 năm\t   B. 15,6 nămC. 8,4 năm\t   D. 5,25 nămCâu 5.Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:A. 9,6 μm\t   B. 9,6 nmC. l,6 μm    \tD. 16 nm.Câu 6.Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.A. 0,4 μm\t   B. 0,75 μmC. 0,6 μm\t   D. 0,5 μm.Câu 7.Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:Câu 8.Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:A. 33,3.10-8s \t      B. 0,25.10-8sC. 16,7.10-8s \t      D. 0,25.10-7sCâu 9.Sóng điện từ có khả năng phản xạ ở tầng điện li là:A. Sóng dài và sóng trung.B. Sóng trung và sóng ngắn.C. Sóng dài và sóng ngắn.D. Sóng dài, sóng trung và sóng ngắn.Câu 10.Phát biểu nào sau đây không đúng?Khi một từ trường biến thiên theo thời gian thì nó sinh ra một điện trườngA. xoáy.B. mà chỉ có thể tồn tại trong dây dẫn.C. mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ.D. cảm ứng mà nó tự tồn tại trong không gian.Câu 11.Khi ánh sáng đi từ không khí vào nước thì tần số:A. tăng lên và vận tốc giảm đi.B. không đổi và bước sóng trong nước nhỏ hơn trong không khí.C. không đổi và bước sóng trong nước lớn hơn trong không khí.D. giảm đi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:A. 0,50μm    \tB. 0,6μmC. 0,54μm    \tD. 0,66μmCâu 13.Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?A. Tia Rơnghen có khả năng đâm xuyên.B. Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất.C. Tia Rơnghen bị lệch trong điện trường.D. Tia Rơnghen có tác dụng sinh lí.Câu 14.Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:A. bước sóng của ánh sáng.B. nhiệt độ của các vật phát sáng do bị nung nóng.C. thành phần cấu tạo của các vật phát sáng.D. công suất của nguồn sáng.Câu 15.Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.A. Ánh sáng trắng bị tán sắc khi đi qua lăng kính.B. Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục.C. Mỗi chùm sáng trên đều có một bước sóng xác định.D. Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất.Câu 16.Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:A. hai vạch của dãy Laiman.B. hai vạch của dãy Banme.C. hai vạch của dãy Laiman và một vạch của dãy Banme.D. một vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Giới hạn quang điện của mỗi kim loại là:A. bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.B. bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.C. công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.D. công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó.Câu 18.Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:A. 75,5.10-12m \t   B. 82,8.10-12mC. 75,5.10-10m\t       D. 82,8.10-10mCâu 19.Sự phát xạ cảm ứng là:A. sự phát ra phôtôn bởi một nguyên tử.B. sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số.C. sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau.D. sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:Câu 21.Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?A. tia anpha bị lệch về phía bản âm của tụ điện.B. tia beta trừ bị lệch về phía bản dương của tụ.C. tia beta cộng bị lệch về phía bản âm của tụ.D. tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Trong phản ứng hạt nhânA. tổng năng lượng được bảo toàn.B. tổng khối lượng của các hạt được bảo toàn.C. tổng số nơtron được bảo toàn.D. động năng được bảo toàn.Câu 23.Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:A. 15,70%\t   B. 11,54%C. 7,5%\t       D. 26,82%Câu 24.Phát biểu nào sau đây là đúng?A. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ.B. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ.C. Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.D. Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron.Câu 25.Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:A. 4,4%\t   B. 3,2%C. 1,2%\t   D. 2,4%Đáp án & Thang điểmCâu 1.Đáp án DKhoảng vân:Lập các tỉ số:→ Tại M là vân tối, ở N là vân sáng.Câu 2.Đáp án A.Công suất nguồn sáng bằng tổng năng lượng các photon phát ra trong 1 giây.Do đó:Từ đó tính được λ = 4,9(μm)Câu 3.Đáp án A.Năng lượng toả ra là: Wlk (Y)- Wlk(X1) - Wlk(X2) = 0,5(MeV)Câu 4.Đáp án D.Số hạt nhân trong 3 mglà:Độ phóng xạ của 3 mg: H0= 3,41.1010Bq.Ta có:≈ 165406320s = 5,245 năm ≈ 5,25 năm.Câu 5.Đáp án A.Ta có:Câu 6.Đáp án D.Hệ vân dịch đoạn x0:Theo đề ra, vân trung tâm dời đến vị trí vân sáng thứ 5, ta có:Từ (1) và (2), suy ra:Câu 7.Đáp án D.Theo định luật bảo toàn năng lượng ta có:Khi i = I0/4  thay vào (1) ta được:Từ (2) và (3) suy ra:Câu 8.Đáp án D.Ta có: q = Q0cos⁡(ωt + φ)Tại thời điểm t = 0 thì q = Q0→ cos⁡ φ = 1 → φ = 0 → q = Q0cos⁡ωtTheo định luật bảo toàn năng lượng ta có:Khi Wt= WdthìThời gian ngắn nhất ứng với giá trị t thoả mãn:Câu 9.Đáp án D.Sóng dài, sóng trung và sóng ngắn.Câu 10.Đáp án B.Chỉ có thể tồn tại trong dây dẫnCâu 11.Đáp án B.Không đổi và bước sóng trong nước nhỏ hơn trong không khí.Câu 12.Đáp án A.Lúc đầu:Lúc sau:Câu 13.Đáp án C.Tia Rơnghen bị lệch trong điện trường.Câu 14.Đáp án B.Nhiệt độ của các vật phát sáng do bị nung nóng.Câu 15.Đáp án C.Mỗi chùm sáng trên đều có một bước sóng xác định.Câu 16.Đáp án C.Hai vạch của dãy Laiman và một vạch của dãy Banme.Câu 17.Đáp án A.Bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện.Câu 18.Đáp án B.Ta có:Câu 19.Đáp án D.Sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số.Câu 20.Đáp án D.Phương trình phóng xạ:Theo định luật bảo toàn động lượng:Câu 21.Đáp án D.Tia gama có năng lượng lớn và nó xuyên qua các bản tụ.Câu 22.Đáp án A.Tổng năng lượng được bảo toàn.Câu 23.Đáp án B.Năng lượng của photon ánh sáng phát quang và ánh sáng tới lần lượt là:Vì cứ 5 photon chiếu tới có 1 photon phát ra, nên hiệu suất phát quang là:Câu 24.Đáp án C.Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác.Câu 25.Đáp án D.Số photon chiếu vào một đơn vị diện tích kim loại trong 1 giây là:Số electron thoát ra khỏi 1 đơn vị diện tích kim loại trong 1 giây là:Hiệu suất lượng tử bằng:(199k) Xem Khóa học Vật Lí 12 KNTTXem Khóa học Vật Lí 12 CDXem Khóa học Vật Lí 12 CTSTXem thêm Bài tập trắc nghiệm Vật Lí 12 có đáp án hay khác:30 bài tập trắc nghiệm Mạch dao động (có lời giải)30 bài tập trắc nghiệm Mạch dao động (có đáp án - phần 2)Trắc nghiệm Điện từ trường (có đáp án)20 bài tập trắc nghiệm Sóng điện từ (có lời giải)👉Giải bài nhanh với AI Hay:HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mallTÀI LIỆU FILE WORD DÀNH CHO GIÁO VIÊN VÀ PHỤ HUYNH LỚP 12+ Bộ giáo án, đề thi tốt nghiệp THPT, DGNL các trường các trường có lời giải chi tiết 2025 tạihttps://tailieugiaovien.com.vn/+ Hỗ trợ zalo:VietJack Official+ Tổng đài hỗ trợ đăng ký :084 283 45 85500+ đề thi thử tốt nghiệp THPT Quốc gia form 2025(128tài liệu )100+ đề thi ĐGNL ĐHQG Hà Nội, Tp.Hồ Chí Minh...(84tài liệu )Đề thi giữa kì, cuối kì 12(143tài liệu )Bài giảng Powerpoint Văn, Sử, Địa 12....(31tài liệu )Chuyên đề dạy thêm Toán, Lí, Hóa ...12(104tài liệu )Đề thi HSG 12(4tài liệu )xem tất cảĐã có app VietJack trên điện thoại, giải bài tập SGK, SBT Soạn văn, Văn mẫu, Thi online, Bài giảng....miễn phí. Tải ngay ứng dụng trên Android và iOS.Theo dõi chúng tôi miễn phí trên mạng xã hội facebook và youtube:Nếu thấy hay, hãy động viên và chia sẻ nhé! Các bình luận không phù hợp vớinội quy bình luận trang websẽ bị cấm bình luận vĩnh viễn.Trang trướcTrang sauGiải bài tập lớp 12 sách mới các môn họcGiải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Đặt điện áp  u=100cos100πt (V) vào hai đầu cuộn cảm thuần có độ tự cảm  1/2π (H). Biểu thức của cường độ dòng điện qua cuộn cảm là",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Đặt điện áp xoay chiều u=Uocos100πt (V) vào hai đầu đọna mạch AB mắc nối tiếp gồm điện trở thuần 100 Ω, tụ điện có điện dung 10-4/π  (F) và cuộn cảm thuần có độ tự cảm thay đổi được. để điện áp giữa hai đầu điện trở trễ pha  π/4 so với điện áp giữa hai đầu đoạn mạch AB thì độ tự cảm của cuộn cảm bằng",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Rôto của một máy phát điện xoay chiều một pha là nam châm có bốn cặp cực (4 cực từ Nam và 4 cực từ Bắc). Khi rôto quay với tốc độ 900 vòng/phút thì suất điện động do máy tạo ra có tần số là",
+        "options": [
+          {
+            "option": "A",
+            "text": "60 Hz        B.\t100 Hz        C.\t120 Hz        D.\t50 Hz"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Trên mặt nước có hai nguồn kết hợp A, B dao động theo phương thẳng đứng với phương trình uA= uB=2cos20πt (nm). Tốc độ truyền sóng là 30 m/s. Coi biên độ sóng không đổi trong quá trình truyền sóng. Phần tử M ở mặt nước cách hai nguồn lần lượt là 10,5 cm và 13,5 cm có biên độ dao động là",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 mm        B.\t2 mm        C.\t1 mm        D.\t0"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Một chất điểm dao động điều hòa theo trục Ox với phương trình x = 10cos2πt (cm). Quãng đường đi được của chất điểm trong một chu kì dao động là",
+        "options": [
+          {
+            "option": "A",
+            "text": "10 cm        B.\t30 cm        C.\t40 cm        D.\t20 cm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Cuộn sơ cấo và cuộn thứ cấp của một máy biến áp lí tưởng có số vòng dây lần lượt là N1và N2. Biết N1=10N2. Đặt vào hai đầu cuộn sơ cấp một điện áp xoay chiều u=Uocosωt thì điện áp hiệu dụng giữa hai đầu cuộn thứ cấp để hở là",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Tại cùng một nơi trên Trái Đất, con lắc đơn có chiều dài l dao động điều hòa với chu kì 2 s, con lắc đơn có chiều dài 2l dao động điều hòa với chu kì là",
+        "options": [
+          {
+            "option": "A",
+            "text": "2 s        B.\t2√2  s        C.\t√2  s        D.\t4 s"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Phát biểu nào sau đây là sai khi nói về đoạn mạch điện xoay chiều chỉ có tụ điện?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Hệ số công suất của đoạn mạch bằng 0"
+          },
+          {
+            "option": "B",
+            "text": "Công suất tiêu thụ của đoạn mạch khác 0"
+          },
+          {
+            "option": "C",
+            "text": "Tần số góc của dòng điện càng lớn thì dung kháng của đoạn mạch càng nhỏ"
+          },
+          {
+            "option": "D",
+            "text": "Điện áp giữa hai bản tự điện trễ pha π/2 so với cường độ dòng điện qua đoạn mạch"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Đặt điện áp xoay chiều u=200√2 cos100πt (V) vào hai đầu một đoạn mạch AB gồm điện trở thuần 100 Ω, cuộn cảm thuần và tụ điện mắc nối tiếp. Khi đó, điện áp hai đầu tụ điện là",
+        "options": [
+          {
+            "option": "A",
+            "text": "200 W        B.\t100 W        C.\t400 W        D.\t300 W"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Cho hai dao động điều hòa cùng phương có phương trình lần lượt là x1=A1cosωt và x2=A2cos(ωt+π/2). Biên độ dao động tổng hợp của hai dao động này là",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Một con lắc lò xo gồm một vật nhỏ khối lượng 100 g gắn với một lò xo nhẹ. Con lắc dao động điều hòa theo phương ngang với phương trình x = 10 cos10πt (cm). Mốc thế năng ở vị trí cân bằng. Lấy π2=10. Cơ năng của con lắc bằng",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,10 J        B.\t0,05 J        C.\t1,00 J        D.\t0,50 J"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "Một con lắc lò xo gồm một vật nhỏ có khối lượng 200 g và một lò xo nhẹ có độ cứng 80 N/m. Con lắc dao động điều hòa theo phương nằm ngang với biên độ 4 cm. Độ lớn vận tốc của vật khi vật ở vị trí cân bằng là",
+        "options": [
+          {
+            "option": "A",
+            "text": "100 cm/s        B.\t40 cm/s"
+          },
+          {
+            "option": "C",
+            "text": "80 cm/s         D.\t60 cm/s"
+          }
+        ],
+        "answer": "Đáp án & Hướng dẫn giải",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "C",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "A",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "A",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "A",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "A",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "C",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "C",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "B",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "C",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 1.",
+        "question_text": "hực hiện giao thoa ánh sáng có bước sóng λ = 0,6μm với hai khe Young cách nhau a = 0,5mm. Màn ảnh cách hai khe một khoảng D = 2m. Ở các điểm M và N ở hai bên vân sáng trung tâm, cách vân sáng trung tâm 3,6mm và 2,4mm, ta có vân tối hay sáng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tại M và N đều là vân sáng."
+          },
+          {
+            "option": "B",
+            "text": "Tại M và N đều là vân tối."
+          },
+          {
+            "option": "C",
+            "text": "Tại M là vân sáng, ở N là vân tối."
+          },
+          {
+            "option": "D",
+            "text": "Tại M là vân tối, ở N là vân sáng."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2.",
+        "question_text": "Một nguồn sáng phát ra ánh sáng đơn sắc, có công suất 1W, trong mỗi giây phát ra 2,5.1019phôtôn. Cho biết h = 6,625.10-34J.s; c = 3.108m/s. Bức xạ do đèn phát ra là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "hồng ngoại\t   B. tử ngoại"
+          },
+          {
+            "option": "C",
+            "text": "màu tím\t\t   D. màu đỏ"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3.",
+        "question_text": "Cho phản ứng hạt nhân: hai hạt nhân X1và X2tương tác với nhau, tạo thành hạt nhân Y và một prôtôn. Nếu năng lượng liên kết của các hạt nhân X1, X2và Y lần lượt là 2 MeV, 1,5 MeV và 4 MeV thì năng lượng phản ứng tỏa ra là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,5 MeV\t   B. 1 MeV"
+          },
+          {
+            "option": "C",
+            "text": "2MeV\t   D. 2,5 MeV"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4.",
+        "question_text": "Độ phóng xạ của 3mglà 3,41 Ci.",
+        "options": [
+          {
+            "option": "A",
+            "text": "32 năm\t   B. 15,6 năm"
+          },
+          {
+            "option": "C",
+            "text": "8,4 năm\t   D. 5,25 năm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5.",
+        "question_text": "Trong thí nghiệm Young cho a = 2,5mm, D = l,5m. Người ta đặt trước một trong hai khe sáng một bản mặt song song mỏng chiết suất n = 1,52. Khi đó ta thấy hệ vân giao thoa trên màn bị dịch chuyển một đoạn 3mm. Bề dày e của bản mỏng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "9,6 μm\t   B. 9,6 nm"
+          },
+          {
+            "option": "C",
+            "text": "l,6 μm    \tD. 16 nm."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6.",
+        "question_text": "Trong thí nghiệm giao thoa bằng Y - âng, khoảng cách từ màn đến hai khe là D; khoảng cách hai khe S1S2là a. Nguồn S phát ra ánh sáng có bước sóng λ. Sau một trong hai khe người ta đặt một bản song song dày e = 0,005mm, chiết xuất n = 1,5 thì thấy vân trung tâm dời đến vị trí vân sáng thứ 5. Tính bước sóng λ.",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,4 μm\t   B. 0,75 μm"
+          },
+          {
+            "option": "C",
+            "text": "0,6 μm\t   D. 0,5 μm."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7.",
+        "question_text": "Trong mạch dao động LC lí tưởng có dao động điện từ tự do, hiệu điện thế cực đại giữa hai bản tụ là U0. Khi cường độ dòng điện trong mạch có giá trị bằng 1/4 giá trị cực đại của nó thì hiệu điện thế giữa hai bản tụ là:",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8.",
+        "question_text": "Một tụ điện C = 1pF đã tích điện được mắc nối tiếp với cuộn dây L = 1mH thông qua một khóa K. Tại thời điểm t=0 người ta đóng khóa K. Thời gian ngắn nhất từ lúc đóng khóa K cho đến khi năng lượng điện trường trên tụ bằng năng lượng từ trường trên cuộn dây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "33,3.10-8s \t      B. 0,25.10-8s"
+          },
+          {
+            "option": "C",
+            "text": "16,7.10-8s \t      D. 0,25.10-7s"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9.",
+        "question_text": "Sóng điện từ có khả năng phản xạ ở tầng điện li là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Sóng dài và sóng trung."
+          },
+          {
+            "option": "B",
+            "text": "Sóng trung và sóng ngắn."
+          },
+          {
+            "option": "C",
+            "text": "Sóng dài và sóng ngắn."
+          },
+          {
+            "option": "D",
+            "text": "Sóng dài, sóng trung và sóng ngắn."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10.",
+        "question_text": "Phát biểu nào sau đây không đúng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "xoáy."
+          },
+          {
+            "option": "B",
+            "text": "mà chỉ có thể tồn tại trong dây dẫn."
+          },
+          {
+            "option": "C",
+            "text": "mà các đường sức là những đường cong khép kín bao quanh các đường cảm ứng từ."
+          },
+          {
+            "option": "D",
+            "text": "cảm ứng mà nó tự tồn tại trong không gian."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11.",
+        "question_text": "Khi ánh sáng đi từ không khí vào nước thì tần số:",
+        "options": [
+          {
+            "option": "A",
+            "text": "tăng lên và vận tốc giảm đi."
+          },
+          {
+            "option": "B",
+            "text": "không đổi và bước sóng trong nước nhỏ hơn trong không khí."
+          },
+          {
+            "option": "C",
+            "text": "không đổi và bước sóng trong nước lớn hơn trong không khí."
+          },
+          {
+            "option": "D",
+            "text": "giảm đi và bước sóng trong nước nhỏ hơn trong không khí."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12.",
+        "question_text": "Thực hiện giao thoa ánh sáng với hai khe Y-âng cách nhau a = 1 mm, có khoảng vân i = 1mm. Di chuyển màn ảnh (E) lại gần hai khe thêm một đoạn 40 cm thì khoảng vân 0,8 mm. Bước sóng của bức xạ dùng trong thí nghiệm là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "0,50μm    \tB. 0,6μm"
+          },
+          {
+            "option": "C",
+            "text": "0,54μm    \tD. 0,66μm"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13.",
+        "question_text": "Phát biểu nào sau đây là sai khi nói về tính chất và tác dụng của tia Rơnghen?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tia Rơnghen có khả năng đâm xuyên."
+          },
+          {
+            "option": "B",
+            "text": "Tia Rơnghen tác dụng mạnh lên kính ảnh, làm phát quang một số chất."
+          },
+          {
+            "option": "C",
+            "text": "Tia Rơnghen bị lệch trong điện trường."
+          },
+          {
+            "option": "D",
+            "text": "Tia Rơnghen có tác dụng sinh lí."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14.",
+        "question_text": "Phát biểu nào sau đây là đúng khi nói về ứng dụng của quang phổ liên tục? Quang phổ liên tục dùng để xác định:",
+        "options": [
+          {
+            "option": "A",
+            "text": "bước sóng của ánh sáng."
+          },
+          {
+            "option": "B",
+            "text": "nhiệt độ của các vật phát sáng do bị nung nóng."
+          },
+          {
+            "option": "C",
+            "text": "thành phần cấu tạo của các vật phát sáng."
+          },
+          {
+            "option": "D",
+            "text": "công suất của nguồn sáng."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15.",
+        "question_text": "Phát biểu nào sau đây là không đúng? Cho các chùm sáng sau: Trắng, đỏ, vàng, tím.",
+        "options": [
+          {
+            "option": "A",
+            "text": "Ánh sáng trắng bị tán sắc khi đi qua lăng kính."
+          },
+          {
+            "option": "B",
+            "text": "Chiếu ánh sáng trắng vào máy quang phổ sẽ thu được quang phổ liên tục."
+          },
+          {
+            "option": "C",
+            "text": "Mỗi chùm sáng trên đều có một bước sóng xác định."
+          },
+          {
+            "option": "D",
+            "text": "Ánh sáng tím bị lệch về phía đáy lăng kính nhiều nhất do chiết suất của lăng kính đối với nó là lớn nhất."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16.",
+        "question_text": "Nguyên tử hiđro bị kích thích do chiếu xạ và electron của nguyên tử đã chuyển từ quỹ đạo K lên quỹ đạo M. Sau khi ngừng chiếu xạ, nguyên tử hiđro phát xạ thứ cấp. Phổ xạ này gồm:",
+        "options": [
+          {
+            "option": "A",
+            "text": "hai vạch của dãy Laiman."
+          },
+          {
+            "option": "B",
+            "text": "hai vạch của dãy Banme."
+          },
+          {
+            "option": "C",
+            "text": "hai vạch của dãy Laiman và một vạch của dãy Banme."
+          },
+          {
+            "option": "D",
+            "text": "một vạch của dãy Laiman và một vạch của dãy Banme."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17.",
+        "question_text": "Giới hạn quang điện của mỗi kim loại là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "bước sóng dài nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện."
+          },
+          {
+            "option": "B",
+            "text": "bước sóng ngắn nhất của bức xạ chiếu vào kim loại đó mà gây ra hiện tượng quang điện."
+          },
+          {
+            "option": "C",
+            "text": "công nhỏ nhất dùng để bứt electron ra khỏi bề mặt kim loại đó."
+          },
+          {
+            "option": "D",
+            "text": "công lớn nhất dùng để bứt electron ra khỏi bề mặt kim loại đó."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18.",
+        "question_text": "Cho h = 6,625.10-34J.s; c = 3.108m/s; e = 1,6.10-19C. Hiệu điện thế giữa hai cực của một ống Rơnghen là 15kV. Giả sử electron bật ra từ catot có vận tốc ban đầu bằng không thì bước sóng ngắn nhất của tia X mà ống có thể phát ra là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "75,5.10-12m \t   B. 82,8.10-12m"
+          },
+          {
+            "option": "C",
+            "text": "75,5.10-10m\t       D. 82,8.10-10m"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19.",
+        "question_text": "Sự phát xạ cảm ứng là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "sự phát ra phôtôn bởi một nguyên tử."
+          },
+          {
+            "option": "B",
+            "text": "sự phát xạ của một nguyên tử ở trạng thái kích thích dưới tác dụng của một điện từ trường có cùng tần số."
+          },
+          {
+            "option": "C",
+            "text": "sự phát xạ đồng thời của hai nguyên tử có tương tác lẫn nhau."
+          },
+          {
+            "option": "D",
+            "text": "sự phát xạ của một nguyên tử ở trạng thái kích thích, nếu hấp thụ thêm một phôtôn có cùng tần số."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20.",
+        "question_text": "Một hạt nhân có số khối A, đang đứng yên, phát ra hạt α với tốc độ v. Lấy khối lượng các hạt theo đơn vị u gần bằng số khối của chúng. Tốc độ giật lùi của hạt nhân con là:",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21.",
+        "question_text": "Cho 4 loại tia phóng xạ α, β-, β+, γ đi qua theo phương song song với các bản của một tụ điện phẳng. Kết luận nào sau đây là sai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "tia anpha bị lệch về phía bản âm của tụ điện."
+          },
+          {
+            "option": "B",
+            "text": "tia beta trừ bị lệch về phía bản dương của tụ."
+          },
+          {
+            "option": "C",
+            "text": "tia beta cộng bị lệch về phía bản âm của tụ."
+          },
+          {
+            "option": "D",
+            "text": "tia gama có năng lượng lớn và nó xuyên qua các bản tụ."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22.",
+        "question_text": "Trong phản ứng hạt nhân",
+        "options": [
+          {
+            "option": "A",
+            "text": "tổng năng lượng được bảo toàn."
+          },
+          {
+            "option": "B",
+            "text": "tổng khối lượng của các hạt được bảo toàn."
+          },
+          {
+            "option": "C",
+            "text": "tổng số nơtron được bảo toàn."
+          },
+          {
+            "option": "D",
+            "text": "động năng được bảo toàn."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23.",
+        "question_text": "Một dung dịch hấp thu bước sóng 0,3μm và phát ra bức xạ có bước sóng 0,52μm. Người ta gọi hiệu suất của sự phát quang là tỉ số giữa năng lượng ánh sáng phát quang và năng lượng ánh sáng hấp thụ. Số phôtôn bị hấp thụ dẫn đến sự phát quang chiếm tỉ lệ là 1/5 của tổng số phôtôn chiếu tới dung dịch. Hiệu suất của sự phát quang của dung dịch là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "15,70%\t   B. 11,54%"
+          },
+          {
+            "option": "C",
+            "text": "7,5%\t       D. 26,82%"
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24.",
+        "question_text": "Phát biểu nào sau đây là đúng?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra sóng điện từ."
+          },
+          {
+            "option": "B",
+            "text": "Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia α, β, γ."
+          },
+          {
+            "option": "C",
+            "text": "Phóng xạ là hiện tượng hạt nhân nguyên tử phát ra các tia không nhìn thấy và biến thành các hạt nhân khác."
+          },
+          {
+            "option": "D",
+            "text": "Phóng xạ là hiện tượng hạt nhân nguyên tử nặng bị phá vỡ thành các hạt nhân nhẹ khi hấp thụ nơtron."
+          }
+        ],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25.",
+        "question_text": "Chiếu ánh sáng có bước sóng 350nm vào kim loại có công thoát 2,48eV. Biết cường độ dòng quang điện bão hòa là 0,02A; cường độ ánh sáng kích thích là 3W/m3. Hiệu suất lượng tử bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,4%\t   B. 3,2%"
+          },
+          {
+            "option": "C",
+            "text": "1,2%\t   D. 2,4%"
+          }
+        ],
+        "answer": "Đáp án & Thang điểm",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 1.",
+        "question_text": "Đáp án D",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10.",
+        "question_text": "Đáp án B.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11.",
+        "question_text": "Đáp án B.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13.",
+        "question_text": "Đáp án C.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14.",
+        "question_text": "Đáp án B.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15.",
+        "question_text": "Đáp án C.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16.",
+        "question_text": "Đáp án C.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18.",
+        "question_text": "Đáp án B.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22.",
+        "question_text": "Đáp án A.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23.",
+        "question_text": "Đáp án B.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24.",
+        "question_text": "Đáp án C.",
+        "options": [],
+        "answer": null,
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25.",
+        "question_text": "Đáp án D.",
+        "options": [],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 96
+}

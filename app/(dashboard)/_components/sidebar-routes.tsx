@@ -70,6 +70,7 @@ const studentSections: RouteSection[] = [
     title: "Labs & Tools",
     routes: [
       { icon: FlaskConical, label: "LabTwin", href: "/dashboard/labtwin", badge: "Lab" },
+      { icon: Sparkles, label: "Aura", href: "/dashboard/aura", badge: "3D" },
       { icon: Zap, label: "STEM Projects", href: "/dashboard/stem" },
       { icon: StickyNote, label: "Ghi chú", href: "/dashboard/notes" },
       { icon: Kanban, label: "Scrum Board", href: "/dashboard/scrumboard" },
@@ -193,7 +194,7 @@ export const SidebarRoutes = memo(function SidebarRoutes({ collapsed = false }: 
             <div className="section-label">{section.title}</div>
           )}
           {collapsed && si > 0 && section.title && (
-            <div className="w-6 h-px bg-white/[0.06] mx-auto my-1.5" />
+            <div className="w-6 h-px bg-border mx-auto my-1.5" />
           )}
           {section.routes.map((route) => (
             <SidebarItem

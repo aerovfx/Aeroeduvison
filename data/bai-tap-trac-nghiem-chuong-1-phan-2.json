@@ -1,0 +1,264 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-chuong-1-phan-2.jsp",
+  "title": "30 bài tập ôn tập Dao động cơ (có đáp án - phần 2)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Một chất điểm dao động điều hòa trên một trục cố định. Chiều dài quỹ đạo là 10 cm, tần số 10 Hz. Tại thời điểm t = 0, chất điểm qua vị trí có li độ cm và đi theo chiều dương của trục tọa độ. Phương trình dao động của vật là:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 17:",
+        "question_text": "Một vật dao động điều hòa với phương trình:",
+        "options": [
+          {
+            "option": "A",
+            "text": "12 cm.     \tB. 10 cm."
+          },
+          {
+            "option": "C",
+            "text": "20 cm.     \tD. 12,5 cm."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 18:",
+        "question_text": "Cho:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 19:",
+        "question_text": "Nhận định nào sau đâysaikhi nói về dao động cơ học tắt dần?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Dao động tắt dần là dao động có biên độ giảm dần theo thời gian."
+          },
+          {
+            "option": "B",
+            "text": "Dao động tắt dần có động năng và thế năng giảm đều theo thời gian."
+          },
+          {
+            "option": "C",
+            "text": "Lực ma sát càng lớn thì dao động tắt dần càng nhanh."
+          },
+          {
+            "option": "D",
+            "text": "Trong dao động tắt dần cơ năng giảm dần theo thời gian."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 20:",
+        "question_text": "Một vật dao động điều hòa theo phương trình:t tính bằng giây. Thời gian vật 3 thực hiện được một dao động toàn phần là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "1 s.       \tB. 4 s."
+          },
+          {
+            "option": "C",
+            "text": "0,5 s.     \t\t\tD. 2 s."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 21:",
+        "question_text": "Một vật nhỏ dao động điều hòa trên trục Ox theo phương trình x = A cos( ωt + φ). Gia tốc của vật có biểu thức:",
+        "options": [],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 22:",
+        "question_text": "Gắn một vật m1= 4 kg vào một lò xo thì nó dao động với chu kì T1= 1 s. Khi gắn một vật khác có khối lượng m2vào lò xo trên thì nó dao động với chu kì T2= 0,5s. Khối lượng vật m2bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "2 kg.     \tB. 1 kg."
+          },
+          {
+            "option": "C",
+            "text": "8 kg.     \tD. 16 kg."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 23:",
+        "question_text": "Một con lắc đơn có chiều dài dây treo là 64 cm. Lấy g = π2m/s2. Số dao động toàn phần vật thực hiện được trong 24 giây là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "15.      \tB. 10."
+          },
+          {
+            "option": "C",
+            "text": "1,5.     \tD. 25."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 24:",
+        "question_text": "Vận tốc của một vật dao động điều hòa có phương trình v=20cos10t cm/s. Khối lượng của vật là m = 500 g. Hợp lực tác dụng lên vật có giá trị cực đại là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "105N.     \tB. 100 N."
+          },
+          {
+            "option": "C",
+            "text": "10 N.      \tD. 1 N."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 25:",
+        "question_text": "Một chất điểm thực hiện đồng thời hai dao động điều hòa cùng phương với phương trình:",
+        "options": [
+          {
+            "option": "A",
+            "text": "√3 m/s     \tB. 200 m/s."
+          },
+          {
+            "option": "C",
+            "text": "1 m/s.      \tD. 2 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 26:",
+        "question_text": "Một người xách một xô nước đi trên đường, mỗi bước đi dài 40 cm. Chu kỳ dao động riêng của nước trong xô là 0,2 s. Để nước trong xô sóng sánh mạnh nhất thì người đó phải đi với tốc độ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4 m/s.      \tB. 2 m/s."
+          },
+          {
+            "option": "C",
+            "text": "80 m/s.     \tD. 40 m/s."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 27:",
+        "question_text": "Một vật nặng gắn vào lò xo có độ cứng k = 200 N/m, dao động điều hòa với biên độ A = 10 cm. Khi vật nặng cách vị trí biên 6 cm nó sẽ có động năng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "8400 J.     \tB. 0,84 J."
+          },
+          {
+            "option": "C",
+            "text": "0,16 J.     \tD. 0,64 J."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 28:",
+        "question_text": "Hai chất điểm M và N dao động điều hòa cạnh nhau, dọc theo trục Ox. Vị trí cân bằng của hai chất điểm ở cùng gốc tọa độ O. Phương trình dao động của chúng lần lượt là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "40 cm/s.     \tB. 92 cm/s."
+          },
+          {
+            "option": "C",
+            "text": "66 cm/s.     \tD. 12 cm/s."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 29:",
+        "question_text": "Một chất điểm thực hiện đồng thời hai dao động điều hoà cùng phương, với li độ x1và x2có đồ thị như hình vẽ. Lấy π2=10. Vận tốc của chất điểm tại thời điểm t = 1s là:",
+        "options": [],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 30:",
+        "question_text": "Một con lắc lò xo có khối lượng vật nhỏ là m1= 300 g dao động điều hòa với chu kì 1 s. Nếu thay vật nhỏ có khối lượng m1bằng vật nhỏ có khối lượng m2thì con lắc dao động với chu kì 0,5 s. Giá trị m2bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "150 g.     \tB. 75 g."
+          },
+          {
+            "option": "C",
+            "text": "25 g.      \tD. 100 g."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 15
+}

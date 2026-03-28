@@ -9,16 +9,16 @@ import { db as prisma } from "@/lib/db"
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const matrixId = params.id
+    const { id: matrixId } = await params
 
     // Fetch original matrix with all relations
     const originalMatrix = await prisma.examMatrix.findUnique({

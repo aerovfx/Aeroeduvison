@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { aiTutorService } from '@/lib/ai-services';
+import { withAiAccess } from '@/lib/with-ai-access';
 
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const body = await request.json();
+  const { message, context, type } = body;
 
-    const { message, context, type } = await request.json();
+  return withAiAccess(request, "ai_chat", async (userId, plan) => {
+    try {
 
     let response: string;
 
@@ -40,18 +36,19 @@ export async function POST(request: NextRequest) {
       success: true,
       response,
       timestamp: new Date().toISOString(),
-      userId: session.user.id
+      userId,
     });
 
-  } catch (error) {
-    console.error('AI Chat Error:', error);
-    return NextResponse.json(
-      { 
-        success: false, 
-        error: 'AI service temporarily unavailable',
-        fallback: 'Xin lỗi, tôi không thể trả lời ngay bây giờ. Hãy thử lại sau nhé!'
-      },
-      { status: 500 }
-    );
-  }
+    } catch (error) {
+      console.error('AI Chat Error:', error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'AI service temporarily unavailable',
+          fallback: 'Xin lỗi, tôi không thể trả lời ngay bây giờ. Hãy thử lại sau nhé!'
+        },
+        { status: 500 }
+      );
+    }
+  }, { action: "chat_message" });
 }

@@ -1,0 +1,331 @@
+{
+  "source": "https://vietjack.com/bai-tap-trac-nghiem-vat-li-12/bai-tap-trac-nghiem-dac-trung-vat-li-cua-am-1.jsp",
+  "title": "16 bài tập trắc nghiệm Đặc trưng vật lí của âm (có đáp án)",
+  "content": {
+    "questions": [
+      {
+        "question_number": "Câu 1:",
+        "question_text": "Một sóng âm truyền trong không khí. Mức cường độ âm tại điểm M và tại điểm N lần lượt là 40 dB và 80 dB. Cường độ âm tại N lớn hơn cường độ âm tại M:",
+        "options": [
+          {
+            "option": "A",
+            "text": "40 lần.      \t\tB. 1000 lần."
+          },
+          {
+            "option": "C",
+            "text": "2 lần.      \tD. 10000 lần."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 2:",
+        "question_text": "Một nguồn điểm O phát sóng âm có công suất không đổi trong một môi trường truyền âm đẳng hướng và không hấp thụ âm. Hai điểm A, B cách nguồn âm lần lượt là r1 và r2. Biết cường độ âm tại A gấp 4 lần cường độ âm tại B. Tỉ số r2/r1 bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4.         \tB. 0,5."
+          },
+          {
+            "option": "C",
+            "text": "0,25.      \t\t\t\t\tD. 2."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 3:",
+        "question_text": "Khi nói về sóng âm, phát biểu nào sau đây làsai?",
+        "options": [
+          {
+            "option": "A",
+            "text": "Biên độ dao động của sóng âm càng lớn thì âm càng cao."
+          },
+          {
+            "option": "B",
+            "text": "Sóng âm là một sóng cơ."
+          },
+          {
+            "option": "C",
+            "text": "Tốc độ truyền âm phụ thuộc vào bản chất của môi trường truyền âm."
+          },
+          {
+            "option": "D",
+            "text": "Sóng âm không truyền được trong chân không."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 4:",
+        "question_text": "Sóng âm không truyền được trong:",
+        "options": [
+          {
+            "option": "A",
+            "text": "thép."
+          },
+          {
+            "option": "B",
+            "text": "không khí."
+          },
+          {
+            "option": "C",
+            "text": "chân không."
+          },
+          {
+            "option": "D",
+            "text": "nước."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 5:",
+        "question_text": "Tại O có một nguồn phát âm thanh đẳng hướng với công suất không đổi. Một người đi bộ từ A đến C theo 1 đường thẳng và lắng nghe âm thanh từ nguồn O thì nghe thấy cường độ âm tăng từ I đến 4I rồi lại giảm xuống I. Khoảng cách AO bằng:",
+        "options": [],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 6:",
+        "question_text": "Nguồn âm điểm phát ra âm với công suất P thì mức cường độ âm tại điểm M cách nguồn một khoảng r là L. Nếu công suất của nguồn âm là 10P thì mức cường độ âm tại M là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "L – 1 dB.      \t\tB. L + 1 B."
+          },
+          {
+            "option": "C",
+            "text": "L – 1 B.       \tD. L + 1 dB."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 7:",
+        "question_text": "Hai nguồn âm giống nhau được đặt tại hai điểm A, B cách nhau một khoảng AB = L = 2 m, phát cùng một âm đơn, cùng tần số 1500 Hz. Vận tốc truyền âm trong không khí là v = 340 m/s. Gọi I là trung điểm của AB, điểm O trên đường trung trực AB sao cho D = OI = 45 m. Từ O vẽ đường Ox song song với AB. Xác định khoảng cách của hai điểm gần nhau nhất trên Ox mà nghe thấy âm nhỏ nhất. Giả thiết λ << L; L << d.",
+        "options": [
+          {
+            "option": "A",
+            "text": "11,33 m.      \t\t\tB. 7,83 m."
+          },
+          {
+            "option": "C",
+            "text": "5,1 m.        \tD. 5,67 m."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 8:",
+        "question_text": "Tại điểm O trong môi trường đẳng hướng, không hấp thụ âm, có 9 nguồn âm điểm, giống nhau với công suất phát âm không đổi. Tại điểm A có mức cường độ âm 20 dB. M là một điểm thuộc OA sao cho OM = OA/5. Để M có mức cường độ âm là 40 dB thì số nguồn âm giống các nguồn âm trên cần đặt tại O bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4.      \tB. 36."
+          },
+          {
+            "option": "C",
+            "text": "10.     \t\tD. 30."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 9:",
+        "question_text": "Từ điểm A bắt đầu thả rơi tự do một nguồn phát âm có công suất không đổi, khi chạm đất tại B nguồn âm đứng yên luôn. Tại C, ở khoảng giữa A và B (nhưng không thuộc AB), có một máy M đo mức cường độ âm, C cách AB là 12 m. Biết khoảng thời gian từ khi thả nguồn đến khi máy M thu được âm có mức cường độ âm cực đại, lớn hơn 1,528 s so với khoảng thời gian từ đó đến khi máy M thu được âm không đổi; đồng thời hiệu hai khoảng cách tương ứng này là 11 m. Bỏ qua sức cản không khí, lấy g = 10 m/s2. Hiệu giữa mức cường độ âm cuối cùng và đầu tiên xấp xỉ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "4,68 dB.     \tB. 3,74 dB."
+          },
+          {
+            "option": "C",
+            "text": "3,26 dB.     \tD. 6,72 dB."
+          }
+        ],
+        "answer": "Chọn đáp án B",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 10:",
+        "question_text": "Khi cường độ âm tăng lên 10n lần, thì mức cường độ âm sẽ:",
+        "options": [
+          {
+            "option": "A",
+            "text": "Tăng thêm 10n dB."
+          },
+          {
+            "option": "B",
+            "text": "Tăng lên 10n lần."
+          },
+          {
+            "option": "C",
+            "text": "Tăng thêm 10ndB."
+          },
+          {
+            "option": "D",
+            "text": "Tăng lên n lần."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 11:",
+        "question_text": "Một nguồn phát âm coi là nguồn điểm phát âm đều theo mọi phương. Mức cường độ âm tại điểm M lúc đầu là 80 dB. Nếu tăng công suất của nguồn âm lên 20% thì mức cường độ âm tại M là bao nhiêu?",
+        "options": [
+          {
+            "option": "A",
+            "text": "95 dB.       \tB. 125 dB."
+          },
+          {
+            "option": "C",
+            "text": "80,8 dB.     \t\t\t\tD. 62,5 dB."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 12:",
+        "question_text": "Một sóng âm truyền trong không khí với tốc độ 340 m/s và bước sóng 34 cm. Tần số của sóng âm này là:",
+        "options": [
+          {
+            "option": "A",
+            "text": "500 Hz.      \tB. 2000 Hz."
+          },
+          {
+            "option": "C",
+            "text": "1000 Hz.     \t\t\tD. 1500 Hz."
+          }
+        ],
+        "answer": "Chọn đáp án C",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 13:",
+        "question_text": "Tại điểm O trong môi trường đẳng hướng không hấp thụ âm và phản xạ âm, phát ra âm với công suất không đổi. Trên tia Ox theo thứ tự có ba điểm A, B, C sao cho OC = 4OA. Biết mức cường độ âm tại B là 2 B, tổng mức cường độ âm tại A và C là 4 B. Nếu AB = 20 m thì:",
+        "options": [
+          {
+            "option": "A",
+            "text": "BC = 40 m.     \tB. BC = 80 m."
+          },
+          {
+            "option": "C",
+            "text": "BC = 30 m.     \tD. BC = 20 m."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 14:",
+        "question_text": "Trong môi trường truyền âm, tại hai điểm A và B có mức cường độ âm lần lượt là 90 dB và 40 dB với cùng cường độ âm chuẩn. Cường độ âm tại A lớn gấp bao nhiêu lần so với cường độ âm tại B?",
+        "options": [
+          {
+            "option": "A",
+            "text": "2,25 lần.     \tB. 3600 lần."
+          },
+          {
+            "option": "C",
+            "text": "1000 lần.     \tD. 100000 lần."
+          }
+        ],
+        "answer": "Chọn đáp án D",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 15:",
+        "question_text": "Một phòng hát karaoke có diện tích 20 m2, cao 4 m (với điều kiện hai lần chiều rộng BC và chiều dài AB chênh nhau không quá 2 m để phòng trông cân đối) với dàn âm gồm bốn loa như nhau có công suất lớn, hai cái đặt ở góc A, B của phòng, hai cái treo trên góc trần A′, B′. Đồng thời còn có một màn hình lớn được gắn trên tường ABB’A’ để người hát ngồi tại trung điểm M của CD có được cảm giác sống động nhất.",
+        "options": [
+          {
+            "option": "A",
+            "text": "842 W.     \tB. 535 W."
+          },
+          {
+            "option": "C",
+            "text": "723 W.     \tD. 796 W."
+          }
+        ],
+        "answer": "Chọn đáp án A",
+        "explanation": null
+      },
+      {
+        "question_number": "Câu 16:",
+        "question_text": "Cường độ âm được đo bằng:",
+        "options": [
+          {
+            "option": "A",
+            "text": "oát trên mét vuông."
+          },
+          {
+            "option": "B",
+            "text": "oát."
+          },
+          {
+            "option": "C",
+            "text": "niutơn trên mét vuông."
+          },
+          {
+            "option": "D",
+            "text": "niutơn trên mét."
+          }
+        ],
+        "answer": "HOT500+ Đề thi thử tốt nghiệp THPT, ĐGNL các trường ĐH fle word có đáp án (2025).Các sản phẩm khác của Vietjack:Combo 3 khóa học Toán - Văn - Anh lớp 1-12 chỉ với 250kPhòng luyện 1000 đề VIP ĐGNL các trường ĐHQGHN, Tp.HCM, Bách Khoa, tốt nghiệp THPT chỉ với 399kMã giảm giá 20% sản phẩm sách VietJack trên Shopee mall",
+        "explanation": "Giải Tiếng Anh 12 Global SuccessGiải sgk Tiếng Anh 12 Smart WorldGiải sgk Tiếng Anh 12 Friends GlobalLớp 12 Kết nối tri thứcSoạn văn 12 (hay nhất) - KNTTSoạn văn 12 (ngắn nhất) - KNTTGiải sgk Toán 12 - KNTTGiải sgk Vật Lí 12 - KNTTGiải sgk Hóa học 12 - KNTTGiải sgk Sinh học 12 - KNTTGiải sgk Lịch Sử 12 - KNTTGiải sgk Địa Lí 12 - KNTTGiải sgk Giáo dục KTPL 12 - KNTTGiải sgk Tin học 12 - KNTTGiải sgk Công nghệ 12 - KNTTGiải sgk Hoạt động trải nghiệm 12 - KNTTGiải sgk Giáo dục quốc phòng 12 - KNTTGiải sgk Âm nhạc 12 - KNTTGiải sgk Mĩ thuật 12 - KNTTLớp 12 Chân trời sáng tạoSoạn văn 12 (hay nhất) - CTSTSoạn văn 12 (ngắn nhất) - CTSTGiải sgk Toán 12 - CTSTGiải sgk Vật Lí 12 - CTSTGiải sgk Hóa học 12 - CTSTGiải sgk Sinh học 12 - CTSTGiải sgk Lịch Sử 12 - CTSTGiải sgk Địa Lí 12 - CTSTGiải sgk Giáo dục KTPL 12 - CTSTGiải sgk Tin học 12 - CTSTGiải sgk Hoạt động trải nghiệm 12 - CTSTGiải sgk Âm nhạc 12 - CTSTLớp 12 Cánh diềuSoạn văn 12 Cánh diều (hay nhất)Soạn văn 12 Cánh diều (ngắn nhất)Giải sgk Toán 12 Cánh diềuGiải sgk Vật Lí 12 - Cánh diềuGiải sgk Hóa học 12 - Cánh diềuGiải sgk Sinh học 12 - Cánh diềuGiải sgk Lịch Sử 12 - Cánh diềuGiải sgk Địa Lí 12 - Cánh diềuGiải sgk Giáo dục KTPL 12 - Cánh diềuGiải sgk Tin học 12 - Cánh diềuGiải sgk Công nghệ 12 - Cánh diềuGiải sgk Hoạt động trải nghiệm 12 - Cánh diềuGiải sgk Giáo dục quốc phòng 12 - Cánh diềuGiải sgk Âm nhạc 12 - Cánh diều"
+      }
+    ],
+    "answers": []
+  },
+  "related_lessons": [
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Giải Vật Lí 12",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Kết nối",
+      "url": "https://vietjack.com/vat-li-12-kn/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Kết nối tri thức",
+      "url": "https://vietjack.com/vat-li-12-kn/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 - Chân trời",
+      "url": "https://vietjack.com/vat-li-12-ct/index.jsp"
+    },
+    {
+      "title": "Lý thuyết Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/ly-thuyet-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Trắc nghiệm Vật Lí 12 Chân trời sáng tạo",
+      "url": "https://vietjack.com/vat-li-12-ct/trac-nghiem-vat-li-lop-12.jsp"
+    },
+    {
+      "title": "Giải sgk Vật Lí 12 Cánh diều",
+      "url": "https://vietjack.com/vat-li-12-cd/index.jsp"
+    }
+  ],
+  "total_questions": 16
+}

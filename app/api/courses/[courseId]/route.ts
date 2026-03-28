@@ -1,21 +1,9 @@
-import Mux from "@mux/mux-node";
 import { getServerSession } from "next-auth/next";
 import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { authOptions } from "@/lib/auth";
 import { checkCourseManagementPermission } from "@/lib/permission-middleware";
-
-let Video: any = null;
-try {
-  const mux = new Mux(
-    process.env.MUX_TOKEN_ID || '',
-    process.env.MUX_TOKEN_SECRET || '',
-  );
-  Video = mux.Video;
-} catch (error) {
-  console.warn('Mux not configured, video features disabled');
-}
 
 export async function DELETE(
   req: NextRequest,
@@ -47,13 +35,12 @@ export async function DELETE(
       return new NextResponse("Not found", { status: 404 });
     }
 
+    // Clean up muxData records from DB (Mux API no longer used)
     for (const chapter of course.chapters) {
-      if (chapter.muxData?.assetId && Video) {
-        try {
-          await Video.Assets.del(chapter.muxData.assetId);
-        } catch (error) {
-          console.warn('Failed to delete Mux asset:', error);
-        }
+      if (chapter.muxData) {
+        await db.muxData.delete({
+          where: { id: chapter.muxData.id },
+        }).catch(() => {});
       }
     }
 

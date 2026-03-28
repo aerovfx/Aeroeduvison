@@ -19,31 +19,31 @@ export async function GET() {
       include: {
         _count: {
           select: {
-            purchases: true,
-            chapters: true
+            Purchase: true,
+            Chapter: true
           }
         }
       }
     });
 
     // Calculate statistics for teacher's courses
-    const totalStudents = teacherCourses.reduce((sum, course) => 
-      sum + course._count.purchases, 0
+    const totalStudents = teacherCourses.reduce((sum, course) =>
+      sum + course._count.Purchase, 0
     );
 
     const publishedCourses = teacherCourses.filter(c => c.isPublished).length;
     const draftCourses = teacherCourses.filter(c => !c.isPublished).length;
-    const totalRevenue = teacherCourses.reduce((sum, course) => 
-      sum + (course._count.purchases * (course.price || 0)), 0
+    const totalRevenue = teacherCourses.reduce((sum, course) =>
+      sum + (course._count.Purchase * (course.price || 0)), 0
     );
 
     // Get recent enrollments (last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const recentEnrollments = await db.purchase.count({
       where: {
-        course: { userId: teacherId },
+        Course: { userId: teacherId },
         createdAt: { gte: thirtyDaysAgo }
       }
     });
@@ -57,11 +57,11 @@ export async function GET() {
     // Get student growth data (last 6 months)
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-    
+
     const monthlyEnrollments = await db.purchase.groupBy({
       by: ['createdAt'],
       where: {
-        course: { userId: teacherId },
+        Course: { userId: teacherId },
         createdAt: { gte: sixMonthsAgo }
       },
       _count: { id: true }
@@ -70,8 +70,8 @@ export async function GET() {
     // Get active students (students who have made progress in last 30 days)
     const activeStudents = await db.userProgress.count({
       where: {
-        chapter: {
-          course: { userId: teacherId }
+        Chapter: {
+          Course: { userId: teacherId }
         },
         updatedAt: { gte: thirtyDaysAgo }
       }
@@ -98,8 +98,8 @@ export async function GET() {
       },
       coursePerformance: teacherCourses.map(course => ({
         name: course.title,
-        students: course._count.purchases,
-        revenue: course._count.purchases * (course.price || 0),
+        students: course._count.Purchase,
+        revenue: course._count.Purchase * (course.price || 0),
         completion: 75, // Mock completion rate
         rating: 4.5 // Mock rating
       }))

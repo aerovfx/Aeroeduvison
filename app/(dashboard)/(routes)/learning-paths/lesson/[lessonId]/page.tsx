@@ -7,7 +7,7 @@ import {
   ThumbsUp, ThumbsDown, Star, Zap, Trophy, RefreshCw,
   MessageCircle, AlertCircle, Play, ChevronRight
 } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { syncLessonStart, syncLessonProgress, syncLessonCompletion } from '@/lib/student-data-sync';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -41,6 +41,7 @@ export default function LessonPage() {
   
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const lessonId = params.lessonId as string;
 
   const [loading, setLoading] = useState(true);
@@ -58,40 +59,81 @@ export default function LessonPage() {
 
   const loadLessonData = async () => {
     setLoading(true);
-    
-    // Simulate loading lesson info
-    const mockLesson = {
-      id: lessonId,
-      title: 'Ứng dụng đạo hàm',
-      subject: 'mathematics',
-      difficulty: 'beginner',
-      duration: 68,
-      xpReward: 104,
-      day: 5,
-      date: '2024-10-22'
-    };
-    
-    setLessonData(mockLesson);
-    
+
+    // 1. Try to load real lesson data from AI-generated path (localStorage)
+    let lesson: any = null;
+    try {
+      const savedPath = localStorage.getItem('learning-path-ai-generated');
+      if (savedPath) {
+        const pathData = JSON.parse(savedPath);
+        // Search through all weeks/lessons for this lessonId
+        for (const week of (pathData.weeks || [])) {
+          for (const l of (week.lessons || [])) {
+            if (l.id === lessonId) {
+              lesson = {
+                id: l.id,
+                title: l.title || `Bài học ${lessonId}`,
+                subject: l.subject || 'mathematics',
+                difficulty: l.difficulty || 'intermediate',
+                duration: l.duration || 45,
+                xpReward: l.xpReward || 100,
+                day: l.day || 1,
+                date: l.date || new Date().toISOString().split('T')[0],
+                bankQuestions: l.bankQuestions || [], // Questions from bank attached during path generation
+              };
+              break;
+            }
+          }
+          if (lesson) break;
+        }
+      }
+    } catch (err) {
+      console.warn('[LESSON] Could not load from saved path:', err);
+    }
+
+    // 2. Fallback - use query params if available, otherwise generic defaults
+    if (!lesson) {
+      const qTitle = searchParams.get('title');
+      const qSubject = searchParams.get('subject');
+      const qDifficulty = searchParams.get('difficulty');
+
+      lesson = {
+        id: lessonId,
+        title: qTitle || 'Bài học',
+        subject: qSubject || 'mathematics',
+        difficulty: qDifficulty || 'intermediate',
+        duration: 45,
+        xpReward: 100,
+        day: 1,
+        date: new Date().toISOString().split('T')[0],
+        bankQuestions: [],
+      };
+
+      console.log(`[LESSON] Loaded from ${qTitle ? 'URL params' : 'defaults'}: title="${lesson.title}", subject="${lesson.subject}"`);
+    }
+
+    setLessonData(lesson);
+    console.log(`[LESSON] Final lesson data: id="${lesson.id}", title="${lesson.title}", subject="${lesson.subject}"`);
+
     // Sync lesson start to all modules
     syncLessonStart(
       lessonId,
-      mockLesson.title,
-      mockLesson.subject,
-      mockLesson.difficulty,
-      mockLesson.duration,
-      mockLesson.xpReward
+      lesson.title,
+      lesson.subject,
+      lesson.difficulty,
+      lesson.duration,
+      lesson.xpReward
     );
-    
-    // Generate lesson content using AI
-    await generateLessonContent(mockLesson);
-    
+
+    // Generate lesson content using AI + question bank
+    await generateLessonContent(lesson);
+
     setLoading(false);
   };
 
   const generateLessonContent = async (lesson: any) => {
     try {
-      // Call AI API to generate content
+      // Call AI API to generate content (now integrates question bank)
       const response = await fetch('/api/ai-generate-lesson', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -99,367 +141,507 @@ export default function LessonPage() {
           title: lesson.title,
           subject: lesson.subject,
           difficulty: lesson.difficulty,
-          duration: lesson.duration
+          duration: lesson.duration,
+          lessonId: lesson.id,
+          bankQuestions: lesson.bankQuestions || [], // Pass bank questions from path
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        setLessonContent(data.content);
-      } else {
-        // Fallback to demo content
-        setLessonContent(getDemoContent());
+        if (data.success && data.content) {
+          console.log(`[LESSON] Content generated via ${data.model}, ${data.questionsFromBank || 0} questions from bank`);
+          setLessonContent(data.content);
+          return;
+        }
       }
+      // Fallback to demo content - now dynamic based on lesson info
+      setLessonContent(getDemoContent(lesson));
     } catch (error) {
-      console.error('Error generating lesson:', error);
-      setLessonContent(getDemoContent());
+      console.error('[LESSON] Error generating content:', error);
+      setLessonContent(getDemoContent(lesson));
     }
   };
 
-  const getDemoContent = (): LessonContent => {
+  /**
+   * Dynamic demo content generator - creates placeholder lesson content
+   * based on the actual lesson title and subject instead of hardcoded content.
+   */
+  const getDemoContent = (lesson?: { title: string; subject: string; difficulty: string }): LessonContent => {
+    const title = lesson?.title || lessonData?.title || 'Bài học';
+    const subject = lesson?.subject || lessonData?.subject || 'mathematics';
+    const difficulty = lesson?.difficulty || lessonData?.difficulty || 'intermediate';
+
+    const subjectLabels: Record<string, string> = {
+      physics: 'Vật lý',
+      mathematics: 'Toán học',
+      chemistry: 'Hóa học',
+      biology: 'Sinh học',
+      computer_science: 'Tin học',
+      literature: 'Ngữ văn',
+      english: 'Tiếng Anh',
+      history: 'Lịch sử',
+      geography: 'Địa lý',
+    };
+    const subjectLabel = subjectLabels[subject] || 'Khoa học';
+    const difficultyLabel = difficulty === 'basic' ? 'Cơ bản' : difficulty === 'advanced' ? 'Nâng cao' : 'Trung bình';
+
+    // --- Check for specific physics topic content ---
+    const titleLower = title.toLowerCase().trim();
+
+    if (titleLower.includes('dao động') || titleLower.includes('dao dong')) {
+      return getDaoDocCoContent(title, difficultyLabel);
+    }
+    if (titleLower.includes('sóng cơ') || titleLower.includes('song co')) {
+      return getSongCoContent(title, difficultyLabel);
+    }
+    if (titleLower.includes('đạo hàm') || titleLower.includes('dao ham')) {
+      return getDaoHamContent(title, difficultyLabel);
+    }
+
+    // --- GENERIC FALLBACK for any topic/subject ---
     return {
       theory: {
         objectives: [
-          'Hiểu sâu về khái niệm đạo hàm và ý nghĩa hình học, vật lý của đạo hàm',
-          'Nắm vững các công thức và quy tắc tính đạo hàm cơ bản, hàm hợp, hàm ngược',
-          'Áp dụng thành thạo đạo hàm để giải các bài toán thực tế về cực trị, tối ưu hóa',
-          'Sử dụng đạo hàm để khảo sát và vẽ đồ thị hàm số một cách chính xác',
-          'Phát triển tư duy logic và khả năng phân tích vấn đề phức tạp'
+          `Hiểu các khái niệm cơ bản về ${title}`,
+          `Nắm vững các công thức và nguyên lý quan trọng liên quan đến ${title}`,
+          `Áp dụng kiến thức ${title} vào giải bài tập và tình huống thực tế`,
+          `Phân tích và đánh giá các vấn đề liên quan đến ${title}`,
+          `Phát triển tư duy logic và khả năng giải quyết vấn đề trong lĩnh vực ${subjectLabel}`
         ],
         knowledge: [
-          'Định nghĩa đạo hàm tại một điểm theo giới hạn: f\'(x₀) = lim[h→0] [f(x₀+h)-f(x₀)]/h',
-          'Các công thức đạo hàm cơ bản: (xⁿ)\', (sin x)\', (cos x)\', (eˣ)\', (ln x)\'',
-          'Quy tắc tính đạo hàm: tổng, hiệu, tích, thương',
-          'Đạo hàm của hàm hợp: [f(g(x))]\' = f\'(g(x))·g\'(x)',
-          'Đạo hàm cấp cao và ý nghĩa hình học của đạo hàm cấp hai',
-          'Ứng dụng đạo hàm: tìm cực trị, khảo sát hàm số, bài toán tối ưu',
-          'Mối liên hệ giữa dấu đạo hàm và tính đơn điệu của hàm số'
+          `Các khái niệm nền tảng của ${title}`,
+          `Các công thức và định luật cơ bản liên quan`,
+          `Mối liên hệ giữa ${title} với các chủ đề khác trong ${subjectLabel}`,
+          `Các ứng dụng thực tiễn của ${title}`,
+          `Lịch sử phát triển và ý nghĩa khoa học của ${title}`
         ],
         skills: [
-          'Tính thành thạo đạo hàm của các hàm số cơ bản và phức tạp',
-          'Vận dụng quy tắc chuỗi (chain rule) cho hàm hợp',
-          'Giải và phân tích bài toán cực trị, tìm GTLN-GTNN',
-          'Khảo sát sự biến thiên và vẽ đồ thị hàm số',
-          'Áp dụng đạo hàm vào các bài toán thực tế về kinh tế, vật lý, kỹ thuật',
-          'Phân tích và giải quyết các bài toán tối ưu hóa có điều kiện ràng buộc',
-          'Sử dụng đạo hàm để chứng minh bất đẳng thức'
+          `Giải các bài toán cơ bản về ${title}`,
+          `Phân tích và giải thích các hiện tượng liên quan`,
+          `Vận dụng kiến thức vào tình huống thực tế`,
+          `Kết nối kiến thức ${title} với các lĩnh vực liên quan`,
+          `Trình bày và lập luận logic các vấn đề về ${title}`
         ],
         content: `
-# ĐẠOHÀM VÀ ỨNG DỤNG
-## Chương trình học AI-Generated - Phù hợp với trình độ của bạn
+# ${title.toUpperCase()}
+## Chương trình học AI-Generated - Trình độ: ${difficultyLabel}
+### Môn: ${subjectLabel}
 
 ---
 
-## 📚 PHẦN 1: KHÁI NIỆM ĐẠO HÀM
+## 📚 PHẦN 1: GIỚI THIỆU
 
-### 1.1. Định nghĩa
-Cho hàm số y = f(x) xác định trên khoảng (a,b) và x₀ ∈ (a,b).
+Bài học này sẽ giúp bạn tìm hiểu về **${title}** - một chủ đề quan trọng trong ${subjectLabel}.
 
-**Đạo hàm của f(x) tại x₀** là giới hạn (nếu tồn tại):
-
-    f'(x₀) = lim[h→0] [f(x₀ + h) - f(x₀)] / h
-
-Hoặc viết dưới dạng:
-
-    f'(x₀) = lim[x→x₀] [f(x) - f(x₀)] / (x - x₀)
-
-### 1.2. Ý nghĩa của đạo hàm
-
-**🔷 Ý nghĩa hình học:**
-- Đạo hàm f'(x₀) là **hệ số góc** của tiếp tuyến với đồ thị hàm số tại điểm M(x₀, f(x₀))
-- Phương trình tiếp tuyến: y - f(x₀) = f'(x₀)(x - x₀)
-
-**🔷 Ý nghĩa vật lý:**
-- Nếu s(t) là quãng đường theo thời gian → s'(t) là **vận tốc tức thời**
-- Nếu v(t) là vận tốc → v'(t) là **gia tốc**
-- Đạo hàm biểu thị **tốc độ thay đổi** của đại lượng
-
-**📌 Ví dụ 1:** Tính đạo hàm của f(x) = x² tại x₀ = 2
-
-    f'(2) = lim[h→0] [(2+h)² - 2²] / h
-          = lim[h→0] [4 + 4h + h² - 4] / h
-          = lim[h→0] (4h + h²) / h
-          = lim[h→0] (4 + h) = 4
+Nội dung bài học được thiết kế phù hợp với trình độ **${difficultyLabel}** của bạn, bao gồm lý thuyết cơ bản, ví dụ minh họa và bài tập thực hành.
 
 ---
 
-## 🔢 PHẦN 2: CÁC CÔNG THỨC ĐẠO HÀM CƠ BẢN
+## 🔢 PHẦN 2: KIẾN THỨC CƠ BẢN
 
-### 2.1. Đạo hàm các hàm sơ cấp
+### 2.1. Các khái niệm chính
+Trong phần này, bạn sẽ tìm hiểu các khái niệm nền tảng của ${title}, bao gồm định nghĩa, tính chất, và các quy luật cơ bản.
 
-| Hàm số | Đạo hàm | Điều kiện |
-|--------|---------|-----------|
-| c (hằng số) | 0 | ∀x |
-| x | 1 | ∀x |
-| xⁿ | n·xⁿ⁻¹ | n ∈ ℝ |
-| √x | 1/(2√x) | x > 0 |
-| 1/x | -1/x² | x ≠ 0 |
-| eˣ | eˣ | ∀x |
-| aˣ | aˣ·ln(a) | a > 0, a ≠ 1 |
-| ln(x) | 1/x | x > 0 |
-| logₐ(x) | 1/(x·ln(a)) | x > 0, a > 0, a ≠ 1 |
-
-### 2.2. Đạo hàm các hàm lượng giác
-
-| Hàm số | Đạo hàm |
-|--------|---------|
-| sin(x) | cos(x) |
-| cos(x) | -sin(x) |
-| tan(x) | 1/cos²(x) = 1 + tan²(x) |
-| cot(x) | -1/sin²(x) = -(1 + cot²(x)) |
-
-**📌 Ví dụ 2:** Tính đạo hàm của y = x³ - 2x² + 5x - 1
-
-    y' = (x³)' - (2x²)' + (5x)' - (1)'
-       = 3x² - 4x + 5 - 0
-       = 3x² - 4x + 5
+### 2.2. Công thức và nguyên lý
+Các công thức quan trọng liên quan đến ${title} sẽ được trình bày chi tiết với ví dụ minh họa cụ thể.
 
 ---
 
-## ⚙️ PHẦN 3: QUY TẮC TÍNH ĐẠO HÀM
+## ⚙️ PHẦN 3: VÍ DỤ MINH HỌA
 
-### 3.1. Quy tắc cơ bản
-Cho u = u(x), v = v(x) là các hàm số có đạo hàm:
-
-**1️⃣ Quy tắc tổng/hiệu:**
-    (u ± v)' = u' ± v'
-
-**2️⃣ Quy tắc tích:**
-    (u·v)' = u'·v + u·v'
-
-**3️⃣ Quy tắc thương:**
-    (u/v)' = (u'·v - u·v') / v²  (v ≠ 0)
-
-**4️⃣ Quy tắc nhân với hằng số:**
-    (k·u)' = k·u'
-
-### 3.2. Đạo hàm hàm hợp (Chain Rule)
-Nếu y = f(u) và u = g(x) thì:
-
-    y'ₓ = y'ᵤ · u'ₓ
-
-Hay: **[f(g(x))]' = f'(g(x))·g'(x)**
-
-**📌 Ví dụ 3:** Tính đạo hàm của y = (2x + 1)⁵
-
-    Đặt u = 2x + 1 → y = u⁵
-    y'ₓ = y'ᵤ · u'ₓ = 5u⁴ · 2 = 10(2x + 1)⁴
-
-**📌 Ví dụ 4:** Tính đạo hàm của y = sin(3x² + 1)
-
-    y' = cos(3x² + 1) · (3x² + 1)'
-       = cos(3x² + 1) · 6x
-       = 6x·cos(3x² + 1)
+Các ví dụ được chọn lọc để giúp bạn hiểu rõ cách áp dụng kiến thức ${title} vào giải bài tập.
 
 ---
 
-## 📈 PHẦN 4: ỨNG DỤNG ĐẠO HÀM
+## 📈 PHẦN 4: ỨNG DỤNG THỰC TẾ
 
-### 4.1. Khảo sát tính đơn điệu của hàm số
-
-**Định lý:**
-- Nếu f'(x) > 0 ∀x ∈ (a,b) → f(x) **đồng biến** trên (a,b)
-- Nếu f'(x) < 0 ∀x ∈ (a,b) → f(x) **nghịch biến** trên (a,b)
-- Nếu f'(x) = 0 ∀x ∈ (a,b) → f(x) **không đổi** trên (a,b)
-
-**Quy trình:**
-1. Tìm tập xác định
-2. Tính f'(x)
-3. Giải f'(x) = 0 và f'(x) không xác định
-4. Lập bảng biến thiên
-5. Kết luận
-
-### 4.2. Tìm cực trị của hàm số
-
-**🔷 Điều kiện cần:**
-Nếu f(x) đạt cực trị tại x₀ → f'(x₀) = 0 hoặc f'(x₀) không tồn tại
-
-**🔷 Điều kiện đủ (Quy tắc I):**
-Nếu f'(x) đổi dấu khi x đi qua x₀:
-- f'(x) đổi từ (+) sang (-) → x₀ là điểm **cực đại**
-- f'(x) đổi từ (-) sang (+) → x₀ là điểm **cực tiểu**
-
-**🔷 Quy tắc II (sử dụng đạo hàm cấp 2):**
-Nếu f'(x₀) = 0 và f''(x₀) ≠ 0:
-- f''(x₀) < 0 → x₀ là điểm **cực đại**
-- f''(x₀) > 0 → x₀ là điểm **cực tiểu**
-
-**📌 Ví dụ 5:** Tìm cực trị của f(x) = x³ - 3x + 1
-
-    Bước 1: f'(x) = 3x² - 3
-    Bước 2: f'(x) = 0 ⟺ 3x² - 3 = 0 ⟺ x = ±1
-    Bước 3: Lập bảng biến thiên
-    
-    x      | -∞     -1      1      +∞
-    f'(x)  |   +  0  -  0  +
-    f(x)   |   ↗  3  ↘  -1  ↗
-    
-    Kết luận:
-    - x = -1: Cực đại, f(-1) = 3
-    - x = 1: Cực tiểu, f(1) = -1
-
-### 4.3. Giải bài toán tối ưu
-
-**Phương pháp:**
-1. Đặt ẩn và điều kiện ràng buộc
-2. Lập hàm mục tiêu f(x)
-3. Tìm f'(x) = 0
-4. So sánh giá trị tại điểm dừng và biên
-5. Kết luận
-
-**📌 Ví dụ 6:** (Bài toán thực tế)
-Một người nông dân có 100m hàng rào để rào một mảnh vườn hình chữ nhật dọc theo bờ sông (một cạnh không cần rào). Tìm kích thước để diện tích lớn nhất.
-
-    Giải:
-    - Gọi x là chiều rộng (0 < x < 100)
-    - Chiều dài: y = 100 - 2x
-    - Diện tích: S(x) = x·y = x(100 - 2x) = 100x - 2x²
-    
-    Tìm max:
-    S'(x) = 100 - 4x = 0 ⟺ x = 25
-    S''(x) = -4 < 0 → x = 25 là điểm cực đại
-    
-    Khi x = 25 → y = 50
-    Diện tích lớn nhất: S = 1250 m²
-
----
-
-## 💡 PHẦN 5: MẸO VÀ LƯU Ý
-
-### 5.1. Các sai lầm thường gặp
-❌ (u·v)' = u'·v' (SAI!)
-✅ (u·v)' = u'·v + u·v' (ĐÚNG)
-
-❌ (u/v)' = u'/v' (SAI!)
-✅ (u/v)' = (u'v - uv')/v² (ĐÚNG)
-
-❌ [f(g(x))]' = f'(x)·g'(x) (SAI!)
-✅ [f(g(x))]' = f'(g(x))·g'(x) (ĐÚNG)
-
-### 5.2. Mẹo nhớ công thức
-📝 **Đạo hàm hàm hợp:** "Đạo hàm ngoài nhân đạo hàm trong"
-📝 **Quy tắc tích:** "Cái này nhân đạo hàm cái kia, cộng ngược lại"
-📝 **Quy tắc thương:** "Trên trừ dưới, tất cả chia dưới bình phương"
-
-### 5.3. Bài tập tự luyện
-Hãy thử tính đạo hàm của các hàm sau:
-1. y = (x² + 1)·eˣ
-2. y = ln(x² + 2x + 1)
-3. y = sin²(3x)
-4. y = √(x² + 1)
+${title} có nhiều ứng dụng quan trọng trong đời sống và khoa học kỹ thuật. Phần này sẽ giới thiệu một số ứng dụng tiêu biểu.
 
 ---
 
 ## 🎯 TÓM TẮT BÀI HỌC
 
-✅ Đạo hàm là công cụ quan trọng để nghiên cứu sự biến thiên của hàm số
-✅ Nắm vững công thức và quy tắc là nền tảng để giải mọi bài toán
-✅ Ứng dụng đa dạng: khảo sát hàm số, tối ưu hóa, vật lý, kinh tế...
-✅ Luyện tập nhiều để thành thạo kỹ thuật tính đạo hàm
+✅ Nắm được các khái niệm cơ bản về ${title}
+✅ Hiểu các công thức và nguyên lý quan trọng
+✅ Biết cách áp dụng vào giải bài tập
+✅ Nhận thức ứng dụng thực tế của ${title}
 
 💪 **Hãy làm bài tập để củng cố kiến thức!**
         `
       },
-      exercises: [
-        {
-          type: 'multiple_choice',
-          question: '**Câu 1:** Cho hàm số f(x) = x³ - 3x² + 2. Tính đạo hàm f\'(2) = ?\n\n_Gợi ý: Áp dụng công thức đạo hàm (xⁿ)\' = n·xⁿ⁻¹_',
-          options: [
-            'A. f\'(2) = 0',
-            'B. f\'(2) = 6', 
-            'C. f\'(2) = 12',
-            'D. f\'(2) = 18'
-          ],
-          correctAnswer: 0,
-          points: 15
-        },
-        {
-          type: 'multiple_choice',
-          question: '**Câu 2:** Đạo hàm của hàm số y = sin(2x) + cos(3x) là:\n\n_Gợi ý: Sử dụng quy tắc đạo hàm hàm hợp: [f(g(x))]\' = f\'(g(x))·g\'(x)_',
-          options: [
-            'A. y\' = cos(2x) - sin(3x)',
-            'B. y\' = 2·cos(2x) - 3·sin(3x)',
-            'C. y\' = -2·sin(2x) + 3·cos(3x)',
-            'D. y\' = cos(2x) + sin(3x)'
-          ],
-          correctAnswer: 1,
-          points: 15
-        },
-        {
-          type: 'multiple_choice',
-          question: '**Câu 3:** Hàm số y = x³ - 3x² + 2 đạt cực tiểu tại điểm nào?\n\n_Gợi ý: Tìm y\' = 0, sau đó xét dấu y\' hoặc tính y\'\'_',
-          options: [
-            'A. x = 0',
-            'B. x = 1',
-            'C. x = 2',
-            'D. x = 3'
-          ],
-          correctAnswer: 2,
-          points: 20
-        },
-        {
-          type: 'multiple_choice',
-          question: '**Câu 4:** Cho hàm số f(x) = ln(x² + 1). Đạo hàm f\'(x) bằng:\n\n_Gợi ý: Sử dụng công thức (ln u)\' = u\'/u và quy tắc hàm hợp_',
-          options: [
-            'A. f\'(x) = 1/(x² + 1)',
-            'B. f\'(x) = 2x/(x² + 1)',
-            'C. f\'(x) = 2x·ln(x² + 1)',
-            'D. f\'(x) = x/(x² + 1)'
-          ],
-          correctAnswer: 1,
-          points: 20
-        },
-        {
-          type: 'short_answer',
-          question: '**Câu 5:** Tìm đạo hàm của hàm số f(x) = (x² + 1)·eˣ\n\n_Yêu cầu:_\n- Viết rõ quy tắc sử dụng\n- Trình bày các bước tính toán\n- Viết kết quả dưới dạng khai triển hoặc rút gọn\n\n_Gợi ý: Sử dụng quy tắc tích (u·v)\' = u\'·v + u·v\'_',
-          rubric: 'Đáp án đúng: f\'(x) = 2x·eˣ + (x² + 1)·eˣ = (x² + 2x + 1)·eˣ hoặc (x + 1)²·eˣ.\nCó thể chấp nhận cả dạng chưa rút gọn nếu tính toán đúng.',
-          points: 15
-        },
-        {
-          type: 'short_answer',
-          question: '**Câu 6:** Tính đạo hàm cấp 2 của hàm số y = x⁴ - 2x³ + 1\n\n_Yêu cầu:_\n- Tính y\' trước\n- Sau đó tính y\'\' = (y\')\'  \n- Viết kết quả rút gọn\n\n_Gợi ý: Áp dụng công thức (xⁿ)\' = n·xⁿ⁻¹ hai lần_',
-          rubric: 'Đáp án: y\' = 4x³ - 6x², y\'\' = 12x² - 12x = 12x(x - 1)',
-          points: 15
-        },
-        {
-          type: 'essay',
-          question: '**Câu 7:** Bài toán tối ưu hóa\n\nMột người nông dân có 120m hàng rào muốn rào một mảnh vườn hình chữ nhật dọc theo bờ sông (một cạnh không cần rào, sử dụng bờ sông). Hỏi kích thước của mảnh vườn như thế nào để diện tích lớn nhất?\n\n**Yêu cầu bài làm:**\n1. Đặt ẩn và xác định điều kiện (rõ ràng)\n2. Lập hàm diện tích S(x) theo biến x\n3. Tính đạo hàm S\'(x) và giải S\'(x) = 0\n4. Chứng minh giá trị tìm được là cực đại (dùng S\'\' hoặc lập bảng biến thiên)\n5. Kết luận kích thước tối ưu và diện tích lớn nhất\n\n_Hãy trình bày đầy đủ, rõ ràng từng bước. Giải thích lý do tại sao đó là giá trị lớn nhất._',
-          rubric: `
-**Rubric chấm điểm (20 điểm):**
-
-1. **Đặt ẩn và điều kiện (4 điểm)**
-   - Đặt x là một cạnh (ví dụ: chiều rộng) [1đ]
-   - Xác định cạnh còn lại theo x [1đ]
-   - Điều kiện 0 < x < 120 [1đ]
-   - Vẽ hình minh họa (nếu có) [1đ]
-
-2. **Lập hàm mục tiêu (4 điểm)**
-   - Viết công thức diện tích đúng [2đ]
-   - Biểu diễn theo 1 biến [2đ]
-
-3. **Tính đạo hàm và giải phương trình (5 điểm)**
-   - Tính S\'(x) đúng [2đ]
-   - Giải S\'(x) = 0 đúng [2đ]
-   - Tính giá trị x [1đ]
-
-4. **Chứng minh cực đại (4 điểm)**
-   - Tính S\'\'(x) hoặc lập bảng biến thiên [2đ]
-   - Kết luận đúng là cực đại [2đ]
-
-5. **Kết luận (3 điểm)**
-   - Nêu kích thước tối ưu [1đ]
-   - Tính diện tích lớn nhất [1đ]
-   - Giải thích ý nghĩa thực tế [1đ]
-
-**Đáp án mẫu:**
-- Chiều rộng: x = 30m
-- Chiều dài: y = 60m  
-- Diện tích lớn nhất: S = 1800 m²
-          `,
-          points: 20
-        }
-      ]
+      exercises: getGenericExercises(title, subjectLabel)
     };
+  };
+
+  /** Dao động cơ specific content */
+  const getDaoDocCoContent = (title: string, difficultyLabel: string): LessonContent => ({
+    theory: {
+      objectives: [
+        'Hiểu khái niệm dao động cơ học và các đại lượng đặc trưng',
+        'Nắm vững phương trình dao động điều hòa x = A·cos(ωt + φ)',
+        'Phân biệt các loại dao động: tự do, tắt dần, cưỡng bức, cộng hưởng',
+        'Áp dụng kiến thức dao động cơ vào giải bài tập và hiện tượng thực tế',
+        'Phân tích năng lượng trong dao động điều hòa'
+      ],
+      knowledge: [
+        'Dao động cơ là chuyển động lặp đi lặp lại quanh vị trí cân bằng',
+        'Phương trình dao động điều hòa: x = A·cos(ωt + φ)',
+        'Chu kỳ T = 2π/ω, tần số f = 1/T = ω/(2π)',
+        'Vận tốc: v = -Aω·sin(ωt + φ), Gia tốc: a = -ω²x',
+        'Con lắc lò xo: T = 2π·√(m/k), Con lắc đơn: T = 2π·√(l/g)',
+        'Năng lượng dao động: W = ½kA² = ½mω²A² (bảo toàn)',
+        'Cộng hưởng xảy ra khi f_ngoại = f_riêng → biên độ cực đại'
+      ],
+      skills: [
+        'Viết phương trình dao động từ điều kiện ban đầu',
+        'Xác định biên độ, chu kỳ, tần số, pha ban đầu',
+        'Tính vận tốc, gia tốc tại thời điểm bất kỳ',
+        'Giải bài toán con lắc lò xo và con lắc đơn',
+        'Phân tích năng lượng: thế năng, động năng trong dao động'
+      ],
+      content: `
+# ${title.toUpperCase()}
+## Chương trình học AI-Generated - Trình độ: ${difficultyLabel}
+
+---
+
+## 📚 PHẦN 1: KHÁI NIỆM DAO ĐỘNG CƠ
+
+### 1.1. Định nghĩa
+**Dao động cơ** là chuyển động lặp đi lặp lại quanh một vị trí cân bằng.
+
+**Dao động điều hòa** là dao động mà li độ x biến thiên theo hàm cosin (hoặc sin) của thời gian:
+
+    x = A·cos(ωt + φ)
+
+Trong đó:
+- **A** (biên độ): li độ cực đại, A > 0
+- **ω** (tần số góc): ω = 2πf = 2π/T (rad/s)
+- **φ** (pha ban đầu): xác định trạng thái dao động tại t = 0
+
+### 1.2. Các đại lượng đặc trưng
+
+**🔷 Chu kỳ và tần số:**
+- Chu kỳ T: thời gian thực hiện một dao động toàn phần (s)
+- Tần số f = 1/T: số dao động trong 1 giây (Hz)
+- Tần số góc: ω = 2π/T = 2πf (rad/s)
+
+**🔷 Vận tốc và gia tốc:**
+
+    v = x' = -Aω·sin(ωt + φ)
+    a = v' = -Aω²·cos(ωt + φ) = -ω²·x
+
+**📌 Nhận xét:**
+- |v_max| = Aω (tại VTCB, x = 0)
+- |a_max| = Aω² (tại biên, x = ±A)
+- Gia tốc luôn hướng về VTCB: a = -ω²x
+
+---
+
+## 🔢 PHẦN 2: CON LẮC LÒ XO
+
+### 2.1. Công thức chu kỳ
+    T = 2π·√(m/k)
+
+### 2.2. Lực phục hồi
+    F = -kx → ω² = k/m
+
+**📌 Ví dụ:** m = 100g, k = 40 N/m
+    ω = √(k/m) = √(40/0.1) = 20 rad/s
+    T = 2π/20 ≈ 0.314 s
+
+---
+
+## ⚙️ PHẦN 3: CON LẮC ĐƠN
+
+    T = 2π·√(l/g)
+
+- Chu kỳ không phụ thuộc vào khối lượng
+- Ứng dụng: đo gia tốc trọng trường g
+
+---
+
+## 📈 PHẦN 4: NĂNG LƯỢNG DAO ĐỘNG
+
+- **Động năng:** Wđ = ½mv²
+- **Thế năng:** Wt = ½kx²
+- **Cơ năng:** W = Wđ + Wt = ½kA² = const
+
+---
+
+## 💡 PHẦN 5: DAO ĐỘNG TẮT DẦN VÀ CƯỠNG BỨC
+
+- **Tắt dần:** biên độ giảm do ma sát
+- **Cưỡng bức:** có ngoại lực tuần hoàn
+- **Cộng hưởng:** f_ngoại = f_riêng → biên độ cực đại
+
+---
+
+## 🎯 TÓM TẮT
+
+✅ x = A·cos(ωt + φ)
+✅ Con lắc lò xo: T = 2π·√(m/k)
+✅ Con lắc đơn: T = 2π·√(l/g)
+✅ W = ½kA² = const
+
+💪 **Hãy làm bài tập để củng cố kiến thức!**
+      `
+    },
+    exercises: [
+      {
+        type: 'multiple_choice' as const,
+        question: '**Câu 1:** Một vật dao động điều hòa x = 5·cos(4πt + π/3) cm. Biên độ và tần số góc là:\\n\\n_Gợi ý: So sánh với x = A·cos(ωt + φ)_',
+        options: ['A. A = 5 cm, ω = 4π rad/s', 'B. A = 5 cm, ω = 4 rad/s', 'C. A = 4π cm, ω = 5 rad/s', 'D. A = 5 cm, ω = π/3 rad/s'],
+        correctAnswer: 0,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: '**Câu 2:** Con lắc lò xo m = 200g, k = 80 N/m. Chu kỳ T = ?\\n\\n_Gợi ý: T = 2π·√(m/k)_',
+        options: ['A. T ≈ 0.14 s', 'B. T ≈ 0.31 s', 'C. T ≈ 0.50 s', 'D. T ≈ 1.00 s'],
+        correctAnswer: 1,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: '**Câu 3:** Trong dao động điều hòa, gia tốc của vật:\\n\\n_Gợi ý: a = -ω²x_',
+        options: ['A. Luôn cùng chiều với vận tốc', 'B. Luôn hướng về vị trí cân bằng', 'C. Cực đại tại VTCB', 'D. Bằng 0 tại biên'],
+        correctAnswer: 1,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: '**Câu 4:** Cộng hưởng xảy ra khi:',
+        options: ['A. Biên độ ngoại lực = biên độ dao động', 'B. Tần số ngoại lực = tần số riêng', 'C. Lực cản = 0', 'D. Dao động tắt dần hoàn toàn'],
+        correctAnswer: 1,
+        points: 20
+      },
+      {
+        type: 'short_answer' as const,
+        question: '**Câu 5:** Con lắc lò xo: A = 10 cm, f = 2 Hz, m = 0.5 kg.\\nTính: a) ω  b) k  c) Cơ năng W\\n\\n_Gợi ý: ω = 2πf, k = mω², W = ½kA²_',
+        rubric: 'a) ω = 4π ≈ 12.57 rad/s\\nb) k = mω² ≈ 78.96 N/m\\nc) W = ½kA² ≈ 0.395 J',
+        points: 15
+      },
+      {
+        type: 'essay' as const,
+        question: '**Câu 6:** Con lắc lò xo nằm ngang k = 100 N/m, m = 400g. Kéo ra 8cm rồi thả nhẹ.\\n\\n**Yêu cầu:**\\n1. Viết phương trình x(t)\\n2. Tính v_max\\n3. Tính Wđ, Wt khi x = 4 cm\\n4. Thời điểm x = 4 cm lần đầu',
+        rubric: '1. ω = √(k/m) = √250 ≈ 15.81 rad/s, x = 8·cos(√250·t) cm\\n2. v_max = Aω ≈ 1.265 m/s\\n3. Wt = 0.08 J, W = 0.32 J, Wđ = 0.24 J\\n4. t = π/(3√250) ≈ 0.066 s',
+        points: 20
+      }
+    ]
+  });
+
+  /** Sóng cơ specific content */
+  const getSongCoContent = (title: string, difficultyLabel: string): LessonContent => ({
+    theory: {
+      objectives: [
+        'Hiểu khái niệm sóng cơ và phân biệt sóng dọc, sóng ngang',
+        'Nắm phương trình sóng và các đại lượng đặc trưng',
+        'Giải thích hiện tượng giao thoa, nhiễu xạ, phản xạ sóng',
+        'Áp dụng kiến thức sóng vào sóng âm và sóng dừng'
+      ],
+      knowledge: [
+        'Sóng cơ là dao động lan truyền trong môi trường vật chất',
+        'Phương trình sóng: u = A·cos(2πft - 2πx/λ)',
+        'Bước sóng λ = v·T = v/f',
+        'Giao thoa: cực đại khi Δd = kλ, cực tiểu khi Δd = (k+0.5)λ',
+        'Sóng dừng: khoảng cách 2 nút liên tiếp = λ/2'
+      ],
+      skills: [
+        'Viết phương trình sóng tại một điểm',
+        'Tính bước sóng, tần số, vận tốc truyền sóng',
+        'Xác định vị trí cực đại, cực tiểu giao thoa',
+        'Giải bài toán sóng dừng trên dây'
+      ],
+      content: `
+# ${title.toUpperCase()}
+## Chương trình học AI-Generated - Trình độ: ${difficultyLabel}
+
+---
+
+## 📚 PHẦN 1: KHÁI NIỆM SÓNG CƠ
+
+**Sóng cơ** là dao động cơ lan truyền trong một môi trường vật chất.
+- **Sóng ngang:** phương dao động ⊥ phương truyền sóng
+- **Sóng dọc:** phương dao động // phương truyền sóng
+
+**Các đại lượng:** λ = v·T = v/f
+
+---
+
+## 🔢 PHẦN 2: PHƯƠNG TRÌNH SÓNG
+
+    u(x,t) = A·cos(ωt - 2πx/λ)
+
+---
+
+## ⚙️ PHẦN 3: GIAO THOA SÓNG
+
+- Cực đại: Δd = kλ (k ∈ Z)
+- Cực tiểu: Δd = (k + 0.5)λ
+
+---
+
+## 📈 PHẦN 4: SÓNG DỪNG
+
+- Nút sóng + Bụng sóng
+- Khoảng cách 2 nút liên tiếp = λ/2
+
+---
+
+## 🎯 TÓM TẮT
+
+✅ λ = v·T = v/f
+✅ Giao thoa: cực đại khi Δd = kλ
+✅ Sóng dừng: khoảng cách 2 nút = λ/2
+
+💪 **Hãy làm bài tập để củng cố kiến thức!**
+      `
+    },
+    exercises: getGenericExercises(title, 'Vật lý')
+  });
+
+  /** Đạo hàm specific content (original content, now properly scoped) */
+  const getDaoHamContent = (title: string, difficultyLabel: string): LessonContent => ({
+    theory: {
+      objectives: [
+        'Hiểu sâu về khái niệm đạo hàm và ý nghĩa hình học, vật lý',
+        'Nắm vững các công thức và quy tắc tính đạo hàm',
+        'Áp dụng đạo hàm để giải bài toán cực trị, tối ưu hóa',
+        'Sử dụng đạo hàm để khảo sát và vẽ đồ thị hàm số'
+      ],
+      knowledge: [
+        "Định nghĩa đạo hàm: f'(x₀) = lim[h→0] [f(x₀+h)-f(x₀)]/h",
+        "Công thức đạo hàm cơ bản: (xⁿ)', (sin x)', (cos x)', (eˣ)', (ln x)'",
+        "Quy tắc tích, thương, hàm hợp",
+        "Ứng dụng: cực trị, khảo sát hàm số, tối ưu"
+      ],
+      skills: [
+        'Tính đạo hàm các hàm cơ bản và phức tạp',
+        'Giải bài toán cực trị, GTLN-GTNN',
+        'Khảo sát hàm số và vẽ đồ thị',
+        'Áp dụng vào bài toán thực tế'
+      ],
+      content: `
+# ${title.toUpperCase()}
+## Chương trình học AI-Generated - Trình độ: ${difficultyLabel}
+
+---
+
+## 📚 PHẦN 1: KHÁI NIỆM ĐẠO HÀM
+
+f'(x₀) = lim[h→0] [f(x₀+h) - f(x₀)] / h
+
+**Ý nghĩa:** Hệ số góc tiếp tuyến, tốc độ thay đổi
+
+---
+
+## 🔢 PHẦN 2: CÔNG THỨC CƠ BẢN
+
+(xⁿ)' = n·xⁿ⁻¹, (sin x)' = cos x, (eˣ)' = eˣ, (ln x)' = 1/x
+
+---
+
+## ⚙️ PHẦN 3: QUY TẮC
+
+- Tích: (uv)' = u'v + uv'
+- Thương: (u/v)' = (u'v - uv')/v²
+- Hàm hợp: [f(g(x))]' = f'(g(x))·g'(x)
+
+---
+
+## 📈 PHẦN 4: ỨNG DỤNG
+
+- Khảo sát tính đơn điệu
+- Tìm cực trị
+- Bài toán tối ưu
+
+---
+
+## 🎯 TÓM TẮT
+
+✅ Đạo hàm = tốc độ thay đổi
+✅ Quy tắc: tích, thương, hàm hợp
+✅ Ứng dụng: cực trị, khảo sát, tối ưu
+
+💪 **Hãy làm bài tập để củng cố kiến thức!**
+      `
+    },
+    exercises: [
+      {
+        type: 'multiple_choice' as const,
+        question: "**Câu 1:** Cho f(x) = x³ - 3x² + 2. Tính f'(2) = ?",
+        options: ["A. f'(2) = 0", "B. f'(2) = 6", "C. f'(2) = 12", "D. f'(2) = 18"],
+        correctAnswer: 0,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: "**Câu 2:** Đạo hàm y = sin(2x) + cos(3x):",
+        options: ["A. y' = cos(2x) - sin(3x)", "B. y' = 2cos(2x) - 3sin(3x)", "C. y' = -2sin(2x) + 3cos(3x)", "D. y' = cos(2x) + sin(3x)"],
+        correctAnswer: 1,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: "**Câu 3:** Hàm y = x³ - 3x² + 2 đạt cực tiểu tại:",
+        options: ['A. x = 0', 'B. x = 1', 'C. x = 2', 'D. x = 3'],
+        correctAnswer: 2,
+        points: 20
+      },
+      {
+        type: 'short_answer' as const,
+        question: "**Câu 4:** Tìm đạo hàm f(x) = (x²+1)·eˣ\\n\\n_Gợi ý: quy tắc tích_",
+        rubric: "f'(x) = 2x·eˣ + (x²+1)·eˣ = (x+1)²·eˣ",
+        points: 20
+      },
+      {
+        type: 'essay' as const,
+        question: "**Câu 5:** Bài toán tối ưu: 120m hàng rào rào vườn hình chữ nhật dọc sông (1 cạnh không rào). Tìm kích thước để S lớn nhất.",
+        rubric: "x = 30m, y = 60m, S_max = 1800 m²",
+        points: 30
+      }
+    ]
+  });
+
+  /** Generic exercises for any topic */
+  const getGenericExercises = (title: string, subjectLabel: string): LessonContent['exercises'] => {
+    return [
+      {
+        type: 'multiple_choice' as const,
+        question: `**Câu 1:** Câu hỏi kiểm tra kiến thức cơ bản về ${title}.\n\nChọn đáp án đúng nhất.`,
+        options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
+        correctAnswer: 0,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: `**Câu 2:** Câu hỏi vận dụng kiến thức ${title}.\n\nChọn phương án chính xác nhất.`,
+        options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
+        correctAnswer: 1,
+        points: 15
+      },
+      {
+        type: 'multiple_choice' as const,
+        question: `**Câu 3:** Câu hỏi phân tích về ${title}.\n\nXác định đáp án đúng.`,
+        options: ['A. Đáp án A', 'B. Đáp án B', 'C. Đáp án C', 'D. Đáp án D'],
+        correctAnswer: 2,
+        points: 20
+      },
+      {
+        type: 'short_answer' as const,
+        question: `**Câu 4:** Trình bày ngắn gọn các khái niệm cơ bản về ${title}.\n\n_Yêu cầu:_\n- Nêu định nghĩa chính xác\n- Giải thích ý nghĩa\n- Cho ví dụ minh họa`,
+        rubric: 'Đánh giá: độ chính xác định nghĩa, tính logic giải thích, chất lượng ví dụ.',
+        points: 20
+      },
+      {
+        type: 'essay' as const,
+        question: `**Câu 5:** Bài tập tổng hợp về ${title}\n\nPhân tích và giải quyết vấn đề liên quan.\n\n**Yêu cầu:**\n1. Xác định dữ kiện\n2. Trình bày phương pháp\n3. Thực hiện tính toán\n4. Kiểm tra kết quả\n5. Kết luận`,
+        rubric: 'Rubric: Dữ kiện (6đ), Phương pháp (6đ), Thực hiện (8đ), Kết luận (10đ)',
+        points: 30
+      }
+    ];
   };
 
   const handleAnswerChange = (exerciseIndex: number, answer: string | number) => {

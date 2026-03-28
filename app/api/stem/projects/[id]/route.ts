@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 // GET - Get specific STEM project by ID
 export async function GET(
@@ -25,16 +26,16 @@ export async function GET(
         id: id
       },
       include: {
-        teamMembers: true,
-        milestones: {
+        STEMTeamMember: true,
+        STEMMilestone: {
           include: {
-            deliverables: true
+            STEMDeliverable: true
           },
           orderBy: {
             position: 'asc'
           }
         },
-        feedback: true
+        STEMFeedback: true
       }
     });
 
@@ -53,7 +54,7 @@ export async function GET(
         dueDate: project.dueDate?.toISOString(),
         createdAt: project.createdAt.toISOString(),
         updatedAt: project.updatedAt.toISOString(),
-        teamMembers: project.teamMembers.map(member => ({
+        teamMembers: project.STEMTeamMember.map(member => ({
           id: member.id,
           name: member.name,
           role: member.role,
@@ -66,14 +67,14 @@ export async function GET(
           email: session.user.email || 'instructor@example.com'
         },
         tags: [], // TODO: Add tags field to schema
-        milestones: project.milestones.map(milestone => ({
+        milestones: project.STEMMilestone.map(milestone => ({
           id: milestone.id,
           title: milestone.title,
           description: milestone.description,
           status: milestone.status,
           dueDate: milestone.dueDate?.toISOString(),
           completedAt: milestone.completedAt?.toISOString(),
-          deliverables: milestone.deliverables.map(deliverable => ({
+          deliverables: milestone.STEMDeliverable.map(deliverable => ({
             id: deliverable.id,
             title: deliverable.title,
             description: deliverable.description,
@@ -81,7 +82,7 @@ export async function GET(
             url: deliverable.url
           }))
         })),
-        feedback: project.feedback.map(feedback => ({
+        feedback: project.STEMFeedback.map(feedback => ({
           id: feedback.id,
           author: feedback.author,
           content: feedback.content,

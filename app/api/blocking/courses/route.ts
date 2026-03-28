@@ -58,14 +58,14 @@ export async function GET(req: NextRequest) {
     const courses = await db.course.findMany({
       where: { schoolId: user.schoolId },
       include: {
-        user: {
+        User: {
           select: { id: true, name: true, email: true }
         },
-        category: {
+        Category: {
           select: { name: true }
         },
         _count: {
-          select: { chapters: true, attachments: true, purchases: true }
+          select: { Chapter: true, Attachment: true, Purchase: true }
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -76,18 +76,18 @@ export async function GET(req: NextRequest) {
       id: course.id,
       title: course.title,
       description: course.description,
-      teacher: course.user,
-      studentsCount: course._count.purchases,
-      assignmentsCount: course._count.attachments,
-      quizzesCount: course._count.chapters,
+      teacher: course.User,
+      studentsCount: course._count.Purchase,
+      assignmentsCount: course._count.Attachment,
+      quizzesCount: course._count.Chapter,
       status: course.isPublished ? 'published' : 'draft',
       createdAt: course.createdAt,
       updatedAt: course.updatedAt,
       // Calculate additional metrics
-      completionRate: course._count.purchases > 0 ? 
-        Math.round((course._count.purchases / (course._count.purchases + 10)) * 100) : 0,
+      completionRate: course._count.Purchase > 0 ?
+        Math.round((course._count.Purchase / (course._count.Purchase + 10)) * 100) : 0,
       difficulty: 'intermediate', // Default since not in schema
-      category: course.category?.name || 'general',
+      category: course.Category?.name || 'general',
       price: course.price || 0,
       imageUrl: course.imageUrl
     }));
@@ -97,10 +97,10 @@ export async function GET(req: NextRequest) {
       totalCourses: courses.length,
       activeCourses: courses.filter(c => c.isPublished).length,
       draftCourses: courses.filter(c => !c.isPublished).length,
-      totalStudents: courses.reduce((sum, c) => sum + c._count.purchases, 0),
-      totalAssignments: courses.reduce((sum, c) => sum + c._count.attachments, 0),
-      totalQuizzes: courses.reduce((sum, c) => sum + c._count.chapters, 0),
-      averageCompletionRate: processedCourses.length > 0 ? 
+      totalStudents: courses.reduce((sum, c) => sum + c._count.Purchase, 0),
+      totalAssignments: courses.reduce((sum, c) => sum + c._count.Attachment, 0),
+      totalQuizzes: courses.reduce((sum, c) => sum + c._count.Chapter, 0),
+      averageCompletionRate: processedCourses.length > 0 ?
         Math.round(processedCourses.reduce((sum, c) => sum + c.completionRate, 0) / processedCourses.length) : 0
     };
 
@@ -177,15 +177,15 @@ export async function POST(req: NextRequest) {
     // Blocking operation: Create course
     const newCourse = await db.course.create({
       data: {
-        title,
-        description,
+        title: title || '',
+        description: description || '',
         price: price || 0,
         isPublished: false,
         userId: user.id,
         schoolId: user.schoolId
       },
       include: {
-        user: {
+        User: {
           select: { id: true, name: true, email: true }
         }
       }
@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
           id: newCourse.id,
           title: newCourse.title,
           description: newCourse.description,
-          teacher: newCourse.user,
+          teacher: (newCourse as any).User,
           status: newCourse.isPublished ? 'published' : 'draft',
           createdAt: newCourse.createdAt,
           updatedAt: newCourse.updatedAt

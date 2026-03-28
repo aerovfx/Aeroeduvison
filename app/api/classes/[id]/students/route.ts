@@ -6,18 +6,19 @@ import { db as prisma } from "@/lib/db"
 // GET /api/classes/[id]/students - Get students in class
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     // Verify class ownership
     const classData = await prisma.class.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!classData) {
@@ -36,7 +37,7 @@ export async function GET(
 
     const classStudents = await prisma.classStudent.findMany({
       where: {
-        classId: params.id,
+        classId: id,
       },
       include: {
         student: {
@@ -97,18 +98,19 @@ export async function GET(
 // POST /api/classes/[id]/students - Add students to class
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const { id } = await params
     // Verify class ownership
     const classData = await prisma.class.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!classData) {
@@ -137,13 +139,13 @@ export async function POST(
 
     // Get current student count to assign student numbers
     const currentCount = await prisma.classStudent.count({
-      where: { classId: params.id },
+      where: { classId: id },
     })
 
     // Check which students are already in the class
     const existingStudents = await prisma.classStudent.findMany({
       where: {
-        classId: params.id,
+        classId: id,
         studentId: { in: studentIds },
       },
     })
@@ -152,7 +154,7 @@ export async function POST(
       existingStudents.map((es) => es.studentId)
     )
     const newStudentIds = studentIds.filter(
-      (id: string) => !existingStudentIds.has(id)
+      (studentId: string) => !existingStudentIds.has(studentId)
     )
 
     if (newStudentIds.length === 0) {
@@ -180,7 +182,7 @@ export async function POST(
     // Add students to class
     const classStudents = await prisma.classStudent.createMany({
       data: newStudentIds.map((studentId: string, index: number) => ({
-        classId: params.id,
+        classId: id,
         studentId,
         studentNumber: currentCount + index + 1,
         status: "active",
