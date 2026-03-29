@@ -111,19 +111,9 @@ export async function generateMetadata({
     }
 }
 
-export async function generateStaticParams(): Promise<
-    DocPageProps["params"][]
-> {
-    // Include empty slug for home page
-    const params = [{ slug: [] }]
-    
-    // Add all doc slugs
-    const docParams = allDocs.map((doc) => ({
-        slug: doc.slugAsParams.split("/"),
-    }))
-    
-    return [...params, ...docParams]
-}
+// Disable static generation to prevent OOM during Docker build
+// generateStaticParams removed — pages render on-demand at request time
+export const dynamic = 'force-dynamic'
 
 export default async function DocPage({ params }: DocPageProps) {
     const doc = await getDocFromParams({ params })
