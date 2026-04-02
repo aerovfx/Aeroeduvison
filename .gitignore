@@ -129,3 +129,15 @@ uploads/**/*.mp4
 # Stale dev scripts (not needed for production)
 middleware-advanced.ts
 middleware-new.ts
+
+# Large sub-projects (maintain separately or use Git submodules)
+openfang/
+python-simulations/
+transcript-video/
+desktop-current-app/
+
+# All video/media files
+**/*.MP4
+**/*.mp4
+**/*.avi
+**/*.mov

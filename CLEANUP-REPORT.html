@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AeroEdu - Code Cleanup Report</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; padding: 20px; }
+.container { max-width: 1200px; margin: 0 auto; }
+h1 { font-size: 28px; margin-bottom: 8px; color: #f1f5f9; }
+.subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat { background: #1e293b; border-radius: 12px; padding: 16px; text-align: center; border: 1px solid #334155; }
+.stat .num { font-size: 32px; font-weight: 700; }
+.stat .label { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+.red { color: #f87171; } .orange { color: #fb923c; } .yellow { color: #fbbf24; } .green { color: #4ade80; } .blue { color: #60a5fa; }
+.section { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #334155; }
+.section h2 { font-size: 18px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+.badge-red { background: #7f1d1d; color: #fca5a5; }
+.badge-orange { background: #7c2d12; color: #fdba74; }
+.badge-yellow { background: #713f12; color: #fde047; }
+.badge-green { background: #14532d; color: #86efac; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+th { text-align: left; padding: 8px 12px; background: #0f172a; color: #94a3b8; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+td { padding: 8px 12px; border-top: 1px solid #334155; vertical-align: top; }
+tr:hover { background: #334155; }
+code { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #93c5fd; }
+.action { font-size: 12px; padding: 3px 10px; border-radius: 6px; font-weight: 600; display: inline-block; }
+.action-remove { background: #7f1d1d; color: #fca5a5; }
+.action-consolidate { background: #7c2d12; color: #fdba74; }
+.action-keep { background: #14532d; color: #86efac; }
+.action-rename { background: #1e3a5f; color: #93c5fd; }
+.summary-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 12px 0; }
+.summary-bar div { height: 100%; }
+details { margin-top: 8px; }
+details summary { cursor: pointer; color: #60a5fa; font-size: 13px; }
+details summary:hover { text-decoration: underline; }
+.group { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #334155; }
+.group:last-child { border-bottom: none; }
+.group h3 { font-size: 15px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>AeroEdu Cleanup Report</h1>
+<p class="subtitle">229 Pages + 261 API Routes | Generated 2026-03-30</p>
+
+<div class="stats">
+  <div class="stat"><div class="num red">229</div><div class="label">Total Pages</div></div>
+  <div class="stat"><div class="num orange">261</div><div class="label">API Routes</div></div>
+  <div class="stat"><div class="num yellow">~60</div><div class="label">Pages To Remove</div></div>
+  <div class="stat"><div class="num yellow">~35</div><div class="label">APIs To Remove</div></div>
+  <div class="stat"><div class="num green">~169</div><div class="label">Pages After Cleanup</div></div>
+  <div class="stat"><div class="num green">~226</div><div class="label">APIs After Cleanup</div></div>
+</div>
+
+<!-- ====== SECTION 1: UNUSED PAGES ====== -->
+<div class="section">
+<h2>1. Unused / Test Pages <span class="badge badge-red">HIGH PRIORITY</span></h2>
+<p style="color:#94a3b8; font-size:13px; margin-bottom:12px;">Pages not linked from any navigation sidebar, or clearly test/demo content.</p>
+
+<div class="group">
+<h3 class="red">1A. Unindexed Lab Pages (25 pages)</h3>
+<p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">Not listed in <code>/public/labs/index.json</code> — not accessible from LabTwin UI.</p>
+<table>
+<tr><th>Path</th><th>Lines</th><th>Status</th><th>Action</th></tr>
+<tr><td><code>labtwin/labs/motion-gen</code></td><td>18</td><td>Test wrapper</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/newton2</code></td><td>18</td><td>Test wrapper</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/hinh-hoc</code></td><td>18</td><td>Test wrapper</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/assembly-sim</code></td><td>496</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/bubble-effect</code></td><td>381</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/gesture-swarm</code></td><td>419</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/keo-co-app</code></td><td>557</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/pixel-agents</code></td><td>696</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/rust-lab</code></td><td>573</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/quiz-tug-of-war</code></td><td>1853</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/r3f-sandbox</code></td><td>4202</td><td>Unindexed sandbox</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/color-picker-3d</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/convergent-lens-image</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/divergent-lens-image</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/electric-effect</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/focal-length-measurement</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/light-propagation</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/light-shadows</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/lens-identification</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/object-recognition-ar</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/pendulum-hand</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/piston-assembly</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/ripple-effect</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/roll-call-wheel</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/labs/spring-hand</code></td><td>-</td><td>Unindexed</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="red">1B. Not In Navigation (14 pages)</h3>
+<p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">Pages not linked from any sidebar navigation.</p>
+<table>
+<tr><th>Path</th><th>Reason</th><th>Action</th></tr>
+<tr><td><code>dashboard/logo-a-demo</code></td><td>Demo page</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/theme</code></td><td>Theme test page</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/weather</code></td><td>Not education-related</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/study-dashboard</code></td><td>Duplicate of /dashboard</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/study-group-map</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/vision-tracker</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/profile</code></td><td>Not in nav (use settings)</td><td><span class="action action-consolidate">MERGE → settings</span></td></tr>
+<tr><td><code>search-disabled</code></td><td>Disabled feature</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>aeroedu</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>ai-tutor/chat-test</code></td><td>Test page</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>teacher/system-flow</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>teacher/vision/object-detection</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>teacher/multi-disciplinary-paths</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>dashboard/ai-content-generator</code></td><td>Duplicate of teacher/create-module</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="orange">1C. Duplicate Dashboard/Admin Pages (7 pages)</h3>
+<p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">Two admin areas exist: <code>/app/admin/</code> (standalone) and <code>/app/(dashboard)/(routes)/admin/</code> (dashboard-integrated).</p>
+<table>
+<tr><th>Page</th><th>Standalone Admin</th><th>Dashboard Admin</th><th>Action</th></tr>
+<tr><td>Dashboard/Overview</td><td><code>admin/dashboard</code> (456 lines)</td><td><code>admin/overview</code> (479 lines)</td><td><span class="action action-consolidate">PICK ONE</span></td></tr>
+<tr><td>Competition</td><td><code>admin/competition</code> (649 lines)</td><td><code>dashboard/competition</code> (295 lines)</td><td><span class="action action-consolidate">PICK ONE</span></td></tr>
+<tr><td>STEM</td><td><code>admin/stem</code> (35 lines)</td><td><code>dashboard/stem</code> (531 lines)</td><td><span class="action action-consolidate">PICK ONE</span></td></tr>
+<tr><td>Assignments</td><td><code>admin/assignments</code> (429 lines)</td><td><code>dashboard/assignments</code> (redirect)</td><td><span class="action action-keep">OK</span></td></tr>
+<tr><td>Courses</td><td><code>admin/courses</code> (412 lines)</td><td><code>dashboard/courses</code> (redirect)</td><td><span class="action action-keep">OK</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="yellow">1D. Learning Math Games (8 pages) — Feature Complete?</h3>
+<table>
+<tr><th>Path</th><th>Description</th><th>Action</th></tr>
+<tr><td><code>dashboard/learning/</code></td><td>Main learning hub</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/start</code></td><td>Start page</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/luyen-tap</code></td><td>Practice</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/kiem-tra</code></td><td>Test</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/thu-thach</code></td><td>Challenge</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/kho-bau</code></td><td>Treasure</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/phuong-trinh-bac-nhat</code></td><td>Linear equations</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/phuong-trinh-bac-hai</code></td><td>Quadratic equations</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>dashboard/learning/he-phuong-trinh</code></td><td>System of equations</td><td><span class="action action-keep">KEEP</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="yellow">1E. Labtwin Sub-Pages (4 pages)</h3>
+<table>
+<tr><th>Path</th><th>Status</th><th>Action</th></tr>
+<tr><td><code>labtwin/labs-simple</code></td><td>Duplicate of labs/ with simpler UI</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/simulations-simple</code></td><td>Simplified sim viewer</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/ml-training</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>labtwin/video-tracking</code></td><td>Not in nav</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+</div>
+
+<!-- ====== SECTION 2: API ROUTES ====== -->
+<div class="section">
+<h2>2. Duplicate / Overlapping API Routes <span class="badge badge-red">HIGH PRIORITY</span></h2>
+
+<div class="group">
+<h3 class="red">2A. Grading/OCR Chaos (10 routes → 4)</h3>
+<p style="color:#94a3b8;font-size:12px;margin-bottom:8px;">10 different grading API routes doing similar things with different AI models.</p>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/grading/grade</code></td><td>Advanced rubric grading</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/grading/ocr</code></td><td>OCR extraction bridge</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/grading/omr-process</code></td><td>OMR bubble detection</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/grading/upload</code></td><td>Upload for grading</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/ocr-grading</code></td><td>Duplicate of grading/ocr</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ocr-process</code></td><td>Duplicate of grading/omr</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ocr/auto-grade</code></td><td>Duplicate of grading/grade</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ocr/upload</code></td><td>Duplicate of grading/upload</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ollama-grading</code></td><td>Merge into grading/grade</td><td><span class="action action-consolidate">MERGE</span></td></tr>
+<tr><td><code>/api/llm-grading</code></td><td>Merge into grading/grade</td><td><span class="action action-consolidate">MERGE</span></td></tr>
+<tr><td><code>/api/assignments/grade-ocr</code></td><td>Merge into grading/grade</td><td><span class="action action-consolidate">MERGE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="red">2B. Lesson/Content Generation (6 routes → 2)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/content-generation/generate</code></td><td>Main content gen with caching</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/ai-content/generate-stream</code></td><td>Streaming variant</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/generate-lesson</code></td><td>Gemini lesson gen</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/generate-lesson-grok</code></td><td>Grok lesson gen</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ai-generate-lesson</code></td><td>Multi-provider gen</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/ai-intelligent/generate</code></td><td>Smart model selector</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="orange">2C. Chat / AI (4 routes → 2)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/ai-tutor-chat</code></td><td>Tutor chat, multi-model</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/chat/messages</code></td><td>Message persistence</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/ai-chat</code></td><td>Generic AI chat</td><td><span class="action action-consolidate">MERGE → ai-tutor-chat</span></td></tr>
+<tr><td><code>/api/rag/ask</code></td><td>Simple RAG</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/rag/agent</code></td><td>Agent RAG</td><td><span class="action action-keep">KEEP</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="orange">2D. Search / Vector (4 routes → 2)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/kg/search</code></td><td>Knowledge graph search</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/vector/search</code></td><td>Vector search</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/search</code></td><td>Disabled / stub</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/vector-similarity</code></td><td>Duplicate of vector/search</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="orange">2E. Payment / Webhook (6 routes → 4)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/payment/create-checkout</code></td><td>SePay checkout</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/payment/webhook</code></td><td>SePay webhook</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/subscription/checkout</code></td><td>Stripe checkout</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/subscription/webhook</code></td><td>Stripe webhook</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/webhook</code></td><td>Duplicate of subscription/webhook</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/courses/[id]/checkout</code></td><td>Course-specific (redundant)</td><td><span class="action action-consolidate">MERGE → payment</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="yellow">2F. Students (3 → 1)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/admin/students</code></td><td>Admin student list (with filters)</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/teacher/students</code></td><td>Teacher student list</td><td><span class="action action-consolidate">MERGE → /api/students</span></td></tr>
+<tr><td><code>/api/students</code></td><td>Generic student list</td><td><span class="action action-consolidate">MERGE with RBAC</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="yellow">2G. Cache / Redis (5 → 3)</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/cache</code></td><td>Cache management</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/cache/clear</code></td><td>Clear cache</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/cache/stats</code></td><td>Cache stats</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/redis/health</code></td><td>Redis health check</td><td><span class="action action-keep">KEEP</span></td></tr>
+<tr><td><code>/api/redis/cache</code></td><td>Test endpoint (duplicate)</td><td><span class="action action-remove">REMOVE</span></td></tr>
+</table>
+</div>
+
+<div class="group">
+<h3 class="yellow">2H. Misc Test/Seed Routes</h3>
+<table>
+<tr><th>Route</th><th>Purpose</th><th>Action</th></tr>
+<tr><td><code>/api/stem/test</code></td><td>DB test endpoint</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/stem/sync</code></td><td>Mock data endpoint</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/admin/seed-teky</code></td><td>Seed data endpoint</td><td><span class="action action-remove">REMOVE (prod)</span></td></tr>
+<tr><td><code>/api/admin/cleanup-users</code></td><td>Cleanup endpoint</td><td><span class="action action-remove">REMOVE (prod)</span></td></tr>
+<tr><td><code>/api/seed-questions</code></td><td>Seed questions</td><td><span class="action action-remove">REMOVE (prod)</span></td></tr>
+<tr><td><code>/api/documents/fix-status</code></td><td>One-time fix script</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/template-optimized</code></td><td>Test template</td><td><span class="action action-remove">REMOVE</span></td></tr>
+<tr><td><code>/api/openfang-service</code></td><td>External service bridge</td><td><span class="action action-remove">REVIEW</span></td></tr>
+</table>
+</div>
+
+</div>
+
+<!-- ====== SECTION 3: SUMMARY ====== -->
+<div class="section">
+<h2>3. Impact Summary</h2>
+<table>
+<tr><th>Category</th><th>Current</th><th>Remove</th><th>After</th><th>Reduction</th></tr>
+<tr><td><strong>Pages</strong></td><td>229</td><td class="red">~60</td><td class="green">~169</td><td>26%</td></tr>
+<tr><td>&nbsp;&nbsp;Lab pages</td><td>57</td><td class="red">29</td><td class="green">28</td><td>51%</td></tr>
+<tr><td>&nbsp;&nbsp;Dashboard pages</td><td>~40</td><td class="red">10</td><td class="green">30</td><td>25%</td></tr>
+<tr><td>&nbsp;&nbsp;Admin duplicates</td><td>~7</td><td class="red">3</td><td class="green">4</td><td>43%</td></tr>
+<tr><td><strong>API Routes</strong></td><td>261</td><td class="red">~35</td><td class="green">~226</td><td>13%</td></tr>
+<tr><td>&nbsp;&nbsp;Grading/OCR</td><td>10+</td><td class="red">7</td><td class="green">4</td><td>60%</td></tr>
+<tr><td>&nbsp;&nbsp;Lesson gen</td><td>6</td><td class="red">4</td><td class="green">2</td><td>67%</td></tr>
+<tr><td>&nbsp;&nbsp;Test/seed routes</td><td>8</td><td class="red">8</td><td class="green">0</td><td>100%</td></tr>
+</table>
+
+<div style="margin-top:16px; padding:12px; background:#0f172a; border-radius:8px; border: 1px solid #334155;">
+<p style="font-size:14px; font-weight:600; color:#fbbf24; margin-bottom:8px;">Build Time Impact</p>
+<p style="font-size:13px; color:#94a3b8;">
+Removing ~60 pages reduces Next.js build from ~229 pages to ~169 pages.<br>
+Estimated build time reduction: <strong class="green">20-30%</strong> (fewer pages = less SSR compilation + smaller Docker image).<br>
+Cold start on Cloud Run should also improve due to smaller <code>.next/server</code> bundle.
+</p>
+</div>
+</div>
+
+</div>
+</body>
+</html>
