@@ -27,12 +27,16 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm-debug.log*
 
-# Local env files
+# Local env files (ALL env files with real secrets)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+**/.env
+**/.env.local
+**/.env.production
 
 # Editor directories and files
 .vscode/*
@@ -78,14 +82,43 @@ desktop-current-app/dist/
 # Secrets & credentials (NEVER commit)
 sa-ci-deployer-key.json
 gen-lang-client-*.json
+**/service-account*.json
+**/firebase-adminsdk*.json
 *.pem
 *.key
+*.p12
+*.pfx
+*.jks
 
 # Dev logs & temp
 next-dev.log
 deployment.log
+**/deployment.log
 cookies.txt
 cookies_new.txt
+**/cookies.txt
+**/cookies_new.txt
+.next-old/
+j.json
+
+# Database backups & dumps (contain real data)
+*.dump
+*.db.backup
+*.sql.backup
+backup_old.dump
+
+# Setup scripts with secrets
+**/setup-secrets.sh
+
+# Cache & build artifacts
+.cache/
+.ruff_cache/
+.contentlayer/
+
+# Test artifacts at root
+omr_*.jpg
+template.png
+0[1-9]_*.jpg
 
 # Large video files (use Git LFS or external storage)
 uploads/cameras/*.MP4
