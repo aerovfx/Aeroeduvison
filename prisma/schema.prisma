@@ -1,6 +1,10 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextIndex", "fullTextSearch"]
+  // Explicitly target linux/amd64 (Cloud Run Gen2) + native for local dev.
+  // This ensures the correct native binary is always generated — prevents
+  // Prisma from falling back to the WASM engine on the server (OOM risk).
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

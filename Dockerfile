@@ -29,20 +29,25 @@ COPY . .
 # Ensure public directory exists
 RUN mkdir -p public
 
-# Generate Prisma client with validation skipped
-RUN PRISMA_SKIP_VALIDATION=1 npx prisma generate || true
+# Generate Prisma client for linux/amd64 (matches Cloud Run Gen2 runtime).
+# PRISMA_SKIP_VALIDATION=1 → skip DATABASE_URL check (not needed at build time).
+# We do NOT use `|| true` here — a silent failure leaves .prisma/client empty,
+# which forces Prisma to fall back to the WASM engine at runtime → OOM.
+RUN PRISMA_SKIP_VALIDATION=1 npx prisma generate
 
 # Build Next.js application with standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV SKIP_ENV_VALIDATION=1
 ENV DISABLE_CONTENTLAYER=1
-# Limit Node heap to 2GB to leave room for OS + webpack workers within Docker's RAM
-# Enable aggressive GC to reclaim memory between page data collection
-ENV NODE_OPTIONS="--max-old-space-size=2048 --max-semi-space-size=64 --expose-gc"
+# === BUILD MEMORY STRATEGY ===
+# Problem: Build compiles OK (~3min) but OOM at "Generating static pages (193)"
+# Solution: Use generous heap BUT with GC pressure to free memory between pages
+# Docker Desktop has 16GB; BuildKit gets ~10-12GB usable
+ENV NODE_OPTIONS="--max-old-space-size=7168"
 
-# Build Next.js — all pages use force-dynamic so "Collecting page data" is lightweight
-RUN npm run build 2>&1 || (echo "Build failed, checking for errors..." && exit 1)
+# Build Next.js
+RUN npm run build || (echo "Build failed" && exit 1)
 
 # Runner stage
 FROM base AS runner
@@ -60,17 +65,33 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
+# Fix Next.js 15 RSC: standalone omits page_client-reference-manifest.js
+# for nested route groups like (dashboard)/(routes)/(root)/page.js
+# Copy the FULL .next/server to overwrite standalone's incomplete version
+COPY --from=builder --chown=nextjs:nodejs /app/.next/server ./.next/server
+
 # Copy Prisma files
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copy data directory (quiz JSON files loaded at runtime)
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
 
 # Switch to non-root user
 USER nextjs
 
 EXPOSE 3000
 
-ENV PORT=3000
+# NOTE: Do NOT set PORT here — Cloud Run gen2 sets it automatically
+# ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+# === RUNTIME MEMORY STRATEGY ===
+# Cloud Run kills container (SIGKILL/signal 9) when exceeding memory limit.
+# Set Node.js heap to ~75% of container memory (4GiB → 3072MB).
+# Note: NODE_OPTIONS is also overridden by the Cloud Run env var set in the
+# gcloud deploy command, so this Dockerfile value is a safe fallback.
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 
 CMD ["node", "server.js"]

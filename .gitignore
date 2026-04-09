@@ -141,3 +141,11 @@ desktop-current-app/
 **/*.mp4
 **/*.avi
 **/*.mov
+
+# Fuse filesystem temporary/hidden files (editor backups)
+.fuse_hidden*
+**/.fuse_hidden*
+
+# Database dumps with real data
+*.sql
+!scripts/*.sql

@@ -36,52 +36,10 @@ const queryMetrics = {
   latencies: [] as number[],
 };
 
-// Extended Prisma client with logging
-const prisma = new PrismaClient({
-  log: [
-    { level: 'query', emit: 'event' },
-    { level: 'error', emit: 'event' },
-    { level: 'warn', emit: 'event' },
-  ],
-});
-
-// Query logging and monitoring
-prisma.$on('query', (e) => {
-  const duration = e.duration;
-  queryMetrics.total++;
-  queryMetrics.latencies.push(duration);
-  
-  // Keep last 1000 latencies
-  if (queryMetrics.latencies.length > 1000) {
-    queryMetrics.latencies.shift();
-  }
-  
-  // Calculate average
-  queryMetrics.avgLatency = queryMetrics.latencies.reduce((a, b) => a + b, 0) / queryMetrics.latencies.length;
-
-  // Log slow queries
-  if (duration > SLOW_QUERY_THRESHOLD) {
-    queryMetrics.slow++;
-    apiLogger.warn('Slow query detected', {
-      metadata: {
-        query: e.query,
-        params: e.params,
-        duration: `${duration}ms`,
-        threshold: `${SLOW_QUERY_THRESHOLD}ms`,
-      },
-    });
-  }
-});
-
-prisma.$on('error', (e) => {
-  queryMetrics.errors++;
-  apiLogger.error('Database error', {
-    metadata: {
-      level: e.level,
-      error: e.message,
-    },
-  });
-});
+// NOTE: Do NOT create PrismaClient instances at module load time.
+// Module-level instantiation causes Prisma to load native binaries and
+// attempt DB connections as soon as any route imports this module.
+// Use lazy initialization (getOptimizedPrisma()) instead.
 
 // Global instance for hot reload
 declare global {
@@ -145,7 +103,7 @@ class PrismaClientOptimized extends PrismaClient {
       stopOnError?: boolean;
     }
   ): Promise<T[]> {
-    const { concurrency = 10, stopOnError = false } = options || {};
+    const { concurrency = 10, stopOnError = false } = options ?? {};
 
     const results: T[] = [];
     const errors: Error[] = [];
@@ -187,7 +145,7 @@ class PrismaClientOptimized extends PrismaClient {
       timeout?: number;
     }
   ): Promise<T> {
-    const { maxRetries = 3, timeout = 30000 } = options || {};
+    const { maxRetries = 3, timeout = 30000 } = options ?? {};
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -259,63 +217,76 @@ class PrismaClientOptimized extends PrismaClient {
   }
 }
 
-// Create optimized instance
-const optimizedPrisma = new PrismaClientOptimized({
-  log: [
-    { level: 'query', emit: 'event' },
-    { level: 'error', emit: 'event' },
-    { level: 'warn', emit: 'event' },
-  ],
-});
+// Lazy singleton: only created on first access
+function getOptimizedPrisma(): PrismaClientOptimized {
+  if (globalThis.prismaOptimized) return globalThis.prismaOptimized;
 
-// Add event listeners
-optimizedPrisma.$on('query', (e) => {
-  const duration = e.duration;
-  queryMetrics.total++;
-  queryMetrics.latencies.push(duration);
-  
-  if (queryMetrics.latencies.length > 1000) {
-    queryMetrics.latencies.shift();
-  }
-  
-  queryMetrics.avgLatency = queryMetrics.latencies.reduce((a, b) => a + b, 0) / queryMetrics.latencies.length;
+  const optimizedPrisma = new PrismaClientOptimized({
+    log: [
+      { level: 'query', emit: 'event' },
+      { level: 'error', emit: 'event' },
+      { level: 'warn', emit: 'event' },
+    ],
+  });
 
-  if (duration > SLOW_QUERY_THRESHOLD) {
-    queryMetrics.slow++;
-    apiLogger.warn('Slow query detected', {
+  // Add event listeners
+  optimizedPrisma.$on('query', (e: any) => {
+    const duration = e.duration;
+    queryMetrics.total++;
+    queryMetrics.latencies.push(duration);
+
+    if (queryMetrics.latencies.length > 1000) {
+      queryMetrics.latencies.shift();
+    }
+
+    queryMetrics.avgLatency = queryMetrics.latencies.reduce((a, b) => a + b, 0) / queryMetrics.latencies.length;
+
+    if (duration > SLOW_QUERY_THRESHOLD) {
+      queryMetrics.slow++;
+      apiLogger.warn('Slow query detected', {
+        metadata: {
+          query: e.query,
+          params: e.params,
+          duration: `${duration}ms`,
+          threshold: `${SLOW_QUERY_THRESHOLD}ms`,
+        },
+      });
+    }
+  });
+
+  optimizedPrisma.$on('error', (e: any) => {
+    queryMetrics.errors++;
+    apiLogger.error('Database error', {
       metadata: {
-        query: e.query,
-        params: e.params,
-        duration: `${duration}ms`,
-        threshold: `${SLOW_QUERY_THRESHOLD}ms`,
+        level: e.level,
+        error: e.message,
       },
     });
-  }
-});
-
-optimizedPrisma.$on('error', (e) => {
-  queryMetrics.errors++;
-  apiLogger.error('Database error', {
-    metadata: {
-      level: e.level,
-      error: e.message,
-    },
   });
-});
 
-// Export singleton
-export const db = globalThis.prismaOptimized ?? optimizedPrisma;
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.prismaOptimized = db;
+  globalThis.prismaOptimized = optimizedPrisma;
+  return optimizedPrisma;
 }
+
+// Lazy singleton export — PrismaClient is NOT created at import time.
+// The Proxy ensures the instance is created only on first property access.
+export const db: PrismaClientOptimized = new Proxy({} as PrismaClientOptimized, {
+  get(_target, prop) {
+    const client = getOptimizedPrisma();
+    const value = (client as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  },
+});
 
 // Query optimization helpers
 export const QueryOptimizer = {
   /**
    * Add pagination with cursor for better performance
    */
-  paginate<T>(
+  async paginate<T>(
     query: (options: { skip?: number; take: number; cursor?: any }) => Promise<T[]>,
     options: {
       page: number;
@@ -330,17 +301,16 @@ export const QueryOptimizer = {
     const { page, pageSize, cursor } = options;
     const skip = cursor ? 0 : (page - 1) * pageSize;
 
-    return query({
+    const results = await query({
       skip,
       take: pageSize + 1, // Fetch one extra to check if there's more
       cursor,
-    }).then((results) => {
-      const hasMore = results.length > pageSize;
-      const data = hasMore ? results.slice(0, pageSize) : results;
-      const nextCursor = hasMore ? results[pageSize - 1] : undefined;
-
-      return { data, hasMore, nextCursor };
     });
+    const hasMore = results.length > pageSize;
+    const data = hasMore ? results.slice(0, pageSize) : results;
+    const nextCursor = hasMore ? results[pageSize - 1] : undefined;
+
+    return { data, hasMore, nextCursor };
   },
 
   /**
@@ -348,7 +318,7 @@ export const QueryOptimizer = {
    */
   selectFields<T, K extends keyof T>(
     fields: K[]
-  ): Prisma.SelectSubset<T, Pick<T, K>> {
+  ): any {
     return {
       select: fields.reduce((acc, field) => {
         acc[field] = true;
@@ -367,7 +337,7 @@ export const QueryOptimizer = {
       batchDelay?: number;
     }
   ): (id: K) => Promise<T | null> {
-    const { batchSize = 100, batchDelay = 0 } = options || {};
+    const { batchSize = 100, batchDelay = 0 } = options ?? {};
     const queue = new Set<K>();
     let pendingPromise: Promise<Map<K, T>> | null = null;
 
@@ -376,7 +346,6 @@ export const QueryOptimizer = {
 
       const ids = Array.from(queue);
       queue.clear();
-      pendingPromise = null;
 
       pendingPromise = loader(ids);
     };
@@ -392,7 +361,7 @@ export const QueryOptimizer = {
         }
       }
 
-      const results = await pendingPromise!;
+      const results = await (pendingPromise ?? Promise.resolve(new Map()));
       return results.get(id) ?? null;
     };
   },

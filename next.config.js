@@ -248,6 +248,7 @@ const nextConfig = {
     cpus: 1,
   },
 
+
   // Webpack optimization
   webpack: (config, { dev, isServer }) => {
     // Contentlayer webpack plugin (inlined from withContentlayer wrapper)
@@ -375,10 +376,23 @@ const nextConfig = {
     return config;
   },
 
-  // SWC compiler options — drop console in production
+  // SWC compiler options
+  // FIX (2026-04): Keep console.log in production so Cloud Run logs show crash details.
+  // Previously stripped → impossible to diagnose the 7-second SIGKILL crash loop.
+  // Re-enable stripping only after the crash is definitively fixed.
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
+    removeConsole: false,
   },
+
+  // Prevent Prisma and other Node.js-only packages from being bundled
+  // into the Edge runtime (middleware) or SSR bundles. They must run
+  // as Node.js external modules via require(), not as webpack bundles.
+  serverExternalPackages: [
+    '@prisma/client',
+    'prisma',
+    'bcryptjs',
+    'ioredis',
+  ],
 }
 
 module.exports = nextConfig

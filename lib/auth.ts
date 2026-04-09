@@ -218,138 +218,93 @@ export const authOptions: NextAuthOptions = {
       return `${baseUrl}/dashboard`
     },
     async jwt({ token, user, account, trigger }) {
-      console.log("🔑 [JWT] JWT callback called", {
-        hasUser: !!user,
-        hasToken: !!token,
-        trigger,
-        tokenKeys: token ? Object.keys(token) : [],
-        userData: user ? { id: user.id, email: user.email, role: user.role } : null
-      })
-
-      // Initial sign in
-      if (user) {
-        token.role = user.role
-        token.id = user.id
-        token.email = user.email
-        token.name = user.name || ""
-        token.image = user.image || ""
-        token.lastUpdated = Date.now()
-        // console.log("🔑 [JWT] Updated token with user data:", { id: token.id, email: token.email, role: token.role })
-      }
-
-      // Update token with fresh data from database
-      if (trigger === "update" || (token.email && Date.now() - (token.lastUpdated as number) > 5 * 60 * 1000)) {
-        try {
-          const normalizedEmail = token.email!.toLowerCase().trim()
-          const dbUser = await db.user.findUnique({
-            where: { email: normalizedEmail },
-            select: { id: true, email: true, role: true, name: true, image: true }
-          })
-
-          if (dbUser) {
-            token.role = dbUser.role
-            token.id = dbUser.id
-            token.email = dbUser.email
-            token.name = dbUser.name || ""
-            token.image = dbUser.image || ""
-            token.lastUpdated = Date.now()
-          }
-        } catch (error) {
-          console.error("❌ [JWT] Error refreshing token from DB:", error)
-          // Return existing token when DB is unavailable
-          return token
+      // CRITICAL: This callback MUST NOT throw — any unhandled error causes
+      // /api/auth/session to fail → CLIENT_FETCH_ERROR
+      try {
+        // Initial sign in — populate token from user object
+        if (user) {
+          token.role = user.role
+          token.id = user.id
+          token.email = user.email
+          token.name = user.name || ""
+          token.image = user.image || ""
+          token.lastUpdated = Date.now()
         }
-      }
 
-      // Đảm bảo role được cập nhật từ database cho Google OAuth
-      if (account?.provider === "google" && token.email) {
-        try {
-          const normalizedEmail = token.email.toLowerCase().trim()
-          const dbUser = await db.user.findUnique({
-            where: { email: normalizedEmail },
-            select: { id: true, email: true, role: true, name: true, image: true }
-          })
-          if (dbUser) {
-            token.role = dbUser.role
-            token.id = dbUser.id
-            token.name = dbUser.name || ""
-            token.image = dbUser.image || ""
+        // Refresh token from database periodically (every 5 minutes) or on explicit update
+        const shouldRefresh = trigger === "update" ||
+          (token.email && Date.now() - ((token.lastUpdated as number) || 0) > 5 * 60 * 1000);
+
+        if (shouldRefresh && token.email) {
+          try {
+            const normalizedEmail = (token.email as string).toLowerCase().trim()
+            const dbUser = await db.user.findUnique({
+              where: { email: normalizedEmail },
+              select: { id: true, email: true, role: true, name: true, image: true }
+            })
+
+            if (dbUser) {
+              token.role = dbUser.role
+              token.id = dbUser.id
+              token.email = dbUser.email
+              token.name = dbUser.name || ""
+              token.image = dbUser.image || ""
+              token.lastUpdated = Date.now()
+            }
+          } catch (dbError) {
+            // DB error is non-fatal: keep existing token data
+            console.warn("⚠️ [JWT] DB refresh failed, using cached token:",
+              dbError instanceof Error ? dbError.message : dbError)
           }
-        } catch (error) {
-          console.error("❌ [JWT] Error updating Google OAuth token:", error)
         }
+
+        // For Google OAuth initial sign-in, fetch role from DB
+        if (account?.provider === "google" && token.email && !token.role) {
+          try {
+            const normalizedEmail = (token.email as string).toLowerCase().trim()
+            const dbUser = await db.user.findUnique({
+              where: { email: normalizedEmail },
+              select: { id: true, email: true, role: true, name: true, image: true }
+            })
+            if (dbUser) {
+              token.role = dbUser.role
+              token.id = dbUser.id
+              token.name = dbUser.name || ""
+              token.image = dbUser.image || ""
+            }
+          } catch (error) {
+            console.warn("⚠️ [JWT] Google OAuth DB lookup failed:", error)
+          }
+        }
+      } catch (error) {
+        console.error("❌ [JWT] Unexpected error in JWT callback:", error)
       }
 
-      // console.log("🔑 [JWT] Returning token:", { id: token.id, email: token.email, role: token.role })
       return token
     },
     async session({ session, token }) {
       // With JWT strategy, token is passed (not user)
-      console.log("📊 [SESSION] Session callback called", {
-        hasSession: !!session,
-        hasToken: !!token,
-        tokenData: token ? {
-          id: token.id,
-          email: token.email,
-          role: token.role
-        } : null
-      })
-
-      if (token) {
-        // Update session with data from JWT token
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.email = token.email as string
-        session.user.name = token.name as string
-        session.user.image = token.image as string
-
-        // console.log("📊 [SESSION] Updated session with token data:", { 
-        //   id: session.user.id, 
-        //   email: session.user.email, 
-        //   role: session.user.role 
-        // })
-      }
-
-      // Validate session by checking if user still exists in database
-      if (session?.user?.email) {
-        try {
-          const normalizedEmail = session.user.email.toLowerCase().trim()
-          // console.log("📊 [SESSION] Validating user in database:", normalizedEmail)
-
-          const dbUser = await db.user.findUnique({
-            where: { email: normalizedEmail },
-            select: { id: true, email: true, role: true, name: true, image: true }
-          })
-
-          if (!dbUser) {
-            // console.log("❌ [SESSION] User not found in database")
-            // If user not found in DB, we should probably invalidate session.
-            // But returning null breaks the type signature.
-            // We can return session as is, but it might be stale.
-            // Or we can return a default session.
-            return session
-          }
-
-          // console.log("✅ [SESSION] User validated in database:", { 
-          //   id: dbUser.id, 
-          //   email: dbUser.email, 
-          //   role: dbUser.role 
-          // })
-
-          // Update session with latest user data
-          session.user.id = dbUser.id
-          session.user.role = dbUser.role
-          session.user.email = dbUser.email
-          session.user.name = dbUser.name
-          session.user.image = dbUser.image
-        } catch (error) {
-          console.error("❌ [SESSION] Error validating session:", error)
-          // return null (cannot return null in session callback)
-          return session
+      // CRITICAL: This callback MUST NOT throw — any unhandled error causes
+      // /api/auth/session to return HTML error page → CLIENT_FETCH_ERROR
+      //
+      // FIX (2026-04): Removed redundant DB query from session callback.
+      // The JWT callback already refreshes from DB every 5 minutes.
+      // Querying DB here causes Neon cold-start delays on EVERY session
+      // check (refetchInterval=5min * all active users) → connection pool
+      // exhaustion → OOM → SIGKILL. JWT token data is sufficient here.
+      try {
+        if (token) {
+          // Populate session from JWT token data (already refreshed by jwt callback)
+          session.user.id = token.id as string
+          session.user.role = token.role as string
+          session.user.email = token.email as string
+          session.user.name = token.name as string
+          session.user.image = token.image as string
         }
+      } catch (error) {
+        console.error("❌ [SESSION] Unexpected error in session callback:", error)
       }
 
-      // console.log("📊 [SESSION] Returning session:", { id: session?.user?.id, email: session?.user?.email, role: session?.user?.role })
       return session
     },
   },
