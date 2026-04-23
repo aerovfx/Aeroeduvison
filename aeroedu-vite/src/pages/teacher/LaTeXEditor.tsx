@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { api } from '@/services/api'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
 
@@ -40,10 +41,9 @@ export default function LaTeXEditorPage() {
   const fetchProjects = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/latex-projects')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      setProjects(data.projects || [])
+      const { data } = await api.get('/latex-projects')
+      // API returns { success, data: [...], count } — pick the array
+      setProjects(data.data || data.projects || [])
     } catch {
       toast.error('Không thể tải danh sách tài liệu LaTeX')
     } finally {
@@ -54,15 +54,11 @@ export default function LaTeXEditorPage() {
   const handleCreate = async () => {
     try {
       setCreating(true)
-      const res = await fetch('/api/latex-projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Tài liệu LaTeX mới' }),
-      })
-      if (!res.ok) throw new Error('Failed to create')
-      const data = await res.json()
+      const { data } = await api.post('/latex-projects', { title: 'Tài liệu LaTeX mới' })
+      // API returns { success, data: { id, ... } }
+      const id = data.data?.id ?? data.id
       toast.success('Đã tạo tài liệu mới')
-      navigate(`/teacher/latex-documents/${data.id}`)
+      navigate(`/teacher/latex-documents/${id}`)
     } catch {
       toast.error('Không thể tạo tài liệu')
     } finally {
@@ -76,21 +72,12 @@ export default function LaTeXEditorPage() {
       setAiCreating(true)
       const title = config.title ?? `Đề ${config.subject} — Khối ${config.grade}`
       // 1) Tạo project với title
-      const createRes = await fetch('/api/latex-projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      })
-      if (!createRes.ok) throw new Error('Không thể tạo project')
-      const { id } = await createRes.json()
+      const { data: createData } = await api.post('/latex-projects', { title })
+      // API returns { success, data: { id, ... } }
+      const id = createData.data?.id ?? createData.id
 
       // 2) Lưu nội dung LaTeX vừa sinh vào project
-      const saveRes = await fetch(`/api/latex-projects/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, mainContent: result.latex }),
-      })
-      if (!saveRes.ok) throw new Error('Không thể lưu nội dung AI')
+      await api.put(`/latex-projects/${id}`, { title, mainContent: result.latex })
 
       toast.success(`Đã tạo "${title}" với ${result.totalQuestions} câu hỏi.`)
       setAiDialogOpen(false)
@@ -104,8 +91,7 @@ export default function LaTeXEditorPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/latex-projects/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
+      await api.delete(`/latex-projects/${id}`)
       setProjects(prev => prev.filter(p => p.id !== id))
       setDeleteTarget(null)
       toast.success('Đã xóa tài liệu')

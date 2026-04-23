@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
+import { api } from "@/services/api"
 import {
   Plus, Clock, Eye, Trash2, Copy, Users, Search,
   BarChart3, Play, Square, KeyRound, ArrowRight,
@@ -153,11 +154,15 @@ export default function OnlineExamRoomPage() {
   const loadRooms = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch("/api/online-exam-room")
-      const data = await res.json()
-      setRooms(data.examRooms || [])
-      setPublicRooms(data.publicRooms || [])
-    } catch {
+      const { data } = await api.get('/online-exam-room')
+      setRooms(data.examRooms || data.data?.examRooms || [])
+      setPublicRooms(data.publicRooms || data.data?.publicRooms || [])
+    } catch (e: any) {
+      const status = e?.response?.status
+      if (status !== 503 && status !== 502) {
+        // silence unavailable service; show other errors in console
+        console.error('loadRooms error', e)
+      }
       setRooms([]); setPublicRooms([])
     } finally {
       setLoading(false)
@@ -167,8 +172,7 @@ export default function OnlineExamRoomPage() {
   const loadExams = useCallback(async () => {
     try {
       setExamsLoading(true)
-      const res = await fetch("/api/exams?limit=100")
-      const data = await res.json()
+      const { data } = await api.get('/exams', { params: { limit: 100 } })
       const list = data.success ? (data.data?.exams || []) : (data.exams || [])
       setExams(Array.isArray(list) ? list.map((e: any) => ({
         id: e.id, title: e.title || "Không tên",
@@ -182,11 +186,13 @@ export default function OnlineExamRoomPage() {
   const loadSchedules = useCallback(async (roomId: string) => {
     try {
       setSchedulesLoading(true)
-      const res = await fetch(`/api/online-exam-room/${roomId}/schedule`)
-      const data = await res.json()
-      setSchedules(data.schedules || [])
-    } catch { setSchedules([]) }
-    finally { setSchedulesLoading(false) }
+      const { data } = await api.get(`/online-exam-room/${roomId}/schedule`)
+      setSchedules(data.schedules || data.data?.schedules || [])
+    } catch (e: any) {
+      const status = e?.response?.status
+      if (status !== 503 && status !== 502) console.error('loadSchedules error', e)
+      setSchedules([])
+    } finally { setSchedulesLoading(false) }
   }, [])
 
   useEffect(() => { void loadRooms() }, [loadRooms])
@@ -218,55 +224,45 @@ export default function OnlineExamRoomPage() {
     if (!selectedId || !editName.trim()) { toast.error("Tên phòng thi không được để trống"); return }
     setSaving(true)
     try {
-      const res = await fetch(`/api/online-exam-room/${selectedId}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editName.trim(), duration: editDuration,
-          startTime: editStart ? new Date(editStart).toISOString() : undefined,
-          endTime: editEnd ? new Date(editEnd).toISOString() : undefined,
-          isPublic: editIsPublic,
-          maxStudents: editMaxStudents === "" ? null : Number(editMaxStudents),
-          description: editDescription.trim() || null,
-        }),
+      await api.put(`/online-exam-room/${selectedId}`, {
+        name: editName.trim(), duration: editDuration,
+        startTime: editStart ? new Date(editStart).toISOString() : undefined,
+        endTime: editEnd ? new Date(editEnd).toISOString() : undefined,
+        isPublic: editIsPublic,
+        maxStudents: editMaxStudents === "" ? null : Number(editMaxStudents),
+        description: editDescription.trim() || null,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
       toast.success("Đã cập nhật phòng thi")
       setEditing(false)
       await loadRooms()
-    } catch (e: any) { toast.error(e.message || "Không thể cập nhật") }
-    finally { setSaving(false) }
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể cập nhật")
+    } finally { setSaving(false) }
   }
 
   const handleJoinByCode = async () => {
     if (!joinCode.trim()) return
     setJoining("code")
     try {
-      const res = await fetch("/api/online-exam-room/join", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessCode: joinCode.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      toast.success(data.data.alreadyJoined ? "Đã tham gia trước đó" : "Tham gia thành công!")
-      navigate(`/teacher/online-exam-room/${data.data.roomId}/take`)
-    } catch (e: any) { toast.error(e.message || "Không thể tham gia") }
-    finally { setJoining(null) }
+      const { data } = await api.post('/online-exam-room/join', { accessCode: joinCode.trim() })
+      const res = data.data ?? data
+      toast.success(res.alreadyJoined ? "Đã tham gia trước đó" : "Tham gia thành công!")
+      navigate(`/teacher/online-exam-room/${res.roomId}/take`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể tham gia")
+    } finally { setJoining(null) }
   }
 
   const handleJoinPublic = async (roomId: string) => {
     setJoining(roomId)
     try {
-      const res = await fetch("/api/online-exam-room/join", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const { data } = await api.post('/online-exam-room/join', { roomId })
+      const res = data.data ?? data
       toast.success("Đã vào phòng thi!")
-      navigate(`/teacher/online-exam-room/${data.data.roomId}/take`)
-    } catch (e: any) { toast.error(e.message || "Không thể tham gia") }
-    finally { setJoining(null) }
+      navigate(`/teacher/online-exam-room/${res.roomId}/take`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể tham gia")
+    } finally { setJoining(null) }
   }
 
   const handleCreate = async () => {
@@ -274,59 +270,50 @@ export default function OnlineExamRoomPage() {
     if (!newExamId) { toast.error("Vui lòng chọn đề thi để gắn vào phòng"); return }
     setCreating(true)
     try {
-      const res = await fetch("/api/online-exam-room", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newName.trim(),
-          startTime: new Date(newStart).toISOString(),
-          endTime: new Date(newEnd).toISOString(),
-          duration: newDuration,
-          isPublic: newIsPublic,
-          examId: newExamId,
-        }),
+      const { data } = await api.post('/online-exam-room', {
+        name: newName.trim(),
+        startTime: new Date(newStart).toISOString(),
+        endTime: new Date(newEnd).toISOString(),
+        duration: newDuration,
+        isPublic: newIsPublic,
+        examId: newExamId,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const room = data.examRoom ?? data.data ?? data
       const msg = newIsPublic
         ? "Phòng thi công khai đã tạo — Ai cũng có thể vào!"
-        : `Phòng thi bí mật đã tạo — Mã: ${data.examRoom?.accessCode}`
+        : `Phòng thi bí mật đã tạo — Mã: ${room?.accessCode ?? ''}`
       toast.success(msg)
       setShowCreate(false); setNewName(""); setNewExamId(""); setNewStart(""); setNewEnd("")
       await loadRooms()
-    } catch (e: any) { toast.error(e.message || "Không thể tạo phòng thi") }
-    finally { setCreating(false) }
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể tạo phòng thi")
+    } finally { setCreating(false) }
   }
 
   const handleStart = async (room: ExamRoom) => {
     try {
-      await fetch(`/api/online-exam-room/${room.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "active" }),
-      })
+      await api.put(`/online-exam-room/${room.id}`, { status: "active" })
       toast.success("Đã mở phòng thi!")
       await loadRooms()
-    } catch { toast.error("Lỗi") }
+    } catch (e: any) { toast.error(e.response?.data?.error || "Lỗi") }
   }
 
   const handleStop = async (room: ExamRoom) => {
     try {
-      await fetch(`/api/online-exam-room/${room.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "completed" }),
-      })
+      await api.put(`/online-exam-room/${room.id}`, { status: "completed" })
       toast.success("Đã kết thúc phòng thi")
       await loadRooms()
-    } catch { toast.error("Lỗi") }
+    } catch (e: any) { toast.error(e.response?.data?.error || "Lỗi") }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm("Xoá phòng thi này?")) return
     try {
-      await fetch(`/api/online-exam-room/${id}`, { method: "DELETE" })
+      await api.delete(`/online-exam-room/${id}`)
       toast.success("Đã xoá")
       if (selectedId === id) setSelectedId(null)
       await loadRooms()
-    } catch { toast.error("Lỗi") }
+    } catch (e: any) { toast.error(e.response?.data?.error || "Lỗi") }
   }
 
   const copyCode = (code: string) => {
@@ -340,23 +327,19 @@ export default function OnlineExamRoomPage() {
     }
     setAddingSchedule(true)
     try {
-      const res = await fetch(`/api/online-exam-room/${selectedId}/schedule`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          examId: scheduleExamId,
-          activeFrom: new Date(scheduleFrom).toISOString(),
-          activeTo: new Date(scheduleTo).toISOString(),
-          label: scheduleLabel.trim() || undefined,
-        }),
+      await api.post(`/online-exam-room/${selectedId}/schedule`, {
+        examId: scheduleExamId,
+        activeFrom: new Date(scheduleFrom).toISOString(),
+        activeTo: new Date(scheduleTo).toISOString(),
+        label: scheduleLabel.trim() || undefined,
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
       toast.success("Đã thêm lịch đề thi")
       setShowScheduleForm(false)
       setScheduleExamId(""); setScheduleFrom(""); setScheduleTo(""); setScheduleLabel("")
       await loadSchedules(selectedId)
-    } catch (e: any) { toast.error(e.message || "Không thể thêm lịch") }
-    finally { setAddingSchedule(false) }
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể thêm lịch")
+    } finally { setAddingSchedule(false) }
   }
 
   const handleActivateSchedule = async (scheduleId: string) => {
@@ -364,27 +347,23 @@ export default function OnlineExamRoomPage() {
     if (!confirm("Kích hoạt lịch này sẽ thay toàn bộ câu hỏi hiện tại bằng đề thi mới. Tiếp tục?")) return
     setActivatingSchedule(scheduleId)
     try {
-      const res = await fetch(`/api/online-exam-room/${selectedId}/schedule/activate`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scheduleId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const { data } = await api.post(`/online-exam-room/${selectedId}/schedule/activate`, { scheduleId })
       toast.success(`Đã kích hoạt: ${data.examTitle} (${data.questionsImported} câu)`)
       await loadSchedules(selectedId)
       await loadRooms()
-    } catch (e: any) { toast.error(e.message || "Không thể kích hoạt") }
-    finally { setActivatingSchedule(null) }
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || e.message || "Không thể kích hoạt")
+    } finally { setActivatingSchedule(null) }
   }
 
   const handleDeleteSchedule = async (scheduleId: string) => {
     if (!selectedId) return
     if (!confirm("Xoá lịch này?")) return
     try {
-      await fetch(`/api/online-exam-room/${selectedId}/schedule?scheduleId=${scheduleId}`, { method: "DELETE" })
+      await api.delete(`/online-exam-room/${selectedId}/schedule`, { params: { scheduleId } })
       toast.success("Đã xoá lịch")
       await loadSchedules(selectedId)
-    } catch { toast.error("Không thể xoá") }
+    } catch (e: any) { toast.error(e.response?.data?.error || "Không thể xoá") }
   }
 
   // ── Computed ───────────────────────────────────────────────

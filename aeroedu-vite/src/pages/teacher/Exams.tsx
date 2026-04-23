@@ -6,6 +6,7 @@ import {
   Grid3x3, Search, BarChart3, Sparkles, Loader2,
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { api } from "@/services/api"
 
 // ── Dark palette ──────────────────────────────────────────────
 const D = {
@@ -78,10 +79,8 @@ export default function ExamsPage() {
   const loadExams = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/teacher/exams')
-      if (!res.ok) throw new Error(`Load failed (${res.status})`)
-      const data = await res.json().catch(() => ({}))
-      const list = Array.isArray(data?.exams) ? data.exams : []
+      const { data } = await api.get('/teacher/exams')
+      const list = Array.isArray(data?.exams) ? data.exams : Array.isArray(data?.data) ? data.data : []
       setExams(
         list.map((e: any) => ({
           id: String(e.id),
@@ -94,10 +93,16 @@ export default function ExamsPage() {
           createdAt: String(e.createdAt || new Date().toISOString()),
         }))
       )
-    } catch (err) {
-      console.error(err)
-      toast.error("Không tải được danh sách đề thi")
-      setExams([])
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (status === 503 || status === 502) {
+        // Service not yet deployed — show empty list silently, no error toast spam
+        setExams([])
+      } else {
+        console.error(err)
+        toast.error("Không tải được danh sách đề thi")
+        setExams([])
+      }
     } finally {
       setLoading(false)
     }
@@ -107,8 +112,7 @@ export default function ExamsPage() {
     if (!confirm('Xóa đề thi này?')) return
     try {
       setDeletingId(id)
-      const res = await fetch(`/api/teacher/exams/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
+      await api.delete(`/teacher/exams/${id}`)
       toast.success('Đã xóa đề thi')
       if (selectedExamId === id) setSelectedExamId(null)
       loadExams()
@@ -122,8 +126,7 @@ export default function ExamsPage() {
   const handleDuplicate = async (id: string) => {
     try {
       setDuplicatingId(id)
-      const res = await fetch(`/api/teacher/exams/${id}/duplicate`, { method: 'POST' })
-      if (!res.ok) throw new Error()
+      await api.post(`/teacher/exams/${id}/duplicate`)
       toast.success('Đã nhân bản đề thi')
       loadExams()
     } catch {
@@ -137,17 +140,13 @@ export default function ExamsPage() {
     if (!examId || exportingLatexId) return
     setExportingLatexId(examId)
     try {
-      const res = await fetch('/api/latex-projects/export-from-exam', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examId }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Lỗi xuất LaTeX')
+      const { data } = await api.post('/latex-projects/export-from-exam', { examId })
+      // API returns { success, data: { id, ... } }
+      const projectId = data.data?.id ?? data.id
       toast.success('Đã tạo tài liệu LaTeX. Đang mở...')
-      navigate(`/teacher/latex-documents/${data.id}`)
+      navigate(`/teacher/latex-documents/${projectId}`)
     } catch (err: any) {
-      toast.error(err?.message || 'Không thể gửi đề sang LaTeX')
+      toast.error(err?.response?.data?.error || err?.message || 'Không thể gửi đề sang LaTeX')
     } finally {
       setExportingLatexId(null)
     }

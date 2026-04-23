@@ -83,6 +83,22 @@ pub struct ExamWithQuestions {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateExamRequest {
+    pub title: String,
+    pub description: Option<String>,
+    pub exam_type: Option<String>,
+    pub status: Option<String>,
+    pub duration: Option<i32>,
+    pub total_questions: Option<i32>,
+    pub passing_score: Option<f64>,   // accepted but stored as totalScore
+    pub shuffle: Option<bool>,        // accepted, no DB column yet — ignored
+    pub subject: Option<String>,      // accepted, no DB column yet — ignored
+    pub source_type: Option<String>,  // accepted, no DB column yet — ignored
+    pub matrix_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DuplicateExamRequest {
     pub exam_id: String,
 }
@@ -93,9 +109,40 @@ pub struct ListExamsQuery {
     #[serde(rename = "examType")]
     pub exam_type: Option<String>,
     pub search: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+// Answer-key: one entry per question sent from the PDF-import flow.
+// The frontend sends MCQ, TF (with subAnswers), and short-answer questions.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswerKeyQuestion {
+    #[serde(rename = "type")]
+    pub question_type: String,
+    pub question_index: Option<i32>,
+    pub section: Option<String>,
+    pub correct_answer: Option<String>,
+    // TF sub-answers: [{ sub: "a", answer: "Đúng"|"Sai"|"" }]
+    pub sub_answers: Option<serde_json::Value>,
 }
 
 // ── Response DTOs ──
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateExamResponse {
+    pub success: bool,
+    pub data: ExamSummary,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnswerKeyResponse {
+    pub success: bool,
+    pub message: String,
+    pub questions_saved: usize,
+}
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

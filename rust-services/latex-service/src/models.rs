@@ -3,35 +3,61 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 // ── Database Models ──
+// Column names follow the Prisma schema (camelCase) — sqlx rename maps them.
 
+/// LatexProject — maps Prisma camelCase DB columns to Rust, serializes to camelCase JSON.
 #[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LatexProject {
     pub id: String,
     pub title: String,
+    /// DB column: mainContent — exposed to frontend as "content"
+    #[sqlx(rename = "mainContent")]
+    #[serde(rename = "content")]
     pub content: String,
+    /// DB column: userId
+    #[sqlx(rename = "userId")]
     pub user_id: String,
-    pub is_public: bool,
-    pub compiled_pdf_url: Option<String>,
+    /// DB column: createdAt
+    #[sqlx(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
+    /// DB column: updatedAt
+    #[sqlx(rename = "updatedAt")]
     pub updated_at: DateTime<Utc>,
 }
 
+/// LatexProjectVersion — version snapshot record.
 #[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LatexProjectVersion {
     pub id: String,
+    /// DB column: projectId
+    #[sqlx(rename = "projectId")]
     pub project_id: String,
+    /// DB column: mainContent
+    #[sqlx(rename = "mainContent")]
+    #[serde(rename = "content")]
     pub content: String,
-    pub version_number: i32,
-    pub created_by: String,
+    /// DB column: createdAt
+    #[sqlx(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
 }
 
+/// LatexProjectCollaborator — project collaborator record.
 #[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LatexProjectCollaborator {
     pub id: String,
+    /// DB column: projectId
+    #[sqlx(rename = "projectId")]
     pub project_id: String,
+    /// DB column: userId
+    #[sqlx(rename = "userId")]
     pub user_id: String,
-    pub can_edit: bool,
+    /// DB column: role ("VIEW" | "EDIT")
+    pub role: String,
+    /// DB column: createdAt
+    #[sqlx(rename = "createdAt")]
     pub created_at: DateTime<Utc>,
 }
 
@@ -47,13 +73,27 @@ pub struct User {
 #[derive(Debug, Deserialize)]
 pub struct CreateProjectRequest {
     pub title: String,
+    /// Frontend may send either `content` (legacy) or `mainContent` (new)
     pub content: Option<String>,
+    #[serde(rename = "mainContent")]
+    pub main_content: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateProjectRequest {
     pub title: Option<String>,
+    /// Legacy key — kept for backward compatibility
     pub content: Option<String>,
+    /// New key — used by the Vite frontend
+    #[serde(rename = "mainContent")]
+    pub main_content: Option<String>,
+}
+
+impl UpdateProjectRequest {
+    /// Returns whichever content field is set (mainContent takes priority)
+    pub fn resolved_content(&self) -> Option<&String> {
+        self.main_content.as_ref().or(self.content.as_ref())
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,6 +105,7 @@ pub struct CompileRequest {
 #[derive(Debug, Deserialize)]
 pub struct AddCollaboratorRequest {
     pub email: String,
+    /// true → "EDIT", false → "VIEW"
     pub can_edit: Option<bool>,
 }
 
@@ -122,7 +163,7 @@ pub struct CollaboratorInfo {
     pub user_id: String,
     pub name: Option<String>,
     pub email: Option<String>,
-    pub can_edit: bool,
+    pub role: String,
 }
 
 #[derive(Debug, Serialize)]

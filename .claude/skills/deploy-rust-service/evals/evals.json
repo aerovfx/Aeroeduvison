@@ -1,0 +1,23 @@
+{
+  "skill_name": "deploy-rust-service",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "teacher-service đang bị 503, deploy nó lên Cloud Run đi",
+      "expected_output": "Skill walks through: check auth, verify secrets, run gcloud builds submit from rust-services/teacher-service/, then gcloud run deploy pixiai-teacher, then update TEACHER_SERVICE_URL on aero-backend. Provides copy-paste commands with correct project ID and region.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Deploy cả teacher-service và exam-service lên Cloud Run. Dùng parallel build nếu được.",
+      "expected_output": "Skill handles multi-service deploy. Runs two Cloud Build jobs (ideally in background &), then deploys both, then updates both TEACHER_SERVICE_URL and EXAM_SERVICE_URL on aero-backend. Uses correct Cloud Run service names (pixiai-teacher, pixiai-exam).",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "latex-service vừa deploy xong nhưng vẫn 503. Kiểm tra lỗi và fix.",
+      "expected_output": "Skill diagnoses 503 post-deploy: checks if LATEX_SERVICE_URL was updated on aero-backend, checks Cloud Run logs, checks if service cold-started. Provides gcloud logging read command and update-env-vars fix.",
+      "files": []
+    }
+  ]
+}

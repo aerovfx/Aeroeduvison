@@ -22,7 +22,7 @@
 
 const express = require('express');
 const path = require('path');
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const { createProxyMiddleware, fixRequestBody } = require('http-proxy-middleware');
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
@@ -377,6 +377,11 @@ function makeProxy(target, label, pathFilter) {
       },
       proxyReq: (proxyReq, req) => {
         console.log(`[proxy:${label}] ${req.method} ${req.originalUrl} → ${target}${req.originalUrl}`);
+        // CRITICAL: express.json() ở server.cjs đã consume request body.
+        // Nếu không re-stream body vào proxyReq, HPM v3 sẽ hang → timeout → 503.
+        // fixRequestBody: no-op nếu không có body, re-write body + Content-Length nếu có.
+        // Bug này ảnh hưởng MỌI POST/PUT/PATCH qua mọi proxy (latex, media, teacher).
+        fixRequestBody(proxyReq, req);
       },
     },
   });

@@ -84,9 +84,11 @@ fn create_router(state: AppState) -> Router {
 
         // Exams
         .route("/api/teacher/exams", get(handlers::exams::list_exams))
+        .route("/api/teacher/exams", post(handlers::exams::create_exam))
         .route("/api/teacher/exams/:id", get(handlers::exams::get_exam))
         .route("/api/teacher/exams/:id", delete(handlers::exams::delete_exam))
         .route("/api/teacher/exams/:id/duplicate", post(handlers::exams::duplicate_exam))
+        .route("/api/teacher/exams/:id/answer-key", post(handlers::exams::save_answer_key))
 
         .with_state(state)
 }

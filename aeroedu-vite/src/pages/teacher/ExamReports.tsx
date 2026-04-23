@@ -5,6 +5,7 @@ import {
   Loader2, Activity,
 } from "lucide-react"
 import toast from "react-hot-toast"
+import { api } from "@/services/api"
 
 // ── Dark palette ─────────────────────────────────────────────────────────────
 const D = {
@@ -122,11 +123,10 @@ export default function ExamReports() {
     ;(async () => {
       try {
         setLoading(true)
-        const res = await fetch("/api/teacher/exams")
-        if (!res.ok) { setExams([]); return }
-        const data = await res.json()
-        if (!cancelled) setExams(data.exams || [])
+        const { data } = await api.get("/teacher/exams")
+        if (!cancelled) setExams(data.exams || data.data || [])
       } catch {
+        // Service not available yet — show empty list
         if (!cancelled) setExams([])
       } finally {
         if (!cancelled) setLoading(false)
@@ -142,9 +142,7 @@ export default function ExamReports() {
     ;(async () => {
       setAnalyticsLoading(true)
       try {
-        const res = await fetch(`/api/teacher/exams/${selectedExamId}/analytics`)
-        if (!res.ok) { if (!cancelled) setAnalytics(generateMockAnalytics()); return }
-        const data = await res.json()
+        const { data } = await api.get(`/teacher/exams/${selectedExamId}/analytics`)
         if (!cancelled) setAnalytics(data)
       } catch {
         if (!cancelled) setAnalytics(generateMockAnalytics())
@@ -158,10 +156,11 @@ export default function ExamReports() {
   const handleExport = async (format: "csv" | "excel" | "pdf") => {
     if (!selectedExamId) { toast.error("Vui lòng chọn đề thi"); return }
     try {
-      const res = await fetch(`/api/teacher/exams/${selectedExamId}/export?format=${format}`)
-      if (!res.ok) { toast.error("Không thể xuất báo cáo"); return }
-      const blob = await res.blob()
-      const url = window.URL.createObjectURL(blob)
+      const res = await api.get(
+        `/teacher/exams/${selectedExamId}/export?format=${format}`,
+        { responseType: 'blob' },
+      )
+      const url = window.URL.createObjectURL(res.data)
       const a = document.createElement("a")
       a.href = url
       a.download = `exam-report-${selectedExamId}.${format === "excel" ? "xlsx" : format}`

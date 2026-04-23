@@ -99,23 +99,21 @@ export interface GenerateResult {
 }
 
 // ── Main API ─────────────────────────────────────────────────
+import { api } from '@/services/api'
+
 export const latexAiService = {
   generateExam: async (config: ExamConfig): Promise<GenerateResult> => {
-    // 1) Thử gọi backend AI
+    // 1) Thử gọi backend AI (dùng axios instance có Bearer token)
     try {
-      const res = await fetch('/api/latex-projects/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      })
-      if (res.ok) {
-        const data = (await res.json()) as { latex?: string; totalQuestions?: number }
-        if (data.latex && typeof data.latex === 'string' && data.latex.trim()) {
-          return {
-            latex: data.latex,
-            source: 'ai',
-            totalQuestions: data.totalQuestions ?? computeTotal(config.difficulty),
-          }
+      const { data } = await api.post<{ latex?: string; totalQuestions?: number }>(
+        '/latex-projects/ai-generate',
+        config,
+      )
+      if (data.latex && typeof data.latex === 'string' && data.latex.trim()) {
+        return {
+          latex: data.latex,
+          source: 'ai',
+          totalQuestions: data.totalQuestions ?? computeTotal(config.difficulty),
         }
       }
     } catch {

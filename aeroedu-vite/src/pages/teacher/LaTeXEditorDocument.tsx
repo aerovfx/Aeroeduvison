@@ -5,6 +5,7 @@ import {
   Printer, History, Share2, Trash2, Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { api } from '@/services/api'
 import { LatexEditor } from '@/components/latex-editor'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
 import { LATEX_TEMPLATES, getTemplateById } from '@/lib/latex-templates'
@@ -102,12 +103,7 @@ export default function LaTeXEditorDocument() {
     if (!id) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/latex-projects/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mainContent: c, ...(t !== undefined && { title: t }) }),
-      })
-      if (!res.ok) throw new Error('Save failed')
+      await api.put(`/latex-projects/${id}`, { mainContent: c, ...(t !== undefined && { title: t }) })
       toast.success('Đã lưu')
     } catch {
       toast.error('Không thể lưu')
@@ -122,16 +118,18 @@ export default function LaTeXEditorDocument() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    fetch(`/api/latex-projects/${id}`)
-      .then(r => {
-        if (!r.ok) { if (r.status === 404) setNotFound(true); return null }
-        return r.json()
+    api.get(`/latex-projects/${id}`)
+      .then(({ data }) => {
+        if (cancelled) return
+        // API returns { success, data: { id, title, content, userId, createdAt, updatedAt } }
+        const proj = data.data ?? data
+        setTitle(proj.title ?? '')
+        setContent(proj.content ?? proj.mainContent ?? '')
+        setIsOwner(proj.isOwner !== false)
       })
-      .then(data => {
-        if (cancelled || !data) return
-        setTitle(data.title ?? '')
-        setContent(data.mainContent ?? '')
-        setIsOwner(data.isOwner !== false)
+      .catch((err) => {
+        if (cancelled) return
+        if (err?.response?.status === 404) setNotFound(true)
       })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -148,9 +146,12 @@ export default function LaTeXEditorDocument() {
   /* ── Load versions ── */
   const fetchVersions = useCallback(() => {
     if (!id) return
-    fetch(`/api/latex-projects/${id}/versions`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d?.versions && setVersions(d.versions))
+    api.get(`/latex-projects/${id}/versions`)
+      .then(({ data }) => {
+        // API returns { success, data: [...] }
+        const arr = data?.data ?? data?.versions
+        if (arr) setVersions(arr)
+      })
       .catch(() => {})
   }, [id])
 
@@ -159,9 +160,12 @@ export default function LaTeXEditorDocument() {
   /* ── Load collaborators ── */
   const fetchCollaborators = useCallback(() => {
     if (!id) return
-    fetch(`/api/latex-projects/${id}/collaborators`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => d?.collaborators && setCollaborators(d.collaborators))
+    api.get(`/latex-projects/${id}/collaborators`)
+      .then(({ data }) => {
+        // API returns { success, data: [...] }
+        const arr = data?.data ?? data?.collaborators
+        if (arr) setCollaborators(arr)
+      })
       .catch(() => {})
   }, [id])
   useEffect(() => { if (shareOpen && id) fetchCollaborators() }, [shareOpen, id, fetchCollaborators])
@@ -199,30 +203,35 @@ export default function LaTeXEditorDocument() {
     setCompiling(true)
     setCompileError(null)
     try {
-      const res = await fetch('/api/latex-projects/compile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: id, content }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        const msg = data.error ?? 'Biên dịch thất bại'
-        setCompileError(data.log ?? msg)
-        if (res.status === 503) {
-          toast.error('Dịch vụ biên dịch chưa sẵn sàng. Cấu hình Docker TeX Live hoặc thử lại sau.')
-        } else {
-          toast.error(msg)
-        }
-        return
-      }
-      const blob = await res.blob()
+      const res = await api.post(
+        '/latex-projects/compile',
+        { projectId: id, content },
+        { responseType: 'blob' },
+      )
       if (prevPdfRef.current) URL.revokeObjectURL(prevPdfRef.current)
-      const url = URL.createObjectURL(blob)
+      const url = URL.createObjectURL(res.data)
       prevPdfRef.current = url
       setPdfBlobUrl(url)
       toast.success('Đã biên dịch. Xem PDF bên phải.')
-    } catch {
-      toast.error('Lỗi khi gọi dịch vụ biên dịch')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { status?: number; data?: Blob } }
+      if (axiosErr?.response?.data instanceof Blob) {
+        try {
+          const text = await axiosErr.response.data.text()
+          const parsed = JSON.parse(text)
+          const msg = parsed.error ?? 'Biên dịch thất bại'
+          setCompileError(parsed.log ?? msg)
+          if (axiosErr.response.status === 503) {
+            toast.error('Dịch vụ biên dịch chưa sẵn sàng. Cấu hình Docker TeX Live hoặc thử lại sau.')
+          } else {
+            toast.error(msg)
+          }
+        } catch {
+          toast.error('Biên dịch thất bại')
+        }
+      } else {
+        toast.error('Lỗi khi gọi dịch vụ biên dịch')
+      }
     } finally {
       setCompiling(false)
       compileInflight.current = false
@@ -267,13 +276,7 @@ export default function LaTeXEditorDocument() {
     if (!id) return
     setRestoringId(versionId)
     try {
-      const res = await fetch(`/api/latex-projects/${id}/versions/restore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ versionId }),
-      })
-      if (!res.ok) throw new Error('Restore failed')
-      const data = await res.json()
+      const { data } = await api.post(`/latex-projects/${id}/versions/restore`, { versionId })
       setContent(data.mainContent ?? '')
       setTitle(data.title ?? '')
       toast.success('Đã khôi phục phiên bản')
@@ -290,17 +293,13 @@ export default function LaTeXEditorDocument() {
     if (!id || !shareEmail.trim()) return
     setAddingCollab(true)
     try {
-      const res = await fetch(`/api/latex-projects/${id}/collaborators`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: shareEmail.trim(), role: shareRole }),
-      })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed') }
+      await api.post(`/latex-projects/${id}/collaborators`, { email: shareEmail.trim(), role: shareRole })
       setShareEmail('')
       fetchCollaborators()
       toast.success('Đã thêm cộng tác viên')
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Không thể thêm')
+      const msg = (e as { response?: { data?: { error?: string } } })?.response?.data?.error
+      toast.error(msg || 'Không thể thêm')
     } finally {
       setAddingCollab(false)
     }
@@ -309,8 +308,7 @@ export default function LaTeXEditorDocument() {
   const handleRemoveCollaborator = async (userId: string) => {
     if (!id) return
     try {
-      const res = await fetch(`/api/latex-projects/${id}/collaborators/${userId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed')
+      await api.delete(`/latex-projects/${id}/collaborators/${userId}`)
       fetchCollaborators()
       toast.success('Đã xóa cộng tác viên')
     } catch {

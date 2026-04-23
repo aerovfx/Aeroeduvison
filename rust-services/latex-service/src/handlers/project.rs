@@ -12,11 +12,19 @@ use crate::{
     models::{
         AddCollaboratorRequest, AuthUser, CollaboratorInfo, CollaboratorResponse, CompileRequest,
         CompileResponse, CreateProjectRequest, ExportFromExamRequest, ExportFromMatrixRequest,
-        LatexProject, LatexProjectCollaborator, LatexProjectVersion, ProjectListResponse,
+        LatexProject, LatexProjectVersion, ProjectListResponse,
         ProjectResponse, RestoreVersionRequest, UpdateProjectRequest, User, DEFAULT_LATEX_TEMPLATE,
     },
     AppState,
 };
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// SELECT columns for LatexProject (matches Prisma camelCase column names → sqlx rename attrs)
+const PROJECT_COLS: &str =
+    r#"p.id, p.title, p."mainContent", p."userId", p."createdAt", p."updatedAt""#;
+
+// ── Handlers ─────────────────────────────────────────────────────────────────
 
 /// GET /api/latex-projects - List projects (owner or collaborator)
 pub async fn list_projects(
@@ -34,21 +42,23 @@ pub async fn list_projects(
         .and_then(|s| s.parse::<i64>().ok())
         .unwrap_or(0);
 
-    let projects = sqlx::query_as::<_, LatexProject>(
+    let sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        LEFT JOIN "LatexProjectCollaborator" c ON c.project_id = p.id AND c.user_id = $1
-        WHERE p.user_id = $1 OR c.user_id = $1
-        ORDER BY p.updated_at DESC
+        LEFT JOIN "LatexProjectCollaborator" c ON c."projectId" = p.id AND c."userId" = $1
+        WHERE p."userId" = $1 OR c."userId" = $1
+        ORDER BY p."updatedAt" DESC
         LIMIT $2 OFFSET $3
         "#
-    )
-    .bind(&user.id)
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&state.db)
-    .await?;
+    );
+
+    let projects = sqlx::query_as::<_, LatexProject>(&sql)
+        .bind(&user.id)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&state.db)
+        .await?;
 
     let count = projects.len() as i64;
 
@@ -71,20 +81,22 @@ pub async fn create_project(
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now();
-    let content = body.content.unwrap_or_else(|| DEFAULT_LATEX_TEMPLATE.to_string());
+    // Resolve content: mainContent takes priority, then content, then default template
+    let content = body.main_content
+        .or(body.content)
+        .unwrap_or_else(|| DEFAULT_LATEX_TEMPLATE.to_string());
 
     let project = sqlx::query_as::<_, LatexProject>(
         r#"
-        INSERT INTO "LatexProject" (id, title, content, user_id, is_public, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, title, content, user_id, is_public, compiled_pdf_url, created_at, updated_at
+        INSERT INTO "LatexProject" (id, title, "mainContent", "userId", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, title, "mainContent", "userId", "createdAt", "updatedAt"
         "#
     )
     .bind(&id)
     .bind(&body.title)
     .bind(&content)
     .bind(&user.id)
-    .bind(false)
     .bind(now)
     .bind(now)
     .fetch_one(&state.db)
@@ -105,18 +117,20 @@ pub async fn get_project(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> Result<Json<ProjectResponse>, AppError> {
-    let project = sqlx::query_as::<_, LatexProject>(
+    let sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        LEFT JOIN "LatexProjectCollaborator" c ON c.project_id = p.id AND c.user_id = $1
-        WHERE p.id = $2 AND (p.user_id = $1 OR c.user_id = $1 OR p.is_public = true)
+        LEFT JOIN "LatexProjectCollaborator" c ON c."projectId" = p.id AND c."userId" = $1
+        WHERE p.id = $2 AND (p."userId" = $1 OR c."userId" = $1)
         "#
-    )
-    .bind(&user.id)
-    .bind(&id)
-    .fetch_optional(&state.db)
-    .await?;
+    );
+
+    let project = sqlx::query_as::<_, LatexProject>(&sql)
+        .bind(&user.id)
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
 
     let project = project.ok_or_else(|| {
         AppError::NotFound("Project not found or unauthorized".to_string())
@@ -135,53 +149,42 @@ pub async fn update_project(
     Path(id): Path<String>,
     Json(body): Json<UpdateProjectRequest>,
 ) -> Result<Json<ProjectResponse>, AppError> {
-    // Verify ownership or edit access
-    let existing = sqlx::query_as::<_, LatexProject>(
+    // Verify ownership or EDIT-role collaborator access
+    let existing_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        LEFT JOIN "LatexProjectCollaborator" c ON c.project_id = p.id AND c.user_id = $1
-        WHERE p.id = $2 AND (p.user_id = $1 OR (c.user_id = $1 AND c.can_edit = true))
+        LEFT JOIN "LatexProjectCollaborator" c ON c."projectId" = p.id AND c."userId" = $1
+        WHERE p.id = $2 AND (p."userId" = $1 OR (c."userId" = $1 AND c.role = 'EDIT'))
         "#
-    )
-    .bind(&user.id)
-    .bind(&id)
-    .fetch_optional(&state.db)
-    .await?;
+    );
+
+    let existing = sqlx::query_as::<_, LatexProject>(&existing_sql)
+        .bind(&user.id)
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?;
 
     let existing = existing.ok_or_else(|| {
         AppError::Forbidden("You do not have permission to edit this project".to_string())
     })?;
 
-    let new_title = body.title.as_ref().unwrap_or(&existing.title);
-    let new_content = body.content.as_ref().unwrap_or(&existing.content);
+    let new_title = body.title.as_deref().unwrap_or(&existing.title);
+    let new_content = body.resolved_content().map(|s| s.as_str()).unwrap_or(&existing.content);
     let now = Utc::now();
 
-    // Save version if content changed
-    if let Some(ref new_content) = body.content {
-        if new_content != &existing.content {
-            let version_number = sqlx::query_scalar::<_, i32>(
-                r#"
-                SELECT COALESCE(MAX(version_number), 0) + 1
-                FROM "LatexProjectVersion"
-                WHERE project_id = $1
-                "#
-            )
-            .bind(&id)
-            .fetch_one(&state.db)
-            .await?;
-
+    // Save version snapshot if content changed
+    if let Some(incoming) = body.resolved_content() {
+        if incoming != &existing.content {
             sqlx::query(
                 r#"
-                INSERT INTO "LatexProjectVersion" (id, project_id, content, version_number, created_by, created_at)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO "LatexProjectVersion" (id, "projectId", "mainContent", "createdAt")
+                VALUES ($1, $2, $3, $4)
                 "#
             )
             .bind(Uuid::new_v4().to_string())
             .bind(&id)
             .bind(&existing.content)
-            .bind(version_number)
-            .bind(&user.id)
             .bind(now)
             .execute(&state.db)
             .await?;
@@ -191,9 +194,9 @@ pub async fn update_project(
     let project = sqlx::query_as::<_, LatexProject>(
         r#"
         UPDATE "LatexProject"
-        SET title = $1, content = $2, updated_at = $3
+        SET title = $1, "mainContent" = $2, "updatedAt" = $3
         WHERE id = $4
-        RETURNING id, title, content, user_id, is_public, compiled_pdf_url, created_at, updated_at
+        RETURNING id, title, "mainContent", "userId", "createdAt", "updatedAt"
         "#
     )
     .bind(new_title)
@@ -218,7 +221,7 @@ pub async fn delete_project(
     let result = sqlx::query(
         r#"
         DELETE FROM "LatexProject"
-        WHERE id = $1 AND user_id = $2
+        WHERE id = $1 AND "userId" = $2
         "#
     )
     .bind(&id)
@@ -245,26 +248,28 @@ pub async fn list_versions(
     Path(id): Path<String>,
 ) -> Result<Json<crate::models::VersionResponse>, AppError> {
     // Verify access
-    let _project = sqlx::query_as::<_, LatexProject>(
+    let access_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        LEFT JOIN "LatexProjectCollaborator" c ON c.project_id = p.id AND c.user_id = $1
-        WHERE p.id = $2 AND (p.user_id = $1 OR c.user_id = $1)
+        LEFT JOIN "LatexProjectCollaborator" c ON c."projectId" = p.id AND c."userId" = $1
+        WHERE p.id = $2 AND (p."userId" = $1 OR c."userId" = $1)
         "#
-    )
-    .bind(&user.id)
-    .bind(&id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound("Project not found".to_string()))?;
+    );
+    sqlx::query_as::<_, LatexProject>(&access_sql)
+        .bind(&user.id)
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Project not found".to_string()))?;
 
     let versions = sqlx::query_as::<_, LatexProjectVersion>(
         r#"
-        SELECT id, project_id, content, version_number, created_by, created_at
+        SELECT id, "projectId", "mainContent", "createdAt"
         FROM "LatexProjectVersion"
-        WHERE project_id = $1
-        ORDER BY version_number DESC
+        WHERE "projectId" = $1
+        ORDER BY "createdAt" DESC
+        LIMIT 50
         "#
     )
     .bind(&id)
@@ -285,25 +290,26 @@ pub async fn restore_version(
     Json(body): Json<RestoreVersionRequest>,
 ) -> Result<Json<ProjectResponse>, AppError> {
     // Verify ownership
-    let project = sqlx::query_as::<_, LatexProject>(
+    let project_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        WHERE p.id = $1 AND p.user_id = $2
+        WHERE p.id = $1 AND p."userId" = $2
         "#
-    )
-    .bind(&id)
-    .bind(&user.id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Only owner can restore versions".to_string()))?;
+    );
+    let project = sqlx::query_as::<_, LatexProject>(&project_sql)
+        .bind(&id)
+        .bind(&user.id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Forbidden("Only owner can restore versions".to_string()))?;
 
     // Get version content
     let version = sqlx::query_as::<_, LatexProjectVersion>(
         r#"
-        SELECT id, project_id, content, version_number, created_by, created_at
+        SELECT id, "projectId", "mainContent", "createdAt"
         FROM "LatexProjectVersion"
-        WHERE id = $1 AND project_id = $2
+        WHERE id = $1 AND "projectId" = $2
         "#
     )
     .bind(&body.version_id)
@@ -314,29 +320,16 @@ pub async fn restore_version(
 
     let now = Utc::now();
 
-    // Create new version from current content
-    let version_number = sqlx::query_scalar::<_, i32>(
-        r#"
-        SELECT COALESCE(MAX(version_number), 0) + 1
-        FROM "LatexProjectVersion"
-        WHERE project_id = $1
-        "#
-    )
-    .bind(&id)
-    .fetch_one(&state.db)
-    .await?;
-
+    // Snapshot current content before restoring
     sqlx::query(
         r#"
-        INSERT INTO "LatexProjectVersion" (id, project_id, content, version_number, created_by, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO "LatexProjectVersion" (id, "projectId", "mainContent", "createdAt")
+        VALUES ($1, $2, $3, $4)
         "#
     )
     .bind(Uuid::new_v4().to_string())
     .bind(&id)
     .bind(&project.content)
-    .bind(version_number)
-    .bind(&user.id)
     .bind(now)
     .execute(&state.db)
     .await?;
@@ -345,9 +338,9 @@ pub async fn restore_version(
     let updated = sqlx::query_as::<_, LatexProject>(
         r#"
         UPDATE "LatexProject"
-        SET content = $1, updated_at = $2
+        SET "mainContent" = $1, "updatedAt" = $2
         WHERE id = $3
-        RETURNING id, title, content, user_id, is_public, compiled_pdf_url, created_at, updated_at
+        RETURNING id, title, "mainContent", "userId", "createdAt", "updatedAt"
         "#
     )
     .bind(&version.content)
@@ -368,26 +361,27 @@ pub async fn list_collaborators(
     user: AuthUser,
     Path(id): Path<String>,
 ) -> Result<Json<CollaboratorResponse>, AppError> {
-    // Verify access
-    let _project = sqlx::query_as::<_, LatexProject>(
+    // Verify owner access
+    let owner_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        WHERE p.id = $1 AND p.user_id = $2
+        WHERE p.id = $1 AND p."userId" = $2
         "#
-    )
-    .bind(&id)
-    .bind(&user.id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Only owner can view collaborators".to_string()))?;
+    );
+    sqlx::query_as::<_, LatexProject>(&owner_sql)
+        .bind(&id)
+        .bind(&user.id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Forbidden("Only owner can view collaborators".to_string()))?;
 
-    let collaborators = sqlx::query_as::<_, (String, Option<String>, Option<String>, bool)>(
+    let collaborators = sqlx::query_as::<_, (String, Option<String>, Option<String>, String)>(
         r#"
-        SELECT u.id, u.name, u.email, c.can_edit
+        SELECT u.id, u.name, u.email, c.role
         FROM "LatexProjectCollaborator" c
-        LEFT JOIN "User" u ON u.id = c.user_id
-        WHERE c.project_id = $1
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE c."projectId" = $1
         "#
     )
     .bind(&id)
@@ -396,11 +390,11 @@ pub async fn list_collaborators(
 
     let data = collaborators
         .into_iter()
-        .map(|(user_id, name, email, can_edit)| CollaboratorInfo {
+        .map(|(user_id, name, email, role)| CollaboratorInfo {
             user_id,
             name,
             email,
-            can_edit,
+            role,
         })
         .collect();
 
@@ -418,18 +412,19 @@ pub async fn add_collaborator(
     Json(body): Json<AddCollaboratorRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Verify ownership
-    let _project = sqlx::query_as::<_, LatexProject>(
+    let owner_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        WHERE p.id = $1 AND p.user_id = $2
+        WHERE p.id = $1 AND p."userId" = $2
         "#
-    )
-    .bind(&id)
-    .bind(&user.id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Only owner can add collaborators".to_string()))?;
+    );
+    sqlx::query_as::<_, LatexProject>(&owner_sql)
+        .bind(&id)
+        .bind(&user.id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Forbidden("Only owner can add collaborators".to_string()))?;
 
     // Find user by email
     let collab_user = sqlx::query_as::<_, User>(
@@ -442,20 +437,20 @@ pub async fn add_collaborator(
     .await?
     .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
-    let can_edit = body.can_edit.unwrap_or(true);
+    let role = if body.can_edit.unwrap_or(true) { "EDIT" } else { "VIEW" };
     let now = Utc::now();
 
     sqlx::query(
         r#"
-        INSERT INTO "LatexProjectCollaborator" (id, project_id, user_id, can_edit, created_at)
+        INSERT INTO "LatexProjectCollaborator" (id, "projectId", "userId", role, "createdAt")
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT ("projectId", "userId") DO UPDATE SET role = EXCLUDED.role
         "#
     )
     .bind(Uuid::new_v4().to_string())
     .bind(&id)
     .bind(&collab_user.id)
-    .bind(can_edit)
+    .bind(role)
     .bind(now)
     .execute(&state.db)
     .await?;
@@ -473,23 +468,24 @@ pub async fn remove_collaborator(
     Path((id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     // Verify ownership
-    let _project = sqlx::query_as::<_, LatexProject>(
+    let owner_sql = format!(
         r#"
-        SELECT p.id, p.title, p.content, p.user_id, p.is_public, p.compiled_pdf_url, p.created_at, p.updated_at
+        SELECT {PROJECT_COLS}
         FROM "LatexProject" p
-        WHERE p.id = $1 AND p.user_id = $2
+        WHERE p.id = $1 AND p."userId" = $2
         "#
-    )
-    .bind(&id)
-    .bind(&user.id)
-    .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::Forbidden("Only owner can remove collaborators".to_string()))?;
+    );
+    sqlx::query_as::<_, LatexProject>(&owner_sql)
+        .bind(&id)
+        .bind(&user.id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::Forbidden("Only owner can remove collaborators".to_string()))?;
 
     sqlx::query(
         r#"
         DELETE FROM "LatexProjectCollaborator"
-        WHERE project_id = $1 AND user_id = $2
+        WHERE "projectId" = $1 AND "userId" = $2
         "#
     )
     .bind(&id)
@@ -516,8 +512,6 @@ pub async fn compile_project(
 
     match pdflatex_check {
         Ok(output) if output.status.success() => {
-            // pdflatex is available - in production would compile
-            // For now, return stub
             Ok(Json(CompileResponse {
                 success: false,
                 pdf_url: None,
@@ -526,7 +520,7 @@ pub async fn compile_project(
             }))
         }
         _ => {
-            // pdflatex not available
+            let _ = body; // suppress unused warning
             Ok(Json(CompileResponse {
                 success: false,
                 pdf_url: None,
@@ -561,12 +555,9 @@ pub async fn export_from_exam(
     user: AuthUser,
     Json(body): Json<ExportFromExamRequest>,
 ) -> Result<(StatusCode, Json<ProjectResponse>), AppError> {
-    let _exam_id = &body.exam_id;
-    // In production, would fetch exam questions from DB
-    // For now, create project with stub content
     let id = Uuid::new_v4().to_string();
     let now = Utc::now();
-    let title = body.title.unwrap_or_else(|| format!("Exam Export {}", _exam_id));
+    let title = body.title.unwrap_or_else(|| format!("Exam Export {}", body.exam_id));
     let content = r#"\documentclass{article}
 \usepackage[utf8]{inputenc}
 \title{Exam Questions}
@@ -580,16 +571,15 @@ pub async fn export_from_exam(
 
     let project = sqlx::query_as::<_, LatexProject>(
         r#"
-        INSERT INTO "LatexProject" (id, title, content, user_id, is_public, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, title, content, user_id, is_public, compiled_pdf_url, created_at, updated_at
+        INSERT INTO "LatexProject" (id, title, "mainContent", "userId", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, title, "mainContent", "userId", "createdAt", "updatedAt"
         "#
     )
     .bind(&id)
     .bind(&title)
     .bind(content)
     .bind(&user.id)
-    .bind(false)
     .bind(now)
     .bind(now)
     .fetch_one(&state.db)
@@ -610,11 +600,9 @@ pub async fn export_from_matrix(
     user: AuthUser,
     Json(body): Json<ExportFromMatrixRequest>,
 ) -> Result<(StatusCode, Json<ProjectResponse>), AppError> {
-    let _matrix_id = &body.matrix_id;
-    // In production, would fetch matrix data from DB
     let id = Uuid::new_v4().to_string();
     let now = Utc::now();
-    let title = body.title.unwrap_or_else(|| format!("Matrix Export {}", _matrix_id));
+    let title = body.title.unwrap_or_else(|| format!("Matrix Export {}", body.matrix_id));
     let content = r#"\documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{array}
@@ -629,16 +617,15 @@ pub async fn export_from_matrix(
 
     let project = sqlx::query_as::<_, LatexProject>(
         r#"
-        INSERT INTO "LatexProject" (id, title, content, user_id, is_public, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        RETURNING id, title, content, user_id, is_public, compiled_pdf_url, created_at, updated_at
+        INSERT INTO "LatexProject" (id, title, "mainContent", "userId", "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, title, "mainContent", "userId", "createdAt", "updatedAt"
         "#
     )
     .bind(&id)
     .bind(&title)
     .bind(content)
     .bind(&user.id)
-    .bind(false)
     .bind(now)
     .bind(now)
     .fetch_one(&state.db)
