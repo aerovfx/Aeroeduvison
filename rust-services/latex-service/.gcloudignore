@@ -1,0 +1,34 @@
+# ============================================================
+# .gcloudignore for latex-service
+# Exclude files that should NOT be uploaded to Cloud Build.
+# Without this, gcloud tar's up target/ (~2 GB of Rust artifacts)
+# → disk full + 7-minute upload.
+# ============================================================
+
+# Rust build artifacts — cargo build sẽ tự chạy trong Dockerfile
+target/
+target-*
+
+# Local env files — secrets must come from Secret Manager, not uploaded
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Build metadata không cần trong context
+Cargo.lock.bak
+
+# Documentation đi kèm ngữ cảnh dev, không cần trong build
+*.md
+!README.md

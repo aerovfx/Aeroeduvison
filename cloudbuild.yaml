@@ -1,0 +1,64 @@
+# ============================================================
+# AeroEduVision — Cloud Build config for `pixiai` service
+#
+# Used by deploy-cloudbuild.sh (NO local Docker). Replaces the
+# implicit build triggered by `gcloud run deploy --source=.` so
+# we can pass --build-arg flags (needed to bake VITE_* env vars
+# into the Vite bundle at build time).
+#
+# Substitutions (set by deploy-cloudbuild.sh):
+#   _REGION                 — e.g. asia-southeast1
+#   _REPO_NAME              — Artifact Registry repo, e.g. aeroedu
+#   _SERVICE_NAME           — Cloud Run service, e.g. pixiai
+#   _TAG                    — image tag, e.g. 20260421-143000
+#   _VITE_GOOGLE_CLIENT_ID  — public Google OAuth client ID
+#   _VITE_API_URL           — e.g. https://inphysic.com
+#   _VITE_WS_URL            — e.g. wss://inphysic.com
+#   _VITE_APP_URL           — e.g. https://inphysic.com
+# ============================================================
+steps:
+  # Build with explicit --build-arg so Vite can inline import.meta.env.VITE_*
+  - name: gcr.io/cloud-builders/docker
+    id: build
+    args:
+      - build
+      - --build-arg
+      - VITE_GOOGLE_CLIENT_ID=${_VITE_GOOGLE_CLIENT_ID}
+      - --build-arg
+      - VITE_API_URL=${_VITE_API_URL}
+      - --build-arg
+      - VITE_WS_URL=${_VITE_WS_URL}
+      - --build-arg
+      - VITE_APP_URL=${_VITE_APP_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest
+      - -f
+      - Dockerfile
+      - .
+
+  # Push both tags to Artifact Registry
+  - name: gcr.io/cloud-builders/docker
+    id: push-tag
+    waitFor: [build]
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}
+
+  - name: gcr.io/cloud-builders/docker
+    id: push-latest
+    waitFor: [build]
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/${_SERVICE_NAME}:latest
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

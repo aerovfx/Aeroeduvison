@@ -36,6 +36,24 @@ struct AppState {
     client: Client,
     lobby_state: Arc<Mutex<HashMap<String, LobbyState>>>,
     auth_service_url: String,
+    // Downstream microservice URLs (used by the proxy router)
+    course_service_url: String,
+    admin_service_url: String,
+    student_service_url: String,
+    analytics_service_url: String,
+    assignments_service_url: String,
+    achievements_service_url: String,
+    chat_service_url: String,
+    emotion_service_url: String,
+    grading_service_url: String,
+    media_service_url: String,
+    camera_service_url: String,
+    stem_service_url: String,
+    ai_service_url: String,
+    teacher_service_url: String,
+    exam_service_url: String,
+    transcript_service_url: String,
+    latex_service_url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -247,7 +265,41 @@ async fn main() {
             .expect("failed to build reqwest client"),
         lobby_state: Arc::new(Mutex::new(HashMap::new())),
         auth_service_url: std::env::var("AUTH_SERVICE_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:8091".to_string()),
+            .unwrap_or_else(|_| "http://127.0.0.1:8092".to_string()),
+        course_service_url: std::env::var("COURSE_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8093".to_string()),
+        admin_service_url: std::env::var("ADMIN_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8094".to_string()),
+        student_service_url: std::env::var("STUDENT_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8095".to_string()),
+        analytics_service_url: std::env::var("ANALYTICS_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8104".to_string()),
+        assignments_service_url: std::env::var("ASSIGNMENTS_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8102".to_string()),
+        achievements_service_url: std::env::var("ACHIEVEMENTS_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8103".to_string()),
+        chat_service_url: std::env::var("CHAT_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8101".to_string()),
+        emotion_service_url: std::env::var("EMOTION_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8105".to_string()),
+        grading_service_url: std::env::var("GRADING_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8100".to_string()),
+        media_service_url: std::env::var("MEDIA_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8098".to_string()),
+        camera_service_url: std::env::var("CAMERA_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8099".to_string()),
+        stem_service_url: std::env::var("STEM_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8097".to_string()),
+        ai_service_url: std::env::var("AI_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8096".to_string()),
+        teacher_service_url: std::env::var("TEACHER_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8106".to_string()),
+        exam_service_url: std::env::var("EXAM_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8107".to_string()),
+        transcript_service_url: std::env::var("TRANSCRIPT_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8108".to_string()),
+        latex_service_url: std::env::var("LATEX_SERVICE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8109".to_string()),
     };
 
     let app = Router::new()
@@ -268,6 +320,80 @@ async fn main() {
         .route("/api/labtwin/quiz/lobby/leave", post(lobby_leave))
         .route("/api/labtwin/quiz/lobby/:code", get(lobby_get))
         .route("/api/labtwin/quiz/lobby/:code/ws", get(lobby_ws))
+        // ── Service proxy routes (forward to downstream microservices) ──────
+        .route("/api/auth/*path", any(proxy_auth))
+        .route("/api/categories", any(proxy_courses))
+        .route("/api/categories/*path", any(proxy_courses))
+        .route("/api/courses", any(proxy_courses))
+        .route("/api/courses/*path", any(proxy_courses))
+        .route("/api/instructor/courses", any(proxy_courses))
+        .route("/api/instructor/courses/*path", any(proxy_courses))
+        .route("/api/learning/*path", any(proxy_courses))
+        .route("/api/admin/*path", any(proxy_admin))
+        .route("/api/analytics/*path", any(proxy_analytics))
+        .route("/api/assignments/*path", any(proxy_assignments))
+        .route("/api/achievements/*path", any(proxy_achievements))
+        .route("/api/chat/*path", any(proxy_chat))
+        .route("/api/emotion/*path", any(proxy_emotion))
+        .route("/api/students/*path", any(proxy_students))
+        // ── New service proxy routes ─────────────────────────────────────────
+        .route("/api/classes", any(proxy_classes))
+        .route("/api/classes/*path", any(proxy_classes))
+        .route("/api/grading", any(proxy_grading))
+        .route("/api/grading/*path", any(proxy_grading))
+        .route("/api/documents", any(proxy_media))
+        .route("/api/documents/*path", any(proxy_media))
+        .route("/api/question-bank", any(proxy_media))
+        .route("/api/question-bank/*path", any(proxy_media))
+        .route("/api/questions", any(proxy_media))
+        .route("/api/questions/*path", any(proxy_media))
+        .route("/api/exam-matrices", any(proxy_media))
+        .route("/api/exam-matrices/*path", any(proxy_media))
+        .route("/api/exams", any(proxy_media))
+        .route("/api/exams/*path", any(proxy_media))
+        .route("/api/upload", any(proxy_media))
+        .route("/api/upload/*path", any(proxy_media))
+        .route("/api/cameras", any(proxy_camera))
+        .route("/api/cameras/*path", any(proxy_camera))
+        .route("/api/camera", any(proxy_camera))
+        .route("/api/camera/*path", any(proxy_camera))
+        .route("/api/iot", any(proxy_camera))
+        .route("/api/iot/*path", any(proxy_camera))
+        .route("/api/stem", any(proxy_stem))
+        .route("/api/stem/*path", any(proxy_stem))
+        .route("/api/physics/*path", any(proxy_stem))
+        .route("/api/chemistry/*path", any(proxy_stem))
+        .route("/api/lab-completion", any(proxy_stem))
+        .route("/api/ai-chat", any(proxy_ai))
+        .route("/api/ai-chat/*path", any(proxy_ai))
+        .route("/api/ai-content", any(proxy_ai))
+        .route("/api/ai-content/*path", any(proxy_ai))
+        .route("/api/ai-analytics/*path", any(proxy_ai))
+        .route("/api/ai-generate-lesson", any(proxy_ai))
+        .route("/api/ai-grade-lesson", any(proxy_ai))
+        .route("/api/ai-tutor-chat", any(proxy_ai))
+        .route("/api/ai/*path", any(proxy_ai))
+        // ── New services (teacher, exam, transcript, latex) ──────────────────
+        .route("/api/teacher", any(proxy_teacher))
+        .route("/api/teacher/*path", any(proxy_teacher))
+        .route("/api/online-exam-room", any(proxy_exam))
+        .route("/api/online-exam-room/*path", any(proxy_exam))
+        .route("/api/transcript", any(proxy_transcript))
+        .route("/api/transcript/*path", any(proxy_transcript))
+        .route("/api/latex-projects", any(proxy_latex))
+        .route("/api/latex-projects/*path", any(proxy_latex))
+        // ── vision-tracker: emotion → emotion-service, rest → stub ───────────
+        .route("/api/vision-tracker/emotion/stats", get(vision_tracker_emotion_stats))
+        .route("/api/vision-tracker/emotion", post(vision_tracker_emotion_post))
+        .route("/api/vision-tracker/attention", post(vision_tracker_attention))
+        .route("/api/vision-tracker/consent", post(vision_tracker_consent).get(vision_tracker_consent_get))
+        .route("/api/vision-tracker/heartmap", get(vision_tracker_heartmap))
+        // ── /api/users → student-service; /api/student → student-service ─────
+        .route("/api/users", any(proxy_students))
+        .route("/api/users/*path", any(proxy_students))
+        .route("/api/student", any(proxy_students))
+        .route("/api/student/*path", any(proxy_students))
+        // ── Fallback ────────────────────────────────────────────────────────
         .route("/api", any(api_not_implemented_root))
         .route("/api/*path", any(api_not_implemented))
         .with_state(state)
@@ -1347,6 +1473,288 @@ fn smart_simulation_grade(
 fn round1(value: f64) -> f64 {
     (value * 10.0).round() / 10.0
 }
+
+// ── Generic reverse-proxy helper ─────────────────────────────────────────────
+
+/// Forward an Axum request to a downstream service, preserving method, headers, and body.
+/// `prefix` is stripped from the path before forwarding, e.g. "/api/auth" → "/api/auth".
+async fn proxy_to(
+    state: &AppState,
+    target_base: &str,
+    request: Request,
+) -> impl IntoResponse {
+    let method = reqwest::Method::from_bytes(request.method().as_str().as_bytes())
+        .unwrap_or(reqwest::Method::GET);
+
+    // Build target URL: target_base + original path + query
+    let original_uri = request.uri();
+    let path_and_query = original_uri
+        .path_and_query()
+        .map(|pq| pq.as_str())
+        .unwrap_or(original_uri.path());
+    let target_url = format!("{}{}", target_base, path_and_query);
+
+    // Copy headers (skip hop-by-hop)
+    let mut req_builder = state.client.request(method, &target_url);
+    for (name, value) in request.headers() {
+        let name_str = name.as_str().to_lowercase();
+        if !matches!(name_str.as_str(), "host" | "connection" | "transfer-encoding" | "te" | "trailer" | "upgrade") {
+            if let Ok(v) = value.to_str() {
+                req_builder = req_builder.header(name.as_str(), v);
+            }
+        }
+    }
+
+    // Forward body
+    let body_bytes = match axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024).await {
+        Ok(b) => b,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Failed to read request body" })),
+            ).into_response();
+        }
+    };
+    if !body_bytes.is_empty() {
+        req_builder = req_builder.body(body_bytes.to_vec());
+    }
+
+    match req_builder.send().await {
+        Ok(resp) => {
+            let status = StatusCode::from_u16(resp.status().as_u16())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let mut response_builder = axum::response::Response::builder().status(status);
+
+            // Forward response headers
+            for (name, value) in resp.headers() {
+                let name_str = name.as_str().to_lowercase();
+                if !matches!(name_str.as_str(), "connection" | "transfer-encoding") {
+                    response_builder = response_builder.header(name.as_str(), value.to_str().unwrap_or(""));
+                }
+            }
+
+            let body = resp.bytes().await.unwrap_or_default();
+            response_builder
+                .body(axum::body::Body::from(body))
+                .unwrap_or_else(|_| {
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Proxy error").into_response()
+                })
+        }
+        Err(e) => {
+            tracing::error!("Proxy error forwarding to {}: {}", target_url, e);
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": "Service unavailable",
+                    "message": format!("Downstream service unreachable: {}", target_url),
+                })),
+            ).into_response()
+        }
+    }
+}
+
+async fn proxy_auth(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.auth_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_courses(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.course_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_admin(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.admin_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_analytics(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.analytics_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_assignments(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.assignments_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_achievements(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.achievements_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_chat(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.chat_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_emotion(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.emotion_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_students(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.student_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_classes(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.student_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_grading(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.grading_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_media(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.media_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_camera(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.camera_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_stem(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.stem_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_ai(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.ai_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_teacher(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.teacher_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_exam(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.exam_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_transcript(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.transcript_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+async fn proxy_latex(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let url = state.latex_service_url.clone();
+    proxy_to(&state, &url, request).await
+}
+
+// ── vision-tracker stub/proxy handlers ───────────────────────────────────────
+
+/// POST /api/vision-tracker/emotion → forward to emotion-service /api/emotion
+async fn vision_tracker_emotion_post(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    // Rewrite path to /api/emotion and proxy to emotion-service
+    let url = format!("{}/api/emotion", state.emotion_service_url);
+    proxy_to_url(&state, &url, request).await
+}
+
+/// GET /api/vision-tracker/emotion/stats → forward to emotion-service /api/emotion/stats
+async fn vision_tracker_emotion_stats(State(state): State<AppState>, request: Request) -> impl IntoResponse {
+    let uri = request.uri();
+    let query = uri.query().map(|q| format!("?{}", q)).unwrap_or_default();
+    let url = format!("{}/api/emotion/stats{}", state.emotion_service_url, query);
+    proxy_to_url(&state, &url, request).await
+}
+
+/// POST /api/vision-tracker/attention — in-memory stub (no persistent storage needed)
+async fn vision_tracker_attention(Json(_body): Json<Value>) -> impl IntoResponse {
+    Json(json!({
+        "success": true,
+        "message": "Attention event recorded",
+        "backend": "rust"
+    }))
+}
+
+/// POST + GET /api/vision-tracker/consent — consent stub
+async fn vision_tracker_consent(Json(_body): Json<Value>) -> impl IntoResponse {
+    Json(json!({
+        "success": true,
+        "message": "Consent recorded",
+        "backend": "rust"
+    }))
+}
+
+async fn vision_tracker_consent_get() -> impl IntoResponse {
+    Json(json!({
+        "success": true,
+        "consents": [],
+        "backend": "rust"
+    }))
+}
+
+/// GET /api/vision-tracker/heartmap — mock heartmap data
+async fn vision_tracker_heartmap() -> impl IntoResponse {
+    Json(json!({
+        "success": true,
+        "data": {
+            "class_id": "default",
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "students": [],
+            "class_statistics": {
+                "total_students": 0,
+                "consent_students": 0,
+                "average_attention": 0.0,
+                "low_attention_count": 0,
+                "high_attention_count": 0,
+                "engagement_trend": "stable"
+            }
+        },
+        "backend": "rust"
+    }))
+}
+
+/// Like proxy_to but forwards to an explicit URL (not derived from request path)
+async fn proxy_to_url(state: &AppState, target_url: &str, request: Request) -> impl IntoResponse {
+    let method = reqwest::Method::from_bytes(request.method().as_str().as_bytes())
+        .unwrap_or(reqwest::Method::GET);
+
+    let mut req_builder = state.client.request(method, target_url);
+    for (name, value) in request.headers() {
+        let name_str = name.as_str().to_lowercase();
+        if !matches!(name_str.as_str(), "host" | "connection" | "transfer-encoding" | "te" | "trailer" | "upgrade") {
+            if let Ok(v) = value.to_str() {
+                req_builder = req_builder.header(name.as_str(), v);
+            }
+        }
+    }
+
+    let body_bytes = match axum::body::to_bytes(request.into_body(), 10 * 1024 * 1024).await {
+        Ok(b) => b,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({ "error": "Failed to read request body" })),
+            ).into_response();
+        }
+    };
+    if !body_bytes.is_empty() {
+        req_builder = req_builder.body(body_bytes.to_vec());
+    }
+
+    match req_builder.send().await {
+        Ok(resp) => {
+            let status = StatusCode::from_u16(resp.status().as_u16())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let body = resp.bytes().await.unwrap_or_default();
+            (status, body).into_response()
+        }
+        Err(e) => {
+            error!("proxy_to_url error: {}", e);
+            (StatusCode::BAD_GATEWAY, Json(json!({ "error": "Upstream service unavailable" }))).into_response()
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 async fn api_not_implemented_root(request: Request) -> impl IntoResponse {
     build_not_implemented_response(request.uri().path().to_string())

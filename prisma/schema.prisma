@@ -4,7 +4,7 @@ generator client {
   // Explicitly target linux/amd64 (Cloud Run Gen2) + native for local dev.
   // This ensures the correct native binary is always generated — prevents
   // Prisma from falling back to the WASM engine on the server (OOM risk).
-  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -497,6 +497,35 @@ model UserProgress {
 
   @@unique([userId, chapterId])
   @@index([chapterId])
+}
+
+/// Per-student learning activity log.
+/// One row per event (OPENED, RESUMED, COMPLETED, QUIZ_ATTEMPT, ...) so we
+/// can render a chronological timeline of what a student did inside a given
+/// course — or inside a personalised LearningPath — across time.
+///
+/// instructorId is denormalised from Course.userId so the same student can
+/// have distinct timelines when studying with different teachers.
+///
+/// NOTE: This table is bootstrapped at runtime by server.cjs via
+/// `CREATE TABLE IF NOT EXISTS` so no Prisma migration is strictly required
+/// for deployments. Keep the shape below in sync with the SQL in server.cjs.
+model LessonHistory {
+  id             String   @id @default(cuid())
+  userId         String
+  courseId       String?
+  chapterId      String?
+  instructorId   String?
+  learningPathId String?
+  segmentId      String?
+  action         String   // OPENED | RESUMED | COMPLETED | QUIZ_ATTEMPT | CUSTOM
+  title          String?  // human-readable snapshot (chapter title, quiz name)
+  metadata       Json?    // free-form: score, duration seconds, etc.
+  occurredAt     DateTime @default(now())
+
+  @@index([userId, courseId, occurredAt])
+  @@index([userId, learningPathId, occurredAt])
+  @@index([userId, occurredAt])
 }
 
 model VerificationToken {

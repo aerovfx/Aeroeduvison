@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS "Chapter" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_chapter_course_id ON "Chapter"(course_id);
-CREATE INDEX idx_chapter_position ON "Chapter"(position);
+CREATE INDEX IF NOT EXISTS idx_chapter_course_id ON "Chapter"(course_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_position ON "Chapter"(position);
 
 -- User Progress table
 CREATE TABLE IF NOT EXISTS "UserProgress" (
@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS "UserProgress" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_user_progress_user_id ON "UserProgress"(user_id);
-CREATE INDEX idx_user_progress_chapter_id ON "UserProgress"(chapter_id);
-CREATE UNIQUE INDEX idx_user_progress_unique ON "UserProgress"(user_id, chapter_id);
+CREATE INDEX IF NOT EXISTS idx_user_progress_user_id ON "UserProgress"(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_progress_chapter_id ON "UserProgress"(chapter_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_progress_unique ON "UserProgress"(user_id, chapter_id);
 
 -- Attachments table
 CREATE TABLE IF NOT EXISTS "Attachment" (
@@ -58,4 +58,4 @@ CREATE TABLE IF NOT EXISTS "Attachment" (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_attachment_course_id ON "Attachment"(course_id);
+CREATE INDEX IF NOT EXISTS idx_attachment_course_id ON "Attachment"(course_id);

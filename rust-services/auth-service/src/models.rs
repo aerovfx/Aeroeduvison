@@ -1,6 +1,8 @@
-use chrono::NaiveDateTime;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+
+// ── DB row structs (sqlx) ─────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct User {
@@ -58,6 +60,8 @@ pub struct PasswordResetToken {
     pub expires: NaiveDateTime,
 }
 
+// ── Request bodies ────────────────────────────────────────────────────────────
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     pub email: String,
@@ -85,12 +89,6 @@ pub struct TwoFactorVerifyRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TwoFactorDisableRequest {
-    pub user_id: String,
-    pub code: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct ForgotPasswordRequest {
     pub email: String,
 }
@@ -111,30 +109,78 @@ pub struct ResendVerificationRequest {
     pub email: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginResponse {
-    pub success: bool,
-    pub message: String,
-    pub user: UserInfo,
-    pub callback_url: Option<String>,
-    pub requires_2fa: Option<bool>,
-}
+// ── UserInfo — serialized as camelCase to match frontend User type ────────────
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RegisterResponse {
-    pub success: bool,
-    pub message: String,
-    pub user: UserInfo,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
+/// Matches frontend:
+/// ```ts
+/// interface User {
+///   id, name, email, image, role,
+///   isTwoFactorEnabled, createdAt, updatedAt
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub id: String,
     pub email: String,
     pub name: String,
     pub image: Option<String>,
     pub role: String,
-    pub email_verified: Option<NaiveDateTime>,
+    pub is_two_factor_enabled: bool,
+    pub created_at: String,  // ISO 8601 string
+    pub updated_at: String,
+}
+
+// ── AuthTokens — matches frontend AuthTokens interface ───────────────────────
+/// ```ts
+/// interface AuthTokens { accessToken, refreshToken, expiresIn }
+/// ```
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthTokens {
+    pub access_token: String,
+    pub refresh_token: String, // reserved for future httpOnly cookie flow
+    pub expires_in: u64,       // seconds
+}
+
+// ── AuthResponse — matches frontend AuthResponse interface ───────────────────
+/// ```ts
+/// interface AuthResponse { user: User, tokens: AuthTokens }
+/// ```
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuthResponse {
+    pub user: UserInfo,
+    pub tokens: AuthTokens,
+}
+
+// ── Login-specific extras (2FA, callback) ────────────────────────────────────
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LoginResponse {
+    pub user: UserInfo,
+    pub tokens: AuthTokens,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requires_2fa: Option<bool>,
+}
+
+/// Lightweight 2FA challenge response (no tokens yet)
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TwoFaChallengeResponse {
+    pub success: bool,
+    pub message: String,
+    pub user: UserInfo,
+    pub requires_2fa: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegisterResponse {
+    pub user: UserInfo,
+    pub tokens: AuthTokens,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -153,6 +199,18 @@ pub struct HealthResponse {
     pub database_connected: bool,
 }
 
+// ── Refresh response — matches frontend api.ts interceptor ───────────────────
+/// Frontend expects: `data.accessToken`
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshResponse {
+    pub access_token: String,
+    pub expires_in: u64,
+    pub user: UserInfo,
+}
+
+// ── Builder helpers ───────────────────────────────────────────────────────────
+
 impl User {
     pub fn to_user_info(&self) -> UserInfo {
         UserInfo {
@@ -161,7 +219,9 @@ impl User {
             name: self.name.clone().unwrap_or_else(|| "User".to_string()),
             image: self.image.clone(),
             role: self.role.clone(),
-            email_verified: self.email_verified,
+            is_two_factor_enabled: self.two_factor_enabled,
+            created_at: self.created_at.and_utc().to_rfc3339(),
+            updated_at: self.updated_at.and_utc().to_rfc3339(),
         }
     }
 }

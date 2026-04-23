@@ -149,3 +149,4 @@ desktop-current-app/
 # Database dumps with real data
 *.sql
 !scripts/*.sql
+infra/gcs-sa-key.json

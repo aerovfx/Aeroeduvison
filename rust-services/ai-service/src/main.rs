@@ -45,7 +45,7 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // Get configuration
-    let addr = std::env::var("AI_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:8095".to_string());
+    let addr = std::env::var("AI_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:8096".to_string());
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-key-min-32-chars!!".to_string());
     let grok_api_key = std::env::var("GROK_API_KEY").unwrap_or_default();

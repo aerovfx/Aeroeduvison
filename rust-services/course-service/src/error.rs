@@ -29,6 +29,12 @@ pub enum CourseError {
     #[error("Course already unpublished")]
     CourseAlreadyUnpublished,
 
+    #[error("Not found: {0}")]
+    NotFound(String),
+
+    #[error("Conflict: {0}")]
+    Conflict(String),
+
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
@@ -62,6 +68,12 @@ impl IntoResponse for CourseError {
             }
             CourseError::CourseAlreadyUnpublished => {
                 (StatusCode::BAD_REQUEST, "Course is already unpublished")
+            }
+            CourseError::NotFound(msg) => {
+                (StatusCode::NOT_FOUND, msg.as_str())
+            }
+            CourseError::Conflict(msg) => {
+                (StatusCode::CONFLICT, msg.as_str())
             }
             CourseError::Database(e) => {
                 tracing::error!("Database error: {}", e);

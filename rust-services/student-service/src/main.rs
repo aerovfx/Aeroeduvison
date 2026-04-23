@@ -103,5 +103,10 @@ fn create_router(state: AppState) -> Router {
         .route("/api/plg/:student_id/recommendations", get(handlers::get_recommendations))
         // XP (Consolidated from /api/user/xp)
         .route("/api/user/xp", post(handlers::update_xp))
+        // Users — list all users with optional role filter (replaces Next.js /api/users)
+        .route("/api/users", get(handlers::list_users))
+        // Student self-service routes (replaces Next.js /api/student/*)
+        .route("/api/student/agent-settings", get(handlers::get_agent_settings).post(handlers::save_agent_settings))
+        .route("/api/student/exams", get(handlers::get_student_exams))
         .with_state(state)
 }

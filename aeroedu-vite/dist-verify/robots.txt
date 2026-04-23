@@ -1,0 +1,71 @@
+# =============================================
+# inphysic.com — Robots.txt
+# =============================================
+# Allow Google, block aggressive/unwanted bots
+# to reduce server load on Cloud Run demo
+
+# Google — full access
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 5
+
+# Bing — allowed with delay
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 10
+
+# Baidu — block (heavy crawler, not target audience)
+User-agent: Baiduspider
+Disallow: /
+
+# Yandex — block
+User-agent: YandexBot
+Disallow: /
+
+# Semrush — block
+User-agent: SemrushBot
+Disallow: /
+
+# Ahrefs — block
+User-agent: AhrefsBot
+Disallow: /
+
+# MJ12 — block
+User-agent: MJ12bot
+Disallow: /
+
+# DotBot — block
+User-agent: DotBot
+Disallow: /
+
+# PetalBot (Huawei) — block
+User-agent: PetalBot
+Disallow: /
+
+# GPTBot (OpenAI) — block
+User-agent: GPTBot
+Disallow: /
+
+# CCBot (Common Crawl) — block
+User-agent: CCBot
+Disallow: /
+
+# ByteSpider (TikTok) — block
+User-agent: Bytespider
+Disallow: /
+
+# All other bots — limited access
+User-agent: *
+Allow: /
+Crawl-delay: 10
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /teacher/
+Disallow: /student/
+Disallow: /auth/
+Disallow: /debug-auth/
+Disallow: /clear-session/
+
+# Sitemap
+Sitemap: https://inphysic.com/sitemap.xml

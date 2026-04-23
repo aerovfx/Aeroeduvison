@@ -1,0 +1,842 @@
+/**
+ * Teacher AI Dashboard
+ * Port of app/(dashboard)/(routes)/teacher/ai-dashboard/page.tsx → Vite
+ *
+ * Inline: ClassOverview, StudentList, AICoTeacherPanel,
+ *         EngagementHeatmap, EmotionTimeline, QuickActions
+ * Removes: useRouter → useNavigate, useSession → useAuth, useLanguage → removed
+ */
+
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/hooks/useAuth'
+import {
+  Users, Brain, TrendingUp, AlertTriangle, Sparkles,
+  BarChart3, Heart, Zap, Target, Clock, Award, Eye,
+  MessageSquare, BookOpen, Settings, Bell, Trophy,
+  Activity, Search, ChevronRight, RefreshCw,
+  Flame, Star, CheckCircle, Plus, FileText, Camera,
+  Cpu, Lightbulb, ArrowUpRight,
+} from 'lucide-react'
+
+/* ─── Dark palette ─────────────────────────────────────────────── */
+const D = {
+  bg:     '#0d0e17',
+  card:   '#10111e',
+  card2:  '#161728',
+  border: 'rgba(255,255,255,0.07)',
+  text:   '#f1f5f9',
+  muted:  '#94a3b8',
+  purple: '#7c3aed',
+  purpleL:'#a78bfa',
+  cyan:   '#22d3ee',
+  green:  '#10b981',
+  amber:  '#f59e0b',
+  red:    '#ef4444',
+  blue:   '#3b82f6',
+  pink:   '#e879f9',
+  white: (a: number) => `rgba(255,255,255,${a})`,
+  purpleA:(a: number) => `rgba(124,58,237,${a})`,
+  greenA: (a: number) => `rgba(16,185,129,${a})`,
+  redA:   (a: number) => `rgba(239,68,68,${a})`,
+  cyanA:  (a: number) => `rgba(34,211,238,${a})`,
+  blueA:  (a: number) => `rgba(59,130,246,${a})`,
+}
+
+/* ─── Types ─────────────────────────────────────────────────────── */
+interface Student {
+  id: string
+  name: string
+  email: string
+  totalXP: number
+  level: number
+  progress: number
+  averageScore: number
+  lessonsCompleted: number
+  lastActive: string
+  emotion: 'happy' | 'neutral' | 'sad' | 'focused' | 'confused'
+  atRisk: boolean
+  excelling: boolean
+  engagement: number
+  streak: number
+  capability: number
+  motivation: number
+}
+
+interface ClassStats {
+  totalStudents: number
+  averageXP: number
+  averageProgress: number
+  averageScore: number
+  averageEngagement: number
+  averageCapability: number
+  atRiskCount: number
+  excellingCount: number
+}
+
+/* ─── Demo data ─────────────────────────────────────────────────── */
+const DEMO_STUDENTS: Student[] = [
+  { id: 's1', name: 'Nguyễn Văn A',  email: 'nva@school.vn',  totalXP: 2480, level: 3, progress: 88, averageScore: 9.1, lessonsCompleted: 22, lastActive: '10 phút trước', emotion: 'happy',   atRisk: false, excelling: true,  engagement: 92, streak: 14, capability: 88, motivation: 91 },
+  { id: 's2', name: 'Trần Thị B',    email: 'ttb@school.vn',  totalXP: 620,  level: 1, progress: 38, averageScore: 5.8, lessonsCompleted: 7,  lastActive: '2 ngày trước', emotion: 'sad',     atRisk: true,  excelling: false, engagement: 32, streak: 0,  capability: 42, motivation: 28 },
+  { id: 's3', name: 'Lê Văn C',      email: 'lvc@school.vn',  totalXP: 1350, level: 2, progress: 62, averageScore: 7.6, lessonsCompleted: 14, lastActive: '3 giờ trước',  emotion: 'focused', atRisk: false, excelling: false, engagement: 71, streak: 5,  capability: 73, motivation: 68 },
+  { id: 's4', name: 'Phạm Thị D',    email: 'ptd@school.vn',  totalXP: 390,  level: 1, progress: 24, averageScore: 5.2, lessonsCompleted: 4,  lastActive: '4 ngày trước', emotion: 'confused',atRisk: true,  excelling: false, engagement: 22, streak: 0,  capability: 35, motivation: 20 },
+  { id: 's5', name: 'Hoàng Văn E',   email: 'hve@school.vn',  totalXP: 3120, level: 4, progress: 95, averageScore: 9.5, lessonsCompleted: 28, lastActive: '30 phút trước',emotion: 'happy',   atRisk: false, excelling: true,  engagement: 97, streak: 21, capability: 95, motivation: 96 },
+  { id: 's6', name: 'Vũ Thị F',      email: 'vtf@school.vn',  totalXP: 980,  level: 1, progress: 55, averageScore: 7.2, lessonsCompleted: 11, lastActive: '1 giờ trước',  emotion: 'neutral', atRisk: false, excelling: false, engagement: 64, streak: 3,  capability: 65, motivation: 62 },
+  { id: 's7', name: 'Đặng Văn G',    email: 'dvg@school.vn',  totalXP: 540,  level: 1, progress: 31, averageScore: 5.5, lessonsCompleted: 6,  lastActive: '3 ngày trước', emotion: 'sad',     atRisk: true,  excelling: false, engagement: 28, streak: 0,  capability: 38, motivation: 25 },
+  { id: 's8', name: 'Ngô Thị H',     email: 'nth@school.vn',  totalXP: 1780, level: 2, progress: 74, averageScore: 8.3, lessonsCompleted: 18, lastActive: '45 phút trước',emotion: 'focused', atRisk: false, excelling: false, engagement: 80, streak: 9,  capability: 79, motivation: 77 },
+]
+
+function buildStats(ss: Student[]): ClassStats {
+  const n = ss.length || 1
+  return {
+    totalStudents:    ss.length,
+    averageXP:        Math.round(ss.reduce((a, s) => a + s.totalXP, 0) / n),
+    averageProgress:  Math.round(ss.reduce((a, s) => a + s.progress, 0) / n),
+    averageScore:     +(ss.reduce((a, s) => a + s.averageScore, 0) / n).toFixed(1),
+    averageEngagement:Math.round(ss.reduce((a, s) => a + s.engagement, 0) / n),
+    averageCapability:Math.round(ss.reduce((a, s) => a + s.capability, 0) / n),
+    atRiskCount:      ss.filter(s => s.atRisk).length,
+    excellingCount:   ss.filter(s => s.excelling).length,
+  }
+}
+
+const EMOTION_META: Record<string, { icon: string; color: string; label: string }> = {
+  happy:   { icon: '😊', color: D.green, label: 'Vui vẻ' },
+  neutral: { icon: '😐', color: D.muted, label: 'Bình thường' },
+  sad:     { icon: '😢', color: D.red,   label: 'Buồn' },
+  focused: { icon: '🎯', color: D.cyan,  label: 'Tập trung' },
+  confused:{ icon: '😕', color: D.amber, label: 'Bối rối' },
+}
+
+/* ─── Small hover-aware button ──────────────────────────────────── */
+function ActionBtn({
+  icon: Icon, label, color, onClick,
+}: {
+  icon: React.ComponentType<{ size?: number | string; style?: React.CSSProperties; className?: string }>
+  label: string; color: string; onClick?: () => void
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: '100%', padding: '10px 14px', borderRadius: 10,
+        background: hov ? `${color}18` : D.white(0.03),
+        border: `1px solid ${hov ? color + '44' : D.border}`,
+        color: hov ? color : D.text,
+        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        textAlign: 'left', transition: 'all .15s',
+      }}
+    >
+      <Icon size={16} style={{ color }} />
+      {label}
+    </button>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+══════════════════════════════════════════════════════════════ */
+export default function TeacherDashboard() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const [students,     setStudents]     = useState<Student[]>([])
+  const [classStats,   setClassStats]   = useState<ClassStats | null>(null)
+  const [selectedView, setSelectedView] = useState<'overview' | 'heatmap' | 'emotions'>('overview')
+  const [timeRange,    setTimeRange]    = useState<'today' | 'week' | 'month'>('week')
+  const [searchQuery,  setSearchQuery]  = useState('')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'at-risk' | 'excelling'>('all')
+  const [loading,      setLoading]      = useState(true)
+  const [aiExpanded,   setAiExpanded]   = useState(true)
+  const [refreshing,   setRefreshing]   = useState(false)
+
+  useEffect(() => { loadData() }, [])
+
+  const loadData = async () => {
+    try {
+      const res = await fetch('/api/teacher/students', { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        const list = data.students as Student[]
+        setStudents(list); setClassStats(buildStats(list))
+      } else throw new Error()
+    } catch {
+      setStudents(DEMO_STUDENTS); setClassStats(buildStats(DEMO_STUDENTS))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await loadData()
+    setTimeout(() => setRefreshing(false), 600)
+  }
+
+  const filteredStudents = students.filter(s => {
+    if (searchQuery && !s.name.toLowerCase().includes(searchQuery.toLowerCase()) && !s.email.toLowerCase().includes(searchQuery.toLowerCase())) return false
+    if (filterStatus === 'at-risk'   && !s.atRisk)    return false
+    if (filterStatus === 'excelling' && !s.excelling) return false
+    return true
+  })
+
+  /* ─── AI Co-Teacher suggestions ──────────────────────────── */
+  const aiSuggestions = [
+    ...(classStats && classStats.atRiskCount > 0 ? [{
+      type: 'alert',
+      color: D.red,
+      icon: AlertTriangle,
+      title: `${classStats.atRiskCount} học sinh cần can thiệp`,
+      desc: 'Gửi thông báo hỗ trợ hoặc lên lịch trao đổi riêng ngay hôm nay.',
+    }] : []),
+    {
+      type: 'tip',
+      color: D.cyan,
+      icon: Lightbulb,
+      title: 'Giờ học hiệu quả nhất: 8–10h sáng',
+      desc: 'Heatmap cho thấy học sinh tập trung cao nhất trong khung giờ này.',
+    },
+    {
+      type: 'action',
+      color: D.green,
+      icon: Sparkles,
+      title: `${classStats?.excellingCount ?? 0} học sinh xuất sắc`,
+      desc: 'Cân nhắc nâng độ khó bài tập để duy trì thử thách cho nhóm này.',
+    },
+    {
+      type: 'tip',
+      color: D.purple,
+      icon: Brain,
+      title: 'Điểm năng lực TB: ' + (classStats?.averageCapability ?? 0) + '%',
+      desc: 'Tốt hơn tuần trước 4%. Tiếp tục duy trì lộ trình hiện tại.',
+    },
+  ]
+
+  /* ─── Loading ─────────────────────────────────────────────── */
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: D.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          border: `3px solid ${D.purpleA(0.2)}`,
+          borderTopColor: D.purple,
+          animation: 'spin 1s linear infinite',
+          margin: '0 auto 16px',
+        }} />
+        <p style={{ color: D.muted, fontSize: 14 }}>Đang tải dữ liệu AI Dashboard...</p>
+      </div>
+      <style>{`@keyframes spin { to { transform:rotate(360deg) } }`}</style>
+    </div>
+  )
+
+  /* ─── Render ─────────────────────────────────────────────── */
+  return (
+    <div style={{ minHeight: '100vh', background: D.bg, color: D.text }}>
+      <style>{`
+        @keyframes spin { to { transform:rotate(360deg) } }
+        @keyframes pulse-dot { 0%,100%{opacity:.4} 50%{opacity:1} }
+        .td-row:hover { background: rgba(255,255,255,0.025) !important; }
+        .td-action-btn:hover { background: rgba(124,58,237,0.15) !important; color: #a78bfa !important; }
+        .td-action-btn2:hover { background: rgba(34,211,238,0.12) !important; color: #22d3ee !important; }
+        .custom-scrollbar::-webkit-scrollbar { width:4px; height:4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background:transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background:rgba(124,58,237,.3); border-radius:4px; }
+      `}</style>
+
+      {/* ════ TOP BAR ════ */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(13,14,23,0.9)', backdropFilter: 'blur(16px)',
+        borderBottom: `1px solid ${D.border}`,
+      }}>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '14px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+
+            {/* Left: brand + title */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: `linear-gradient(135deg, ${D.purple}, #5b21b6)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 4px 16px ${D.purpleA(0.4)}`,
+              }}>
+                <Brain size={20} style={{ color: '#fff' }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h1 style={{ fontSize: 18, fontWeight: 800, color: D.text, margin: 0 }}>AI Teacher Dashboard</h1>
+                  <span style={{
+                    padding: '2px 8px', borderRadius: 99, fontSize: 10, fontWeight: 700,
+                    background: D.purpleA(0.15), color: D.purpleL,
+                    border: `1px solid ${D.purpleA(0.3)}`,
+                  }}>BETA</span>
+                </div>
+                <p style={{ fontSize: 12, color: D.muted, margin: 0 }}>
+                  Xin chào, {user?.name ?? 'Giáo viên'} · Lớp 12A1
+                </p>
+              </div>
+            </div>
+
+            {/* Center: time range */}
+            <div style={{ display: 'flex', gap: 4, background: D.white(0.05), borderRadius: 10, padding: 4 }}>
+              {(['today', 'week', 'month'] as const).map(r => (
+                <button key={r} onClick={() => setTimeRange(r)} style={{
+                  padding: '6px 16px', borderRadius: 7, fontSize: 13, fontWeight: 600,
+                  border: 'none', cursor: 'pointer',
+                  background: timeRange === r ? D.purple : 'transparent',
+                  color:      timeRange === r ? '#fff'   : D.muted,
+                  boxShadow:  timeRange === r ? `0 2px 8px ${D.purpleA(0.4)}` : 'none',
+                  transition: 'all .15s',
+                }}>
+                  {r === 'today' ? 'Hôm nay' : r === 'week' ? 'Tuần này' : 'Tháng này'}
+                </button>
+              ))}
+            </div>
+
+            {/* Right: actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button onClick={handleRefresh} style={{
+                width: 36, height: 36, borderRadius: 9, background: D.white(0.05),
+                border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: D.muted,
+              }}>
+                <RefreshCw size={15} style={{ animation: refreshing ? 'spin .6s linear' : 'none' }} />
+              </button>
+              <button style={{
+                position: 'relative', width: 36, height: 36, borderRadius: 9,
+                background: D.white(0.05), border: `1px solid ${D.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: D.muted,
+              }}>
+                <Bell size={15} />
+                {(classStats?.atRiskCount ?? 0) > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 6, right: 6, width: 7, height: 7,
+                    borderRadius: '50%', background: D.red,
+                    animation: 'pulse-dot 2s infinite',
+                  }} />
+                )}
+              </button>
+              <button
+                onClick={() => navigate('/teacher/analytics')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                  background: D.white(0.06), border: `1px solid ${D.border}`,
+                  color: D.text, cursor: 'pointer',
+                }}
+              >
+                <BarChart3 size={14} /> Analytics
+              </button>
+              <button
+                onClick={() => navigate('/teacher/classes')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 9, fontSize: 13, fontWeight: 700,
+                  background: `linear-gradient(135deg,${D.purple},#5b21b6)`,
+                  border: 'none', color: '#fff', cursor: 'pointer',
+                  boxShadow: `0 2px 12px ${D.purpleA(0.4)}`,
+                }}
+              >
+                <Users size={14} /> Quản lý lớp
+              </button>
+            </div>
+          </div>
+
+          {/* Search + Filter row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: D.muted }} />
+              <input
+                type="text"
+                placeholder="Tìm kiếm học sinh..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%', paddingLeft: 38, paddingRight: 16, paddingTop: 8, paddingBottom: 8,
+                  background: D.white(0.05), border: `1px solid ${D.border}`,
+                  borderRadius: 9, fontSize: 13, color: D.text, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            {(['all', 'at-risk', 'excelling'] as const).map(f => (
+              <button key={f} onClick={() => setFilterStatus(f)} style={{
+                padding: '7px 14px', borderRadius: 9, fontSize: 12, fontWeight: 600,
+                border: `1px solid ${filterStatus === f ? (f === 'at-risk' ? D.red : f === 'excelling' ? D.green : D.purple) + '55' : D.border}`,
+                background: filterStatus === f
+                  ? (f === 'at-risk' ? D.redA(0.12) : f === 'excelling' ? D.greenA(0.12) : D.purpleA(0.12))
+                  : 'transparent',
+                color: filterStatus === f
+                  ? (f === 'at-risk' ? D.red : f === 'excelling' ? D.green : D.purpleL)
+                  : D.muted,
+                cursor: 'pointer', transition: 'all .15s',
+              }}>
+                {f === 'all' ? `Tất cả (${students.length})` : f === 'at-risk' ? `⚠ Cần hỗ trợ (${classStats?.atRiskCount ?? 0})` : `⭐ Xuất sắc (${classStats?.excellingCount ?? 0})`}
+              </button>
+            ))}
+            {/* View toggle */}
+            <div style={{ display: 'flex', gap: 3, background: D.white(0.05), borderRadius: 9, padding: 3 }}>
+              {([
+                { id: 'overview' as const, Icon: BarChart3 },
+                { id: 'heatmap'  as const, Icon: Activity },
+                { id: 'emotions' as const, Icon: Heart },
+              ]).map(({ id, Icon }) => (
+                <button key={id} onClick={() => setSelectedView(id)} style={{
+                  width: 32, height: 32, borderRadius: 7, border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: selectedView === id ? D.purple : 'transparent',
+                  color:      selectedView === id ? '#fff'   : D.muted,
+                  transition: 'all .15s',
+                }}>
+                  <Icon size={14} />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ════ MAIN CONTENT ════ */}
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '20px 24px', display: 'flex', gap: 20 }}>
+
+        {/* ── Left column (flex-1) ── */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Stat cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+            {[
+              { icon: Users,         color: D.blue,   bg: D.blueA(0.12),   label: 'Học sinh',       value: classStats?.totalStudents ?? 0,        sub: `${classStats?.excellingCount ?? 0} xuất sắc` },
+              { icon: Trophy,        color: D.amber,  bg: 'rgba(245,158,11,.12)', label: 'XP trung bình', value: (classStats?.averageXP ?? 0).toLocaleString('vi'), sub: `Cấp độ TB: ${Math.floor((classStats?.averageXP ?? 0) / 1000) + 1}` },
+              { icon: Brain,         color: D.purple, bg: D.purpleA(0.12), label: 'Năng lực TB',    value: `${classStats?.averageCapability ?? 0}%`, sub: `Tương tác: ${classStats?.averageEngagement ?? 0}%` },
+              { icon: AlertTriangle, color: (classStats?.atRiskCount ?? 0) > 0 ? D.red : D.green,
+                bg: (classStats?.atRiskCount ?? 0) > 0 ? D.redA(0.12) : D.greenA(0.12),
+                label: 'Cần hỗ trợ', value: classStats?.atRiskCount ?? 0,
+                sub: (classStats?.atRiskCount ?? 0) === 0 ? 'Tất cả ổn định ✓' : 'Cần can thiệp ngay' },
+            ].map((card, i) => {
+              const Icon = card.icon
+              return (
+                <div key={i} style={{
+                  background: D.card, border: `1px solid ${D.border}`,
+                  borderRadius: 14, padding: 16,
+                  display: 'flex', flexDirection: 'column', gap: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: 10,
+                      background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon size={18} style={{ color: card.color }} />
+                    </div>
+                    <span style={{ fontSize: 24, fontWeight: 800, color: card.color }}>{card.value}</span>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 12, color: D.muted, margin: '0 0 2px' }}>{card.label}</p>
+                    <p style={{ fontSize: 11, color: D.white(0.4), margin: 0 }}>{card.sub}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* View panel */}
+          <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, overflow: 'hidden' }}>
+            {/* Tab bar */}
+            <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: `1px solid ${D.border}` }}>
+              {([
+                { id: 'overview' as const, label: 'Tổng quan',    Icon: BarChart3 },
+                { id: 'heatmap'  as const, label: 'Tương tác',    Icon: Activity },
+                { id: 'emotions' as const, label: 'Cảm xúc',      Icon: Heart },
+              ]).map(({ id, label, Icon }) => (
+                <button key={id} onClick={() => setSelectedView(id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 16px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+                  border: 'none', cursor: 'pointer', transition: 'all .15s',
+                  background: selectedView === id ? D.purpleA(0.15) : 'transparent',
+                  color:      selectedView === id ? D.purpleL : D.muted,
+                }}>
+                  <Icon size={14} /> {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Overview */}
+            {selectedView === 'overview' && (
+              <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+                {[
+                  { label: 'Điểm TB',       value: classStats?.averageScore, suffix: '/10', color: D.green, icon: Star },
+                  { label: 'Tiến độ TB',    value: `${classStats?.averageProgress ?? 0}%`, suffix: '',      color: D.cyan,  icon: TrendingUp },
+                  { label: 'Tương tác TB',  value: `${classStats?.averageEngagement ?? 0}%`, suffix: '',    color: D.purple, icon: Activity },
+                ].map((item, i) => {
+                  const Icon = item.icon
+                  return (
+                    <div key={i} style={{ background: D.white(0.03), borderRadius: 12, padding: 16, textAlign: 'center' }}>
+                      <Icon size={22} style={{ color: item.color, marginBottom: 8 }} />
+                      <p style={{ fontSize: 28, fontWeight: 800, color: item.color, margin: '0 0 4px' }}>{item.value}{item.suffix}</p>
+                      <p style={{ fontSize: 12, color: D.muted, margin: 0 }}>{item.label}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Engagement Heatmap */}
+            {selectedView === 'heatmap' && (
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <p style={{ fontSize: 12, color: D.muted, margin: '0 0 8px' }}>Mức độ tương tác theo học sinh ({timeRange === 'today' ? 'hôm nay' : timeRange === 'week' ? 'tuần này' : 'tháng này'})</p>
+                {filteredStudents.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 13, color: D.text, width: 130, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                    <div style={{ flex: 1, height: 10, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
+                      <div style={{
+                        width: `${s.engagement}%`, height: '100%', borderRadius: 99,
+                        background: s.engagement >= 70
+                          ? `linear-gradient(90deg,${D.green},${D.cyan})`
+                          : s.engagement >= 40
+                          ? `linear-gradient(90deg,${D.amber},#fbbf24)`
+                          : `linear-gradient(90deg,${D.red},#f87171)`,
+                        transition: 'width .8s ease',
+                      }} />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: s.engagement >= 70 ? D.green : s.engagement >= 40 ? D.amber : D.red, width: 40, textAlign: 'right' }}>
+                      {s.engagement}%
+                    </span>
+                    {s.atRisk && (
+                      <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 99, background: D.redA(0.12), color: D.red, border: `1px solid ${D.redA(0.3)}`, flexShrink: 0 }}>
+                        Cần hỗ trợ
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Emotion Timeline */}
+            {selectedView === 'emotions' && (
+              <div style={{ padding: 16 }}>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                  {(['happy', 'neutral', 'focused', 'confused', 'sad'] as const).map(em => {
+                    const meta = EMOTION_META[em]
+                    const count = students.filter(s => s.emotion === em).length
+                    return (
+                      <div key={em} style={{
+                        flex: 1, padding: '12px 8px', borderRadius: 12,
+                        background: `${meta.color}10`, border: `1px solid ${meta.color}30`,
+                        textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: 24, marginBottom: 6 }}>{meta.icon}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: meta.color }}>{count}</div>
+                        <div style={{ fontSize: 11, color: D.muted }}>{meta.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Emotion per-student row */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {filteredStudents.map(s => {
+                    const meta = EMOTION_META[s.emotion]
+                    return (
+                      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: D.white(0.02), borderRadius: 10 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: `${meta.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{meta.icon}</div>
+                        <span style={{ flex: 1, fontSize: 13, color: D.text, fontWeight: 600 }}>{s.name}</span>
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: `${meta.color}15`, color: meta.color, border: `1px solid ${meta.color}33` }}>{meta.label}</span>
+                        <span style={{ fontSize: 12, color: D.muted }}>Streak: {s.streak}🔥</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Student table */}
+          <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: `1px solid ${D.border}` }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: D.text, margin: 0 }}>
+                Danh sách học sinh <span style={{ color: D.muted, fontWeight: 400, fontSize: 13 }}>({filteredStudents.length})</span>
+              </h2>
+              <button
+                onClick={() => navigate('/teacher/student-insight')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                  background: D.purpleA(0.12), border: `1px solid ${D.purpleA(0.3)}`,
+                  color: D.purpleL, cursor: 'pointer',
+                }}
+              >
+                <ArrowUpRight size={13} /> Xem chi tiết
+              </button>
+            </div>
+
+            <div className="custom-scrollbar" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${D.border}` }}>
+                    {['Học sinh', 'XP / Cấp', 'Năng lực', 'Tiến độ', 'Điểm TB', 'Cảm xúc', 'Trạng thái', ''].map((h, i) => (
+                      <th key={i} style={{
+                        padding: '10px 16px', textAlign: i >= 7 ? 'right' : 'left',
+                        fontSize: 11, fontWeight: 700, color: D.muted, textTransform: 'uppercase', letterSpacing: '.05em',
+                        background: D.white(0.02),
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.length === 0 ? (
+                    <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: D.muted, fontSize: 14 }}>Không tìm thấy học sinh</td></tr>
+                  ) : filteredStudents.map(s => {
+                    const em = EMOTION_META[s.emotion]
+                    return (
+                      <tr key={s.id} className="td-row" style={{ borderBottom: `1px solid ${D.border}`, transition: 'background .12s' }}>
+                        {/* Name */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{
+                              width: 36, height: 36, borderRadius: '50%',
+                              background: s.atRisk ? D.redA(0.15) : s.excelling ? D.greenA(0.15) : D.purpleA(0.15),
+                              border: `1px solid ${s.atRisk ? D.redA(0.4) : s.excelling ? D.greenA(0.4) : D.purpleA(0.35)}`,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 14, fontWeight: 700,
+                              color: s.atRisk ? D.red : s.excelling ? D.green : D.purpleL,
+                              flexShrink: 0,
+                            }}>{s.name.charAt(0)}</div>
+                            <div>
+                              <p style={{ fontSize: 13, fontWeight: 600, color: D.text, margin: 0 }}>{s.name}</p>
+                              <p style={{ fontSize: 11, color: D.muted, margin: 0 }}>{s.lastActive}</p>
+                            </div>
+                          </div>
+                        </td>
+                        {/* XP / Level */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Trophy size={13} style={{ color: D.amber }} />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: D.text }}>{s.totalXP.toLocaleString('vi')}</span>
+                          </div>
+                          <span style={{ fontSize: 11, color: D.muted }}>Cấp {s.level}</span>
+                        </td>
+                        {/* Capability */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 64, height: 6, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{
+                                width: `${s.capability}%`, height: '100%', borderRadius: 99,
+                                background: s.capability >= 70 ? D.green : s.capability >= 40 ? D.amber : D.red,
+                              }} />
+                            </div>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: s.capability >= 70 ? D.green : s.capability >= 40 ? D.amber : D.red }}>{s.capability}%</span>
+                          </div>
+                        </td>
+                        {/* Progress */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ width: 64, height: 6, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
+                              <div style={{ width: `${s.progress}%`, height: '100%', borderRadius: 99, background: `linear-gradient(90deg,${D.cyan},${D.blue})` }} />
+                            </div>
+                            <span style={{ fontSize: 12, color: D.muted }}>{s.progress}%</span>
+                          </div>
+                        </td>
+                        {/* Score */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{
+                            padding: '3px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                            background: s.averageScore >= 8 ? D.greenA(0.12) : s.averageScore >= 6 ? 'rgba(245,158,11,.12)' : D.redA(0.12),
+                            color: s.averageScore >= 8 ? D.green : s.averageScore >= 6 ? D.amber : D.red,
+                            border: `1px solid ${s.averageScore >= 8 ? D.greenA(0.3) : s.averageScore >= 6 ? 'rgba(245,158,11,.3)' : D.redA(0.3)}`,
+                          }}>{s.averageScore}</span>
+                        </td>
+                        {/* Emotion */}
+                        <td style={{ padding: '12px 16px' }}>
+                          <span title={em.label} style={{ fontSize: 20 }}>{em.icon}</span>
+                        </td>
+                        {/* Status */}
+                        <td style={{ padding: '12px 16px' }}>
+                          {s.atRisk ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                              background: D.redA(0.12), color: D.red, border: `1px solid ${D.redA(0.3)}`,
+                            }}><AlertTriangle size={10} /> Cần hỗ trợ</span>
+                          ) : s.excelling ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                              background: D.greenA(0.12), color: D.green, border: `1px solid ${D.greenA(0.3)}`,
+                            }}><Star size={10} /> Xuất sắc</span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '3px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
+                              background: D.white(0.06), color: D.muted, border: `1px solid ${D.border}`,
+                            }}><CheckCircle size={10} /> Ổn định</span>
+                          )}
+                        </td>
+                        {/* Actions */}
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                            <button
+                              className="td-action-btn"
+                              onClick={() => navigate(`/teacher/student/${s.id}`)}
+                              style={{
+                                width: 30, height: 30, borderRadius: 8, border: `1px solid ${D.border}`,
+                                background: D.white(0.04), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', color: D.muted, transition: 'all .15s',
+                              }}
+                              title="Xem chi tiết"
+                            >
+                              <Eye size={14} />
+                            </button>
+                            <button
+                              className="td-action-btn2"
+                              onClick={() => navigate(`/teacher/interaction-center?student=${s.id}`)}
+                              style={{
+                                width: 30, height: 30, borderRadius: 8, border: `1px solid ${D.border}`,
+                                background: D.white(0.04), display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', color: D.muted, transition: 'all .15s',
+                              }}
+                              title="Tương tác"
+                            >
+                              <MessageSquare size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column (320px) ── */}
+        <div style={{ width: 308, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* AI Co-Teacher panel */}
+          <div style={{ background: D.card, border: `1px solid ${D.purpleA(0.25)}`, borderRadius: 14, overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{
+              padding: '14px 16px', background: `linear-gradient(135deg, ${D.purpleA(0.2)}, ${D.purpleA(0.05)})`,
+              borderBottom: `1px solid ${D.purpleA(0.2)}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer',
+            }} onClick={() => setAiExpanded(!aiExpanded)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: 8,
+                  background: `linear-gradient(135deg,${D.purple},${D.pink})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 2px 10px ${D.purpleA(0.5)}`,
+                }}>
+                  <Sparkles size={15} style={{ color: '#fff' }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: 0 }}>AI Co-Teacher</p>
+                  <p style={{ fontSize: 10, color: D.purpleL, margin: 0 }}>Gợi ý thông minh</p>
+                </div>
+              </div>
+              <div style={{
+                width: 6, height: 6, borderRadius: '50%', background: D.green,
+                animation: 'pulse-dot 2s infinite', boxShadow: `0 0 6px ${D.green}`,
+              }} />
+            </div>
+
+            {/* Suggestions */}
+            {aiExpanded && (
+              <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {aiSuggestions.map((s, i) => {
+                  const Icon = s.icon
+                  return (
+                    <div key={i} style={{
+                      padding: '10px 12px', borderRadius: 10,
+                      background: `${s.color}0d`, border: `1px solid ${s.color}28`,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <div style={{
+                          width: 26, height: 26, borderRadius: 7,
+                          background: `${s.color}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          <Icon size={13} style={{ color: s.color }} />
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 12, fontWeight: 700, color: D.text, margin: '0 0 2px' }}>{s.title}</p>
+                          <p style={{ fontSize: 11, color: D.muted, margin: 0, lineHeight: 1.5 }}>{s.desc}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Class performance ring */}
+          <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: '0 0 14px' }}>Hiệu suất lớp học</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { label: 'Năng lực',     val: classStats?.averageCapability ?? 0, color: D.purple },
+                { label: 'Tương tác',    val: classStats?.averageEngagement ?? 0, color: D.cyan },
+                { label: 'Tiến độ',      val: classStats?.averageProgress ?? 0,   color: D.green },
+                { label: 'Hoàn thành',   val: Math.round(((classStats?.averageScore ?? 0) / 10) * 100), color: D.amber },
+              ].map((item, i) => (
+                <div key={i}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                    <span style={{ fontSize: 12, color: D.muted }}>{item.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.val}%</span>
+                  </div>
+                  <div style={{ height: 6, background: D.white(0.06), borderRadius: 99, overflow: 'hidden' }}>
+                    <div style={{
+                      width: `${item.val}%`, height: '100%', borderRadius: 99,
+                      background: item.color, transition: 'width .8s ease',
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: '0 0 12px' }}>Thao tác nhanh</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              <ActionBtn icon={FileText}  label="Tạo bài tập mới"         color={D.purple} onClick={() => navigate('/teacher/assignments')} />
+              <ActionBtn icon={Cpu}       label="Tạo đề thi AI"           color={D.cyan}   onClick={() => navigate('/teacher/exam-generator')} />
+              <ActionBtn icon={Camera}    label="Xem Camera AI"           color={D.amber}  onClick={() => navigate('/teacher/camera-management')} />
+              <ActionBtn icon={Brain}     label="AI Dashboard phân tích"  color={D.pink}   onClick={() => navigate('/teacher/ai-dashboard')} />
+              <ActionBtn icon={Activity}  label="Bản đồ cảm xúc"          color={D.green}  onClick={() => navigate('/teacher/emotion-map')} />
+              <ActionBtn icon={MessageSquare} label="Trung tâm tương tác" color={D.blue}  onClick={() => navigate('/teacher/interaction-center')} />
+            </div>
+          </div>
+
+          {/* Streak leaders */}
+          <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: 0 }}>🔥 Streak hàng đầu</p>
+              <Flame size={14} style={{ color: D.amber }} />
+            </div>
+            {[...students].sort((a, b) => b.streak - a.streak).slice(0, 4).map((s, i) => (
+              <div key={s.id} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '7px 0', borderBottom: i < 3 ? `1px solid ${D.border}` : 'none',
+              }}>
+                <span style={{ fontSize: 16, width: 22, textAlign: 'center' }}>{['🥇','🥈','🥉','4️⃣'][i]}</span>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%',
+                  background: D.purpleA(0.15), border: `1px solid ${D.purpleA(0.35)}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: D.purpleL,
+                }}>{s.name.charAt(0)}</div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: D.text, margin: 0 }}>{s.name}</p>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: D.amber }}>{s.streak} ngày</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

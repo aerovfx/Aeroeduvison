@@ -1,0 +1,100 @@
+# ================================================================
+# Dockerfile.demo — Optimized for DEMO Cloud Run deployment
+# ================================================================
+# Target: Minimal image size for demo/testing
+# Based on: Dockerfile.production (Alpine) with extra optimizations
+# Service: demo | Project: extreme-lattice-491123-p2
+# Region: asia-southeast1
+# ================================================================
+
+# ---- Stage 1: Base ----
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl
+
+# ---- Stage 2: Dependencies ----
+FROM base AS deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY prisma ./prisma/
+
+# Install ALL dependencies first (prisma CLI is a devDependency)
+# --ignore-scripts: skip postinstall "prisma generate" — we run it manually next
+RUN npm ci --legacy-peer-deps --ignore-scripts && \
+    # Generate Prisma client (needs prisma CLI from devDeps)
+    npx prisma generate && \
+    # Now prune devDependencies to reduce image size
+    npm prune --omit=dev --legacy-peer-deps && \
+    # Remove Prisma engines we don't need at runtime (keeps query engine only)
+    rm -rf node_modules/@prisma/engines node_modules/prisma && \
+    # Clean npm cache
+    npm cache clean --force
+
+# ---- Stage 3: Builder ----
+FROM base AS builder
+WORKDIR /app
+
+# Install ALL dependencies (including devDeps needed for build)
+COPY package.json package-lock.json ./
+RUN npm ci --legacy-peer-deps --ignore-scripts
+
+COPY . .
+
+# Ensure required directories exist
+RUN mkdir -p public
+
+# Generate Prisma client for build
+RUN PRISMA_SKIP_VALIDATION=1 npx prisma generate || true
+
+# Build Next.js (standalone output)
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV SKIP_ENV_VALIDATION=1
+ENV DISABLE_CONTENTLAYER=1
+
+# Memory tuning for build:
+# 4GB heap — balanced for Docker Desktop with Rosetta
+# 64MB semi-space — faster minor GC during SSG
+ENV NODE_OPTIONS="--max-old-space-size=4096 --max-semi-space-size=64"
+
+RUN npm run build 2>&1 || (echo "❌ Build failed!" && exit 1)
+
+# ---- Stage 4: Runner (Production) ----
+FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl curl && \
+    rm -rf /var/cache/apk/*
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+# Non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy standalone build output (includes server.js + node_modules + .next/server)
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copy Prisma files — ALL from builder stage (same stage that ran the build)
+# This ensures clientReferenceManifest and Prisma client are consistent
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Copy data directory (quiz JSON files loaded at runtime)
+COPY --from=builder --chown=nextjs:nodejs /app/data ./data
+
+USER nextjs
+
+EXPOSE 3000
+
+# Health check (used by Cloud Run probes)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Exec form for proper signal handling in Cloud Run
+CMD ["node", "server.js"]

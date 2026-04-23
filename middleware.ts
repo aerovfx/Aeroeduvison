@@ -63,6 +63,11 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
   const rustMediaBase = process.env.RUST_MEDIA_URL || "http://127.0.0.1:8098";
   const rustCameraBase = process.env.RUST_CAMERA_URL || "http://127.0.0.1:8099";
   const rustGradingBase = process.env.RUST_GRADING_URL || "http://127.0.0.1:8100";
+  const rustChatBase = process.env.RUST_CHAT_URL || "http://127.0.0.1:8101";
+  const rustAssignmentsBase = process.env.RUST_ASSIGNMENTS_URL || "http://127.0.0.1:8102";
+  const rustAchievementsBase = process.env.RUST_ACHIEVEMENTS_URL || "http://127.0.0.1:8103";
+  const rustAnalyticsBase = process.env.RUST_ANALYTICS_URL || "http://127.0.0.1:8104";
+  const rustEmotionBase = process.env.RUST_EMOTION_URL || "http://127.0.0.1:8105";
 
   const directVectorProxy = process.env.DIRECT_RUST_VECTOR_PROXY === "true";
   const directOcrGradingProxy = process.env.DIRECT_RUST_OCR_GRADING_PROXY === "true";
@@ -77,6 +82,11 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
   const directMediaProxy = process.env.DIRECT_RUST_MEDIA_PROXY === "true";
   const directCameraProxy = process.env.DIRECT_RUST_CAMERA_PROXY === "true";
   const directGradingProxy = process.env.DIRECT_RUST_GRADING_PROXY === "true";
+  const directChatProxy = process.env.DIRECT_RUST_CHAT_PROXY === "true";
+  const directAssignmentsProxy = process.env.DIRECT_RUST_ASSIGNMENTS_PROXY === "true";
+  const directAchievementsProxy = process.env.DIRECT_RUST_ACHIEVEMENTS_PROXY === "true";
+  const directAnalyticsProxy = process.env.DIRECT_RUST_ANALYTICS_PROXY === "true";
+  const directEmotionProxy = process.env.DIRECT_RUST_EMOTION_PROXY === "true";
 
   // === VECTOR SERVICE (8091) ===
   if (pathname === "/api/vector-similarity" || pathname === "/api/vector-similarity/cache") {
@@ -252,6 +262,56 @@ function getStranglerRouteConfig(pathname: string): StranglerRouteConfig | null 
       rustPath: pathname,
       directProxyEnabled: directGradingProxy,
       canaryKey: "grading",
+    };
+  }
+
+  // === CHAT SERVICE (8101) ===
+  if (pathname.startsWith("/api/chat") || pathname.startsWith("/api/messages") || pathname.startsWith("/api/rooms")) {
+    return {
+      rustBase: rustChatBase,
+      rustPath: pathname,
+      directProxyEnabled: directChatProxy,
+      canaryKey: "chat",
+    };
+  }
+
+  // === ASSIGNMENTS SERVICE (8102) ===
+  if (pathname.startsWith("/api/assignments") || pathname.startsWith("/api/submissions")) {
+    return {
+      rustBase: rustAssignmentsBase,
+      rustPath: pathname,
+      directProxyEnabled: directAssignmentsProxy,
+      canaryKey: "assignments",
+    };
+  }
+
+  // === ACHIEVEMENTS SERVICE (8103) ===
+  if (pathname.startsWith("/api/achievements") || pathname.startsWith("/api/badges") || pathname.startsWith("/api/leaderboard")) {
+    return {
+      rustBase: rustAchievementsBase,
+      rustPath: pathname,
+      directProxyEnabled: directAchievementsProxy,
+      canaryKey: "achievements",
+    };
+  }
+
+  // === ANALYTICS SERVICE (8104) ===
+  if (pathname.startsWith("/api/analytics") || pathname.startsWith("/api/reports") || pathname.startsWith("/api/insights")) {
+    return {
+      rustBase: rustAnalyticsBase,
+      rustPath: pathname,
+      directProxyEnabled: directAnalyticsProxy,
+      canaryKey: "analytics",
+    };
+  }
+
+  // === EMOTION SERVICE (8105) ===
+  if (pathname.startsWith("/api/emotion") || pathname.startsWith("/api/face-analysis") || pathname.startsWith("/api/engagement")) {
+    return {
+      rustBase: rustEmotionBase,
+      rustPath: pathname,
+      directProxyEnabled: directEmotionProxy,
+      canaryKey: "emotion",
     };
   }
 

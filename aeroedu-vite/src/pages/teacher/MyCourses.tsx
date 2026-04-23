@@ -1,0 +1,271 @@
+/**
+ * Teacher: My Courses — quản lý khoá học của giảng viên
+ * Ported from elearniv: /instructor/courses
+ */
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  Plus,
+  BookOpen,
+  Users,
+  MoreVertical,
+  Edit,
+  Upload,
+  FileText,
+  Trash2,
+  Eye,
+  EyeOff,
+  TrendingUp,
+} from 'lucide-react'
+import { instructorService } from '@/services/instructor.service'
+import { cn } from '@/lib/utils'
+import { toast } from 'react-hot-toast'
+import type { InstructorCourse } from '@/types'
+import { InstructorBanner } from '@/components/teacher/InstructorBanner'
+
+function CourseCard({ course }: { course: InstructorCourse }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const qc = useQueryClient()
+
+  const deleteCourse = useMutation({
+    mutationFn: () => instructorService.deleteCourse(course.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instructor-courses'] })
+      toast.success('Đã xoá khoá học')
+    },
+    onError: () => toast.error('Không thể xoá khoá học'),
+  })
+
+  const togglePublish = useMutation({
+    mutationFn: () => instructorService.togglePublish(course.id, !course.isPublished),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-courses'] }),
+  })
+
+  const confirmDelete = () => {
+    if (window.confirm(`Xoá khoá học "${course.title}"? Hành động này không thể hoàn tác.`)) {
+      deleteCourse.mutate()
+    }
+    setMenuOpen(false)
+  }
+
+  return (
+    <div className="group relative rounded-xl bg-white/5 border border-white/10 hover:border-purple-500/30 transition-all overflow-hidden">
+      {/* Thumbnail */}
+      <div className="relative aspect-video bg-gray-800 overflow-hidden">
+        {course.image ? (
+          <img
+            src={course.image}
+            alt={course.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-12 h-12 text-gray-600" />
+          </div>
+        )}
+
+        {/* Publish badge */}
+        <div
+          className={cn(
+            'absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium',
+            course.isPublished
+              ? 'bg-green-500/80 text-white'
+              : 'bg-yellow-500/80 text-black'
+          )}
+        >
+          {course.isPublished ? 'Đã đăng' : 'Nháp'}
+        </div>
+
+        {/* Action menu */}
+        <div className="absolute top-2 right-2">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center"
+          >
+            <MoreVertical className="w-4 h-4 text-white" />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 top-9 w-48 rounded-lg bg-gray-800 border border-white/10 shadow-xl z-10 py-1">
+              <Link
+                to={`/teacher/course/${course.id}/edit`}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Edit className="w-4 h-4" /> Chỉnh sửa
+              </Link>
+              <Link
+                to={`/teacher/course/${course.id}/videos`}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Upload className="w-4 h-4" /> Video
+              </Link>
+              <Link
+                to={`/teacher/course/${course.id}/assets`}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+                onClick={() => setMenuOpen(false)}
+              >
+                <FileText className="w-4 h-4" /> Tài liệu
+              </Link>
+              <button
+                onClick={() => {
+                  togglePublish.mutate()
+                  setMenuOpen(false)
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+              >
+                {course.isPublished ? (
+                  <><EyeOff className="w-4 h-4" /> Ẩn khoá học</>
+                ) : (
+                  <><Eye className="w-4 h-4" /> Đăng khoá học</>
+                )}
+              </button>
+              <div className="my-1 border-t border-white/10" />
+              <button
+                onClick={confirmDelete}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" /> Xoá khoá học
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 space-y-3">
+        <Link
+          to={`/teacher/course/${course.id}/edit`}
+          className="block text-white font-semibold hover:text-purple-300 transition-colors line-clamp-2"
+        >
+          {course.title}
+        </Link>
+
+        {course.category && (
+          <span className="inline-block px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs">
+            {course.category.name}
+          </span>
+        )}
+
+        {/* Stats */}
+        <div className="flex items-center gap-4 text-sm text-gray-400">
+          <span className="flex items-center gap-1">
+            <Users className="w-4 h-4" />
+            {course.enrollments?.length ?? 0} học viên
+          </span>
+          <span className="flex items-center gap-1">
+            <BookOpen className="w-4 h-4" />
+            {course.lessons ?? 0} bài
+          </span>
+        </div>
+
+        {/* Price */}
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-purple-300 font-bold">
+            {course.regularPrice > 0
+              ? `${course.regularPrice.toLocaleString()}₫`
+              : 'Miễn phí'}
+          </span>
+          {course.beforePrice > 0 && (
+            <span className="text-gray-500 line-through">{course.beforePrice.toLocaleString()}₫</span>
+          )}
+        </div>
+
+        {/* Quick action buttons */}
+        <div className="flex gap-2 pt-1">
+          <Link
+            to={`/teacher/course/${course.id}/edit`}
+            className="flex-1 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium text-center transition-colors border border-white/10"
+          >
+            <Edit className="w-3.5 h-3.5 inline mr-1" />
+            Sửa
+          </Link>
+          <Link
+            to={`/teacher/course/${course.id}/videos`}
+            className="flex-1 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 text-xs font-medium text-center transition-colors border border-purple-500/30"
+          >
+            <Upload className="w-3.5 h-3.5 inline mr-1" />
+            Video
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function TeacherMyCourses() {
+  const { data: courses = [], isLoading } = useQuery({
+    queryKey: ['instructor-courses'],
+    queryFn: instructorService.getMyCourses,
+  })
+
+  const totalStudents = courses.reduce((sum, c) => sum + (c.enrollments?.length ?? 0), 0)
+
+  return (
+    <div className="p-6 lg:p-8 space-y-6">
+      {/* Banner từ elearniv: InstructorHeader */}
+      <InstructorBanner
+        totalCourses={courses.length}
+        totalStudents={totalStudents}
+      />
+
+      {/* Stats summary */}
+      {courses.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {[
+            { label: 'Tổng khoá học', value: courses.length, icon: BookOpen, color: 'text-purple-400' },
+            { label: 'Tổng học viên', value: totalStudents, icon: Users, color: 'text-blue-400' },
+            { label: 'Đã đăng', value: courses.filter((c) => c.isPublished).length, icon: TrendingUp, color: 'text-green-400' },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="rounded-xl bg-white/5 border border-white/10 p-4 flex items-center gap-3">
+              <div className={cn('w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center', color)}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{value}</p>
+                <p className="text-xs text-gray-400">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-white/5 animate-pulse h-72" />
+          ))}
+        </div>
+      )}
+
+      {/* Empty */}
+      {!isLoading && courses.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
+            <BookOpen className="w-10 h-10 text-purple-400" />
+          </div>
+          <h2 className="text-xl font-bold text-white">Chưa có khoá học nào</h2>
+          <p className="text-gray-400">Tạo khoá học đầu tiên và chia sẻ kiến thức của bạn.</p>
+          <Link
+            to="/teacher/course/create"
+            className="flex items-center gap-2 px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Tạo khoá học
+          </Link>
+        </div>
+      )}
+
+      {/* Grid */}
+      {!isLoading && courses.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course) => (
+            <CourseCard key={course.id} course={course} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

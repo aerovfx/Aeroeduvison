@@ -16,12 +16,13 @@ use tower_http::{
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::db::DbPool;
-use crate::services::MediaService;
+use crate::services::{MediaService, GcsClient};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DbPool,
     pub media: MediaService,
+    pub gcs: GcsClient,
 }
 
 #[tokio::main]
@@ -39,25 +40,33 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // Get configuration
-    let addr = std::env::var("MEDIA_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:8098".to_string());
+    // Cloud Run sets PORT automatically — honour it if present
+    let addr = if let Ok(port) = std::env::var("PORT") {
+        format!("0.0.0.0:{}", port)
+    } else {
+        std::env::var("MEDIA_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:8098".to_string())
+    };
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "dev-secret-key-min-32-chars!!".to_string());
-    let gcs_bucket = std::env::var("GCS_BUCKET").unwrap_or_default();
 
-    // Initialize database pool
+    // Lazy connect: create pool without blocking on connection.
+    // This lets the server bind its port immediately (required by Cloud Run health check)
+    // and fail gracefully on first query if DB is unreachable.
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(10)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database pool");
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .connect_lazy(&database_url)
+        .expect("Invalid DATABASE_URL");
 
-    // Initialize service
-    let media_service = MediaService::new(jwt_secret, gcs_bucket);
+    // Initialize services
+    let media_service = MediaService::new(jwt_secret);
+    let gcs_client = GcsClient::from_env();
 
     // Create app state
     let state = AppState {
         db: pool,
         media: media_service,
+        gcs: gcs_client,
     };
 
     // CORS configuration
@@ -91,6 +100,11 @@ fn create_router(state: AppState) -> Router {
         .route("/api/documents/upload", post(handlers::upload_document))
         // Question Bank (Consolidated)
         .route("/api/question-bank", get(handlers::list_questions))
+        // Questions CRUD + Import
+        .route("/api/questions", get(handlers::list_questions_v2).post(handlers::create_question))
+        .route("/api/questions/batch", post(handlers::batch_import_questions))
+        .route("/api/questions/import", post(handlers::import_questions_excel))
+        .route("/api/questions/:id", put(handlers::update_question).delete(handlers::delete_question))
         // Exam matrices
         .route("/api/exam-matrices", get(handlers::list_exam_matrices))
         .route("/api/exam-matrices", post(handlers::create_exam_matrix))
@@ -98,8 +112,12 @@ fn create_router(state: AppState) -> Router {
         .route("/api/exam-matrices/:id/process", post(handlers::process_exam_matrix))
         // Exams
         .route("/api/exams/generate-from-matrix", post(handlers::generate_exam))
-        // Upload
+        // Upload — GCS-backed
+        .route("/api/upload/request", post(handlers::request_upload_session))
+        .route("/api/upload/image", post(handlers::upload_image))
         .route("/api/upload/presigned-url", post(handlers::get_presigned_url))
         .route("/api/upload/gcs-presigned-url", post(handlers::get_gcs_presigned_url))
+        .route("/api/upload/object", delete(handlers::delete_upload))
+        .route("/api/upload/status", get(handlers::upload_status))
         .with_state(state)
 }

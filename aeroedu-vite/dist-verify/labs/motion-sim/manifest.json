@@ -1,0 +1,47 @@
+{
+  "id": "motion-sim",
+  "name": "MotionSim",
+  "title": "Mô phỏng chuyển động vật lý",
+  "description": "Rơi tự do, ném xiên, dao động với AI",
+  "version": "1.0.0",
+  "category": "Cơ học",
+  "level": "Trung bình",
+  "difficulty": "Trung bình",
+  "duration": "15-30 phút",
+  "xp": 200,
+  "icon": "Activity",
+  "tags": [
+    "motion-sim",
+    "cơ học",
+    "simulation",
+    "interactive"
+  ],
+  "features": [
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
+  ],
+  "learning_objectives": [
+    "Hiểu mô phỏng chuyển động vật lý",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
+  ],
+  "backend": {
+    "port": 8014,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
+}

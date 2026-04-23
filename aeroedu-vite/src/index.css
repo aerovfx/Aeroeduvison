@@ -1,0 +1,1151 @@
+@import './neumorphic.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+ * AI NATIVE DESIGN SYSTEM — globals.css
+ * Light: flat white cards, bg-slate-50, pill tabs, purple accent
+ * Dark:  glassmorphism, glow, dark navy
+ * All dark overrides written as  .dark .selector {}  (no nesting)
+ * ============================================================ */
+
+/* ============================================================
+ * SHADCN / RADIX TOKENS — LIGHT (default)
+ * ============================================================ */
+:root {
+  /* Nền sáng + chữ đậm hơn để đạt tương phản tốt (WCAG) */
+  --background:           210 40% 98%;
+  --foreground:           222 47% 8%;
+  --card:                 0 0% 100%;
+  --card-foreground:      222 47% 8%;
+  --popover:              0 0% 100%;
+  --popover-foreground:   222 47% 8%;
+  --primary:              262 83% 58%;
+  --primary-foreground:   210 40% 98%;
+  --secondary:            210 40% 96%;
+  --secondary-foreground: 222 47% 8%;
+  --muted:                210 40% 96%;
+  /* Phụ đề: đậm hơn (trước ~47% L → ~36%) so với nền trắng/card */
+  --muted-foreground:     222 14% 36%;
+  --accent:               210 40% 96%;
+  --accent-foreground:    222 47% 8%;
+  --destructive:          0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --success:              142 76% 36%;
+  --success-foreground:   210 40% 98%;
+  --warning:              38 92% 50%;
+  --warning-foreground:   210 40% 98%;
+  --info:                 217 91% 60%;
+  --info-foreground:      210 40% 98%;
+  /* Viền đậm nhẹ để tách khối rõ hơn trên nền sáng */
+  --border:               214 24% 84%;
+  --input:                214 24% 84%;
+  --ring:                 262 83% 58%;
+  --radius:               0.5rem;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow:    0 1px 3px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.10);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.10), 0 2px 4px -2px rgb(0 0 0 / 0.10);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.10), 0 4px 6px -4px rgb(0 0 0 / 0.10);
+
+  /* AI Native light tokens */
+  --ai-page-bg:           #f8fafc;
+  --ai-card-bg:           #ffffff;
+  --ai-card-border:       #f1f5f9;
+  --ai-card-shadow:       0 1px 3px 0 rgb(0 0 0 / 0.08);
+  --ai-header-bg:         #ffffff;
+  --ai-header-border:     #e2e8f0;
+  --ai-tabs-bg:           #f1f5f9;
+  --ai-tab-active-bg:     #ffffff;
+  --ai-tab-active-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.12);
+  --ai-tab-active-color:  #7c3aed;
+  --ai-tab-inactive-color:#3f3f46;
+  --ai-accent:            #7c3aed;
+  --ai-accent-hover:      #6d28d9;
+  --ai-divider:           #e2e8f0;
+  --ai-muted-text:        #52525b;
+
+  /* Light-mode glass & gradient for .neu-container / glass-panel (override neumorphic dark-first) */
+  --glass-bg:             rgba(0,0,0,0.03);
+  --glass-bg-hover:       rgba(0,0,0,0.06);
+  --glass-border:         rgba(0,0,0,0.08);
+  --glass-border-hover:   rgba(0,0,0,0.12);
+  --glass-blur:           16px;
+  --gradient-background:  linear-gradient(180deg, hsl(var(--background)) 0%, hsl(210 40% 96%) 100%);
+  --ambient-glow-1:       radial-gradient(ellipse 600px 400px at 20% 20%, rgba(124,58,237,0.04) 0%, transparent 70%);
+  --ambient-glow-2:       radial-gradient(ellipse 500px 350px at 80% 80%, rgba(59,130,246,0.03) 0%, transparent 70%);
+  --ambient-glow-3:       none;
+}
+
+/* ============================================================
+ * SHADCN / RADIX TOKENS — DARK
+ * ============================================================ */
+.dark {
+  --background:           225 15% 6%;
+  /* Chữ chính gần trắng tuyệt đối trên nền rất tối */
+  --foreground:           210 40% 99%;
+  --card:                 225 15% 8%;
+  --card-foreground:      210 40% 99%;
+  --popover:              225 15% 8%;
+  --popover-foreground:   210 40% 99%;
+  --primary:              262 83% 58%;
+  --primary-foreground:   210 40% 99%;
+  --secondary:            225 15% 12%;
+  --secondary-foreground: 210 40% 99%;
+  --muted:                225 15% 12%;
+  /* Phụ đề sáng hơn (~72% L) để đọc rõ trên navy gần đen */
+  --muted-foreground:     215 14% 72%;
+  --accent:               225 15% 12%;
+  --accent-foreground:    210 40% 99%;
+  --destructive:          0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --success:              142 76% 36%;
+  --success-foreground:   210 40% 98%;
+  --warning:              38 92% 50%;
+  --warning-foreground:   210 40% 98%;
+  --info:                 217 91% 60%;
+  --info-foreground:      210 40% 98%;
+  --border:               225 12% 26%;
+  --input:                225 12% 26%;
+  --ring:                 262 83% 58%;
+
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.25);
+  --shadow:    0 2px 8px rgba(0,0,0,0.30);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.40);
+
+  --glow-primary:     0 0 20px rgba(120,100,255,0.20);
+  --glow-success:     0 0 20px rgba(0,210,180,0.20);
+  --glow-warning:     0 0 20px rgba(255,180,50,0.20);
+  --glow-destructive: 0 0 20px rgba(255,80,80,0.20);
+
+  --glass-bg:           rgba(255,255,255,0.02);
+  --glass-bg-hover:     rgba(255,255,255,0.04);
+  --glass-border:       rgba(255,255,255,0.06);
+  --glass-border-hover: rgba(255,255,255,0.10);
+  --glass-blur:         20px;
+
+  /* Dark gradient & ambient for .neu-container (explicit dark theme) */
+  --gradient-background: linear-gradient(180deg, hsl(225 15% 6%) 0%, hsl(225 18% 4%) 100%);
+  --ambient-glow-1:      radial-gradient(ellipse 600px 400px at 20% 20%, rgba(120,100,255,0.06) 0%, transparent 70%);
+  --ambient-glow-2:      radial-gradient(ellipse 500px 350px at 80% 80%, rgba(0,210,190,0.04) 0%, transparent 70%);
+  --ambient-glow-3:      radial-gradient(ellipse 400px 300px at 60% 30%, rgba(180,100,255,0.03) 0%, transparent 70%);
+
+  /* AI Native dark tokens */
+  --ai-page-bg:           hsl(225 15% 6%);
+  --ai-card-bg:           rgba(255,255,255,0.02);
+  --ai-card-border:       rgba(255,255,255,0.06);
+  --ai-card-shadow:       0 2px 8px rgba(0,0,0,0.30);
+  --ai-header-bg:         rgba(255,255,255,0.02);
+  --ai-header-border:     rgba(255,255,255,0.06);
+  --ai-tabs-bg:           rgba(255,255,255,0.04);
+  --ai-tab-active-bg:     rgba(255,255,255,0.08);
+  --ai-tab-active-shadow: 0 0 10px rgba(120,100,255,0.15);
+  --ai-tab-active-color:  hsl(245 85% 75%);
+  --ai-tab-inactive-color:rgba(255,255,255,0.62);
+  --ai-accent:            hsl(245 85% 65%);
+  --ai-accent-hover:      hsl(245 85% 72%);
+  --ai-divider:           rgba(255,255,255,0.10);
+  --ai-muted-text:        rgba(255,255,255,0.58);
+}
+
+/* ============================================================
+ * GLOBAL RESETS
+ * ============================================================ */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  transition: background-color 0.3s ease, color 0.3s ease;
+  text-rendering: optimizeLegibility;
+}
+::selection {
+  background: hsl(var(--primary) / 0.20);
+  color: hsl(var(--foreground));
+}
+
+/* ============================================================
+ * AI NATIVE COMPONENT CLASSES
+ * Token-based — automatically correct in light & dark modes.
+ * ============================================================ */
+
+/* Page wrapper */
+.ai-page {
+  min-height: 100vh;
+  background: var(--ai-page-bg);
+}
+
+/* Sticky header */
+.ai-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--ai-header-bg);
+  border-bottom: 1px solid var(--ai-header-border);
+}
+
+/* Centered content column */
+.ai-container {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+/* White/glass card */
+.ai-card {
+  background: var(--ai-card-bg);
+  border: 1px solid var(--ai-card-border);
+  border-radius: 0.75rem;
+  box-shadow: var(--ai-card-shadow);
+}
+
+/* Card inner divider */
+.ai-card-divider { border-top: 1px solid var(--ai-divider); }
+
+/* Pill tab bar */
+.ai-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--ai-tabs-bg);
+  border-radius: 0.625rem;
+  padding: 0.25rem;
+}
+
+/* Tab button */
+.ai-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 1rem;
+  border-radius: 0.4375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--ai-tab-inactive-color);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 150ms, background 150ms, box-shadow 150ms;
+  white-space: nowrap;
+}
+.ai-tab-btn:hover { color: hsl(var(--foreground)); }
+.ai-tab-btn.active,
+.ai-tab-btn[aria-selected="true"] {
+  background:  var(--ai-tab-active-bg);
+  box-shadow:  var(--ai-tab-active-shadow);
+  color:       var(--ai-tab-active-color);
+}
+
+/* Stat card */
+.ai-stat {
+  background:    var(--ai-card-bg);
+  border:        1px solid var(--ai-card-border);
+  border-radius: 0.75rem;
+  box-shadow:    var(--ai-card-shadow);
+  padding:       1rem;
+}
+
+/* Muted section label */
+.ai-label {
+  font-size:      0.6875rem;
+  font-weight:    600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ai-muted-text);
+}
+
+/* Primary CTA */
+.ai-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 1rem;
+  background: var(--ai-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.ai-btn-primary:hover:not(:disabled) { background: var(--ai-accent-hover); }
+.ai-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Ghost button */
+.ai-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4375rem 1rem;
+  background: transparent;
+  color: var(--ai-muted-text);
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.ai-btn-ghost:hover {
+  background: var(--ai-tabs-bg);
+  color: hsl(var(--foreground));
+}
+
+/* Input */
+.ai-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: var(--ai-card-bg);
+  border: 1px solid var(--ai-header-border);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: hsl(var(--foreground));
+  transition: border-color 150ms, box-shadow 150ms;
+  outline: none;
+}
+.ai-input:focus {
+  border-color: var(--ai-accent);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
+}
+.ai-input::placeholder { color: var(--ai-muted-text); }
+
+/* Empty state */
+.ai-empty {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  color: var(--ai-muted-text);
+}
+
+/* Badge */
+.ai-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: var(--ai-tabs-bg);
+  color: var(--ai-muted-text);
+}
+
+/* ============================================================
+ * SHARED GLASS UTILITIES
+ * ============================================================ */
+.glass-panel {
+  background: var(--glass-bg, hsl(var(--card)));
+  backdrop-filter: blur(var(--glass-blur, 0px));
+  border: 1px solid var(--glass-border, hsl(var(--border)));
+}
+.ai-button {
+  background: var(--glass-bg, hsl(var(--secondary)));
+  color: hsl(var(--foreground));
+  border: 1px solid var(--glass-border, hsl(var(--border)));
+  border-radius: var(--radius, 0.5rem);
+  transition: background 150ms, border-color 150ms;
+  cursor: pointer;
+}
+.ai-button:hover {
+  background: var(--glass-bg-hover, hsl(var(--accent)));
+  border-color: var(--glass-border-hover, hsl(var(--border)));
+}
+.ai-button-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: none;
+  border-radius: var(--radius, 0.5rem);
+  box-shadow: var(--shadow, var(--glow-primary, none));
+  cursor: pointer;
+  transition: filter 150ms;
+}
+.ai-button-primary:hover { filter: brightness(1.1); }
+
+/* ============================================================
+ * PERFORMANCE
+ * ============================================================ */
+aside { contain: layout style; }
+main  { contain: layout; }
+.animate-pulse, .animate-spin, .animate-bounce,
+.transition-all, .transform { will-change: transform, opacity; }
+.backdrop-blur, .backdrop-blur-xl, .backdrop-blur-sm { transform: translateZ(0); }
+
+@media (prefers-reduced-motion: reduce), (max-width: 768px) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .backdrop-blur-xl {
+    -webkit-backdrop-filter: blur(10px) !important;
+    backdrop-filter: blur(10px) !important;
+  }
+}
+
+/* ============================================================
+ * SCROLLBAR
+ * ============================================================ */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.20); }
+
+.dark ::-webkit-scrollbar-thumb       { background: rgba(255,255,255,0.08); }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); border-radius: 2px; }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); }
+
+/* ============================================================
+ * DARK MODE OVERRIDES — all as  .dark .selector {}
+ * ============================================================ */
+
+/* ── Backgrounds ──────────────────────────────────────────── */
+.dark .bg-white             { background: rgba(255,255,255,0.02) !important; }
+.dark .bg-gray-50           { background: rgba(255,255,255,0.015) !important; }
+.dark .bg-slate-50          { background: rgba(255,255,255,0.015) !important; }
+.dark .bg-gray-100          { background: rgba(255,255,255,0.030) !important; }
+.dark .bg-slate-100         { background: rgba(255,255,255,0.030) !important; }
+.dark .bg-gray-200          { background: rgba(255,255,255,0.050) !important; }
+.dark .bg-slate-200         { background: rgba(255,255,255,0.050) !important; }
+.dark .bg-secondary         { background: rgba(255,255,255,0.060) !important; }
+.dark .bg-background        { background: rgba(0,0,0,0.20) !important; }
+
+/* Colored badge backgrounds */
+.dark .bg-blue-50           { background: rgba(60,130,255,0.10) !important; }
+.dark .bg-blue-100          { background: rgba(60,130,255,0.12) !important; }
+.dark .bg-green-50          { background: rgba(0,210,130,0.10) !important; }
+.dark .bg-green-100         { background: rgba(0,210,130,0.12) !important; }
+.dark .bg-red-50            { background: rgba(255,80,80,0.10) !important; }
+.dark .bg-red-100           { background: rgba(255,80,80,0.12) !important; }
+.dark .bg-yellow-50         { background: rgba(230,180,50,0.10) !important; }
+.dark .bg-yellow-100        { background: rgba(230,180,50,0.12) !important; }
+.dark .bg-amber-50          { background: rgba(245,158,11,0.10) !important; }
+.dark .bg-amber-100         { background: rgba(245,158,11,0.12) !important; }
+.dark .bg-purple-50         { background: rgba(160,80,255,0.10) !important; }
+.dark .bg-purple-100        { background: rgba(160,80,255,0.12) !important; }
+.dark .bg-indigo-50         { background: rgba(120,100,255,0.10) !important; }
+.dark .bg-indigo-100        { background: rgba(120,100,255,0.12) !important; }
+.dark .bg-orange-50         { background: rgba(230,130,50,0.10) !important; }
+.dark .bg-orange-100        { background: rgba(230,130,50,0.12) !important; }
+.dark .bg-pink-50           { background: rgba(240,100,140,0.10) !important; }
+.dark .bg-pink-100          { background: rgba(240,100,140,0.12) !important; }
+.dark .bg-teal-50           { background: rgba(0,180,160,0.10) !important; }
+.dark .bg-teal-100          { background: rgba(0,180,160,0.12) !important; }
+.dark .bg-cyan-50           { background: rgba(0,180,220,0.10) !important; }
+.dark .bg-cyan-100          { background: rgba(0,180,220,0.12) !important; }
+.dark .bg-emerald-50        { background: rgba(0,200,140,0.10) !important; }
+.dark .bg-emerald-100       { background: rgba(0,200,140,0.12) !important; }
+
+/* Light gradient stops → transparent */
+.dark .from-indigo-50, .dark .from-blue-50,   .dark .from-purple-50,
+.dark .from-pink-50,   .dark .from-slate-50,  .dark .from-gray-50,
+.dark .from-white,     .dark .from-sky-50,    .dark .from-cyan-50,
+.dark .from-orange-50, .dark .from-red-50,    .dark .from-green-50,
+.dark .from-yellow-50, .dark .from-rose-50,   .dark .from-emerald-50,
+.dark .from-teal-50 {
+  --tw-gradient-from:  transparent !important;
+  --tw-gradient-to:    transparent !important;
+  --tw-gradient-stops: transparent !important;
+  background: transparent !important;
+}
+.dark .via-purple-50, .dark .via-pink-50, .dark .via-blue-50,
+.dark .via-rose-50,   .dark .via-white,   .dark .via-indigo-50,
+.dark .via-slate-50 { --tw-gradient-via: transparent !important; }
+.dark .to-pink-50,   .dark .to-blue-50,  .dark .to-purple-50,
+.dark .to-indigo-50, .dark .to-cyan-50,  .dark .to-rose-50,
+.dark .to-orange-50, .dark .to-red-50,   .dark .to-emerald-50,
+.dark .to-slate-50,  .dark .to-pink-100, .dark .to-indigo-100,
+.dark .to-emerald-100,.dark .to-orange-100 { --tw-gradient-to: transparent !important; }
+
+/* ── Text ─────────────────────────────────────────────────── */
+.dark .text-gray-900, .dark .text-slate-900 { color: rgba(255,255,255,0.90) !important; }
+.dark .text-gray-800, .dark .text-slate-800 { color: rgba(255,255,255,0.85) !important; }
+.dark .text-gray-700, .dark .text-slate-700 { color: rgba(255,255,255,0.70) !important; }
+.dark .text-gray-600, .dark .text-slate-600 { color: rgba(255,255,255,0.50) !important; }
+.dark .text-gray-500, .dark .text-slate-500 { color: rgba(255,255,255,0.40) !important; }
+.dark .text-gray-400, .dark .text-slate-400 { color: rgba(255,255,255,0.30) !important; }
+.dark .text-gray-300                        { color: rgba(255,255,255,0.25) !important; }
+.dark .text-black                           { color: rgba(255,255,255,0.90) !important; }
+.dark .text-muted-foreground                { color: rgba(255,255,255,0.40) !important; }
+
+/* Colored text */
+.dark .text-blue-600,  .dark .text-blue-700   { color: hsl(210 90% 65%) !important; }
+.dark .text-blue-800                          { color: hsl(210 90% 70%) !important; }
+.dark .text-green-600, .dark .text-green-700  { color: hsl(155 75% 55%) !important; }
+.dark .text-green-800                         { color: hsl(155 75% 60%) !important; }
+.dark .text-red-600,   .dark .text-red-700    { color: hsl(0   80% 65%) !important; }
+.dark .text-red-800                           { color: hsl(0   80% 70%) !important; }
+.dark .text-yellow-600,.dark .text-yellow-700 { color: hsl(40  90% 60%) !important; }
+.dark .text-yellow-800                        { color: hsl(40  90% 65%) !important; }
+.dark .text-amber-600, .dark .text-amber-700  { color: hsl(38  90% 58%) !important; }
+.dark .text-purple-600,.dark .text-purple-700 { color: hsl(280 75% 65%) !important; }
+.dark .text-purple-800                        { color: hsl(280 75% 70%) !important; }
+.dark .text-indigo-600,.dark .text-indigo-700 { color: hsl(245 85% 70%) !important; }
+.dark .text-indigo-800                        { color: hsl(245 85% 75%) !important; }
+.dark .text-orange-600,.dark .text-orange-700 { color: hsl(25  90% 60%) !important; }
+.dark .text-orange-800                        { color: hsl(25  90% 65%) !important; }
+.dark .text-pink-600,  .dark .text-pink-700   { color: hsl(340 80% 65%) !important; }
+.dark .text-pink-800                          { color: hsl(340 80% 70%) !important; }
+.dark .text-teal-600,  .dark .text-teal-700   { color: hsl(175 80% 50%) !important; }
+.dark .text-emerald-600,.dark .text-emerald-700 { color: hsl(160 75% 50%) !important; }
+.dark .text-cyan-600,  .dark .text-cyan-700   { color: hsl(190 85% 55%) !important; }
+.dark .text-pink-100,  .dark .text-blue-100,  .dark .text-green-100,
+.dark .text-purple-100,.dark .text-orange-100,.dark .text-yellow-100,
+.dark .text-indigo-100,.dark .text-red-100    { color: rgba(255,255,255,0.60) !important; }
+.dark .text-green-200, .dark .text-blue-200,  .dark .text-purple-200,
+.dark .text-orange-200,.dark .text-yellow-200,.dark .text-pink-200 { color: rgba(255,255,255,0.50) !important; }
+
+/* ── Borders ──────────────────────────────────────────────── */
+.dark .border-gray-100, .dark .border-slate-100,
+.dark .border-gray-200, .dark .border-slate-200,
+.dark .border-gray-300, .dark .border-slate-300 { border-color: rgba(255,255,255,0.06) !important; }
+.dark .divide-gray-100 > * + *,
+.dark .divide-gray-200 > * + *                  { border-color: rgba(255,255,255,0.06) !important; }
+.dark .border-blue-100   { border-color: rgba(60,130,255,0.12) !important; }
+.dark .border-blue-200   { border-color: rgba(60,130,255,0.15) !important; }
+.dark .border-blue-300   { border-color: rgba(60,130,255,0.20) !important; }
+.dark .border-blue-500   { border-color: rgba(60,130,255,0.50) !important; }
+.dark .border-green-200  { border-color: rgba(0,210,130,0.15) !important; }
+.dark .border-green-300  { border-color: rgba(0,210,130,0.20) !important; }
+.dark .border-green-500  { border-color: rgba(0,210,130,0.50) !important; }
+.dark .border-red-200    { border-color: rgba(255,80,80,0.15) !important; }
+.dark .border-red-300    { border-color: rgba(255,80,80,0.20) !important; }
+.dark .border-red-500    { border-color: rgba(255,80,80,0.50) !important; }
+.dark .border-yellow-200 { border-color: rgba(230,180,50,0.15) !important; }
+.dark .border-yellow-300 { border-color: rgba(230,180,50,0.20) !important; }
+.dark .border-yellow-500 { border-color: rgba(230,180,50,0.50) !important; }
+.dark .border-purple-100 { border-color: rgba(160,80,255,0.12) !important; }
+.dark .border-purple-200 { border-color: rgba(160,80,255,0.15) !important; }
+.dark .border-purple-300 { border-color: rgba(160,80,255,0.20) !important; }
+.dark .border-purple-500 { border-color: rgba(160,80,255,0.50) !important; }
+.dark .border-indigo-100 { border-color: rgba(120,100,255,0.12) !important; }
+.dark .border-indigo-200 { border-color: rgba(120,100,255,0.15) !important; }
+.dark .border-pink-100   { border-color: rgba(240,100,140,0.12) !important; }
+.dark .border-pink-200   { border-color: rgba(240,100,140,0.15) !important; }
+.dark .border-orange-200 { border-color: rgba(230,130,50,0.15) !important; }
+
+/* ── Shadows ──────────────────────────────────────────────── */
+.dark .shadow-sm  { box-shadow: 0 1px 4px rgba(0,0,0,0.25) !important; }
+.dark .shadow,
+.dark .shadow-md  { box-shadow: 0 2px 8px rgba(0,0,0,0.30) !important; }
+.dark .shadow-lg  { box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important; }
+.dark .shadow-xl  { box-shadow: 0 8px 24px rgba(0,0,0,0.40) !important; }
+.dark .shadow-2xl { box-shadow: 0 12px 40px rgba(0,0,0,0.45) !important; }
+
+/* ── Rings ────────────────────────────────────────────────── */
+.dark .ring-gray-100,
+.dark .ring-gray-200 { --tw-ring-color: rgba(255,255,255,0.06) !important; }
+
+/* ── Hover states ─────────────────────────────────────────── */
+.dark .hover\:bg-gray-50:hover,
+.dark .hover\:bg-gray-100:hover,
+.dark .hover\:bg-slate-50:hover  { background: rgba(255,255,255,0.04) !important; }
+.dark .hover\:bg-gray-200:hover  { background: rgba(255,255,255,0.06) !important; }
+.dark .hover\:bg-blue-50:hover   { background: rgba(60,130,255,0.08) !important; }
+.dark .hover\:bg-green-50:hover  { background: rgba(0,210,130,0.08) !important; }
+.dark .hover\:bg-red-50:hover    { background: rgba(255,80,80,0.08) !important; }
+.dark .hover\:bg-purple-50:hover { background: rgba(160,80,255,0.08) !important; }
+
+/* ── Common component patterns ────────────────────────────── */
+.dark .border-b.bg-white {
+  background: rgba(255,255,255,0.02) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+.dark [data-slot="card"],
+.dark .rounded-lg.border.bg-card {
+  background: rgba(255,255,255,0.02) !important;
+  border-color: rgba(255,255,255,0.06) !important;
+}
+.dark .placeholder-gray-400::placeholder,
+.dark .placeholder-gray-500::placeholder { color: rgba(255,255,255,0.25) !important; }
+.dark select option {
+  background: hsl(225 15% 12%);
+  color: rgba(255,255,255,0.85);
+}
+
+/* ── Recharts ─────────────────────────────────────────────── */
+.dark .recharts-cartesian-grid line  { stroke: rgba(255,255,255,0.06) !important; }
+.dark .recharts-text                 { fill: rgba(255,255,255,0.40) !important; }
+.dark .recharts-legend-item-text     { color: rgba(255,255,255,0.50) !important; }
+.dark .recharts-pie-label-text       { fill: rgba(255,255,255,0.70) !important; }
+.dark .recharts-tooltip-item         { color: rgba(255,255,255,0.70) !important; }
+.dark .recharts-tooltip-label        { color: rgba(255,255,255,0.90) !important; }
+.dark .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: hsl(225 15% 10%) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.40) !important;
+}
+
+/* ============================================================
+ * UTILITIES
+ * ============================================================ */
+@layer utilities {
+  .perspective-1000  { perspective: 1000px; }
+  .backface-hidden   { backface-visibility: hidden; }
+  .rotate-y-180      { transform: rotateY(180deg); }
+  .card-flip         { transform-style: preserve-3d; transition: transform 0.6s; }
+  .card-flip.flipped { transform: rotateY(180deg); }
+  .hover-lift        { transition: transform 0.2s ease-in-out; }
+  .hover-lift:hover  { transform: translateY(-2px); }
+}
+
+/* ============================================================
+ * LEGACY COMPONENT CLASSES (backward compat)
+ * ============================================================ */
+@layer components {
+  /* ── Form helpers (used in CourseEditor and similar LMS forms) ── */
+  .label {
+    @apply block text-sm font-medium text-gray-300 mb-1.5;
+  }
+  .err {
+    @apply mt-1 text-xs text-red-400;
+  }
+
+  .study-card {
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: all 0.3s;
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-sm);
+  }
+  .study-card:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+    transform: translateY(-2px);
+  }
+  .study-header  { padding: 0.75rem 1rem; font-size: 1.125rem; font-weight: 600; }
+  .study-content { padding: 1.5rem; }
+
+  .progress-bar  {
+    width: 100%;
+    border-radius: 9999px;
+    height: 0.375rem;
+    overflow: hidden;
+    background: rgba(0,0,0,0.06);
+  }
+  .progress-fill {
+    height: 0.375rem;
+    border-radius: 9999px;
+    transition: all 0.5s;
+    background: hsl(var(--primary));
+  }
+
+  .btn-primary {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 150ms;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+
+  .btn-secondary {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 150ms;
+    background: hsl(var(--secondary));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    cursor: pointer;
+  }
+  .btn-secondary:hover { filter: brightness(0.97); }
+
+  .input-field {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: all 150ms;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+    outline: none;
+  }
+  .input-field:focus {
+    border-color: hsl(var(--primary) / 0.5);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.10);
+  }
+
+  .tag { font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; font-weight: 500; }
+}
+
+/* ============================================================
+ * LIGHT MODE: Override dark-first utility classes
+ * The dashboard uses text-white/XX, bg-white/[0.XX] etc
+ * as a dark-first design. These overrides flip them for light.
+ * ============================================================ */
+
+/* ── Text: white opacity → foreground opacity ──────────────── */
+html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.90) !important; }
+html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.80) !important; }
+html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.70) !important; }
+html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.60) !important; }
+html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.50) !important; }
+html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.40) !important; }
+html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.35) !important; }
+html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.30) !important; }
+html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.25) !important; }
+html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.15) !important; }
+/* NOTE: plain .text-white is NOT overridden — it is widely used on colored
+   backgrounds (buttons, badges, gradient CTAs) where dark text would be wrong.
+   Only text-white/XX opacity variants (common in dark-first glass panels)
+   are overridden above. */
+
+/* ── BG: white low-opacity overlay → dark low-opacity overlay */
+html:not(.dark) .bg-white\/\[0\.015\] { background-color: rgba(0,0,0,0.015) !important; }
+html:not(.dark) .bg-white\/\[0\.02\]  { background-color: rgba(0,0,0,0.02) !important; }
+html:not(.dark) .bg-white\/\[0\.03\]  { background-color: rgba(0,0,0,0.025) !important; }
+html:not(.dark) .bg-white\/\[0\.04\]  { background-color: rgba(0,0,0,0.035) !important; }
+html:not(.dark) .bg-white\/\[0\.06\]  { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .bg-white\/\[0\.08\]  { background-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .bg-white\/\[0\.10\]  { background-color: rgba(0,0,0,0.06) !important; }
+
+/* ── Border: white low-opacity → dark low-opacity ──────────── */
+html:not(.dark) .border-white\/\[0\.04\]  { border-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .border-white\/\[0\.06\]  { border-color: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .border-white\/\[0\.08\]  { border-color: rgba(0,0,0,0.10) !important; }
+html:not(.dark) .border-white\/\[0\.10\]  { border-color: rgba(0,0,0,0.12) !important; }
+html:not(.dark) .border-white\/\[0\.12\]  { border-color: rgba(0,0,0,0.14) !important; }
+
+/* ── Hover: bg-white low-opacity → dark low-opacity ────────── */
+html:not(.dark) .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(0,0,0,0.03) !important; }
+html:not(.dark) .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .hover\:bg-white\/\[0\.08\]:hover { background-color: rgba(0,0,0,0.06) !important; }
+
+/* ── Hover border-color → dark ─────────────────────────────── */
+html:not(.dark) .hover\:border-white\/\[0\.10\]:hover { border-color: rgba(0,0,0,0.12) !important; }
+html:not(.dark) .hover\:border-white\/\[0\.15\]:hover { border-color: rgba(0,0,0,0.16) !important; }
+
+/* ── Progress bars / dividers using white opacity as track ─── */
+html:not(.dark) .bg-white\/\[0\.06\] { background-color: rgba(0,0,0,0.06) !important; }
+
+/* ── SVG circle track (used in RadialProgress) ─────────────── */
+html:not(.dark) circle[stroke="rgba(255,255,255,0.04)"] { stroke: rgba(0,0,0,0.06) !important; }
+
+/* ── Loader border overrides ───────────────────────────────── */
+html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.08) !important; }
+
+/* ── Light gray/slate text → dark foreground ─────────────────
+ * These are used across 110+ files as dark-theme text. In light
+ * mode they become invisible on white backgrounds.             */
+html:not(.dark) .text-gray-50   { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-gray-100  { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-gray-200  { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-gray-300  { color: hsl(var(--foreground) / 0.60) !important; }
+html:not(.dark) .text-gray-400  { color: hsl(var(--foreground) / 0.50) !important; }
+html:not(.dark) .text-slate-50  { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-slate-100 { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-slate-200 { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-slate-300 { color: hsl(var(--foreground) / 0.60) !important; }
+html:not(.dark) .text-slate-400 { color: hsl(var(--foreground) / 0.50) !important; }
+
+/* ── Placeholder text ────────────────────────────────────────── */
+html:not(.dark) .placeholder-gray-400::placeholder  { color: hsl(var(--foreground) / 0.40) !important; }
+html:not(.dark) .placeholder-gray-500::placeholder  { color: hsl(var(--foreground) / 0.45) !important; }
+html:not(.dark) .placeholder-white\/40::placeholder  { color: hsl(var(--foreground) / 0.40) !important; }
+html:not(.dark) .placeholder-white\/50::placeholder  { color: hsl(var(--foreground) / 0.45) !important; }
+
+/* ── bg-gray/slate dark shades → light equivalents ───────────── */
+html:not(.dark) .bg-gray-800    { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-gray-900    { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-gray-950    { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-slate-800   { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-slate-900   { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-slate-950   { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-zinc-800    { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-zinc-900    { background-color: hsl(var(--background)) !important; }
+html:not(.dark) .bg-zinc-950    { background-color: hsl(var(--background)) !important; }
+
+/* ── border-gray/slate dark shades → light equivalents ───────── */
+html:not(.dark) .border-gray-700  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-gray-800  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-slate-700 { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-slate-800 { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-zinc-700  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-zinc-800  { border-color: hsl(var(--border)) !important; }
+
+/* ── Additional bg mid-dark shades (600-700) → light ─────────── */
+html:not(.dark) .bg-gray-700     { background-color: hsl(var(--secondary)) !important; }
+html:not(.dark) .bg-gray-600     { background-color: hsl(var(--secondary)) !important; }
+html:not(.dark) .bg-gray-500     { background-color: hsl(var(--muted)) !important; }
+html:not(.dark) .bg-slate-700    { background-color: hsl(var(--secondary)) !important; }
+html:not(.dark) .bg-slate-600    { background-color: hsl(var(--muted)) !important; }
+html:not(.dark) .bg-zinc-700     { background-color: hsl(var(--secondary)) !important; }
+
+/* ── bg dark shades WITH opacity → light glass equivalents ───── */
+html:not(.dark) .bg-slate-800\/50  { background-color: rgba(255,255,255,0.75) !important; }
+html:not(.dark) .bg-slate-800\/60  { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-slate-800\/40  { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-slate-700\/50  { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-slate-700\/60  { background-color: rgba(255,255,255,0.75) !important; }
+html:not(.dark) .bg-slate-900\/50  { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-slate-900\/60  { background-color: rgba(255,255,255,0.85) !important; }
+html:not(.dark) .bg-slate-950\/40  { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-slate-950\/60  { background-color: rgba(255,255,255,0.85) !important; }
+html:not(.dark) .bg-slate-500\/10  { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .bg-slate-300\/20  { background-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .bg-slate-200\/20  { background-color: rgba(0,0,0,0.04) !important; }
+html:not(.dark) .bg-zinc-800\/90   { background-color: rgba(255,255,255,0.90) !important; }
+html:not(.dark) .bg-zinc-900\/30   { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-zinc-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-gray-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-gray-800\/50   { background-color: rgba(255,255,255,0.75) !important; }
+
+/* ── Additional border dark shades (500-600, 900) ────────────── */
+html:not(.dark) .border-slate-600  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-slate-500  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-slate-900  { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-gray-600   { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-gray-900   { border-color: hsl(var(--border)) !important; }
+html:not(.dark) .border-gray-500   { border-color: hsl(var(--border)) !important; }
+
+/* ── hover:bg dark → light hover states ──────────────────────── */
+html:not(.dark) .hover\:bg-gray-800:hover   { background-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .hover\:bg-gray-700:hover   { background-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .hover\:bg-gray-600:hover   { background-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .hover\:bg-zinc-700:hover   { background-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .hover\:bg-slate-700:hover  { background-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .hover\:bg-slate-800:hover  { background-color: rgba(0,0,0,0.06) !important; }
+html:not(.dark) .hover\:bg-slate-300:hover  { background-color: rgba(0,0,0,0.05) !important; }
+
+/* ── text-zinc variants → dark foreground ────────────────────── */
+html:not(.dark) .text-zinc-300  { color: hsl(var(--foreground) / 0.60) !important; }
+html:not(.dark) .text-zinc-400  { color: hsl(var(--foreground) / 0.50) !important; }
+html:not(.dark) .text-zinc-500  { color: hsl(var(--muted-foreground)) !important; }
+
+/* ── hover:text overrides for dark-first hover text ──────────── */
+html:not(.dark) .hover\:text-white:hover  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .hover\:text-gray-100:hover { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .hover\:text-gray-200:hover { color: hsl(var(--foreground) / 0.75) !important; }
+
+/* ── Ring/divide overrides ───────────────────────────────────── */
+html:not(.dark) .ring-white\/10   { --tw-ring-color: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .ring-white\/20   { --tw-ring-color: rgba(0,0,0,0.12) !important; }
+html:not(.dark) .divide-white\/\[0\.06\] > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.08) !important; }
+
+/* ── Shadow glow effects → subtle shadows in light mode ──────── */
+html:not(.dark) [class*="shadow-\[0_0_"][class*="rgba(120,100,255"] { box-shadow: 0 2px 8px rgba(120,100,255,0.08) !important; }
+html:not(.dark) [class*="shadow-\[0_0_"][class*="rgba(0,210"] { box-shadow: 0 2px 8px rgba(0,180,160,0.08) !important; }
+
+/* ── Additional bg-white opacity patterns ────────────────────── */
+html:not(.dark) .bg-white\/5     { background-color: rgba(0,0,0,0.025) !important; }
+html:not(.dark) .bg-white\/10    { background-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .bg-white\/20    { background-color: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .bg-white\/30    { background-color: rgba(0,0,0,0.06) !important; }
+
+/* ── border-white opacity patterns ───────────────────────────── */
+html:not(.dark) .border-white\/5  { border-color: rgba(0,0,0,0.05) !important; }
+html:not(.dark) .border-white\/10 { border-color: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .border-white\/20 { border-color: rgba(0,0,0,0.12) !important; }
+
+/* ── from/to/via gradient white opacity → dark opacity ───────── */
+html:not(.dark) .from-white\/5   { --tw-gradient-from: rgba(0,0,0,0.025) var(--tw-gradient-from-position) !important; }
+html:not(.dark) .from-white\/10  { --tw-gradient-from: rgba(0,0,0,0.04) var(--tw-gradient-from-position) !important; }
+html:not(.dark) .to-white\/5     { --tw-gradient-to: rgba(0,0,0,0.025) var(--tw-gradient-to-position) !important; }
+html:not(.dark) .to-white\/10    { --tw-gradient-to: rgba(0,0,0,0.04) var(--tw-gradient-to-position) !important; }
+
+/* ── Light-mode Recharts overrides ──────────────────────────── */
+html:not(.dark) .recharts-cartesian-grid line  { stroke: rgba(0,0,0,0.08) !important; }
+html:not(.dark) .recharts-text                 { fill: rgba(0,0,0,0.50) !important; }
+html:not(.dark) .recharts-legend-item-text     { color: rgba(0,0,0,0.60) !important; }
+html:not(.dark) .recharts-pie-label-text       { fill: rgba(0,0,0,0.70) !important; }
+html:not(.dark) .recharts-tooltip-item         { color: rgba(0,0,0,0.70) !important; }
+html:not(.dark) .recharts-tooltip-label        { color: rgba(0,0,0,0.90) !important; }
+html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: hsl(0 0% 100%) !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10) !important;
+}
+
+/* ============================================================
+ * DARK MODE OVERRIDES FOR LIGHT-FIRST PAGES
+ * Pages like Labtwin use pastel backgrounds designed for light mode.
+ * These `.dark` overrides adapt them to dark mode automatically.
+ * ============================================================ */
+
+/* ── Pastel bg solid (50/100/200) → dark tinted glass ────────── */
+.dark .bg-yellow-50    { background-color: hsla(40,50%,10%,0.25) !important; }
+.dark .bg-yellow-100   { background-color: hsla(40,50%,12%,0.30) !important; }
+.dark .bg-yellow-200   { background-color: hsla(40,50%,14%,0.35) !important; }
+.dark .bg-pink-50      { background-color: hsla(330,40%,10%,0.25) !important; }
+.dark .bg-pink-100     { background-color: hsla(330,40%,12%,0.30) !important; }
+.dark .bg-pink-200     { background-color: hsla(330,40%,14%,0.35) !important; }
+.dark .bg-purple-50    { background-color: hsla(270,50%,10%,0.25) !important; }
+.dark .bg-purple-100   { background-color: hsla(270,50%,12%,0.30) !important; }
+.dark .bg-purple-200   { background-color: hsla(270,50%,14%,0.35) !important; }
+.dark .bg-green-50     { background-color: hsla(145,50%,10%,0.25) !important; }
+.dark .bg-green-100    { background-color: hsla(145,50%,12%,0.30) !important; }
+.dark .bg-green-200    { background-color: hsla(145,50%,14%,0.35) !important; }
+.dark .bg-sky-50       { background-color: hsla(200,60%,10%,0.25) !important; }
+.dark .bg-sky-100      { background-color: hsla(200,60%,12%,0.30) !important; }
+.dark .bg-blue-50      { background-color: hsla(215,60%,10%,0.25) !important; }
+.dark .bg-blue-100     { background-color: hsla(215,60%,12%,0.30) !important; }
+.dark .bg-cyan-100     { background-color: hsla(185,60%,12%,0.30) !important; }
+.dark .bg-teal-100     { background-color: hsla(170,50%,12%,0.30) !important; }
+.dark .bg-indigo-100   { background-color: hsla(235,55%,12%,0.30) !important; }
+.dark .bg-indigo-200   { background-color: hsla(235,55%,14%,0.35) !important; }
+.dark .bg-amber-50     { background-color: hsla(38,50%,10%,0.25) !important; }
+.dark .bg-amber-100    { background-color: hsla(38,50%,12%,0.30) !important; }
+.dark .bg-orange-100   { background-color: hsla(25,55%,12%,0.30) !important; }
+.dark .bg-red-100      { background-color: hsla(0,50%,12%,0.30) !important; }
+.dark .bg-emerald-100  { background-color: hsla(160,50%,12%,0.30) !important; }
+.dark .bg-slate-50     { background-color: hsla(210,30%,10%,0.25) !important; }
+.dark .bg-indigo-50    { background-color: hsla(235,55%,10%,0.25) !important; }
+.dark .bg-lime-100     { background-color: hsla(85,50%,12%,0.30) !important; }
+.dark .bg-gray-100     { background-color: hsla(220,15%,14%,0.35) !important; }
+.dark .bg-gray-200     { background-color: hsla(220,15%,16%,0.40) !important; }
+
+/* ── Gradient from/via/to pastel stops → dark tinted ─────────── */
+.dark .from-yellow-50  { --tw-gradient-from: hsla(40,50%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-yellow-100 { --tw-gradient-from: hsla(40,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-yellow-200 { --tw-gradient-from: hsla(40,50%,16%,0.45) var(--tw-gradient-from-position) !important; }
+.dark .from-pink-50    { --tw-gradient-from: hsla(330,40%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-pink-100   { --tw-gradient-from: hsla(330,40%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-pink-200   { --tw-gradient-from: hsla(330,40%,16%,0.45) var(--tw-gradient-from-position) !important; }
+.dark .from-purple-50  { --tw-gradient-from: hsla(270,50%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-purple-100 { --tw-gradient-from: hsla(270,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-purple-200 { --tw-gradient-from: hsla(270,50%,16%,0.45) var(--tw-gradient-from-position) !important; }
+.dark .from-green-50   { --tw-gradient-from: hsla(145,50%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-green-100  { --tw-gradient-from: hsla(145,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-sky-100    { --tw-gradient-from: hsla(200,60%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-blue-50    { --tw-gradient-from: hsla(215,60%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-blue-100   { --tw-gradient-from: hsla(215,60%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-indigo-100 { --tw-gradient-from: hsla(235,55%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-indigo-200 { --tw-gradient-from: hsla(235,55%,16%,0.45) var(--tw-gradient-from-position) !important; }
+.dark .from-amber-50   { --tw-gradient-from: hsla(38,50%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-amber-100  { --tw-gradient-from: hsla(38,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-orange-100 { --tw-gradient-from: hsla(25,55%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-red-100    { --tw-gradient-from: hsla(0,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-cyan-100   { --tw-gradient-from: hsla(185,60%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-teal-100   { --tw-gradient-from: hsla(170,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-emerald-100 { --tw-gradient-from: hsla(160,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-lime-100   { --tw-gradient-from: hsla(85,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-teal-100   { --tw-gradient-from: hsla(170,50%,14%,0.40) var(--tw-gradient-from-position) !important; }
+.dark .from-slate-50   { --tw-gradient-from: hsla(210,30%,10%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-indigo-50  { --tw-gradient-from: hsla(235,55%,12%,0.35) var(--tw-gradient-from-position) !important; }
+.dark .from-gray-100   { --tw-gradient-from: hsla(220,15%,14%,0.50) var(--tw-gradient-from-position) !important; }
+.dark .from-gray-200   { --tw-gradient-from: hsla(220,15%,16%,0.55) var(--tw-gradient-from-position) !important; }
+
+.dark .via-pink-50     { --tw-gradient-stops: var(--tw-gradient-from), hsla(330,40%,12%,0.35), var(--tw-gradient-to) !important; }
+.dark .via-pink-100    { --tw-gradient-stops: var(--tw-gradient-from), hsla(330,40%,14%,0.40), var(--tw-gradient-to) !important; }
+.dark .via-blue-100    { --tw-gradient-stops: var(--tw-gradient-from), hsla(215,60%,14%,0.40), var(--tw-gradient-to) !important; }
+.dark .via-purple-100  { --tw-gradient-stops: var(--tw-gradient-from), hsla(270,50%,14%,0.40), var(--tw-gradient-to) !important; }
+
+.dark .to-purple-50    { --tw-gradient-to: hsla(270,50%,12%,0.35) var(--tw-gradient-to-position) !important; }
+.dark .to-purple-100   { --tw-gradient-to: hsla(270,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-purple-200   { --tw-gradient-to: hsla(270,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-pink-100     { --tw-gradient-to: hsla(330,40%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-pink-200     { --tw-gradient-to: hsla(330,40%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-green-100    { --tw-gradient-to: hsla(145,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-green-200    { --tw-gradient-to: hsla(145,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-yellow-100   { --tw-gradient-to: hsla(40,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-yellow-200   { --tw-gradient-to: hsla(40,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-cyan-100     { --tw-gradient-to: hsla(185,60%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-blue-100     { --tw-gradient-to: hsla(215,60%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-amber-100    { --tw-gradient-to: hsla(38,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-red-100      { --tw-gradient-to: hsla(0,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-teal-100     { --tw-gradient-to: hsla(170,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-emerald-100  { --tw-gradient-to: hsla(160,50%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-teal-200     { --tw-gradient-to: hsla(170,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-emerald-200  { --tw-gradient-to: hsla(160,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-orange-200   { --tw-gradient-to: hsla(25,55%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-red-200      { --tw-gradient-to: hsla(0,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-cyan-200     { --tw-gradient-to: hsla(185,60%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-indigo-200   { --tw-gradient-to: hsla(235,55%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-lime-200     { --tw-gradient-to: hsla(85,50%,16%,0.45) var(--tw-gradient-to-position) !important; }
+.dark .to-orange-100   { --tw-gradient-to: hsla(25,55%,14%,0.40) var(--tw-gradient-to-position) !important; }
+.dark .to-gray-200     { --tw-gradient-to: hsla(220,15%,16%,0.55) var(--tw-gradient-to-position) !important; }
+.dark .to-gray-100     { --tw-gradient-to: hsla(220,15%,14%,0.50) var(--tw-gradient-to-position) !important; }
+.dark .to-blue-50      { --tw-gradient-to: hsla(215,60%,12%,0.35) var(--tw-gradient-to-position) !important; }
+.dark .to-pink-50      { --tw-gradient-to: hsla(330,40%,12%,0.35) var(--tw-gradient-to-position) !important; }
+.dark .to-slate-50     { --tw-gradient-to: hsla(210,30%,10%,0.35) var(--tw-gradient-to-position) !important; }
+
+/* ── Colored text (dark values) → lighter for dark bg ────────── */
+/* purple */
+.dark .text-purple-600 { color: hsl(270,70%,75%) !important; }
+.dark .text-purple-700 { color: hsl(270,65%,72%) !important; }
+.dark .text-purple-900 { color: hsl(270,60%,82%) !important; }
+/* gray */
+.dark .text-gray-600   { color: hsl(220,10%,65%) !important; }
+.dark .text-gray-700   { color: hsl(220,10%,72%) !important; }
+.dark .text-gray-900   { color: hsl(220,10%,90%) !important; }
+/* sky */
+.dark .text-sky-600    { color: hsl(200,70%,72%) !important; }
+.dark .text-sky-700    { color: hsl(200,65%,68%) !important; }
+.dark .text-sky-900    { color: hsl(200,55%,82%) !important; }
+/* indigo */
+.dark .text-indigo-700 { color: hsl(235,65%,72%) !important; }
+.dark .text-indigo-900 { color: hsl(235,55%,82%) !important; }
+/* green */
+.dark .text-green-600  { color: hsl(145,55%,65%) !important; }
+.dark .text-green-700  { color: hsl(145,50%,62%) !important; }
+/* yellow */
+.dark .text-yellow-600 { color: hsl(40,80%,68%) !important; }
+.dark .text-yellow-700 { color: hsl(40,70%,65%) !important; }
+.dark .text-yellow-900 { color: hsl(40,60%,78%) !important; }
+/* pink */
+.dark .text-pink-600   { color: hsl(330,65%,72%) !important; }
+.dark .text-pink-700   { color: hsl(330,60%,68%) !important; }
+/* amber */
+.dark .text-amber-600  { color: hsl(38,75%,68%) !important; }
+.dark .text-amber-900  { color: hsl(38,60%,78%) !important; }
+/* blue */
+.dark .text-blue-600   { color: hsl(215,70%,72%) !important; }
+.dark .text-blue-700   { color: hsl(215,65%,68%) !important; }
+.dark .text-blue-900   { color: hsl(215,55%,82%) !important; }
+/* orange */
+.dark .text-orange-600 { color: hsl(25,80%,68%) !important; }
+.dark .text-orange-700 { color: hsl(25,70%,65%) !important; }
+/* cyan */
+.dark .text-cyan-600   { color: hsl(185,65%,65%) !important; }
+.dark .text-cyan-700   { color: hsl(185,60%,62%) !important; }
+/* teal */
+.dark .text-teal-700   { color: hsl(170,55%,62%) !important; }
+/* emerald */
+.dark .text-emerald-700 { color: hsl(160,55%,62%) !important; }
+/* lime / additional green */
+.dark .text-lime-700   { color: hsl(85,55%,62%) !important; }
+
+/* ── bg-white with opacity → dark glass in dark mode ─────────── */
+.dark .bg-white\/50  { background-color: rgba(255,255,255,0.06) !important; }
+.dark .bg-white\/60  { background-color: rgba(255,255,255,0.07) !important; }
+.dark .bg-white\/70  { background-color: rgba(255,255,255,0.08) !important; }
+.dark .bg-white\/80  { background-color: rgba(255,255,255,0.10) !important; }
+.dark .bg-white\/90  { background-color: rgba(255,255,255,0.12) !important; }
+
+/* ── Colored borders (light 200/300) → dark equivalents ──────── */
+.dark .border-purple-200 { border-color: hsla(270,50%,40%,0.35) !important; }
+.dark .border-purple-300 { border-color: hsla(270,50%,45%,0.40) !important; }
+.dark .border-green-200  { border-color: hsla(145,50%,35%,0.35) !important; }
+.dark .border-green-300  { border-color: hsla(145,50%,40%,0.40) !important; }
+.dark .border-yellow-200 { border-color: hsla(40,50%,38%,0.35) !important; }
+.dark .border-pink-200   { border-color: hsla(330,40%,38%,0.35) !important; }
+.dark .border-sky-200    { border-color: hsla(200,60%,35%,0.35) !important; }
+.dark .border-sky-300    { border-color: hsla(200,60%,40%,0.40) !important; }
+.dark .border-sky-400    { border-color: hsla(200,60%,45%,0.45) !important; }
+.dark .border-blue-200   { border-color: hsla(215,60%,35%,0.35) !important; }
+.dark .border-blue-300   { border-color: hsla(215,60%,40%,0.40) !important; }
+.dark .border-indigo-200 { border-color: hsla(235,55%,38%,0.35) !important; }
+.dark .border-indigo-300 { border-color: hsla(235,55%,42%,0.40) !important; }
+.dark .border-amber-200  { border-color: hsla(38,50%,38%,0.35) !important; }
+.dark .border-amber-300  { border-color: hsla(38,50%,42%,0.40) !important; }
+.dark .border-gray-200   { border-color: hsla(220,10%,30%,0.40) !important; }
+.dark .border-gray-300   { border-color: hsla(220,10%,35%,0.45) !important; }
+.dark .border-cyan-300   { border-color: hsla(185,60%,40%,0.40) !important; }
+.dark .border-teal-300   { border-color: hsla(170,50%,40%,0.40) !important; }
+.dark .border-emerald-300 { border-color: hsla(160,50%,40%,0.40) !important; }
+.dark .border-orange-300 { border-color: hsla(25,55%,42%,0.40) !important; }
+.dark .border-red-300    { border-color: hsla(0,50%,42%,0.40) !important; }
+.dark .border-yellow-300 { border-color: hsla(40,50%,42%,0.40) !important; }
+.dark .border-pink-300   { border-color: hsla(330,40%,42%,0.40) !important; }
+.dark .border-lime-300   { border-color: hsla(85,50%,40%,0.40) !important; }
+.dark .border-white\/50  { border-color: rgba(255,255,255,0.08) !important; }
+
+/* ── bg-*-50 used inside cards (like bg-sky-50) ──────────────── */
+.dark .bg-sky-50         { background-color: hsla(200,60%,10%,0.25) !important; }
+
+/* ── Gradient from-purple-200/50 type patterns → dark ────────── */
+.dark [class*="from-purple-200\/"] { --tw-gradient-from: hsla(270,50%,18%,0.25) var(--tw-gradient-from-position) !important; }
+.dark [class*="to-pink-200\/"]     { --tw-gradient-to: hsla(330,40%,18%,0.25) var(--tw-gradient-to-position) !important; }
+.dark [class*="from-sky-200\/"]    { --tw-gradient-from: hsla(200,60%,18%,0.25) var(--tw-gradient-from-position) !important; }
+.dark [class*="to-cyan-200\/"]     { --tw-gradient-to: hsla(185,60%,18%,0.25) var(--tw-gradient-to-position) !important; }
+.dark [class*="from-white\/90"]    { --tw-gradient-from: rgba(255,255,255,0.08) var(--tw-gradient-from-position) !important; }
+.dark [class*="to-sky-50\/90"]     { --tw-gradient-to: hsla(200,60%,12%,0.20) var(--tw-gradient-to-position) !important; }
+
+/* ============================================================
+ * RESPONSIVE
+ * ============================================================ */
+@media (max-width: 768px) {
+  .ai-container { padding-inline: 1rem; }
+}
+
+/* ============================================================
+ * PRINT
+ * ============================================================ */
+@media print {
+  .ai-header { position: static; }
+  .ai-btn-primary, .btn-primary, .btn-secondary { display: none; }
+}
+
+/* ============================================================
+ * TIPTAP RICH TEXT EDITOR
+ * ============================================================ */
+.tiptap-content .ProseMirror {
+  padding: 0.75rem 1rem;
+  outline: none;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* Placeholder */
+.tiptap-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #6b7280;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* Typography inside editor */
+.tiptap-content .ProseMirror h2 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  margin: 0.75rem 0 0.375rem;
+}
+.tiptap-content .ProseMirror h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 0.625rem 0 0.3rem;
+}
+.tiptap-content .ProseMirror p {
+  margin: 0 0 0.5rem;
+}
+.tiptap-content .ProseMirror strong { color: #f8fafc; }
+.tiptap-content .ProseMirror em { font-style: italic; }
+.tiptap-content .ProseMirror u { text-decoration: underline; }
+.tiptap-content .ProseMirror hr {
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  margin: 0.75rem 0;
+}
+
+/* Lists */
+.tiptap-content .ProseMirror ul,
+.tiptap-content .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin: 0.4rem 0 0.75rem;
+}
+.tiptap-content .ProseMirror ul { list-style-type: disc; }
+.tiptap-content .ProseMirror ol { list-style-type: decimal; }
+.tiptap-content .ProseMirror li { margin-bottom: 0.2rem; }
+.tiptap-content .ProseMirror li p { margin: 0; }
+
+/* Read-only display (dangerouslySetInnerHTML output) */
+.tiptap-display h2 { font-size: 1.125rem; font-weight: 700; margin: 0.75rem 0 0.375rem; }
+.tiptap-display h3 { font-size: 1rem; font-weight: 600; margin: 0.625rem 0 0.3rem; }
+.tiptap-display p  { margin-bottom: 0.5rem; line-height: 1.7; }
+.tiptap-display ul { list-style: disc; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.tiptap-display ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 0.75rem; }
+.tiptap-display li { margin-bottom: 0.2rem; }
+.tiptap-display strong { font-weight: 700; }
+.tiptap-display hr { border-top: 1px solid rgba(255,255,255,0.15); margin: 0.75rem 0; }

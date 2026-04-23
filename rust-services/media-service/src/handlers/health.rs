@@ -20,7 +20,7 @@ pub async fn health(State(state): State<AppState>) -> Result<Json<HealthResponse
         .await
         .unwrap_or(false);
 
-    let gcs_configured = state.media.is_gcs_configured();
+    let gcs_configured = state.gcs.is_enabled();
 
     Ok(Json(HealthResponse {
         status: "healthy",

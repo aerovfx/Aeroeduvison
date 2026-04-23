@@ -40,7 +40,15 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // Get configuration
-    let addr = std::env::var("AUTH_SERVICE_ADDR").unwrap_or_else(|_| "127.0.0.1:8092".to_string());
+    // Address priority:
+    //   1. AUTH_SERVICE_ADDR (explicit override — used in start.sh to bind localhost:8092)
+    //   2. PORT env var (Cloud Run — only used when running as standalone service)
+    //   3. Default 127.0.0.1:8092 (local dev)
+    let addr = std::env::var("AUTH_SERVICE_ADDR").unwrap_or_else(|_| {
+        std::env::var("PORT")
+            .map(|p| format!("0.0.0.0:{}", p))
+            .unwrap_or_else(|_| "127.0.0.1:8092".to_string())
+    });
     let mut database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     // Local dev: if DB requires TLS but sqlx was built without TLS, set AUTH_DATABASE_INSECURE_LOCAL=1
     // to use sslmode=disable (only for local development).
@@ -59,18 +67,19 @@ async fn main() {
         .parse()
         .unwrap_or(24);
 
-    // Initialize database pool (TLS: Cargo.toml has runtime-tokio-rustls; or AUTH_DATABASE_INSECURE_LOCAL=1 for local)
+    // Initialize database pool with timeouts so hung connections fail fast instead of hanging.
+    // - acquire_timeout: fail with error (not hang) if DB not reachable within 8s
+    // - idle_timeout:    recycle idle connections (prevents stale connections after DB restarts)
+    // - max_lifetime:    force-recycle connections to avoid long-lived stale TCP sessions
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(10)
-        .connect(&database_url)
-        .await
-        .expect("Failed to create database pool (if TLS error: set AUTH_DATABASE_INSECURE_LOCAL=1 for local, or use DATABASE_URL without sslmode=require)");
+        .acquire_timeout(std::time::Duration::from_secs(8))
+        .idle_timeout(std::time::Duration::from_secs(300))   // 5 min idle → recycle
+        .max_lifetime(std::time::Duration::from_secs(1800))  // 30 min max per connection
+        .connect_lazy(&database_url)
+        .expect("Invalid DATABASE_URL format");
 
-    // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    // Tables managed by Prisma — no sqlx migrations needed
 
     // Initialize services
     let auth_service = AuthService::new(jwt_secret, jwt_expiry_hours);
@@ -107,6 +116,7 @@ fn create_router(state: AppState) -> Router {
         // Auth routes
         .route("/api/auth/register", post(handlers::register))
         .route("/api/auth/login", post(handlers::login))
+        .route("/api/auth/google", post(handlers::google_login))
         .route("/api/auth/logout", post(handlers::logout))
         .route("/api/auth/me", get(handlers::get_current_user))
         // Password reset
@@ -115,5 +125,8 @@ fn create_router(state: AppState) -> Router {
         // Email verification
         .route("/api/auth/verify", post(handlers::verify_email))
         .route("/api/auth/resend-verification", post(handlers::resend_verification))
+        // Token refresh & password change
+        .route("/api/auth/refresh", post(handlers::refresh_token))
+        .route("/api/auth/change-password", post(handlers::change_password))
         .with_state(state)
 }

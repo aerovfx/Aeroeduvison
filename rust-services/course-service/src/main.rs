@@ -50,11 +50,20 @@ async fn main() {
         .await
         .expect("Failed to create database pool");
 
-    // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    // Ensure Certificate table exists (Prisma owns the rest of the schema)
+    sqlx::query(r#"
+        CREATE TABLE IF NOT EXISTS "Certificate" (
+            id TEXT PRIMARY KEY,
+            "userId" TEXT NOT NULL,
+            "courseId" TEXT NOT NULL REFERENCES "Course"(id) ON DELETE CASCADE,
+            "completedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            UNIQUE("userId", "courseId")
+        )
+    "#)
+    .execute(&pool)
+    .await
+    .expect("Failed to create Certificate table");
 
     // Initialize service
     let course_service = CourseService::new(jwt_secret);
@@ -86,6 +95,11 @@ fn create_router(state: AppState) -> Router {
     Router::new()
         // Health check
         .route("/health", get(handlers::health))
+        // Categories
+        .route("/api/categories", get(handlers::list_categories).post(handlers::create_category))
+        .route("/api/categories/:id", get(handlers::get_category).put(handlers::update_category).delete(handlers::delete_category))
+        // Instructor routes
+        .route("/api/instructor/courses", get(handlers::list_instructor_courses))
         // Course routes
         .route("/api/courses", post(handlers::create_course))
         .route("/api/courses", get(handlers::list_courses))
@@ -106,5 +120,10 @@ fn create_router(state: AppState) -> Router {
         // Progress routes
         .route("/api/courses/:course_id/chapters/:id/progress", get(handlers::get_progress))
         .route("/api/courses/:course_id/chapters/:id/progress", post(handlers::update_progress))
+        // Dashboard & course-level progress (must be before /:id routes to avoid conflicts)
+        .route("/api/courses/dashboard", get(handlers::get_dashboard))
+        .route("/api/courses/:id/progress", get(handlers::get_course_progress))
+        // Certificate routes
+        .route("/api/learning/certificate/:course_id", get(handlers::get_or_issue_certificate))
         .with_state(state)
 }

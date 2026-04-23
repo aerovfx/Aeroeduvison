@@ -1,0 +1,47 @@
+{
+  "id": "mechaforce",
+  "name": "MechaForce",
+  "title": "Mô phỏng lực cơ học",
+  "description": "Phân tích lực, mômen, chuyển động cơ học",
+  "version": "1.0.0",
+  "category": "Cơ học",
+  "level": "Trung bình",
+  "difficulty": "Trung bình",
+  "duration": "15-30 phút",
+  "xp": 180,
+  "icon": "Settings",
+  "tags": [
+    "mechaforce",
+    "cơ học",
+    "simulation",
+    "interactive"
+  ],
+  "features": [
+    "Interactive simulation",
+    "Real-time calculations",
+    "Visualization tools",
+    "Parameter adjustment"
+  ],
+  "learning_objectives": [
+    "Hiểu mô phỏng lực cơ học",
+    "Thực hành mô phỏng tương tác",
+    "Phân tích kết quả thí nghiệm",
+    "Áp dụng kiến thức thực tế"
+  ],
+  "backend": {
+    "port": 8004,
+    "endpoints": [
+      "/api/simulate",
+      "/api/analyze",
+      "/api/visualize"
+    ]
+  },
+  "demo": {
+    "features": [
+      "Interactive controls",
+      "Real-time visualization",
+      "Parameter analysis",
+      "Results export"
+    ]
+  }
+}

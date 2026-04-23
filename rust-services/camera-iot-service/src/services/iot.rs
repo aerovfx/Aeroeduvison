@@ -62,10 +62,11 @@ impl IoTService {
 
     pub async fn process_telemetry(&self, req: TelemetryBatchRequest) -> Result<(), AppError> {
         // 1. Validate device token (simplified)
-        let device = sqlx::query!(
-            "SELECT id FROM iot_devices WHERE device_id = $1 AND device_token = $2",
-            req.device_id, req.device_token
+        let _device = sqlx::query(
+            "SELECT id FROM iot_devices WHERE device_id = $1 AND device_token = $2"
         )
+        .bind(&req.device_id)
+        .bind(&req.device_token)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| AppError::Unauthorized("Invalid device token".to_string()))?;
@@ -151,12 +152,12 @@ impl IoTService {
     }
 
     pub async fn get_device_telemetry(&self, device_id: &str, limit: i64) -> Result<Vec<DeviceTelemetry>, AppError> {
-        let telemetry = sqlx::query_as!(
-            DeviceTelemetry,
-            "SELECT device_id, timestamp, sensor_type, value, unit, NULL as metadata 
-             FROM device_telemetry WHERE device_id = $1 ORDER BY timestamp DESC LIMIT $2",
-            device_id, limit
+        let telemetry: Vec<DeviceTelemetry> = sqlx::query_as(
+            "SELECT device_id, timestamp, sensor_type, value, unit, NULL::jsonb as metadata
+             FROM device_telemetry WHERE device_id = $1 ORDER BY timestamp DESC LIMIT $2"
         )
+        .bind(device_id)
+        .bind(limit)
         .fetch_all(&self.pool)
         .await?;
 
@@ -168,24 +169,29 @@ impl IoTService {
         let class_name = format!("Lớp {}", class_id);
         
         // 2. Get camera status for this class
-        let camera_status = sqlx::query!(
-            "SELECT status FROM cameras WHERE class_id = $1 LIMIT 1",
-            class_id
+        #[derive(sqlx::FromRow)]
+        struct CameraRow { status: String }
+        let camera_status = sqlx::query_as::<_, CameraRow>(
+            "SELECT status FROM cameras WHERE class_id = $1 LIMIT 1"
         )
+        .bind(class_id)
         .fetch_optional(&self.pool)
         .await?
         .map(|r| r.status)
         .unwrap_or_else(|| "none".to_string());
 
         // 3. Get devices and their latest readings
-        let devices = sqlx::query!(
-            r#"
-            SELECT device_id, name, device_type, status 
-            FROM iot_devices 
-            WHERE class_id = $1
-            "#,
-            class_id
+        #[derive(sqlx::FromRow)]
+        struct DeviceRow {
+            device_id: String,
+            name: String,
+            device_type: String,
+            status: String,
+        }
+        let devices: Vec<DeviceRow> = sqlx::query_as(
+            "SELECT device_id, name, device_type, status FROM iot_devices WHERE class_id = $1"
         )
+        .bind(class_id)
         .fetch_all(&self.pool)
         .await?;
 
@@ -200,11 +206,13 @@ impl IoTService {
 
         for d in devices {
             // Get latest reading for this device
-            let latest = sqlx::query!(
-                "SELECT sensor_type, value, unit FROM device_telemetry 
-                 WHERE device_id = $1 ORDER BY timestamp DESC LIMIT 10",
-                d.device_id
+            #[derive(sqlx::FromRow)]
+            struct TelRow { sensor_type: String, value: f64, unit: String }
+            let latest: Vec<TelRow> = sqlx::query_as(
+                "SELECT sensor_type, value, unit FROM device_telemetry
+                 WHERE device_id = $1 ORDER BY timestamp DESC LIMIT 10"
             )
+            .bind(&d.device_id)
             .fetch_all(&self.pool)
             .await?;
 

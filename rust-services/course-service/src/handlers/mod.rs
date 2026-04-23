@@ -1,12 +1,18 @@
+mod categories;
 mod courses;
 mod chapters;
 mod progress;
+mod dashboard;
 mod health;
+mod certificates;
 
-pub use courses::{create_course, list_courses, get_course, update_course, delete_course, publish_course, unpublish_course};
+pub use categories::{list_categories, get_category, create_category, update_category, delete_category};
+pub use courses::{create_course, list_courses, list_instructor_courses, get_course, update_course, delete_course, publish_course, unpublish_course};
 pub use chapters::{create_chapter, list_chapters, get_chapter, update_chapter, delete_chapter, reorder_chapters, publish_chapter, unpublish_chapter};
 pub use progress::{get_progress, update_progress};
+pub use dashboard::{get_dashboard, get_course_progress};
 pub use health::health;
+pub use certificates::get_or_issue_certificate;
 
 use axum::http::{header::AUTHORIZATION, HeaderMap};
 

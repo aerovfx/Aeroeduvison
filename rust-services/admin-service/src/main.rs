@@ -82,6 +82,11 @@ fn create_router(state: AppState) -> Router {
         .route("/api/admin/users/:id", put(handlers::update_user))
         .route("/api/admin/users/:id", delete(handlers::delete_user))
         // Students
+        // Teachers
+        .route("/api/admin/teachers", get(handlers::list_teachers))
+        .route("/api/admin/teachers/:id", get(handlers::get_teacher))
+        .route("/api/admin/teachers/:id", put(handlers::update_teacher))
+        // Students
         .route("/api/admin/students", get(handlers::list_students))
         .route("/api/admin/students/:id", get(handlers::get_student))
         .route("/api/admin/students/:id", put(handlers::update_student))

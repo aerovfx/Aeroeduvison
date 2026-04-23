@@ -4,9 +4,8 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::db::record_failed_login;
 use crate::error::{AuthError, Result};
-use crate::models::{RegisterRequest, RegisterResponse, UserInfo};
+use crate::models::{AuthTokens, RegisterResponse};
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterBody {
@@ -17,16 +16,26 @@ pub struct RegisterBody {
 }
 
 /// POST /api/auth/register
+///
+/// Returns AuthResponse matching frontend:
+/// `{ user: User, tokens: { accessToken, refreshToken, expiresIn } }`
+///
+/// Password validation: minimum 6 chars only (matches Zod schema in Register.tsx)
 pub async fn register(
     State(state): State<AppState>,
     Json(body): Json<RegisterBody>,
 ) -> Result<Json<RegisterResponse>> {
     let email = body.email.trim().to_lowercase();
-    
+
     tracing::info!(email = %email, name = %body.name, "Registration attempt");
 
-    // Validate password strength
-    validate_password(&body.password)?;
+    // Validate password — match frontend Zod schema (min 6 chars)
+    if body.password.len() < 6 {
+        return Err(AuthError::Validation("Password must be at least 6 characters".to_string()));
+    }
+    if body.password.len() > 100 {
+        return Err(AuthError::Validation("Password too long".to_string()));
+    }
 
     // Check if user already exists
     let existing = sqlx::query_scalar::<_, i64>(
@@ -45,11 +54,7 @@ pub async fn register(
     let hashed_password = state.auth.hash_password(&body.password)?;
 
     // Generate user ID
-    let user_id = format!("user_{}_{}", Utc::now().timestamp(), Uuid::new_v4().to_string()[..8].to_string());
-
-    // Generate verification token
-    let verification_token = Uuid::new_v4().to_string();
-    let token_expires = Utc::now() + Duration::hours(24);
+    let user_id = format!("user_{}_{}", Utc::now().timestamp(), &Uuid::new_v4().to_string()[..8]);
 
     // Create user
     let user = sqlx::query_as::<_, crate::models::User>(
@@ -72,69 +77,46 @@ pub async fn register(
     .bind(&body.name)
     .bind(&hashed_password)
     .bind(body.role.as_deref().unwrap_or("STUDENT"))
-    .bind(Utc::now())
-    .bind(Utc::now())
+    .bind(Utc::now().naive_utc())
+    .bind(Utc::now().naive_utc())
     .fetch_one(&state.db)
     .await?;
 
     tracing::info!(user_id = %user.id, email = %email, "User created");
 
-    // Create verification token in database
-    sqlx::query(
-        r#"
-        INSERT INTO "VerificationToken" (identifier, token, expires)
-        VALUES ($1, $2, $3)
-        "#
+    // Try to send verification email (non-fatal if email service unavailable)
+    let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let verification_token = Uuid::new_v4().to_string();
+    let token_expires = Utc::now() + Duration::hours(24);
+
+    // Create verification token (best-effort)
+    let _ = sqlx::query(
+        r#"INSERT INTO "VerificationToken" (identifier, token, expires) VALUES ($1, $2, $3)"#
     )
     .bind(&email)
     .bind(&verification_token)
-    .bind(token_expires)
+    .bind(token_expires.naive_utc())
     .execute(&state.db)
-    .await?;
+    .await;
 
-    tracing::info!(user_id = %user.id, "Verification token created");
-
-    // Send verification email
-    let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    state
+    // Send verification email (best-effort — don't fail registration if email fails)
+    let _ = state
         .email
         .send_verification_email(&email, &body.name, &verification_token, &app_url)
-        .await?;
+        .await;
 
-    tracing::info!(user_id = %user.id, "Verification email sent");
+    tracing::info!(user_id = %user.id, "Registration complete");
+
+    // Issue JWT immediately so user can log in without waiting for email verification
+    let jwt_expiry_hours = state.auth.expiry_hours();
+    let token = state.auth.generate_token(&user.id, &user.email, &user.role)?;
 
     Ok(Json(RegisterResponse {
-        success: true,
-        message: "Account created successfully. Please check your email to verify your account.".to_string(),
         user: user.to_user_info(),
+        tokens: AuthTokens {
+            access_token: token,
+            refresh_token: String::new(),
+            expires_in: jwt_expiry_hours * 3600,
+        },
     }))
-}
-
-fn validate_password(password: &str) -> Result<()> {
-    let mut errors = Vec::new();
-
-    if password.len() < 8 {
-        errors.push("Password must be at least 8 characters");
-    }
-    if password.len() > 100 {
-        errors.push("Password must be less than 100 characters");
-    }
-    if !password.chars().any(|c| c.is_uppercase()) {
-        errors.push("Password must contain at least one uppercase letter");
-    }
-    if !password.chars().any(|c| c.is_lowercase()) {
-        errors.push("Password must contain at least one lowercase letter");
-    }
-    if !password.chars().any(|c| c.is_numeric()) {
-        errors.push("Password must contain at least one number");
-    }
-    if !password.chars().any(|c| !c.is_alphanumeric()) {
-        errors.push("Password must contain at least one special character");
-    }
-
-    if !errors.is_empty() {
-        return Err(AuthError::Validation(errors.join("; ")));
-    }
-
-    Ok(())
 }

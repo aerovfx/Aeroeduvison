@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AeroEduVision — Nền tảng học tập thông minh với AI & Lab mô phỏng STEM" />
+    <title>AeroEduVision</title>
+    <!-- Preconnect đến Cloud Run backend (VITE_API_URL được bake-in lúc build) -->
+    <!-- Dev: proxy qua Vite nên không cần preconnect -->
+    <!-- Prod: thay bằng URL thật nếu dùng custom domain -->
+    <link rel="dns-prefetch" href="https://pixiai-s7mvhtkngq-as.a.run.app" />
+    <!--
+      Google Identity Services (GSI) — KHÔNG nạp ở đây nữa.
+      Script `accounts.google.com/gsi/client` giờ được lazy-load bởi
+      `@/lib/loadGsi` chỉ khi trang /auth/login mount.
+      Trước đây nằm trong <head> làm mọi trang (kể cả Landing) phải
+      chịu cost DNS + TLS + download ~40KB JS bên thứ ba.
+      Thêm preconnect nhẹ để vẫn warm-up TLS khi nào cần.
+    -->
+    <link rel="preconnect" href="https://accounts.google.com" crossorigin />
+    <link rel="dns-prefetch" href="https://accounts.google.com" />
+
+    <!--
+      Anti-flash theme script — runs BEFORE React hydration.
+      Reads stored themeSettings (or falls back to system preference)
+      and applies .dark class to <html> instantly so there's no white flash.
+    -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('themeSettings');
+          var mode = raw ? JSON.parse(raw).mode : 'system';
+          var resolved =
+            mode === 'dark'  ? 'dark'  :
+            mode === 'light' ? 'light' :
+            window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          if (resolved === 'dark') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          // If anything fails, use system default
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+          }
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

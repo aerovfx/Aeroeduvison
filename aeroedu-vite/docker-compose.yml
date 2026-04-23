@@ -1,0 +1,21 @@
+# docker-compose cho local development
+# Usage: docker-compose up
+version: '3.8'
+
+services:
+  aeroedu-vite:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8090}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8090}
+    ports:
+      - "3000:8080"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

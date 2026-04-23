@@ -93,10 +93,10 @@ impl IntoResponse for AuthError {
                 (StatusCode::BAD_REQUEST, "2FA is not enabled for this account")
             }
             AuthError::InvalidToken => {
-                (StatusCode::BAD_REQUEST, "Invalid or expired token")
+                (StatusCode::UNAUTHORIZED, "Invalid or expired token")
             }
             AuthError::TokenExpired => {
-                (StatusCode::BAD_REQUEST, "Token has expired")
+                (StatusCode::UNAUTHORIZED, "Token has expired")
             }
             AuthError::Database(e) => {
                 tracing::error!("Database error: {}", e);

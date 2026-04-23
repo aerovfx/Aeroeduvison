@@ -1,0 +1,33 @@
+[package]
+name = "achievements-service"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "achievements_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "achievements-service"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+jsonwebtoken = "9"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+
+
+[dev-dependencies]
+tower = { version = "0.4", features = ["util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

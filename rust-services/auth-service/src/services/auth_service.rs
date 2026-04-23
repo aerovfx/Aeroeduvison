@@ -36,6 +36,11 @@ impl AuthService {
         }
     }
 
+    /// Return configured JWT expiry in hours
+    pub fn expiry_hours(&self) -> u64 {
+        self.jwt_expiry_hours
+    }
+
     /// Hash password using Argon2
     pub fn hash_password(&self, password: &str) -> Result<String> {
         let salt = SaltString::generate(&mut OsRng);
@@ -97,6 +102,23 @@ impl AuthService {
             jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
             _ => AuthError::InvalidToken,
         })?;
+
+        Ok(token_data.claims)
+    }
+
+    /// Validate JWT token ignoring expiry — used for refresh flow
+    /// to allow recently-expired tokens to get a fresh one.
+    pub fn validate_token_ignore_expiry(&self, token: &str) -> Result<JwtClaims> {
+        let mut validation = Validation::default();
+        validation.validate_exp = false; // allow expired
+        validation.validate_nbf = false;
+
+        let token_data = decode::<JwtClaims>(
+            token,
+            &DecodingKey::from_secret(self.jwt_secret.as_bytes()),
+            &validation,
+        )
+        .map_err(|_| AuthError::InvalidToken)?;
 
         Ok(token_data.claims)
     }

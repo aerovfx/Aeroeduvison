@@ -1,0 +1,457 @@
+/**
+ * Router — ánh xạ toàn bộ Next.js routes → React Router paths
+ *
+ * Mapping:
+ *   app/(auth)/...           → /auth/*
+ *   app/(dashboard)/...      → /dashboard/*, /teacher/*, /student/*
+ *   app/(course)/...         → /courses/*
+ *   app/admin/...            → /admin/*
+ *   app/(marketing)/...      → /, /pricing, /contact-sales
+ *
+ * Chiến lược:
+ *   - Component Vite thực sự  → dùng lazy import trực tiếp
+ *   - Trang chưa port         → PageFallback iframe Next.js (localhost:3000)
+ *   - Wildcard sections       → PageFallback tự mirror path hiện tại
+ */
+import { lazy, Suspense } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { RoleGuard } from '@/components/auth/RoleGuard'
+import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import PageFallback from '@/pages/common/PageFallback'
+
+// Loading spinner
+function PageLoader() {
+  return (
+    <div className="flex-1 flex items-center justify-center min-h-screen">
+      <div className="relative w-10 h-10">
+        <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[hsl(262,83%,58%)] animate-spin" />
+      </div>
+    </div>
+  )
+}
+
+// ── Auth Pages (không lazy vì cần load nhanh) ───────────────
+import LoginPage from '@/pages/auth/Login'
+import RegisterPage from '@/pages/auth/Register'
+import ForgotPasswordPage from '@/pages/auth/ForgotPassword'
+import ResetPasswordPage from '@/pages/auth/ResetPassword'
+
+// ── Marketing Pages ─────────────────────────────────────────
+const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
+const PricingPage      = lazy(() => import('@/pages/marketing/Pricing'))
+
+// ── Public Pages (không cần đăng nhập) ───────────────────────
+const ScanAssignmentPage = lazy(() => import('@/pages/public/ScanAssignment'))
+const KeoCoJoinPage      = lazy(() => import('@/pages/public/KeoCoJoin'))
+const KeoCoChallengePage = lazy(() => import('@/pages/public/KeoCoChallenge'))
+const KeoCoLivePage      = lazy(() => import('@/pages/public/KeoCoLive'))
+
+// ── Dashboard (Student/General) ──────────────────────────────
+const DashboardHome    = lazy(() => import('@/pages/dashboard/Home'))
+const AnalyticsPage    = lazy(() => import('@/pages/dashboard/Analytics'))
+const AchievementsPage = lazy(() => import('@/pages/dashboard/Achievements'))
+const AssignmentsPage  = lazy(() => import('@/pages/dashboard/Assignments'))
+const CoursesPage      = lazy(() => import('@/pages/dashboard/Courses'))
+const AiTutorPage      = lazy(() => import('@/pages/dashboard/AiTutor'))
+const ChatPage         = lazy(() => import('@/pages/dashboard/Chat'))
+const EmotionPage      = lazy(() => import('@/pages/dashboard/Emotion'))
+const AuraPage         = lazy(() => import('@/pages/dashboard/Aura'))
+const StemPage         = lazy(() => import('@/pages/dashboard/Stem'))
+const NotesPage        = lazy(() => import('@/pages/dashboard/Notes'))
+const ScrumboardPage   = lazy(() => import('@/pages/dashboard/Scrumboard'))
+const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
+const ContactsPage     = lazy(() => import('@/pages/dashboard/Contacts'))
+
+// ── STEM Sub-pages ───────────────────────────────────────────
+const StemDetailPage    = lazy(() => import('@/pages/stem/StemDetail'))
+const StemEditPage      = lazy(() => import('@/pages/stem/StemEdit'))
+const StemTimelinePage  = lazy(() => import('@/pages/stem/StemTimeline'))
+const StemCreatePage    = lazy(() => import('@/pages/stem/StemCreate'))
+const StemTemplatesPage = lazy(() => import('@/pages/stem/StemTemplates'))
+
+// ── Courses ─────────────────────────────────────────────────
+const CourseViewPage   = lazy(() => import('@/pages/courses/CourseView'))
+const ChapterViewPage  = lazy(() => import('@/pages/courses/ChapterView'))
+
+// ── Labs (3D heavy) ─────────────────────────────────────────
+const LabsIndexPage      = lazy(() => import('@/pages/labs/LabsIndex'))
+const PythonLabsPage     = lazy(() => import('@/pages/labs/PythonLabs'))
+const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
+const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
+const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
+const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
+const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
+const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
+const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
+const SpringPendulum     = lazy(() => import('@/pages/labs/SpringPendulum'))
+const SimplePendulum     = lazy(() => import('@/pages/labs/SimplePendulum'))
+const OpticsLab          = lazy(() => import('@/pages/labs/OpticsLab'))
+const WaveInterference   = lazy(() => import('@/pages/labs/WaveInterference'))
+const MechaForce         = lazy(() => import('@/pages/labs/MechaForce'))
+const PixelAgents        = lazy(() => import('@/pages/labs/PixelAgents'))
+const PhysicsDungeon     = lazy(() => import('@/pages/labs/PhysicsDungeon'))
+const KeoCoApp           = lazy(() => import('@/pages/labs/KeoCoApp'))
+const RollCallWheel      = lazy(() => import('@/pages/labs/RollCallWheel'))
+const GestureSwarm       = lazy(() => import('@/pages/labs/GestureSwarm'))
+const AssemblySim        = lazy(() => import('@/pages/labs/AssemblySim'))
+const IoTLab             = lazy(() => import('@/pages/labs/IoTLab'))
+const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
+
+// ── Teacher Pages (đã port) ──────────────────────────────────
+const TeacherDashboard      = lazy(() => import('@/pages/teacher/Dashboard'))
+const ExamMatrixPage        = lazy(() => import('@/pages/teacher/ExamMatrix'))
+const QuestionBankPage      = lazy(() => import('@/pages/teacher/QuestionBank'))
+const ExamsPage             = lazy(() => import('@/pages/teacher/Exams'))
+const CreateExamPage        = lazy(() => import('@/pages/teacher/CreateExam'))
+const OnlineExamRoomPage    = lazy(() => import('@/pages/teacher/OnlineExamRoom'))
+const ExamGradingPage       = lazy(() => import('@/pages/teacher/ExamGrading'))
+const TranscriptPage        = lazy(() => import('@/pages/teacher/Transcript'))
+const CreateModulePage      = lazy(() => import('@/pages/teacher/CreateModule'))
+const LaTeXEditorPage       = lazy(() => import('@/pages/teacher/LaTeXEditor'))
+const TeacherMyCoursesPage  = lazy(() => import('@/pages/teacher/MyCourses'))
+const TeacherCourseEditorPage = lazy(() => import('@/pages/teacher/CourseEditor'))
+const TeacherCourseVideosPage = lazy(() => import('@/pages/teacher/CourseVideos'))
+const TeacherCourseAssetsPage = lazy(() => import('@/pages/teacher/CourseAssets'))
+const AiDashboardPage          = lazy(() => import('@/pages/teacher/AiDashboard'))
+const TeacherAnalyticsPage     = lazy(() => import('@/pages/teacher/Analytics'))
+const EmotionMapPage           = lazy(() => import('@/pages/teacher/EmotionMap'))
+const TeacherClassesPage       = lazy(() => import('@/pages/teacher/Classes'))
+const ClassDetailPage          = lazy(() => import('@/pages/teacher/ClassDetail'))
+const TeacherCalendarPage      = lazy(() => import('@/pages/teacher/Calendar'))
+const TeacherAssignmentsPage   = lazy(() => import('@/pages/teacher/Assignments'))
+const MeetingNotesPage         = lazy(() => import('@/pages/teacher/MeetingNotes'))
+const InteractionCenterPage    = lazy(() => import('@/pages/teacher/InteractionCenter'))
+const ExamGeneratorPage        = lazy(() => import('@/pages/teacher/ExamGenerator'))
+const AgentsPage               = lazy(() => import('@/pages/teacher/Agents'))
+const StudentInsightPage       = lazy(() => import('@/pages/teacher/StudentInsight'))
+const ExamReportsPage          = lazy(() => import('@/pages/teacher/ExamReports'))
+const DocumentDigitizationPage = lazy(() => import('@/pages/teacher/DocumentDigitization'))
+const DocumentDigitizationReviewPage = lazy(() => import('@/pages/teacher/DocumentDigitizationReview'))
+const LaTeXEditorDocumentPage = lazy(() => import('@/pages/teacher/LaTeXEditorDocument'))
+const LearningPathBuilderPage = lazy(() => import('@/pages/teacher/LearningPathBuilder'))
+const CameraManagementPage         = lazy(() => import('@/pages/teacher/CameraManagement'))
+const EnvironmentMonitoringPage    = lazy(() => import('@/pages/teacher/EnvironmentMonitoring'))
+
+// ── Student Pages (đã port) ──────────────────────────────────
+const StudentDashboardPage            = lazy(() => import('@/pages/student/Dashboard'))
+const StudentProgressPage             = lazy(() => import('@/pages/student/Progress'))
+const StudentSchedulePage             = lazy(() => import('@/pages/student/Schedule'))
+const StudentMyCoursesPage            = lazy(() => import('@/pages/student/MyCourses'))
+const StudentPurchaseHistoryPage      = lazy(() => import('@/pages/student/PurchaseHistory'))
+const StudentWishlistPage             = lazy(() => import('@/pages/student/Wishlist'))
+const StudentCertificatePage          = lazy(() => import('@/pages/student/Certificate'))
+const StudentAgentSettingsPage        = lazy(() => import('@/pages/student/AgentSettings'))
+const StudentAiTutorPage              = lazy(() => import('@/pages/student/AiTutor'))
+const StudentCareerPage               = lazy(() => import('@/pages/student/Career'))
+const StudentExamPrepPage             = lazy(() => import('@/pages/student/ExamPrep'))
+const StudentExamsPage                = lazy(() => import('@/pages/student/Exams'))
+const StudentVideoTranscriptPage      = lazy(() => import('@/pages/student/VideoTranscript'))
+const StudentVideoTranscriptHistoryPage = lazy(() => import('@/pages/student/VideoTranscriptHistory'))
+
+// ── Learning Paths ────────────────────────────────────────────
+const LearningPathsPage            = lazy(() => import('@/pages/learning/LearningPaths'))
+const LearningPathsRecommendedPage = lazy(() => import('@/pages/learning/LearningPathsRecommended'))
+
+// ── Learning / Course Player ─────────────────────────────────
+const CoursePlayerPage = lazy(() => import('@/pages/learning/CoursePlayer'))
+
+// ── Profile Pages ────────────────────────────────────────────
+const ProfileBasicInfoPage = lazy(() => import('@/pages/profile/BasicInfo'))
+const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
+
+// ── Admin Pages (đã port) ────────────────────────────────────
+const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
+const AdminStudents         = lazy(() => import('@/pages/admin/Students'))
+const AdminTeachers         = lazy(() => import('@/pages/admin/Teachers'))
+const AdminCameraManagement = lazy(() => import('@/pages/admin/CameraManagement'))
+const AdminIoTManagement    = lazy(() => import('@/pages/admin/IoTManagement'))
+const AdminModels           = lazy(() => import('@/pages/admin/Models'))
+const AdminSettings         = lazy(() => import('@/pages/admin/AdminSettings'))
+const AdminAtRiskPage       = lazy(() => import('@/pages/admin/AtRisk'))
+const AdminEmotionPage      = lazy(() => import('@/pages/admin/Emotion'))
+const AdminContentPage      = lazy(() => import('@/pages/admin/Content'))
+const AdminOperationsPage   = lazy(() => import('@/pages/admin/Operations'))
+const AdminCategoriesPage   = lazy(() => import('@/pages/admin/Categories'))
+
+// ── Fallback (PageFallback) dùng trực tiếp không cần lazy ────
+// vì component rất nhẹ (chỉ là iframe)
+
+export function AppRouter() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+
+        {/* ══════════════════════════════════════════════════
+            PUBLIC / MARKETING
+        ══════════════════════════════════════════════════ */}
+        <Route path="/"               element={<LandingPage />} />
+        <Route path="/pricing"        element={<PricingPage />} />
+        <Route path="/a/:token"       element={<ScanAssignmentPage />} />
+        <Route path="/k/:token"       element={<KeoCoJoinPage />} />
+        <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
+        <Route path="/kl/:token"      element={<KeoCoLivePage />} />
+        <Route path="/contact-sales"  element={<PageFallback />} />
+        <Route path="/cookies"        element={<PageFallback />} />
+        <Route path="/privacy"        element={<PageFallback />} />
+        <Route path="/terms"          element={<PageFallback />} />
+
+        {/* ══════════════════════════════════════════════════
+            AUTH ROUTES (không cần login)
+        ══════════════════════════════════════════════════ */}
+        <Route path="/auth/login"          element={<LoginPage />} />
+        <Route path="/auth/register"       element={<RegisterPage />} />
+        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        {/* Legacy redirects */}
+        <Route path="/sign-in"        element={<Navigate to="/auth/login" replace />} />
+        <Route path="/auth/signin"    element={<Navigate to="/auth/login" replace />} />
+        <Route path="/auth/signup"    element={<Navigate to="/auth/register" replace />} />
+        <Route path="/auth/error"     element={<PageFallback />} />
+
+        {/* ══════════════════════════════════════════════════
+            PROTECTED ROUTES (yêu cầu đăng nhập)
+        ══════════════════════════════════════════════════ */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<DashboardLayout />}>
+
+            {/* ── DASHBOARD (Student/General) ─────────────── */}
+            <Route path="/dashboard"                      element={<DashboardHome />} />
+            <Route path="/dashboard/analytics"            element={<AnalyticsPage />} />
+            <Route path="/dashboard/achievements"         element={<AchievementsPage />} />
+            <Route path="/dashboard/assignments"          element={<AssignmentsPage />} />
+            <Route path="/dashboard/courses"              element={<CoursesPage />} />
+            <Route path="/dashboard/emotion"              element={<EmotionPage />} />
+            <Route path="/ai-tutor"                       element={<AiTutorPage />} />
+            <Route path="/chat"                           element={<ChatPage />} />
+
+            {/* Dashboard pages chưa port → PageFallback */}
+            <Route path="/dashboard/ai-content-generator" element={<PageFallback />} />
+            <Route path="/dashboard/aura"                  element={<AuraPage />} />
+            <Route path="/dashboard/change-password"       element={<PageFallback />} />
+            <Route path="/dashboard/competition"           element={<PageFallback />} />
+            <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
+            <Route path="/dashboard/contacts"              element={<ContactsPage />} />
+            <Route path="/dashboard/iot-lab"               element={<IoTLab />} />
+            <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
+            <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
+            <Route path="/dashboard/learning"              element={<PageFallback />} />
+            <Route path="/dashboard/learning/*"            element={<PageFallback />} />
+            <Route path="/dashboard/logo-a-demo"           element={<PageFallback />} />
+            <Route path="/dashboard/notes"                 element={<NotesPage />} />
+            <Route path="/dashboard/notifications"         element={<PageFallback />} />
+            <Route path="/dashboard/profile"               element={<PageFallback />} />
+            <Route path="/dashboard/quiz/:quizId"          element={<PageFallback />} />
+            <Route path="/dashboard/quizzes"               element={<PageFallback />} />
+            <Route path="/dashboard/scrumboard"            element={<ScrumboardPage />} />
+            <Route path="/dashboard/settings"              element={<SettingsPage />} />
+            <Route path="/dashboard/stem"                  element={<StemPage />} />
+            <Route path="/dashboard/stem/create"           element={<StemCreatePage />} />
+            <Route path="/dashboard/stem/templates"        element={<StemTemplatesPage />} />
+            <Route path="/dashboard/stem/:id"              element={<StemDetailPage />} />
+            <Route path="/dashboard/stem/:id/edit"         element={<StemEditPage />} />
+            <Route path="/dashboard/stem/:id/timeline"     element={<StemTimelinePage />} />
+            <Route path="/dashboard/study-dashboard"       element={<PageFallback />} />
+            <Route path="/dashboard/study-group-map"       element={<PageFallback />} />
+            <Route path="/dashboard/theme"                 element={<PageFallback />} />
+            <Route path="/dashboard/vision-tracker"        element={<PageFallback />} />
+            <Route path="/dashboard/weather"               element={<Navigate to="/dashboard" replace />} />
+
+            {/* ── AI TUTOR sub-routes ─────────────────────── */}
+            <Route path="/ai-tutor/assignments"  element={<PageFallback />} />
+            <Route path="/ai-tutor/chat-test"    element={<PageFallback />} />
+
+            {/* ── LABS ──────────────────────────────────────── */}
+            <Route path="/dashboard/labtwin"                              element={<LabsIndexPage />} />
+            <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
+            <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
+            <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
+            <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
+            <Route path="/dashboard/labtwin/labs/physics-motion"          element={<PhysicsMotion />} />
+            <Route path="/dashboard/labtwin/labs/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
+            {/* ── New native simulation labs ───────────────── */}
+            <Route path="/dashboard/labtwin/labs/spring-pendulum"         element={<SpringPendulum />} />
+            <Route path="/dashboard/labtwin/labs/simple-pendulum"         element={<SimplePendulum />} />
+            <Route path="/dashboard/labtwin/labs/optics-lab"              element={<OpticsLab />} />
+            <Route path="/dashboard/labtwin/labs/wave-interference"       element={<WaveInterference />} />
+            <Route path="/dashboard/labtwin/labs/mechaforce"              element={<MechaForce />} />
+            <Route path="/dashboard/labtwin/labs/pixel-agents"            element={<PixelAgents />} />
+            <Route path="/dashboard/labtwin/labs/physics-dungeon"         element={<PhysicsDungeon />} />
+            <Route path="/dashboard/labtwin/labs/keo-co-app"              element={<KeoCoApp />} />
+            <Route path="/dashboard/labtwin/labs/roll-call-wheel"         element={<RollCallWheel />} />
+            <Route path="/dashboard/labtwin/labs/gesture-swarm"           element={<GestureSwarm />} />
+            <Route path="/dashboard/labtwin/labs/assembly-sim"            element={<AssemblySim />} />
+            {/* Tất cả labs khác → LabNextJsFallback (info card, no iframe) */}
+            <Route path="/dashboard/labtwin/labs/:labSlug"                element={<LabNextJsFallback />} />
+            {/* Lab experiment pages */}
+            <Route path="/dashboard/labtwin/experiment/*"   element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/labs"           element={<PythonLabsPage />} />
+            <Route path="/dashboard/labtwin/labs-simple"    element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/ml-training"    element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/simulations-simple" element={<PageFallback />} />
+            <Route path="/dashboard/labtwin/video-tracking" element={<PageFallback />} />
+
+            {/* ── COURSES ───────────────────────────────────── */}
+            <Route path="/courses/:courseId"                              element={<CourseViewPage />} />
+            <Route path="/courses/:courseId/chapters/:chapterId"          element={<ChapterViewPage />} />
+
+            {/* ── LEARNING PATHS ────────────────────────────── */}
+            <Route path="/learning-paths"                     element={<LearningPathsPage />} />
+            <Route path="/learning-paths/recommended"         element={<LearningPathsRecommendedPage />} />
+            <Route path="/learning-paths/lesson/:lessonId"    element={<PageFallback />} />
+
+            {/* ── SEARCH ────────────────────────────────────── */}
+            <Route path="/search"          element={<PageFallback />} />
+            <Route path="/search-disabled" element={<PageFallback />} />
+
+            {/* ── AEROEDU ───────────────────────────────────── */}
+            <Route path="/aeroedu" element={<PageFallback />} />
+
+            {/* ── PROFILE (all roles) ───────────────────────── */}
+            <Route path="/profile/basic-information" element={<ProfileBasicInfoPage />} />
+            <Route path="/profile/photo"             element={<ProfilePhotoPage />} />
+            <Route path="/profile"                   element={<Navigate to="/profile/basic-information" replace />} />
+
+            {/* ── COURSE PLAYER (full-screen) ───────────────── */}
+            <Route path="/learning/course/:slug/:courseId" element={<CoursePlayerPage />} />
+            {/* Legacy redirects */}
+            <Route path="/learning/my-courses"         element={<Navigate to="/student/my-courses" replace />} />
+            <Route path="/learning/wishlist"           element={<Navigate to="/student/wishlist" replace />} />
+            <Route path="/learning/my-purchase-history" element={<Navigate to="/student/purchase-history" replace />} />
+
+            {/* ══════════════════════════════════════════════
+                STUDENT ROUTES
+            ══════════════════════════════════════════════ */}
+            <Route element={<RoleGuard roles={['STUDENT', 'TEACHER', 'ADMIN']} />}>
+              {/* Đã port */}
+              <Route path="/student/dashboard"         element={<StudentDashboardPage />} />
+              <Route path="/student/progress"          element={<StudentProgressPage />} />
+              <Route path="/student/schedule"          element={<StudentSchedulePage />} />
+              <Route path="/student/my-courses"        element={<StudentMyCoursesPage />} />
+              <Route path="/student/purchase-history"  element={<StudentPurchaseHistoryPage />} />
+              <Route path="/student/wishlist"          element={<StudentWishlistPage />} />
+              <Route path="/student/certificate/:courseId" element={<StudentCertificatePage />} />
+
+              {/* Đã port */}
+              <Route path="/student/agent-settings"           element={<StudentAgentSettingsPage />} />
+              <Route path="/student/ai-tutor"                 element={<StudentAiTutorPage />} />
+              <Route path="/student/career"                   element={<StudentCareerPage />} />
+              <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
+              <Route path="/student/exam/:id"                 element={<PageFallback />} />
+              <Route path="/student/exams"                    element={<StudentExamsPage />} />
+              <Route path="/student/video-transcript/history" element={<StudentVideoTranscriptHistoryPage />} />
+              <Route path="/student/video-transcript"         element={<StudentVideoTranscriptPage />} />
+            </Route>
+
+            {/* ══════════════════════════════════════════════
+                TEACHER ROUTES
+            ══════════════════════════════════════════════ */}
+            <Route element={<RoleGuard roles={['TEACHER', 'ADMIN']} />}>
+              {/* Đã port */}
+              <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
+              <Route path="/teacher/my-courses"             element={<TeacherMyCoursesPage />} />
+              <Route path="/teacher/course/create"          element={<TeacherCourseEditorPage />} />
+              <Route path="/teacher/course/:courseId/edit"  element={<TeacherCourseEditorPage />} />
+              <Route path="/teacher/course/:courseId/videos" element={<TeacherCourseVideosPage />} />
+              <Route path="/teacher/course/:courseId/assets" element={<TeacherCourseAssetsPage />} />
+              <Route path="/teacher/exam-matrix"            element={<ExamMatrixPage />} />
+              <Route path="/teacher/question-bank"          element={<QuestionBankPage />} />
+              <Route path="/teacher/exams"                  element={<ExamsPage />} />
+              <Route path="/teacher/online-exam-room"       element={<OnlineExamRoomPage />} />
+              <Route path="/teacher/exam-grading"           element={<ExamGradingPage />} />
+              <Route path="/teacher/transcript"             element={<TranscriptPage />} />
+              <Route path="/teacher/create-module"          element={<CreateModulePage />} />
+              <Route path="/teacher/latex-documents"        element={<LaTeXEditorPage />} />
+
+              {/* Chưa port → PageFallback (specific trước, wildcard sau) */}
+              <Route path="/teacher/agents"                        element={<AgentsPage />} />
+              <Route path="/teacher/ai-dashboard"                  element={<AiDashboardPage />} />
+              <Route path="/teacher/analytics"                     element={<TeacherAnalyticsPage />} />
+              <Route path="/teacher/assignments"                   element={<TeacherAssignmentsPage />} />
+              <Route path="/teacher/calendar"                      element={<TeacherCalendarPage />} />
+              <Route path="/teacher/camera-management"             element={<CameraManagementPage />} />
+              <Route path="/teacher/classes"                       element={<TeacherClassesPage />} />
+              <Route path="/teacher/classes/:id"                   element={<ClassDetailPage />} />
+              <Route path="/teacher/document-digitization"         element={<DocumentDigitizationPage />} />
+              <Route path="/teacher/document-digitization/:id/review" element={<DocumentDigitizationReviewPage />} />
+              <Route path="/teacher/emotion-map"                   element={<EmotionMapPage />} />
+              <Route path="/teacher/environment-monitoring"        element={<EnvironmentMonitoringPage />} />
+              <Route path="/teacher/exam-edit/:examId/:questionId" element={<PageFallback />} />
+              <Route path="/teacher/exam-generator"                element={<ExamGeneratorPage />} />
+              <Route path="/teacher/exam-matrix/create"            element={<PageFallback />} />
+              <Route path="/teacher/exam-matrix/:id"               element={<PageFallback />} />
+              <Route path="/teacher/exam-matrix/:id/edit"          element={<PageFallback />} />
+              <Route path="/teacher/exam-matrix/:id/review"        element={<PageFallback />} />
+              <Route path="/teacher/exam-preview/:examId"          element={<PageFallback />} />
+              <Route path="/teacher/exam-reports"                  element={<ExamReportsPage />} />
+              <Route path="/teacher/exams/create"                  element={<CreateExamPage />} />
+              <Route path="/teacher/exams/:id"                     element={<PageFallback />} />
+              <Route path="/teacher/exams/:id/edit"                element={<PageFallback />} />
+              <Route path="/teacher/grading"                       element={<PageFallback />} />
+              <Route path="/teacher/interaction-center"            element={<InteractionCenterPage />} />
+              <Route path="/teacher/latex-documents/:id"           element={<LaTeXEditorDocumentPage />} />
+              <Route path="/teacher/learning-path-builder"         element={<LearningPathBuilderPage />} />
+              <Route path="/teacher/meeting-notes"                 element={<MeetingNotesPage />} />
+              <Route path="/teacher/meeting-notes/history"         element={<PageFallback />} />
+              <Route path="/teacher/multi-disciplinary-paths"      element={<PageFallback />} />
+              <Route path="/teacher/online-exam-room/:id/take"     element={<PageFallback />} />
+              <Route path="/teacher/question-bank/add"             element={<PageFallback />} />
+              <Route path="/teacher/question-bank/create"          element={<PageFallback />} />
+              <Route path="/teacher/question-bank/edit/:id"        element={<PageFallback />} />
+              <Route path="/teacher/question-bank/list"            element={<PageFallback />} />
+              <Route path="/teacher/student/:studentId"            element={<StudentInsightPage />} />
+              <Route path="/teacher/system-flow"                   element={<PageFallback />} />
+              <Route path="/teacher/transcript/library"            element={<PageFallback />} />
+              <Route path="/teacher/transcript/recording"          element={<PageFallback />} />
+              <Route path="/teacher/transcript/upload"             element={<PageFallback />} />
+              <Route path="/teacher/vision/object-detection"       element={<PageFallback />} />
+            </Route>
+
+            {/* ══════════════════════════════════════════════
+                ADMIN ROUTES
+            ══════════════════════════════════════════════ */}
+            <Route element={<RoleGuard roles={['ADMIN']} />}>
+              <Route path="/admin"         element={<Navigate to="/admin/overview" replace />} />
+              {/* Đã port */}
+              <Route path="/admin/overview"            element={<AdminOverview />} />
+              <Route path="/admin/students"            element={<AdminStudents />} />
+              <Route path="/admin/teachers"            element={<AdminTeachers />} />
+              <Route path="/admin/camera-management"   element={<AdminCameraManagement />} />
+              <Route path="/admin/iot-management"      element={<AdminIoTManagement />} />
+              <Route path="/admin/models"              element={<AdminModels />} />
+              <Route path="/admin/settings"            element={<AdminSettings />} />
+
+              {/* Chưa port → PageFallback */}
+              <Route path="/admin/agents"              element={<PageFallback />} />
+              <Route path="/admin/agents/chat"         element={<PageFallback />} />
+              <Route path="/admin/alerts"              element={<PageFallback />} />
+              <Route path="/admin/at-risk"             element={<AdminAtRiskPage />} />
+              <Route path="/admin/content"             element={<AdminContentPage />} />
+              <Route path="/admin/emotion"             element={<AdminEmotionPage />} />
+              <Route path="/admin/operations"          element={<AdminOperationsPage />} />
+              <Route path="/admin/categories"          element={<AdminCategoriesPage />} />
+            </Route>
+
+          </Route>{/* /DashboardLayout */}
+        </Route>{/* /ProtectedRoute */}
+
+        {/* ══════════════════════════════════════════════════
+            MISC / DEBUG / TOOLS (không cần layout)
+        ══════════════════════════════════════════════════ */}
+        <Route path="/blocking"       element={<PageFallback />} />
+        <Route path="/clear-session"  element={<PageFallback />} />
+        <Route path="/debug-auth"     element={<PageFallback />} />
+        <Route path="/grading-system" element={<PageFallback />} />
+        <Route path="/hand-tracking"  element={<PageFallback />} />
+        <Route path="/labtwin-circuit" element={<PageFallback />} />
+        <Route path="/streaming"      element={<PageFallback />} />
+        <Route path="/test-r3f"       element={<PageFallback />} />
+        <Route path="/competition"    element={<PageFallback />} />
+
+        {/* ── 404 fallback ─────────────────────────────── */}
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+      </Routes>
+    </Suspense>
+  )
+}

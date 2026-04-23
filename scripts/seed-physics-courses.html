@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>🚀 Seed Physics Courses — AeroEduVision</title>
+<style>
+  body { font-family: monospace; background: #0f0f1a; color: #e0e0e0; padding: 2rem; }
+  h1 { color: #a78bfa; }
+  #log { background: #1a1a2e; border: 1px solid #2d2d4e; border-radius: 8px; padding: 1rem;
+         white-space: pre-wrap; line-height: 1.8; min-height: 200px; }
+  .ok  { color: #4ade80; }
+  .err { color: #f87171; }
+  .info{ color: #60a5fa; }
+  button { background: #7c3aed; color: white; border: none; padding: 12px 32px;
+           border-radius: 8px; font-size: 16px; cursor: pointer; margin: 1rem 0; }
+  button:hover { background: #6d28d9; }
+  button:disabled { background: #4b5563; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<h1>🚀 Seed 4 Khoá học Vật lí — AeroEduVision</h1>
+<p style="color:#94a3b8">Bấm nút bên dưới để tạo 4 khoá học Vật lí mockup trực tiếp vào database Neon.</p>
+<button id="btn" onclick="runSeed()">▶ Bắt đầu Seed</button>
+<div id="log"><span class="info">Sẵn sàng. Bấm nút để bắt đầu...</span></div>
+
+<script type="module">
+// ── Config ────────────────────────────────────────────────────────────────────
+const CONNECTION_STRING = 'postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z.ap-southeast-1.aws.neon.tech/neondb'
+const TEACHER_ID = 'cmnn66ky20000s602tl7vgseu'
+const SCHOOL_ID  = 'default-school'
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const logEl = document.getElementById('log')
+function log(msg, cls = '') {
+  logEl.innerHTML += `<span class="${cls}">${msg}</span>\n`
+  logEl.scrollTop = logEl.scrollHeight
+}
+function uid() {
+  return Math.random().toString(36).slice(2,11) + Math.random().toString(36).slice(2,11)
+}
+
+// ── Course data ───────────────────────────────────────────────────────────────
+const courses = [
+  {
+    title: 'Cơ học Newton – Nền tảng Vật lí đại cương',
+    description: '<p>Khoá học cung cấp nền tảng vững chắc về cơ học cổ điển theo các định luật Newton. Học viên sẽ hiểu sâu về chuyển động, lực, năng lượng và hệ quy chiếu quán tính.</p><ul><li>3 định luật Newton và ứng dụng thực tế</li><li>Động học: vận tốc, gia tốc, phương trình chuyển động</li><li>Công, năng lượng, định lý động năng</li><li>Va chạm đàn hồi và không đàn hồi</li><li>Chuyển động tròn và lực hướng tâm</li></ul>',
+    price: 299000,
+    image_url: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&q=80',
+    chapters: [
+      { title: 'Giới thiệu: Vật lí cơ học là gì?', pos: 1, free: true },
+      { title: 'Định luật 1 Newton – Quán tính', pos: 2, free: true },
+      { title: 'Định luật 2 Newton – F = ma', pos: 3 },
+      { title: 'Định luật 3 Newton – Phản lực', pos: 4 },
+      { title: 'Lực ma sát và ứng dụng', pos: 5 },
+      { title: 'Động năng và thế năng', pos: 6 },
+      { title: 'Bảo toàn năng lượng', pos: 7 },
+      { title: 'Va chạm và bảo toàn động lượng', pos: 8 },
+    ],
+  },
+  {
+    title: 'Điện từ học – Điện trường, Từ trường & Cảm ứng điện từ',
+    description: '<p>Khoá học toàn diện về điện từ học, từ điện tích cơ bản đến sóng điện từ Maxwell. Phù hợp cho học sinh lớp 11 và sinh viên năm nhất đại học.</p><ul><li>Điện tích, định luật Coulomb, điện trường</li><li>Điện thế, tụ điện, năng lượng điện trường</li><li>Dòng điện không đổi, định luật Ohm, mạch điện</li><li>Từ trường, lực Lorentz, cảm ứng điện từ</li><li>Máy biến áp và dòng điện xoay chiều</li></ul>',
+    price: 349000,
+    image_url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80',
+    chapters: [
+      { title: 'Điện tích và Định luật Coulomb', pos: 1, free: true },
+      { title: 'Điện trường – Khái niệm và tính toán', pos: 2, free: true },
+      { title: 'Điện thế và Hiệu điện thế', pos: 3 },
+      { title: 'Tụ điện – Cấu tạo và ứng dụng', pos: 4 },
+      { title: 'Dòng điện không đổi và Định luật Ohm', pos: 5 },
+      { title: 'Mạch điện: nối tiếp, song song, hỗn hợp', pos: 6 },
+      { title: 'Từ trường và Lực từ', pos: 7 },
+      { title: 'Cảm ứng điện từ – Định luật Faraday', pos: 8 },
+      { title: 'Dòng điện xoay chiều và Máy biến áp', pos: 9 },
+    ],
+  },
+  {
+    title: 'Quang học & Sóng – Ánh sáng, Giao thoa và Khúc xạ',
+    description: '<p>Khám phá thế giới của sóng ánh sáng — từ gương phẳng, thấu kính đến hiện tượng giao thoa và tán sắc. Khoá học kết hợp lý thuyết với thực nghiệm trực quan.</p><ul><li>Bản chất sóng của ánh sáng, phổ điện từ</li><li>Phản xạ, khúc xạ, định luật Snell</li><li>Thấu kính hội tụ và phân kỳ – dựng ảnh</li><li>Giao thoa ánh sáng – thí nghiệm Young</li><li>Nhiễu xạ, tán sắc và ứng dụng quang học</li><li>Sóng âm và đặc tính âm thanh</li></ul>',
+    price: 279000,
+    image_url: 'https://images.unsplash.com/photo-1576086213369-97a306d36557?w=800&q=80',
+    chapters: [
+      { title: 'Ánh sáng là gì? Tốc độ ánh sáng', pos: 1, free: true },
+      { title: 'Phản xạ ánh sáng và Gương phẳng', pos: 2, free: true },
+      { title: 'Khúc xạ ánh sáng – Định luật Snell', pos: 3 },
+      { title: 'Thấu kính hội tụ – Dựng ảnh và tính toán', pos: 4 },
+      { title: 'Thấu kính phân kỳ và Hệ thấu kính', pos: 5 },
+      { title: 'Giao thoa ánh sáng – Thí nghiệm Young', pos: 6 },
+      { title: 'Tán sắc ánh sáng và Màu sắc', pos: 7 },
+      { title: 'Sóng âm, Cộng hưởng và Doppler', pos: 8 },
+    ],
+  },
+  {
+    title: 'Vật lí Hiện đại – Lượng tử, Hạt nhân & Thuyết tương đối',
+    description: '<p>Hành trình vào thế giới vi mô: từ hiệu ứng quang điện của Einstein đến cơ học lượng tử, phóng xạ hạt nhân và E=mc². Khoá học dành cho học sinh lớp 12 và người yêu thích Vật lí lý thuyết.</p><ul><li>Thuyết tương đối hẹp Einstein: E=mc², giãn nở thời gian</li><li>Bức xạ vật đen, giả thuyết Planck</li><li>Hiệu ứng quang điện và lưỡng tính sóng–hạt</li><li>Mô hình nguyên tử Bohr, phổ vạch hydro</li><li>Phóng xạ alpha, beta, gamma và chu kỳ bán rã</li><li>Phản ứng hạt nhân, năng lượng liên kết và lò phản ứng</li></ul>',
+    price: 399000,
+    image_url: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80',
+    chapters: [
+      { title: 'Giới thiệu Vật lí hiện đại', pos: 1, free: true },
+      { title: 'Thuyết tương đối hẹp – E=mc²', pos: 2, free: true },
+      { title: 'Giãn nở thời gian và Co rút không gian', pos: 3 },
+      { title: 'Bức xạ vật đen và Giả thuyết Planck', pos: 4 },
+      { title: 'Hiệu ứng quang điện – Photon là gì?', pos: 5 },
+      { title: 'Lưỡng tính sóng–hạt và Nguyên lý bất định', pos: 6 },
+      { title: 'Mô hình nguyên tử Bohr', pos: 7 },
+      { title: 'Phóng xạ và Phân rã hạt nhân', pos: 8 },
+      { title: 'Phản ứng hạt nhân và Năng lượng hạt nhân', pos: 9 },
+      { title: 'Ứng dụng: Lò phản ứng, PET scan, Carbon dating', pos: 10 },
+    ],
+  },
+]
+
+// ── Seed function ─────────────────────────────────────────────────────────────
+window.runSeed = async function() {
+  const btn = document.getElementById('btn')
+  btn.disabled = true
+  logEl.innerHTML = ''
+
+  log('🔌 Kết nối Neon database...', 'info')
+
+  let neon
+  try {
+    // Load @neondatabase/serverless from CDN
+    const mod = await import('https://esm.sh/@neondatabase/serverless@0.10.4')
+    neon = mod.neon
+    log('✅ Neon serverless driver đã tải', 'ok')
+  } catch(e) {
+    log(`❌ Không tải được driver: ${e.message}`, 'err')
+    log('👉 Hãy chạy: node scripts/seed-physics-courses.mjs', 'info')
+    btn.disabled = false
+    return
+  }
+
+  const sql = neon(CONNECTION_STRING)
+
+  try {
+    // Ping
+    const ping = await sql`SELECT 1 as ok`
+    log(`✅ Đã kết nối DB (ping OK)`, 'ok')
+  } catch(e) {
+    log(`❌ Kết nối thất bại: ${e.message}`, 'err')
+    btn.disabled = false
+    return
+  }
+
+  // Ensure Category "Vật lí"
+  log('\n📁 Kiểm tra danh mục "Vật lí"...', 'info')
+  let catRows = await sql`SELECT id FROM "Category" WHERE lower(name) = 'vật lí'`
+  let catId
+  if (catRows.length) {
+    catId = catRows[0].id
+    log(`   Đã tồn tại → ${catId}`, 'info')
+  } else {
+    catId = uid()
+    await sql`INSERT INTO "Category" (id, name) VALUES (${catId}, 'Vật lí')`
+    log(`   Đã tạo mới → ${catId}`, 'ok')
+  }
+
+  // Insert courses
+  log('\n📚 Tạo 4 khoá học...', 'info')
+  for (const c of courses) {
+    const courseId = uid()
+    const now = new Date().toISOString()
+    try {
+      await sql`
+        INSERT INTO "Course"
+          (id, user_id, school_id, title, description, image_url, price, category_id, is_published, created_at, updated_at)
+        VALUES
+          (${courseId}, ${TEACHER_ID}, ${SCHOOL_ID}, ${c.title}, ${c.description},
+           ${c.image_url}, ${c.price}, ${catId}, true, ${now}, ${now})
+      `
+      log(`\n✅ ${c.title.substring(0,55)}`, 'ok')
+
+      for (const ch of c.chapters) {
+        const chId = uid()
+        await sql`
+          INSERT INTO "Chapter"
+            (id, course_id, title, position, is_published, is_free, created_at, updated_at)
+          VALUES
+            (${chId}, ${courseId}, ${ch.title}, ${ch.pos}, true, ${ch.free ?? false}, ${now}, ${now})
+        `
+        log(`   └ ${ch.free ? '🆓 ' : '   '}${ch.title}`, 'info')
+      }
+    } catch(e) {
+      log(`❌ Lỗi khoá học "${c.title.substring(0,30)}": ${e.message}`, 'err')
+    }
+  }
+
+  log('\n\n🎉 HOÀN TẤT! Reload lại http://localhost:5173 để xem khoá học.', 'ok')
+  btn.textContent = '✅ Đã xong!'
+}
+</script>
+</body>
+</html>

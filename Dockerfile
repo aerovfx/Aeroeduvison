@@ -1,97 +1,102 @@
-# Multi-stage build for production
-# Using Debian-based image for better Prisma compatibility
-FROM node:20-slim AS base
+# ============================================================
+# AeroEduVision — Cloud Run container (pixiai)
+#
+# Architecture:
+#   Stage 1: Build Vite React SPA
+#   Stage 2: Runtime — Express proxy server
+#              /api/auth/* → AUTH_SERVICE_URL (Rust auth-service OR built-in Node.js)
+#              /api/*      → BACKEND_URL (Rust aero-backend gateway)
+#              /*          → Vite dist/ (static SPA)
+#
+# Auth strategy:
+#   - If AUTH_SERVICE_URL is set in Cloud Run env vars → proxy to Rust auth-service
+#   - If AUTH_SERVICE_URL is NOT set → built-in Node.js auth (pg + bcryptjs + jsonwebtoken)
+#   The built-in auth reads DATABASE_URL + JWT_SECRET from Cloud Run secrets.
+# ============================================================
 
-# Install OpenSSL and other dependencies
-RUN apt-get update && apt-get install -y \
-    openssl \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Dependencies stage
-FROM base AS deps
+# ── Stage 1: Build Vite SPA ─────────────────────────────────
+FROM node:20-slim AS vite-builder
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-COPY prisma ./prisma/
+# Build-time arguments (required for OAuth — Vite bakes VITE_* vars into the bundle)
+# Passed from deploy.sh via `docker buildx build --build-arg`.
+ARG VITE_GOOGLE_CLIENT_ID=""
+ARG VITE_API_URL=""
+ARG VITE_WS_URL=""
+ARG VITE_APP_URL=""
 
-# Install dependencies with better error handling
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+COPY aeroedu-vite/package.json aeroedu-vite/package-lock.json* ./
+RUN npm config set fetch-timeout 600000 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm ci --legacy-peer-deps
 
-# Builder stage
-FROM base AS builder
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Ensure public directory exists
-RUN mkdir -p public
-
-# Generate Prisma client for linux/amd64 (matches Cloud Run Gen2 runtime).
-# PRISMA_SKIP_VALIDATION=1 → skip DATABASE_URL check (not needed at build time).
-# We do NOT use `|| true` here — a silent failure leaves .prisma/client empty,
-# which forces Prisma to fall back to the WASM engine at runtime → OOM.
-RUN PRISMA_SKIP_VALIDATION=1 npx prisma generate
-
-# Build Next.js application with standalone output
-ENV NEXT_TELEMETRY_DISABLED=1
+COPY aeroedu-vite/ .
 ENV NODE_ENV=production
-ENV SKIP_ENV_VALIDATION=1
-ENV DISABLE_CONTENTLAYER=1
-# === BUILD MEMORY STRATEGY ===
-# Problem: Build compiles OK (~3min) but OOM at "Generating static pages (193)"
-# Solution: Use generous heap BUT with GC pressure to free memory between pages
-# Docker Desktop has 16GB; BuildKit gets ~10-12GB usable
-ENV NODE_OPTIONS="--max-old-space-size=7168"
+ENV VITE_APP_VERSION=cloud-run
+# Promote build args to ENV so Vite picks them up during `npm run build`
+ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_WS_URL=${VITE_WS_URL}
+ENV VITE_APP_URL=${VITE_APP_URL}
+# Hard validation — reject build if VITE_GOOGLE_CLIENT_ID is polluted.
+# Context: 2026-04-21 incident — deploy-cloudbuild.sh used `echo` to stdout inside
+# $(load_env_var …), which contaminated the build-arg with a debug prefix like
+# "  VITE_GOOGLE_CLIENT_ID: loaded from aeroedu-vite/.env.production\n<real-id>".
+# Vite happily baked that polluted string into the bundle → Google OAuth returned
+# invalid_client. This block fails the Docker build early if garbage leaks through.
+RUN set -eu; \
+    echo "▶ VITE_GOOGLE_CLIENT_ID length=${#VITE_GOOGLE_CLIENT_ID} (must be >0 for Google OAuth)"; \
+    if [ -n "${VITE_GOOGLE_CLIENT_ID}" ]; then \
+      case "${VITE_GOOGLE_CLIENT_ID}" in \
+        *[[:space:]]*) \
+          echo "❌ VITE_GOOGLE_CLIENT_ID contains whitespace/newline — refusing to build." >&2; \
+          printf '%s' "${VITE_GOOGLE_CLIENT_ID}" | od -c | head -20 >&2; \
+          exit 1 ;; \
+      esac; \
+      if ! printf '%s' "${VITE_GOOGLE_CLIENT_ID}" \
+           | grep -qE '^[0-9]+-[a-zA-Z0-9]+\.apps\.googleusercontent\.com$'; then \
+        echo "❌ VITE_GOOGLE_CLIENT_ID format invalid — refusing to build." >&2; \
+        echo "   Got: ${VITE_GOOGLE_CLIENT_ID}" >&2; \
+        exit 1; \
+      fi; \
+      echo "  ✓ VITE_GOOGLE_CLIENT_ID format valid"; \
+    else \
+      echo "  ⚠ VITE_GOOGLE_CLIENT_ID empty — Google sign-in will fall back to runtime override only"; \
+    fi; \
+    npm run build
 
-# Build Next.js
-RUN npm run build || (echo "Build failed" && exit 1)
-
-# Runner stage
-FROM base AS runner
+# ── Stage 2: Runtime ────────────────────────────────────────
+FROM node:20-slim AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
+# Copy Express server and install runtime deps
+# pg + bcryptjs + jsonwebtoken → needed for built-in Node.js auth fallback
+COPY server.cjs ./
+RUN npm config set fetch-timeout 600000 && \
+    npm init -y && \
+    npm install --omit=dev \
+      express@4 \
+      http-proxy-middleware@3 \
+      serve-static \
+      pg \
+      bcryptjs \
+      jsonwebtoken \
+      hash-wasm
 
-# Create non-root user
-RUN groupadd --system --gid 1001 nodejs
-RUN useradd --system --uid 1001 nextjs
+# Copy Vite build output
+COPY --from=vite-builder /app/dist ./dist
 
-# Copy built application
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# Non-root user
+RUN groupadd --system --gid 1001 appuser && \
+    useradd --system --uid 1001 --gid appuser appuser && \
+    chown -R appuser:appuser /app
+USER appuser
 
-# Fix Next.js 15 RSC: standalone omits page_client-reference-manifest.js
-# for nested route groups like (dashboard)/(routes)/(root)/page.js
-# Copy the FULL .next/server to overwrite standalone's incomplete version
-COPY --from=builder --chown=nextjs:nodejs /app/.next/server ./.next/server
+EXPOSE 8080
 
-# Copy Prisma files
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+# AUTH_SERVICE_URL intentionally NOT set here — server.cjs falls back to
+# built-in Node.js auth when this is absent. Set it in Cloud Run env vars
+# if/when a dedicated Rust auth-service is deployed.
 
-# Copy data directory (quiz JSON files loaded at runtime)
-COPY --from=builder --chown=nextjs:nodejs /app/data ./data
-
-# Switch to non-root user
-USER nextjs
-
-EXPOSE 3000
-
-# NOTE: Do NOT set PORT here — Cloud Run gen2 sets it automatically
-# ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# === RUNTIME MEMORY STRATEGY ===
-# Cloud Run kills container (SIGKILL/signal 9) when exceeding memory limit.
-# Set Node.js heap to ~75% of container memory (4GiB → 3072MB).
-# Note: NODE_OPTIONS is also overridden by the Cloud Run env var set in the
-# gcloud deploy command, so this Dockerfile value is a safe fallback.
-ENV NODE_OPTIONS="--max-old-space-size=3072"
-
-CMD ["node", "server.js"]
+CMD ["node", "server.cjs"]

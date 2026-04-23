@@ -12,6 +12,8 @@ dist
 .env
 .env.*
 !.env.example
+# Vite production vars are baked into JS bundle at build time — safe to include
+!aeroedu-vite/.env.production
 sa-ci-deployer-key.json
 gen-lang-client-*.json
 *.pem
@@ -19,7 +21,11 @@ gen-lang-client-*.json
 cookies.txt
 cookies_new.txt
 
-# === Separate projects (NOT part of Next.js app) ===
+# === Separate projects (NOT part of this Docker build) ===
+# NOTE: aeroedu-vite/ IS needed — it's the frontend being built
+aeroedu-vite/node_modules/
+aeroedu-vite/.vite/
+aeroedu-vite/stats.html
 worldmonitor/
 openfang/
 openfang-core/
@@ -30,8 +36,14 @@ openfang-aeroedu-risk-watch/
 desktop-bun-electron/
 desktop-current-app/
 latex-compiler/
+# Exclude all rust-services EXCEPT auth-service (bundled into pixiai container)
 rust-services/
+!rust-services/auth-service/
+!rust-services/auth-service/**
+# But still exclude the Rust build cache (can be hundreds of MB)
+rust-services/auth-service/target/
 python-ocr/
+python-omr/
 python-simulations/
 python-vision-server/
 aero-agent-os/

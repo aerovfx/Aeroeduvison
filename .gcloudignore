@@ -7,6 +7,14 @@ node_modules
 .next
 dist
 .contentlayer
+# Vite build outputs — old deploy-verify snapshots, Dockerfile sẽ build lại từ src/
+aeroedu-vite/dist
+aeroedu-vite/dist-fix
+aeroedu-vite/dist-verify
+aeroedu-vite/dist-*
+# Python virtualenv ngoài project
+.venv
+venv
 
 # === Environment & secrets ===
 .env

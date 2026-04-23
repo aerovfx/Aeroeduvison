@@ -115,7 +115,7 @@ pub struct RegisterDeviceResponse {
     pub ws_endpoint: String,   // WebSocket endpoint for real-time
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DeviceTelemetry {
     pub device_id: String,
     pub timestamp: DateTime<Utc>,
