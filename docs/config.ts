@@ -66,6 +66,11 @@ export const docsConfig = {
                     href: "/docs/beginner/07-tai-lieu-tham-khao",
                     items: [],
                 },
+                {
+                    title: "Hướng Dẫn Sử Dụng Web",
+                    href: "/docs/beginner/08-huong-dan-su-dung-web",
+                    items: [],
+                },
             ],
         },
         {

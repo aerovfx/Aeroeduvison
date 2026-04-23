@@ -97,6 +97,7 @@ export default function HomePage() {
               <a href="#solutions" className="text-muted-foreground hover:text-foreground font-medium transition-colors">{t('landing.nav.solutions')}</a>
               <a href="#developers" className="text-muted-foreground hover:text-foreground font-medium transition-colors">{t('landing.nav.developers')}</a>
               <a href="#resources" className="text-muted-foreground hover:text-foreground font-medium transition-colors">{t('landing.nav.resources')}</a>
+              <a href="/docs" className="text-muted-foreground hover:text-foreground font-medium transition-colors">{t('landing.nav.docs')}</a>
               <a href="/pricing" className="text-muted-foreground hover:text-foreground font-medium transition-colors">{t('landing.nav.pricing')}</a>
             </nav>
 
@@ -144,6 +145,7 @@ export default function HomePage() {
               <a href="#solutions" className="block font-medium text-muted-foreground transition-colors hover:text-foreground">{t('landing.nav.solutions')}</a>
               <a href="#developers" className="block font-medium text-muted-foreground transition-colors hover:text-foreground">{t('landing.nav.developers')}</a>
               <a href="#resources" className="block font-medium text-muted-foreground transition-colors hover:text-foreground">{t('landing.nav.resources')}</a>
+              <a href="/docs" className="block font-medium text-muted-foreground transition-colors hover:text-foreground">{t('landing.nav.docs')}</a>
               <a href="/pricing" className="block font-medium text-muted-foreground transition-colors hover:text-foreground">{t('landing.nav.pricing')}</a>
               <div className="space-y-2 border-t border-border pt-4">
                 <div className="mb-2 flex items-center justify-center gap-2">
