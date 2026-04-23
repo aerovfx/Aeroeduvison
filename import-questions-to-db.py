@@ -20,7 +20,7 @@ except ImportError:
     sys.exit(1)
 
 # ── Config ────────────────────────────────────────────────────
-DB_URL       = "postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+DB_URL       = os.environ.get("DATABASE_URL") or sys.exit("❌ Set DATABASE_URL env var (Neon connection string)")
 JSON_FILE    = os.path.join(os.path.dirname(__file__), "data", "questions_import.json")
 CREATED_BY   = "system-import"
 BATCH_SIZE   = 200

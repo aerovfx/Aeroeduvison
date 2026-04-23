@@ -10,6 +10,16 @@ SERVICE_NAME="edu"
 SERVICE_URL="https://edu-667564078289.asia-southeast1.run.app"
 IMAGE="asia-southeast1-docker.pkg.dev/extreme-lattice-491123-p2/aeroedu/edu@sha256:b39c3429604b60d65727446ec2dbb17b93748ff4906eb135aea2377885059c61"
 
+# ---- Secrets from env (or source .env.production) ----
+[ -f .env.production ] && set -a && . ./.env.production && set +a
+: "${DATABASE_URL:?Set DATABASE_URL}"
+: "${DIRECT_DATABASE_URL:?Set DIRECT_DATABASE_URL}"
+: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET}"
+: "${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}"
+: "${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}"
+: "${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY}"
+: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
+
 echo ""
 echo "================================================================"
 echo " FIX STARTUP PROBE: ${SERVICE_NAME}"
@@ -47,13 +57,13 @@ gcloud run services update "${SERVICE_NAME}" \
   --update-env-vars="NEXT_TELEMETRY_DISABLED=1" \
   --update-env-vars="HOSTNAME=0.0.0.0" \
   --update-env-vars="SKIP_ENV_VALIDATION=1" \
-  --update-env-vars="DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&pgbouncer=true&connect_timeout=15" \
-  --update-env-vars="DIRECT_DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=15" \
-  --update-env-vars="NEXTAUTH_SECRET=8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa" \
-  --update-env-vars="GOOGLE_CLIENT_ID=667564078289-7lv5ipchhsgahfu44vqhtj68tkuovcrc.apps.googleusercontent.com" \
-  --update-env-vars="GOOGLE_CLIENT_SECRET=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" \
-  --update-env-vars="OPENROUTER_API_KEY=ysk-or-v1-88c6bef9f94c1d45a92719015429df94dcffcf5b897fac4ce9fb85d16de0ae94" \
-  --update-env-vars="ANTHROPIC_API_KEY=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" \
+  --update-env-vars="DATABASE_URL=${DATABASE_URL}" \
+  --update-env-vars="DIRECT_DATABASE_URL=${DIRECT_DATABASE_URL}" \
+  --update-env-vars="NEXTAUTH_SECRET=${NEXTAUTH_SECRET}" \
+  --update-env-vars="GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}" \
+  --update-env-vars="GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}" \
+  --update-env-vars="OPENROUTER_API_KEY=${OPENROUTER_API_KEY}" \
+  --update-env-vars="ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}" \
   --update-env-vars="GOOGLE_CLOUD_PROJECT=gen-lang-client-0712182643" \
   --update-env-vars="NEXT_PUBLIC_TRACKING_SERVER_URL=wss://vision-tracking-server-1069154179448.us-central1.run.app/ws/tracking" \
   --quiet

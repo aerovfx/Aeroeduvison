@@ -25,7 +25,9 @@
 
 <script type="module">
 // ── Config ────────────────────────────────────────────────────────────────────
-const CONNECTION_STRING = 'postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z.ap-southeast-1.aws.neon.tech/neondb'
+// Set via window.__DB_URL or prompt — do NOT hardcode secrets in repo
+const CONNECTION_STRING = (typeof window !== 'undefined' && window.__DB_URL) || prompt('Neon DATABASE_URL?') || ''
+if (!CONNECTION_STRING) throw new Error('DATABASE_URL required')
 const TEACHER_ID = 'cmnn66ky20000s602tl7vgseu'
 const SCHOOL_ID  = 'default-school'
 

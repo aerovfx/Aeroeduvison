@@ -30,6 +30,17 @@ IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}"
 TAG="$(date +%Y%m%d-%H%M%S)"
 DOCKERFILE="Dockerfile"
 
+# ---- Secrets (export these before running, or source a local .env.production) ----
+# Optional: source a local untracked env file (.env.production is in .gitignore)
+[ -f .env.production ] && set -a && . ./.env.production && set +a
+: "${DATABASE_URL:?Set DATABASE_URL — Neon connection string (pooler)}"
+: "${DIRECT_DATABASE_URL:?Set DIRECT_DATABASE_URL — Neon direct connection}"
+: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET — openssl rand -hex 32}"
+: "${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}"
+: "${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}"
+: "${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY}"
+: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
+
 # ---- Parse args ----
 SKIP_BUILD=false
 for arg in "$@"; do
@@ -217,13 +228,13 @@ NEXT_TELEMETRY_DISABLED=1,\
 HOSTNAME=0.0.0.0,\
 SKIP_ENV_VALIDATION=1,\
 NODE_OPTIONS=--max-old-space-size=3072,\
-DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&pgbouncer=true&connect_timeout=15,\
-DIRECT_DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=15,\
-NEXTAUTH_SECRET=8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa,\
-GOOGLE_CLIENT_ID=667564078289-7lv5ipchhsgahfu44vqhtj68tkuovcrc.apps.googleusercontent.com,\
-GOOGLE_CLIENT_SECRET=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,\
-OPENROUTER_API_KEY=ysk-or-v1-88c6bef9f94c1d45a92719015429df94dcffcf5b897fac4ce9fb85d16de0ae94,\
-ANTHROPIC_API_KEY=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,\
+DATABASE_URL=${DATABASE_URL},\
+DIRECT_DATABASE_URL=${DIRECT_DATABASE_URL},\
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET},\
+GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},\
+GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET},\
+OPENROUTER_API_KEY=${OPENROUTER_API_KEY},\
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY},\
 GOOGLE_CLOUD_PROJECT=gen-lang-client-0712182643,\
 NEXT_PUBLIC_TRACKING_SERVER_URL=wss://vision-tracking-server-1069154179448.us-central1.run.app/ws/tracking" \
     --quiet
@@ -264,13 +275,13 @@ NEXT_TELEMETRY_DISABLED=1,\
 HOSTNAME=0.0.0.0,\
 SKIP_ENV_VALIDATION=1,\
 NODE_OPTIONS=--max-old-space-size=3072,\
-DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&pgbouncer=true&connect_timeout=15,\
-DIRECT_DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&connect_timeout=15,\
-NEXTAUTH_SECRET=8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa,\
-GOOGLE_CLIENT_ID=667564078289-7lv5ipchhsgahfu44vqhtj68tkuovcrc.apps.googleusercontent.com,\
-GOOGLE_CLIENT_SECRET=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,\
-OPENROUTER_API_KEY=ysk-or-v1-88c6bef9f94c1d45a92719015429df94dcffcf5b897fac4ce9fb85d16de0ae94,\
-ANTHROPIC_API_KEY=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,\
+DATABASE_URL=${DATABASE_URL},\
+DIRECT_DATABASE_URL=${DIRECT_DATABASE_URL},\
+NEXTAUTH_SECRET=${NEXTAUTH_SECRET},\
+GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},\
+GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET},\
+OPENROUTER_API_KEY=${OPENROUTER_API_KEY},\
+ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY},\
 GOOGLE_CLOUD_PROJECT=gen-lang-client-0712182643,\
 NEXT_PUBLIC_TRACKING_SERVER_URL=wss://vision-tracking-server-1069154179448.us-central1.run.app/ws/tracking" \
   --quiet

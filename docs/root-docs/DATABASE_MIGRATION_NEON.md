@@ -23,7 +23,7 @@
 
 ### **Connection String:**
 ```
-postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-twilight-recipe-a12e50nn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+postgresql://neondb_owner:<PASSWORD>@ep-twilight-recipe-a12e50nn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
 ```
 
 ### **Environment Files Updated:**
@@ -96,11 +96,11 @@ http://localhost:3000/api/auth/callback/google
 ### **Required Variables:**
 ```env
 # Database
-DATABASE_URL="postgresql://neondb_owner:npg_ADdhqO90fnVb@..."
+DATABASE_URL="postgresql://neondb_owner:<PASSWORD>@..."
 
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa"
+NEXTAUTH_SECRET="<generate-with-openssl-rand-hex-32>"
 
 # Google OAuth
 GOOGLE_CLIENT_ID="442514522574-95bi4m5do7h479aol12boottsua0bj5g.apps.googleusercontent.com"
@@ -117,7 +117,7 @@ GOOGLE_CLOUD_PROJECT="gen-lang-client-0712182643"
 ### **Database Connection:**
 ```bash
 # Test connection
-psql 'postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-twilight-recipe-a12e50nn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
+psql 'postgresql://neondb_owner:<PASSWORD>@ep-twilight-recipe-a12e50nn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require'
 ```
 Status: ✅ Connected successfully
 

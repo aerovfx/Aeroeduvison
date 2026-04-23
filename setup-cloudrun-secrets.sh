@@ -11,6 +11,15 @@ PROJECT_ID="extreme-lattice-491123-p2"
 REGION="asia-southeast1"
 SERVICE_NAME="pixiai"
 
+# ---- Secrets from env (or source .env.production) ----
+[ -f .env.production ] && set -a && . ./.env.production && set +a
+: "${DATABASE_URL:?Set DATABASE_URL — Neon direct (not Accelerate)}"
+: "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET — openssl rand -hex 32}"
+: "${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}"
+: "${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}"
+: "${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY}"
+: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
+
 # ── Màu terminal ─────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,26 +84,20 @@ echo -e "${BLUE}(Sửa các giá trị YOUR_* trước khi chạy script này)${
 # server.cjs dùng `pg` thuần → chỉ parse được scheme postgresql://
 # Nếu cần URL qua Accelerate cho Prisma Client, lưu vào secret riêng
 # (ví dụ `pixiai-prisma-accelerate-url`).
-create_or_update_secret "pixiai-database-url" \
-  "postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+create_or_update_secret "pixiai-database-url" "${DATABASE_URL}"
 
 # ─── NextAuth ────────────────────────────────────────────────
-create_or_update_secret "pixiai-nextauth-secret" \
-  "8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa"
+create_or_update_secret "pixiai-nextauth-secret" "${NEXTAUTH_SECRET}"
 
 # ─── Google OAuth ─────────────────────────────────────────────
-create_or_update_secret "pixiai-google-client-id" \
-  "667564078289-7lv5ipchhsgahfu44vqhtj68tkuovcrc.apps.googleusercontent.com"
+create_or_update_secret "pixiai-google-client-id" "${GOOGLE_CLIENT_ID}"
 
-create_or_update_secret "pixiai-google-client-secret" \
-  "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"
+create_or_update_secret "pixiai-google-client-secret" "${GOOGLE_CLIENT_SECRET}"
 
 # ─── AI / LLM ─────────────────────────────────────────────────
-create_or_update_secret "pixiai-openrouter-api-key" \
-  "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"
+create_or_update_secret "pixiai-openrouter-api-key" "${OPENROUTER_API_KEY}"
 
-create_or_update_secret "pixiai-anthropic-api-key" \
-  "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"
+create_or_update_secret "pixiai-anthropic-api-key" "${ANTHROPIC_API_KEY}"
 
 echo -e "\n${GREEN}✅ Secrets created in Secret Manager${NC}"
 

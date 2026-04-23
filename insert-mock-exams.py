@@ -16,11 +16,8 @@ import time, random, string, json
 from datetime import datetime, timezone, timedelta
 
 # ── Neon DB connection ─────────────────────────────────────────────────────────
-DATABASE_URL = (
-    "postgresql://neondb_owner:npg_ADdhqO90fnVb"
-    "@ep-young-hat-a15kp33z-pooler.ap-southeast-1.aws.neon.tech"
-    "/neondb?sslmode=require&channel_binding=require"
-)
+import os as _os, sys as _sys
+DATABASE_URL = _os.environ.get("DATABASE_URL") or _sys.exit("❌ Set DATABASE_URL env var (Neon connection string)")
 
 # ── cuid-style ID generator ───────────────────────────────────────────────────
 def cuid():
