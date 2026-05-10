@@ -150,3 +150,13 @@ desktop-current-app/
 *.sql
 !scripts/*.sql
 infra/gcs-sa-key.json
+
+# Payment / Telegram / Email runtime state (do NOT commit — auto-generated at runtime)
+uploads/.entitlements.json
+uploads/.payment-orders.json
+uploads/.telegram-admin.json
+uploads/.last-email.html
+uploads/.last-received.pdf
+
+# Dev experiments
+aeroedu-vite/vite.config.minimal.mjs

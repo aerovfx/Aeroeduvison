@@ -191,16 +191,30 @@ export default function ExamsPage() {
                 <p className="text-sm" style={{ color: D.muted }}>Quản lý và chấm điểm tự động</p>
               </div>
             </div>
-            <button
-              onClick={() => navigate('/teacher/exams/create')}
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-              style={{ background: D.purple, color: '#fff' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#6d28d9')}
-              onMouseLeave={e => (e.currentTarget.style.background = D.purple)}
-            >
-              <Plus className="w-4 h-4" />
-              Tạo đề thi
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate('/teacher/wayground')}
+                className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all"
+                style={{
+                  background: 'linear-gradient(90deg,#ec4899,#db2777)',
+                  color: '#fff', boxShadow: '0 4px 12px rgba(236,72,153,0.35)',
+                }}
+                title="Tạo đề từ PDF bằng fal.ai (Wayground-style)"
+              >
+                <Plus className="w-4 h-4" />
+                Tạo đề bằng AI
+              </button>
+              <button
+                onClick={() => navigate('/teacher/exams/create')}
+                className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                style={{ background: D.purple, color: '#fff' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#6d28d9')}
+                onMouseLeave={e => (e.currentTarget.style.background = D.purple)}
+              >
+                <Plus className="w-4 h-4" />
+                Tạo thủ công
+              </button>
+            </div>
           </div>
         </div>
       </div>
