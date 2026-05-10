@@ -164,11 +164,14 @@ else
   echo "  ⚠️  pixiai-latex not deployed (LaTeX features will return 503)"
 fi
 
-# Build env-vars string
+# Build env-vars string. Dùng --update-env-vars (merge) ở step deploy nên
+# các env không liệt kê ở đây vẫn được giữ nguyên ở revision cũ.
+# AUTH_SERVICE_URL + LATEX_SERVICE_URL: DEPRECATED — built-in handlers thay thế.
 ENV_VARS="NODE_ENV=production"
-[ -n "${AUTH_SERVICE_URL}" ]  && ENV_VARS="${ENV_VARS},AUTH_SERVICE_URL=${AUTH_SERVICE_URL}"
 [ -n "${MEDIA_SERVICE_URL}" ] && ENV_VARS="${ENV_VARS},MEDIA_SERVICE_URL=${MEDIA_SERVICE_URL}"
-[ -n "${LATEX_SERVICE_URL}" ] && ENV_VARS="${ENV_VARS},LATEX_SERVICE_URL=${LATEX_SERVICE_URL}"
+# Pin các env quan trọng cho payment/ai mặc dù --update-env-vars merge,
+# để revision MỚI deploy lần đầu có sẵn (vd Cloud Build rebuild image).
+ENV_VARS="${ENV_VARS},AI_PREFERRED_PROVIDER=fal,TELEGRAM_USE_WEBHOOK=true"
 
 # ── Step 5.5: Load VITE_* build-time env vars ──────────────────
 # Vite bakes `import.meta.env.VITE_*` into the bundle at BUILD time, not
@@ -283,8 +286,8 @@ gcloud run deploy "${SERVICE_NAME}" \
   --timeout=60 \
   --cpu-boost \
   --execution-environment=gen2 \
-  --set-env-vars="${ENV_VARS}" \
-  --update-secrets="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest" \
+  --update-env-vars="${ENV_VARS}" \
+  --update-secrets="DATABASE_URL=pixiai-database-url:latest,JWT_SECRET=pixiai-jwt-secret:latest,GOOGLE_CLIENT_ID=pixiai-google-client-id:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest,FAL_API_KEY=fal-api-key:latest,SMTP_PASS=smtp-pass:latest" \
   --tag="t${TAG}" \
   --quiet
 
