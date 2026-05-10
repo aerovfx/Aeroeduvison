@@ -28,6 +28,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary]', error, info.componentStack)
+    // Stale chunk: build mới deploy → bundle cũ user đang giữ trong tab bị 404.
+    // Tự reload 1 lần (dùng sessionStorage flag tránh reload loop).
+    const msg = String(error?.message || '');
+    if (
+      /Failed to fetch dynamically imported module|Loading chunk \d+ failed|ChunkLoadError|Importing a module script failed/i.test(msg)
+    ) {
+      const key = '__chunk_reloaded_at__';
+      const last = Number(sessionStorage.getItem(key) || 0);
+      if (Date.now() - last > 60_000) {
+        sessionStorage.setItem(key, String(Date.now()));
+        console.warn('[ErrorBoundary] stale chunk → auto reload');
+        setTimeout(() => window.location.reload(), 200);
+      }
+    }
   }
 
   componentDidUpdate(prev: Props) {
