@@ -859,7 +859,7 @@ function makeProxy(target, label, pathFilter) {
             // chuỗi JSON `["A.","B."]` mà Postgres báo "malformed array literal").
             Array.isArray(q.options) ? q.options.map(String) : [],
             String(q.correctAnswer || ''),
-            q.explanation || null,
+            q.explanation || '',  // Question.explanation NOT NULL trong schema
             userId,
             now,
           ]
