@@ -591,22 +591,34 @@ function makeProxy(target, label, pathFilter) {
     } catch { return null; }
   }
 
-  // Parse subject out of description JSON (stored as {"subject":"Vật lý"})
-  function parseSubject(description) {
-    if (!description) return null;
+  // Parse description JSON ({"subject","grade","notes","public","publishedAt"})
+  // → return obj. Nếu description là string thuần, đặt nó vào notes.
+  function parseExamMeta(description) {
+    if (!description) return {};
     try {
-      const parsed = JSON.parse(description);
-      return parsed.subject || null;
+      const p = JSON.parse(description);
+      return {
+        subject:     p.subject || null,
+        grade:       p.grade || null,
+        notes:       p.notes || null,
+        isPublic:    !!p.public,
+        publishedAt: p.publishedAt || null,
+      };
     } catch {
-      return description || null;
+      return { notes: description };
     }
   }
 
   function mapExam(row) {
+    const meta = parseExamMeta(row.description);
     return {
       id:             row.id,
       title:          row.title,
-      subject:        parseSubject(row.description),
+      subject:        meta.subject,
+      grade:          meta.grade,
+      notes:          meta.notes,
+      isPublic:       meta.isPublic,
+      publishedAt:    meta.publishedAt,
       examType:       row.examType,
       duration:       row.duration,
       totalScore:     parseFloat(row.totalScore) || 10,
@@ -720,17 +732,8 @@ function makeProxy(target, label, pathFilter) {
          ORDER BY eq."order" ASC`,
         [req.params.id]
       );
-      let descObj = {};
-      try { descObj = JSON.parse(examRows[0].description || '{}'); } catch {}
-      return res.json({
-        exam: {
-          ...exam,
-          isPublic: !!descObj.public,
-          publishedAt: descObj.publishedAt || null,
-          notes: descObj.notes || null,
-        },
-        questions: qRows,
-      });
+      // mapExam đã parse subject/grade/notes/isPublic/publishedAt từ description
+      return res.json({ exam, questions: qRows });
     } catch (err) {
       console.error('[teacher:exams:get] ❌', err.message);
       return res.status(500).json({ error: err.message });
@@ -5074,45 +5077,118 @@ if (!USE_NODEJS_QUESTIONS) {
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/questions'));
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/question-bank'));
 }
-// /api/exams (catch-all list cho student/teacher) — built-in trả Exam đang
-// "Đang diễn ra" + isPublic=true (cho học sinh) hoặc của user nếu có Bearer.
-app.get('/api/exams', async (req, res) => {
-  try {
-    const { Pool: XPool } = require('pg');
-    const xjwt = require('jsonwebtoken');
-    const DATABASE_URL = process.env.DATABASE_URL;
-    if (!DATABASE_URL) return res.json({ exams: [] });
-    const xpool = new XPool({ connectionString: DATABASE_URL, max: 3 });
-    const auth = req.headers.authorization || '';
-    let userId = null;
-    if (auth.startsWith('Bearer ')) {
-      try {
-        const decoded = xjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!');
-        userId = decoded.sub || decoded.userId || null;
-      } catch {}
+// /api/exams* (catch-all built-in) — list + detail cho học sinh + teacher.
+// Hai endpoint:
+//   GET  /api/exams           → list, filter theo bearer token (own + public)
+//   GET  /api/exams/:id       → detail + questions (chỉ public, hoặc của owner)
+{
+  const { Pool: PXPool } = require('pg');
+  const xjwt = require('jsonwebtoken');
+  let _xpool = null;
+  function getXPool() {
+    if (!_xpool) {
+      const DATABASE_URL = process.env.DATABASE_URL;
+      if (!DATABASE_URL) return null;
+      _xpool = new PXPool({ connectionString: DATABASE_URL, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
     }
-    const limit = Math.min(Number(req.query.limit) || 100, 200);
-    let q, params;
-    if (userId) {
-      // Teacher view: own exams + public ones
-      q = `SELECT * FROM "Exam"
+    return _xpool;
+  }
+  const XJWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+  function getXUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = xjwt.verify(auth.slice(7), XJWT_SECRET);
+      return decoded.sub || decoded.userId || null;
+    } catch { return null; }
+  }
+  function parseMeta(description) {
+    if (!description) return {};
+    try {
+      const p = JSON.parse(description);
+      return { subject: p.subject || null, grade: p.grade || null,
+        notes: p.notes || null, isPublic: !!p.public,
+        publishedAt: p.publishedAt || null };
+    } catch { return { notes: description }; }
+  }
+  function mapRow(row) {
+    const m = parseMeta(row.description);
+    return {
+      id: row.id, title: row.title,
+      subject: m.subject, grade: m.grade, notes: m.notes,
+      isPublic: m.isPublic, publishedAt: m.publishedAt,
+      examType: row.examType, duration: row.duration,
+      totalScore: parseFloat(row.totalScore) || 10,
+      totalQuestions: row.totalQuestions, status: row.status,
+      matrixId: row.matrixId || null, userId: row.userId,
+      createdAt: row.createdAt, updatedAt: row.updatedAt,
+    };
+  }
+
+  app.get('/api/exams', async (req, res) => {
+    try {
+      const xpool = getXPool();
+      if (!xpool) return res.json({ exams: [] });
+      const userId = getXUserId(req);
+      const limit = Math.min(Number(req.query.limit) || 100, 200);
+      const q = userId
+        ? `SELECT * FROM "Exam"
            WHERE "userId" = $1 OR (status = 'Đang diễn ra' AND description LIKE '%"public":true%')
-           ORDER BY "createdAt" DESC LIMIT $2`;
-      params = [userId, limit];
-    } else {
-      // Public student view: chỉ exam Đang diễn ra + public
-      q = `SELECT * FROM "Exam"
+           ORDER BY "createdAt" DESC LIMIT $2`
+        : `SELECT * FROM "Exam"
            WHERE status = 'Đang diễn ra' AND description LIKE '%"public":true%'
            ORDER BY "createdAt" DESC LIMIT $1`;
-      params = [limit];
+      const params = userId ? [userId, limit] : [limit];
+      const { rows } = await xpool.query(q, params);
+      return res.json({ exams: rows.map(mapRow) });
+    } catch (err) {
+      console.error('[exams:list] ❌', err.message);
+      return res.status(500).json({ error: err.message });
     }
-    const { rows } = await xpool.query(q, params);
-    return res.json({ exams: rows });
-  } catch (err) {
-    console.error('[exams:list] ❌', err.message);
-    return res.status(500).json({ error: err.message });
-  }
-});
+  });
+
+  // GET /api/exams/:id — detail + questions, cho học sinh xem trước khi làm.
+  // Cho phép xem nếu (a) là exam công khai + status "Đang diễn ra", hoặc
+  // (b) là chủ đề thi (Bearer token khớp userId).
+  app.get('/api/exams/:id', async (req, res) => {
+    try {
+      const xpool = getXPool();
+      if (!xpool) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const { rows: examRows } = await xpool.query(
+        `SELECT * FROM "Exam" WHERE id=$1 LIMIT 1`, [req.params.id]
+      );
+      if (!examRows[0]) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const exam = mapRow(examRows[0]);
+      const userId = getXUserId(req);
+      const isOwner = userId && examRows[0].userId === userId;
+      const isPublicLive = exam.isPublic && exam.status === 'Đang diễn ra';
+      if (!isOwner && !isPublicLive) {
+        return res.status(403).json({ error: 'Đề thi này chưa công khai' });
+      }
+      const { rows: qRows } = await xpool.query(
+        `SELECT q.id, q."questionType", q.content, q.options, q."correctAnswer",
+                q.explanation, eq."order", eq.points
+         FROM "ExamQuestion" eq
+         JOIN "Question" q ON q.id = eq."questionId"
+         WHERE eq."examId" = $1
+         ORDER BY eq."order" ASC`,
+        [req.params.id]
+      );
+      // Học sinh không phải owner → ẩn correctAnswer + explanation cho đến
+      // khi nộp bài. Owner thì trả full để chỉnh sửa.
+      const questions = isOwner ? qRows : qRows.map(q => ({
+        id: q.id, questionType: q.questionType, content: q.content,
+        options: q.options, order: q.order, points: q.points,
+      }));
+      return res.json({ exam, questions });
+    } catch (err) {
+      console.error('[exams:get] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+}
 
 // /api/online-exam-room — phòng thi online. Built-in trả empty list.
 app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
