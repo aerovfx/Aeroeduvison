@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
+import BuffaloRunner from '@/components/games/BuffaloRunner'
 
 // ── Theme tokens ──────────────────────────────────────────────
 // Dùng CSS variable từ design system AI Native (xem index.css) để page
@@ -491,6 +492,11 @@ export default function WaygroundCreatePage() {
               ))}
             </div>
             <style>{`@keyframes pulse { 0%,100% { opacity: 0.5 } 50% { opacity: 1 } }`}</style>
+
+            {/* Mini-game giải trí trong lúc chờ AI sinh đề */}
+            <div style={{ marginTop: 24, width: '100%', maxWidth: 620 }}>
+              <BuffaloRunner autoStart />
+            </div>
           </div>
         )}
 
