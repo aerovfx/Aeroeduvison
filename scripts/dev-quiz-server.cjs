@@ -200,8 +200,10 @@ const server = http.createServer(async (req, res) => {
       const result = mode === 'generate'
         ? await generateQuestionsFromPdf(pdfBuffer, opts)
         : await extractQuestionsFromPdf(pdfBuffer, opts);
-      console.log(`[quiz-extract] ✅ mode=${mode || 'extract'} file=${filename} questions=${result.questions.length} took=${Date.now() - t0}ms`);
-      return sendJSON(res, 200, { success: true, ...result, receivedFilename: filename || null });
+      console.log(`[quiz-extract] ✅ mode=${mode || 'extract'} file=${filename} questions=${result.questions.length} model=${result._internalModel || '?'} took=${Date.now() - t0}ms`);
+      const { _internalModel, ...publicResult } = result;
+      void _internalModel;
+      return sendJSON(res, 200, { success: true, ...publicResult, receivedFilename: filename || null });
     }
 
     if (pathname === '/api/teacher/quiz-publish' && req.method === 'POST') {

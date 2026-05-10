@@ -6,10 +6,11 @@
  *   1. Choose mode (Assessment / Presentation / Video / Passage / Flashcards)
  *      — chỉ Assessment hoạt động ở v1, các loại khác hiển thị "Coming soon".
  *   2. Customize: chọn PDF, grade, language, mode (extract / generate)
- *   3. "Understanding Document..." (loading) → backend gọi fal.ai
+ *   3. "Understanding Document..." (loading) → backend gọi AI extractor
  *   4. Review & Publish: hiển thị danh sách câu hỏi, cho phép edit nhanh, lưu
  *
- * Powered by fal.ai (anthropic/claude-3.5-sonnet) qua endpoint
+ * Backend dùng AI provider trừu tượng (xem lib/ai-services.ts) — KHÔNG expose
+ * tên provider/model cho user qua UI.
  *   POST /api/teacher/quiz-extract
  *   POST /api/teacher/quiz-publish
  */
@@ -475,7 +476,7 @@ export default function WaygroundCreatePage() {
             </div>
             <div style={{ fontSize: 18, fontWeight: 600 }}>Understanding Document...</div>
             <div style={{ color: D.muted, fontSize: 13, textAlign: 'center', maxWidth: 380, lineHeight: 1.55 }}>
-              fal.ai đang phân tích PDF, nhận diện câu hỏi & đáp án.<br/>
+              AI đang phân tích PDF, nhận diện câu hỏi & đáp án.<br/>
               Việc này có thể mất 10–60 giây tuỳ độ dài tài liệu.
             </div>
             <div style={{
@@ -511,7 +512,6 @@ export default function WaygroundCreatePage() {
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{title || 'Untitled assessment'}</div>
                 <div style={{ color: D.muted, fontSize: 12, marginTop: 3 }}>
                   Assessment · {subject} · Grade {grade} · {questions.length} questions · {totalPoints} Points
-                  {meta?.model && <> · model: <code>{meta.model}</code></>}
                   {meta?.tookMs && <> · {(meta.tookMs/1000).toFixed(1)}s</>}
                 </div>
               </div>

@@ -199,7 +199,7 @@ export default function ExamsPage() {
                   background: 'linear-gradient(90deg,#ec4899,#db2777)',
                   color: '#fff', boxShadow: '0 4px 12px rgba(236,72,153,0.35)',
                 }}
-                title="Tạo đề từ PDF bằng fal.ai (Wayground-style)"
+                title="Tạo đề từ PDF bằng AI (Wayground-style)"
               >
                 <Plus className="w-4 h-4" />
                 Tạo đề bằng AI

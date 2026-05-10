@@ -775,11 +775,15 @@ function makeProxy(target, label, pathFilter) {
         : await extractQuestionsFromPdf(pdfBuffer, opts);
 
       console.log(`[quiz-extract] ✅ user=${userId || 'anon'} mode=${mode || 'extract'} `
-        + `file=${filename || 'unknown'} questions=${result.questions.length} took=${Date.now() - t0}ms`);
+        + `file=${filename || 'unknown'} questions=${result.questions.length} `
+        + `model=${result._internalModel || 'unknown'} took=${Date.now() - t0}ms`);
 
+      // Strip internal field — không gửi tên model/provider về client.
+      const { _internalModel, ...publicResult } = result;
+      void _internalModel;
       return res.json({
         success: true,
-        ...result,
+        ...publicResult,
         receivedFilename: filename || null,
       });
     } catch (err) {
@@ -850,7 +854,10 @@ function makeProxy(target, label, pathFilter) {
             String(grade || '11'),
             String(q.questionType || 'MULTIPLE_CHOICE'),
             String(q.content || ''),
-            JSON.stringify(q.options || []),
+            // Question.options là String[] (Postgres TEXT[]) — pg driver tự convert
+            // JS array → Postgres array literal {…}. KHÔNG stringify (sẽ ra
+            // chuỗi JSON `["A.","B."]` mà Postgres báo "malformed array literal").
+            Array.isArray(q.options) ? q.options.map(String) : [],
             String(q.correctAnswer || ''),
             q.explanation || null,
             userId,
