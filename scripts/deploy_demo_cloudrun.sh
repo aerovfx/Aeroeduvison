@@ -234,26 +234,33 @@ deploy_cloud_run() {
     # We use ^||^ separator to avoid conflicts with special chars in URLs
     local ENV_VARS="NODE_ENV=production"
 
+    # Secrets expected in env (export or source .env.production before running)
+    : "${DATABASE_URL:?Set DATABASE_URL (Neon connection string)}"
+    : "${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET (openssl rand -hex 32)}"
+    : "${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}"
+    : "${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}"
+    : "${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY}"
+
     # Database
-    ENV_VARS="${ENV_VARS}||DATABASE_URL=postgresql://neondb_owner:npg_ADdhqO90fnVb@ep-twilight-recipe-a12e50nn-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+    ENV_VARS="${ENV_VARS}||DATABASE_URL=${DATABASE_URL}"
 
     # Auth — NEXTAUTH_URL will be auto-set in Step 7
-    ENV_VARS="${ENV_VARS}||NEXTAUTH_SECRET=8761740715842a2bdf7428e4e35c2564c8aa35c9cd45f14d6138b91d5d0867fa"
+    ENV_VARS="${ENV_VARS}||NEXTAUTH_SECRET=${NEXTAUTH_SECRET}"
     ENV_VARS="${ENV_VARS}||NEXTAUTH_URL=https://demo-placeholder.run.app"
 
     # Google OAuth
-    ENV_VARS="${ENV_VARS}||GOOGLE_CLIENT_ID=903966803331-vf16qa9g66ocnhme1et3m0gc0r4um8th.apps.googleusercontent.com"
-    ENV_VARS="${ENV_VARS}||GOOGLE_CLIENT_SECRET=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"
+    ENV_VARS="${ENV_VARS}||GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
+    ENV_VARS="${ENV_VARS}||GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}"
 
     # Google Cloud
     ENV_VARS="${ENV_VARS}||GOOGLE_CLOUD_PROJECT=${PROJECT_ID}"
     ENV_VARS="${ENV_VARS}||GOOGLE_CLOUD_BUCKET=${BUCKET_NAME}"
 
     # AI / LLM — OpenRouter for production (Ollama won't work in Cloud Run)
-    ENV_VARS="${ENV_VARS}||OPENAI_API_KEY=${OPENROUTER_API_KEY:-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}"
+    ENV_VARS="${ENV_VARS}||OPENAI_API_KEY=${OPENROUTER_API_KEY}"
     ENV_VARS="${ENV_VARS}||OPENAI_BASE_URL=https://openrouter.ai/api/v1"
     ENV_VARS="${ENV_VARS}||OPENAI_MODEL=gpt-4o-mini"
-    ENV_VARS="${ENV_VARS}||OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-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}"
+    ENV_VARS="${ENV_VARS}||OPENROUTER_API_KEY=${OPENROUTER_API_KEY}"
 
     # Rust canary — disabled for demo
     ENV_VARS="${ENV_VARS}||RUST_CANARY_GRADING_PERCENT=0"
