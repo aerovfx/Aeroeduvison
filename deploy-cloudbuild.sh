@@ -283,7 +283,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --min-instances=0 \
   --max-instances=10 \
   --concurrency=80 \
-  --timeout=60 \
+  --timeout=600 \
   --cpu-boost \
   --execution-environment=gen2 \
   --update-env-vars="${ENV_VARS}" \

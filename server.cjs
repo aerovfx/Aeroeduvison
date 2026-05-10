@@ -2395,6 +2395,42 @@ if (USE_NODEJS_QUESTIONS) {
         });
       }
 
+      // ── community-stats ───────────────────────────────
+      // Thống kê cộng đồng: tổng số bài đã làm, top scorer ẩn danh, distribution
+      // điểm. Trả empty-shape nếu chưa có data → frontend fallback localStorage.
+      if (action === 'community-stats') {
+        const [totalQ, topQ, distQ] = await Promise.all([
+          pool.query(`SELECT COUNT(*)::int AS n FROM "PracticeExam" WHERE completed = TRUE`),
+          pool.query(
+            `SELECT percentage, "completedAt" FROM "PracticeExam"
+              WHERE completed = TRUE AND percentage IS NOT NULL
+              ORDER BY "completedAt" DESC LIMIT 50`
+          ),
+          pool.query(
+            `SELECT
+               COUNT(*) FILTER (WHERE percentage >= 90)::int AS excellent,
+               COUNT(*) FILTER (WHERE percentage >= 75 AND percentage < 90)::int AS good,
+               COUNT(*) FILTER (WHERE percentage >= 50 AND percentage < 75)::int AS average,
+               COUNT(*) FILTER (WHERE percentage < 50)::int AS weak,
+               COALESCE(AVG(percentage), 0)::float AS overall_avg
+             FROM "PracticeExam"
+             WHERE completed = TRUE AND percentage IS NOT NULL
+               AND "completedAt" > NOW() - INTERVAL '30 days'`
+          ),
+        ]);
+        return res.json({
+          success: true,
+          data: {
+            totalCompleted: totalQ.rows[0].n,
+            distribution: distQ.rows[0] || {},
+            recent: topQ.rows.map(r => ({
+              percentage: Number(r.percentage),
+              completedAt: r.completedAt,
+            })),
+          },
+        });
+      }
+
       // ── history ───────────────────────────────────────
       if (action === 'history') {
         const { rows } = await pool.query(
