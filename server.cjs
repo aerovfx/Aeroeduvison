@@ -4918,7 +4918,62 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
     }
   });
 
-  // Export endpoints — chưa implement (cần AI gen LaTeX, sẽ thêm sau)
+  // POST /api/latex-projects/ai-generate
+  // Sinh đề thi LaTeX bằng AI (fal.ai → Claude/Gemini). Body: ExamConfig
+  // (subject, grade, topic, difficulty {easy,medium,hard,veryHard}, ...).
+  // Trả { latex, totalQuestions } — frontend sẽ in `source: 'ai'`.
+  app.post('/api/latex-projects/ai-generate', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const cfg = req.body || {};
+      const totalQuestions =
+        (cfg.difficulty?.easy || 0) + (cfg.difficulty?.medium || 0) +
+        (cfg.difficulty?.hard || 0) + (cfg.difficulty?.veryHard || 0);
+      if (!totalQuestions) return res.status(400).json({ error: 'Cần ít nhất 1 câu hỏi' });
+
+      const fal = require('./lib/fal-client.cjs');
+      const subject = cfg.subject || 'Toán';
+      const grade = cfg.grade || '11';
+      const topic = cfg.topic || '';
+      const prompt = [
+        `Bạn là chuyên gia ra đề ${subject} lớp ${grade}.`,
+        topic ? `Chủ đề: ${topic}.` : '',
+        `Sinh ${totalQuestions} câu hỏi với phân bố độ khó:`,
+        `- Dễ: ${cfg.difficulty?.easy || 0}`,
+        `- Trung bình: ${cfg.difficulty?.medium || 0}`,
+        `- Khó: ${cfg.difficulty?.hard || 0}`,
+        `- Vận dụng cao: ${cfg.difficulty?.veryHard || 0}`,
+        cfg.notes ? `Lưu ý: ${cfg.notes}` : '',
+        '',
+        `OUTPUT: 1 file LaTeX hoàn chỉnh (\\documentclass{article} → \\end{document}).`,
+        `Dùng package: amsmath, amssymb, geometry, vietnam (cho tiếng Việt).`,
+        `Mỗi câu trắc nghiệm: 4 lựa chọn A/B/C/D.`,
+        cfg.title ? `Tiêu đề: ${cfg.title}` : '',
+        cfg.schoolName ? `Trường: ${cfg.schoolName}` : '',
+        cfg.includeAnswerKey ? 'Cuối đề thêm phần "ĐÁP ÁN".' : '',
+        '',
+        `CHỈ trả về nội dung LaTeX, KHÔNG markdown fence, KHÔNG giải thích.`,
+      ].filter(Boolean).join('\n');
+
+      const result = await fal.complete({
+        messages: [{ role: 'user', content: prompt }],
+        system: 'You are a LaTeX exam paper generator. Output only valid LaTeX, no markdown fences.',
+      });
+      // Strip code fence nếu có
+      let latex = result.content.trim();
+      const fenceMatch = latex.match(/^```(?:latex|tex)?\s*([\s\S]*?)\s*```$/);
+      if (fenceMatch) latex = fenceMatch[1].trim();
+
+      console.log(`[latex:ai-generate] ✅ user=${userId} questions=${totalQuestions} took=${Date.now() - t0}ms`);
+      return res.json({ latex, totalQuestions });
+    } catch (err) {
+      console.error('[latex:ai-generate] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/latex-projects/export-from-exam', (_req, res) => {
     res.status(501).json({ error: 'Tính năng đang phát triển' });
   });

@@ -130,11 +130,11 @@ export function AiExamDialog({
       const result = await latexAiService.generateExam(config)
       if (result.source === 'local') {
         toast(
-          'AI chưa được cấu hình trên server — đã dùng generator cục bộ. Quản trị cần set ANTHROPIC_API_KEY trên latex-service (xem AI_SETUP.md).',
+          'AI tạm chưa khả dụng — đã dùng generator cục bộ. Bạn vẫn có file LaTeX hoàn chỉnh để chỉnh sửa.',
           { icon: '⚙️', duration: 5200 },
         )
       } else {
-        toast.success(`Claude AI đã sinh đề với ${result.totalQuestions} câu hỏi.`)
+        toast.success(`AI đã sinh đề với ${result.totalQuestions} câu hỏi.`)
       }
       onGenerated(result, config)
     } catch {
