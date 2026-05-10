@@ -696,6 +696,42 @@ function makeProxy(target, label, pathFilter) {
       return res.status(500).json({ error: err.message });
     }
   });
+
+  // ── POST /api/teacher/exams/:id/publish ─────────────────────
+  // Body: { status?, isPublic? }. Đổi status (mặc định "Đang diễn ra")
+  // để học sinh nhìn thấy đề trong /student/exams. Nếu isPublic=true,
+  // lưu metadata.public=true vào description JSON.
+  app.post('/api/teacher/exams/:id/publish', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const newStatus = (req.body && req.body.status) || 'Đang diễn ra';
+      const isPublic = req.body && req.body.isPublic !== false; // mặc định true
+
+      const pool = getEPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+
+      // Merge isPublic vào description JSON (đã lưu subject ở đó)
+      let descObj = {};
+      try { descObj = JSON.parse(rows[0].description || '{}'); } catch {}
+      descObj.public = isPublic;
+      descObj.publishedAt = new Date().toISOString();
+
+      await pool.query(
+        `UPDATE "Exam" SET status=$1, description=$2, "updatedAt"=$3 WHERE id=$4`,
+        [newStatus, JSON.stringify(descObj), new Date(), req.params.id]
+      );
+      console.log(`[teacher:exams:publish] ✅ ${req.params.id} → ${newStatus} public=${isPublic}`);
+      return res.json({ ok: true, status: newStatus, isPublic });
+    } catch (err) {
+      console.error('[teacher:exams:publish] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
