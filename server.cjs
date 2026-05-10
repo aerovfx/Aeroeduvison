@@ -2661,6 +2661,27 @@ if (USE_NODEJS_QUESTIONS) {
         const byDifficulty = { EASY: { correct: 0, total: 0, accuracy: 0 }, MEDIUM: { correct: 0, total: 0, accuracy: 0 }, HARD: { correct: 0, total: 0, accuracy: 0 } };
         const details = [];
 
+        // normalizeAnswer — chuẩn hoá đáp án để so sánh giữa user_ans và
+        // correct_ans (TỰ HOẠT ĐỘNG cho cả MCQ + SHORT_ANSWER):
+        //   • MCQ: extract letter ABCD từ "D. F = k·q₁·q₂/r²" → "D"
+        //   • Số: chuẩn hoá '0,4' / '0.40' / ' 0.4 ' → '0.4'
+        //   • Text: lowercase + trim
+        // Lý do: publish-li10.py lưu correctAnswer="D" (1 chữ) nhưng UI
+        // gửi user_ans là full option text "D. công thức..." → so sánh
+        // string thẳng sẽ ra false dù user chọn đúng.
+        const normalizeAnswer = (ans) => {
+          const s = String(ans ?? '').trim();
+          if (!s) return '';
+          if (/^[A-Z]$/i.test(s)) return s.toUpperCase();
+          const m = s.match(/^([A-Z])[\.\)\s]/i);
+          if (m) return m[1].toUpperCase();
+          const numStr = s.replace(/,/g, '.').replace(/\s+/g, '');
+          if (numStr !== '' && !isNaN(Number(numStr))) {
+            return String(Number(numStr));
+          }
+          return s.toLowerCase();
+        };
+
         for (const q of questions) {
           const qid = q.questionId;
           const user_ans = answers[qid];
@@ -2669,9 +2690,7 @@ if (USE_NODEJS_QUESTIONS) {
 
           let isCorrect = false;
           if (isAnswered && correct_ans) {
-            // Robust compare: trim + case-insensitive for text answers; exact for MCQ option strings
-            isCorrect = String(user_ans).trim() === String(correct_ans).trim()
-              || String(user_ans).trim().toLowerCase() === String(correct_ans).trim().toLowerCase();
+            isCorrect = normalizeAnswer(user_ans) === normalizeAnswer(correct_ans);
           }
 
           if (!isAnswered) unanswered++;
@@ -2796,6 +2815,88 @@ if (USE_NODEJS_QUESTIONS) {
             },
           },
         });
+      }
+
+      // ── regrade (re-chấm bài đã nộp với logic normalize mới) ──
+      // Dùng khi: fix bug grading rồi muốn cập nhật điểm cho các bài đã nộp.
+      // Body: { action: 'regrade', practiceId: 'xxx' } HOẶC { action: 'regrade', all: true }
+      if (action === 'regrade') {
+        const targetIds = [];
+        if (body.all === true) {
+          // Chỉ admin được regrade ALL — check qua header X-Admin-Key.
+          const adminKey = req.headers['x-admin-key'];
+          if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+            return res.status(403).json({ success: false, error: 'admin_required' });
+          }
+          const { rows } = await pool.query(
+            `SELECT id FROM "PracticeExam" WHERE completed = TRUE`
+          );
+          for (const r of rows) targetIds.push(r.id);
+        } else {
+          const practiceId = String(body.practiceId || '').trim();
+          if (!practiceId) return res.status(400).json({ success: false, error: 'missing_practiceId' });
+          targetIds.push(practiceId);
+        }
+
+        const normalize = (ans) => {
+          const s = String(ans ?? '').trim();
+          if (!s) return '';
+          if (/^[A-Z]$/i.test(s)) return s.toUpperCase();
+          const m = s.match(/^([A-Z])[\.\)\s]/i);
+          if (m) return m[1].toUpperCase();
+          const numStr = s.replace(/,/g, '.').replace(/\s+/g, '');
+          if (numStr !== '' && !isNaN(Number(numStr))) return String(Number(numStr));
+          return s.toLowerCase();
+        };
+
+        const results = [];
+        for (const pid of targetIds) {
+          const r = await pool.query(
+            `SELECT id, "studentId", questions, answers, score, percentage, completed
+               FROM "PracticeExam" WHERE id = $1`, [pid]
+          );
+          if (r.rows.length === 0) {
+            results.push({ practiceId: pid, error: 'not_found' });
+            continue;
+          }
+          const pe = r.rows[0];
+          if (!body.all && pe.studentId !== user.id) {
+            results.push({ practiceId: pid, error: 'forbidden' });
+            continue;
+          }
+          if (!pe.completed) {
+            results.push({ practiceId: pid, error: 'not_submitted' });
+            continue;
+          }
+          const qs = Array.isArray(pe.questions) ? pe.questions : [];
+          const ans = pe.answers && typeof pe.answers === 'object' ? pe.answers : {};
+          let c = 0, ic = 0, un = 0;
+          for (const q of qs) {
+            const u = ans[q.questionId];
+            const ca = q.correctAnswer || '';
+            const answered = u !== undefined && u !== null && String(u).length > 0;
+            if (!answered) un++;
+            else if (ca && normalize(u) === normalize(ca)) c++;
+            else ic++;
+          }
+          const newPct = qs.length > 0 ? Math.round((c / qs.length) * 100) : 0;
+          const newScore = qs.length > 0 ? Math.round((c / qs.length) * 100) / 10 : 0;
+          await pool.query(
+            `UPDATE "PracticeExam" SET score = $1, percentage = $2,
+               breakdown = jsonb_set(COALESCE(breakdown,'{}'::jsonb), '{correct}', $3::jsonb)
+             WHERE id = $4`,
+            [newScore, newPct, JSON.stringify(c), pid]
+          );
+          results.push({
+            practiceId: pid,
+            before: { score: pe.score, percentage: pe.percentage },
+            after: { score: newScore, percentage: newPct, correct: c, incorrect: ic, unanswered: un, total: qs.length },
+            changed: pe.percentage !== newPct,
+          });
+        }
+        const changedCount = results.filter(r => r.changed).length;
+        console.log(`[exam-prep:regrade] ✅ ${results.length} bài, ${changedCount} bài thay đổi điểm`);
+        return res.json({ success: true, data: { results, changedCount } });
       }
 
       return res.status(400).json({ success: false, error: 'invalid_action' });
@@ -3653,12 +3754,23 @@ if (USE_NODEJS_QUESTIONS) {
     };
   }
 
+  // Normalize MCQ + numeric + text answers — xem comment ở exam-prep submit.
+  function normalizeKcAnswer(s) {
+    s = String(s ?? '').trim();
+    if (!s) return '';
+    if (/^[A-Z]$/i.test(s)) return s.toUpperCase();
+    const m = s.match(/^([A-Z])[\.\)\s]/i);
+    if (m) return m[1].toUpperCase();
+    const numStr = s.replace(/,/g, '.').replace(/\s+/g, '');
+    if (numStr !== '' && !isNaN(Number(numStr))) return String(Number(numStr));
+    return s.toLowerCase();
+  }
+
   function isCorrect(q, given) {
     if (!q) return false;
-    const a = String(q.correctAnswer || '').trim().toLowerCase();
-    const g = String(given || '').trim().toLowerCase();
+    const a = normalizeKcAnswer(q.correctAnswer);
     if (!a) return false;
-    return a === g;
+    return a === normalizeKcAnswer(given);
   }
 
   // ════════════════════════════════════════════════
