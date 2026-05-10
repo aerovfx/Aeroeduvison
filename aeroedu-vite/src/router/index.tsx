@@ -392,8 +392,11 @@ export function AppRouter() {
               <Route path="/teacher/exam-preview/:examId"          element={<PageFallback />} />
               <Route path="/teacher/exam-reports"                  element={<ExamReportsPage />} />
               <Route path="/teacher/exams/create"                  element={<CreateExamPage />} />
-              <Route path="/teacher/wayground"                     element={<WaygroundCreatePage />} />
-              <Route path="/teacher/wayground/create"               element={<WaygroundCreatePage />} />
+              <Route path="/teacher/taodethi"                      element={<WaygroundCreatePage />} />
+              <Route path="/teacher/taodethi/create"                element={<WaygroundCreatePage />} />
+              {/* Legacy redirects — link cũ vẫn dùng được */}
+              <Route path="/teacher/wayground"                     element={<Navigate to="/teacher/taodethi" replace />} />
+              <Route path="/teacher/wayground/create"               element={<Navigate to="/teacher/taodethi" replace />} />
               <Route path="/teacher/exams/:id"                     element={<PageFallback />} />
               <Route path="/teacher/exams/:id/edit"                element={<PageFallback />} />
               <Route path="/teacher/grading"                       element={<PageFallback />} />

@@ -1,6 +1,6 @@
 /**
  * WaygroundCreate — quy trình tạo đề thi 4 bước (Wayground / Quizizz style)
- * Route: /teacher/wayground
+ * Route: /teacher/taodethi  (legacy alias: /teacher/wayground)
  *
  * Steps:
  *   1. Choose mode (Assessment / Presentation / Video / Passage / Flashcards)
