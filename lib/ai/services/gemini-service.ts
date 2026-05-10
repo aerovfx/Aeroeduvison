@@ -4,18 +4,24 @@
  */
 
 import { GeminiProvider, GeminiVisionInput } from '../providers/gemini-provider';
+import { FalProvider } from '../providers/fal-provider';
 import { AIServiceOrchestrator } from '../ai-service-orchestrator';
 import { AIMessage } from '../providers/base-provider';
 
+// Provider có cùng interface vision/OCR mà GeminiService cần.
+// Cả GeminiProvider lẫn FalProvider implement đủ: complete, completeWithVision,
+// extractTextFromImage, isAvailable.
+type VisionCapableProvider = GeminiProvider | FalProvider;
+
 export class GeminiService {
-  private static provider: GeminiProvider;
+  private static provider: VisionCapableProvider;
   private static orchestrator: AIServiceOrchestrator;
 
   /**
    * Initialize Gemini service
    */
   static initialize() {
-    this.provider = new GeminiProvider();
+    this.provider = this.buildProvider();
     this.orchestrator = new AIServiceOrchestrator({
       preferredProvider: 'gemini',
       fallbackEnabled: true,
@@ -25,13 +31,22 @@ export class GeminiService {
   }
 
   /**
-   * Get Gemini provider instance
+   * Get provider instance — fal.ai khi AI_PREFERRED_PROVIDER=fal hoặc khi
+   * không có GEMINI_API_KEY nhưng có FAL_API_KEY.
    */
-  static getProvider(): GeminiProvider {
-    if (!this.provider) {
-      this.provider = new GeminiProvider();
-    }
+  static getProvider(): VisionCapableProvider {
+    if (!this.provider) this.provider = this.buildProvider();
     return this.provider;
+  }
+
+  private static buildProvider(): VisionCapableProvider {
+    const pref = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+    const hasFal = !!process.env.FAL_API_KEY;
+    const hasGemini = !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY);
+    if ((pref === 'fal' && hasFal) || (!hasGemini && hasFal)) {
+      return new FalProvider();
+    }
+    return new GeminiProvider();
   }
 
   /**

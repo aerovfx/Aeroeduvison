@@ -77,7 +77,10 @@ app.use((_req, res, next) => {
 });
 
 // ── Body parser (needed for auth routes) ───────────────────
-app.use(express.json());
+// Default limit là 100kb; PDF base64 có thể tới ~30MB → bump lên 50mb cho
+// các route đặc biệt (quiz-extract). express.json() chấp nhận limit duy nhất
+// nên ta dùng giới hạn lớn cho mọi request — tin tưởng vì backend đứng sau auth.
+app.use(express.json({ limit: '50mb' }));
 
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN NODE.JS AUTH — active when AUTH_SERVICE_URL is not set
@@ -535,6 +538,372 @@ if (HAS_AUTH_PROXY) {
     } catch (err) {
       console.error('[teacher:exams:duplicate] ❌', err.message);
       return res.status(500).json({ error: err.message });
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUILT-IN QUIZ EXTRACTOR — Wayground-style flow
+// Handles: POST /api/teacher/quiz-extract  → fal.ai trích xuất câu hỏi từ PDF
+//          POST /api/teacher/quiz-publish  → lưu Exam + ExamQuestion vào DB
+//
+// Body cho extract:  { fileBase64, filename, mode, subject, grade, language, model? }
+// Body cho publish:  { title, subject, grade, duration, questions[] }
+//
+// Khoá fal.ai lấy từ env FAL_API_KEY ("key_id:secret"). Routes này luôn
+// chạy TRƯỚC proxy /api/teacher để không bị forward sang teacher-service.
+// ══════════════════════════════════════════════════════════════
+{
+  const { extractQuestionsFromPdf, generateQuestionsFromPdf } = require('./lib/fal-quiz-extractor.cjs');
+  const { Pool: QPool } = require('pg');
+  const qjwt = require('jsonwebtoken');
+  const { randomUUID: quizUUID } = require('crypto');
+
+  let _qpool = null;
+  function getQPool() {
+    if (!_qpool) {
+      const DATABASE_URL = process.env.DATABASE_URL;
+      if (!DATABASE_URL) throw new Error('DATABASE_URL env var not set');
+      _qpool = new QPool({ connectionString: DATABASE_URL, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _qpool;
+  }
+
+  const QJWT_SECRET = process.env.JWT_SECRET
+    || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+
+  function getQuizUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = qjwt.verify(auth.slice(7), QJWT_SECRET);
+      return decoded.sub || decoded.userId || null;
+    } catch { return null; }
+  }
+
+  // ── POST /api/teacher/quiz-extract ─────────────────────────
+  // Bắt đầu pipeline Wayground: PDF → fal.ai → JSON câu hỏi.
+  // KHÔNG yêu cầu DATABASE_URL — extractor stateless để dev nhanh.
+  app.post('/api/teacher/quiz-extract', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      // Auth optional ở dev: cho phép gọi không cần token nếu ALLOW_QUIZ_ANON=1.
+      const userId = getQuizUserId(req);
+      if (!userId && process.env.ALLOW_QUIZ_ANON !== '1') {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { fileBase64, filename, mode, subject, grade, language, model, count } = req.body || {};
+      if (!fileBase64) return res.status(400).json({ error: 'fileBase64 is required' });
+
+      const pdfBuffer = Buffer.from(fileBase64, 'base64');
+      if (pdfBuffer.length < 100) {
+        return res.status(400).json({ error: 'PDF buffer quá nhỏ — base64 sai?' });
+      }
+      if (pdfBuffer.length > 30 * 1024 * 1024) {
+        return res.status(413).json({ error: 'PDF tối đa 30MB' });
+      }
+
+      const opts = {
+        subject: subject || 'Vật lí',
+        grade: grade || '11',
+        language: language || 'Vietnamese',
+        model,
+        count: Number(count) || 20,
+      };
+
+      const result = mode === 'generate'
+        ? await generateQuestionsFromPdf(pdfBuffer, opts)
+        : await extractQuestionsFromPdf(pdfBuffer, opts);
+
+      console.log(`[quiz-extract] ✅ user=${userId || 'anon'} mode=${mode || 'extract'} `
+        + `file=${filename || 'unknown'} questions=${result.questions.length} took=${Date.now() - t0}ms`);
+
+      return res.json({
+        success: true,
+        ...result,
+        receivedFilename: filename || null,
+      });
+    } catch (err) {
+      console.error('[quiz-extract] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/quiz-publish ─────────────────────────
+  // Lưu Exam vào bảng "Exam"; mỗi câu hỏi tạo Question + ExamQuestion link.
+  // Mọi op trong 1 transaction — fail thì rollback toàn bộ.
+  app.post('/api/teacher/quiz-publish', async (req, res) => {
+    const client = await (async () => {
+      try { return await getQPool().connect(); }
+      catch { return null; }
+    })();
+    if (!client) {
+      return res.status(503).json({ error: 'Database không kết nối được — thiếu DATABASE_URL?' });
+    }
+
+    try {
+      const userId = getQuizUserId(req);
+      if (!userId) {
+        client.release();
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { title, subject, grade, duration, questions, description } = req.body || {};
+      if (!title || !Array.isArray(questions) || !questions.length) {
+        client.release();
+        return res.status(400).json({ error: 'title + questions[] required' });
+      }
+
+      await client.query('BEGIN');
+      const examId = quizUUID();
+      const now = new Date();
+
+      const examDescription = JSON.stringify({
+        subject: subject || 'Vật lí',
+        grade: grade || '11',
+        source: 'wayground',
+        notes: description || '',
+      });
+
+      await client.query(
+        `INSERT INTO "Exam"
+           (id, title, description, "examType", duration, "totalScore",
+            "totalQuestions", status, "userId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,'Trắc nghiệm',$4,$5,$6,'Nháp',$7,$8,$8)`,
+        [examId, title, examDescription, Number(duration) || 45,
+         questions.length, questions.length, userId, now]
+      );
+
+      // Insert từng Question + ExamQuestion (order = idx + 1)
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const qid = quizUUID();
+        await client.query(
+          `INSERT INTO "Question"
+             (id, topic, subject, grade, "questionType", difficulty, content,
+              options, "correctAnswer", explanation, "qualityScore", "usageCount",
+              "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,true,true,'active',$10,$11,$11)`,
+          [
+            qid,
+            'wayground-import',
+            subject || 'Vật lí',
+            String(grade || '11'),
+            String(q.questionType || 'MULTIPLE_CHOICE'),
+            String(q.content || ''),
+            JSON.stringify(q.options || []),
+            String(q.correctAnswer || ''),
+            q.explanation || null,
+            userId,
+            now,
+          ]
+        );
+        await client.query(
+          `INSERT INTO "ExamQuestion" (id, "examId", "questionId", "order", points)
+           VALUES ($1,$2,$3,$4,1)`,
+          [quizUUID(), examId, qid, i + 1]
+        );
+      }
+
+      await client.query('COMMIT');
+      console.log(`[quiz-publish] ✅ exam=${examId} questions=${questions.length} user=${userId}`);
+      return res.status(201).json({ success: true, examId });
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch {}
+      console.error('[quiz-publish] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    } finally {
+      client.release();
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// BUILT-IN PAYMENT (bank transfer + Telegram notification)
+//
+// Endpoints:
+//   GET  /api/payment/plans              → danh sách gói
+//   GET  /api/payment/bank               → thông tin tài khoản nhận
+//   POST /api/payment/orders             → tạo order { planId, userId?, userEmail?, userName? }
+//   GET  /api/payment/orders/:id         → poll status
+//   POST /api/payment/orders/:id/notify  → user click "đã chuyển khoản" → ping admin Telegram
+//   POST /api/telegram/webhook           → callback từ Telegram (Approve/Reject)
+//
+// ENV:
+//   TELEGRAM_BOT_TOKEN, ADMIN_TELEGRAM_CHAT_ID (optional, auto-bind via /start),
+//   PAYMENT_BANK_NAME, PAYMENT_BANK_NAME_FULL, PAYMENT_ACCOUNT_NUMBER, PAYMENT_ACCOUNT_HOLDER
+// ══════════════════════════════════════════════════════════════
+{
+  const tg = require('./lib/telegram-bot.cjs');
+  const orders = require('./lib/payment-orders.cjs');
+  const entitlements = require('./lib/entitlements.cjs');
+  const emailSender = require('./lib/email-sender.cjs');
+  const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+
+  // Callback từ admin (cả polling lẫn webhook đều dùng chung handler này)
+  // Khi PAID: sinh activation code + gửi email cho user + ack qua Telegram.
+  async function onAdminCallback({ action, orderId, fromChatId, messageId }) {
+    if (!orderId || !['approve','reject'].includes(action)) return;
+    const order = await orders.getOrder(orderId);
+    if (!order) {
+      console.warn('[payment] callback: order not found', orderId);
+      return;
+    }
+    const newStatus = action === 'approve' ? 'PAID' : 'REJECTED';
+    const updated = await orders.setStatus(orderId, newStatus);
+    await tg.markOrderHandled(fromChatId, messageId, action, updated);
+    console.log(`[payment] order=${orderId} → ${newStatus} via Telegram`);
+
+    if (newStatus !== 'PAID') return;
+    try {
+      const code = await entitlements.generateActivationCode(updated);
+      console.log(`[payment] code generated for order=${orderId} → ${code.code}`);
+      if (updated.userEmail) {
+        const result = await emailSender.sendActivationEmail({
+          to: updated.userEmail,
+          code: code.code,
+          planName: updated.planName,
+          features: code.features.map(f => entitlements.FEATURES[f] || f),
+          durationDays: code.durationDays,
+          baseUrl: PUBLIC_URL,
+        });
+        console.log(`[payment] activation email → ${updated.userEmail} via ${result.provider}`);
+      }
+      // Forward code qua Telegram cho admin (phòng email lỗi)
+      try {
+        await tg.tgCall('sendMessage', {
+          chat_id: fromChatId,
+          text: `🔑 Mã kích hoạt cho order <code>${updated.id}</code>:\n` +
+                `<b>${code.code}</b>\n\n` +
+                `Email: ${updated.userEmail || '(không có)'}\n` +
+                `Hiệu lực ${code.durationDays} ngày`,
+          parse_mode: 'HTML',
+        });
+      } catch {}
+    } catch (e) {
+      console.error('[payment] generate/email code FAILED:', e.message);
+    }
+  }
+
+  // Helper: lấy userKey từ JWT Bearer (dùng EJWT_SECRET đã decl bên trên).
+  function getUserKey(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = require('jsonwebtoken').verify(auth.slice(7),
+        process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!');
+      return decoded.sub || decoded.userId || decoded.email || null;
+    } catch { return null; }
+  }
+
+  // Long polling worker (chỉ cần khi không setWebhook)
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_USE_WEBHOOK !== 'true') {
+    tg.startPolling({ onCallback: onAdminCallback });
+  }
+
+  app.get('/api/payment/plans', (_req, res) => {
+    res.json({ plans: orders.PLANS });
+  });
+
+  app.get('/api/payment/bank', (_req, res) => {
+    res.json(orders.getBankInfo());
+  });
+
+  app.post('/api/payment/orders', async (req, res) => {
+    try {
+      const { planId, userId, userEmail, userName, metadata } = req.body || {};
+      if (!planId) return res.status(400).json({ error: 'planId required' });
+      const order = await orders.createOrder({ planId, userId, userEmail, userName, metadata });
+      const bank = orders.getBankInfo();
+      const qrUrl = orders.buildQrUrl({
+        bankCode: bank.bankCode,
+        accountNo: bank.accountNo,
+        accountName: bank.accountName,
+        amount: order.amount,
+        code: order.transferCode,
+      });
+      console.log(`[payment] created order=${order.id} plan=${planId} amount=${order.amount}`);
+      res.status(201).json({ order, bank, qrUrl });
+    } catch (err) {
+      console.error('[payment:create] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/payment/orders/:id', async (req, res) => {
+    const o = await orders.getOrder(req.params.id);
+    if (!o) return res.status(404).json({ error: 'Order not found' });
+    res.json({ order: o });
+  });
+
+  app.post('/api/payment/orders/:id/notify', async (req, res) => {
+    try {
+      const order = await orders.getOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status !== 'PENDING') {
+        return res.status(409).json({ error: 'Order already in status: ' + order.status });
+      }
+      // Send Telegram FIRST — chỉ đổi status nếu thành công, để tránh user
+      // nghĩ "đã thông báo cho admin" nhưng thực ra notify failed.
+      const tgRes = await tg.sendOrderNotification(order);
+      const updated = await orders.setStatus(order.id, 'AWAITING_REVIEW', {
+        tgChatId: tgRes.chatId, tgMessageId: tgRes.messageId,
+      });
+      console.log(`[payment] order=${order.id} → AWAITING_REVIEW (tg msg ${tgRes.messageId})`);
+      res.json({ ok: true, status: 'AWAITING_REVIEW', order: updated });
+    } catch (err) {
+      console.error('[payment:notify] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ─── Entitlements ──────────────────────────────────────────
+  app.get('/api/entitlements/plan-features', (_req, res) => {
+    res.json({
+      features: entitlements.FEATURES,
+      planFeatures: entitlements.PLAN_FEATURES,
+    });
+  });
+
+  app.get('/api/entitlements/me', async (req, res) => {
+    const userKey = getUserKey(req);
+    if (!userKey) return res.status(401).json({ error: 'Unauthorized' });
+    const list = await entitlements.listEntitlements(userKey);
+    res.json({ userKey, entitlements: list });
+  });
+
+  app.post('/api/entitlements/activate', async (req, res) => {
+    try {
+      const { code } = req.body || {};
+      if (!code) return res.status(400).json({ error: 'code required' });
+      const userKey = getUserKey(req);
+      if (!userKey) return res.status(401).json({ error: 'Đăng nhập trước khi kích hoạt' });
+      const result = await entitlements.activateCode(String(code).trim().toUpperCase(), userKey);
+      console.log(`[entitlements] user=${userKey} activated ${result.code} → ${result.features.join(',')}`);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // Webhook entry (Telegram → server). Chỉ dùng nếu set TELEGRAM_USE_WEBHOOK=true
+  // và setWebhook đã trỏ về URL này. Header X-Telegram-Bot-Api-Secret-Token được
+  // verify nếu TELEGRAM_WEBHOOK_SECRET có set.
+  app.post('/api/telegram/webhook', async (req, res) => {
+    try {
+      const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      if (secret) {
+        const got = req.headers['x-telegram-bot-api-secret-token'];
+        if (got !== secret) return res.status(401).json({ error: 'bad secret' });
+      }
+      await tg.handleUpdate(req.body, { onCallback: onAdminCallback });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[telegram:webhook] ❌', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 }

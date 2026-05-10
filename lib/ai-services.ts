@@ -3,6 +3,7 @@ import { modelSelector, TaskType, Priority } from './ai/model-selector';
 import { GeminiProvider } from './ai/providers/gemini-provider';
 import { OllamaProvider } from './ai/providers/ollama-provider';
 import { OpenAIProvider } from './ai/providers/openai-provider';
+import { FalProvider } from './ai/providers/fal-provider';
 import { AIMessage } from './ai/providers/base-provider';
 
 interface AIResponse {
@@ -20,24 +21,34 @@ export class AITutorService {
   private gemini: GeminiProvider;
   private ollama: OllamaProvider;
   private openai: OpenAIProvider;
+  private fal: FalProvider;
 
   constructor() {
     this.gemini = new GeminiProvider();
     this.ollama = new OllamaProvider();
     this.openai = new OpenAIProvider();
+    this.fal = new FalProvider();
   }
 
   private async callProvider(selection: any, messages: AIMessage[]): Promise<AIResponse> {
+    // Global override: AI_PREFERRED_PROVIDER=fal sẽ ép mọi request qua fal.ai
+    // bất kể model-selector chọn gì. Hữu ích khi muốn dồn budget vào 1 nhà cung cấp.
+    const forced = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
     let provider;
-    switch (selection.provider) {
+    if (forced === 'fal' || selection.provider === 'fal.ai') {
+      provider = this.fal;
+    } else switch (selection.provider) {
       case 'Ollama': provider = this.ollama; break;
       case 'Google Gemini': provider = this.gemini; break;
       default: provider = this.openai;
     }
 
-    const response = await provider.complete(messages, {
-      model: selection.selectedModel,
-    });
+    // Khi route sang fal, đổi tên model selection sang fal-prefixed nếu cần.
+    const model = (provider === this.fal && selection.selectedModel && !selection.selectedModel.includes('/'))
+      ? this.mapToFalModel(selection.selectedModel)
+      : selection.selectedModel;
+
+    const response = await provider.complete(messages, { model });
 
     return {
       content: response.content,
@@ -48,6 +59,16 @@ export class AITutorService {
         total_tokens: response.usage.totalTokens
       }
     };
+  }
+
+  // Heuristic: map "claude-3.5-sonnet" → "anthropic/claude-3.5-sonnet" cho fal any-llm.
+  private mapToFalModel(modelName: string): string {
+    const m = modelName.toLowerCase();
+    if (m.startsWith('claude'))   return `anthropic/${modelName}`;
+    if (m.startsWith('gemini'))   return `google/${modelName}`;
+    if (m.startsWith('gpt'))      return `openai/${modelName}`;
+    if (m.startsWith('grok'))     return `xai/${modelName}`;
+    return modelName; // already namespaced or unknown
   }
 
   // Generate daily learning plan

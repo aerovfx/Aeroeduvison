@@ -66,9 +66,13 @@ export function getOpenAIClient(): OpenAI {
 }
 
 // Expose which provider is active (for logging)
-export function getActiveProvider(): 'openrouter' | 'openai' | 'none' {
+export function getActiveProvider(): 'openrouter' | 'openai' | 'fal' | 'none' {
+  // shouldUseFal() chưa định nghĩa ở scope này, copy logic ngắn:
+  const pref = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+  if (pref === 'fal' && process.env.FAL_API_KEY) return 'fal';
   if (process.env.OPENROUTER_API_KEY) return 'openrouter';
   if (process.env.OPENAI_API_KEY) return 'openai';
+  if (process.env.FAL_API_KEY) return 'fal';
   return 'none';
 }
 
@@ -87,6 +91,22 @@ export const DEFAULT_VISION_MODEL =
 export const EMBEDDING_MODEL =
   process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
 
+// ── fal.ai routing flag ────────────────────────────────────────────────────────
+// Khi AI_PREFERRED_PROVIDER=fal HOẶC chỉ FAL_API_KEY có sẵn, route chat &
+// vision qua fal.ai (any-llm). Cho phép dự án chạy hoàn toàn trên fal mà không
+// cần OpenAI/OpenRouter key.
+function shouldUseFal(): boolean {
+  const pref = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+  if (pref === 'fal') return !!process.env.FAL_API_KEY;
+  // Auto: dùng fal khi không có OpenAI/OpenRouter nhưng có fal
+  if (pref === 'auto' || !pref) {
+    if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY && process.env.FAL_API_KEY) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // ── Chat completion ────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
@@ -102,6 +122,18 @@ export async function chatCompletion(
     maxTokens?: number;
   }
 ): Promise<string> {
+  // Route qua fal.ai nếu được cấu hình (xem shouldUseFal())
+  if (shouldUseFal()) {
+    const { FalProvider } = await import('./providers/fal-provider');
+    const fal = new FalProvider();
+    const res = await fal.complete(messages, {
+      model: opts?.model,
+      temperature: opts?.temperature,
+      maxTokens: opts?.maxTokens,
+    });
+    return res.content;
+  }
+
   const client = getOpenAIClient();
   const response = await client.chat.completions.create({
     model: opts?.model ?? DEFAULT_CHAT_MODEL,
@@ -123,14 +155,10 @@ export async function visionCompletion(
     maxTokens?: number;
   }
 ): Promise<string> {
-  const client = getOpenAIClient();
-
-  // Convert Buffer → base64 string if needed
+  // Detect mime + convert to base64 first (cùng logic dùng cho cả 2 nhánh)
   let base64: string;
   let mimeType = 'image/jpeg';
-
   if (Buffer.isBuffer(imageData)) {
-    // Detect MIME from magic bytes
     if (imageData[0] === 0x89 && imageData[1] === 0x50) mimeType = 'image/png';
     else if (imageData[0] === 0xff && imageData[1] === 0xd8) mimeType = 'image/jpeg';
     else if (imageData[0] === 0x47 && imageData[1] === 0x49) mimeType = 'image/gif';
@@ -139,17 +167,26 @@ export async function visionCompletion(
   } else {
     if (imageData.startsWith('data:')) {
       const match = imageData.match(/^data:(image\/\w+);base64,(.+)$/);
-      if (match) {
-        mimeType = match[1];
-        base64 = match[2];
-      } else {
-        base64 = imageData.split(',')[1] ?? imageData;
-      }
+      if (match) { mimeType = match[1]; base64 = match[2]; }
+      else { base64 = imageData.split(',')[1] ?? imageData; }
     } else {
       base64 = imageData;
     }
   }
 
+  // Route qua fal.ai nếu được cấu hình
+  if (shouldUseFal()) {
+    const { FalProvider } = await import('./providers/fal-provider');
+    const fal = new FalProvider();
+    const res = await fal.completeWithVision(
+      [{ role: 'user', content: prompt }],
+      [{ mimeType, data: base64 }],
+      { model: opts?.model, maxTokens: opts?.maxTokens },
+    );
+    return res.content;
+  }
+
+  const client = getOpenAIClient();
   const response = await client.chat.completions.create({
     model: opts?.model ?? DEFAULT_VISION_MODEL,
     messages: [

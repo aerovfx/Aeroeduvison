@@ -39,7 +39,6 @@ import ResetPasswordPage from '@/pages/auth/ResetPassword'
 
 // ── Marketing Pages ─────────────────────────────────────────
 const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
-const PricingPage      = lazy(() => import('@/pages/marketing/Pricing'))
 
 // ── Public Pages (không cần đăng nhập) ───────────────────────
 const ScanAssignmentPage = lazy(() => import('@/pages/public/ScanAssignment'))
@@ -104,6 +103,10 @@ const ExamMatrixPage        = lazy(() => import('@/pages/teacher/ExamMatrix'))
 const QuestionBankPage      = lazy(() => import('@/pages/teacher/QuestionBank'))
 const ExamsPage             = lazy(() => import('@/pages/teacher/Exams'))
 const CreateExamPage        = lazy(() => import('@/pages/teacher/CreateExam'))
+const WaygroundCreatePage   = lazy(() => import('@/pages/teacher/WaygroundCreate'))
+const PricingPage2          = lazy(() => import('@/pages/payment/Pricing'))
+const PaymentDetailPage     = lazy(() => import('@/pages/payment/PaymentDetail'))
+const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
 const OnlineExamRoomPage    = lazy(() => import('@/pages/teacher/OnlineExamRoom'))
 const ExamGradingPage       = lazy(() => import('@/pages/teacher/ExamGrading'))
 const TranscriptPage        = lazy(() => import('@/pages/teacher/Transcript'))
@@ -186,7 +189,9 @@ export function AppRouter() {
             PUBLIC / MARKETING
         ══════════════════════════════════════════════════ */}
         <Route path="/"               element={<LandingPage />} />
-        <Route path="/pricing"        element={<PricingPage />} />
+        <Route path="/pricing"          element={<PricingPage2 />} />
+        <Route path="/payment/:orderId" element={<PaymentDetailPage />} />
+        <Route path="/activate"         element={<ActivatePage />} />
         <Route path="/a/:token"       element={<ScanAssignmentPage />} />
         <Route path="/k/:token"       element={<KeoCoJoinPage />} />
         <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
@@ -385,6 +390,8 @@ export function AppRouter() {
               <Route path="/teacher/exam-preview/:examId"          element={<PageFallback />} />
               <Route path="/teacher/exam-reports"                  element={<ExamReportsPage />} />
               <Route path="/teacher/exams/create"                  element={<CreateExamPage />} />
+              <Route path="/teacher/wayground"                     element={<WaygroundCreatePage />} />
+              <Route path="/teacher/wayground/create"               element={<WaygroundCreatePage />} />
               <Route path="/teacher/exams/:id"                     element={<PageFallback />} />
               <Route path="/teacher/exams/:id/edit"                element={<PageFallback />} />
               <Route path="/teacher/grading"                       element={<PageFallback />} />
