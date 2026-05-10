@@ -5064,6 +5064,49 @@ if (!USE_NODEJS_QUESTIONS) {
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/questions'));
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/question-bank'));
 }
+// /api/exams (catch-all list cho student/teacher) — built-in trả Exam đang
+// "Đang diễn ra" + isPublic=true (cho học sinh) hoặc của user nếu có Bearer.
+app.get('/api/exams', async (req, res) => {
+  try {
+    const { Pool: XPool } = require('pg');
+    const xjwt = require('jsonwebtoken');
+    const DATABASE_URL = process.env.DATABASE_URL;
+    if (!DATABASE_URL) return res.json({ exams: [] });
+    const xpool = new XPool({ connectionString: DATABASE_URL, max: 3 });
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const decoded = xjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!');
+        userId = decoded.sub || decoded.userId || null;
+      } catch {}
+    }
+    const limit = Math.min(Number(req.query.limit) || 100, 200);
+    let q, params;
+    if (userId) {
+      // Teacher view: own exams + public ones
+      q = `SELECT * FROM "Exam"
+           WHERE "userId" = $1 OR (status = 'Đang diễn ra' AND description LIKE '%"public":true%')
+           ORDER BY "createdAt" DESC LIMIT $2`;
+      params = [userId, limit];
+    } else {
+      // Public student view: chỉ exam Đang diễn ra + public
+      q = `SELECT * FROM "Exam"
+           WHERE status = 'Đang diễn ra' AND description LIKE '%"public":true%'
+           ORDER BY "createdAt" DESC LIMIT $1`;
+      params = [limit];
+    }
+    const { rows } = await xpool.query(q, params);
+    return res.json({ exams: rows });
+  } catch (err) {
+    console.error('[exams:list] ❌', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// /api/online-exam-room — phòng thi online. Built-in trả empty list.
+app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
+
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
 // ══════════════════════════════════════════════════════════════
