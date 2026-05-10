@@ -926,14 +926,14 @@ export default function ExamPrepPage() {
           )}
 
           {/* Weak topics warning */}
-          {stats && stats.weakTopics.length > 0 && (
+          {stats && (stats.weakTopics?.length ?? 0) > 0 && (
             <div className="bg-red-500/5 backdrop-blur-xl rounded-2xl border border-red-500/10 p-5">
               <h3 className="font-semibold text-red-400 text-sm mb-2 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 Chủ đề cần ôn tập
               </h3>
               <div className="flex flex-wrap gap-2">
-                {stats.weakTopics.map((t) => (
+                {(stats.weakTopics ?? []).map((t) => (
                   <span key={t} className="px-3 py-1 rounded-lg bg-red-500/10 text-red-300 text-xs border border-red-500/15">
                     {t}
                   </span>
@@ -1014,13 +1014,13 @@ function CommunityStatsPanel({
         <div className="space-y-5">
           {/* Summary tiles */}
           <div className="grid grid-cols-3 gap-3">
-            <SummaryTile label="Tổng lượt làm" value={stats.totalAttempts.toLocaleString("vi-VN")} />
-            <SummaryTile label="Học sinh tham gia" value={stats.totalUsers.toLocaleString("vi-VN")} />
-            <SummaryTile label="Điểm TB cộng đồng" value={`${stats.averagePercentage}%`} />
+            <SummaryTile label="Tổng lượt làm" value={(stats.totalAttempts ?? 0).toLocaleString("vi-VN")} />
+            <SummaryTile label="Học sinh tham gia" value={(stats.totalUsers ?? 0).toLocaleString("vi-VN")} />
+            <SummaryTile label="Điểm TB cộng đồng" value={`${stats.averagePercentage ?? 0}%`} />
           </div>
 
           {/* Leaderboard */}
-          {stats.leaderboard.length > 0 && (
+          {(stats.leaderboard?.length ?? 0) > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <Medal className="h-3.5 w-3.5 text-yellow-400" /> Bảng xếp hạng điểm cao
@@ -1033,7 +1033,7 @@ function CommunityStatsPanel({
                   <div className="col-span-2 text-right">Điểm</div>
                   <div className="col-span-1 text-right">%</div>
                 </div>
-                {stats.leaderboard.map((row, idx) => (
+                {(stats.leaderboard ?? []).map((row, idx) => (
                   <div
                     key={`${row.userName}-${row.completedAt}-${idx}`}
                     className="grid grid-cols-12 gap-2 px-3 py-2.5 border-t border-white/[0.04] text-sm items-center"
@@ -1072,20 +1072,20 @@ function CommunityStatsPanel({
 
           {/* Distribution grids */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {stats.bySubject.length > 0 && (
+            {(stats.bySubject?.length ?? 0) > 0 && (
               <DistributionCard
                 title="Môn học được luyện nhiều nhất"
-                items={stats.bySubject.slice(0, 6).map((b) => ({
+                items={(stats.bySubject ?? []).slice(0, 6).map((b) => ({
                   label: b.subject,
                   count: b.count,
                   extra: `TB ${b.avgPercentage}%`,
                 }))}
               />
             )}
-            {stats.byExamType.length > 0 && (
+            {(stats.byExamType?.length ?? 0) > 0 && (
               <DistributionCard
                 title="Loại đề phổ biến"
-                items={stats.byExamType.slice(0, 6).map((b) => ({
+                items={(stats.byExamType ?? []).slice(0, 6).map((b) => ({
                   label: b.examType,
                   count: b.count,
                   extra: `TB ${b.avgPercentage}%`,
@@ -1095,13 +1095,13 @@ function CommunityStatsPanel({
           </div>
 
           {/* Recent activity */}
-          {stats.recentActivity.length > 0 && (
+          {(stats.recentActivity?.length ?? 0) > 0 && (
             <div>
               <h4 className="text-xs font-semibold text-white/60 uppercase tracking-wider mb-2">
                 Hoạt động gần đây
               </h4>
               <div className="space-y-1.5">
-                {stats.recentActivity.slice(0, 6).map((row, idx) => (
+                {(stats.recentActivity ?? []).slice(0, 6).map((row, idx) => (
                   <div
                     key={`${row.userName}-${row.completedAt}-${idx}`}
                     className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.04]"

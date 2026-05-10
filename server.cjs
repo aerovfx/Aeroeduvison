@@ -2396,35 +2396,86 @@ if (USE_NODEJS_QUESTIONS) {
       }
 
       // ── community-stats ───────────────────────────────
-      // Thống kê cộng đồng: tổng số bài đã làm, top scorer ẩn danh, distribution
-      // điểm. Trả empty-shape nếu chưa có data → frontend fallback localStorage.
+      // Shape khớp với type ExamCommunityStats trong aeroedu-vite/src/types
+      // (totalAttempts/totalUsers/averagePercentage/leaderboard/bySubject/byExamType/recentActivity).
+      // Đứng tên người dùng ẩn danh (User_xxx) — không expose email/full name.
       if (action === 'community-stats') {
-        const [totalQ, topQ, distQ] = await Promise.all([
-          pool.query(`SELECT COUNT(*)::int AS n FROM "PracticeExam" WHERE completed = TRUE`),
+        const [overallQ, leaderboardQ, bySubjQ, byTypeQ, recentQ] = await Promise.all([
           pool.query(
-            `SELECT percentage, "completedAt" FROM "PracticeExam"
-              WHERE completed = TRUE AND percentage IS NOT NULL
-              ORDER BY "completedAt" DESC LIMIT 50`
+            `SELECT COUNT(*)::int                            AS total_attempts,
+                    COUNT(DISTINCT "studentId")::int         AS total_users,
+                    COALESCE(AVG(percentage),0)::float       AS avg_pct
+               FROM "PracticeExam"
+              WHERE completed = TRUE`
           ),
           pool.query(
-            `SELECT
-               COUNT(*) FILTER (WHERE percentage >= 90)::int AS excellent,
-               COUNT(*) FILTER (WHERE percentage >= 75 AND percentage < 90)::int AS good,
-               COUNT(*) FILTER (WHERE percentage >= 50 AND percentage < 75)::int AS average,
-               COUNT(*) FILTER (WHERE percentage < 50)::int AS weak,
-               COALESCE(AVG(percentage), 0)::float AS overall_avg
-             FROM "PracticeExam"
-             WHERE completed = TRUE AND percentage IS NOT NULL
-               AND "completedAt" > NOW() - INTERVAL '30 days'`
+            `SELECT pe.subject, pe."examType", pe.percentage, pe.score,
+                    pe."questionCount" AS total, pe."completedAt", pe."studentId"
+               FROM "PracticeExam" pe
+              WHERE pe.completed = TRUE AND pe.percentage IS NOT NULL
+              ORDER BY pe.percentage DESC, pe."completedAt" DESC
+              LIMIT 10`
+          ),
+          pool.query(
+            `SELECT subject,
+                    COUNT(*)::int                AS count,
+                    COALESCE(AVG(percentage),0)::float AS avg_pct
+               FROM "PracticeExam"
+              WHERE completed = TRUE AND percentage IS NOT NULL AND subject <> ''
+              GROUP BY subject
+              ORDER BY count DESC LIMIT 10`
+          ),
+          pool.query(
+            `SELECT "examType",
+                    COUNT(*)::int                AS count,
+                    COALESCE(AVG(percentage),0)::float AS avg_pct
+               FROM "PracticeExam"
+              WHERE completed = TRUE AND percentage IS NOT NULL AND "examType" <> ''
+              GROUP BY "examType"
+              ORDER BY count DESC LIMIT 10`
+          ),
+          pool.query(
+            `SELECT subject, "examType", percentage, "completedAt", "studentId"
+               FROM "PracticeExam"
+              WHERE completed = TRUE AND percentage IS NOT NULL
+              ORDER BY "completedAt" DESC LIMIT 10`
           ),
         ]);
+        const ovr = overallQ.rows[0] || {};
+        const anonName = (sid) => `Học sinh ${String(sid || '').slice(0, 4) || '----'}`;
         return res.json({
           success: true,
           data: {
-            totalCompleted: totalQ.rows[0].n,
-            distribution: distQ.rows[0] || {},
-            recent: topQ.rows.map(r => ({
-              percentage: Number(r.percentage),
+            totalAttempts: ovr.total_attempts || 0,
+            totalUsers: ovr.total_users || 0,
+            averagePercentage: Math.round(Number(ovr.avg_pct || 0)),
+            updatedAt: new Date().toISOString(),
+            leaderboard: leaderboardQ.rows.map(r => ({
+              userName: anonName(r.studentId),
+              userImage: null,
+              subject: r.subject || '',
+              examType: r.examType || '',
+              percentage: Math.round(Number(r.percentage || 0)),
+              score: Number(r.score || 0),
+              total: Number(r.total || 0),
+              completedAt: r.completedAt,
+            })),
+            bySubject: bySubjQ.rows.map(r => ({
+              subject: r.subject,
+              count: r.count,
+              avgPercentage: Math.round(Number(r.avg_pct || 0)),
+            })),
+            byExamType: byTypeQ.rows.map(r => ({
+              examType: r.examType,
+              count: r.count,
+              avgPercentage: Math.round(Number(r.avg_pct || 0)),
+            })),
+            recentActivity: recentQ.rows.map(r => ({
+              userName: anonName(r.studentId),
+              userImage: null,
+              subject: r.subject || '',
+              examType: r.examType || '',
+              percentage: Math.round(Number(r.percentage || 0)),
               completedAt: r.completedAt,
             })),
           },
