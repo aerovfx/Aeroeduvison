@@ -5354,6 +5354,91 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 // LATEX_SERVICE_URL: DEPRECATED — built-in handlers thay thế.
 // (proxy cũ đã xoá vì pixiai-latex Cloud Run service không còn tồn tại)
 
+// ══════════════════════════════════════════════════════════════
+// SAFE-DEFAULT STUBS — endpoints frontend gọi nhưng aero-backend Cloud Run
+// không tồn tại trên prod. Trả empty/mock data 200 thay vì 503 ECONNREFUSED.
+// Có thể implement sau khi cần real data.
+// ══════════════════════════════════════════════════════════════
+{
+  const emptyArr = (_req, res) => res.json([]);
+  const emptyObj = (_req, res) => res.json({});
+  const okMsg   = (_req, res) => res.json({ ok: true });
+  const notImpl = (msg = 'Tính năng đang phát triển') =>
+    (_req, res) => res.status(501).json({ error: msg });
+
+  // ─ Teacher / Class management ─────────────────────────────
+  app.get('/api/teacher/students', (_req, res) => res.json({ students: [] }));
+  app.get('/api/teacher/students/:id', (req, res) => res.json({ id: req.params.id, name: '—', email: '—' }));
+  app.get('/api/classes', (_req, res) => res.json({ classes: [] }));
+  app.get('/api/classes/:id', emptyObj);
+  app.post('/api/classes', notImpl('Tạo lớp đang phát triển'));
+
+  // ─ Stats / Progress ───────────────────────────────────────
+  app.get('/api/exam-stats', (_req, res) => res.json({ totalExams: 0, avgScore: 0, completed: 0 }));
+  app.get('/api/courses-progress', (_req, res) => res.json({ progress: [] }));
+  app.post('/api/update-learning-progress', okMsg);
+  app.get('/api/agents/progress-tracker', emptyObj);
+
+  // ─ Emotion ────────────────────────────────────────────────
+  app.get('/api/emotion', (_req, res) => res.json({ records: [] }));
+  app.get('/api/emotion/stats', (_req, res) => res.json({ stats: [], total: 0 }));
+  // /api/plg/<id>, /api/xp/analyze/<id>
+  app.get(/^\/api\/plg\/.+/, (_req, res) => res.json({ riskLevel: 0, factors: [] }));
+  app.get(/^\/api\/xp\/analyze\/.+/, (_req, res) => res.json({ totalXp: 0, recent: [] }));
+
+  // ─ Grading ────────────────────────────────────────────────
+  app.get('/api/grading/answer-keys', (_req, res) => res.json({ keys: [] }));
+  app.post('/api/grading/answer-keys', okMsg);
+  app.get('/api/grading/graded-sheets', (_req, res) => res.json({ sheets: [] }));
+  app.post('/api/grading/graded-sheets', okMsg);
+  app.post('/api/grading/ocr', notImpl('OCR phiếu chấm đang phát triển'));
+
+  // ─ Documents ──────────────────────────────────────────────
+  app.get('/api/documents', (_req, res) => res.json({ documents: [] }));
+  app.post('/api/documents/upload', notImpl('Upload tài liệu đang phát triển'));
+  app.post('/api/documents/fix-status', okMsg);
+
+  // ─ Question bank ──────────────────────────────────────────
+  app.post('/api/questions/bulk-generate', notImpl('AI bulk generate đang phát triển'));
+  app.post('/api/questions/bulk-save', okMsg);
+  app.post('/api/questions/import', okMsg);
+  app.post('/api/questions/batch', okMsg);
+
+  // ─ Exam matrix advanced ───────────────────────────────────
+  app.get('/api/exams/generate-from-matrix', notImpl('Sinh đề từ ma trận đang phát triển'));
+  app.post('/api/exams/generate-from-matrix', notImpl('Sinh đề từ ma trận đang phát triển'));
+  app.post('/api/ai/exam/generate-from-matrix', notImpl());
+  app.post('/api/ai/exam/generate-multiple-variants', notImpl());
+
+  // ─ AI services ────────────────────────────────────────────
+  app.get('/api/ai-tutor/conversations', (_req, res) => res.json({ conversations: [] }));
+  app.post('/api/ai-tutor/chat', notImpl('AI Tutor chat đang nâng cấp'));
+  app.post('/api/ai/summarize', notImpl('AI summarize đang phát triển'));
+
+  // ─ Extract / Scrape ───────────────────────────────────────
+  app.post('/api/extract/website', notImpl('Trích xuất web đang phát triển'));
+  app.post('/api/extract/youtube', notImpl('Trích xuất YouTube đang phát triển'));
+
+  // ─ Transcript ─────────────────────────────────────────────
+  app.get('/api/transcript/history', (_req, res) => res.json({ history: [] }));
+  app.post('/api/transcript/save', okMsg);
+  app.post('/api/transcript/local/transcribe', notImpl('Transcript đang phát triển'));
+  app.post('/api/transcript/local/transcribe-stream', notImpl('Transcript đang phát triển'));
+  app.post('/api/transcript/elevenlabs/transcribe', notImpl('Transcript đang phát triển'));
+  app.post('/api/transcript/summarize', notImpl('Transcript summarize đang phát triển'));
+
+  // ─ Camera / IoT ──────────────────────────────────────────
+  app.get('/api/camera/recording', (_req, res) => res.json({ recordings: [] }));
+
+  // ─ Agents / Settings ─────────────────────────────────────
+  app.get('/api/student/agent-settings', emptyObj);
+  app.put('/api/student/agent-settings', okMsg);
+
+  // ─ Openfang stub ─────────────────────────────────────────
+  app.get('/api/openfang-service', emptyObj);
+  app.post('/api/openfang-service/chat', notImpl('Service đang nâng cấp'));
+}
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 
