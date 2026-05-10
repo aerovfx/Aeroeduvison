@@ -84,8 +84,8 @@ RUN npm config set fetch-timeout 600000 && \
       bcryptjs \
       jsonwebtoken \
       hash-wasm \
-      pdf-parse \
-      nodemailer
+      pdf-parse@1.1.4 \
+      nodemailer@6
 
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist
