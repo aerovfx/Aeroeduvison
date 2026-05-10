@@ -182,15 +182,29 @@ export default function BuffaloRunner({ autoStart = false, onScoreUpdate }: Prop
         ctx.fillText(emoji, o.x, GROUND_Y + 4)
       }
 
-      // Draw buffalo (trâu) — đảo phải khi đang nhảy
+      // Draw buffalo (trâu) — lật ngang để mặt nhìn QUA PHẢI (chiều chạy).
+      // Animation run: bob lên xuống + tilt nhẹ + mặt đất nhún để cảm giác guốc đập đất.
       ctx.save()
       ctx.translate(BUFFALO_X + BUFFALO_SIZE / 2, s.y)
-      const bob = (s.runFrame === 1 && s.y >= GROUND_Y - 0.5) ? 2 : 0
+      // Trâu mặc định trên hầu hết hệ điều hành nhìn TRÁI (face left).
+      // scaleX(-1) để lật mặt nhìn PHẢI (theo chiều chạy).
+      ctx.scale(-1, 1)
+      const onGround = s.y >= GROUND_Y - 0.5
+      const bob = onGround ? (s.runFrame === 1 ? 3 : 0) : 0
+      const tilt = onGround ? (s.runFrame === 1 ? 0.05 : -0.03) : -0.18
+      ctx.rotate(tilt)
       ctx.font = `${BUFFALO_SIZE}px serif`
       ctx.textBaseline = 'bottom'
       ctx.textAlign = 'center'
       ctx.fillText('🐃', 0, 6 + bob)
       ctx.restore()
+      // Bụi mờ dưới chân khi đang chạy + chạm đất
+      if (onGround && s.runFrame === 0) {
+        ctx.fillStyle = 'rgba(148,163,184,0.4)'
+        ctx.beginPath()
+        ctx.ellipse(BUFFALO_X + BUFFALO_SIZE / 2 - 14, GROUND_Y + 2, 6, 2, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }
 
       // HUD
       ctx.fillStyle = '#475569'

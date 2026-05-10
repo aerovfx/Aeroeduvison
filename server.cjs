@@ -4776,8 +4776,186 @@ if (USE_NODEJS_QUESTIONS) {
   });
 }
 
+// ══════════════════════════════════════════════════════════════
+// BUILT-IN EXAM MATRICES — không cần pixiai-media Cloud Run cho CRUD cơ bản
+// Handles list/get/create/update/delete/duplicate. Endpoints AI phức tạp
+// (digitize, generate-from-matrix) trả 501 cho phiên bản này.
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool: MPool } = require('pg');
+  const mjwt = require('jsonwebtoken');
+  const { randomUUID: matrixUUID } = require('crypto');
+
+  let _mpool = null;
+  function getMPool() {
+    if (!_mpool) {
+      const DATABASE_URL = process.env.DATABASE_URL;
+      if (!DATABASE_URL) throw new Error('DATABASE_URL env var not set');
+      _mpool = new MPool({ connectionString: DATABASE_URL, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _mpool;
+  }
+  const MJWT_SECRET = process.env.JWT_SECRET
+    || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+
+  function getMatrixUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = mjwt.verify(auth.slice(7), MJWT_SECRET);
+      return decoded.sub || decoded.userId || null;
+    } catch { return null; }
+  }
+
+  // GET /api/exam-matrices?subject=&grade=&status=
+  app.get('/api/exam-matrices', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const wheres = [`"userId" = $1`];
+      const vals = [userId];
+      let i = 2;
+      if (req.query.subject) { wheres.push(`subject = $${i++}`); vals.push(String(req.query.subject)); }
+      if (req.query.grade)   { wheres.push(`grade = $${i++}`);   vals.push(String(req.query.grade)); }
+      if (req.query.status)  { wheres.push(`status = $${i++}`);  vals.push(String(req.query.status)); }
+      const { rows } = await getMPool().query(
+        `SELECT * FROM "ExamMatrix" WHERE ${wheres.join(' AND ')} ORDER BY "createdAt" DESC`,
+        vals
+      );
+      return res.json({ matrices: rows });
+    } catch (err) {
+      console.error('[matrix:list] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/exam-matrices/:id
+  app.get('/api/exam-matrices/:id', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { rows } = await getMPool().query(
+        `SELECT * FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json(rows[0]);
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/exam-matrices → tạo manual
+  app.post('/api/exam-matrices', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { name, subject, grade, examType, duration, totalScore, totalQuestions, type } = req.body || {};
+      if (!name || !grade || !examType || !duration) {
+        return res.status(400).json({ error: 'name + grade + examType + duration required' });
+      }
+      const id = matrixUUID();
+      const now = new Date();
+      const { rows } = await getMPool().query(
+        `INSERT INTO "ExamMatrix"
+          (id, name, subject, grade, "examType", duration, "totalScore",
+           "totalQuestions", type, status, "userId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Hàng đợi',$10,$11,$11)
+         RETURNING *`,
+        [id, String(name).slice(0, 200), subject || null, String(grade), String(examType),
+         Number(duration) || 45, Number(totalScore) || 10,
+         Number(totalQuestions) || 0, type || 'Tạo mới', userId, now]
+      );
+      console.log(`[matrix:create] ✅ ${id} user=${userId}`);
+      return res.status(201).json(rows[0]);
+    } catch (err) {
+      console.error('[matrix:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/exam-matrices/:id
+  app.put('/api/exam-matrices/:id', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const allowed = ['name','subject','grade','examType','duration','totalScore','totalQuestions','status','type'];
+      const sets = []; const vals = [req.params.id, userId]; let idx = 3;
+      for (const k of allowed) {
+        if (req.body && req.body[k] !== undefined) {
+          sets.push(`"${k}" = $${idx++}`);
+          vals.push(typeof req.body[k] === 'number' ? req.body[k] : String(req.body[k]));
+        }
+      }
+      if (!sets.length) return res.status(400).json({ error: 'Không có field nào để update' });
+      sets.push(`"updatedAt" = $${idx++}`); vals.push(new Date());
+      const { rowCount } = await getMPool().query(
+        `UPDATE "ExamMatrix" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/exam-matrices/:id
+  app.delete('/api/exam-matrices/:id', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { rowCount } = await getMPool().query(
+        `DELETE FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2`,
+        [req.params.id, userId]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/exam-matrices/:id/duplicate
+  app.post('/api/exam-matrices/:id/duplicate', async (req, res) => {
+    try {
+      const userId = getMatrixUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getMPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy' });
+      const src = rows[0];
+      const newId = matrixUUID();
+      const now = new Date();
+      const { rows: created } = await pool.query(
+        `INSERT INTO "ExamMatrix"
+          (id, name, subject, grade, "examType", duration, "totalScore",
+           "totalQuestions", type, status, "userId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Hàng đợi',$10,$11,$11)
+         RETURNING *`,
+        [newId, `${src.name} (Bản sao)`, src.subject, src.grade, src.examType,
+         src.duration, src.totalScore, src.totalQuestions, src.type, userId, now]
+      );
+      console.log(`[matrix:duplicate] ✅ ${src.id} → ${newId}`);
+      return res.status(201).json(created[0]);
+    } catch (err) {
+      console.error('[matrix:duplicate] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Endpoints AI phức tạp — chưa implement cho phiên bản này
+  app.post('/api/exam-matrices/digitize', (_req, res) => {
+    res.status(501).json({ error: 'Số hoá ma trận từ ảnh chưa khả dụng — dùng "Tạo mới" thủ công' });
+  });
+}
+
 // ── media-service routes (only if MEDIA_SERVICE_URL is external) ──
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exam-matrices'));
+// /api/exam-matrices đã được merge built-in ở trên — bỏ proxy.
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/media'));
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/documents'));
 if (!USE_NODEJS_QUESTIONS) {
