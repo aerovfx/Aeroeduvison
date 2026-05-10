@@ -19,6 +19,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import PageFallback from '@/pages/common/PageFallback'
+import { RouteErrorBoundary } from '@/components/common/ErrorBoundary'
 
 // Loading spinner
 function PageLoader() {
@@ -182,8 +183,9 @@ const AdminCategoriesPage   = lazy(() => import('@/pages/admin/Categories'))
 
 export function AppRouter() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
+    <RouteErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
 
         {/* ══════════════════════════════════════════════════
             PUBLIC / MARKETING
@@ -458,7 +460,8 @@ export function AppRouter() {
         {/* ── 404 fallback ─────────────────────────────── */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
 
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </RouteErrorBoundary>
   )
 }

@@ -70,9 +70,10 @@ RUN set -eu; \
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Copy Express server and install runtime deps
-# pg + bcryptjs + jsonwebtoken → needed for built-in Node.js auth fallback
+# Copy Express server + lib modules (auth, payment, telegram, fal.ai, email)
+# Built-in Node.js handlers cần các module này — không có sẽ crash startup.
 COPY server.cjs ./
+COPY lib ./lib
 RUN npm config set fetch-timeout 600000 && \
     npm init -y && \
     npm install --omit=dev \
@@ -82,7 +83,9 @@ RUN npm config set fetch-timeout 600000 && \
       pg \
       bcryptjs \
       jsonwebtoken \
-      hash-wasm
+      hash-wasm \
+      pdf-parse \
+      nodemailer
 
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist

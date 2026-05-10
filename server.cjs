@@ -1,21 +1,30 @@
 /**
- * AeroEduVision — Production Server
+ * AeroEduVision — Production Server (consolidated, no separate auth service)
+ *
  * - Serves Vite static build from ./dist
- * - Proxies /api/auth/*         → AUTH_SERVICE_URL  (pixiai-auth Cloud Run)
- * - Proxies /api/exam-matrices* → MEDIA_SERVICE_URL (pixiai-media Cloud Run)
- * - Proxies /api/media*         → MEDIA_SERVICE_URL
- * - Proxies /api/documents*     → MEDIA_SERVICE_URL
- * - Proxies /api/*              → BACKEND_URL       (aero-backend gateway)
- * - Proxies /socket.io          → BACKEND_URL       (WebSocket)
- * - Handles SPA routing         → index.html
+ * - Built-in /api/auth/* (Node.js, dùng Postgres + bcryptjs + jsonwebtoken)
+ *   → KHÔNG cần pixiai-auth Cloud Run service nữa
+ * - Built-in /api/payment/*, /api/entitlements/*, /api/telegram/webhook
+ * - Proxies /api/exam-matrices*, /api/media*, /api/documents*, /api/exams*,
+ *           /api/questions*, /api/question-bank* → MEDIA_SERVICE_URL
+ * - Proxies /api/teacher/*  → TEACHER_SERVICE_URL (built-in handlers chạy trước)
+ * - Proxies /api/latex-projects* → LATEX_SERVICE_URL
+ * - Proxies /api/*               → BACKEND_URL  (aero-backend gateway, fallback)
+ * - Proxies /socket.io           → BACKEND_URL  (WebSocket)
+ * - Handles SPA routing          → index.html
  *
  * ENV vars (set by Cloud Run — do NOT override PORT):
  *   PORT              — set automatically by Cloud Run
+ *   DATABASE_URL      — Postgres connection (BẮT BUỘC cho auth + payment)
+ *   JWT_SECRET        — JWT signing secret  (BẮT BUỘC)
+ *   PUBLIC_URL        — base URL của site (cho password reset link, payment)
  *   BACKEND_URL       — Rust aero-backend URL (default: http://localhost:8090)
- *   AUTH_SERVICE_URL  — pixiai-auth Cloud Run URL
  *   MEDIA_SERVICE_URL — pixiai-media Cloud Run URL
- *   DATABASE_URL      — Postgres connection string (for built-in auth fallback)
- *   JWT_SECRET        — JWT signing secret (for built-in auth fallback)
+ *   TEACHER_SERVICE_URL — pixiai-teacher Cloud Run URL
+ *   LATEX_SERVICE_URL — pixiai-latex Cloud Run URL
+ *   TELEGRAM_BOT_TOKEN, SMTP_*, FAL_API_KEY — xem .env.example
+ *
+ * AUTH_SERVICE_URL: DEPRECATED — pixiai-auth đã được merge vào server này.
  */
 
 'use strict';
@@ -28,8 +37,12 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8090';
 
-// Auth service (pixiai-auth Cloud Run) — handles /api/auth/*
+// AUTH_SERVICE_URL: DEPRECATED — built-in handlers cover toàn bộ /api/auth/*.
+// Giữ biến để log warning nếu user còn set, nhưng KHÔNG dùng làm fallback nữa.
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || '';
+if (AUTH_SERVICE_URL) {
+  console.warn('[server] ⚠ AUTH_SERVICE_URL set nhưng đã DEPRECATED — built-in auth thay thế. Bỏ env này đi.');
+}
 
 // Media service (pixiai-media Cloud Run) — handles /api/exam-matrices, /api/media, /api/documents,
 // /api/questions, /api/question-bank, /api/exams
@@ -49,8 +62,7 @@ const LATEX_SERVICE_URL = process.env.LATEX_SERVICE_URL || 'http://localhost:810
 // Lý do: khi Rust auth-service down/chết, login/register/google/me/logout vẫn hoạt động
 // (trước đây proxy treo 30s → UI hiển thị "Lỗi kết nối mạng").
 const HAS_DATABASE_URL = !!process.env.DATABASE_URL;
-const USE_NODEJS_AUTH = HAS_DATABASE_URL;      // primary handler cho login/register/google/me/logout
-const HAS_AUTH_PROXY  = !!AUTH_SERVICE_URL;    // fallback proxy cho endpoint built-in chưa cover
+const USE_NODEJS_AUTH = HAS_DATABASE_URL;      // built-in auth handlers (login/register/google/me/logout/refresh/forgot/reset/change)
 
 // USE_NODEJS_QUESTIONS = true  → built-in Node.js handlers query "Question" table directly
 // USE_NODEJS_QUESTIONS = false → proxy to MEDIA_SERVICE_URL (pixiai-media Cloud Run)
@@ -62,9 +74,7 @@ const USE_NODEJS_QUESTIONS = process.env.DIRECT_RUST_MEDIA_PROXY !== 'true';
 
 console.log(`[server] PORT=${PORT}`);
 console.log(`[server] BACKEND_URL=${BACKEND_URL}`);
-console.log(`[server] AUTH_SERVICE_URL=${AUTH_SERVICE_URL || '(not set)'}`);
-console.log(`[server] USE_NODEJS_AUTH=${USE_NODEJS_AUTH} (primary)`);
-console.log(`[server] HAS_AUTH_PROXY=${HAS_AUTH_PROXY} (fallback for routes built-in doesn't cover)`);
+console.log(`[server] USE_NODEJS_AUTH=${USE_NODEJS_AUTH} (built-in /api/auth/* — no separate auth service)`);
 console.log(`[server] MEDIA_SERVICE_URL=${MEDIA_SERVICE_URL}`);
 console.log(`[server] TEACHER_SERVICE_URL=${TEACHER_SERVICE_URL}`);
 console.log(`[server] LATEX_SERVICE_URL=${LATEX_SERVICE_URL}`);
@@ -309,6 +319,155 @@ if (USE_NODEJS_AUTH) {
     return res.json({ success: true });
   });
 
+  // ── POST /api/auth/refresh ────────────────────────────────
+  // JWT stateless: chấp nhận token cũ (kể cả expired ≤ 7 ngày) → cấp token mới.
+  // Production thực thụ nên dùng refresh-token riêng + DB; ở đây tối giản
+  // để bỏ pixiai-auth service.
+  app.post('/api/auth/refresh', async (req, res) => {
+    try {
+      const auth = req.headers.authorization || '';
+      const oldToken = auth.startsWith('Bearer ') ? auth.slice(7) : (req.body?.refreshToken || '');
+      if (!oldToken) return res.status(401).json({ error: 'No token' });
+
+      let decoded;
+      try {
+        decoded = jwt.verify(oldToken, JWT_SECRET);
+      } catch (e) {
+        // Token hết hạn → vẫn decode payload để re-issue (gracefully)
+        if (e.name !== 'TokenExpiredError') {
+          return res.status(401).json({ error: 'Invalid token' });
+        }
+        decoded = jwt.decode(oldToken);
+        // Reject nếu token expired quá lâu (> 7 ngày)
+        if (!decoded || (decoded.exp * 1000 + 7 * 24 * 3600 * 1000) < Date.now()) {
+          return res.status(401).json({ error: 'Refresh window expired, please login again' });
+        }
+      }
+
+      const pool = getPool();
+      const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [decoded.sub]);
+      if (!rows[0]) return res.status(401).json({ error: 'User not found' });
+
+      const newToken = issueToken(rows[0]);
+      return res.json({ accessToken: newToken, refreshToken: '' });
+    } catch (err) {
+      console.error('[auth:refresh] ❌', err.message);
+      return res.status(500).json({ error: 'Refresh failed' });
+    }
+  });
+
+  // ── POST /api/auth/forgot-password ─────────────────────────
+  // Body: { email }. Sinh reset token (JWT 30 phút), gửi email.
+  // KHÔNG báo email tồn tại hay không (chống user enumeration).
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body || {};
+      if (!email) return res.status(400).json({ error: 'Email required' });
+
+      const pool = getPool();
+      const { rows } = await pool.query(
+        'SELECT id, email, name FROM "User" WHERE LOWER(email) = $1 LIMIT 1',
+        [String(email).toLowerCase().trim()]
+      );
+      const user = rows[0];
+
+      if (user) {
+        const resetToken = jwt.sign(
+          { sub: user.id, type: 'password_reset' },
+          JWT_SECRET,
+          { expiresIn: '30m' }
+        );
+        const baseUrl = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
+        const resetUrl = `${baseUrl}/auth/reset-password?token=${encodeURIComponent(resetToken)}`;
+        try {
+          const { sendEmail } = require('./lib/email-sender.cjs');
+          await sendEmail({
+            to: user.email,
+            subject: '[AeroEdu] Đặt lại mật khẩu',
+            html: `<p>Xin chào ${user.name || ''},</p>
+                   <p>Bạn đã yêu cầu đặt lại mật khẩu. Click link bên dưới (hết hạn sau 30 phút):</p>
+                   <p><a href="${resetUrl}">${resetUrl}</a></p>
+                   <p>Nếu không phải bạn, vui lòng bỏ qua email này.</p>`,
+            text: `Đặt lại mật khẩu: ${resetUrl}`,
+          });
+          console.log(`[auth:forgot] ✅ reset email → ${user.email}`);
+        } catch (e) {
+          console.error('[auth:forgot] email failed:', e.message);
+        }
+      }
+      // Trả thành công bất kể email tồn tại không
+      return res.json({ ok: true, message: 'Nếu email tồn tại, link đặt lại đã được gửi.' });
+    } catch (err) {
+      console.error('[auth:forgot] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── POST /api/auth/reset-password ──────────────────────────
+  // Body: { token, newPassword }
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, newPassword } = req.body || {};
+      if (!token || !newPassword) return res.status(400).json({ error: 'token + newPassword required' });
+      if (String(newPassword).length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
+
+      let decoded;
+      try { decoded = jwt.verify(token, JWT_SECRET); }
+      catch { return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn' }); }
+
+      if (decoded.type !== 'password_reset') return res.status(401).json({ error: 'Token sai loại' });
+
+      const hash = await bcrypt.hash(newPassword, 12);
+      const pool = getPool();
+      const { rowCount } = await pool.query(
+        'UPDATE "User" SET password = $1, "updatedAt" = $2 WHERE id = $3',
+        [hash, new Date(), decoded.sub]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'User not found' });
+      console.log(`[auth:reset] ✅ user=${decoded.sub}`);
+      return res.json({ ok: true, message: 'Đặt lại mật khẩu thành công' });
+    } catch (err) {
+      console.error('[auth:reset] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── POST /api/auth/change-password ─────────────────────────
+  // Body: { currentPassword, newPassword }. Yêu cầu Bearer token.
+  app.post('/api/auth/change-password', async (req, res) => {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+      let decoded;
+      try { decoded = jwt.verify(auth.slice(7), JWT_SECRET); }
+      catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+      const { currentPassword, newPassword } = req.body || {};
+      if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Thiếu mật khẩu' });
+      if (String(newPassword).length < 6) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 6 ký tự' });
+
+      const pool = getPool();
+      const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [decoded.sub]);
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user.password) return res.status(400).json({ error: 'Tài khoản này dùng Google đăng nhập' });
+
+      const valid = await verifyPassword(currentPassword, user.password);
+      if (!valid) return res.status(401).json({ error: 'Mật khẩu hiện tại không đúng' });
+
+      const hash = await bcrypt.hash(newPassword, 12);
+      await pool.query(
+        'UPDATE "User" SET password = $1, "updatedAt" = $2 WHERE id = $3',
+        [hash, new Date(), user.id]
+      );
+      console.log(`[auth:change-password] ✅ user=${user.id}`);
+      return res.json({ ok: true, message: 'Đổi mật khẩu thành công' });
+    } catch (err) {
+      console.error('[auth:change-password] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
   // ── POST /api/auth/register ───────────────────────────────
   app.post('/api/auth/register', async (req, res) => {
     try {
@@ -390,13 +549,10 @@ function makeProxy(target, label, pathFilter) {
   });
 }
 
-// ── /api/auth/* → Rust auth-service (fallback) ──
-// Built-in handlers phía trên đã xử lý login/register/google/me/logout.
-// Proxy này chỉ nhận các endpoint built-in chưa cover (refresh, forgot-password, v.v.)
-// Nếu AUTH_SERVICE_URL không set, bỏ qua — các endpoint đó sẽ 404, client tự xử lý.
-if (HAS_AUTH_PROXY) {
-  app.use(makeProxy(AUTH_SERVICE_URL, 'auth-service', '/api/auth'));
-}
+// /api/auth/* — KHÔNG có proxy. Tất cả 9 endpoints (login, register, google,
+// me, logout, refresh, forgot-password, reset-password, change-password) đều
+// xử lý built-in trong block USE_NODEJS_AUTH ở trên. pixiai-auth Cloud Run
+// đã được merge vào server này.
 
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN TEACHER EXAM HANDLERS

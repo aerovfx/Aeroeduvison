@@ -127,6 +127,41 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { exams: [] });
     }
 
+    // ── Mock empty endpoints (giữ trang teacher không crash khi backend chưa có)
+    // Thứ tự matter: pattern cụ thể trước, generic sau.
+    if (req.method === 'GET') {
+      // Empty-list shapes: { items: [] } | [] | { ok: true, ... }
+      // Note: /api/teacher/exams trả {exams:[]} ở route trước — không add vào đây.
+      const emptyListRoutes = [
+        '/api/teacher/students',
+        '/api/teacher/classes',
+        '/api/teacher/assignments',
+        '/api/grading/answer-keys',
+        '/api/online-exam-room',
+        '/api/exam-matrices',
+        '/api/questions',
+        '/api/documents',
+        '/api/latex-projects',
+        '/api/instructor/courses',
+        '/api/categories',
+        '/api/courses',
+        '/api/notifications',
+      ];
+      for (const route of emptyListRoutes) {
+        if (pathname === route) return sendJSON(res, 200, []);
+      }
+      if (pathname === '/api/emotion/stats') {
+        return sendJSON(res, 200, { stats: [], total: 0 });
+      }
+      // /api/plg/<id>, /api/xp/analyze/<id> — student insight metrics
+      if (pathname.startsWith('/api/plg/')) return sendJSON(res, 200, { riskLevel: 0, factors: [] });
+      if (pathname.startsWith('/api/xp/analyze/')) return sendJSON(res, 200, { totalXp: 0, recent: [] });
+      // /api/teacher/students/<id>
+      if (pathname.startsWith('/api/teacher/students/')) {
+        return sendJSON(res, 200, { id: pathname.split('/').pop(), name: 'Mock Student' });
+      }
+    }
+
     if (pathname === '/api/teacher/quiz-extract' && req.method === 'POST') {
       const t0 = Date.now();
       const userKey = getUserKey(req);
