@@ -5260,6 +5260,53 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   app.post('/api/latex-projects/export-from-matrix', (_req, res) => {
     res.status(501).json({ error: 'Tính năng đang phát triển' });
   });
+
+  // GET /api/latex-projects/:id/versions → lịch sử lưu (auto-save snapshots).
+  // Bảng "LatexProjectVersion" tự create lazy nếu chưa có.
+  app.get('/api/latex-projects/:id/versions', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getLPool();
+      // Verify ownership
+      const { rows: own } = await pool.query(
+        `SELECT id FROM "LatexProject" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!own[0]) return res.status(404).json({ error: 'Không tìm thấy' });
+      // Auto-create table nếu chưa
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "LatexProjectVersion" (
+          id            TEXT PRIMARY KEY,
+          "projectId"   TEXT NOT NULL,
+          "mainContent" TEXT NOT NULL,
+          "titleSnapshot" TEXT,
+          trigger       TEXT NOT NULL DEFAULT 'save',
+          "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS idx_latex_version_project ON "LatexProjectVersion" ("projectId");
+      `).catch(() => {});
+      const { rows } = await pool.query(
+        `SELECT id, "titleSnapshot", trigger, "createdAt"
+         FROM "LatexProjectVersion" WHERE "projectId"=$1 ORDER BY "createdAt" DESC LIMIT 50`,
+        [req.params.id]
+      );
+      return res.json({ versions: rows });
+    } catch (err) {
+      console.error('[latex:versions] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/latex-projects/compile — compile LaTeX → PDF
+  // Cloud Run không có pdflatex preinstall; trả 501 + gợi ý.
+  // Frontend có thể dùng Overleaf hoặc render preview qua KaTeX/MathJax client-side.
+  app.post('/api/latex-projects/compile', (_req, res) => {
+    res.status(501).json({
+      error: 'Compile LaTeX server-side chưa khả dụng',
+      hint: 'Hãy export file .tex rồi compile với Overleaf (https://overleaf.com) hoặc tectonic local.',
+    });
+  });
 }
 // LATEX_SERVICE_URL: DEPRECATED — built-in handlers thay thế.
 // (proxy cũ đã xoá vì pixiai-latex Cloud Run service không còn tồn tại)
