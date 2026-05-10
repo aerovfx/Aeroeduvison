@@ -39,6 +39,8 @@ interface Exam {
   id: string
   title: string
   subject?: string
+  grade?: string
+  notes?: string
   examType: string
   duration: number
   totalScore: number
@@ -232,7 +234,7 @@ export default function ExamDetailPage() {
               <div style={{ flex: 1 }}>
                 <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>{exam.title}</h1>
                 <div style={{ marginTop: 6, color: 'var(--ai-muted-text)', fontSize: 13 }}>
-                  {exam.subject && `${exam.subject} · `}{exam.examType} · {exam.duration} phút · {exam.totalQuestions} câu · {exam.totalScore} điểm
+                  {exam.subject && `${exam.subject} · `}{exam.grade && `Lớp ${exam.grade} · `}{exam.examType} · {exam.duration} phút · {exam.totalQuestions} câu · {exam.totalScore} điểm
                 </div>
               </div>
             )}
