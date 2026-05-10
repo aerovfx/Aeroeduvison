@@ -5551,11 +5551,24 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
     const pool = getQrPool();
     if (!pool) return null;
     _qrReady = (async () => {
+      // examId/teacherId/questionId là TEXT (Prisma cuid), không phải UUID native.
+      // Drop bảng cũ nếu lỡ tạo type sai (chỉ run lần đầu — không mất data thật vì
+      // chưa launch production live quiz).
+      const colCheck = await pool.query(
+        `SELECT data_type FROM information_schema.columns
+          WHERE table_name='QuizRoom' AND column_name='examId'`
+      );
+      if (colCheck.rows[0]?.data_type === 'uuid') {
+        await pool.query(`DROP TABLE IF EXISTS "QuizRoomAnswer"`);
+        await pool.query(`DROP TABLE IF EXISTS "QuizRoomParticipant"`);
+        await pool.query(`DROP TABLE IF EXISTS "QuizRoom"`);
+        console.log('[quiz-rooms] dropped legacy UUID tables');
+      }
       await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoom" (
-        id UUID PRIMARY KEY,
+        id TEXT PRIMARY KEY,
         code VARCHAR(6) UNIQUE NOT NULL,
-        "examId" UUID NOT NULL,
-        "teacherId" UUID NOT NULL,
+        "examId" TEXT NOT NULL,
+        "teacherId" TEXT NOT NULL,
         status VARCHAR(20) DEFAULT 'waiting',
         "currentQuestion" INT DEFAULT -1,
         "questionStartedAt" TIMESTAMP,
@@ -5565,8 +5578,8 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
         "createdAt" TIMESTAMP DEFAULT NOW()
       )`);
       await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoomParticipant" (
-        id UUID PRIMARY KEY,
-        "roomId" UUID NOT NULL,
+        id TEXT PRIMARY KEY,
+        "roomId" TEXT NOT NULL,
         name VARCHAR(100) NOT NULL,
         avatar VARCHAR(20),
         score INT DEFAULT 0,
@@ -5575,10 +5588,10 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
         UNIQUE("roomId", name)
       )`);
       await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoomAnswer" (
-        id UUID PRIMARY KEY,
-        "roomId" UUID NOT NULL,
-        "participantId" UUID NOT NULL,
-        "questionId" UUID NOT NULL,
+        id TEXT PRIMARY KEY,
+        "roomId" TEXT NOT NULL,
+        "participantId" TEXT NOT NULL,
+        "questionId" TEXT NOT NULL,
         "questionIndex" INT,
         answer TEXT,
         "isCorrect" BOOLEAN,
@@ -5586,7 +5599,7 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
         "submittedAt" TIMESTAMP DEFAULT NOW(),
         UNIQUE("roomId", "participantId", "questionId")
       )`);
-      console.log('[quiz-rooms] ✅ tables ready');
+      console.log('[quiz-rooms] ✅ tables ready (TEXT ids)');
     })().catch(e => { console.error('[quiz-rooms] ❌ ensureTables', e.message); _qrReady = null; });
     return _qrReady;
   }
