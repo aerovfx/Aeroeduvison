@@ -105,6 +105,7 @@ const QuestionBankPage      = lazy(() => import('@/pages/teacher/QuestionBank'))
 const ExamsPage             = lazy(() => import('@/pages/teacher/Exams'))
 const CreateExamPage        = lazy(() => import('@/pages/teacher/CreateExam'))
 const WaygroundCreatePage   = lazy(() => import('@/pages/teacher/WaygroundCreate'))
+const ExamDetailPage        = lazy(() => import('@/pages/teacher/ExamDetail'))
 const PricingPage2          = lazy(() => import('@/pages/payment/Pricing'))
 const PaymentDetailPage     = lazy(() => import('@/pages/payment/PaymentDetail'))
 const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
@@ -397,8 +398,8 @@ export function AppRouter() {
               {/* Legacy redirects — link cũ vẫn dùng được */}
               <Route path="/teacher/wayground"                     element={<Navigate to="/teacher/taodethi" replace />} />
               <Route path="/teacher/wayground/create"               element={<Navigate to="/teacher/taodethi" replace />} />
-              <Route path="/teacher/exams/:id"                     element={<PageFallback />} />
-              <Route path="/teacher/exams/:id/edit"                element={<PageFallback />} />
+              <Route path="/teacher/exams/:id"                     element={<ExamDetailPage />} />
+              <Route path="/teacher/exams/:id/edit"                element={<ExamDetailPage />} />
               <Route path="/teacher/grading"                       element={<PageFallback />} />
               <Route path="/teacher/interaction-center"            element={<InteractionCenterPage />} />
               <Route path="/teacher/latex-documents/:id"           element={<LaTeXEditorDocumentPage />} />

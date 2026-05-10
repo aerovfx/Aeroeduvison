@@ -697,6 +697,72 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── GET /api/teacher/exams/:id ─────────────────────────────
+  // Trả exam + questions array (join Question qua ExamQuestion).
+  app.get('/api/teacher/exams/:id', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getEPool();
+      const { rows: examRows } = await pool.query(
+        `SELECT * FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!examRows[0]) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const exam = mapExam(examRows[0]);
+
+      const { rows: qRows } = await pool.query(
+        `SELECT q.id, q."questionType", q.content, q.options, q."correctAnswer",
+                q.explanation, eq."order", eq.points
+         FROM "ExamQuestion" eq
+         JOIN "Question" q ON q.id = eq."questionId"
+         WHERE eq."examId" = $1
+         ORDER BY eq."order" ASC`,
+        [req.params.id]
+      );
+      let descObj = {};
+      try { descObj = JSON.parse(examRows[0].description || '{}'); } catch {}
+      return res.json({
+        exam: {
+          ...exam,
+          isPublic: !!descObj.public,
+          publishedAt: descObj.publishedAt || null,
+          notes: descObj.notes || null,
+        },
+        questions: qRows,
+      });
+    } catch (err) {
+      console.error('[teacher:exams:get] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PUT /api/teacher/exams/:id ─────────────────────────────
+  // Body: { title?, duration?, description?, status? }
+  app.put('/api/teacher/exams/:id', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const sets = [];
+      const vals = [req.params.id, userId];
+      let i = 3;
+      const { title, duration, status } = req.body || {};
+      if (title !== undefined)    { sets.push(`title=$${i++}`);     vals.push(String(title).slice(0, 200)); }
+      if (duration !== undefined) { sets.push(`duration=$${i++}`);  vals.push(Number(duration)); }
+      if (status !== undefined)   { sets.push(`status=$${i++}`);    vals.push(String(status)); }
+      if (!sets.length) return res.status(400).json({ error: 'Không có field nào để update' });
+      sets.push(`"updatedAt"=$${i++}`); vals.push(new Date());
+      const { rowCount } = await getEPool().query(
+        `UPDATE "Exam" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[teacher:exams:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── POST /api/teacher/exams/:id/publish ─────────────────────
   // Body: { status?, isPublic? }. Đổi status (mặc định "Đang diễn ra")
   // để học sinh nhìn thấy đề trong /student/exams. Nếu isPublic=true,
