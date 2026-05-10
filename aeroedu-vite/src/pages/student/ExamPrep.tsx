@@ -158,6 +158,28 @@ export default function ExamPrepPage() {
     if (found) setFormData((f) => ({ ...f, timeLimit: found.duration }))
   }, [formData.examType])
 
+  /* ─── Auto-start exam khi vào qua link QR ─────────────
+   *  /student/exam-prep?startExam=ID&type=exam|matrix
+   *  Học sinh quét QR trên điện thoại → page tự động vào tab "teacher"
+   *  + tự khởi tạo bài làm. Chỉ chạy 1 lần ở mount.
+   */
+  const autoStartedRef = useRef(false)
+  useEffect(() => {
+    if (autoStartedRef.current) return
+    if (typeof window === 'undefined') return
+    const sp = new URLSearchParams(window.location.search)
+    const examId = sp.get('startExam')
+    const type = sp.get('type') === 'matrix' ? 'matrix' : 'exam'
+    if (!examId) return
+    autoStartedRef.current = true
+    setActiveTab('teacher')
+    // Defer 1 tick để state activeTab apply trước khi gọi API
+    setTimeout(() => { startFromTeacherExam(examId, type) }, 50)
+    // Dọn URL để không loop khi user reload
+    window.history.replaceState({}, '', window.location.pathname)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   /* ─── Create exam from Question Bank ──────────────── */
   const startFromBank = async () => {
     setLoading(true)
@@ -822,21 +844,30 @@ export default function ExamPrepPage() {
                       </h3>
                       <div className="space-y-3">
                         {examMatrices.map((m) => (
-                          <div key={m.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all">
-                            <div className="flex-1">
+                          <div key={m.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all gap-2">
+                            <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-white/85">{m.name}</h4>
                               <p className="text-xs text-white/40 mt-1">
                                 {m.subject} | {m.grade} | {m.examType} | {m._count?.selectedQuestions || m.totalQuestions} câu | {m.duration}p
                               </p>
                               {m.user?.name && <p className="text-xs text-white/30 mt-0.5">GV: {m.user.name}</p>}
                             </div>
-                            <button
-                              onClick={() => startFromTeacherExam(m.id, "matrix")}
-                              disabled={loading}
-                              className="px-3 py-1.5 rounded-lg bg-[hsl(175,80%,40%)] hover:bg-[hsl(175,80%,45%)] text-white text-xs font-medium transition-all disabled:opacity-50"
-                            >
-                              Làm bài
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <QuickScanQr
+                                variant="compact"
+                                accent="cyan"
+                                title={`Quét QR — ${m.name}`}
+                                downloadName={`qr-matrix-${m.id}.png`}
+                                targetUrl={`${window.location.origin}/student/exam-prep?startExam=${m.id}&type=matrix`}
+                              />
+                              <button
+                                onClick={() => startFromTeacherExam(m.id, "matrix")}
+                                disabled={loading}
+                                className="px-3 py-1.5 rounded-lg bg-[hsl(175,80%,40%)] hover:bg-[hsl(175,80%,45%)] text-white text-xs font-medium transition-all disabled:opacity-50"
+                              >
+                                Làm bài
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -852,21 +883,30 @@ export default function ExamPrepPage() {
                       </h3>
                       <div className="space-y-3">
                         {teacherExams.map((ex) => (
-                          <div key={ex.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all">
-                            <div className="flex-1">
+                          <div key={ex.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all gap-2">
+                            <div className="flex-1 min-w-0">
                               <h4 className="font-medium text-white/85">{ex.title}</h4>
                               <p className="text-xs text-white/40 mt-1">
                                 {ex.examType} | {ex.totalQuestions} câu | {ex.duration}p | {ex.totalScore} điểm
                               </p>
                               {ex.user?.name && <p className="text-xs text-white/30 mt-0.5">GV: {ex.user.name}</p>}
                             </div>
-                            <button
-                              onClick={() => startFromTeacherExam(ex.id, "exam")}
-                              disabled={loading}
-                              className="px-3 py-1.5 rounded-lg bg-[hsl(210,90%,50%)] hover:bg-[hsl(210,90%,55%)] text-white text-xs font-medium transition-all disabled:opacity-50"
-                            >
-                              Làm bài
-                            </button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <QuickScanQr
+                                variant="compact"
+                                accent="indigo"
+                                title={`Quét QR — ${ex.title}`}
+                                downloadName={`qr-exam-${ex.id}.png`}
+                                targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
+                              />
+                              <button
+                                onClick={() => startFromTeacherExam(ex.id, "exam")}
+                                disabled={loading}
+                                className="px-3 py-1.5 rounded-lg bg-[hsl(210,90%,50%)] hover:bg-[hsl(210,90%,55%)] text-white text-xs font-medium transition-all disabled:opacity-50"
+                              >
+                                Làm bài
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
