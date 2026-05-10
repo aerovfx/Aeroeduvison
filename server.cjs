@@ -5392,6 +5392,380 @@ if (!USE_NODEJS_QUESTIONS) {
 // /api/online-exam-room — phòng thi online. Built-in trả empty list.
 app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
 
+// ══════════════════════════════════════════════════════════════
+// LIVE QUIZ ROOMS — Wayground/Quizizz-style live game mode
+// Handles: teacher tạo room, học sinh quét QR + nhập tên, leaderboard
+// real-time qua polling 2s. Không dùng WebSocket vì Cloud Run autoscale
+// và HTTP polling đủ tốt cho lớp ≤50 học sinh.
+// ──────────────────────────────────────────────────────────────
+// Endpoints:
+//   POST  /api/quiz-rooms                  → teacher tạo room (cần auth)
+//   GET   /api/quiz-rooms/:code            → public state (poll mỗi 2s)
+//   POST  /api/quiz-rooms/:code/join       → public, body{name,avatar}
+//   POST  /api/quiz-rooms/:code/start      → teacher khởi động (cần auth)
+//   POST  /api/quiz-rooms/:code/next       → teacher next question
+//   POST  /api/quiz-rooms/:code/answer     → student nộp đáp án
+//   POST  /api/quiz-rooms/:code/end        → teacher kết thúc
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool: QrPool } = require('pg');
+  const qrJwt = require('jsonwebtoken');
+  const { randomUUID: qrUUID } = require('crypto');
+
+  let _qrPool = null;
+  let _qrReady = null;
+  function getQrPool() {
+    if (!_qrPool) {
+      const url = process.env.DATABASE_URL;
+      if (!url) return null;
+      _qrPool = new QrPool({ connectionString: url, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _qrPool;
+  }
+  async function ensureQrTables() {
+    if (_qrReady) return _qrReady;
+    const pool = getQrPool();
+    if (!pool) return null;
+    _qrReady = (async () => {
+      await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoom" (
+        id UUID PRIMARY KEY,
+        code VARCHAR(6) UNIQUE NOT NULL,
+        "examId" UUID NOT NULL,
+        "teacherId" UUID NOT NULL,
+        status VARCHAR(20) DEFAULT 'waiting',
+        "currentQuestion" INT DEFAULT -1,
+        "questionStartedAt" TIMESTAMP,
+        "startedAt" TIMESTAMP,
+        "endedAt" TIMESTAMP,
+        settings JSONB DEFAULT '{}',
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoomParticipant" (
+        id UUID PRIMARY KEY,
+        "roomId" UUID NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        avatar VARCHAR(20),
+        score INT DEFAULT 0,
+        "correctCount" INT DEFAULT 0,
+        "joinedAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("roomId", name)
+      )`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS "QuizRoomAnswer" (
+        id UUID PRIMARY KEY,
+        "roomId" UUID NOT NULL,
+        "participantId" UUID NOT NULL,
+        "questionId" UUID NOT NULL,
+        "questionIndex" INT,
+        answer TEXT,
+        "isCorrect" BOOLEAN,
+        "responseTime" INT,
+        "submittedAt" TIMESTAMP DEFAULT NOW(),
+        UNIQUE("roomId", "participantId", "questionId")
+      )`);
+      console.log('[quiz-rooms] ✅ tables ready');
+    })().catch(e => { console.error('[quiz-rooms] ❌ ensureTables', e.message); _qrReady = null; });
+    return _qrReady;
+  }
+  const QR_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+  function getQrTeacherId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      return qrJwt.verify(auth.slice(7), QR_SECRET).sub || null;
+    } catch { return null; }
+  }
+  function gen6digit() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+  function normalizeQuizAns(s) {
+    s = String(s ?? '').trim();
+    if (!s) return '';
+    if (/^[A-Z]$/i.test(s)) return s.toUpperCase();
+    const m = s.match(/^([A-Z])[\.\)\s]/i);
+    if (m) return m[1].toUpperCase();
+    const numStr = s.replace(/,/g, '.').replace(/\s+/g, '');
+    if (numStr !== '' && !isNaN(Number(numStr))) return String(Number(numStr));
+    return s.toLowerCase();
+  }
+
+  // ── POST /api/quiz-rooms — teacher tạo room ──────────────
+  app.post('/api/quiz-rooms', async (req, res) => {
+    try {
+      const teacherId = getQrTeacherId(req);
+      if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      await ensureQrTables();
+
+      const examId = String(req.body?.examId || '').trim();
+      if (!examId) return res.status(400).json({ error: 'examId required' });
+
+      // Verify exam tồn tại + có ít nhất 1 question
+      const ex = await pool.query(`SELECT id, title, "totalQuestions" FROM "Exam" WHERE id = $1`, [examId]);
+      if (ex.rows.length === 0) return res.status(404).json({ error: 'Exam not found' });
+      if (!ex.rows[0].totalQuestions) return res.status(400).json({ error: 'Đề chưa có câu hỏi' });
+
+      // Sinh code 6 chữ số unique (retry max 5 lần)
+      let code = '';
+      for (let i = 0; i < 5; i++) {
+        const c = gen6digit();
+        const exists = await pool.query(`SELECT 1 FROM "QuizRoom" WHERE code = $1 AND status <> 'ended'`, [c]);
+        if (exists.rows.length === 0) { code = c; break; }
+      }
+      if (!code) return res.status(500).json({ error: 'Không sinh được code unique' });
+
+      const roomId = qrUUID();
+      const settings = req.body?.settings || {};
+      await pool.query(
+        `INSERT INTO "QuizRoom" (id, code, "examId", "teacherId", status, settings)
+         VALUES ($1,$2,$3,$4,'waiting',$5)`,
+        [roomId, code, examId, teacherId, JSON.stringify(settings)]
+      );
+      console.log(`[quiz-rooms] ✅ created code=${code} exam=${examId.slice(0,8)} teacher=${teacherId.slice(0,8)}`);
+      return res.json({ roomId, code, examTitle: ex.rows[0].title });
+    } catch (err) {
+      console.error('[quiz-rooms:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/quiz-rooms/:code — public state poll ────────
+  app.get('/api/quiz-rooms/:code', async (req, res) => {
+    try {
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      await ensureQrTables();
+      const { rows } = await pool.query(
+        `SELECT r.*, e.title AS "examTitle", e."totalQuestions"
+           FROM "QuizRoom" r
+           LEFT JOIN "Exam" e ON e.id = r."examId"
+          WHERE r.code = $1 LIMIT 1`,
+        [req.params.code]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Phòng không tồn tại' });
+      const room = rows[0];
+      const parts = await pool.query(
+        `SELECT id, name, avatar, score, "correctCount", "joinedAt"
+           FROM "QuizRoomParticipant" WHERE "roomId" = $1
+          ORDER BY score DESC, "correctCount" DESC, "joinedAt" ASC`,
+        [room.id]
+      );
+      // Nếu đang playing → trả thêm câu hỏi hiện tại (ẩn correctAnswer cho student)
+      let currentQuestion = null;
+      if (room.status === 'playing' && room.currentQuestion >= 0) {
+        const q = await pool.query(
+          `SELECT q.id, q."questionType", q.content, q.options, eq."order", eq.points
+             FROM "ExamQuestion" eq
+             JOIN "Question" q ON q.id = eq."questionId"
+            WHERE eq."examId" = $1 ORDER BY eq."order" ASC OFFSET $2 LIMIT 1`,
+          [room.examId, room.currentQuestion]
+        );
+        if (q.rows[0]) {
+          currentQuestion = {
+            id: q.rows[0].id,
+            index: room.currentQuestion,
+            content: q.rows[0].content,
+            options: q.rows[0].options,
+            questionType: q.rows[0].questionType,
+            startedAt: room.questionStartedAt,
+          };
+        }
+      }
+      return res.json({
+        room: {
+          id: room.id,
+          code: room.code,
+          examId: room.examId,
+          examTitle: room.examTitle,
+          totalQuestions: room.totalQuestions,
+          status: room.status,
+          currentQuestion: room.currentQuestion,
+          startedAt: room.startedAt,
+          endedAt: room.endedAt,
+        },
+        participants: parts.rows,
+        currentQuestion,
+      });
+    } catch (err) {
+      console.error('[quiz-rooms:get] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quiz-rooms/:code/join — học sinh join ──────
+  app.post('/api/quiz-rooms/:code/join', async (req, res) => {
+    try {
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      await ensureQrTables();
+      const name = String(req.body?.name || '').trim().slice(0, 100);
+      const avatar = String(req.body?.avatar || '🐸').slice(0, 20);
+      if (!name) return res.status(400).json({ error: 'Cần nhập tên' });
+
+      const r = await pool.query(`SELECT id, status FROM "QuizRoom" WHERE code = $1`, [req.params.code]);
+      if (r.rows.length === 0) return res.status(404).json({ error: 'Phòng không tồn tại' });
+      const room = r.rows[0];
+      if (room.status === 'ended') return res.status(410).json({ error: 'Phòng đã kết thúc' });
+
+      // Check trùng tên trong room → trả participantId hiện có
+      const exist = await pool.query(
+        `SELECT id FROM "QuizRoomParticipant" WHERE "roomId" = $1 AND name = $2 LIMIT 1`,
+        [room.id, name]
+      );
+      if (exist.rows[0]) {
+        return res.json({ participantId: exist.rows[0].id, name, avatar, rejoined: true });
+      }
+      const pid = qrUUID();
+      await pool.query(
+        `INSERT INTO "QuizRoomParticipant" (id, "roomId", name, avatar) VALUES ($1,$2,$3,$4)`,
+        [pid, room.id, name, avatar]
+      );
+      console.log(`[quiz-rooms:join] ✅ code=${req.params.code} name=${name}`);
+      return res.json({ participantId: pid, name, avatar, rejoined: false });
+    } catch (err) {
+      console.error('[quiz-rooms:join] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quiz-rooms/:code/start — teacher khởi động ──
+  app.post('/api/quiz-rooms/:code/start', async (req, res) => {
+    try {
+      const teacherId = getQrTeacherId(req);
+      if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      const { rowCount } = await pool.query(
+        `UPDATE "QuizRoom"
+            SET status='playing', "currentQuestion"=0,
+                "questionStartedAt"=NOW(), "startedAt"=NOW()
+          WHERE code=$1 AND "teacherId"=$2 AND status='waiting'`,
+        [req.params.code, teacherId]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Phòng không hợp lệ hoặc không phải owner' });
+      console.log(`[quiz-rooms:start] ✅ code=${req.params.code}`);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[quiz-rooms:start] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quiz-rooms/:code/next — câu kế tiếp / kết thúc ──
+  app.post('/api/quiz-rooms/:code/next', async (req, res) => {
+    try {
+      const teacherId = getQrTeacherId(req);
+      if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      const r = await pool.query(
+        `SELECT r.id, r."currentQuestion", e."totalQuestions"
+           FROM "QuizRoom" r LEFT JOIN "Exam" e ON e.id = r."examId"
+          WHERE r.code=$1 AND r."teacherId"=$2 AND r.status='playing'`,
+        [req.params.code, teacherId]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ error: 'Phòng không hợp lệ' });
+      const room = r.rows[0];
+      const nextIdx = (room.currentQuestion || 0) + 1;
+      if (nextIdx >= (room.totalQuestions || 0)) {
+        await pool.query(
+          `UPDATE "QuizRoom" SET status='ended', "endedAt"=NOW() WHERE id=$1`,
+          [room.id]
+        );
+        return res.json({ ended: true });
+      }
+      await pool.query(
+        `UPDATE "QuizRoom" SET "currentQuestion"=$1, "questionStartedAt"=NOW() WHERE id=$2`,
+        [nextIdx, room.id]
+      );
+      return res.json({ ended: false, currentQuestion: nextIdx });
+    } catch (err) {
+      console.error('[quiz-rooms:next] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quiz-rooms/:code/answer — student nộp đáp án ──
+  app.post('/api/quiz-rooms/:code/answer', async (req, res) => {
+    try {
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      const participantId = String(req.body?.participantId || '').trim();
+      const questionId = String(req.body?.questionId || '').trim();
+      const answer = String(req.body?.answer ?? '');
+      if (!participantId || !questionId) {
+        return res.status(400).json({ error: 'participantId + questionId required' });
+      }
+      const r = await pool.query(
+        `SELECT r.id, r."currentQuestion", r."questionStartedAt"
+           FROM "QuizRoom" r WHERE r.code=$1 AND r.status='playing'`,
+        [req.params.code]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ error: 'Phòng không hoạt động' });
+      const room = r.rows[0];
+
+      // Lấy correctAnswer của question
+      const q = await pool.query(`SELECT "correctAnswer" FROM "Question" WHERE id=$1`, [questionId]);
+      if (q.rows.length === 0) return res.status(404).json({ error: 'Question not found' });
+      const isCorrect = normalizeQuizAns(answer) === normalizeQuizAns(q.rows[0].correctAnswer);
+
+      // Speed bonus: nhanh hơn → nhiều điểm hơn
+      // Base 1000, mỗi giây giảm 50, min 500
+      const elapsedMs = room.questionStartedAt
+        ? Date.now() - new Date(room.questionStartedAt).getTime()
+        : 0;
+      const points = isCorrect
+        ? Math.max(500, 1000 - Math.floor(elapsedMs / 1000) * 50)
+        : 0;
+
+      // Insert answer (UNIQUE → conflict do nothing nếu đã nộp)
+      await pool.query(
+        `INSERT INTO "QuizRoomAnswer"
+           (id, "roomId", "participantId", "questionId", "questionIndex",
+            answer, "isCorrect", "responseTime")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         ON CONFLICT ("roomId","participantId","questionId") DO NOTHING`,
+        [qrUUID(), room.id, participantId, questionId, room.currentQuestion,
+         answer, isCorrect, elapsedMs]
+      );
+      // Update participant score nếu đúng
+      if (isCorrect) {
+        await pool.query(
+          `UPDATE "QuizRoomParticipant"
+              SET score = score + $1, "correctCount" = "correctCount" + 1
+            WHERE id = $2`,
+          [points, participantId]
+        );
+      }
+      return res.json({ isCorrect, points });
+    } catch (err) {
+      console.error('[quiz-rooms:answer] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/quiz-rooms/:code/end — teacher kết thúc ──
+  app.post('/api/quiz-rooms/:code/end', async (req, res) => {
+    try {
+      const teacherId = getQrTeacherId(req);
+      if (!teacherId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getQrPool();
+      if (!pool) return res.status(503).json({ error: 'DB not available' });
+      await pool.query(
+        `UPDATE "QuizRoom" SET status='ended', "endedAt"=NOW()
+          WHERE code=$1 AND "teacherId"=$2`,
+        [req.params.code, teacherId]
+      );
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[quiz-rooms:end] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+}
+
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
 // ══════════════════════════════════════════════════════════════

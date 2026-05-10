@@ -18,7 +18,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Loader2, Edit3, Save, Trash2, Eye, EyeOff,
+  ArrowLeft, Loader2, Edit3, Save, Trash2, Eye, EyeOff, Play,
   CheckCircle2, Clock, FileText, ChevronDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -280,6 +280,16 @@ export default function ExamDetailPage() {
             }}>
               {exam.isPublic ? <Eye size={13} /> : <EyeOff size={13} />}
               {exam.isPublic ? 'Công khai cho HS' : 'Ẩn khỏi HS'}
+            </button>
+
+            <button onClick={() => navigate(`/teacher/exams/${exam.id}/play`)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              background: 'linear-gradient(90deg, #ec4899, #a855f7)', border: 'none',
+              borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700,
+              cursor: 'pointer', color: 'white',
+              boxShadow: '0 4px 12px rgba(168,85,247,0.3)',
+            }}>
+              <Play size={13} /> Mở phòng thi LIVE
             </button>
 
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ai-muted-text)' }}>

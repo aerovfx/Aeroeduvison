@@ -106,6 +106,9 @@ const ExamsPage             = lazy(() => import('@/pages/teacher/Exams'))
 const CreateExamPage        = lazy(() => import('@/pages/teacher/CreateExam'))
 const WaygroundCreatePage   = lazy(() => import('@/pages/teacher/WaygroundCreate'))
 const ExamDetailPage        = lazy(() => import('@/pages/teacher/ExamDetail'))
+const ExamHostPage          = lazy(() => import('@/pages/teacher/ExamHost'))
+const PlayJoinPage          = lazy(() => import('@/pages/play/PlayJoin'))
+const PlayRoomPage          = lazy(() => import('@/pages/play/PlayRoom'))
 const PricingPage2          = lazy(() => import('@/pages/payment/Pricing'))
 const PaymentDetailPage     = lazy(() => import('@/pages/payment/PaymentDetail'))
 const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
@@ -216,6 +219,12 @@ export function AppRouter() {
         <Route path="/auth/signin"    element={<Navigate to="/auth/login" replace />} />
         <Route path="/auth/signup"    element={<Navigate to="/auth/register" replace />} />
         <Route path="/auth/error"     element={<PageFallback />} />
+
+        {/* ══════════════════════════════════════════════════
+            PUBLIC PLAY ROUTES — học sinh quét QR/nhập code, không cần login
+        ══════════════════════════════════════════════════ */}
+        <Route path="/play"            element={<PlayJoinPage />} />
+        <Route path="/play/:code"      element={<PlayRoomPage />} />
 
         {/* ══════════════════════════════════════════════════
             PROTECTED ROUTES (yêu cầu đăng nhập)
@@ -400,6 +409,7 @@ export function AppRouter() {
               <Route path="/teacher/wayground/create"               element={<Navigate to="/teacher/taodethi" replace />} />
               <Route path="/teacher/exams/:id"                     element={<ExamDetailPage />} />
               <Route path="/teacher/exams/:id/edit"                element={<ExamDetailPage />} />
+              <Route path="/teacher/exams/:id/play"                element={<ExamHostPage />} />
               <Route path="/teacher/grading"                       element={<PageFallback />} />
               <Route path="/teacher/interaction-center"            element={<InteractionCenterPage />} />
               <Route path="/teacher/latex-documents/:id"           element={<LaTeXEditorDocumentPage />} />
