@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
 import {
   Users, Brain, TrendingUp, AlertTriangle, Sparkles,
   BarChart3, Heart, Zap, Target, Clock, Award, Eye,
@@ -836,6 +837,11 @@ export default function TeacherDashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ════ LIVE LEADERBOARD — top học sinh dẫn đầu thời gian thực ════ */}
+      <div style={{ maxWidth: 1400, margin: '24px auto 0', padding: '0 24px 32px' }}>
+        <LiveLeaderboard />
       </div>
     </div>
   )

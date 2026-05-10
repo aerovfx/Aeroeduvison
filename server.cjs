@@ -5393,6 +5393,129 @@ if (!USE_NODEJS_QUESTIONS) {
 app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
 
 // ══════════════════════════════════════════════════════════════
+// LEADERBOARD REAL-TIME — top học sinh dẫn đầu với chỉ số
+// cảm xúc + tương tác. Aggregate từ PracticeExam + LessonHistory
+// + QuizRoomParticipant. Dùng chung cho Teacher + Student dashboard.
+// ──────────────────────────────────────────────────────────────
+// GET /api/leaderboard/realtime?limit=10
+//   → trả top users theo điểm tổng (sum percentage) + engagement
+//     (action 7d) + emotion (derive từ trend percentage)
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool: LbPool } = require('pg');
+  let _lbPool = null;
+  function getLbPool() {
+    if (!_lbPool) {
+      const url = process.env.DATABASE_URL;
+      if (!url) return null;
+      _lbPool = new LbPool({ connectionString: url, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _lbPool;
+  }
+  const anonName = (sid) => `Học sinh ${String(sid || '').slice(0, 4) || '----'}`;
+  // Emotion derive từ trend percentage:
+  //   improving (avg gần đây > avg cũ + 5)  → 😊
+  //   declining (avg gần đây < avg cũ - 5)  → 😔
+  //   stable                                → 😐
+  function emotionFrom(recentAvg, oldAvg, total) {
+    if (!total || total < 2) return { emoji: '🙂', label: 'Mới bắt đầu', tone: 'neutral' };
+    const diff = recentAvg - oldAvg;
+    if (diff >= 5) return { emoji: '😊', label: 'Tiến bộ', tone: 'positive' };
+    if (diff <= -5) return { emoji: '😔', label: 'Đi xuống', tone: 'negative' };
+    return { emoji: '😐', label: 'Ổn định', tone: 'neutral' };
+  }
+  // Engagement label từ số action 7 ngày
+  function engagementFrom(actions7d) {
+    if (actions7d >= 20) return { level: 'Cao', score: Math.min(100, actions7d * 3), tone: 'high' };
+    if (actions7d >= 5)  return { level: 'Trung bình', score: actions7d * 4, tone: 'mid' };
+    return { level: 'Thấp', score: actions7d * 8, tone: 'low' };
+  }
+
+  app.get('/api/leaderboard/realtime', async (_req, res) => {
+    try {
+      const pool = getLbPool();
+      if (!pool) return res.json({ leaders: [] });
+
+      // Lấy top 30 candidate theo tổng score (sum percentage cho practice exams)
+      const topQ = await pool.query(`
+        SELECT
+          pe."studentId" AS user_id,
+          COUNT(*)::int                                       AS total_attempts,
+          COALESCE(SUM(pe.percentage),0)::int                 AS total_score,
+          COALESCE(AVG(pe.percentage),0)::float               AS avg_pct,
+          COALESCE(AVG(pe.percentage) FILTER (
+            WHERE pe."completedAt" > NOW() - INTERVAL '7 days'
+          ),0)::float                                         AS recent_avg,
+          COALESCE(AVG(pe.percentage) FILTER (
+            WHERE pe."completedAt" <= NOW() - INTERVAL '7 days'
+          ),0)::float                                         AS old_avg,
+          MAX(pe."completedAt")                               AS last_attempt
+        FROM "PracticeExam" pe
+        WHERE pe.completed = TRUE AND pe.percentage IS NOT NULL
+        GROUP BY pe."studentId"
+        ORDER BY total_score DESC, total_attempts DESC
+        LIMIT 30
+      `);
+
+      const userIds = topQ.rows.map(r => r.user_id);
+      if (userIds.length === 0) return res.json({ leaders: [] });
+
+      // Lấy engagement (action count 7d) từ LessonHistory
+      const engQ = await pool.query(`
+        SELECT "userId", COUNT(*)::int AS actions_7d
+          FROM "LessonHistory"
+         WHERE "userId" = ANY($1::text[])
+           AND "occurredAt" > NOW() - INTERVAL '7 days'
+         GROUP BY "userId"
+      `, [userIds]);
+      const engMap = new Map(engQ.rows.map(r => [r.userId, r.actions_7d]));
+
+      // Lấy live quiz scores (QuizRoomParticipant) — Note: participant không
+      // link userId, chỉ có name. Bỏ qua nếu không match được.
+
+      // Lấy User name + image (nếu có)
+      let userMap = new Map();
+      try {
+        const usersQ = await pool.query(
+          `SELECT id, name, image FROM "User" WHERE id = ANY($1::text[])`,
+          [userIds]
+        );
+        userMap = new Map(usersQ.rows.map(r => [r.id, r]));
+      } catch { /* User table có thể thiếu — fallback anon */ }
+
+      const leaders = topQ.rows.slice(0, 10).map((r, idx) => {
+        const u = userMap.get(r.user_id);
+        const emotion = emotionFrom(Number(r.recent_avg), Number(r.old_avg), Number(r.total_attempts));
+        const engagement = engagementFrom(engMap.get(r.user_id) || 0);
+        return {
+          rank: idx + 1,
+          userId: r.user_id,
+          name: u?.name || anonName(r.user_id),
+          avatar: u?.image || null,
+          totalAttempts: Number(r.total_attempts),
+          totalScore: Number(r.total_score),
+          avgPercentage: Math.round(Number(r.avg_pct)),
+          lastAttemptAt: r.last_attempt,
+          emotion,
+          engagement: {
+            level: engagement.level,
+            score: engagement.score,
+            tone: engagement.tone,
+            actions7d: engMap.get(r.user_id) || 0,
+          },
+        };
+      });
+
+      return res.json({ leaders, updatedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error('[leaderboard:realtime] ❌', err.message);
+      return res.status(500).json({ error: err.message, leaders: [] });
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 // LIVE QUIZ ROOMS — Wayground/Quizizz-style live game mode
 // Handles: teacher tạo room, học sinh quét QR + nhập tên, leaderboard
 // real-time qua polling 2s. Không dùng WebSocket vì Cloud Run autoscale

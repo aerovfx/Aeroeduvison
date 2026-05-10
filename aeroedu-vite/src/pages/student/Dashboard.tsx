@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BookOpen, CheckCircle2, Clock, TrendingUp, Award, Brain } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
 
 const DEMO_STATS = [
   { label: 'Khóa học đang học', value: 4, icon: BookOpen, color: 'bg-blue-100 text-blue-600' },
@@ -110,6 +111,9 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* LIVE Leaderboard — real-time top học sinh dẫn đầu */}
+      <LiveLeaderboard highlightUserId={user?.id} />
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
