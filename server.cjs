@@ -4786,10 +4786,148 @@ if (!USE_NODEJS_QUESTIONS) {
 }
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
-// ── /api/latex-projects/* → Rust latex-service (pixiai-latex) ──
-// Direct proxy, bypass aero-backend. latex-service tự xử lý DB + JWT + gọi Anthropic.
-// Phải đăng ký TRƯỚC catch-all aero-backend proxy bên dưới.
-app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
+// ══════════════════════════════════════════════════════════════
+// BUILT-IN LATEX PROJECTS — không cần pixiai-latex Cloud Run riêng
+// Handles 5 endpoints chính: list, create, get, update, delete.
+// 2 endpoint export-from-* trả 501 (chưa implement, không phải critical).
+// Yêu cầu: DATABASE_URL + JWT_SECRET (đã có sẵn cho built-in auth).
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool: LPool } = require('pg');
+  const ljwt = require('jsonwebtoken');
+  const { randomUUID: latexUUID } = require('crypto');
+
+  let _lpool = null;
+  function getLPool() {
+    if (!_lpool) {
+      const DATABASE_URL = process.env.DATABASE_URL;
+      if (!DATABASE_URL) throw new Error('DATABASE_URL env var not set');
+      _lpool = new LPool({ connectionString: DATABASE_URL, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _lpool;
+  }
+  const LJWT_SECRET = process.env.JWT_SECRET
+    || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+
+  function getLatexUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const decoded = ljwt.verify(auth.slice(7), LJWT_SECRET);
+      return decoded.sub || decoded.userId || null;
+    } catch { return null; }
+  }
+
+  // GET /api/latex-projects → list all projects của user
+  app.get('/api/latex-projects', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { rows } = await getLPool().query(
+        `SELECT id, "userId", title, "mainContent", "folderId", "createdAt", "updatedAt"
+         FROM "LatexProject" WHERE "userId" = $1 ORDER BY "updatedAt" DESC`,
+        [userId]
+      );
+      return res.json({ projects: rows });
+    } catch (err) {
+      console.error('[latex:list] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/latex-projects/:id → 1 project
+  app.get('/api/latex-projects/:id', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { rows } = await getLPool().query(
+        `SELECT * FROM "LatexProject" WHERE id = $1 AND "userId" = $2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[latex:get] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/latex-projects → tạo mới { title, mainContent? }
+  app.post('/api/latex-projects', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { title, mainContent } = req.body || {};
+      if (!title) return res.status(400).json({ error: 'title required' });
+      const id = latexUUID();
+      const now = new Date();
+      await getLPool().query(
+        `INSERT INTO "LatexProject" (id, "userId", title, "mainContent", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$5)`,
+        [id, userId, String(title).slice(0, 200), String(mainContent || ''), now]
+      );
+      console.log(`[latex:create] ✅ ${id} user=${userId}`);
+      return res.status(201).json({ id, userId, title, mainContent: mainContent || '', createdAt: now, updatedAt: now });
+    } catch (err) {
+      console.error('[latex:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/latex-projects/:id → update title + mainContent
+  app.put('/api/latex-projects/:id', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { title, mainContent } = req.body || {};
+      const sets = [];
+      const vals = [req.params.id, userId];
+      let idx = 3;
+      if (title !== undefined)        { sets.push(`title=$${idx++}`);          vals.push(String(title).slice(0, 200)); }
+      if (mainContent !== undefined)  { sets.push(`"mainContent"=$${idx++}`);  vals.push(String(mainContent)); }
+      if (!sets.length)               return res.status(400).json({ error: 'Không có field nào để update' });
+      sets.push(`"updatedAt"=$${idx++}`); vals.push(new Date());
+
+      const { rowCount } = await getLPool().query(
+        `UPDATE "LatexProject" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[latex:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/latex-projects/:id
+  app.delete('/api/latex-projects/:id', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { rowCount } = await getLPool().query(
+        `DELETE FROM "LatexProject" WHERE id=$1 AND "userId"=$2`,
+        [req.params.id, userId]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[latex:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Export endpoints — chưa implement (cần AI gen LaTeX, sẽ thêm sau)
+  app.post('/api/latex-projects/export-from-exam', (_req, res) => {
+    res.status(501).json({ error: 'Tính năng đang phát triển' });
+  });
+  app.post('/api/latex-projects/export-from-matrix', (_req, res) => {
+    res.status(501).json({ error: 'Tính năng đang phát triển' });
+  });
+}
+// LATEX_SERVICE_URL: DEPRECATED — built-in handlers thay thế.
+// (proxy cũ đã xoá vì pixiai-latex Cloud Run service không còn tồn tại)
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
