@@ -1173,6 +1173,11 @@ function makeProxy(target, label, pathFilter) {
   });
 }
 
+// Stub specific endpoints TRƯỚC proxy /api/teacher/* — express match theo
+// thứ tự đăng ký, không add ở đây thì proxy sẽ catch trước → 503.
+app.get('/api/teacher/students', (_req, res) => res.json({ students: [] }));
+app.get('/api/teacher/students/:id', (req, res) => res.json({ id: req.params.id, name: '—', email: '—' }));
+
 // ── /api/teacher/* → teacher-service ───────────────────────
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
@@ -5055,6 +5060,11 @@ if (USE_NODEJS_QUESTIONS) {
     res.status(501).json({ error: 'Số hoá ma trận từ ảnh chưa khả dụng — dùng "Tạo mới" thủ công' });
   });
 }
+
+// Stub specific endpoints TRƯỚC proxy /api/documents — express thứ tự matter.
+app.get('/api/documents', (_req, res) => res.json({ documents: [] }));
+app.post('/api/documents/upload', (_req, res) => res.status(501).json({ error: 'Upload tài liệu đang phát triển' }));
+app.post('/api/documents/fix-status', (_req, res) => res.json({ ok: true }));
 
 // ── media-service routes (only if MEDIA_SERVICE_URL is external) ──
 // /api/exam-matrices đã được merge built-in ở trên — bỏ proxy.
