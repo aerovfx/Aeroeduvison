@@ -38,11 +38,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         // Giữ nguyên alias '@/' như Next.js project
         '@': path.resolve(__dirname, './src'),
-        // Fix @mediapipe/tasks-vision (pulled in by @react-three/drei) — dùng CJS bundle
-        '@mediapipe/tasks-vision': path.resolve(
-          __dirname,
-          'node_modules/@mediapipe/tasks-vision/vision_bundle.cjs'
-        ),
+        // Bỏ alias mediapipe — CJS bundle không chạy được trong browser ESM mode.
+        // Vite tự xử lý ESM gốc của @mediapipe/tasks-vision OK.
+        // (Trước đây alias để fix issue với @react-three/drei nhưng giờ không cần)
       },
     },
 

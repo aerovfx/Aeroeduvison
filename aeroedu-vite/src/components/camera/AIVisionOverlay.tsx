@@ -5,7 +5,7 @@ import {
   ObjectDetector,
   FaceLandmarker,
   PoseLandmarker,
-  DrawingUtils
+  DrawingUtils,
 } from '@mediapipe/tasks-vision'
 import {
   AdvancedEmotionDetector,
