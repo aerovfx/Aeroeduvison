@@ -7058,6 +7058,19 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
           + '\\setmainfont{Latin Modern Roman}\n'
         );
       }
+
+      // ── Fix common LaTeX "vertical mode" bug ──────────────
+      // Pattern phổ biến trong template VN: dùng "\\ A. option" ở đầu dòng
+      // để tạo line break giữa các đáp án. LaTeX cho phép \\ trong horizontal
+      // mode (giữa text trong paragraph), nhưng KHÔNG cho phép sau \section{},
+      // \end{center}, \end{tikzpicture}, blank line, etc. (= vertical mode).
+      //
+      // Error: "There's no line here to end."
+      //
+      // Fix: strip "\\" ở đầu dòng → text sau "\\ " tự thành paragraph mới.
+      // KHÔNG đụng tới "\\" ở cuối dòng (line break trong header minipage OK).
+      s = s.replace(/^[ \t]*\\\\(\s)/gm, '$1');
+
       return s;
     }
     const content = makeXelatexCompat(rawContent);
