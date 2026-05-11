@@ -5625,6 +5625,31 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
       await ensureCpTable();
       const action = String(req.query.action || '').toLowerCase();
 
+      // Hỗ trợ ?type=latest (Progress page) → trả CareerProfile mới nhất của user
+      if (req.query.type === 'latest' || action === 'latest') {
+        const userId = getCpUserId(req);
+        if (!userId) return res.json({ success: true, data: null });
+        const { rows: latest } = await pool.query(
+          `SELECT id, "userId", "mbtiType", "mbtiScores", "hollandCode", "hollandScores",
+                  "personalityName", careers, "createdAt"
+             FROM "CareerProfile" WHERE "userId" = $1
+            ORDER BY "createdAt" DESC LIMIT 1`,
+          [userId]
+        );
+        if (latest.length === 0) return res.json({ success: true, data: null });
+        const r = latest[0];
+        return res.json({
+          success: true,
+          data: {
+            id: r.id, userId: r.userId,
+            mbtiType: r.mbtiType, mbtiScores: r.mbtiScores,
+            hollandCode: r.hollandCode, hollandScores: r.hollandScores,
+            personalityName: r.personalityName, careers: r.careers || [],
+            createdAt: r.createdAt,
+          },
+        });
+      }
+
       if (action === 'history') {
         const userId = getCpUserId(req);
         if (!userId) return res.status(401).json({ success: false, error: 'unauthorized' });
@@ -6732,8 +6757,16 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   // ─ Stats / Progress ───────────────────────────────────────
   app.get('/api/exam-stats', (_req, res) => res.json({ totalExams: 0, avgScore: 0, completed: 0 }));
   app.get('/api/courses-progress', (_req, res) => res.json({ progress: [] }));
+  // /api/update-learning-progress: UI dùng cả GET (load) lẫn POST (save)
+  app.get('/api/update-learning-progress', (_req, res) => res.json({ progress: [], updatedAt: null }));
   app.post('/api/update-learning-progress', okMsg);
   app.get('/api/agents/progress-tracker', emptyObj);
+
+  // ─ User profile ───────────────────────────────────────────
+  // PATCH /api/profile (UI Settings update name/avatar/...) — stub trả ok
+  app.get('/api/profile', (_req, res) => res.json({ profile: {} }));
+  app.patch('/api/profile', okMsg);
+  app.put('/api/profile', okMsg);
 
   // ─ Emotion ────────────────────────────────────────────────
   app.get('/api/emotion', (_req, res) => res.json({ records: [] }));
