@@ -230,10 +230,10 @@ export default function WaygroundCreatePage() {
           <ArrowLeft size={14} /> Go Back
         </button>
         <h1 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-          {step === 'choose' && ''}
-          {step === 'customize' && 'Customize your assessment'}
-          {step === 'loading' && 'Understanding Document...'}
-          {step === 'review' && (title || 'Review extracted questions')}
+          {step === 'choose' && 'Tạo tài liệu đánh giá'}
+          {step === 'customize' && 'Tuỳ chỉnh tài liệu đánh giá'}
+          {step === 'loading' && 'Đang xử lý tài liệu…'}
+          {step === 'review' && (title || 'Xem lại câu hỏi đã trích xuất')}
         </h1>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={() => navigate('/teacher/exams')} style={{
@@ -252,10 +252,10 @@ export default function WaygroundCreatePage() {
         {step === 'choose' && (
           <div>
             <p style={{ fontSize: 22, fontWeight: 600, textAlign: 'center', marginBottom: 8 }}>
-              Good day, teacher 👋 Let's create something.
+              Chào thầy/cô 👋 Bắt đầu tạo tài liệu đánh giá nào.
             </p>
             <p style={{ textAlign: 'center', color: D.muted, marginBottom: 32, fontSize: 14 }}>
-              Choose a type to get started
+              Chọn nguồn để tạo đề kiểm tra hoặc bài tập
             </p>
 
             {/* Top quick actions */}
@@ -323,7 +323,7 @@ export default function WaygroundCreatePage() {
         {step === 'customize' && (
           <div style={{ maxWidth: 760, margin: '0 auto' }}>
             <h2 style={{ fontSize: 24, fontWeight: 700, textAlign: 'center', marginBottom: 24 }}>
-              Customize your {resource}
+              Tuỳ chỉnh tài liệu đánh giá của bạn
             </h2>
 
             {/* PDF picker */}
