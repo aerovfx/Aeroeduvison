@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import api from '@/services/api'
 import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
+import { MathText } from '@/components/common/MathText'
 
 interface Message {
   id: string
@@ -195,8 +196,8 @@ function AiTutorPageInner() {
                   : 'bg-[hsl(262,83%,58%)] text-white rounded-tr-sm',
               )}
             >
-              <div className="whitespace-pre-wrap leading-relaxed">
-                {msg.content}
+              <div className="leading-relaxed">
+                <MathText as="span">{msg.content}</MathText>
                 {msg.isStreaming && (
                   <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse rounded-sm" />
                 )}

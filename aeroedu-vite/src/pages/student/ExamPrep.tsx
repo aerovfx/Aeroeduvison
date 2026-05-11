@@ -13,6 +13,7 @@ import { examPrepService } from "@/services/examPrep.service"
 import { useAuth } from "@/hooks/useAuth"
 import { formatRelativeTime } from "@/lib/utils"
 import { QuickScanQr } from "@/components/common/QuickScanQr"
+import { MathText } from "@/components/common/MathText"
 import type {
   PracticeExam,
   GradeResult,
@@ -374,7 +375,7 @@ export default function ExamPrepPage() {
                   )}
                 </div>
 
-                <div className="text-lg font-medium text-white/90 mb-6 whitespace-pre-wrap">{q.content}</div>
+                <MathText as="div" className="text-lg font-medium text-white/90 mb-6">{q.content}</MathText>
 
                 {/* Options */}
                 {q.options && q.options.length > 0 ? (
@@ -400,7 +401,7 @@ export default function ExamPrepPage() {
                             }`}>
                               {label}
                             </div>
-                            <span className="text-white/80 whitespace-pre-wrap">{opt}</span>
+                            <MathText as="span" className="text-white/80">{opt}</MathText>
                           </div>
                         </div>
                       )

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
 import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
+import { MathText } from '@/components/common/MathText'
 
 const D = {
   bg: '#0d0e17',
@@ -61,9 +62,8 @@ function MessageBubble({ msg }: { msg: Message }) {
         fontSize: 14,
         lineHeight: 1.6,
         boxShadow: isUser ? '0 0 16px rgba(124,58,237,0.2)' : 'none',
-        whiteSpace: 'pre-wrap',
       }}>
-        {msg.content}
+        <MathText as="span">{msg.content}</MathText>
         <div style={{ fontSize: 10, color: isUser ? 'rgba(255,255,255,0.5)' : D.muted, marginTop: 4, textAlign: 'right' }}>
           {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
         </div>

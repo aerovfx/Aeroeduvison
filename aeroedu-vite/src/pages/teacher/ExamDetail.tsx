@@ -21,6 +21,7 @@ import {
   ArrowLeft, Loader2, Edit3, Save, Trash2, Eye, EyeOff, Play,
   CheckCircle2, Clock, FileText, ChevronDown,
 } from 'lucide-react'
+import { MathText } from '@/components/common/MathText'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 
@@ -339,7 +340,7 @@ function QuestionRow({ q, idx }: { q: Question; idx: number }) {
         </span>
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: q.options?.length ? 10 : 4, lineHeight: 1.55 }}>
-        {q.content}
+        <MathText as="span">{q.content}</MathText>
       </div>
       {q.options?.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
@@ -354,7 +355,7 @@ function QuestionRow({ q, idx }: { q: Question; idx: number }) {
                 border: `1px solid ${correct ? 'rgba(34,197,94,0.35)' : 'var(--ai-card-border)'}`,
               }}>
                 {correct && <CheckCircle2 size={13} style={{ color: '#22c55e', flexShrink: 0 }} />}
-                <span>{opt}</span>
+                <MathText as="span">{opt}</MathText>
               </div>
             )
           })}

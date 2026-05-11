@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import axios from 'axios'
+import { MathText } from '@/components/common/MathText'
 
 interface Participant {
   id: string; name: string; avatar: string | null
@@ -227,9 +228,9 @@ export default function PlayRoom() {
 
         {/* Question */}
         <div className="bg-black/40 backdrop-blur rounded-3xl p-5 mb-5">
-          <p className="text-white text-xl md:text-2xl font-medium whitespace-pre-wrap leading-relaxed">
+          <MathText as="div" className="text-white text-xl md:text-2xl font-medium leading-relaxed">
             {q.content}
-          </p>
+          </MathText>
         </div>
 
         {/* Result feedback after answering */}
@@ -258,7 +259,7 @@ export default function PlayRoom() {
                     bg-gradient-to-r ${colors[i % 4]}
                     ${isSelected ? 'ring-4 ring-white scale-95' : selected ? 'opacity-40' : 'hover:scale-[1.02] active:scale-95'}
                     transition-all shadow-xl disabled:cursor-not-allowed`}>
-                  {opt}
+                  <MathText as="span">{opt}</MathText>
                 </button>
               )
             })}
