@@ -954,7 +954,9 @@ function makeProxy(target, label, pathFilter) {
            VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,true,true,'active',$10,$11,$11)`,
           [
             qid,
-            'wayground-import',
+            // Topic: dùng từ AI extract nếu có, fallback subject. KHÔNG lưu
+            // 'wayground-import' để không xuất hiện trong "Chủ đề cần ôn tập".
+            (q.topic && String(q.topic).trim()) || subject || 'Vật lí',
             subject || 'Vật lí',
             String(grade || '11'),
             String(q.questionType || 'MULTIPLE_CHOICE'),
@@ -2288,9 +2290,15 @@ if (USE_NODEJS_QUESTIONS) {
 
         // Aggregate weak topics from last 10 exams' breakdown.byTopic
         const topicAgg = new Map(); // topic → { correct, total }
+        // Topic markers nội bộ — không hiển thị trong "Chủ đề cần ôn tập".
+        const INTERNAL_TOPICS = new Set([
+          'wayground-import', 'latex-import', 'pdf-import',
+          'ai-generated', 'manual', 'unknown', '', null,
+        ]);
         for (const row of trendQ.rows) {
           const byTopic = (row.breakdown && row.breakdown.byTopic) || {};
           for (const [topic, v] of Object.entries(byTopic)) {
+            if (INTERNAL_TOPICS.has(topic) || INTERNAL_TOPICS.has(String(topic).toLowerCase())) continue;
             const prev = topicAgg.get(topic) || { correct: 0, total: 0 };
             prev.correct += (v && v.correct) || 0;
             prev.total += (v && v.total) || 0;
@@ -2821,9 +2829,15 @@ if (USE_NODEJS_QUESTIONS) {
         const score = total > 0 ? Math.round((correct / total) * 100) / 10 : 0; // 0–10 scale
 
         // Recommendations: weakest topics + difficulty-level hints
+        // Loại bỏ topic markers nội bộ (wayground-import / latex-import / ...)
+        const INTERNAL_TOPICS_REC = new Set([
+          'wayground-import', 'latex-import', 'pdf-import',
+          'ai-generated', 'manual', 'unknown',
+        ]);
         const recommendations = [];
         const weakTopics = Object.entries(byTopic)
-          .filter(([_, v]) => v.total >= 2 && v.accuracy < 0.6)
+          .filter(([t, v]) => v.total >= 2 && v.accuracy < 0.6
+            && t && !INTERNAL_TOPICS_REC.has(String(t).toLowerCase()))
           .sort((a, b) => a[1].accuracy - b[1].accuracy)
           .slice(0, 3)
           .map(([topic]) => topic);
@@ -6594,7 +6608,9 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
                 "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
              VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,true,false,'active',$10,$11,$11)`,
             [
-              qid, 'latex-import', subject || 'Vật lí', String(grade || '11'),
+              qid,
+              (q.topic && String(q.topic).trim()) || subject || 'Vật lí',
+              subject || 'Vật lí', String(grade || '11'),
               String(q.questionType || 'MULTIPLE_CHOICE'),
               String(q.content || ''),
               Array.isArray(q.options) ? q.options.map(String) : [],

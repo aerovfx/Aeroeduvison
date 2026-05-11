@@ -837,43 +837,8 @@ export default function ExamPrepPage() {
               ) : (
                 <>
                   {/* Exam Matrices */}
-                  {examMatrices.length > 0 && (
-                    <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
-                      <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-[hsl(175,80%,55%)]" />
-                        Ma Trận Đề ({examMatrices.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {examMatrices.map((m) => (
-                          <div key={m.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all gap-2">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white/85">{m.name}</h4>
-                              <p className="text-xs text-white/40 mt-1">
-                                {m.subject} | {m.grade} | {m.examType} | {m._count?.selectedQuestions || m.totalQuestions} câu | {m.duration}p
-                              </p>
-                              {m.user?.name && <p className="text-xs text-white/30 mt-0.5">GV: {m.user.name}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <QuickScanQr
-                                variant="compact"
-                                accent="cyan"
-                                title={`Quét QR — ${m.name}`}
-                                downloadName={`qr-matrix-${m.id}.png`}
-                                targetUrl={`${window.location.origin}/student/exam-prep?startExam=${m.id}&type=matrix`}
-                              />
-                              <button
-                                onClick={() => startFromTeacherExam(m.id, "matrix")}
-                                disabled={loading}
-                                className="px-3 py-1.5 rounded-lg bg-[hsl(175,80%,40%)] hover:bg-[hsl(175,80%,45%)] text-white text-xs font-medium transition-all disabled:opacity-50"
-                              >
-                                Làm bài
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Mục "Ma Trận Đề" đã ẩn — học sinh chỉ thấy đề hoàn chỉnh
+                      do giáo viên xuất bản, không phải template ma trận. */}
 
                   {/* Teacher Exams */}
                   {teacherExams.length > 0 && (
@@ -914,7 +879,7 @@ export default function ExamPrepPage() {
                     </div>
                   )}
 
-                  {teacherExams.length === 0 && examMatrices.length === 0 && (
+                  {teacherExams.length === 0 && (
                     <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-12 text-center">
                       <GraduationCap className="h-12 w-12 text-white/15 mx-auto mb-3" />
                       <p className="text-white/40 text-sm">Chưa có đề thi nào từ giáo viên.</p>
@@ -926,22 +891,32 @@ export default function ExamPrepPage() {
             </div>
           )}
 
-          {/* Weak topics warning */}
-          {stats && (stats.weakTopics?.length ?? 0) > 0 && (
+          {/* Weak topics warning — filter ra các topic markers nội bộ */}
+          {stats && (() => {
+            const INTERNAL_TOPICS = new Set([
+              'wayground-import', 'latex-import', 'pdf-import',
+              'ai-generated', 'manual', 'unknown', '',
+            ])
+            const cleanTopics = (stats.weakTopics ?? []).filter(
+              (t) => t && !INTERNAL_TOPICS.has(String(t).toLowerCase())
+            )
+            if (cleanTopics.length === 0) return null
+            return (
             <div className="bg-red-500/5 backdrop-blur-xl rounded-2xl border border-red-500/10 p-5">
               <h3 className="font-semibold text-red-400 text-sm mb-2 flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 Chủ đề cần ôn tập
               </h3>
               <div className="flex flex-wrap gap-2">
-                {(stats.weakTopics ?? []).map((t) => (
+                {cleanTopics.map((t) => (
                   <span key={t} className="px-3 py-1 rounded-lg bg-red-500/10 text-red-300 text-xs border border-red-500/15">
                     {t}
                   </span>
                 ))}
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Community Stats */}
           <CommunityStatsPanel
