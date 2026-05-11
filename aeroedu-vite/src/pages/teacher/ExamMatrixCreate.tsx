@@ -21,6 +21,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Save, Loader2, Plus, Trash2, BookOpen, Hash, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
+import { DocRef } from '@/components/docs/DocRef'
 
 interface Section {
   key: 'I' | 'II' | 'III' | 'IV'
@@ -212,11 +213,14 @@ export default function ExamMatrixCreatePage() {
           </button>
         </div>
 
-        <h1 className="text-2xl font-bold mb-1">{isEditMode ? 'Chỉnh sửa Ma Trận Đề' : 'Tạo Ma Trận Đề'}</h1>
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl font-bold">{isEditMode ? 'Chỉnh sửa Ma Trận Đề' : 'Tạo Ma Trận Đề'}</h1>
+          <DocRef slug="exam-matrix" term="Hướng dẫn" tooltip="Cách cấu hình ma trận đề" />
+        </div>
         <p className="text-sm text-[hsl(var(--muted-foreground))] mb-6">
           {loading
             ? <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang tải dữ liệu ma trận…</span>
-            : 'Cấu trúc chuẩn Bộ GD&ĐT 2025: 4 phần · 24 câu · 10 điểm · tỉ lệ 40% NB / 30% TH / 30% VD+VDC'}
+            : <>Cấu trúc chuẩn Bộ GD&amp;ĐT 2025: 4 phần · 24 câu · 10 điểm · tỉ lệ 40% NB / 30% TH / 30% VD+VDC — xem <DocRef slug="glossary" anchor="bloom" term="thang Bloom" /></>}
         </p>
 
         {/* Tabs */}

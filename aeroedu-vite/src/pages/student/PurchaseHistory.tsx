@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Receipt, BookOpen, Clock, DollarSign } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
 import { LearningNav } from '@/components/student/LearningNav'
+import { DocRef } from '@/components/docs/DocRef'
 
 function fmt(date: string) {
   return new Date(date).toLocaleDateString('vi-VN', {
@@ -38,6 +39,9 @@ export default function PurchaseHistory() {
             <Receipt className="w-10 h-10 text-gray-500" />
           </div>
           <p className="text-gray-400">Chưa có giao dịch nào.</p>
+          <p className="text-xs text-gray-500">
+            Xem <DocRef slug="payment" anchor="how-to-buy" term="cách mua gói" /> để bắt đầu.
+          </p>
         </div>
       ) : (
         <div className="space-y-3">

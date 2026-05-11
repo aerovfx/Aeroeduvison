@@ -175,6 +175,10 @@ const CoursePlayerPage = lazy(() => import('@/pages/learning/CoursePlayer'))
 const ProfileBasicInfoPage = lazy(() => import('@/pages/profile/BasicInfo'))
 const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
 
+// ── Docs / Hướng dẫn sử dụng ─────────────────────────────────
+const DocsIndexPage   = lazy(() => import('@/pages/docs/DocsIndex'))
+const DocsArticlePage = lazy(() => import('@/pages/docs/DocsArticle'))
+
 // ── Admin Pages (đã port) ────────────────────────────────────
 const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
 const AdminStudents         = lazy(() => import('@/pages/admin/Students'))
@@ -213,6 +217,10 @@ export function AppRouter() {
         <Route path="/cookies"        element={<PageFallback />} />
         <Route path="/privacy"        element={<PageFallback />} />
         <Route path="/terms"          element={<PageFallback />} />
+
+        {/* ── DOCS / Hướng dẫn sử dụng (public — ai cũng đọc được) ── */}
+        <Route path="/docs"           element={<DocsIndexPage />} />
+        <Route path="/docs/:slug"     element={<DocsArticlePage />} />
 
         {/* ══════════════════════════════════════════════════
             AUTH ROUTES (không cần login)

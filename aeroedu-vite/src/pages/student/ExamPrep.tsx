@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { formatRelativeTime } from "@/lib/utils"
 import { QuickScanQr } from "@/components/common/QuickScanQr"
 import { MathText } from "@/components/common/MathText"
+import { DocRef } from "@/components/docs/DocRef"
 import type {
   PracticeExam,
   GradeResult,
@@ -45,10 +46,15 @@ const selectClass = "w-full rounded-xl bg-black/25 backdrop-blur-sm border borde
 const inputClass = "w-full rounded-xl bg-black/25 border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 placeholder-white/30 focus:outline-none focus:border-[hsl(245,85%,65%)]/40"
 
 /* ─── Inline replacements ────────────────────────────── */
-function PageHeader({ title, description }: { title: string; description: string }) {
+function PageHeader({ title, description, docSlug, docAnchor }: { title: string; description: string; docSlug?: string; docAnchor?: string }) {
   return (
     <div className="px-6 py-5 border-b border-white/[0.06]">
-      <h1 className="text-xl font-bold text-white/90">{title}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-xl font-bold text-white/90">{title}</h1>
+        {docSlug && (
+          <DocRef slug={docSlug} anchor={docAnchor} term="Hướng dẫn" className="text-xs text-white/60 hover:text-white" />
+        )}
+      </div>
       {description && <p className="text-sm text-white/40 mt-0.5">{description}</p>}
     </div>
   )
@@ -668,7 +674,7 @@ export default function ExamPrepPage() {
   /* ─── RENDER: Home ────────────────────────────────── */
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Ôn Thi Thông Minh" description="Luyện tập với đề thi từ ngân hàng đề và bài kiểm tra của giáo viên" />
+      <PageHeader title="Ôn Thi Thông Minh" description="Luyện tập với đề thi từ ngân hàng đề và bài kiểm tra của giáo viên" docSlug="student-guide" docAnchor="exam-prep" />
 
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto space-y-5">

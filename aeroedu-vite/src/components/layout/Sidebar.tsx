@@ -87,6 +87,12 @@ const studentSections: RouteSection[] = [
       { icon: Users,    labelKey: 'routeContacts', href: '/dashboard/contacts' },
     ],
   },
+  {
+    titleKey: 'sectionHelp',
+    routes: [
+      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
+    ],
+  },
 ]
 
 const teacherSections: RouteSection[] = [
@@ -143,6 +149,12 @@ const teacherSections: RouteSection[] = [
       { icon: Calendar,     labelKey: 'routeCalendar',    href: '/teacher/calendar' },
     ],
   },
+  {
+    titleKey: 'sectionHelp',
+    routes: [
+      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
+    ],
+  },
 ]
 
 const adminSections: RouteSection[] = [
@@ -172,6 +184,12 @@ const adminSections: RouteSection[] = [
       { icon: Shield,   labelKey: 'routeOperations',   href: '/admin/operations' },
       { icon: Brain,    labelKey: 'routeModels',        href: '/admin/models' },
       { icon: Settings, labelKey: 'routeAdminSettings', href: '/admin/settings' },
+    ],
+  },
+  {
+    titleKey: 'sectionHelp',
+    routes: [
+      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
     ],
   },
 ]
