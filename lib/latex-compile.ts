@@ -128,13 +128,71 @@ async function runTectonic(cwd: string): Promise<{ success: boolean; stdout: str
 }
 
 /**
+ * Compile via remote Rust LaTeX service (Overleaf-style) when LATEX_SERVICE_URL is set.
+ * Posts to {URL}/compile/sync expecting a PDF binary in response.
+ */
+async function compileViaRemoteService(content: string, serviceUrl: string): Promise<CompileResult> {
+  const url = serviceUrl.replace(/\/$/, "") + "/compile/sync";
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+
+    if (!res.ok) {
+      let log = "";
+      try {
+        const data = await res.json();
+        log = data?.log ?? data?.error ?? "";
+      } catch {
+        log = await res.text().catch(() => "");
+      }
+      return {
+        error: `Remote LaTeX service returned ${res.status}. Document has compile errors.`,
+        code: "COMPILE_ERROR",
+        log,
+      };
+    }
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    return { pdf: buf };
+  } catch (err: any) {
+    const msg = String(err?.message ?? err);
+    return {
+      error: `Compile LaTeX server-side chưa khả dụng. Remote LaTeX service không phản hồi (${msg}).`,
+      code: "COMPILE_NOT_AVAILABLE",
+    };
+  }
+}
+
+/**
  * Compile LaTeX source to PDF.
- * Primary: local xelatex (firejail on Linux). Fallback: tectonic. No Docker.
+ * Primary: remote Rust LaTeX service (if LATEX_SERVICE_URL set) → else local xelatex (firejail on Linux) → tectonic fallback.
  */
 export async function compileLatexToPdf(content: string): Promise<CompileResult> {
   const tmpDir = join(process.cwd(), "tmp", "latex-compile", `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 
+  const serviceUrl = process.env.LATEX_SERVICE_URL?.trim();
+  if (serviceUrl) {
+    return compileViaRemoteService(content, serviceUrl);
+  }
+
   try {
+    const [hasXelatex, hasTectonic] = await Promise.all([
+      commandExists("xelatex"),
+      commandExists("tectonic"),
+    ]);
+    if (!hasXelatex && !hasTectonic) {
+      return {
+        error: `Compile LaTeX server-side chưa khả dụng. LaTeX engine chưa được cài đặt. ${getInstallHint()}`,
+        code: "COMPILE_NOT_AVAILABLE",
+      };
+    }
+
     await mkdir(tmpDir, { recursive: true });
     const mainPath = join(tmpDir, "main.tex");
     const outPath = join(tmpDir, "main.pdf");
@@ -181,16 +239,16 @@ export async function compileLatexToPdf(content: string): Promise<CompileResult>
       return { pdf, log };
     } catch {
       const hint = getInstallHint();
-      const [hasXelatex, hasTectonic] = await Promise.all([
+      const [hasXelatexNow, hasTectonicNow] = await Promise.all([
         commandExists("xelatex"),
         commandExists("tectonic"),
       ]);
-      const isNotFound = !hasXelatex && !hasTectonic;
+      const isNotFound = !hasXelatexNow && !hasTectonicNow;
       return {
         error: isNotFound
-          ? `LaTeX engine not installed. ${hint}`
+          ? `Compile LaTeX server-side chưa khả dụng. LaTeX engine chưa được cài đặt. ${hint}`
           : "Compilation failed. XeLaTeX is available but the document has compile errors.",
-        code: "COMPILE_ERROR",
+        code: isNotFound ? "COMPILE_NOT_AVAILABLE" : "COMPILE_ERROR",
         log,
       };
     }

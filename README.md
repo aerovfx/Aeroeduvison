@@ -11,18 +11,18 @@ AeroeduVision is a Next.js education platform with a Strangler migration path fr
 - DB: PostgreSQL + Prisma
 
 ### Strangler Services (Rust)
-- `rust-services/vector-sim-service` (port `8091`)
-  - `POST /v1/vector-similarity`
-  - `DELETE /v1/vector-similarity`
-  - `DELETE /v1/vector-similarity/cache`
-- `rust-services/aero-backend` (port `8090`)
+All Rust services live in a single Cargo workspace at the repo root. See `rust-services/README.md` for the full port map and `docs/STRANGLER_PATTERN_RUST.md` for migration status.
+
+- `rust-services/aero-backend` (port `8090`) — compute-heavy bridge
+  - `POST/DELETE /api/vector-similarity` (was `vector-sim-service`, merged)
   - `POST/GET /api/ocr-grading`
   - `POST /api/ocr/auto-grade`
   - `POST /api/ocr/upload`
   - `POST /api/ocr-process`
   - `POST /api/llm-grading`
   - `POST /api/assignments/grade-ocr`
-  - plus scaffold fallback for unmigrated APIs
+  - scaffold fallback for unmigrated APIs
+- `latex-compiler` (port `8080`) — Overleaf-style LaTeX → PDF (set `LATEX_SERVICE_URL`)
 
 ### Desktop
 - `desktop-current-app`: Electron wrapper for current web app

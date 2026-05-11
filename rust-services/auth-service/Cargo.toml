@@ -1,25 +1,26 @@
 [package]
 name = "auth-service"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 description = "Authentication service for Aeroeduvison - handles login, register, 2FA, JWT"
 
 [dependencies]
 # Web framework
-axum = { version = "0.7", features = ["macros"] }
+axum = { workspace = true, features = ["macros"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { workspace = true, features = ["cors", "trace"] }
 
 # Async runtime
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync"] }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Database
 # TLS required when DATABASE_URL has sslmode=require (e.g. cloud Postgres)
-sqlx = { version = "0.7", features = ["runtime-tokio", "runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal"] }
+sqlx = { workspace = true, features = ["runtime-tokio-rustls", "bigdecimal"] }
 
 # Password hashing
 argon2 = "0.5"
@@ -32,21 +33,21 @@ jsonwebtoken = "9"
 totp-rs = { version = "5", features = ["gen_secret"] }
 
 # Utilities
-uuid = { version = "1", features = ["v4", "serde"] }
-chrono = { version = "0.4", features = ["serde"] }
+uuid = { workspace = true, features = ["serde"] }
+chrono = { workspace = true }
 once_cell = "1"
 thiserror = "2"
 rand = "0.8"
 
 # HTTP client
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { workspace = true }
 
 # Email sending (lettre)
 lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "builder", "smtp-transport"] }
 
 # Logging
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Configuration
 dotenvy = "0.15"
