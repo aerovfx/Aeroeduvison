@@ -6423,14 +6423,81 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
     }
   });
 
-  // POST /api/latex-projects/compile — compile LaTeX → PDF
-  // Cloud Run không có pdflatex preinstall; trả 501 + gợi ý.
-  // Frontend có thể dùng Overleaf hoặc render preview qua KaTeX/MathJax client-side.
-  app.post('/api/latex-projects/compile', (_req, res) => {
-    res.status(501).json({
-      error: 'Compile LaTeX server-side chưa khả dụng',
-      hint: 'Hãy export file .tex rồi compile với Overleaf (https://overleaf.com) hoặc tectonic local.',
-    });
+  // POST /api/latex-projects/compile — compile LaTeX → PDF qua tectonic
+  // (tectonic 0.15 single binary, cài trong Dockerfile, in-house không gửi
+  // nội dung LaTeX của user ra service ngoài).
+  // Body: { projectId?, content }
+  // Response: PDF binary HOẶC JSON {error, log} nếu compile fail.
+  app.post('/api/latex-projects/compile', async (req, res) => {
+    const { spawn } = require('child_process');
+    const fs = require('fs').promises;
+    const fsSync = require('fs');
+    const os = require('os');
+    const path = require('path');
+
+    const content = String(req.body?.content || '').trim();
+    if (!content) return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
+    if (content.length > 200_000) {
+      return res.status(413).json({ error: 'File LaTeX quá lớn (>200KB)' });
+    }
+
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'latex-'));
+    const inFile = path.join(tmpDir, 'input.tex');
+    const outFile = path.join(tmpDir, 'input.pdf');
+    const logFile = path.join(tmpDir, 'input.log');
+
+    try {
+      await fs.writeFile(inFile, content, 'utf8');
+
+      // Spawn tectonic. --keep-logs để có log khi fail. --reruns để xử lý
+      // cross-references (TOC, cite). --chatter minimal để giảm noise.
+      await new Promise((resolve, reject) => {
+        const proc = spawn('tectonic',
+          ['--outdir', tmpDir, '--keep-logs', '--reruns', '1',
+           '--chatter', 'minimal', inFile],
+          { stdio: ['ignore', 'pipe', 'pipe'], timeout: 90_000 }
+        );
+        let stderr = '';
+        proc.stdout.on('data', d => stderr += d.toString());
+        proc.stderr.on('data', d => stderr += d.toString());
+        proc.on('close', code => {
+          if (code === 0) resolve();
+          else {
+            // Đọc thêm log file nếu có để báo chi tiết hơn
+            let extraLog = '';
+            try { extraLog = fsSync.readFileSync(logFile, 'utf8').slice(-3000); } catch {}
+            reject(new Error(`tectonic exit ${code}\n${stderr}\n--- log tail ---\n${extraLog}`));
+          }
+        });
+        proc.on('error', err => reject(err));
+      });
+
+      const pdf = await fs.readFile(outFile);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', pdf.length);
+      res.setHeader('Cache-Control', 'no-store');
+      console.log(`[latex:compile] ✅ pdf=${pdf.length}B src=${content.length}B`);
+      return res.end(pdf);
+    } catch (err) {
+      console.error('[latex:compile] ❌', err.message.slice(0, 300));
+      const isTimeout = /ETIMEDOUT|timeout/i.test(err.message);
+      const isNoBin = /ENOENT|not found/i.test(err.message);
+      if (isNoBin) {
+        return res.status(501).json({
+          error: 'Tectonic chưa được cài trong runtime',
+          hint: 'Container Docker cần install tectonic. Liên hệ admin.',
+        });
+      }
+      return res.status(isTimeout ? 504 : 422).json({
+        error: isTimeout
+          ? 'Biên dịch timeout (>90s) — file quá phức tạp'
+          : 'Biên dịch thất bại',
+        log: err.message.slice(0, 5000),
+      });
+    } finally {
+      // Dọn temp dir bất kể success/fail
+      fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
   });
 }
 // LATEX_SERVICE_URL: DEPRECATED — built-in handlers thay thế.

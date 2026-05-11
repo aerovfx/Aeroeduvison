@@ -70,6 +70,18 @@ RUN set -eu; \
 FROM node:20-slim AS runner
 WORKDIR /app
 
+# ── Tectonic (LaTeX engine) — single binary ~30MB, lazy-fetch packages từ CTAN.
+# An toàn: nội dung LaTeX của user compile in-house, không gửi ra service ngoài.
+# Cache dir đặt tại /var/cache/tectonic (chown cho appuser sau).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl xz-utils && \
+    curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz" \
+      | tar xz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/tectonic && \
+    apt-get purge -y curl xz-utils && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /var/cache/tectonic
+
 # Copy Express server + lib modules (auth, payment, telegram, fal.ai, email)
 # Built-in Node.js handlers cần các module này — không có sẽ crash startup.
 COPY server.cjs ./
@@ -93,8 +105,20 @@ COPY --from=vite-builder /app/dist ./dist
 # Non-root user
 RUN groupadd --system --gid 1001 appuser && \
     useradd --system --uid 1001 --gid appuser appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /var/cache/tectonic
+
+# Tectonic cache location for runtime
+ENV TECTONIC_CACHE_DIR=/var/cache/tectonic
+
 USER appuser
+
+# Prewarm tectonic cache (download ~5MB packages cho hello world).
+# Lần compile đầu của user sẽ nhanh hơn nhiều (chỉ ~5s thay vì 30-60s).
+RUN echo '\documentclass{article}\begin{document}prewarm tectonic cache\end{document}' \
+      > /tmp/prewarm.tex && \
+    tectonic --outdir /tmp /tmp/prewarm.tex && \
+    rm -f /tmp/prewarm.tex /tmp/prewarm.pdf /tmp/prewarm.log
 
 EXPOSE 8080
 
