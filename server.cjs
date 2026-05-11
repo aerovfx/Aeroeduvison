@@ -2583,14 +2583,30 @@ if (USE_NODEJS_QUESTIONS) {
           try {
             const { generateQuestionsByTopic } = require('./lib/fal-quiz-extractor.cjs');
             const { randomUUID: qbUUID } = require('crypto');
-            console.log(`[exam-prep:create] 🤖 AI generate ${missing} câu cho ${subject}-${grade}${topic ? `-${topic}` : ''}`);
-            const result = await generateQuestionsByTopic({
-              subject, grade,
-              topic: topic || `${subject} lớp ${grade}`,
-              count: missing,
-              difficulty: 'medium',
-            });
-            const newQs = result.questions || [];
+            // Chia batch nhỏ (max 10 câu/lần) để tránh fal.ai timeout khi
+            // generate nhiều câu cùng lúc. 30 câu = 3 batch song song.
+            const BATCH = 10;
+            const batches = [];
+            for (let i = 0; i < missing; i += BATCH) {
+              batches.push(Math.min(BATCH, missing - i));
+            }
+            console.log(`[exam-prep:create] 🤖 AI generate ${missing} câu cho ${subject}-${grade}${topic ? `-${topic}` : ''} (${batches.length} batches)`);
+            // Promise.allSettled — batch fail không kéo các batch khác fail
+            const results = await Promise.allSettled(
+              batches.map(count => generateQuestionsByTopic({
+                subject, grade,
+                topic: topic || `${subject} lớp ${grade}`,
+                count, difficulty: 'medium',
+              }))
+            );
+            const newQs = [];
+            for (const r of results) {
+              if (r.status === 'fulfilled' && r.value?.questions) {
+                newQs.push(...r.value.questions);
+              } else if (r.status === 'rejected') {
+                console.warn(`[exam-prep:create] batch fail: ${r.reason?.message?.slice(0, 100) || r.reason}`);
+              }
+            }
 
             // INSERT từng câu vào Question table (lưu cho lần sau)
             const now = new Date();
