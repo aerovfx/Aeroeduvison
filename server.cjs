@@ -5721,8 +5721,27 @@ if (!USE_NODEJS_QUESTIONS) {
   });
 }
 
-// /api/online-exam-room — phòng thi online. Built-in trả empty list.
+// ══════════════════════════════════════════════════════════════
+// ONLINE EXAM ROOM — phòng thi online (scheduled). Khác với LIVE quiz
+// rooms ở /api/quiz-rooms (instant + code 6 chữ số). Đây là phòng có:
+//   - Lịch thi (schedule: start, end, duration)
+//   - Access code optional
+//   - Học sinh join trước giờ + chờ activation
+//
+// Đang phát triển — hiện stub empty/501 để UI /teacher/online-exam-room
+// không 503. Thực thi đầy đủ sẽ làm sau.
+// ══════════════════════════════════════════════════════════════
 app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
+app.get('/api/online-exam-room/:id/schedule', (req, res) =>
+  res.json({ roomId: req.params.id, schedules: [] }));
+app.post('/api/online-exam-room', (_req, res) =>
+  res.status(501).json({ error: 'Tạo phòng thi online đang phát triển — dùng LIVE quiz ở /teacher/exams/:id/play để mở phòng nhanh.' }));
+app.post('/api/online-exam-room/join', (_req, res) =>
+  res.status(501).json({ error: 'Join phòng online đang phát triển — học sinh có thể vào /play để join LIVE quiz qua mã số.' }));
+app.post('/api/online-exam-room/:id/schedule', (_req, res) =>
+  res.status(501).json({ error: 'Đặt lịch thi đang phát triển' }));
+app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
+  res.status(501).json({ error: 'Kích hoạt lịch thi đang phát triển' }));
 
 // ══════════════════════════════════════════════════════════════
 // CAREER PROFILE — lưu kết quả bài test hướng nghiệp (MBTI + Holland)
