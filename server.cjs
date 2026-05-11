@@ -5338,6 +5338,8 @@ if (USE_NODEJS_QUESTIONS) {
   });
 
   // GET /api/exam-matrices/:id
+  // Parse description JSON back → {description, schoolYear, sections, topics}
+  // (lưu ở POST). Nếu description không phải JSON, giữ string thuần.
   app.get('/api/exam-matrices/:id', async (req, res) => {
     try {
       const userId = getMatrixUserId(req);
@@ -5347,35 +5349,65 @@ if (USE_NODEJS_QUESTIONS) {
         [req.params.id, userId]
       );
       if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy' });
-      return res.json(rows[0]);
+      const row = rows[0];
+      let meta = {};
+      if (row.description && typeof row.description === 'string') {
+        try {
+          const parsed = JSON.parse(row.description);
+          if (parsed && typeof parsed === 'object') meta = parsed;
+        } catch { meta = { description: row.description }; }
+      }
+      return res.json({ ...row, ...meta });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }
   });
 
   // POST /api/exam-matrices → tạo manual
+  // Body: {name, subject, grade, examType, duration, totalScore, totalQuestions,
+  //        type, schoolYear?, description?, sections?, topics?}
+  // sections + topics + description gói chung vào ExamMatrix.description (JSON)
+  // để không cần migrate schema (Prisma quản lý).
   app.post('/api/exam-matrices', async (req, res) => {
     try {
       const userId = getMatrixUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-      const { name, subject, grade, examType, duration, totalScore, totalQuestions, type } = req.body || {};
+      const {
+        name, subject, grade, examType, duration,
+        totalScore, totalQuestions, type,
+        schoolYear, description, sections, topics,
+      } = req.body || {};
       if (!name || !grade || !examType || !duration) {
         return res.status(400).json({ error: 'name + grade + examType + duration required' });
       }
+      // Pack metadata vào description JSON
+      const meta = {
+        description: description || '',
+        schoolYear: schoolYear || null,
+        sections: Array.isArray(sections) ? sections : [],
+        topics: Array.isArray(topics) ? topics : [],
+      };
       const id = matrixUUID();
       const now = new Date();
       const { rows } = await getMPool().query(
         `INSERT INTO "ExamMatrix"
           (id, name, subject, grade, "examType", duration, "totalScore",
            "totalQuestions", type, status, "userId", "createdAt", "updatedAt")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Hàng đợi',$10,$11,$11)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Hoạt động',$10,$11,$11)
          RETURNING *`,
         [id, String(name).slice(0, 200), subject || null, String(grade), String(examType),
          Number(duration) || 45, Number(totalScore) || 10,
-         Number(totalQuestions) || 0, type || 'Tạo mới', userId, now]
+         Number(totalQuestions) || 0, type || 'manual', userId, now]
       );
-      console.log(`[matrix:create] ✅ ${id} user=${userId}`);
-      return res.status(201).json(rows[0]);
+      // Try optional update description column với metadata JSON (nếu column tồn tại)
+      try {
+        await getMPool().query(
+          `UPDATE "ExamMatrix" SET description=$1 WHERE id=$2`,
+          [JSON.stringify(meta), id]
+        );
+      } catch { /* description column có thể không tồn tại — ignore */ }
+      console.log(`[matrix:create] ✅ ${id} user=${userId} sections=${meta.sections.length} topics=${meta.topics.length}`);
+      return res.status(201).json({ ...rows[0], ...meta, id });
     } catch (err) {
       console.error('[matrix:create] ❌', err.message);
       return res.status(500).json({ error: err.message });
