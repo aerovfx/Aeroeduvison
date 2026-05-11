@@ -4,7 +4,7 @@ Tập hợp microservices Rust thay thế dần Next.js API routes (Node.js) the
 
 ## Workspace
 
-Tất cả service ở dưới một Cargo workspace duy nhất tại `Aeroeduvison/Cargo.toml` (root). Workspace cũng bao gồm `latex-compiler/`.
+Tất cả service + `latex-compiler/` + `openfang-core/openfang-*` dưới một Cargo workspace duy nhất tại `Aeroeduvison/Cargo.toml` (root). Tổng cộng **15 members**.
 
 ```bash
 # Build toàn bộ workspace
@@ -14,16 +14,11 @@ cargo build --release --workspace
 # Build/chạy 1 service
 cargo run -p auth-service
 cargo run -p latex-compiler
+cargo run -p ai-service
 
 # Test
 cargo test --workspace
 ```
-
-> **Lưu ý**: `ai-service` hiện **bị loại khỏi workspace** (`exclude` trong root `Cargo.toml`) vì có path-dep tới `openfang-core/openfang-*` và `openfang-core/` là nested workspace riêng. Build standalone:
-> ```bash
-> cd rust-services/ai-service && cargo build
-> ```
-> Khi consolidate openfang-core vào workspace root, có thể đưa ai-service vào.
 
 ## Port Map
 

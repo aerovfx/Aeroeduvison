@@ -13,6 +13,7 @@ resolver = "2"
 members = [
     "rust-services/admin-service",
     "rust-services/aero-backend",
+    "rust-services/ai-service",
     "rust-services/auth-service",
     "rust-services/camera-iot-service",
     "rust-services/course-service",
@@ -22,13 +23,10 @@ members = [
     "rust-services/student-service",
     "rust-services/vector-sim-service",
     "latex-compiler",
+    "openfang-core/openfang-types",
+    "openfang-core/openfang-runtime",
+    "openfang-core/openfang-kernel",
 ]
-# ai-service is intentionally excluded: it depends on `openfang-core/openfang-*`
-# via path, and `openfang-core/Cargo.toml` is its own nested workspace. Including
-# ai-service here would create a "multiple workspace roots" conflict. To bring
-# ai-service into this workspace, consolidate openfang-core sub-crates into root
-# members and remove openfang-core/Cargo.toml's [workspace] section.
-exclude = ["rust-services/ai-service", "openfang-core"]
 
 [workspace.package]
 edition = "2021"
@@ -56,6 +54,10 @@ base64 = "0.21"
 num_cpus = "1"
 tempfile = "3"
 redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+async-trait = "0.1"
+futures = "0.3"
+thiserror = "2"
+ed25519-dalek = "2"
 
 # Build profile shared by all members.
 [profile.release]
