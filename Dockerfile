@@ -72,12 +72,17 @@ WORKDIR /app
 
 # ── Tectonic (LaTeX engine) — single binary ~30MB, lazy-fetch packages từ CTAN.
 # An toàn: nội dung LaTeX của user compile in-house, không gửi ra service ngoài.
-# Cache dir đặt tại /var/cache/tectonic (chown cho appuser sau).
+# Cài kèm:
+#   - fontconfig: XeLaTeX cần để tìm font theo NAME (vd "Latin Modern Roman")
+#   - fonts-lmodern + fonts-noto + fonts-noto-cjk: bộ font Unicode đầy đủ
+#     hỗ trợ Vietnamese diacritics (ổ, ố, ự, ỗ...)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils && \
+      ca-certificates curl xz-utils \
+      fontconfig fonts-lmodern fonts-noto-core && \
     curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz" \
       | tar xz -C /usr/local/bin && \
     chmod +x /usr/local/bin/tectonic && \
+    fc-cache -fv && \
     apt-get purge -y curl xz-utils && apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/* && \
     mkdir -p /var/cache/tectonic
