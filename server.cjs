@@ -7261,8 +7261,197 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   app.post('/api/questions/batch', okMsg);
 
   // ─ Exam matrix advanced ───────────────────────────────────
-  app.get('/api/exams/generate-from-matrix', notImpl('Sinh đề từ ma trận đang phát triển'));
-  app.post('/api/exams/generate-from-matrix', notImpl('Sinh đề từ ma trận đang phát triển'));
+  // GET /api/exams/generate-from-matrix?matrixId=... → preview
+  app.get('/api/exams/generate-from-matrix', async (req, res) => {
+    try {
+      const { Pool: GfmPool } = require('pg');
+      const gjwt = require('jsonwebtoken');
+      const url = process.env.DATABASE_URL;
+      if (!url) return res.status(503).json({ success: false, error: 'DB not available' });
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      let userId;
+      try { userId = gjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!').sub; }
+      catch { return res.status(401).json({ success: false, error: 'Invalid token' }); }
+      const matrixId = String(req.query.matrixId || '');
+      if (!matrixId) return res.status(400).json({ success: false, error: 'matrixId required' });
+      const pool = new GfmPool({ connectionString: url, max: 2, connectionTimeoutMillis: 5000 });
+      try {
+        const { rows } = await pool.query(
+          `SELECT * FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+          [matrixId, userId]
+        );
+        if (!rows[0]) return res.status(404).json({ success: false, error: 'Không tìm thấy ma trận' });
+        const m = rows[0];
+        let meta = {};
+        try { meta = JSON.parse(m.description || '{}'); } catch {}
+        return res.json({
+          success: true,
+          data: {
+            matrix: { id: m.id, name: m.name, subject: m.subject, grade: m.grade,
+                     totalQuestions: m.totalQuestions, totalScore: m.totalScore,
+                     ...meta },
+          },
+        });
+      } finally { await pool.end().catch(() => {}); }
+    } catch (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/exams/generate-from-matrix → tạo exam thật
+  // Body: { matrixId, title?, description?, useAIForMissing? }
+  app.post('/api/exams/generate-from-matrix', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const { Pool: GfmPool } = require('pg');
+      const gjwt = require('jsonwebtoken');
+      const { randomUUID: gfmUUID } = require('crypto');
+      const url = process.env.DATABASE_URL;
+      if (!url) return res.status(503).json({ success: false, error: 'DB not available' });
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      let userId;
+      try { userId = gjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!').sub; }
+      catch { return res.status(401).json({ success: false, error: 'Invalid token' }); }
+
+      const { matrixId, title: customTitle, useAIForMissing = true } = req.body || {};
+      if (!matrixId) return res.status(400).json({ success: false, error: 'matrixId required' });
+      const pool = new GfmPool({ connectionString: url, max: 5, connectionTimeoutMillis: 5000 });
+      try {
+        // 1. Load matrix + parse meta
+        const mRes = await pool.query(
+          `SELECT * FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+          [matrixId, userId]
+        );
+        if (!mRes.rows[0]) return res.status(404).json({ success: false, error: 'Không tìm thấy ma trận' });
+        const matrix = mRes.rows[0];
+        let meta = {};
+        try { meta = JSON.parse(matrix.description || '{}'); } catch {}
+        const topics = Array.isArray(meta.topics) ? meta.topics : [];
+        if (topics.length === 0) {
+          return res.status(400).json({ success: false, error: 'Ma trận chưa có chủ đề. Vui lòng cập nhật ma trận.' });
+        }
+
+        // 2. Cho mỗi topic + difficulty → pick từ Question table, missing → AI generate
+        const subject = matrix.subject || 'Vật lí';
+        const grade = matrix.grade || 'Khối 11';
+        const allPicked = [];  // {questionId, points, order}
+        const aiNeeded = [];   // {topic, difficulty, count}
+        const DIFF_MAP = { nb: 'easy', th: 'medium', vd: 'hard', vdc: 'hard' };
+
+        for (const topic of topics) {
+          const counts = topic.counts || {};
+          for (const [diffKey, n] of Object.entries(counts)) {
+            const need = Number(n) || 0;
+            if (need <= 0) continue;
+            const dbDiff = DIFF_MAP[diffKey] || 'medium';
+            // Pick từ bank
+            const qRes = await pool.query(
+              `SELECT id FROM "Question"
+                WHERE subject=$1 AND grade=$2 AND difficulty=$3 AND topic=$4 AND status='Hoạt động'
+                ORDER BY RANDOM() LIMIT $5`,
+              [subject, grade, dbDiff, topic.name, need]
+            );
+            qRes.rows.forEach(r => allPicked.push({ questionId: r.id, points: 1 }));
+            const got = qRes.rows.length;
+            if (got < need) {
+              aiNeeded.push({ topic: topic.name, difficulty: dbDiff, count: need - got });
+            }
+          }
+        }
+
+        // 3. AI fill nếu missing + useAIForMissing
+        let aiAdded = 0;
+        if (aiNeeded.length > 0 && useAIForMissing) {
+          const { generateQuestionsByTopic } = require('./lib/fal-quiz-extractor.cjs');
+          console.log(`[generate-from-matrix] 🤖 AI fill ${aiNeeded.length} groups for matrix ${matrixId.slice(0,8)}`);
+          const tasks = aiNeeded.map(g => generateQuestionsByTopic({
+            subject, grade, topic: g.topic, count: g.count, difficulty: g.difficulty,
+          }).catch(e => ({ questions: [], _err: e.message })));
+          const results = await Promise.all(tasks);
+          const now = new Date();
+          for (let gi = 0; gi < results.length; gi++) {
+            const group = aiNeeded[gi];
+            const newQs = results[gi]?.questions || [];
+            for (const q of newQs) {
+              const qid = gfmUUID();
+              try {
+                await pool.query(
+                  `INSERT INTO "Question"
+                     (id, topic, subject, grade, "questionType", difficulty, content,
+                      options, "correctAnswer", explanation, "qualityScore", "usageCount",
+                      "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,true,false,'Hoạt động',$11,$12,$12)`,
+                  [qid, group.topic, subject, grade,
+                   String(q.questionType || 'MULTIPLE_CHOICE'), group.difficulty,
+                   String(q.content || ''),
+                   Array.isArray(q.options) ? q.options.map(String) : [],
+                   String(q.correctAnswer || ''), q.explanation || '',
+                   userId, now]
+                );
+                allPicked.push({ questionId: qid, points: 1 });
+                aiAdded++;
+              } catch (e) {
+                console.warn(`[generate-from-matrix] insert AI question fail: ${e.message.slice(0, 100)}`);
+              }
+            }
+          }
+        }
+
+        if (allPicked.length === 0) {
+          return res.status(503).json({
+            success: false,
+            error: 'Không pick được câu nào (bank rỗng + AI fail). Hãy import câu vào ngân hàng trước.',
+          });
+        }
+
+        // 4. Tạo Exam + ExamQuestion (transaction)
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          const examId = gfmUUID();
+          const now = new Date();
+          const examTitle = customTitle || `${matrix.name} — Đề thi`;
+          const examDesc = JSON.stringify({
+            subject, grade: String(grade).replace(/^Khối\s+/, ''),
+            source: 'from-matrix', matrixId,
+            notes: `Sinh từ ma trận: ${matrix.name}. ${aiAdded > 0 ? `AI bổ sung ${aiAdded} câu.` : ''}`,
+            public: false,
+            publishedAt: now.toISOString(),
+          });
+          await client.query(
+            `INSERT INTO "Exam"
+               (id, title, description, "examType", duration, "totalScore",
+                "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
+             VALUES ($1,$2,$3,$4,$5,$6,$7,'Nháp',$8,$9,$10,$10)`,
+            [examId, examTitle, examDesc,
+             matrix.examType || 'Trắc nghiệm', matrix.duration || 45,
+             matrix.totalScore || 10, allPicked.length, matrixId, userId, now]
+          );
+          for (let i = 0; i < allPicked.length; i++) {
+            await client.query(
+              `INSERT INTO "ExamQuestion" (id, "examId", "questionId", "order", points)
+               VALUES ($1,$2,$3,$4,$5)`,
+              [gfmUUID(), examId, allPicked[i].questionId, i + 1, allPicked[i].points]
+            );
+          }
+          await client.query('COMMIT');
+          console.log(`[generate-from-matrix] ✅ matrix=${matrixId.slice(0,8)} → exam=${examId.slice(0,8)} (${allPicked.length}Q, AI+${aiAdded}, ${Date.now()-t0}ms)`);
+          return res.json({
+            success: true,
+            data: { examId, totalQuestions: allPicked.length, aiAdded },
+          });
+        } catch (txErr) {
+          await client.query('ROLLBACK');
+          throw txErr;
+        } finally { client.release(); }
+      } finally { await pool.end().catch(() => {}); }
+    } catch (err) {
+      console.error('[generate-from-matrix] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
   app.post('/api/ai/exam/generate-from-matrix', notImpl());
   app.post('/api/ai/exam/generate-multiple-variants', notImpl());
 
