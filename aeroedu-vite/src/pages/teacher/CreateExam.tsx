@@ -5,7 +5,7 @@
  * Tab 1 — Tạo thủ công  (form cũ)
  * Tab 2 — Nhập từ PDF   (upload PDF + phiếu trả lời tương tác)
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Clock, BookOpen, AlignLeft,
@@ -821,7 +821,47 @@ function PdfImportTab({
 export default function CreateExamPage() {
   const navigate = useNavigate()
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'pdf'>('manual')
+  const [activeTab, setActiveTab] = useState<'manual' | 'matrix' | 'pdf'>('manual')
+
+  // ── Matrix tab state ──────────────────────────────────
+  const [matrices, setMatrices] = useState<Array<{ id: string; name: string; subject?: string; grade?: string; totalQuestions?: number }>>([])
+  const [matricesLoading, setMatricesLoading] = useState(false)
+  const [selectedMatrixId, setSelectedMatrixId] = useState<string | null>(null)
+  const [matrixTitle, setMatrixTitle] = useState('')
+  const [useAIForMissing, setUseAIForMissing] = useState(true)
+  const [generatingFromMatrix, setGeneratingFromMatrix] = useState(false)
+
+  // Load matrices khi switch sang tab matrix
+  useEffect(() => {
+    if (activeTab !== 'matrix' || matrices.length > 0) return
+    setMatricesLoading(true)
+    api.get<{ matrices: typeof matrices }>('/exam-matrices')
+      .then(r => setMatrices(r.data?.matrices || []))
+      .catch(() => toast.error('Không tải được danh sách ma trận'))
+      .finally(() => setMatricesLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const generateFromMatrix = async () => {
+    if (!selectedMatrixId) { toast.error('Chọn 1 ma trận trước'); return }
+    setGeneratingFromMatrix(true)
+    const t = toast.loading('Đang sinh đề từ ma trận (có thể mất 30-90s)…')
+    try {
+      const r = await api.post<{ data: { examId: string; totalQuestions: number; aiAdded: number } }>(
+        '/exams/generate-from-matrix',
+        { matrixId: selectedMatrixId, title: matrixTitle.trim() || undefined, useAIForMissing }
+      )
+      const d = r.data.data
+      toast.success(
+        `✅ Đã tạo đề ${d.totalQuestions} câu${d.aiAdded > 0 ? ` (AI bổ sung ${d.aiAdded})` : ''}`,
+        { id: t, duration: 4000 }
+      )
+      setTimeout(() => navigate(`/teacher/exams/${d.examId}/edit`), 600)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Lỗi sinh đề', { id: t })
+    } finally { setGeneratingFromMatrix(false) }
+  }
 
   const [form, setForm] = useState<CreateExamForm>({
     title:          '',
@@ -926,6 +966,7 @@ export default function CreateExamPage() {
         }}>
           {([
             { key: 'manual', label: '✏️  Tạo thủ công' },
+            { key: 'matrix', label: '📐  Từ ma trận + ngân hàng' },
             { key: 'pdf',    label: '📄  Nhập từ PDF' },
           ] as const).map(tab => (
             <button
@@ -1119,6 +1160,107 @@ export default function CreateExamPage() {
         )}
 
         {/* ═══ TAB 2: PDF Import ═══════════════════════════════ */}
+        {/* ═══ TAB 2: From Matrix + Bank ═══════════════════════ */}
+        {activeTab === 'matrix' && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* LEFT: Matrix selector */}
+            <div className="col-span-12 lg:col-span-8">
+              <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: D.text }}>
+                  Chọn ma trận đề
+                </h3>
+                <p style={{ fontSize: 12, color: D.muted, marginBottom: 16 }}>
+                  Đề thi sẽ được sinh tự động từ ngân hàng theo cấu trúc topics + difficulty của ma trận.
+                  Câu thiếu sẽ được AI bổ sung và lưu vào ngân hàng.
+                </p>
+
+                {matricesLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: D.muted }}>
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    Đang tải ma trận…
+                  </div>
+                ) : matrices.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <p style={{ color: D.muted, fontSize: 14, marginBottom: 12 }}>
+                      Bạn chưa có ma trận đề nào.
+                    </p>
+                    <button onClick={() => navigate('/teacher/exam-matrix/create')}
+                      style={{
+                        padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: D.purple, color: '#fff', fontWeight: 600, fontSize: 13,
+                      }}>
+                      Tạo ma trận đầu tiên →
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
+                    {matrices.map(m => (
+                      <button key={m.id} type="button"
+                        onClick={() => setSelectedMatrixId(m.id)}
+                        style={{
+                          textAlign: 'left', padding: 12, borderRadius: 10, cursor: 'pointer',
+                          background: selectedMatrixId === m.id ? 'rgba(124,58,237,0.15)' : 'transparent',
+                          border: `2px solid ${selectedMatrixId === m.id ? D.purple : D.border}`,
+                          transition: 'all 0.15s',
+                        }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: D.text, marginBottom: 4 }}>{m.name}</div>
+                        <div style={{ fontSize: 11, color: D.muted }}>
+                          {m.subject || '—'} · {m.grade || '—'} · {m.totalQuestions ?? 0} câu
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT: Config + generate */}
+            <div className="col-span-12 lg:col-span-4">
+              <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 20, position: 'sticky', top: 90 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: D.text }}>
+                  Tuỳ chọn
+                </h3>
+
+                <label style={{ fontSize: 12, color: D.muted, display: 'block', marginBottom: 4 }}>
+                  Tiêu đề đề thi (không bắt buộc)
+                </label>
+                <input type="text" value={matrixTitle}
+                  onChange={e => setMatrixTitle(e.target.value)}
+                  placeholder="Tự động: {tên ma trận} — Đề thi"
+                  style={{
+                    width: '100%', padding: 8, fontSize: 13,
+                    background: D.bg, border: `1px solid ${D.border}`, borderRadius: 6,
+                    color: D.text, marginBottom: 12,
+                  }} />
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: D.text, cursor: 'pointer', marginBottom: 16 }}>
+                  <input type="checkbox" checked={useAIForMissing}
+                    onChange={e => setUseAIForMissing(e.target.checked)} />
+                  <span>AI bổ sung câu thiếu trong ngân hàng</span>
+                </label>
+
+                <button onClick={generateFromMatrix}
+                  disabled={!selectedMatrixId || generatingFromMatrix}
+                  style={{
+                    width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none',
+                    background: !selectedMatrixId ? D.border : 'linear-gradient(90deg, #ec4899, #a855f7)',
+                    color: '#fff', fontWeight: 700, fontSize: 14, cursor: !selectedMatrixId ? 'not-allowed' : 'pointer',
+                    opacity: generatingFromMatrix ? 0.7 : 1,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                  {generatingFromMatrix
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang sinh đề…</>
+                    : '✨ Sinh đề từ ma trận'}
+                </button>
+
+                <p style={{ fontSize: 11, color: D.muted, marginTop: 12, textAlign: 'center', lineHeight: 1.4 }}>
+                  💡 Sau khi tạo, bạn có thể thêm câu thủ công + sửa từng câu trong trang chi tiết đề.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'pdf' && (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 lg:col-span-8">
