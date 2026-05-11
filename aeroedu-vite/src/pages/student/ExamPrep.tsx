@@ -5,7 +5,7 @@ import {
   XCircle, ChevronLeft, ChevronRight, RotateCcw, FileText,
   GraduationCap, BarChart3, History, Loader2, Search,
   Users, Medal, Sparkles, RefreshCw,
-  Rocket, Mountain, Gamepad2, Target, Zap, ArrowRight, QrCode,
+  Rocket, ArrowRight,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useQuery } from "@tanstack/react-query"
@@ -793,6 +793,14 @@ export default function ExamPrepPage() {
             orbEmoji="🪐"
           />
 
+          {/* ── QR Cover Banner — đưa mã QR ra làm hình bìa, hiển thị ngay top ── */}
+          <QuickScanQr
+            accent="emerald"
+            title="Quét QR để mở trang này trên điện thoại"
+            description="Mở camera điện thoại quét QR → vào thẳng trang ôn thi. Giáo viên có thể tải PNG để in dán bảng lớp, học sinh nào cũng tham gia nhanh."
+            downloadName="examprep-qr.png"
+          />
+
           {/* Level XP card — Meteor "Adelik Fratz" style */}
           <LevelXPCard />
 
@@ -1115,24 +1123,7 @@ export default function ExamPrepPage() {
             </div>
           )}
 
-          {/* ── QR scan (collapsed at bottom for less clutter) ─────── */}
-          <details className="rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
-            <summary className="cursor-pointer px-5 py-4 flex items-center justify-between text-white/80 font-semibold text-base hover:bg-white/[0.04]">
-              <span className="flex items-center gap-2">
-                <QrCode className="h-5 w-5 text-emerald-300" />
-                Quét QR để mở trên điện thoại
-              </span>
-              <span className="text-xs text-white/40">Hiện</span>
-            </summary>
-            <div className="p-5 pt-0">
-              <QuickScanQr
-                accent="emerald"
-                title="Quét QR để làm đề ngay trên điện thoại"
-                description="Mở camera điện thoại quét QR là vào thẳng trang ôn thi — không cần gõ link."
-                downloadName="examprep-qr.png"
-              />
-            </div>
-          </details>
+          {/* QR đã đưa lên đầu trang làm cover — xem trên top */}
 
           {/* Weak topics warning — filter ra các topic markers nội bộ */}
           {stats && (() => {
