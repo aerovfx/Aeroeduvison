@@ -6793,6 +6793,25 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   // ─ Openfang stub ─────────────────────────────────────────
   app.get('/api/openfang-service', emptyObj);
   app.post('/api/openfang-service/chat', notImpl('Service đang nâng cấp'));
+
+  // ─ Learning service stubs (UI gọi nhiều endpoint, BE Rust chưa có) ─
+  // Trả empty array/object để UI không crash. Khi cần thật → wire vào pg.
+  app.get('/api/learning/my-courses', (_req, res) => res.json({ courses: [] }));
+  app.get('/api/learning/purchase-history', (_req, res) => res.json({ history: [] }));
+  app.get('/api/learning/wishlist', (_req, res) => res.json({ wishlist: [] }));
+  app.post('/api/learning/wishlist/:courseId', okMsg);
+  app.delete('/api/learning/wishlist/:courseId', okMsg);
+  app.get('/api/learning/certificate/:courseId',
+    notImpl('Chứng chỉ chưa khả dụng — hoàn thành khoá học để nhận'));
+  app.get('/api/learning/course/:courseId/videos', (_req, res) => res.json({ videos: [] }));
+  app.get('/api/learning/course/:courseId/assets', (_req, res) => res.json({ assets: [] }));
+  app.get('/api/learning/course/:courseId/reviews', (_req, res) => res.json({ reviews: [] }));
+  app.post('/api/learning/course/:courseId/reviews', okMsg);
+  app.get('/api/learning/my-courses-activity', (_req, res) => res.json({ activity: [] }));
+  // Catch-all học sinh đăng ký khoá học, like, bookmark...
+  app.post('/api/learning/enroll/:courseId', okMsg);
+  app.post('/api/learning/like/:courseId', okMsg);
+  app.post('/api/learning/bookmark/:courseId', okMsg);
 }
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
