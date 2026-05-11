@@ -11,6 +11,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import api from '@/services/api'
+import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
 
 interface Message {
   id: string
@@ -28,6 +29,18 @@ const QUICK_PROMPTS = [
 ]
 
 export default function AiTutorPage() {
+  return (
+    <AiSubscriptionGate
+      feature="ai_tutor"
+      featureLabel="AI Tutor"
+      description="AI Tutor là gia sư AI 24/7 — giải thích bài tập, hướng dẫn từng bước, hỗ trợ mọi môn học."
+    >
+      <AiTutorPageInner />
+    </AiSubscriptionGate>
+  )
+}
+
+function AiTutorPageInner() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([
     {

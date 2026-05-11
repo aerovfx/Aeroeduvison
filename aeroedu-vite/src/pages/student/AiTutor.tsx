@@ -3,6 +3,7 @@ import { Send, Bot, User, Sparkles, Trash2, BookOpen, Settings, Loader2 } from '
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
+import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
 
 const D = {
   bg: '#0d0e17',
@@ -77,6 +78,18 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 export default function AiTutor() {
+  return (
+    <AiSubscriptionGate
+      feature="ai_tutor"
+      featureLabel="Gia Sư AI"
+      description="Gia Sư AI là trợ lý AI 24/7 — giải bài tập, giải thích khái niệm, ôn tập mọi môn học."
+    >
+      <AiTutorInner />
+    </AiSubscriptionGate>
+  )
+}
+
+function AiTutorInner() {
   const navigate = useNavigate()
   
   const [messages, setMessages] = useState<Message[]>([
