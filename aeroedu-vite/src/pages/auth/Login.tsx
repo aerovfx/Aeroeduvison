@@ -62,7 +62,13 @@ export default function LoginPage() {
   // callbackRef: keeps handleGoogleCredential current without re-initializing GSI
   const callbackRef = useRef<(r: { credential: string }) => void>(() => {})
 
-  const from = (location.state as { from?: Location })?.from?.pathname || '/dashboard'
+  // Preserve full intended URL incl. ?query và #hash (vd học sinh quét QR
+  // /student/exam-prep?startExam=ID&type=exam → cần giữ query để auto-start
+  // đề thi sau khi login).
+  const fromLocation = (location.state as { from?: { pathname?: string; search?: string; hash?: string } })?.from
+  const from = fromLocation
+    ? `${fromLocation.pathname || ''}${fromLocation.search || ''}${fromLocation.hash || ''}` || '/dashboard'
+    : '/dashboard'
 
   // ── Google GSI callback — nhận credential sau khi user chọn tài khoản ──
   const handleGoogleCredential = useCallback(
@@ -328,7 +334,8 @@ export default function LoginPage() {
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             {t('loginNoAccount')}{' '}
-            <Link to="/auth/register" className="text-[hsl(262,83%,58%)] font-medium hover:underline">
+            <Link to="/auth/register" state={location.state}
+              className="text-[hsl(262,83%,58%)] font-medium hover:underline">
               {t('loginRegisterLink')}
             </Link>
           </p>

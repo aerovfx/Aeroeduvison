@@ -2,7 +2,7 @@
  * Register Page — bilingual (VI / EN)
  */
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,6 +17,12 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
   const { register: registerUser } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  // Preserve intended URL (vd học sinh quét QR đề thi → ?startExam=...)
+  const fromLocation = (location.state as { from?: { pathname?: string; search?: string; hash?: string } })?.from
+  const from = fromLocation
+    ? `${fromLocation.pathname || ''}${fromLocation.search || ''}${fromLocation.hash || ''}` || '/dashboard'
+    : '/dashboard'
 
   const registerSchema = z.object({
     name:            z.string().min(2, t('validNameMin2')),
@@ -36,7 +42,7 @@ export default function RegisterPage() {
     setError(null)
     try {
       await registerUser(data.name, data.email, data.password)
-      navigate('/dashboard', { replace: true })
+      navigate(from, { replace: true })
     } catch (err: unknown) {
       type ApiErr = {
         response?: { status?: number; data?: { message?: string; error?: string } | string }
