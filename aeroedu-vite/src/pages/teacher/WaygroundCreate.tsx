@@ -81,11 +81,11 @@ const RESOURCES: Array<{
   icon: React.ComponentType<{ className?: string; size?: number }>
   enabled: boolean
 }> = [
-  { key: 'assessment',  label: 'Assessment',   desc: 'Quick & interactive questions',         color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)',  icon: ClipboardList, enabled: true },
-  { key: 'presentation',label: 'Presentation', desc: 'Slides with questions and whiteboard',  color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', icon: MessageSquare, enabled: false },
-  { key: 'video',       label: 'Video',        desc: 'Questions at key points in the video',  color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)',  icon: FileVideo,     enabled: false },
-  { key: 'passage',     label: 'Passage',      desc: 'Questions based on a passage',          color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)', icon: FileText,      enabled: false },
-  { key: 'flashcards',  label: 'Flashcards',   desc: 'Questions on front, answers on back',   color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.18)', icon: Layers,        enabled: false },
+  { key: 'assessment',  label: 'Đề kiểm tra',  desc: 'Câu hỏi tương tác nhanh',                 color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)',  icon: ClipboardList, enabled: true },
+  { key: 'presentation',label: 'Bài trình bày',desc: 'Slide có câu hỏi + bảng trắng',           color: '#f97316', bg: 'rgba(249, 115, 22, 0.15)', icon: MessageSquare, enabled: false },
+  { key: 'video',       label: 'Video',        desc: 'Câu hỏi tại các thời điểm trong video',   color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)',  icon: FileVideo,     enabled: false },
+  { key: 'passage',     label: 'Bài đọc',      desc: 'Câu hỏi dựa trên đoạn văn',               color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)', icon: FileText,      enabled: false },
+  { key: 'flashcards',  label: 'Thẻ học',      desc: 'Câu hỏi mặt trước, đáp án mặt sau',       color: '#7c3aed', bg: 'rgba(124, 58, 237, 0.18)', icon: Layers,        enabled: false },
 ]
 
 // ─────────────────────────────────────────────────────────────
@@ -264,9 +264,9 @@ export default function WaygroundCreatePage() {
               maxWidth: 640, margin: '0 auto 36px',
             }}>
               {[
-                { icon: Edit3,  label: 'Create',  sub: 'a resource', active: true },
-                { icon: Search, label: 'Search',  sub: 'for resources' },
-                { icon: Upload, label: 'Upload',  sub: '& enhance your content' },
+                { icon: Edit3,  label: 'Tạo mới',     sub: 'tài liệu đánh giá', active: true },
+                { icon: Search, label: 'Tìm kiếm',    sub: 'tài liệu có sẵn' },
+                { icon: Upload, label: 'Tải lên',     sub: 'tài liệu của bạn' },
               ].map((t) => (
                 <button key={t.label}
                   onClick={() => { /* all lead into chooser below */ }}
@@ -359,7 +359,7 @@ export default function WaygroundCreatePage() {
                 borderRadius: 8, padding: '8px 14px', cursor: 'pointer',
                 fontSize: 13, fontWeight: 600, color: D.text,
               }}>
-                {pdfFile ? 'Upload new document' : 'Select pages'}
+                {pdfFile ? 'Tải tài liệu khác' : 'Chọn file PDF'}
               </button>
             </div>
 
@@ -377,20 +377,20 @@ export default function WaygroundCreatePage() {
                   background: dragging ? D.accentSoft : 'transparent',
                 }}>
                 <Upload size={28} style={{ color: D.accent, marginBottom: 8 }} />
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>Drag & drop a PDF here</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Kéo & thả file PDF vào đây</div>
                 <div style={{ color: D.muted, fontSize: 13 }}>hoặc click để chọn file (≤ 25MB)</div>
               </div>
             )}
 
             {/* Mode toggle */}
             <p style={{ fontSize: 14, marginBottom: 12, fontWeight: 500 }}>
-              Document <strong>{extractMode === 'extract' ? 'contains questions' : 'is reference material'}</strong>.
-              {' '}Would you like to use them or generate new?
+              Tài liệu này <strong>{extractMode === 'extract' ? 'đã có sẵn câu hỏi' : 'là tài liệu tham khảo'}</strong>.
+              {' '}Bạn muốn trích xuất hay sinh câu hỏi mới?
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 28 }}>
               {[
-                { key: 'extract' as const,  label: 'Extract existing questions', icon: '📑', bg: 'rgba(249, 115, 22, 0.15)', color: '#f97316' },
-                { key: 'generate' as const, label: 'Generate new questions',     icon: '✨', bg: 'rgba(6, 182, 212, 0.15)',   color: '#06b6d4' },
+                { key: 'extract' as const,  label: 'Trích xuất câu hỏi có sẵn', icon: '📑', bg: 'rgba(249, 115, 22, 0.15)', color: '#f97316' },
+                { key: 'generate' as const, label: 'Sinh câu hỏi mới bằng AI',  icon: '✨', bg: 'rgba(6, 182, 212, 0.15)',   color: '#06b6d4' },
               ].map(opt => {
                 const active = extractMode === opt.key
                 return (
@@ -417,33 +417,33 @@ export default function WaygroundCreatePage() {
             </div>
 
             {/* Customize form */}
-            <p style={{ fontSize: 13, color: D.muted, marginBottom: 8 }}>Customize your assessment</p>
+            <p style={{ fontSize: 13, color: D.muted, marginBottom: 8 }}>Tuỳ chỉnh tài liệu đánh giá</p>
             <div style={{
               background: D.card, border: `1px solid ${D.border}`, borderRadius: 12,
               padding: 4, marginBottom: 28,
             }}>
-              <Row label="Title">
+              <Row label="Tiêu đề">
                 <input value={title} onChange={e => setTitle(e.target.value)}
                   placeholder="VD: Kiểm tra cuối học kỳ II — Vật lí 11"
                   style={inputCss}/>
               </Row>
-              <Row label="Subject">
+              <Row label="Môn học">
                 <NativeSelect value={subject} onChange={setSubject} options={[
                   'Vật lí', 'Toán', 'Hoá học', 'Sinh học',
                   'Ngữ văn', 'Tiếng Anh', 'Lịch sử', 'Địa lí',
                 ]} />
               </Row>
-              <Row label="Grade level">
+              <Row label="Khối lớp">
                 <NativeSelect value={grade} onChange={setGrade}
-                  options={['6','7','8','9','10','11','12']} suffix="th Grade" />
+                  options={['6','7','8','9','10','11','12']} suffix=" — Khối" />
               </Row>
-              <Row label="Output language">
+              <Row label="Ngôn ngữ đầu ra">
                 <NativeSelect value={language} onChange={setLanguage}
                   options={['Vietnamese', 'English']} />
               </Row>
-              <Row label="Duration (minutes)">
+              <Row label="Thời gian (phút)">
                 <NativeSelect value={String(duration)} onChange={v => setDuration(Number(v))}
-                  options={['15','30','45','60','90','120']} suffix=" mins" />
+                  options={['15','30','45','60','90','120']} suffix=" phút" />
               </Row>
             </div>
 
@@ -457,7 +457,7 @@ export default function WaygroundCreatePage() {
                   opacity: !pdfFile ? 0.5 : 1,
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}>
-                Create Resource <span style={{ fontSize: 16 }}>→</span>
+                Tạo tài liệu <span style={{ fontSize: 16 }}>→</span>
               </button>
             </div>
           </div>
@@ -475,7 +475,7 @@ export default function WaygroundCreatePage() {
                 position: 'absolute', top: -4, right: -4, color: D.accent,
               }} />
             </div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>Understanding Document...</div>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>Đang phân tích tài liệu…</div>
             <div style={{ color: D.muted, fontSize: 13, textAlign: 'center', maxWidth: 380, lineHeight: 1.55 }}>
               AI đang phân tích PDF, nhận diện câu hỏi & đáp án.<br/>
               Việc này có thể mất 10–60 giây tuỳ độ dài tài liệu.
@@ -515,16 +515,16 @@ export default function WaygroundCreatePage() {
                 <CheckCircle2 size={26} style={{ color: D.ok }} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{title || 'Untitled assessment'}</div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{title || 'Tài liệu chưa đặt tên'}</div>
                 <div style={{ color: D.muted, fontSize: 12, marginTop: 3 }}>
-                  Assessment · {subject} · Grade {grade} · {questions.length} questions · {totalPoints} Points
+                  Đề kiểm tra · {subject} · Khối {grade} · {questions.length} câu · {totalPoints} điểm
                   {meta?.tookMs && <> · {(meta.tookMs/1000).toFixed(1)}s</>}
                 </div>
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: D.muted, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox" checked={showAnswers}
                   onChange={e => setShowAnswers(e.target.checked)} />
-                Show answer options
+                Hiện đáp án
               </label>
               <button onClick={() => setStep('customize')} style={{
                 background: 'transparent', border: `1px solid ${D.border}`, borderRadius: 8,
@@ -540,7 +540,7 @@ export default function WaygroundCreatePage() {
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 {publishing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                {publishing ? 'Đang lưu...' : 'Publish'}
+                {publishing ? 'Đang lưu...' : 'Xuất bản'}
               </button>
             </div>
 

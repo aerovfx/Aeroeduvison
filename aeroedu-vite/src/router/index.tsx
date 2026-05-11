@@ -115,6 +115,7 @@ const ExamSheetPage         = lazy(() => import('@/pages/student/ExamSheet'))
 const ExamModesPage         = lazy(() => import('@/pages/student/ExamModes'))
 const ExamSoloPage          = lazy(() => import('@/pages/student/ExamSolo'))
 const ExamFlashcardsPage    = lazy(() => import('@/pages/student/ExamFlashcards'))
+const ExamMasteryPage       = lazy(() => import('@/pages/student/ExamMastery'))
 const PricingPage2          = lazy(() => import('@/pages/payment/Pricing'))
 const PaymentDetailPage     = lazy(() => import('@/pages/payment/PaymentDetail'))
 const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
@@ -237,6 +238,7 @@ export function AppRouter() {
         <Route path="/exam/:examId/modes"      element={<ExamModesPage />} />
         <Route path="/exam/:examId/solo"       element={<ExamSoloPage />} />
         <Route path="/exam/:examId/flashcards" element={<ExamFlashcardsPage />} />
+        <Route path="/exam/:examId/mastery"    element={<ExamMasteryPage />} />
         {/* /exam/:id (no mode) → bare redirect handler trong ExamModes */}
         <Route path="/exam/:examId"            element={<ExamModesPage />} />
 
@@ -411,8 +413,8 @@ export function AppRouter() {
               <Route path="/teacher/exam-generator"                element={<ExamGeneratorPage />} />
               <Route path="/teacher/exam-matrix/create"            element={<ExamMatrixCreatePage />} />
               <Route path="/teacher/exam-matrix/:id"               element={<ExamMatrixDetailPage />} />
-              <Route path="/teacher/exam-matrix/:id/edit"          element={<ExamMatrixDetailPage />} />
-              <Route path="/teacher/exam-matrix/:id/review"        element={<ExamMatrixDetailPage />} />
+              <Route path="/teacher/exam-matrix/:id/edit"          element={<ExamMatrixCreatePage />} />
+              <Route path="/teacher/exam-matrix/:id/review"        element={<ExamMatrixCreatePage />} />
               <Route path="/teacher/exam-preview/:examId"          element={<PageFallback />} />
               <Route path="/teacher/exam-reports"                  element={<ExamReportsPage />} />
               <Route path="/teacher/exams/create"                  element={<CreateExamPage />} />

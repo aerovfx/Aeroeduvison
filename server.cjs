@@ -5415,26 +5415,59 @@ if (USE_NODEJS_QUESTIONS) {
   });
 
   // PUT /api/exam-matrices/:id
+  // Accept: name, subject, grade, examType, duration, totalScore, totalQuestions,
+  //         status, type, sections[], topics[], schoolYear, description.
+  // sections + topics + schoolYear + description gói vào ExamMatrix.description
+  // JSON (giống POST), không cần migrate Prisma schema.
   app.put('/api/exam-matrices/:id', async (req, res) => {
     try {
       const userId = getMatrixUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getMPool();
+      const body = req.body || {};
+
+      // Load current row để merge metadata cũ + mới
+      const cur = await pool.query(
+        `SELECT description FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!cur.rows[0]) return res.status(404).json({ error: 'Không tìm thấy' });
+      let currentMeta = {};
+      try { currentMeta = JSON.parse(cur.rows[0].description || '{}'); } catch {}
+
+      // Build dynamic UPDATE cho columns thật
       const allowed = ['name','subject','grade','examType','duration','totalScore','totalQuestions','status','type'];
       const sets = []; const vals = [req.params.id, userId]; let idx = 3;
       for (const k of allowed) {
-        if (req.body && req.body[k] !== undefined) {
+        if (body[k] !== undefined) {
           sets.push(`"${k}" = $${idx++}`);
-          vals.push(typeof req.body[k] === 'number' ? req.body[k] : String(req.body[k]));
+          vals.push(typeof body[k] === 'number' ? body[k] : String(body[k]));
         }
       }
+
+      // Merge metadata (sections/topics/schoolYear/description text)
+      const META_KEYS = ['sections', 'topics', 'schoolYear', 'description'];
+      let metaChanged = false;
+      const newMeta = { ...currentMeta };
+      for (const k of META_KEYS) {
+        if (body[k] !== undefined) { newMeta[k] = body[k]; metaChanged = true; }
+      }
+      if (metaChanged) {
+        sets.push(`description = $${idx++}`);
+        vals.push(JSON.stringify(newMeta));
+      }
+
       if (!sets.length) return res.status(400).json({ error: 'Không có field nào để update' });
       sets.push(`"updatedAt" = $${idx++}`); vals.push(new Date());
-      const { rowCount } = await getMPool().query(
+
+      const { rowCount } = await pool.query(
         `UPDATE "ExamMatrix" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
       );
       if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      console.log(`[matrix:update] ✅ ${req.params.id.slice(0,8)} fields=${allowed.filter(k => body[k] !== undefined).length} meta=${metaChanged}`);
       return res.json({ ok: true });
     } catch (err) {
+      console.error('[matrix:update] ❌', err.message);
       return res.status(500).json({ error: err.message });
     }
   });
@@ -6795,6 +6828,10 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
       }
 
       // Insert Exam + ExamQuestion + Question (transaction)
+      // Default public=true vì teacher đang share với học sinh ngay sau khi
+      // tạo từ LaTeX (use case chính). Có thể tắt qua body.public=false.
+      const isPublic = req.body?.public !== false;
+      const examStatus = req.body?.status || (isPublic ? 'Đang diễn ra' : 'Nháp');
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -6806,7 +6843,7 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
           grade: String(grade || '11'),
           source: 'latex-import',
           notes: `Tạo từ tài liệu LaTeX: ${project.title}`,
-          public: false,
+          public: isPublic,
           publishedAt: now.toISOString(),
         });
 
@@ -6814,8 +6851,8 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
           `INSERT INTO "Exam"
              (id, title, description, "examType", duration, "totalScore",
               "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
-           VALUES ($1,$2,$3,'Trắc nghiệm',45,$4,$5,'Nháp',NULL,$6,$7,$7)`,
-          [examId, examTitle, desc, questions.length, questions.length, userId, now]
+           VALUES ($1,$2,$3,'Trắc nghiệm',45,$4,$5,$6,NULL,$7,$8,$8)`,
+          [examId, examTitle, desc, questions.length, questions.length, examStatus, userId, now]
         );
 
         for (let i = 0; i < questions.length; i++) {
@@ -6846,8 +6883,13 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
           );
         }
         await client.query('COMMIT');
-        console.log(`[latex:to-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (${questions.length}Q, ${Date.now()-t0}ms)`);
-        return res.json({ ok: true, examId, totalQuestions: questions.length });
+        console.log(`[latex:to-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (${questions.length}Q, public=${isPublic}, ${Date.now()-t0}ms)`);
+        return res.json({
+          ok: true, examId,
+          totalQuestions: questions.length,
+          isPublic, status: examStatus,
+          examTitle,
+        });
       } catch (err) {
         await client.query('ROLLBACK');
         throw err;
@@ -6890,12 +6932,20 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
       // Strip vntex / vncaps (Vietnamese-specific cho pdflatex)
       s = s.replace(/\\usepackage\s*\{(vntex|vncaps)\}\s*\n?/g, '');
 
-      // Nếu user dùng [vietnamese]{babel} hoặc có chữ Việt mà chưa có fontspec
-      // thì inject fontspec + font Unicode. Latin Modern Roman + TeX Gyre Termes
-      // đều ship sẵn với tectonic và support Vietnamese.
+      // Nếu user dùng [vietnamese]{babel}, strip babel hoàn toàn vì babel
+      // vietnamese conflict với XeLaTeX trong nhiều case (shorthands, font
+      // setup). XeLaTeX với fontspec + Latin Modern Roman (full Vietnamese
+      // glyph coverage) là đủ cho VN text — không cần babel hyphenation.
+      // Hyphenation cho Vietnamese không thật sự cần thiết (từ ngắn).
+      const hasVietnamesebabel = /\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}/.test(s);
+      if (hasVietnamesebabel) {
+        s = s.replace(/\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}\s*\n?/g, '');
+      }
+
+      // Inject fontspec + font Unicode nếu cần. Latin Modern Roman + Noto Sans
+      // đều ship sẵn với tectonic và support Vietnamese đầy đủ.
       const hasFontspec = /\\usepackage\s*(\[[^\]]*\])?\s*\{fontspec\}/.test(s);
-      const hasVietnamese = /\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}/.test(s)
-        || /[À-ỿ]/.test(s);  // có ký tự Latin extended (tiếng Việt)
+      const hasVietnamese = hasVietnamesebabel || /[À-ỿ]/.test(s);
       if (hasVietnamese && !hasFontspec) {
         s = s.replace(
           /(\\documentclass[^\n]*\n)/,
@@ -6947,7 +6997,9 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
       console.log(`[latex:compile] ✅ pdf=${pdf.length}B src=${content.length}B`);
       return res.end(pdf);
     } catch (err) {
-      console.error('[latex:compile] ❌', err.message.slice(0, 300));
+      // Log full error message (was truncated at 300 → mất phần error chính,
+      // chỉ thấy warnings ở cuối).
+      console.error('[latex:compile] ❌', err.message.slice(0, 2500));
       const isTimeout = /ETIMEDOUT|timeout/i.test(err.message);
       const isNoBin = /ENOENT|not found/i.test(err.message);
       if (isNoBin) {

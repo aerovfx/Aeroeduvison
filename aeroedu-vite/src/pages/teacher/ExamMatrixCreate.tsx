@@ -16,9 +16,9 @@
  *
  * Live preview: bảng tổng hợp + tỉ lệ % theo NB/TH/VD/VDC
  */
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Loader2, Plus, Trash2, BookOpen, Hash, Calendar, GraduationCap, Sparkles } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeft, Save, Loader2, Plus, Trash2, BookOpen, Hash, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 
@@ -52,8 +52,11 @@ const DEFAULT_SECTIONS: Section[] = [
 
 export default function ExamMatrixCreatePage() {
   const navigate = useNavigate()
+  const { id: editId } = useParams<{ id?: string }>()
+  const isEditMode = !!editId
   const [tab, setTab] = useState<'info' | 'structure' | 'topics'>('info')
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(isEditMode)
 
   // Form state
   const [name, setName] = useState('Ma trận đề kiểm tra giữa học kỳ II')
@@ -71,6 +74,55 @@ export default function ExamMatrixCreatePage() {
     { id: '3', name: 'Động năng, Thế năng, Cơ năng', description: 'Bảo toàn cơ năng, rơi tự do',  nb: 2, th: 2, vd: 1, vdc: 1 },
     { id: '4', name: 'Công suất',                 description: 'P = F.v, ý nghĩa công suất',       nb: 2, th: 1, vd: 1, vdc: 1 },
   ])
+
+  // Edit mode: load matrix + pre-fill state
+  useEffect(() => {
+    if (!editId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        interface MatrixApi {
+          name?: string; subject?: string; grade?: string; examType?: string
+          duration?: number; description?: string; schoolYear?: string
+          sections?: Section[]
+          topics?: Array<{ name?: string; description?: string; counts?: Record<string, number> }>
+        }
+        const r = await api.get<MatrixApi>(`/exam-matrices/${editId}`)
+        if (cancelled) return
+        const m = r.data
+        if (m.name)       setName(m.name)
+        if (m.subject)    setSubject(m.subject)
+        if (m.grade)      setGrade(m.grade)
+        if (m.examType)   setExamType(m.examType)
+        if (m.duration)   setDuration(m.duration)
+        if (m.schoolYear) setSchoolYear(m.schoolYear)
+        if (typeof m.description === 'string' && !m.description.startsWith('{')) {
+          setDescription(m.description)
+        }
+        if (Array.isArray(m.sections) && m.sections.length > 0) {
+          setSections(m.sections)
+        }
+        if (Array.isArray(m.topics) && m.topics.length > 0) {
+          // Backend lưu topics dạng {name, description, counts:{nb,th,vd,vdc}}
+          // UI state dạng {id, name, description, nb, th, vd, vdc} → convert
+          setTopics(m.topics.map((t, i) => ({
+            id: String(i + 1),
+            name: String(t.name || ''),
+            description: String(t.description || ''),
+            nb: Number(t.counts?.nb ?? 0),
+            th: Number(t.counts?.th ?? 0),
+            vd: Number(t.counts?.vd ?? 0),
+            vdc: Number(t.counts?.vdc ?? 0),
+          })))
+        }
+      } catch (err: unknown) {
+        const e = err as { response?: { status?: number; data?: { error?: string } } }
+        toast.error(e.response?.data?.error || 'Không tải được ma trận')
+        if (e.response?.status === 404) setTimeout(() => navigate('/teacher/exam-matrix'), 1500)
+      } finally { if (!cancelled) setLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [editId, navigate])
 
   // ─── Computed totals ──────────────────────────────────
   const totalQuestions = sections.reduce((s, sec) => s + sec.count, 0)
@@ -127,11 +179,17 @@ export default function ExamMatrixCreatePage() {
           total: t.nb + t.th + t.vd + t.vdc,
         })),
       }
-      const res = await api.post<{ id: string; matrix?: { id: string } }>('/exam-matrices', payload)
-      const id = res.data?.id || res.data?.matrix?.id
-      toast.success('Đã tạo ma trận đề!')
-      if (id) navigate(`/teacher/exam-matrix/${id}`)
-      else navigate('/teacher/exam-matrix')
+      if (isEditMode && editId) {
+        await api.put(`/exam-matrices/${editId}`, payload)
+        toast.success('Đã cập nhật ma trận đề!')
+        navigate(`/teacher/exam-matrix/${editId}`)
+      } else {
+        const res = await api.post<{ id: string; matrix?: { id: string } }>('/exam-matrices', payload)
+        const id = res.data?.id || res.data?.matrix?.id
+        toast.success('Đã tạo ma trận đề!')
+        if (id) navigate(`/teacher/exam-matrix/${id}`)
+        else navigate('/teacher/exam-matrix')
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
       toast.error(e.response?.data?.error || 'Không tạo được ma trận')
@@ -154,9 +212,11 @@ export default function ExamMatrixCreatePage() {
           </button>
         </div>
 
-        <h1 className="text-2xl font-bold mb-1">Tạo Ma Trận Đề</h1>
+        <h1 className="text-2xl font-bold mb-1">{isEditMode ? 'Chỉnh sửa Ma Trận Đề' : 'Tạo Ma Trận Đề'}</h1>
         <p className="text-sm text-[hsl(var(--muted-foreground))] mb-6">
-          Cấu trúc chuẩn Bộ GD&amp;ĐT 2025: 4 phần · 24 câu · 10 điểm · tỉ lệ 40% NB / 30% TH / 30% VD+VDC
+          {loading
+            ? <span className="inline-flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang tải dữ liệu ma trận…</span>
+            : 'Cấu trúc chuẩn Bộ GD&ĐT 2025: 4 phần · 24 câu · 10 điểm · tỉ lệ 40% NB / 30% TH / 30% VD+VDC'}
         </p>
 
         {/* Tabs */}

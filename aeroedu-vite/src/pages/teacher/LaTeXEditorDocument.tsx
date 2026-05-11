@@ -77,6 +77,13 @@ export default function LaTeXEditorDocument() {
   const [compileError, setCompileError] = useState<string | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [isOwner, setIsOwner] = useState(true)
+  // Share modal sau khi tạo đề thi từ LaTeX
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareExamUrl, setShareExamUrl] = useState('')
+  const [shareExamId, setShareExamId] = useState('')
+  const [shareExamTitle, setShareExamTitle] = useState('')
+  const [shareExamTotalQ, setShareExamTotalQ] = useState(0)
+  const [shareCopied, setShareCopied] = useState(false)
 
   const [versions, setVersions] = useState<Version[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -428,21 +435,31 @@ export default function LaTeXEditorDocument() {
         {/* Convert to Exam — chuẩn Bộ GD&ĐT */}
         <button
           onClick={async () => {
-            if (!id || !confirm('Tạo đề thi từ tài liệu này? AI sẽ trích xuất câu hỏi.')) return
+            if (!id || !confirm('Tạo đề thi từ tài liệu này? AI sẽ trích xuất câu hỏi và công khai cho học sinh.')) return
             const t = toast.loading('Đang trích xuất câu hỏi…')
             try {
-              const res = await api.post<{ examId: string; totalQuestions: number }>(
-                `/latex-projects/${id}/to-exam`, { subject: 'Vật lí', grade: '11' }
+              const res = await api.post<{
+                examId: string; totalQuestions: number; isPublic: boolean; examTitle: string
+              }>(
+                `/latex-projects/${id}/to-exam`,
+                { subject: 'Vật lí', grade: '11', public: true }
               )
-              toast.success(`✅ Đã tạo đề ${res.data.totalQuestions} câu — chuyển sang trang làm bài`, { id: t })
-              setTimeout(() => { window.open(`/exam-sheet/${res.data.examId}`, '_blank') }, 500)
+              const examUrl = `${window.location.origin}/exam-sheet/${res.data.examId}`
+              toast.success(`✅ Đã tạo đề ${res.data.totalQuestions} câu — học sinh có thể làm ngay`, {
+                id: t, duration: 4000,
+              })
+              setShareExamUrl(examUrl)
+              setShareExamId(res.data.examId)
+              setShareExamTitle(res.data.examTitle)
+              setShareExamTotalQ(res.data.totalQuestions)
+              setShareModalOpen(true)
             } catch (err: unknown) {
               const e = err as { response?: { data?: { error?: string } } }
               toast.error(e.response?.data?.error || 'Không tạo được đề thi', { id: t })
             }
           }}
           disabled={!id || compiling}
-          title="Trích xuất câu hỏi từ tài liệu LaTeX → tạo đề thi chuẩn Bộ GD&ĐT"
+          title="Trích xuất câu hỏi từ tài liệu LaTeX → tạo đề thi chuẩn Bộ GD&ĐT + công khai cho học sinh"
           style={{
             background: 'linear-gradient(90deg, #ec4899, #a855f7)',
             border: 'none', borderRadius: 8, color: '#fff',
@@ -758,6 +775,98 @@ export default function LaTeXEditorDocument() {
           schoolYear: '2025 – 2026',
         }}
       />
+
+      {/* ═══ SHARE MODAL — sau khi tạo đề từ LaTeX ═══════════ */}
+      {shareModalOpen && (
+        <div
+          onClick={() => setShareModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{
+              background: '#1a0b2e', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: 24, maxWidth: 480, width: '100%',
+              color: '#fff', textAlign: 'center',
+              boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+            }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 12px', fontSize: 28,
+            }}>✓</div>
+            <h3 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 4px' }}>
+              Đã tạo đề thi!
+            </h3>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', margin: '0 0 18px' }}>
+              {shareExamTitle} · {shareExamTotalQ} câu · Chuẩn Bộ GD&amp;ĐT
+            </p>
+
+            {/* QR */}
+            <div style={{ background: '#fff', padding: 12, borderRadius: 16, display: 'inline-block', marginBottom: 14 }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=8&data=${encodeURIComponent(shareExamUrl)}`}
+                alt="QR đề thi" width={180} height={180} />
+            </div>
+            <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', margin: '0 0 8px' }}>
+              Học sinh quét QR hoặc mở link để làm bài
+            </p>
+
+            {/* URL */}
+            <div style={{
+              background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 10, padding: '8px 12px', marginBottom: 14,
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <code style={{ flex: 1, fontSize: 11, fontFamily: 'monospace', color: 'rgba(255,255,255,0.8)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                {shareExamUrl}
+              </code>
+              <button onClick={() => {
+                navigator.clipboard.writeText(shareExamUrl)
+                setShareCopied(true); setTimeout(() => setShareCopied(false), 2000)
+                toast.success('Đã copy link')
+              }} style={{
+                padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                background: shareCopied ? '#22c55e' : '#a855f7', color: '#fff',
+                fontSize: 11, fontWeight: 700, flexShrink: 0,
+              }}>
+                {shareCopied ? '✓ Copied' : 'Copy'}
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShareModalOpen(false)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>
+                Đóng
+              </button>
+              <button onClick={() => window.open(shareExamUrl, '_blank')}
+                style={{
+                  flex: 1.2, padding: '10px 16px', borderRadius: 10, border: 'none',
+                  background: 'linear-gradient(90deg, #ec4899, #a855f7)',
+                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}>
+                Mở xem trước →
+              </button>
+              <button onClick={() => navigate(`/teacher/exams/${shareExamId}/edit`)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>
+                Chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

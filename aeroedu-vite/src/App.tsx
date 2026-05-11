@@ -6,12 +6,14 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { LanguageProvider } from '@/contexts/LanguageContext'
 import { AppRouter } from '@/router'
+import { ColdStartIndicator } from '@/components/common/ColdStartIndicator'
 
 export default function App() {
   return (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
+          <ColdStartIndicator />
           <AppRouter />
         </AuthProvider>
       </LanguageProvider>
