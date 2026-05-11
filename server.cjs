@@ -6435,11 +6435,44 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
     const os = require('os');
     const path = require('path');
 
-    const content = String(req.body?.content || '').trim();
-    if (!content) return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
-    if (content.length > 200_000) {
+    const rawContent = String(req.body?.content || '').trim();
+    if (!rawContent) return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
+    if (rawContent.length > 200_000) {
       return res.status(413).json({ error: 'File LaTeX quá lớn (>200KB)' });
     }
+
+    // ── Pre-process: tectonic dùng XeLaTeX (Unicode native), nhưng nhiều
+    // file user import packages cho pdflatex (utf8 inputenc + T5 fontenc).
+    // T5 fontenc làm font Vietnamese hỏng → diacritics thành ký tự lạ.
+    // Transform: strip pdflatex-only packages, inject fontspec + Latin Modern.
+    function makeXelatexCompat(src) {
+      let s = src;
+      // Strip inputenc (XeLaTeX luôn UTF-8 native)
+      s = s.replace(/\\usepackage\s*(\[[^\]]*\])?\s*\{inputenc\}\s*\n?/g, '');
+      // Strip fontenc với T5/T1/etc (XeLaTeX dùng fontspec/Unicode)
+      s = s.replace(/\\usepackage\s*\[\s*[A-Za-z0-9]+\s*\]\s*\{fontenc\}\s*\n?/g, '');
+      s = s.replace(/\\usepackage\s*\{fontenc\}\s*\n?/g, '');
+      // Strip vntex / vncaps (Vietnamese-specific cho pdflatex)
+      s = s.replace(/\\usepackage\s*\{(vntex|vncaps)\}\s*\n?/g, '');
+
+      // Nếu user dùng [vietnamese]{babel} hoặc có chữ Việt mà chưa có fontspec
+      // thì inject fontspec + font Unicode. Latin Modern Roman + TeX Gyre Termes
+      // đều ship sẵn với tectonic và support Vietnamese.
+      const hasFontspec = /\\usepackage\s*(\[[^\]]*\])?\s*\{fontspec\}/.test(s);
+      const hasVietnamese = /\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}/.test(s)
+        || /[À-ỿ]/.test(s);  // có ký tự Latin extended (tiếng Việt)
+      if (hasVietnamese && !hasFontspec) {
+        s = s.replace(
+          /(\\documentclass[^\n]*\n)/,
+          '$1% [auto-injected by server] tectonic XeLaTeX cần fontspec cho Unicode\n'
+          + '\\usepackage{fontspec}\n'
+          + '\\defaultfontfeatures{Ligatures=TeX}\n'
+          + '\\setmainfont{Latin Modern Roman}\n'
+        );
+      }
+      return s;
+    }
+    const content = makeXelatexCompat(rawContent);
 
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'latex-'));
     const inFile = path.join(tmpDir, 'input.tex');
