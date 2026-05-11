@@ -891,7 +891,7 @@ export default function ExamPrepPage() {
             </div>
           )}
 
-          {/* TAB: Teacher Exams — Big colored cards */}
+          {/* TAB: Teacher Exams — MUDREAM-style marketplace grid */}
           {activeTab === "teacher" && (
             <div className="space-y-4">
               {teacherExamsLoading ? (
@@ -902,72 +902,127 @@ export default function ExamPrepPage() {
               ) : (
                 <>
                   {teacherExams.length > 0 && (
-                    <div className="space-y-3 sm:space-y-4">
+                    <>
+                      {/* Header với toggle hiển thị */}
                       <div className="flex items-center justify-between px-1">
                         <h3 className="font-bold text-white text-lg sm:text-xl flex items-center gap-2">
                           <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-[hsl(175,80%,55%)]" />
-                          {teacherExams.length} đề từ giáo viên
+                          <span>{teacherExams.length} đề từ giáo viên</span>
                         </h3>
+                        <div className="text-xs text-white/40">
+                          Sắp xếp: <span className="text-white/70 font-medium">Mới nhất</span>
+                        </div>
                       </div>
-                      {teacherExams.map((ex, idx) => {
-                        // Xoay 5 màu theme Wayground cho từng card
-                        const themes = [
-                          { from: 'hsl(0,73%,45%)',   to: 'hsl(340,75%,40%)', name: 'crimson'  },
-                          { from: 'hsl(175,80%,40%)', to: 'hsl(190,80%,35%)', name: 'teal'     },
-                          { from: 'hsl(25,90%,55%)',  to: 'hsl(15,85%,50%)',  name: 'orange'   },
-                          { from: 'hsl(218,55%,32%)', to: 'hsl(230,55%,28%)', name: 'navy'     },
-                          { from: 'hsl(280,75%,55%)', to: 'hsl(260,70%,50%)', name: 'violet'   },
-                        ]
-                        const t = themes[idx % themes.length]
-                        return (
-                          <div
-                            key={ex.id}
-                            className="relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.2] transition-all"
-                          >
-                            {/* Colored top stripe */}
-                            <div
-                              className="h-2 sm:h-2.5"
-                              style={{ background: `linear-gradient(90deg, ${t.from}, ${t.to})` }}
+
+                      {/* Featured row — top 3 mới nhất theo style avatar lớn */}
+                      {teacherExams.length >= 1 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                          {teacherExams.slice(0, 3).map((ex, idx) => (
+                            <FeaturedExamPill
+                              key={`feat-${ex.id}`}
+                              exam={ex}
+                              theme={inferExamTheme(ex, idx)}
+                              loading={loading}
+                              onStart={() => startFromTeacherExam(ex.id, "exam")}
                             />
-                            <div className="p-4 sm:p-5">
-                              <h4 className="font-bold text-white text-lg sm:text-xl leading-tight mb-2 line-clamp-2">
-                                {ex.title}
-                              </h4>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-white/65 mb-3 sm:mb-4">
-                                <Chip>{ex.examType}</Chip>
-                                <Chip>📝 {ex.totalQuestions} câu</Chip>
-                                <Chip>⏱ {ex.duration}p</Chip>
-                                <Chip>🎯 {ex.totalScore}đ</Chip>
-                              </div>
-                              {ex.user?.name && (
-                                <p className="text-xs sm:text-sm text-white/40 mb-3">👨‍🏫 GV: {ex.user.name}</p>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Marketplace grid — Sản phẩm */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                        {teacherExams.map((ex, idx) => {
+                          const t = inferExamTheme(ex, idx)
+                          const isHot =
+                            Date.now() - new Date(ex.createdAt).getTime() < 7 * 86400_000
+                          const subject = inferExamSubject(ex.title)
+                          return (
+                            <div
+                              key={ex.id}
+                              className="group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.25] hover:-translate-y-0.5 transition-all"
+                            >
+                              {/* HOT badge */}
+                              {isHot && (
+                                <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-md bg-rose-500 text-white text-[10px] font-black tracking-wider">
+                                  HOT
+                                </div>
                               )}
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <button
-                                  onClick={() => startFromTeacherExam(ex.id, "exam")}
-                                  disabled={loading}
-                                  className="flex-1 inline-flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl text-white font-bold text-base sm:text-lg shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
+
+                              {/* Top section — gradient + icon glow */}
+                              <div
+                                className="relative h-24 sm:h-28 flex items-center justify-center"
+                                style={{
+                                  background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                }}
+                              >
+                                {/* Glow blob */}
+                                <div
+                                  className="absolute inset-0 opacity-50 pointer-events-none"
                                   style={{
-                                    background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
-                                    boxShadow: `0 4px 20px ${t.from}40`,
+                                    background: `radial-gradient(circle at 50% 60%, ${t.from}, transparent 70%)`,
+                                  }}
+                                />
+                                {/* Round icon */}
+                                <div
+                                  className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white shadow-2xl"
+                                  style={{
+                                    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), ${t.from} 60%, ${t.to})`,
+                                    boxShadow: `0 8px 24px ${t.from}80`,
                                   }}
                                 >
-                                  <Rocket className="h-5 w-5" />
-                                  Bắt đầu
-                                </button>
-                                <QuickScanQr
-                                  variant="compact"
-                                  accent="indigo"
-                                  title={`Quét QR — ${ex.title}`}
-                                  downloadName={`qr-exam-${ex.id}.png`}
-                                  targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
-                                />
+                                  <span className="text-2xl sm:text-3xl">{t.emoji}</span>
+                                </div>
+                              </div>
+
+                              {/* Bottom — info */}
+                              <div className="p-3 sm:p-4">
+                                <h4
+                                  className="font-bold text-white text-sm sm:text-base leading-tight mb-1 line-clamp-2"
+                                  title={ex.title}
+                                >
+                                  {ex.title}
+                                </h4>
+                                <p className="text-[11px] sm:text-xs text-white/40 mb-2.5 truncate">
+                                  {ex.user?.name ? `GV: ${ex.user.name}` : 'AeroEduVision'}
+                                </p>
+                                {/* Stat chips kiểu DD +18 / FK +64 */}
+                                <div className="flex flex-wrap items-center gap-1 mb-3">
+                                  <StatBadge label={subject.tag} value={`+${ex.totalQuestions}`} color={t.from} />
+                                  <StatBadge label="MIN" value={`+${ex.duration}`} color={t.to} />
+                                </div>
+                                {/* Price/status row */}
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <div
+                                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
+                                      style={{ background: t.from }}
+                                    >
+                                      Đ
+                                    </div>
+                                    <span className="font-bold text-white text-sm sm:text-base tabular-nums truncate">
+                                      {ex.totalScore}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => startFromTeacherExam(ex.id, "exam")}
+                                    disabled={loading}
+                                    className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
+                                    style={{
+                                      background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                      boxShadow: `0 2px 12px ${t.from}50`,
+                                    }}
+                                    title={`Bắt đầu — ${ex.title}`}
+                                  >
+                                    <Rocket className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Bắt đầu</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                          )
+                        })}
+                      </div>
+                    </>
                   )}
 
                   {teacherExams.length === 0 && (
@@ -1232,7 +1287,106 @@ function CommunityStatsPanel({
   )
 }
 
-/* ─── Wayground-style helpers cho home view ──────────────── */
+/* ─── MUDREAM-style helpers cho marketplace grid ────────── */
+
+// Mapping môn → theme color + emoji
+const SUBJECT_THEMES: Record<string, {
+  tag: string; from: string; to: string; emoji: string;
+}> = {
+  'vat-ly':   { tag: 'PHY', from: 'hsl(210,90%,55%)', to: 'hsl(245,85%,55%)', emoji: '⚛️' },
+  'toan':     { tag: 'MTH', from: 'hsl(280,75%,55%)', to: 'hsl(260,70%,50%)', emoji: '∑'  },
+  'hoa':      { tag: 'CHM', from: 'hsl(145,65%,45%)', to: 'hsl(170,75%,40%)', emoji: '⚗️' },
+  'sinh':     { tag: 'BIO', from: 'hsl(95,60%,45%)',  to: 'hsl(120,55%,40%)', emoji: '🌱' },
+  'van':      { tag: 'LIT', from: 'hsl(25,90%,55%)',  to: 'hsl(15,85%,50%)',  emoji: '📚' },
+  'anh':      { tag: 'ENG', from: 'hsl(345,80%,55%)', to: 'hsl(320,75%,50%)', emoji: 'A'  },
+  'su':       { tag: 'HIS', from: 'hsl(30,75%,50%)',  to: 'hsl(20,75%,45%)',  emoji: '🏛'  },
+  'dia':      { tag: 'GEO', from: 'hsl(195,80%,45%)', to: 'hsl(175,80%,40%)', emoji: '🌍' },
+  'tin':      { tag: 'CSC', from: 'hsl(218,55%,45%)', to: 'hsl(230,55%,40%)', emoji: '💻' },
+  'default':  { tag: 'EXM', from: 'hsl(262,83%,58%)', to: 'hsl(280,75%,50%)', emoji: '📝' },
+}
+
+function inferExamSubject(title: string) {
+  const t = title.toLowerCase()
+  if (/vật\s*l[ýyi]|physics/i.test(t)) return SUBJECT_THEMES['vat-ly']
+  if (/toán|maths?/i.test(t))           return SUBJECT_THEMES['toan']
+  if (/hóa|hoá|chemistry/i.test(t))     return SUBJECT_THEMES['hoa']
+  if (/sinh|biology/i.test(t))          return SUBJECT_THEMES['sinh']
+  if (/văn|literature/i.test(t))        return SUBJECT_THEMES['van']
+  if (/tiếng\s*anh|english/i.test(t))   return SUBJECT_THEMES['anh']
+  if (/lịch\s*sử|history/i.test(t))     return SUBJECT_THEMES['su']
+  if (/địa\s*l[ýyi]|geography/i.test(t)) return SUBJECT_THEMES['dia']
+  if (/tin\s*học|computer/i.test(t))    return SUBJECT_THEMES['tin']
+  return SUBJECT_THEMES['default']
+}
+
+function inferExamTheme(ex: { title: string }, fallbackIdx: number) {
+  const found = inferExamSubject(ex.title)
+  if (found !== SUBJECT_THEMES['default']) return found
+  // Rotate qua 5 màu fallback nếu không detect được môn
+  const rot = [
+    SUBJECT_THEMES['default'],
+    SUBJECT_THEMES['vat-ly'],
+    SUBJECT_THEMES['hoa'],
+    SUBJECT_THEMES['van'],
+    SUBJECT_THEMES['anh'],
+  ]
+  return rot[fallbackIdx % rot.length]
+}
+
+function StatBadge({ label, value, color }: { label: string; value: string; color: string }) {
+  return (
+    <span
+      className="inline-flex items-baseline gap-0.5 text-[10px] sm:text-[11px] font-bold tabular-nums px-1.5 py-0.5 rounded-md border"
+      style={{
+        background: `${color}15`,
+        borderColor: `${color}30`,
+        color: 'white',
+      }}
+    >
+      <span className="text-white/60 font-semibold">{label}</span>
+      <span style={{ color }}>{value}</span>
+    </span>
+  )
+}
+
+function FeaturedExamPill({
+  exam, theme, loading, onStart,
+}: {
+  exam: TeacherExam
+  theme: typeof SUBJECT_THEMES['default']
+  loading: boolean
+  onStart: () => void
+}) {
+  return (
+    <button
+      onClick={onStart}
+      disabled={loading}
+      className="group relative overflow-hidden text-left rounded-2xl bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.2] transition-all p-2.5 sm:p-3 flex items-center gap-2.5 sm:gap-3 disabled:opacity-50"
+    >
+      {/* Round avatar with glow */}
+      <div
+        className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center flex-shrink-0 text-white"
+        style={{
+          background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3), ${theme.from} 60%, ${theme.to})`,
+          boxShadow: `0 0 18px ${theme.from}AA`,
+        }}
+      >
+        <span className="text-xl sm:text-2xl">{theme.emoji}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] sm:text-xs font-bold text-white truncate uppercase">
+          {exam.title}
+        </p>
+        <p className="text-[10px] text-white/55 truncate mt-0.5">
+          {exam.user?.name || 'GV ẩn danh'}
+        </p>
+        <div className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded bg-white/[0.05] text-[10px] font-semibold text-white/70">
+          {exam.totalQuestions} câu · {exam.duration}p
+        </div>
+      </div>
+    </button>
+  )
+}
 
 function StatTile({
   icon, value, label, accent,
