@@ -1,0 +1,101 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rust-services/**'
+      - 'latex-compiler/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/rust-ci.yml'
+  pull_request:
+    paths:
+      - 'rust-services/**'
+      - 'latex-compiler/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/rust-ci.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  check-workspace:
+    name: cargo check --workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry & target
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+
+      - name: cargo check
+        run: cargo check --workspace --all-targets
+
+  test-workspace:
+    name: cargo test --workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: check-workspace
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - name: cargo test
+        run: cargo test --workspace --no-fail-fast
+
+  check-ai-service:
+    name: cargo check ai-service (standalone)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-services/ai-service
+          shared-key: ai-service
+      - name: cargo check
+        working-directory: rust-services/ai-service
+        run: cargo check --all-targets
+
+  # Lint jobs are advisory for now — existing code has clippy/fmt drift.
+  # Promote to blocking once code is normalized in a follow-up commit.
+  clippy:
+    name: cargo clippy (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: workspace
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -W clippy::all
+
+  fmt:
+    name: cargo fmt --check (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
