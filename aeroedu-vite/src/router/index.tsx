@@ -179,6 +179,10 @@ const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
 const DocsIndexPage   = lazy(() => import('@/pages/docs/DocsIndex'))
 const DocsArticlePage = lazy(() => import('@/pages/docs/DocsArticle'))
 
+// ── News / Tin tức (Soha-style) ──────────────────────────────
+const NewsIndexPage   = lazy(() => import('@/pages/news/NewsIndex'))
+const NewsArticlePage = lazy(() => import('@/pages/news/NewsArticle'))
+
 // ── Admin Pages (đã port) ────────────────────────────────────
 const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
 const AdminStudents         = lazy(() => import('@/pages/admin/Students'))
@@ -221,6 +225,10 @@ export function AppRouter() {
         {/* ── DOCS / Hướng dẫn sử dụng (public — ai cũng đọc được) ── */}
         <Route path="/docs"           element={<DocsIndexPage />} />
         <Route path="/docs/:slug"     element={<DocsArticlePage />} />
+
+        {/* ── NEWS / Tin tức (Soha-style, public) ─────────────── */}
+        <Route path="/news"           element={<NewsIndexPage />} />
+        <Route path="/news/:slug"     element={<NewsArticlePage />} />
 
         {/* ══════════════════════════════════════════════════
             AUTH ROUTES (không cần login)

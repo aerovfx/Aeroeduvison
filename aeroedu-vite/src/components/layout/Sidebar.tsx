@@ -11,7 +11,7 @@ import {
   Calendar, Shield, AlertTriangle, Activity, Settings, Upload,
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
-  CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark,
+  CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -90,7 +90,8 @@ const studentSections: RouteSection[] = [
   {
     titleKey: 'sectionHelp',
     routes: [
-      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
+      { icon: BookOpen,  labelKey: 'routeDocs', href: '/docs' },
+      { icon: Newspaper, labelKey: 'routeNews', href: '/news' },
     ],
   },
 ]
@@ -152,7 +153,8 @@ const teacherSections: RouteSection[] = [
   {
     titleKey: 'sectionHelp',
     routes: [
-      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
+      { icon: BookOpen,  labelKey: 'routeDocs', href: '/docs' },
+      { icon: Newspaper, labelKey: 'routeNews', href: '/news' },
     ],
   },
 ]
@@ -189,7 +191,8 @@ const adminSections: RouteSection[] = [
   {
     titleKey: 'sectionHelp',
     routes: [
-      { icon: BookOpen, labelKey: 'routeDocs', href: '/docs' },
+      { icon: BookOpen,  labelKey: 'routeDocs', href: '/docs' },
+      { icon: Newspaper, labelKey: 'routeNews', href: '/news' },
     ],
   },
 ]
