@@ -7,6 +7,8 @@
 
 import React, { useState, useCallback, memo } from 'react';
 import { Link } from 'react-router-dom';
+import { GalaxyHero } from '@/components/common/GalaxyHero';
+import { LevelXPCard } from '@/components/common/LevelXPCard';
 import {
   Brain, Target, Lightbulb, MessageCircle, Trophy, Calendar, Activity,
   Rocket, X, ChevronRight, CheckCircle, Clock, Award, Star, Play, ArrowRight,
@@ -443,34 +445,18 @@ export default function DashboardPage() {
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
 
-        {/* ── Hero Header ── */}
-        <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-xl p-8 md:p-10">
-          {/* Ambient glow */}
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-[hsl(245,85%,65%)] opacity-[0.04] rounded-full blur-[100px] pointer-events-none" />
-          <div className="absolute bottom-0 right-1/4 w-72 h-72 bg-[hsl(175,80%,50%)] opacity-[0.03] rounded-full blur-[80px] pointer-events-none" />
+        {/* ── Galaxy Hero — Meteor-style cosmic banner ── */}
+        <GalaxyHero
+          badge="AI-Driven Education Platform"
+          title={<>AERO<br/>EDU·VISION</>}
+          description="Học theo não bộ và cảm xúc của chính mình. Mỗi bài làm cộng XP, mỗi ngày mở khoá thành tích mới."
+          ctaLabel="Bắt đầu luyện tập"
+          ctaTo="/student/exam-prep"
+          orbEmoji="🚀"
+        />
 
-          <div className="relative z-10 text-center">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center shadow-[0_0_20px_rgba(120,100,255,0.3)] mr-3">
-                <Brain className="w-5 h-5 text-white" />
-              </div>
-              <h1 className="text-2xl md:text-3xl font-bold gradient-text">
-                You&apos;re learning with AI-Driven Edu
-              </h1>
-            </div>
-            <div className="max-w-3xl mx-auto space-y-1.5">
-              <p className="text-sm text-white/50">
-                Học sinh được học theo não bộ và cảm xúc của chính mình.
-              </p>
-              <p className="text-sm text-white/50">
-                Giáo viên trở thành người thiết kế hành trình học.
-              </p>
-              <p className="text-sm text-white/60 font-medium">
-                Xã hội tiến tới một nền giáo dục cá nhân hóa đại chúng (Mass Personalization Education).
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Level XP card — gamification */}
+        <LevelXPCard />
 
         {/* ── LAYER 1: Stats Cards ── */}
         <StatsSection />

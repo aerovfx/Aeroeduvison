@@ -17,6 +17,8 @@ import { QuickScanQr } from "@/components/common/QuickScanQr"
 import { MathText } from "@/components/common/MathText"
 import { DocRef } from "@/components/docs/DocRef"
 import { NameStartModal } from "@/components/exam/NameStartModal"
+import { GalaxyHero } from "@/components/common/GalaxyHero"
+import { LevelXPCard } from "@/components/common/LevelXPCard"
 import { api } from "@/services/api"
 import type {
   PracticeExam,
@@ -781,41 +783,21 @@ export default function ExamPrepPage() {
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
 
-          {/* ── Hero greeting + Quick action ─────────────────────── */}
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[hsl(262,83%,30%)] via-[hsl(245,75%,28%)] to-[hsl(210,80%,25%)] p-5 sm:p-7">
-            <div className="absolute -top-12 -right-8 w-48 h-48 rounded-full bg-[hsl(175,80%,50%)]/15 blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-12 -left-8 w-48 h-48 rounded-full bg-[hsl(280,75%,55%)]/20 blur-3xl pointer-events-none" />
-            <div className="relative">
-              <div className="flex items-center gap-2 mb-1.5">
-                <Sparkles className="h-4 w-4 text-[hsl(50,100%,70%)]" />
-                <span className="text-xs sm:text-sm font-medium text-white/70 uppercase tracking-wider">
-                  {greeting}, {firstName}!
-                </span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight mb-1">
-                Sẵn sàng cho 1 đề thi?
-              </h2>
-              <p className="text-sm sm:text-base text-white/70 mb-4 sm:mb-5">
-                Chọn đề từ giáo viên hoặc luyện tập từ ngân hàng câu hỏi.
-              </p>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => setActiveTab("teacher")}
-                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white text-[hsl(262,83%,30%)] font-bold text-sm sm:text-base shadow-lg hover:scale-[1.02] transition-transform"
-                >
-                  <Rocket className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Bắt đầu ngay
-                </button>
-                <button
-                  onClick={() => { loadHistory(); setView("history") }}
-                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white/10 backdrop-blur text-white font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/20 transition"
-                >
-                  <History className="h-4 w-4 sm:h-5 sm:w-5" />
-                  Lịch sử
-                </button>
-              </div>
-            </div>
-          </div>
+          {/* ── Galaxy Hero — Meteor-style cosmic banner ─────────── */}
+          <GalaxyHero
+            badge={`${greeting}, ${firstName}!`}
+            title={<>SẴN SÀNG<br/>CHINH PHỤC ĐỀ?</>}
+            description="Chọn 1 đề từ giáo viên hoặc luyện tập từ ngân hàng câu hỏi — mỗi bài làm cộng XP, lên cấp."
+            ctaLabel="Bắt đầu ngay"
+            ctaTo="#exam-tabs"
+            orbEmoji="🪐"
+          />
+
+          {/* Level XP card — Meteor "Adelik Fratz" style */}
+          <LevelXPCard />
+
+          {/* Anchor để nút CTA scroll xuống */}
+          <div id="exam-tabs" />
 
           {/* ── Stats — 3 tiles BIG text ──────────────────────────── */}
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
