@@ -21,7 +21,6 @@ members = [
     "rust-services/media-service",
     "rust-services/stem-service",
     "rust-services/student-service",
-    "rust-services/vector-sim-service",
     "latex-compiler",
     "openfang-core/openfang-types",
     "openfang-core/openfang-runtime",

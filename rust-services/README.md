@@ -25,8 +25,7 @@ cargo test --workspace
 | Service | Port | Mô tả |
 |---------|------|-------|
 | `latex-compiler` | 8080 | LaTeX → PDF (Overleaf-style) |
-| `aero-backend` | 8090 | API gateway + OCR/LLM batch-1 |
-| `vector-sim-service` | 8091 | Vector similarity (legacy, gộp dần vào aero-backend) |
+| `aero-backend` | 8090 | API gateway + OCR/LLM/vector-similarity |
 | `auth-service` | 8092 | login/register/2FA/JWT |
 | `course-service` | 8093 | Courses, chapters, progress |
 | `admin-service` | 8094 | Dashboard, users, analytics |
@@ -42,7 +41,7 @@ cargo test --workspace
 Mỗi Next.js route đã wired up có env flag `USE_RUST_*_SERVICE`. Khi flag bật, route proxy sang Rust service tương ứng.
 
 Đã wired (xem `app/api/*/route.ts`):
-- `USE_RUST_VECTOR_SERVICE` → vector-sim-service
+- `USE_RUST_VECTOR_SERVICE` → aero-backend (`/api/vector-similarity`)
 - `USE_RUST_OCR_GRADING_SERVICE` → aero-backend
 - `USE_RUST_OCR_PROCESS_SERVICE` → aero-backend
 - `USE_RUST_OCR_AUTO_GRADE_SERVICE` → aero-backend

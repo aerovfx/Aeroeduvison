@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Simple in-memory cache for embeddings
 const embeddingCache = new Map<string, number[]>();
-const RUST_VECTOR_SERVICE_URL = process.env.RUST_VECTOR_SERVICE_URL || 'http://127.0.0.1:8091';
+// vector-sim-service has been merged into aero-backend (port 8090). The
+// legacy RUST_VECTOR_SERVICE_URL env var is honored for backwards
+// compatibility, but defaults to aero-backend now. Prefer RUST_BACKEND_URL.
+const RUST_VECTOR_SERVICE_URL =
+  process.env.RUST_VECTOR_SERVICE_URL ||
+  process.env.RUST_BACKEND_URL ||
+  'http://127.0.0.1:8090';
 const USE_RUST_VECTOR_SERVICE = process.env.USE_RUST_VECTOR_SERVICE === 'true';
 
 // Calculate cosine similarity
@@ -64,7 +70,7 @@ export async function POST(req: NextRequest) {
     const shouldUseRust = target === 'rust' || (target !== 'node' && USE_RUST_VECTOR_SERVICE);
 
     if (shouldUseRust) {
-      const rustResponse = await fetch(`${RUST_VECTOR_SERVICE_URL}/v1/vector-similarity`, {
+      const rustResponse = await fetch(`${RUST_VECTOR_SERVICE_URL}/api/vector-similarity`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
