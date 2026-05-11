@@ -101,6 +101,7 @@ const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
 // ── Teacher Pages (đã port) ──────────────────────────────────
 const TeacherDashboard      = lazy(() => import('@/pages/teacher/Dashboard'))
 const ExamMatrixPage        = lazy(() => import('@/pages/teacher/ExamMatrix'))
+const ExamMatrixDetailPage  = lazy(() => import('@/pages/teacher/ExamMatrixDetail'))
 const QuestionBankPage      = lazy(() => import('@/pages/teacher/QuestionBank'))
 const ExamsPage             = lazy(() => import('@/pages/teacher/Exams'))
 const CreateExamPage        = lazy(() => import('@/pages/teacher/CreateExam'))
@@ -408,9 +409,9 @@ export function AppRouter() {
               <Route path="/teacher/exam-edit/:examId/:questionId" element={<PageFallback />} />
               <Route path="/teacher/exam-generator"                element={<ExamGeneratorPage />} />
               <Route path="/teacher/exam-matrix/create"            element={<PageFallback />} />
-              <Route path="/teacher/exam-matrix/:id"               element={<PageFallback />} />
-              <Route path="/teacher/exam-matrix/:id/edit"          element={<PageFallback />} />
-              <Route path="/teacher/exam-matrix/:id/review"        element={<PageFallback />} />
+              <Route path="/teacher/exam-matrix/:id"               element={<ExamMatrixDetailPage />} />
+              <Route path="/teacher/exam-matrix/:id/edit"          element={<ExamMatrixDetailPage />} />
+              <Route path="/teacher/exam-matrix/:id/review"        element={<ExamMatrixDetailPage />} />
               <Route path="/teacher/exam-preview/:examId"          element={<PageFallback />} />
               <Route path="/teacher/exam-reports"                  element={<ExamReportsPage />} />
               <Route path="/teacher/exams/create"                  element={<CreateExamPage />} />
