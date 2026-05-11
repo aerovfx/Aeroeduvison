@@ -995,23 +995,8 @@ export default function ExamPrepPage() {
                         </div>
                       </div>
 
-                      {/* Featured row — top 3 mới nhất theo style avatar lớn */}
-                      {teacherExams.length >= 1 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                          {teacherExams.slice(0, 3).map((ex, idx) => (
-                            <FeaturedExamPill
-                              key={`feat-${ex.id}`}
-                              exam={ex}
-                              theme={inferExamTheme(ex, idx)}
-                              loading={loading}
-                              onStart={() => startFromTeacherExam(ex.id, "exam", ex.title)}
-                            />
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Marketplace grid — Sản phẩm */}
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                      {/* Task-card style list — full-width row mỗi đề */}
+                      <div className="space-y-2.5 sm:space-y-3">
                         {teacherExams.map((ex, idx) => {
                           const t = inferExamTheme(ex, idx)
                           const isHot =
@@ -1020,72 +1005,21 @@ export default function ExamPrepPage() {
                           return (
                             <div
                               key={ex.id}
-                              className="group relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.25] hover:-translate-y-0.5 transition-all"
+                              className="group rounded-2xl bg-white/[0.025] border border-white/[0.08] hover:border-white/[0.18] hover:bg-white/[0.04] transition-all p-4 sm:p-5"
                             >
-                              {/* HOT badge */}
-                              {isHot && (
-                                <div className="absolute top-2 right-2 z-10 px-2 py-0.5 rounded-md bg-rose-500 text-white text-[10px] font-black tracking-wider">
-                                  HOT
+                              {/* Top row: time pill (left) · counter chips (right) */}
+                              <div className="flex items-center justify-between mb-2.5">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] text-xs sm:text-sm text-white/65">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span className="font-medium">{ex.duration} phút</span>
                                 </div>
-                              )}
-
-                              {/* Top section — gradient + icon glow */}
-                              <div
-                                className="relative h-24 sm:h-28 flex items-center justify-center"
-                                style={{
-                                  background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
-                                }}
-                              >
-                                {/* Glow blob */}
-                                <div
-                                  className="absolute inset-0 opacity-50 pointer-events-none"
-                                  style={{
-                                    background: `radial-gradient(circle at 50% 60%, ${t.from}, transparent 70%)`,
-                                  }}
-                                />
-                                {/* Round icon */}
-                                <div
-                                  className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white shadow-2xl"
-                                  style={{
-                                    background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.25), ${t.from} 60%, ${t.to})`,
-                                    boxShadow: `0 8px 24px ${t.from}80`,
-                                  }}
-                                >
-                                  <span className="text-2xl sm:text-3xl">{t.emoji}</span>
-                                </div>
-                              </div>
-
-                              {/* Bottom — info */}
-                              <div className="p-3 sm:p-4">
-                                <h4
-                                  className="font-bold text-white text-sm sm:text-base leading-tight mb-1 line-clamp-2"
-                                  title={ex.title}
-                                >
-                                  {ex.title}
-                                </h4>
-                                <p className="text-[11px] sm:text-xs text-white/40 mb-2.5 truncate">
-                                  {ex.user?.name ? `GV: ${ex.user.name}` : 'AeroEduVision'}
-                                </p>
-                                {/* Stat chips kiểu DD +18 / FK +64 */}
-                                <div className="flex flex-wrap items-center gap-1 mb-3">
-                                  <StatBadge label={subject.tag} value={`+${ex.totalQuestions}`} color={t.from} />
-                                  <StatBadge label="MIN" value={`+${ex.duration}`} color={t.to} />
-                                </div>
-                                {/* Price/status row */}
-                                <div className="flex items-center justify-between gap-1.5">
-                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                    <div
-                                      className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-white"
-                                      style={{ background: t.from }}
-                                    >
-                                      Đ
-                                    </div>
-                                    <span className="font-bold text-white text-sm sm:text-base tabular-nums truncate">
-                                      {ex.totalScore}
-                                    </span>
-                                  </div>
-                                  {/* QR icon button + Bắt đầu */}
-                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-white/55">
+                                  <span className="inline-flex items-center gap-1">
+                                    <FileText className="h-3.5 w-3.5" />
+                                    {ex.totalQuestions}
+                                  </span>
+                                  {/* QR icon attached vào card */}
+                                  <span title={`Quét QR — ${ex.title}`}>
                                     <QuickScanQr
                                       variant="compact"
                                       accent="indigo"
@@ -1093,21 +1027,58 @@ export default function ExamPrepPage() {
                                       downloadName={`qr-exam-${ex.id}.png`}
                                       targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
                                     />
-                                    <button
-                                      onClick={() => startFromTeacherExam(ex.id, "exam", ex.title)}
-                                      disabled={loading}
-                                      className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
-                                      style={{
-                                        background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
-                                        boxShadow: `0 2px 12px ${t.from}50`,
-                                      }}
-                                      title={`Bắt đầu — ${ex.title}`}
-                                    >
-                                      <Rocket className="h-3.5 w-3.5" />
-                                      <span className="hidden sm:inline">Bắt đầu</span>
-                                    </button>
-                                  </div>
+                                  </span>
                                 </div>
+                              </div>
+
+                              {/* Title big */}
+                              <h4
+                                className="font-bold text-white text-base sm:text-lg leading-tight mb-3 line-clamp-2"
+                                title={ex.title}
+                              >
+                                {ex.title}
+                              </h4>
+
+                              {/* Bottom row: badges (left) · Start button (right) */}
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                  {isHot && (
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-rose-500/30 bg-rose-500/12 text-xs font-bold text-rose-300">
+                                      Mới
+                                    </span>
+                                  )}
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold"
+                                    style={{
+                                      borderColor: `${t.from}50`,
+                                      background: `${t.from}18`,
+                                      color: 'white',
+                                    }}
+                                  >
+                                    <span>{t.emoji}</span> {subject.tag === 'EXM' ? ex.examType : subject.tag}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-white/[0.12] bg-white/[0.03] text-xs text-white/70">
+                                    {ex.totalScore} điểm
+                                  </span>
+                                  {ex.user?.name && (
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] text-xs text-white/55">
+                                      GV: {ex.user.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => startFromTeacherExam(ex.id, "exam", ex.title)}
+                                  disabled={loading}
+                                  className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-white font-bold text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                    boxShadow: `0 2px 12px ${t.from}50`,
+                                  }}
+                                  title={`Bắt đầu — ${ex.title}`}
+                                >
+                                  <Rocket className="h-4 w-4" />
+                                  Bắt đầu
+                                </button>
                               </div>
                             </div>
                           )
