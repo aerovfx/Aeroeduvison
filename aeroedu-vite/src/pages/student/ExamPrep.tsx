@@ -1084,19 +1084,29 @@ export default function ExamPrepPage() {
                                       {ex.totalScore}
                                     </span>
                                   </div>
-                                  <button
-                                    onClick={() => startFromTeacherExam(ex.id, "exam", ex.title)}
-                                    disabled={loading}
-                                    className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
-                                    style={{
-                                      background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
-                                      boxShadow: `0 2px 12px ${t.from}50`,
-                                    }}
-                                    title={`Bắt đầu — ${ex.title}`}
-                                  >
-                                    <Rocket className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Bắt đầu</span>
-                                  </button>
+                                  {/* QR icon button + Bắt đầu */}
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <QuickScanQr
+                                      variant="compact"
+                                      accent="indigo"
+                                      title={`Quét QR — ${ex.title}`}
+                                      downloadName={`qr-exam-${ex.id}.png`}
+                                      targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
+                                    />
+                                    <button
+                                      onClick={() => startFromTeacherExam(ex.id, "exam", ex.title)}
+                                      disabled={loading}
+                                      className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
+                                      style={{
+                                        background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                        boxShadow: `0 2px 12px ${t.from}50`,
+                                      }}
+                                      title={`Bắt đầu — ${ex.title}`}
+                                    >
+                                      <Rocket className="h-3.5 w-3.5" />
+                                      <span className="hidden sm:inline">Bắt đầu</span>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             </div>
