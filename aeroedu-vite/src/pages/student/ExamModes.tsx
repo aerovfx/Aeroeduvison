@@ -15,7 +15,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Play, Users, BookOpen, Volume2, Clock, Sparkles, ArrowLeft, X, Copy, Check, FileText } from 'lucide-react'
+import { Play, Users, BookOpen, Volume2, Clock, Sparkles, ArrowLeft, X, Copy, Check, FileText, Shuffle, Layers } from 'lucide-react'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 
@@ -30,8 +30,17 @@ interface Exam {
 }
 
 const PREFS_KEY = 'exam-prefs-v1'
-type Prefs = { readAloud: boolean; timer: boolean; powerups: boolean }
-const defaultPrefs: Prefs = { readAloud: false, timer: true, powerups: true }
+type Prefs = {
+  readAloud: boolean
+  timer: boolean
+  powerups: boolean
+  shuffleOrder: boolean
+  shuffleOptions: boolean
+}
+const defaultPrefs: Prefs = {
+  readAloud: false, timer: true, powerups: true,
+  shuffleOrder: false, shuffleOptions: false,
+}
 
 export default function ExamModesPage() {
   const { examId } = useParams<{ examId: string }>()
@@ -147,9 +156,15 @@ export default function ExamModesPage() {
           {/* Settings */}
           <div className="bg-white/[0.04] rounded-2xl p-4">
             <p className="text-white/60 text-xs uppercase tracking-wider mb-3">Settings</p>
-            <SettingRow icon={<Volume2 className="w-4 h-4" />} label="Read text aloud"
+            <SettingRow icon={<Shuffle className="w-4 h-4" />} label="Xáo trộn câu hỏi"
+              hint="Đổi thứ tự câu mỗi lần làm để tránh học vẹt"
+              on={prefs.shuffleOrder} onToggle={() => toggle('shuffleOrder')} />
+            <SettingRow icon={<Layers className="w-4 h-4" />} label="Xáo trộn đáp án"
+              hint="Đổi vị trí A/B/C/D — đáp án đúng tự động cập nhật"
+              on={prefs.shuffleOptions} onToggle={() => toggle('shuffleOptions')} />
+            <SettingRow icon={<Volume2 className="w-4 h-4" />} label="Đọc to câu hỏi"
               on={prefs.readAloud} onToggle={() => toggle('readAloud')} />
-            <SettingRow icon={<Clock className="w-4 h-4" />} label="Timer"
+            <SettingRow icon={<Clock className="w-4 h-4" />} label="Đếm ngược"
               on={prefs.timer} onToggle={() => toggle('timer')} />
             <SettingRow icon={<Sparkles className="w-4 h-4" />} label="Power-ups"
               on={prefs.powerups} onToggle={() => toggle('powerups')} />
@@ -192,13 +207,18 @@ export default function ExamModesPage() {
   )
 }
 
-function SettingRow({ icon, label, on, onToggle }: { icon: React.ReactNode; label: string; on: boolean; onToggle: () => void }) {
+function SettingRow({ icon, label, hint, on, onToggle }: {
+  icon: React.ReactNode; label: string; hint?: string; on: boolean; onToggle: () => void
+}) {
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-white/[0.05] last:border-0">
       <span className="text-white/60">{icon}</span>
-      <span className="flex-1 text-white/80 text-sm">{label}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-white/85 text-sm">{label}</p>
+        {hint && <p className="text-white/40 text-[10px] leading-tight mt-0.5">{hint}</p>}
+      </div>
       <button onClick={onToggle}
-        className={`relative w-10 h-5 rounded-full transition-colors ${on ? 'bg-green-500' : 'bg-white/15'}`}>
+        className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${on ? 'bg-green-500' : 'bg-white/15'}`}>
         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${on ? 'left-[22px]' : 'left-0.5'}`} />
       </button>
     </div>

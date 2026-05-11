@@ -17,6 +17,7 @@ import { Clock, Send, Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle } from '
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
+import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
 
 interface Question {
   id: string
@@ -59,7 +60,11 @@ export default function ExamSheetPage() {
         const res = await axios.get<{ exam: Exam; questions: Question[] }>(`/api/exams/${examId}`)
         if (cancelled) return
         setExam(res.data.exam)
-        setQuestions(res.data.questions || [])
+        // Apply shuffle prefs từ ExamModes settings (localStorage)
+        const prefs = readShufflePrefs()
+        const seed = `${examId}-sheet`
+        const qs = shuffleQuestions(res.data.questions || [], { ...prefs, seed })
+        setQuestions(qs)
         setTimeLeft((res.data.exam?.duration || 45) * 60)
       } catch (err: unknown) {
         const e = err as { response?: { data?: { error?: string } } }

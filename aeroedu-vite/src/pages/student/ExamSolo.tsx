@@ -17,6 +17,7 @@ import { ArrowLeft, ChevronRight, Trophy, RotateCcw, Clock, CheckCircle2, XCircl
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
+import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
 
 interface Question {
   id: string
@@ -73,7 +74,11 @@ export default function ExamSoloPage() {
         const r = await axios.get<{ exam: any; questions: Question[] }>(`/api/exams/${examId}`)
         if (cancelled) return
         setExam({ title: r.data.exam.title, duration: r.data.exam.duration })
-        setQuestions(r.data.questions || [])
+        // Apply shuffle prefs (lưu localStorage từ ExamModes settings)
+        const prefs = readShufflePrefs()
+        const seed = `${examId}-${r.data.exam.title}`
+        const qs = shuffleQuestions(r.data.questions || [], { ...prefs, seed })
+        setQuestions(qs)
         setTimeLeft((r.data.exam.duration || 45) * 60)
       } catch (e) {
         toast.error('Không tải được đề thi')

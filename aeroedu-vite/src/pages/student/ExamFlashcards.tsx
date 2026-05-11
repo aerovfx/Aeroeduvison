@@ -17,6 +17,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, RotateCcw, BookOpen, Shuffle, Spa
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
+import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
 
 interface Question {
   id: string
@@ -47,7 +48,15 @@ export default function ExamFlashcardsPage() {
         const r = await axios.get<{ exam: any; questions: Question[] }>(`/api/exams/${examId}`)
         if (cancelled) return
         setExam({ title: r.data.exam.title })
-        setQuestions(r.data.questions || [])
+        // Flashcards mode: chỉ apply shuffle question order (không shuffle options
+        // để mặt sau "Đáp án đúng" hiển thị đúng letter trong context bài học).
+        const prefs = readShufflePrefs()
+        const qs = shuffleQuestions(r.data.questions || [], {
+          shuffleOrder: prefs.shuffleOrder,
+          shuffleOptions: false,
+          seed: `${examId}-flashcards`,
+        })
+        setQuestions(qs)
       } catch {
         toast.error('Không tải được đề thi')
         navigate(-1)
