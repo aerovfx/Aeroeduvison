@@ -199,7 +199,7 @@ export default function PlayRoom() {
     )
   }
 
-  // ─── PLAYING ──────────────────────────────────────────
+  // ─── PLAYING — Wayground/Quizizz style fullscreen 2x2 grid ────
   if (view === 'playing') {
     const q = state?.currentQuestion
     if (!q) {
@@ -210,64 +210,151 @@ export default function PlayRoom() {
         </div>
       )
     }
+
+    // Scoring meter — tính từ answersHistory (lưu trong ref, accumulate đáp án)
+    const totalQ = state?.room.totalQuestions || 1
+    const progress = ((q.index + 1) / totalQ) * 100
+    // Số câu đã trả lời + correct count derive từ score (rough): nếu >= 500 mỗi câu correct → streak counter
+    const correctCount = me?.correctCount ?? 0
+    const answered = q.index + (selected ? 1 : 0)
+    const accuracy = answered > 0 ? Math.round((correctCount / answered) * 100) : 0
+
+    // Wayground 4-color palette (olive/purple/orange/teal)
+    const optionPalette = [
+      { bg: 'linear-gradient(135deg, #b5b400, #8a8a00)', label: 'A', shape: '◆', num: '1' },  // yellow-olive
+      { bg: 'linear-gradient(135deg, #b266ff, #8e3eff)', label: 'B', shape: '●', num: '2' },  // purple
+      { bg: 'linear-gradient(135deg, #ff9933, #e67700)', label: 'C', shape: '▲', num: '3' },  // orange
+      { bg: 'linear-gradient(135deg, #1ec9b1, #11a892)', label: 'D', shape: '■', num: '4' },  // teal
+    ]
+
     return (
-      <div className="min-h-screen flex flex-col px-4 py-6"
+      <div className="min-h-screen flex flex-col"
         style={{ background: 'radial-gradient(ellipse at top, #4a1366 0%, #1a0b2e 70%)' }}>
-        {/* Header: avatar + name + score */}
-        <div className="flex items-center justify-between mb-4">
+
+        {/* ════ TOP BAR: logo · score · progress · streak · fullscreen ════ */}
+        <div className="px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-3xl">{avatar}</span>
-            <span className="text-white font-bold">{name}</span>
+            <span className="text-2xl">⚡</span>
+            <div className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-400/40 text-yellow-300 font-black text-base md:text-lg">
+              {me?.score ?? 0}
+            </div>
+            {correctCount >= 2 && (
+              <div className="px-2 py-1 rounded-lg bg-orange-500/20 border border-orange-400/40 text-orange-300 font-bold text-xs flex items-center gap-1" title="Streak — chuỗi đúng">
+                🔥 {correctCount}
+              </div>
+            )}
           </div>
-          <div className="px-4 py-2 rounded-xl bg-yellow-500/20 border border-yellow-400/40 text-yellow-300 font-black text-xl">
-            {me?.score ?? 0}
+
+          {/* Progress badge giữa */}
+          <div className="px-4 py-1.5 rounded-full bg-black/60 border border-white/[0.08] text-yellow-300 font-bold text-sm md:text-base">
+            {q.index + 1} / {totalQ}
+          </div>
+
+          <button
+            onClick={() => {
+              if (document.fullscreenElement) document.exitFullscreen()
+              else document.documentElement.requestFullscreen?.()
+            }}
+            className="w-9 h-9 rounded-lg bg-white/[0.08] hover:bg-white/[0.15] text-white/80 flex items-center justify-center transition"
+            title="Toàn màn hình"
+          >
+            ⛶
+          </button>
+        </div>
+
+        {/* ════ Progress bar + accuracy meter ════ */}
+        <div className="px-4 mb-2">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="flex-1 h-1.5 bg-black/40 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {answered > 0 && (
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                accuracy >= 80 ? 'text-green-400' : accuracy >= 50 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {accuracy}% đúng
+              </span>
+            )}
           </div>
         </div>
 
-        <p className="text-white/60 text-sm mb-2">Câu {q.index + 1} / {state?.room.totalQuestions}</p>
-
-        {/* Question */}
-        <div className="bg-black/40 backdrop-blur rounded-3xl p-5 mb-5">
-          <MathText as="div" className="text-white text-xl md:text-2xl font-medium leading-relaxed">
-            {q.content}
-          </MathText>
+        {/* ════ QUESTION — chữ to giữa màn hình ════ */}
+        <div className="flex-shrink-0 px-4 md:px-8 mb-4">
+          <div className="max-w-5xl mx-auto bg-black/50 backdrop-blur-xl rounded-2xl px-6 py-6 md:py-10">
+            <MathText as="div" className="text-white text-xl md:text-3xl lg:text-4xl font-medium leading-snug text-center">
+              {q.content}
+            </MathText>
+          </div>
         </div>
 
-        {/* Result feedback after answering */}
+        {/* ════ Result feedback overlay (sau answer) ════ */}
         {lastResult && (
-          <div className={`mb-4 p-4 rounded-2xl text-center text-2xl font-black ${
-            lastResult.correct ? 'bg-green-500/20 text-green-300 border border-green-500/40' : 'bg-red-500/20 text-red-300 border border-red-500/40'
-          }`}>
-            {lastResult.correct ? `✅ ĐÚNG! +${lastResult.points} điểm` : '❌ SAI'}
+          <div className="px-4 mb-3">
+            <div className={`max-w-3xl mx-auto p-4 rounded-2xl text-center text-2xl md:text-3xl font-black animate-in zoom-in-95 ${
+              lastResult.correct
+                ? 'bg-green-500/30 text-green-200 border-2 border-green-400/50 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+                : 'bg-red-500/30 text-red-200 border-2 border-red-400/50 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+            }`}>
+              {lastResult.correct ? `✅ CHÍNH XÁC! +${lastResult.points} điểm` : '❌ CHƯA ĐÚNG'}
+            </div>
           </div>
         )}
 
-        {/* Options */}
-        {q.options?.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3">
-            {q.options.map((opt, i) => {
-              const isSelected = selected === opt
-              const colors = [
-                'from-red-500 to-red-600',
-                'from-blue-500 to-blue-600',
-                'from-yellow-500 to-yellow-600',
-                'from-green-500 to-green-600',
-              ]
-              return (
-                <button key={i} onClick={() => submitAnswer(opt)} disabled={!!selected}
-                  className={`p-5 rounded-2xl text-white text-lg md:text-xl font-bold text-left
-                    bg-gradient-to-r ${colors[i % 4]}
-                    ${isSelected ? 'ring-4 ring-white scale-95' : selected ? 'opacity-40' : 'hover:scale-[1.02] active:scale-95'}
-                    transition-all shadow-xl disabled:cursor-not-allowed`}>
-                  <MathText as="span">{opt}</MathText>
-                </button>
-              )
-            })}
+        {/* ════ OPTIONS — 2x2 grid full screen, 4 màu Wayground, chữ to ════ */}
+        <div className="flex-1 px-3 md:px-6 pb-3 md:pb-6">
+          {q.options?.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 md:gap-4 h-full max-w-7xl mx-auto">
+              {q.options.map((opt, i) => {
+                const isSelected = selected === opt
+                const c = optionPalette[i % 4]
+                return (
+                  <button
+                    key={i}
+                    onClick={() => submitAnswer(opt)}
+                    disabled={!!selected}
+                    className={`relative p-6 md:p-8 rounded-2xl text-white text-xl md:text-3xl lg:text-4xl font-bold flex items-center justify-center text-center
+                      shadow-2xl transition-all
+                      ${isSelected
+                        ? 'ring-4 md:ring-8 ring-white scale-95 brightness-110'
+                        : selected
+                          ? 'opacity-30 scale-95'
+                          : 'hover:scale-[1.02] active:scale-95 hover:brightness-110'}
+                      disabled:cursor-not-allowed`}
+                    style={{ background: c.bg, minHeight: '140px' }}
+                  >
+                    {/* Number badge top-right */}
+                    <span className="absolute top-2 right-3 px-2 py-0.5 rounded bg-black/30 text-white/90 text-xs font-bold">
+                      {c.num}
+                    </span>
+                    {/* Shape badge top-left */}
+                    <span className="absolute top-2 left-3 text-2xl text-white/70">{c.shape}</span>
+                    <MathText as="span" className="block px-2 leading-tight">
+                      {opt}
+                    </MathText>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="max-w-2xl mx-auto">
+              <ShortAnswerInput onSubmit={submitAnswer} disabled={!!selected} />
+            </div>
+          )}
+        </div>
+
+        {/* ════ Bottom: avatar + name (góc trái) ════ */}
+        <div className="px-4 py-2 flex items-center justify-between text-white/70 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{avatar}</span>
+            <span className="font-medium truncate max-w-[150px]">{name}</span>
           </div>
-        ) : (
-          /* SHORT_ANSWER */
-          <ShortAnswerInput onSubmit={submitAnswer} disabled={!!selected} />
-        )}
+          <div className="text-white/40 text-xs">
+            {state?.participants.length ?? 0} 👥
+          </div>
+        </div>
       </div>
     )
   }
