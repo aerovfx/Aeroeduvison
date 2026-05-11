@@ -5647,7 +5647,10 @@ if (!USE_NODEJS_QUESTIONS) {
   // GET /api/exams/:id — detail + questions, cho học sinh xem trước khi làm.
   // Cho phép xem nếu (a) là exam công khai + status "Đang diễn ra", hoặc
   // (b) là chủ đề thi (Bearer token khớp userId).
-  app.get('/api/exams/:id', async (req, res) => {
+  app.get('/api/exams/:id', async (req, res, next) => {
+    // Skip nếu :id là special path (vd 'generate-from-matrix') — let next
+    // handler match. Express :id wildcard match cả static path → cần guard.
+    if (req.params.id === 'generate-from-matrix') return next('route');
     try {
       const xpool = getXPool();
       if (!xpool) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
