@@ -6510,7 +6510,9 @@ app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
   });
 }
 
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
+// NOTE: proxy /api/exams* moved to LATER in file — phải đăng ký AFTER
+// /api/exams/generate-from-matrix endpoints (line 7263+) để Express match
+// specific routes trước catch-all proxy.
 
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN LATEX PROJECTS — không cần pixiai-latex Cloud Run riêng
@@ -7454,6 +7456,11 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   });
   app.post('/api/ai/exam/generate-from-matrix', notImpl());
   app.post('/api/ai/exam/generate-multiple-variants', notImpl());
+
+  // Proxy /api/exams* (catch-all) đăng ký SAU specific routes ở trên.
+  // Trước đây ở line 6513 nhưng catch trước nên endpoint generate-from-matrix
+  // bị shadow → 503 ECONNREFUSED 127.0.0.1:8098 (media-service không tồn tại).
+  app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
   // ─ AI services ────────────────────────────────────────────
   app.get('/api/ai-tutor/conversations', (_req, res) => res.json({ conversations: [] }));
