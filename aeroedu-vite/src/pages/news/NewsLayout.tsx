@@ -17,8 +17,8 @@ interface NewsLayoutProps {
 export function NewsLayout({ children, breadcrumb = [] }: NewsLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar đỏ kiểu Soha */}
-      <header className="sticky top-0 z-30 bg-[hsl(0,73%,45%)] text-white shadow-md">
+      {/* Top bar gradient — đồng bộ với màu chủ đạo của site (purple → blue) */}
+      <header className="sticky top-0 z-30 bg-gradient-to-r from-[hsl(262,83%,58%)] via-[hsl(245,75%,55%)] to-[hsl(210,85%,55%)] text-white shadow-md">
         <div className="max-w-[1200px] mx-auto flex items-center gap-3 px-4 py-2.5">
           <Link to="/" className="flex items-center gap-1 text-sm hover:underline" title="Trang chủ">
             <Home className="w-4 h-4" />
@@ -43,7 +43,7 @@ export function NewsLayout({ children, breadcrumb = [] }: NewsLayoutProps) {
               <span key={i} className="inline-flex items-center">
                 {i > 0 && <ChevronRight className="w-3 h-3 mx-1 opacity-50" />}
                 {b.to ? (
-                  <Link to={b.to} className="hover:text-[hsl(0,73%,45%)] hover:underline">{b.label}</Link>
+                  <Link to={b.to} className="hover:text-[hsl(262,83%,58%)] hover:underline">{b.label}</Link>
                 ) : (
                   <span className="text-foreground font-medium">{b.label}</span>
                 )}

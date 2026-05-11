@@ -37,7 +37,7 @@ function H2({ children }: { children: ReactNode }) {
 }
 function Quote({ children, attribution }: { children: ReactNode; attribution?: string }) {
   return (
-    <blockquote className="my-5 pl-4 border-l-4 border-[hsl(0,73%,45%)] bg-red-50/50 dark:bg-red-950/20 py-2">
+    <blockquote className="my-5 pl-4 border-l-4 border-[hsl(262,83%,58%)] bg-[hsl(262,83%,58%)]/5 py-2 rounded-r-md">
       <p className="text-[17px] italic text-foreground leading-[1.7]">"{children}"</p>
       {attribution && <p className="text-sm text-muted-foreground mt-1">— {attribution}</p>}
     </blockquote>
@@ -88,7 +88,7 @@ export const NEWS: NewsArticle[] = [
       <>
         <P>
           AeroEduVision vừa chính thức "mở cổng" chế độ làm bài <Strong>Mastery Peak</Strong> tại
-          {' '}<a href="/student/exam-prep" className="text-[hsl(0,73%,45%)] hover:underline">trang ôn thi</a>{' '}
+          {' '}<a href="/student/exam-prep" className="text-[hsl(262,83%,58%)] hover:underline">trang ôn thi</a>{' '}
           dành cho học sinh THPT. Khác với các nền tảng học trực tuyến truyền thống — nơi sai câu là
           mất điểm, mất lượt, có khi bị reset — Mastery Peak chọn cách tiếp cận hoàn toàn khác:
           <Strong> đúng thì tiến, sai thì đứng yên</Strong>. Không có hình phạt, chỉ có khích lệ.
@@ -152,7 +152,7 @@ export const NEWS: NewsArticle[] = [
 
         <P>
           Học sinh có thể trải nghiệm Mastery Peak ngay tại{' '}
-          <a href="/student/exam-prep" className="text-[hsl(0,73%,45%)] font-medium hover:underline">
+          <a href="/student/exam-prep" className="text-[hsl(262,83%,58%)] font-medium hover:underline">
             inphysic.com/student/exam-prep
           </a>. Tài khoản miễn phí dùng được tất cả 5 chế độ, không giới hạn số lần làm bài.
         </P>
@@ -178,7 +178,7 @@ export const NEWS: NewsArticle[] = [
         <P>
           Một tuần trước, nhiều giáo viên báo lỗi "tofu box" — các ô vuông trắng thay thế dấu tiếng
           Việt — khi compile đề thi LaTeX qua module{' '}
-          <a href="/teacher/latex-documents" className="text-[hsl(0,73%,45%)] hover:underline">
+          <a href="/teacher/latex-documents" className="text-[hsl(262,83%,58%)] hover:underline">
             Soạn LaTeX
           </a>. Nguyên nhân: pipeline cũ dùng pdfLaTeX với{' '}
           <code className="text-[15px] bg-muted px-1 rounded">babel[vietnamese]</code> nhưng container
@@ -303,7 +303,7 @@ export const NEWS: NewsArticle[] = [
 
         <P>
           Chi tiết kỹ thuật xem tại{' '}
-          <a href="/docs/qr-exam" className="text-[hsl(0,73%,45%)] font-medium hover:underline">
+          <a href="/docs/qr-exam" className="text-[hsl(262,83%,58%)] font-medium hover:underline">
             Tài liệu — QR code đề thi
           </a>.
         </P>
@@ -356,7 +356,7 @@ export const NEWS: NewsArticle[] = [
         <H2>Hỗ trợ từ AeroEduVision</H2>
 
         <P>
-          Module <a href="/teacher/exam-matrix" className="text-[hsl(0,73%,45%)] hover:underline">
+          Module <a href="/teacher/exam-matrix" className="text-[hsl(262,83%,58%)] hover:underline">
             Ma trận đề
           </a>{' '}
           của AeroEduVision đã được cập nhật ngày 1/5 để khớp 100% cấu trúc mới. Giáo viên chỉ cần
@@ -371,7 +371,7 @@ export const NEWS: NewsArticle[] = [
 
         <P>
           Sau khi lưu ma trận, bấm <Strong>Sinh đề</Strong> — backend tự rút câu hỏi từ
-          {' '}<a href="/teacher/question-bank" className="text-[hsl(0,73%,45%)] hover:underline">
+          {' '}<a href="/teacher/question-bank" className="text-[hsl(262,83%,58%)] hover:underline">
             ngân hàng
           </a>{' '}
           + AI bổ sung nếu thiếu. Hỗ trợ Llama 3.3 70B, Qwen 2.5 32B, GPT-OSS qua fal.ai.
@@ -387,7 +387,7 @@ export const NEWS: NewsArticle[] = [
         <P>
           AeroEduVision đang chuẩn bị 30 đề mẫu cho 3 môn: Toán, Vật lý, Hoá học — theo đúng cấu
           trúc THPT 2026. Dự kiến phát hành miễn phí trong tháng 6/2026 tại{' '}
-          <a href="/student/exam-prep" className="text-[hsl(0,73%,45%)] hover:underline">
+          <a href="/student/exam-prep" className="text-[hsl(262,83%,58%)] hover:underline">
             trang ôn thi
           </a>.
         </P>
@@ -468,7 +468,7 @@ export const NEWS: NewsArticle[] = [
 
         <P>
           Chi tiết kỹ thuật về backoff và banner state machine xem tại{' '}
-          <a href="/docs/cold-start" className="text-[hsl(0,73%,45%)] font-medium hover:underline">
+          <a href="/docs/cold-start" className="text-[hsl(262,83%,58%)] font-medium hover:underline">
             Tài liệu — Cold-start
           </a>.
         </P>
@@ -533,7 +533,7 @@ export const NEWS: NewsArticle[] = [
 
         <P>
           Trải nghiệm tại{' '}
-          <a href="/teacher/taodethi" className="text-[hsl(0,73%,45%)] font-medium hover:underline">
+          <a href="/teacher/taodethi" className="text-[hsl(262,83%,58%)] font-medium hover:underline">
             inphysic.com/teacher/taodethi
           </a>. Lần đầu dùng có 5 lần extract miễn phí.
         </P>

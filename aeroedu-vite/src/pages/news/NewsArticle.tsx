@@ -56,7 +56,7 @@ export default function NewsArticle() {
         {/* Main article */}
         <article className="max-w-[720px]">
           {/* Category tag */}
-          <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-[hsl(0,73%,45%)] mb-3">
+          <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-[hsl(262,83%,58%)] mb-3">
             {CATEGORY_LABELS[article.category]}
           </span>
 
@@ -66,7 +66,7 @@ export default function NewsArticle() {
           </h1>
 
           {/* Sapo (lead) */}
-          <p className="text-[19px] leading-[1.55] font-semibold text-muted-foreground mb-5 border-l-4 border-[hsl(0,73%,45%)] pl-4">
+          <p className="text-[19px] leading-[1.55] font-semibold text-muted-foreground mb-5 border-l-4 border-[hsl(262,83%,58%)] pl-4">
             {article.sapo}
           </p>
 
@@ -187,8 +187,8 @@ export default function NewsArticle() {
 
           {/* Same-category footer */}
           {sameCat.length > 0 && (
-            <section className="mt-10 pt-6 border-t-2 border-[hsl(0,73%,45%)]">
-              <h2 className="text-base font-bold uppercase tracking-wider text-[hsl(0,73%,45%)] mb-4">
+            <section className="mt-10 pt-6 border-t-2 border-[hsl(262,83%,58%)]">
+              <h2 className="text-base font-bold uppercase tracking-wider text-[hsl(262,83%,58%)] mb-4">
                 Cùng chuyên mục
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -200,7 +200,7 @@ export default function NewsArticle() {
                       className="w-24 h-20 object-cover rounded-md flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold leading-snug text-foreground group-hover:text-[hsl(0,73%,45%)] transition-colors line-clamp-3">
+                      <h3 className="text-sm font-semibold leading-snug text-foreground group-hover:text-[hsl(262,83%,58%)] transition-colors line-clamp-3">
                         {n.title}
                       </h3>
                       <div className="text-[11px] text-muted-foreground mt-1">
@@ -218,18 +218,18 @@ export default function NewsArticle() {
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
           {/* Most viewed */}
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(0,73%,45%)] pb-2 mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(262,83%,58%)] pb-2 mb-3">
               Tin xem nhiều
             </h3>
             <ol className="space-y-3">
               {mostViewed.map((n, i) => (
                 <li key={n.slug} className="flex gap-3">
-                  <span className="text-2xl font-bold text-[hsl(0,73%,45%)] leading-none flex-shrink-0 w-6">
+                  <span className="text-2xl font-bold text-[hsl(262,83%,58%)] leading-none flex-shrink-0 w-6">
                     {i + 1}
                   </span>
                   <Link
                     to={`/news/${n.slug}`}
-                    className="text-sm font-medium leading-snug text-foreground hover:text-[hsl(0,73%,45%)] transition-colors line-clamp-3"
+                    className="text-sm font-medium leading-snug text-foreground hover:text-[hsl(262,83%,58%)] transition-colors line-clamp-3"
                   >
                     {n.title}
                   </Link>
@@ -240,7 +240,7 @@ export default function NewsArticle() {
 
           {/* Related */}
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(0,73%,45%)] pb-2 mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(262,83%,58%)] pb-2 mb-3">
               Tin liên quan
             </h3>
             <div className="space-y-3">
@@ -251,7 +251,7 @@ export default function NewsArticle() {
                     alt={n.title}
                     className="w-20 h-16 object-cover rounded-md flex-shrink-0"
                   />
-                  <h4 className="text-xs font-medium leading-snug text-foreground group-hover:text-[hsl(0,73%,45%)] transition-colors line-clamp-3">
+                  <h4 className="text-xs font-medium leading-snug text-foreground group-hover:text-[hsl(262,83%,58%)] transition-colors line-clamp-3">
                     {n.title}
                   </h4>
                 </Link>
@@ -259,12 +259,12 @@ export default function NewsArticle() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-[hsl(0,73%,45%)]/5 border border-[hsl(0,73%,45%)]/20 p-4">
+          <div className="rounded-lg bg-[hsl(262,83%,58%)]/5 border border-[hsl(262,83%,58%)]/20 p-4">
             <h3 className="font-bold text-foreground mb-1">📚 Tài liệu</h3>
             <p className="text-xs text-muted-foreground mb-2">
               Hướng dẫn sử dụng đầy đủ cho học sinh + giáo viên.
             </p>
-            <Link to="/docs" className="text-xs font-medium text-[hsl(0,73%,45%)] hover:underline">
+            <Link to="/docs" className="text-xs font-medium text-[hsl(262,83%,58%)] hover:underline">
               Xem tất cả →
             </Link>
           </div>

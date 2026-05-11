@@ -40,10 +40,10 @@ export default function NewsIndex() {
                 alt={featured.title}
                 className="w-full aspect-[16/9] object-cover rounded-md mb-4"
               />
-              <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-[hsl(0,73%,45%)] mb-2">
+              <span className="inline-block text-[11px] font-bold uppercase tracking-wide text-[hsl(262,83%,58%)] mb-2">
                 {CATEGORY_LABELS[featured.category]}
               </span>
-              <h1 className="text-[26px] sm:text-[30px] font-bold leading-tight text-foreground group-hover:text-[hsl(0,73%,45%)] transition-colors mb-2">
+              <h1 className="text-[26px] sm:text-[30px] font-bold leading-tight text-foreground group-hover:text-[hsl(262,83%,58%)] transition-colors mb-2">
                 {featured.title}
               </h1>
               <p className="text-base text-muted-foreground leading-relaxed line-clamp-3 mb-2">
@@ -73,10 +73,10 @@ export default function NewsIndex() {
                   alt={n.title}
                   className="w-full aspect-[16/9] object-cover rounded-md mb-3"
                 />
-                <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[hsl(0,73%,45%)] mb-1.5">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-wide text-[hsl(262,83%,58%)] mb-1.5">
                   {CATEGORY_LABELS[n.category]}
                 </span>
-                <h3 className="text-[17px] font-bold leading-snug text-foreground group-hover:text-[hsl(0,73%,45%)] transition-colors mb-1.5 line-clamp-2">
+                <h3 className="text-[17px] font-bold leading-snug text-foreground group-hover:text-[hsl(262,83%,58%)] transition-colors mb-1.5 line-clamp-2">
                   {n.title}
                 </h3>
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
@@ -105,18 +105,18 @@ export default function NewsIndex() {
         {/* Sidebar phải */}
         <aside className="space-y-6">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(0,73%,45%)] pb-2 mb-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-foreground border-b-2 border-[hsl(262,83%,58%)] pb-2 mb-3">
               Tin xem nhiều
             </h3>
             <ol className="space-y-3">
               {mostViewed.map((n, i) => (
                 <li key={n.slug} className="flex gap-3">
-                  <span className="text-2xl font-bold text-[hsl(0,73%,45%)] leading-none flex-shrink-0 w-6">
+                  <span className="text-2xl font-bold text-[hsl(262,83%,58%)] leading-none flex-shrink-0 w-6">
                     {i + 1}
                   </span>
                   <Link
                     to={`/news/${n.slug}`}
-                    className="text-sm font-medium leading-snug text-foreground hover:text-[hsl(0,73%,45%)] transition-colors line-clamp-3"
+                    className="text-sm font-medium leading-snug text-foreground hover:text-[hsl(262,83%,58%)] transition-colors line-clamp-3"
                   >
                     {n.title}
                   </Link>
@@ -125,14 +125,14 @@ export default function NewsIndex() {
             </ol>
           </div>
 
-          <div className="rounded-lg bg-[hsl(0,73%,45%)]/5 border border-[hsl(0,73%,45%)]/20 p-4">
+          <div className="rounded-lg bg-[hsl(262,83%,58%)]/5 border border-[hsl(262,83%,58%)]/20 p-4">
             <h3 className="font-bold text-foreground mb-1">📚 Tài liệu hệ thống</h3>
             <p className="text-xs text-muted-foreground mb-2">
               Hướng dẫn sử dụng đầy đủ cho học sinh + giáo viên.
             </p>
             <Link
               to="/docs"
-              className="text-xs font-medium text-[hsl(0,73%,45%)] hover:underline"
+              className="text-xs font-medium text-[hsl(262,83%,58%)] hover:underline"
             >
               Xem tất cả tài liệu →
             </Link>
