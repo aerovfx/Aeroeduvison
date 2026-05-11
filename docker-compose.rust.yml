@@ -1,0 +1,78 @@
+# Rust compute-heavy services: latex-compiler + aero-backend + Redis.
+#
+# Bring up:
+#   docker compose -f docker-compose.rust.yml up -d
+#
+# Health:
+#   curl http://localhost:8080/health   # latex-compiler
+#   curl http://localhost:8090/health   # aero-backend
+#
+# Wire from Next.js: set in .env.local
+#   LATEX_SERVICE_URL=http://localhost:8080
+#   RUST_BACKEND_URL=http://localhost:8090
+#   USE_RUST_OCR_GRADING_SERVICE=true
+#   USE_RUST_LLM_GRADING_SERVICE=true
+#   USE_RUST_VECTOR_SERVICE=true
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: aeroedu-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - aeroedu-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  latex-compiler:
+    build:
+      context: .
+      dockerfile: latex-compiler/Dockerfile
+    image: aeroedu/latex-compiler:latest
+    container_name: aeroedu-latex-compiler
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      BIND_HOST: "0.0.0.0"
+      BIND_PORT: "8080"
+      REDIS_URL: "redis://redis:6379"
+      RUST_LOG: "latex_compiler=info,warn"
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Linux-only sandbox via firejail (already installed in the image).
+    # AppArmor/SELinux on the host should still permit firejail invocation.
+    cap_drop:
+      - ALL
+    cap_add:
+      - SYS_ADMIN  # required for firejail user namespace
+    security_opt:
+      - no-new-privileges:true
+
+  aero-backend:
+    build:
+      context: .
+      dockerfile: rust-services/aero-backend/Dockerfile
+    image: aeroedu/aero-backend:latest
+    container_name: aeroedu-aero-backend
+    restart: unless-stopped
+    environment:
+      AERO_BACKEND_ADDR: "0.0.0.0:8090"
+      RUST_LOG: "aero_backend=info,warn"
+      # Optional: forward OCR auto-grade to an in-cluster OCR worker
+      # OCR_GRADING_BACKEND_URL: "http://ocr-grading:8012"
+    ports:
+      - "127.0.0.1:8090:8090"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  aeroedu-redis-data:
