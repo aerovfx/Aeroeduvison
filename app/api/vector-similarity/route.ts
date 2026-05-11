@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { VECTOR_BACKEND_URL } from '@/lib/rust-backend';
 
 // Simple in-memory cache for embeddings
 const embeddingCache = new Map<string, number[]>();
-// vector-sim-service has been merged into aero-backend (port 8090). The
-// legacy RUST_VECTOR_SERVICE_URL env var is honored for backwards
-// compatibility, but defaults to aero-backend now. Prefer RUST_BACKEND_URL.
-const RUST_VECTOR_SERVICE_URL =
-  process.env.RUST_VECTOR_SERVICE_URL ||
-  process.env.RUST_BACKEND_URL ||
-  'http://127.0.0.1:8090';
+const RUST_VECTOR_SERVICE_URL = VECTOR_BACKEND_URL;
 const USE_RUST_VECTOR_SERVICE = process.env.USE_RUST_VECTOR_SERVICE === 'true';
 
 // Calculate cosine similarity

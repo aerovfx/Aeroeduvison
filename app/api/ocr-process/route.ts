@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { OCR_LLM_BACKEND_URL } from '@/lib/rust-backend';
 
 // PaddleOCR server endpoint
 const OCR_SERVER_URL = process.env.OCR_SERVER_URL || 'http://localhost:8001';
-const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+const RUST_BACKEND_URL = OCR_LLM_BACKEND_URL;
 const USE_RUST_OCR_PROCESS_SERVICE = process.env.USE_RUST_OCR_PROCESS_SERVICE === 'true';
 
 export async function POST(req: NextRequest) {

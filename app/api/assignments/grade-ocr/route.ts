@@ -8,7 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
-const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+import { OCR_LLM_BACKEND_URL } from '@/lib/rust-backend';
+const RUST_BACKEND_URL = OCR_LLM_BACKEND_URL;
 const USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE = process.env.USE_RUST_ASSIGNMENTS_GRADE_OCR_SERVICE === 'true';
 
 // Simple similarity calculator for fallback

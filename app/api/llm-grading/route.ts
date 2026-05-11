@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { OCR_LLM_BACKEND_URL } from '@/lib/rust-backend';
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-const RUST_BACKEND_URL = process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8090';
+const RUST_BACKEND_URL = OCR_LLM_BACKEND_URL;
 const USE_RUST_LLM_GRADING_SERVICE = process.env.USE_RUST_LLM_GRADING_SERVICE === 'true';
 
 // Auto-select best AI based on context

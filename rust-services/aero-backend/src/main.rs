@@ -840,6 +840,24 @@ async fn clear_vector_cache() -> Json<CacheClearResponse> {
     })
 }
 
+// ────────────────────────────────────────────────────────────────────
+// DEPRECATED — OCR / LLM-grading handlers below should move to
+// rust-services/grading-service. aero-backend should be a thin
+// gateway, not a compute owner.
+//
+// Migration plan:
+//   1. Port handler bodies (ocr_grading_post, ocr_auto_grade_post,
+//      ocr_upload_post, ocr_process_post, llm_grading_post,
+//      assignments_grade_ocr_post) to grading-service/src/ocr.rs
+//      with identical request/response shapes.
+//   2. Add the same routes to grading-service main router.
+//   3. Flip Node API routes (app/api/ocr-*, /api/llm-grading,
+//      /api/assignments/grade-ocr) to read GRADING_SERVICE_URL
+//      (port 8100) instead of RUST_BACKEND_URL.
+//   4. Remove the handlers + routes from aero-backend; keep only
+//      vector-similarity and labtwin/quiz in aero-backend (gateway
+//      role).
+// ────────────────────────────────────────────────────────────────────
 async fn ocr_grading_post(
     State(state): State<AppState>,
     headers: HeaderMap,
