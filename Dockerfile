@@ -102,22 +102,28 @@ RUN npm config set fetch-timeout 600000 && \
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist
 
-# Non-root user
+# Non-root user — tạo HOME thực sự để tectonic có chỗ cache.
+# Tectonic 0.15 lookup cache theo $HOME/.cache/Tectonic (Linux convention).
 RUN groupadd --system --gid 1001 appuser && \
-    useradd --system --uid 1001 --gid appuser appuser && \
-    chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /var/cache/tectonic
+    useradd --system --create-home --home-dir /home/appuser \
+            --uid 1001 --gid appuser appuser && \
+    mkdir -p /home/appuser/.cache/Tectonic && \
+    chown -R appuser:appuser /app /home/appuser /var/cache/tectonic
 
-# Tectonic cache location for runtime
-ENV TECTONIC_CACHE_DIR=/var/cache/tectonic
+# Tectonic cache (env var cho V2 commands; HOME-based path cho V1 fallback)
+ENV TECTONIC_CACHE_DIR=/home/appuser/.cache/Tectonic \
+    HOME=/home/appuser
 
 USER appuser
 
-# Prewarm tectonic cache (download ~5MB packages cho hello world).
-# Lần compile đầu của user sẽ nhanh hơn nhiều (chỉ ~5s thay vì 30-60s).
-RUN echo '\documentclass{article}\begin{document}prewarm tectonic cache\end{document}' \
+# Prewarm tectonic cache (~5MB packages từ CTAN) — chạy AFTER USER switch
+# để cache đúng thuộc owner appuser. Fail soft: nếu network/CTAN down lúc
+# build thì skip, runtime sẽ lazy-fetch lần đầu (chậm hơn nhưng vẫn work).
+RUN set -eu; \
+    echo '\documentclass{article}\begin{document}prewarm\end{document}' \
       > /tmp/prewarm.tex && \
-    tectonic --outdir /tmp /tmp/prewarm.tex && \
+    (tectonic --outdir /tmp /tmp/prewarm.tex 2>&1 || \
+      echo "⚠ prewarm skipped — runtime will lazy-fetch") && \
     rm -f /tmp/prewarm.tex /tmp/prewarm.pdf /tmp/prewarm.log
 
 EXPOSE 8080
