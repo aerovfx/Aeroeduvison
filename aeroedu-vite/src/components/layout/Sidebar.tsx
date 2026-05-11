@@ -153,8 +153,9 @@ const teacherSections: RouteSection[] = [
   {
     titleKey: 'sectionHelp',
     routes: [
-      { icon: BookOpen,  labelKey: 'routeDocs', href: '/docs' },
-      { icon: Newspaper, labelKey: 'routeNews', href: '/news' },
+      { icon: BookOpen,  labelKey: 'routeDocs',        href: '/docs' },
+      { icon: Newspaper, labelKey: 'routeNews',        href: '/news' },
+      { icon: FileEdit,  labelKey: 'routeNewsCompose', href: '/teacher/news/create' },
     ],
   },
 ]
@@ -183,9 +184,10 @@ const adminSections: RouteSection[] = [
   {
     titleKey: 'sectionOperations',
     routes: [
-      { icon: Shield,   labelKey: 'routeOperations',   href: '/admin/operations' },
-      { icon: Brain,    labelKey: 'routeModels',        href: '/admin/models' },
-      { icon: Settings, labelKey: 'routeAdminSettings', href: '/admin/settings' },
+      { icon: Shield,      labelKey: 'routeOperations',    href: '/admin/operations' },
+      { icon: Brain,       labelKey: 'routeModels',        href: '/admin/models' },
+      { icon: Settings,    labelKey: 'routeAdminSettings', href: '/admin/settings' },
+      { icon: CheckSquare, labelKey: 'routeNewsReview',    href: '/admin/news/review' },
     ],
   },
   {

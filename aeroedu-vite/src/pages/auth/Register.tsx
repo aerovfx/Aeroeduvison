@@ -6,7 +6,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react'
+import { Eye, EyeOff, Loader2, GraduationCap, User as UserIcon, Briefcase } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const { t } = useLanguage()
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [role, setRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT')
   const { register: registerUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -41,7 +42,7 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormData) => {
     setError(null)
     try {
-      await registerUser(data.name, data.email, data.password)
+      await registerUser(data.name, data.email, data.password, role)
       navigate(from, { replace: true })
     } catch (err: unknown) {
       type ApiErr = {
@@ -90,6 +91,46 @@ export default function RegisterPage() {
               {error}
             </div>
           )}
+
+          {/* Role picker — Học sinh / Giáo viên (mặc định Học sinh) */}
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-foreground mb-2">Bạn là:</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setRole('STUDENT')}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                  role === 'STUDENT'
+                    ? 'border-[hsl(262,83%,58%)] bg-[hsl(262,83%,58%)]/8 text-foreground'
+                    : 'border-border bg-card hover:border-border/80 text-muted-foreground'
+                }`}
+              >
+                <UserIcon className={`w-5 h-5 ${role === 'STUDENT' ? 'text-[hsl(262,83%,58%)]' : ''}`} />
+                <span className="font-semibold text-sm">Học sinh</span>
+                <span className="text-[11px] text-muted-foreground text-center leading-tight">
+                  Học, làm bài thi, dùng AI Tutor cơ bản
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRole('TEACHER')}
+                className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                  role === 'TEACHER'
+                    ? 'border-[hsl(175,80%,45%)] bg-[hsl(175,80%,45%)]/8 text-foreground'
+                    : 'border-border bg-card hover:border-border/80 text-muted-foreground'
+                }`}
+              >
+                <Briefcase className={`w-5 h-5 ${role === 'TEACHER' ? 'text-[hsl(175,80%,45%)]' : ''}`} />
+                <span className="font-semibold text-sm">Giáo viên</span>
+                <span className="text-[11px] text-muted-foreground text-center leading-tight">
+                  Soạn đề, ma trận, quản lý lớp
+                </span>
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1.5 leading-tight">
+              Tài khoản Giáo viên có thêm module soạn đề + quản lý lớp. Có thể nâng cấp sau qua liên hệ admin.
+            </p>
+          </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Full name */}

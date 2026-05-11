@@ -471,10 +471,12 @@ if (USE_NODEJS_AUTH) {
   // ── POST /api/auth/register ───────────────────────────────
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { email, password, name } = req.body || {};
+      const { email, password, name, role } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email và mật khẩu không được để trống' });
       }
+      // role: 'STUDENT' (default) hoặc 'TEACHER'. KHÔNG cho phép tự đăng ký ADMIN.
+      const safeRole = String(role || '').toUpperCase() === 'TEACHER' ? 'TEACHER' : 'STUDENT';
 
       const pool = getPool();
       const existing = await pool.query(
@@ -496,8 +498,8 @@ if (USE_NODEJS_AUTH) {
           id, email, name, password, role, image,
           "emailVerified", "twoFactorEnabled", "failedLoginAttempts",
           "createdAt", "updatedAt"
-        ) VALUES ($1,$2,$3,$4,'STUDENT',NULL,NULL,false,0,$5,$6)`,
-        [id, email.toLowerCase().trim(), displayName, hash, now, now]
+        ) VALUES ($1,$2,$3,$4,$5,NULL,NULL,false,0,$6,$7)`,
+        [id, email.toLowerCase().trim(), displayName, hash, safeRole, now, now]
       );
 
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
@@ -7548,6 +7550,239 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
     app.get('/api/courses/dashboard', (_req, res) =>
       res.json({ completedCourses: [], coursesInProgress: [] })
     );
+
+    // ══════════════════════════════════════════════════════════
+    // NEWS DRAFTS — Giáo viên soạn tin, Admin duyệt, public hiển thị
+    // ══════════════════════════════════════════════════════════
+    async function ensureNewsTable() {
+      const pool = getCPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "NewsDraft" (
+          id          TEXT PRIMARY KEY,
+          slug        TEXT UNIQUE NOT NULL,
+          title       TEXT NOT NULL,
+          sapo        TEXT,
+          body        TEXT,
+          hero_image  TEXT,
+          tags        TEXT,
+          category    TEXT DEFAULT 'cong-nghe-giao-duc',
+          status      TEXT NOT NULL DEFAULT 'PENDING',
+          "authorId"  TEXT NOT NULL,
+          "authorName" TEXT,
+          "rejectReason" TEXT,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          "publishedAt" TIMESTAMPTZ,
+          views       INTEGER DEFAULT 0
+        )
+      `);
+    }
+    function getUserFromAuth(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = ljwt.verify(auth.slice(7), LJWT_SECRET);
+        return { id: d.sub || d.userId, email: d.email, role: d.role || 'STUDENT', name: d.name };
+      } catch { return null; }
+    }
+    function slugify(s) {
+      return String(s).toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'd')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim().replace(/\s+/g, '-')
+        .slice(0, 80) || `tin-${Date.now()}`;
+    }
+
+    // GET /api/news — public list (PUBLISHED)
+    app.get('/api/news', async (_req, res) => {
+      const pool = getCPool();
+      if (!pool) return res.json({ items: [] });
+      try {
+        await ensureNewsTable();
+        const { rows } = await pool.query(
+          `SELECT * FROM "NewsDraft"
+            WHERE status = 'PUBLISHED'
+            ORDER BY "publishedAt" DESC NULLS LAST
+            LIMIT 50`
+        );
+        res.json({ items: rows });
+      } catch (e) {
+        console.error('[news:public:list]', e.message);
+        res.json({ items: [] });
+      }
+    });
+
+    // GET /api/news/:slug — single PUBLISHED article
+    app.get('/api/news/:slug', async (req, res) => {
+      const pool = getCPool();
+      if (!pool) return res.status(404).json({ error: 'not found' });
+      try {
+        await ensureNewsTable();
+        const { rows } = await pool.query(
+          `SELECT * FROM "NewsDraft" WHERE slug = $1 AND status = 'PUBLISHED' LIMIT 1`,
+          [req.params.slug]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+        // tăng view counter (không chặn response)
+        pool.query(`UPDATE "NewsDraft" SET views = views + 1 WHERE id = $1`, [rows[0].id]).catch(() => {});
+        res.json(rows[0]);
+      } catch (e) {
+        console.error('[news:public:get]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/teacher/news — teacher tạo bài viết (status=PENDING)
+    app.post('/api/teacher/news', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      if (!/TEACHER|ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Chỉ giáo viên mới được soạn tin' });
+      }
+      const pool = getCPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureNewsTable();
+        const { title, sapo, body, heroImage, tags, category } = req.body || {};
+        if (!title || !body) return res.status(400).json({ error: 'Thiếu tiêu đề hoặc nội dung' });
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        let slug = slugify(title);
+        // ensure unique slug
+        const existing = await pool.query('SELECT id FROM "NewsDraft" WHERE slug = $1', [slug]);
+        if (existing.rows.length) slug = `${slug}-${id.slice(0, 6)}`;
+        await pool.query(
+          `INSERT INTO "NewsDraft"
+             (id, slug, title, sapo, body, hero_image, tags, category,
+              status, "authorId", "authorName")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PENDING',$9,$10)`,
+          [id, slug, title, sapo || '', body, heroImage || null,
+           Array.isArray(tags) ? tags.join(',') : (tags || ''),
+           category || 'cong-nghe-giao-duc',
+           user.id, user.name || user.email]
+        );
+        res.status(201).json({ id, slug, status: 'PENDING' });
+      } catch (e) {
+        console.error('[news:teacher:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/teacher/news/mine — teacher xem bài của mình
+    app.get('/api/teacher/news/mine', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCPool();
+      if (!pool) return res.json({ items: [] });
+      try {
+        await ensureNewsTable();
+        const { rows } = await pool.query(
+          `SELECT * FROM "NewsDraft" WHERE "authorId" = $1 ORDER BY "createdAt" DESC LIMIT 50`,
+          [user.id]
+        );
+        res.json({ items: rows });
+      } catch (e) {
+        console.error('[news:teacher:mine]', e.message);
+        res.json({ items: [] });
+      }
+    });
+
+    // GET /api/admin/news/pending — admin xem queue
+    app.get('/api/admin/news/pending', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Admin only' });
+      }
+      const pool = getCPool();
+      if (!pool) return res.json({ items: [] });
+      try {
+        await ensureNewsTable();
+        const { rows } = await pool.query(
+          `SELECT * FROM "NewsDraft" WHERE status = 'PENDING' ORDER BY "createdAt" ASC LIMIT 100`
+        );
+        res.json({ items: rows });
+      } catch (e) {
+        console.error('[news:admin:pending]', e.message);
+        res.json({ items: [] });
+      }
+    });
+
+    // POST /api/admin/news/:id/approve
+    app.post('/api/admin/news/:id/approve', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Admin only' });
+      }
+      const pool = getCPool();
+      try {
+        await pool.query(
+          `UPDATE "NewsDraft" SET status='PUBLISHED', "publishedAt"=NOW(), "updatedAt"=NOW()
+            WHERE id = $1`,
+          [req.params.id]
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[news:admin:approve]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/admin/news/:id/reject  body: { reason }
+    app.post('/api/admin/news/:id/reject', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Admin only' });
+      }
+      const pool = getCPool();
+      try {
+        await pool.query(
+          `UPDATE "NewsDraft" SET status='REJECTED', "rejectReason"=$2, "updatedAt"=NOW()
+            WHERE id = $1`,
+          [req.params.id, req.body?.reason || 'Không có lý do']
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[news:admin:reject]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── AI entitlement check ─────────────────────────────────
+    // GET /api/entitlements/check?feature=ai_tutor
+    // Return { allowed: bool, plan: 'FREE'|'PREMIUM'|'PRO', reason: string }
+    // Đơn giản: ADMIN/TEACHER được dùng AI; STUDENT free chỉ được dùng giới hạn.
+    // Thực tế production sẽ tra Entitlement table; ở đây stub theo role.
+    app.get('/api/entitlements/check', (req, res) => {
+      const user = getUserFromAuth(req);
+      const feature = req.query.feature || '';
+      if (!user) return res.json({ allowed: false, plan: 'GUEST', reason: 'Vui lòng đăng nhập' });
+      // Admin và teacher → cho phép full
+      if (/ADMIN|TEACHER/i.test(user.role || '')) {
+        return res.json({ allowed: true, plan: 'PRO', reason: 'Tài khoản chuyên nghiệp' });
+      }
+      // Free student: cho phép feature cơ bản, block các AI nâng cao
+      const FREE_ALLOWED = new Set([
+        'ai_tutor_basic', 'exam_basic',
+      ]);
+      const PREMIUM_ONLY = new Set([
+        'ai_tutor_unlimited', 'ai_content_gen', 'ocr_digitize',
+        'transcript_whisper', 'quiz_extract_ai', 'aura_3d',
+      ]);
+      if (FREE_ALLOWED.has(feature)) {
+        return res.json({ allowed: true, plan: 'FREE', reason: 'Gói miễn phí' });
+      }
+      if (PREMIUM_ONLY.has(feature)) {
+        return res.json({
+          allowed: false, plan: 'FREE',
+          reason: 'Tính năng này yêu cầu gói Premium hoặc Pro.',
+          upgradeUrl: '/pricing',
+        });
+      }
+      // Mặc định: cho phép (feature không khai báo)
+      res.json({ allowed: true, plan: 'FREE', reason: 'OK' });
+    });
 
     // ── Seed mock courses (idempotent) ──────────────────────
     // POST /api/admin/seed-mock-courses

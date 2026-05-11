@@ -26,6 +26,7 @@ export interface RegisterInput {
   name: string
   email: string
   password: string
+  role?: 'STUDENT' | 'TEACHER'
 }
 
 export interface ForgotPasswordInput {

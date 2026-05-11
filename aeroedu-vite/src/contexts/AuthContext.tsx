@@ -15,7 +15,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
 
   login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
+  register: (name: string, email: string, password: string, role?: 'STUDENT' | 'TEACHER') => Promise<void>
   googleLogin: (credential: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -65,8 +65,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(user)
   }, [])
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
-    const { user } = await authService.register({ name, email, password })
+  const register = useCallback(async (name: string, email: string, password: string, role: 'STUDENT' | 'TEACHER' = 'STUDENT') => {
+    const { user } = await authService.register({ name, email, password, role })
     setUser(user)
   }, [])
 

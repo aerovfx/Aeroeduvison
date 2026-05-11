@@ -147,6 +147,44 @@ export default function NewsArticle() {
             </div>
           </div>
 
+          {/* ── Big share section — Facebook prominent ──────────── */}
+          <div className="mt-8 p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-[#1877F2]/8 to-[#1877F2]/2 border border-[#1877F2]/30">
+            <h3 className="text-base sm:text-lg font-bold text-foreground mb-1.5">
+              Bài viết hữu ích? Chia sẻ với bạn bè
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Giúp giáo viên và phụ huynh khác biết tới AeroEduVision.
+            </p>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <a
+                href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-5 sm:px-6 py-3 rounded-xl bg-[#1877F2] hover:bg-[#0d62cf] text-white font-bold text-sm sm:text-base shadow-md transition"
+              >
+                <Facebook className="w-5 h-5" />
+                Chia sẻ Facebook
+              </a>
+              <a
+                href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(article.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-3 rounded-xl bg-[#1DA1F2] hover:bg-[#0c8bd9] text-white font-bold text-sm sm:text-base shadow-md transition"
+              >
+                <Twitter className="w-5 h-5" />
+                Twitter
+              </a>
+              <button
+                type="button"
+                onClick={copyLink}
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-3 rounded-xl bg-muted hover:bg-accent text-foreground font-semibold text-sm sm:text-base border border-border transition"
+              >
+                <Link2 className="w-5 h-5" />
+                Sao chép link
+              </button>
+            </div>
+          </div>
+
           {/* Same-category footer */}
           {sameCat.length > 0 && (
             <section className="mt-10 pt-6 border-t-2 border-[hsl(0,73%,45%)]">

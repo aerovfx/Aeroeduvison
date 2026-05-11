@@ -182,6 +182,8 @@ const DocsArticlePage = lazy(() => import('@/pages/docs/DocsArticle'))
 // ── News / Tin tức (Soha-style) ──────────────────────────────
 const NewsIndexPage   = lazy(() => import('@/pages/news/NewsIndex'))
 const NewsArticlePage = lazy(() => import('@/pages/news/NewsArticle'))
+const TeacherNewsComposePage = lazy(() => import('@/pages/teacher/NewsCompose'))
+const AdminNewsReviewPage    = lazy(() => import('@/pages/admin/NewsReview'))
 
 // ── Admin Pages (đã port) ────────────────────────────────────
 const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
@@ -398,6 +400,8 @@ export function AppRouter() {
             <Route element={<RoleGuard roles={['TEACHER', 'ADMIN']} />}>
               {/* Đã port */}
               <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
+              <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
+              <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />
               <Route path="/teacher/my-courses"             element={<TeacherMyCoursesPage />} />
               <Route path="/teacher/course/create"          element={<TeacherCourseEditorPage />} />
               <Route path="/teacher/course/:courseId/edit"  element={<TeacherCourseEditorPage />} />
@@ -469,6 +473,7 @@ export function AppRouter() {
               <Route path="/admin"         element={<Navigate to="/admin/overview" replace />} />
               {/* Đã port */}
               <Route path="/admin/overview"            element={<AdminOverview />} />
+              <Route path="/admin/news/review"         element={<AdminNewsReviewPage />} />
               <Route path="/admin/students"            element={<AdminStudents />} />
               <Route path="/admin/teachers"            element={<AdminTeachers />} />
               <Route path="/admin/camera-management"   element={<AdminCameraManagement />} />
