@@ -1486,9 +1486,93 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
       return res.json(rows);
     } catch (err) {
       console.error('[categories:list] ❌', err.message);
+      // Fallback empty array — UI dropdown vẫn render (chưa setup Category table)
+      return res.json([]);
+    }
+  });
+
+  // ── POST /api/instructor/courses ──────────────────────────
+  // Tạo course mới. Required: title. Other fields optional.
+  app.post('/api/instructor/courses', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      const { title, description, price, imageUrl, categoryId } = req.body || {};
+      if (!title) return res.status(400).json({ error: 'title required' });
+      // Try to auto-create Course table if missing
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS "Course" (
+          id TEXT PRIMARY KEY,
+          "userId" TEXT NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          "imageUrl" TEXT,
+          price NUMERIC,
+          "categoryId" TEXT,
+          "isPublished" BOOLEAN DEFAULT false,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          "updatedAt" TIMESTAMP DEFAULT NOW()
+        )`);
+      } catch {}
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const now = new Date();
+      const { rows } = await pool.query(
+        `INSERT INTO "Course" (id, "userId", title, description, "imageUrl", price, "categoryId", "isPublished", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8,$8) RETURNING *`,
+        [id, userId, String(title).slice(0, 200),
+         description || null, imageUrl || null,
+         price ? Number(price) : null,
+         categoryId || null, now]
+      );
+      console.log(`[instructor:create] ✅ ${id.slice(0,8)} title="${title}"`);
+      return res.status(201).json(rows[0]);
+    } catch (err) {
+      console.error('[instructor:create] ❌', err.message);
       return res.status(500).json({ error: err.message });
     }
   });
+
+  // ── PATCH /api/instructor/courses/:id ─────────────────────
+  app.patch('/api/instructor/courses/:id', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getIPool();
+      const allowed = ['title','description','imageUrl','price','categoryId'];
+      const sets = []; const vals = [req.params.id, userId]; let i = 3;
+      for (const k of allowed) {
+        if (req.body && req.body[k] !== undefined) {
+          sets.push(`"${k}" = $${i++}`);
+          vals.push(req.body[k]);
+        }
+      }
+      if (!sets.length) return res.status(400).json({ error: 'No fields' });
+      sets.push(`"updatedAt" = $${i++}`); vals.push(new Date());
+      const { rowCount } = await pool.query(
+        `UPDATE "Course" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[instructor:update] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Stubs cho videos + assets endpoints (chưa implement full) ──
+  const _501 = (msg) => (_req, res) => res.status(501).json({ error: msg });
+  const _ok  = (_req, res) => res.json({ ok: true });
+  app.get('/api/instructor/courses/:id/videos', (_req, res) => res.json([]));
+  app.post('/api/instructor/courses/:id/videos', _501('Upload video đang phát triển'));
+  app.delete('/api/instructor/courses/:id/videos/:videoId', _ok);
+  app.get('/api/instructor/courses/:id/assets', (_req, res) => res.json([]));
+  app.post('/api/instructor/courses/:id/assets', _501('Upload assets đang phát triển'));
+  app.delete('/api/instructor/courses/:id/assets/:assetId', _ok);
+
+  // ── Upload image endpoint (avatar / course thumbnail) ─────
+  app.post('/api/upload/image', _501('Upload ảnh đang phát triển — hãy paste link URL ảnh có sẵn vào ô imageUrl'));
 }
 
 // ══════════════════════════════════════════════════════════════
