@@ -7394,6 +7394,409 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
     });
   }
 
+  // ─ Public courses (Postgres-backed) ──────────────────────
+  // FE shape: Course { id, name, title, description, imageUrl, price, level,
+  //   duration, enrollCount, rating, isPublished, chapters[], instructor, tags }
+  {
+    const { Pool: CPool } = require('pg');
+    let _cpool = null;
+    function getCPool() {
+      if (!_cpool && process.env.DATABASE_URL) {
+        _cpool = new CPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _cpool;
+    }
+
+    // Map row PG → shape FE
+    function mapCourseRow(r, chapters = [], teacherName = 'AeroEduVision') {
+      return {
+        id:           r.id,
+        name:         r.title,           // FE dùng cả `name` lẫn `title`
+        title:        r.title,
+        slug:         r.id,
+        description:  r.description || '',
+        imageUrl:     r.imageUrl || null,
+        image:        r.imageUrl || null,
+        price:        Number(r.price || 0),
+        regularPrice: Number(r.price || 0),
+        beforePrice:  0,
+        categoryId:   r.categoryId || null,
+        isPublished:  !!r.isPublished,
+        level:        'Trung cấp',
+        duration:     chapters.reduce((s, c) => s + (c.duration || 30), 0),
+        lessons:      chapters.length,
+        enrollCount:  0,
+        rating:       4.7,
+        chapters:     chapters,
+        instructor:   { name: teacherName, avatar: null, title: 'Giảng viên' },
+        user:         { id: r.userId, name: teacherName, image: null },
+        tags:         [],
+        createdAt:    r.createdAt,
+        updatedAt:    r.updatedAt,
+      };
+    }
+    function mapChapterRow(r) {
+      return {
+        id:          r.id,
+        name:        r.title,
+        title:       r.title,
+        description: r.description || '',
+        duration:    Number(r.duration || 30),
+        isFree:      !!r.isFree,
+        isPublished: !!r.isPublished,
+        position:    Number(r.position || 0),
+        videoUrl:    r.videoUrl || null,
+        progress:    0,
+      };
+    }
+
+    // GET /api/courses — list public (paginated)
+    app.get('/api/courses', async (req, res) => {
+      const pool = getCPool();
+      if (!pool) return res.json({ courses: [], total: 0 });
+      try {
+        const limit  = Math.min(parseInt(req.query.limit) || 24, 100);
+        const offset = parseInt(req.query.offset) || 0;
+        const { rows } = await pool.query(
+          `SELECT c.*, u.name AS teacher_name
+             FROM "Course" c
+             LEFT JOIN "User" u ON u.id = c."userId"
+            WHERE c."isPublished" = true
+            ORDER BY c."createdAt" DESC
+            LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
+        const items = rows.map(r => mapCourseRow(r, [], r.teacher_name || 'AeroEduVision'));
+        res.json({ courses: items, items, total: items.length });
+      } catch (e) {
+        if (/relation .* does not exist/i.test(e.message)) return res.json({ courses: [], total: 0 });
+        console.error('[courses:list]', e.message);
+        res.json({ courses: [], total: 0 });
+      }
+    });
+
+    // GET /api/courses/:id
+    app.get('/api/courses/:id', async (req, res) => {
+      const pool = getCPool();
+      if (!pool) return res.status(404).json({ error: 'not found' });
+      try {
+        const { id } = req.params;
+        const { rows } = await pool.query(
+          `SELECT c.*, u.name AS teacher_name
+             FROM "Course" c
+             LEFT JOIN "User" u ON u.id = c."userId"
+            WHERE c.id = $1
+            LIMIT 1`,
+          [id]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Course not found' });
+        const course = rows[0];
+
+        // Lấy chapters
+        let chapters = [];
+        try {
+          const ch = await pool.query(
+            `SELECT id, title, description, position, "isFree", "isPublished",
+                    duration, "videoUrl", "courseId"
+               FROM "Chapter"
+              WHERE "courseId" = $1
+              ORDER BY position ASC`,
+            [id]
+          );
+          chapters = ch.rows.map(mapChapterRow);
+        } catch (e) {
+          if (!/relation .* does not exist/i.test(e.message)) {
+            console.warn('[courses:get:chapters]', e.message);
+          }
+        }
+        res.json(mapCourseRow(course, chapters, course.teacher_name || 'AeroEduVision'));
+      } catch (e) {
+        if (/relation .* does not exist/i.test(e.message)) return res.status(404).json({ error: 'not found' });
+        console.error('[courses:get]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/courses/:courseId/chapters/:chapterId
+    app.get('/api/courses/:courseId/chapters/:chapterId', async (req, res) => {
+      const pool = getCPool();
+      if (!pool) return res.status(404).json({ error: 'not found' });
+      try {
+        const { rows } = await pool.query(
+          `SELECT * FROM "Chapter" WHERE id = $1 AND "courseId" = $2 LIMIT 1`,
+          [req.params.chapterId, req.params.courseId]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Chapter not found' });
+        res.json(mapChapterRow(rows[0]));
+      } catch (e) {
+        if (/relation .* does not exist/i.test(e.message)) return res.status(404).json({ error: 'not found' });
+        console.error('[courses:chapter]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/courses/:courseId/progress (đơn giản — luôn 0 cho user mới)
+    app.get('/api/courses/:courseId/progress', (_req, res) => res.json(0));
+
+    // POST /api/courses/:courseId/chapters/:chapterId/progress
+    app.post('/api/courses/:courseId/chapters/:chapterId/progress', (_req, res) => res.json({ ok: true }));
+
+    // GET /api/courses/dashboard — split completed/in-progress (empty mặc định)
+    app.get('/api/courses/dashboard', (_req, res) =>
+      res.json({ completedCourses: [], coursesInProgress: [] })
+    );
+
+    // ── Seed mock courses (idempotent) ──────────────────────
+    // POST /api/admin/seed-mock-courses
+    // - Tạo teacher@example.com (role=TEACHER) nếu chưa có
+    // - Tạo 3 category Vật lý / Toán / Hoá
+    // - UPSERT 6 khoá id c1..c6 + chapters c{N}-ch{P}
+    // Yêu cầu: header X-Seed-Token = ENV SEED_TOKEN (mặc định "aero-seed-2026")
+    app.post('/api/admin/seed-mock-courses', async (req, res) => {
+      const token = req.header('X-Seed-Token') || req.query.token;
+      const expected = process.env.SEED_TOKEN || 'aero-seed-2026';
+      if (token !== expected) return res.status(401).json({ error: 'Invalid seed token' });
+
+      const pool = getCPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+
+      const TEACHER_EMAIL = 'teacher@example.com';
+      const TEACHER_NAME  = 'Nguyễn Văn Thành';
+      const DEMO_VIDEO    = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+
+      const CATEGORIES = [
+        { name: 'Vật lý' }, { name: 'Toán học' }, { name: 'Hoá học' },
+      ];
+
+      const COURSES = [
+        {
+          id: 'c1', cat: 'Vật lý',
+          title: 'Vật lý 12 — Dao động và Sóng cơ',
+          description: 'Khoá học toàn diện về dao động điều hoà, con lắc lò xo / con lắc đơn, sóng cơ và sóng âm. Đầy đủ lý thuyết + 200+ bài tập có lời giải chi tiết. Dành cho học sinh lớp 12 ôn thi THPT Quốc gia môn Vật lý.',
+          imageUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=1200&q=80',
+          price: 299000, isPublished: true,
+          chapters: [
+            { title: 'Dao động điều hoà — Khái niệm và phương trình', description: 'Định nghĩa dao động điều hoà, phương trình x = A·cos(ωt + φ), biên độ — tần số góc — pha ban đầu.', duration: 45, isFree: true,  isPublished: true },
+            { title: 'Con lắc lò xo — Năng lượng và chu kỳ',           description: 'Phương trình con lắc lò xo, định luật bảo toàn năng lượng cơ học, chu kỳ T = 2π√(m/k).',     duration: 60, isFree: false, isPublished: true },
+            { title: 'Con lắc đơn — Ứng dụng thực tế',                  description: 'Dao động của con lắc đơn, chu kỳ T = 2π√(l/g), ảnh hưởng nhiệt độ — vĩ độ — độ cao.',     duration: 55, isFree: false, isPublished: true },
+            { title: 'Sóng cơ — Bản chất và đặc trưng',                description: 'Sóng cơ, sóng ngang/sóng dọc, các đại lượng đặc trưng (chu kỳ, tần số, bước sóng, vận tốc).', duration: 50, isFree: false, isPublished: true },
+            { title: 'Giao thoa sóng & Sóng dừng',                      description: 'Điều kiện giao thoa, vị trí cực đại — cực tiểu, sóng dừng trên sợi dây.',                 duration: 65, isFree: false, isPublished: true },
+            { title: 'Sóng âm — Đặc trưng vật lý và sinh lý',           description: 'Cường độ âm, mức cường độ âm L = 10·log(I/I₀), âm cơ bản — hoạ âm, hiệu ứng Doppler.',     duration: 40, isFree: false, isPublished: true },
+          ],
+        },
+        {
+          id: 'c2', cat: 'Vật lý',
+          title: 'Vật lý 12 — Điện xoay chiều',
+          description: 'Phân tích sâu mạch RLC nối tiếp, công suất tiêu thụ, hệ số công suất, máy biến áp và truyền tải điện năng. Phương pháp giản đồ Fresnel + số phức để giải nhanh bài tập.',
+          imageUrl: 'https://images.unsplash.com/photo-1620714223084-8fcacc2dcea1?w=1200&q=80',
+          price: 349000, isPublished: true,
+          chapters: [
+            { title: 'Đại cương dòng điện xoay chiều',         description: 'Suất điện động xoay chiều, giá trị hiệu dụng, biểu thức i(t) — u(t), pha của các đại lượng.', duration: 50, isFree: true,  isPublished: true },
+            { title: 'Mạch thuần trở, thuần cảm, thuần dung',  description: 'Quan hệ pha u — i, cảm kháng Z_L = ωL, dung kháng Z_C = 1/(ωC).',                          duration: 55, isFree: false, isPublished: true },
+            { title: 'Mạch R-L-C nối tiếp — Cộng hưởng điện', description: 'Tổng trở Z, độ lệch pha φ, điều kiện cộng hưởng ω² = 1/(LC).',                              duration: 70, isFree: false, isPublished: true },
+            { title: 'Công suất và hệ số công suất',           description: 'P = UI·cosφ, ý nghĩa hệ số công suất, biện pháp nâng cao cosφ trong thực tế.',              duration: 45, isFree: false, isPublished: true },
+            { title: 'Máy biến áp — Truyền tải điện năng',     description: 'Nguyên lý máy biến áp, công thức U₁/U₂ = N₁/N₂, hao phí trên đường dây.',                  duration: 50, isFree: false, isPublished: true },
+          ],
+        },
+        {
+          id: 'c3', cat: 'Vật lý',
+          title: 'Luyện thi THPT — Vật lý Hạt nhân',
+          description: 'Chuyên đề hạt nhân nguyên tử: cấu tạo, năng lượng liên kết, phóng xạ, phản ứng hạt nhân (phân hạch — nhiệt hạch). Giải chi tiết 200+ bài tập theo cấu trúc đề thi mới.',
+          imageUrl: 'https://images.unsplash.com/photo-1532094349884-543559450146?w=1200&q=80',
+          price: 199000, isPublished: true,
+          chapters: [
+            { title: 'Cấu tạo hạt nhân — Năng lượng liên kết', description: 'Số khối A, số proton Z, đồng vị, năng lượng liên kết ΔE = Δm·c², độ hụt khối.', duration: 45, isFree: true,  isPublished: true },
+            { title: 'Phóng xạ — Định luật phân rã',            description: 'α, β⁻, β⁺, γ, định luật phân rã N(t) = N₀·e^(-λt), chu kỳ bán rã T.',         duration: 50, isFree: false, isPublished: true },
+            { title: 'Phản ứng phân hạch và nhiệt hạch',        description: 'Phản ứng phân hạch dây chuyền, hệ số nhân nơtron, nhiệt hạch trong Mặt Trời.', duration: 55, isFree: false, isPublished: true },
+            { title: 'Bài tập tổng hợp chương hạt nhân',        description: 'Tổng hợp 50+ bài tập tự luyện kèm lời giải, phân loại theo dạng & mức độ.',    duration: 90, isFree: false, isPublished: true },
+          ],
+        },
+        {
+          id: 'c4', cat: 'Toán học',
+          title: 'Toán 12 — Giải tích (Đạo hàm & Tích phân)',
+          description: 'Hệ thống lý thuyết và bài tập đạo hàm, tích phân, ứng dụng thực tế. Mỗi chương có 30+ bài luyện kèm video chữa chi tiết. Khoá học MIỄN PHÍ — chỉ cần đăng ký để học.',
+          imageUrl: 'https://images.unsplash.com/photo-1635372722656-389f87a941b7?w=1200&q=80',
+          price: 0, isPublished: true,
+          chapters: [
+            { title: 'Đạo hàm — Định nghĩa và quy tắc',                description: 'Định nghĩa đạo hàm, đạo hàm các hàm sơ cấp, quy tắc đạo hàm tổng/hiệu/tích/thương/hợp.',  duration: 50, isFree: true,  isPublished: true },
+            { title: 'Ứng dụng đạo hàm — Cực trị, tiếp tuyến',         description: 'Tìm cực trị, viết PT tiếp tuyến, khảo sát hàm số, bài toán tối ưu thực tế.',             duration: 60, isFree: true,  isPublished: true },
+            { title: 'Tích phân — Định nghĩa và bảng nguyên hàm',      description: 'Nguyên hàm, tích phân xác định, công thức Newton-Leibniz, phương pháp đổi biến.',         duration: 70, isFree: false, isPublished: true },
+            { title: 'Ứng dụng tích phân — Diện tích, thể tích',       description: 'Diện tích hình phẳng, thể tích vật thể tròn xoay, ứng dụng vật lý (quãng đường — công).',   duration: 65, isFree: false, isPublished: true },
+            { title: 'Đề thi thử THPT — Giải chi tiết',                description: '5 đề thi thử full, mỗi đề 50 câu trắc nghiệm có video chữa.',                              duration: 120, isFree: false, isPublished: true },
+          ],
+        },
+        {
+          id: 'c5', cat: 'Hoá học',
+          title: 'Hoá học 12 — Hoá hữu cơ nâng cao',
+          description: 'Chinh phục Hoá hữu cơ: ancol, anđehit, axit, este, amin, amino axit, protein, polime. Giải thích cơ chế phản ứng + 150+ bài tập chuyên đề THPT.',
+          imageUrl: 'https://images.unsplash.com/photo-1628863353691-0071c8c1874c?w=1200&q=80',
+          price: 249000, isPublished: true,
+          chapters: [
+            { title: 'Ancol — Phân loại và tính chất',  description: 'Cấu tạo, đồng phân, danh pháp, tính chất hoá học (tác dụng Na, axit, oxi hoá).',     duration: 50, isFree: true,  isPublished: true },
+            { title: 'Anđehit và Axit cacboxylic',      description: 'Phản ứng tráng bạc, phản ứng với Cu(OH)₂, axit cacboxylic và tính chất chung.',     duration: 55, isFree: false, isPublished: true },
+            { title: 'Este và Lipit',                   description: 'Phản ứng este hoá, xà phòng hoá, chất béo và phản ứng hidro hoá dầu thực vật.',      duration: 60, isFree: false, isPublished: true },
+            { title: 'Amin — Amino axit — Protein',     description: 'Tính bazơ của amin, tính lưỡng tính của amino axit, peptit và phản ứng biure.',    duration: 55, isFree: false, isPublished: true },
+            { title: 'Polime — Vật liệu polime',        description: 'Phân loại, điều chế (trùng hợp/trùng ngưng), ứng dụng polime tổng hợp & thiên nhiên.', duration: 45, isFree: false, isPublished: true },
+          ],
+        },
+        {
+          id: 'c6', cat: 'Vật lý',
+          title: 'Vật lý Cơ học Nâng cao — Lab 3D Tương tác',
+          description: 'Khám phá cơ học Newton bằng thí nghiệm 3D tương tác và phỏng vấn vật lý chuyên sâu. Phù hợp học sinh giỏi và sinh viên năm 1 vật lý đại cương.',
+          imageUrl: 'https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?w=1200&q=80',
+          price: 0, isPublished: true,
+          chapters: [
+            { title: 'Giới thiệu về Cơ học Newtonian',          description: 'Ba định luật Newton, lực — gia tốc — khối lượng, hệ quy chiếu quán tính.',         duration: 45, isFree: true,  isPublished: true },
+            { title: 'Động lực học chuyển động thẳng',           description: 'Vận tốc, gia tốc, quãng đường, đồ thị chuyển động.',                              duration: 60, isFree: true,  isPublished: true },
+            { title: 'Chuyển động tròn và lực hướng tâm',        description: 'Phân tích chuyển động tròn đều và không đều, lực hướng tâm F = mv²/r.',          duration: 55, isFree: false, isPublished: true },
+            { title: 'Định luật bảo toàn năng lượng',            description: 'Cơ năng, thế năng trọng trường, động năng, định luật bảo toàn cơ năng.',         duration: 70, isFree: false, isPublished: true },
+            { title: 'Va chạm và xung lượng',                    description: 'Va chạm đàn hồi, va chạm không đàn hồi, định luật bảo toàn động lượng.',         duration: 50, isFree: false, isPublished: true },
+            { title: 'Dao động và sóng cơ — Phòng lab 3D',       description: 'Con lắc đơn, con lắc lò xo, sóng cơ trong phòng lab ảo 3D tương tác.',          duration: 65, isFree: false, isPublished: true },
+          ],
+        },
+      ];
+
+      const { randomUUID } = require('crypto');
+      const log = [];
+
+      try {
+        // Đảm bảo các bảng + cột (tránh "relation does not exist" trên DB sạch)
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "User" (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT,
+            role TEXT DEFAULT 'STUDENT',
+            "emailVerified" TIMESTAMPTZ,
+            "twoFactorEnabled" BOOLEAN DEFAULT false,
+            "failedLoginAttempts" INTEGER DEFAULT 0,
+            "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+            "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+          )
+        `);
+        await pool.query(`CREATE TABLE IF NOT EXISTS "Category" (id TEXT PRIMARY KEY, name TEXT UNIQUE NOT NULL)`);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "Course" (
+            id TEXT PRIMARY KEY,
+            "userId" TEXT NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            "imageUrl" TEXT,
+            price NUMERIC,
+            "categoryId" TEXT,
+            "isPublished" BOOLEAN DEFAULT false,
+            "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+            "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+          )
+        `);
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "Chapter" (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            duration INTEGER,
+            "videoUrl" TEXT,
+            position INTEGER NOT NULL DEFAULT 1,
+            "isPublished" BOOLEAN DEFAULT false,
+            "isFree" BOOLEAN DEFAULT false,
+            "courseId" TEXT NOT NULL,
+            "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+            "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+          )
+        `);
+        // Bổ sung column nếu Chapter cũ thiếu
+        for (const [col, kind] of [['description','TEXT'],['duration','INTEGER'],['videoUrl','TEXT']]) {
+          try { await pool.query(`ALTER TABLE "Chapter" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); } catch (e) { /* ignore */ }
+        }
+
+        // 1) Teacher
+        const u = await pool.query('SELECT id FROM "User" WHERE email = $1 LIMIT 1', [TEACHER_EMAIL]);
+        let teacherId;
+        if (u.rows.length) {
+          teacherId = u.rows[0].id;
+          await pool.query(`UPDATE "User" SET role='TEACHER', name=$1 WHERE id=$2`, [TEACHER_NAME, teacherId]);
+          log.push(`✅ Teacher exists: ${teacherId}`);
+        } else {
+          teacherId = randomUUID();
+          await pool.query(
+            `INSERT INTO "User" (id, email, name, role, "emailVerified")
+             VALUES ($1, $2, $3, 'TEACHER', NOW())`,
+            [teacherId, TEACHER_EMAIL, TEACHER_NAME]
+          );
+          log.push(`✅ Created teacher: ${TEACHER_EMAIL}`);
+        }
+
+        // 2) Categories
+        const catMap = {};
+        for (const cat of CATEGORIES) {
+          const r = await pool.query('SELECT id FROM "Category" WHERE name = $1 LIMIT 1', [cat.name]);
+          if (r.rows.length) {
+            catMap[cat.name] = r.rows[0].id;
+          } else {
+            const id = randomUUID();
+            await pool.query('INSERT INTO "Category" (id, name) VALUES ($1, $2)', [id, cat.name]);
+            catMap[cat.name] = id;
+            log.push(`✅ Created category: ${cat.name}`);
+          }
+        }
+
+        // 3) Courses + chapters (UPSERT)
+        let coursesCount = 0, chaptersCount = 0;
+        for (let i = 0; i < COURSES.length; i++) {
+          const c = COURSES[i];
+          const created = new Date(Date.now() - (30 - i * 5) * 86400_000);
+          const updated = new Date(Date.now() - (1 + i) * 86400_000);
+          await pool.query(
+            `INSERT INTO "Course"
+               (id, "userId", title, description, "imageUrl", price,
+                "isPublished", "categoryId", "createdAt", "updatedAt")
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+             ON CONFLICT (id) DO UPDATE SET
+               "userId"=EXCLUDED."userId", title=EXCLUDED.title,
+               description=EXCLUDED.description, "imageUrl"=EXCLUDED."imageUrl",
+               price=EXCLUDED.price, "isPublished"=EXCLUDED."isPublished",
+               "categoryId"=EXCLUDED."categoryId", "updatedAt"=EXCLUDED."updatedAt"`,
+            [c.id, teacherId, c.title, c.description, c.imageUrl, c.price,
+             c.isPublished, catMap[c.cat], created, updated]
+          );
+          // Xoá chapters cũ rồi insert lại
+          await pool.query('DELETE FROM "Chapter" WHERE "courseId" = $1', [c.id]);
+          for (let p = 0; p < c.chapters.length; p++) {
+            const ch = c.chapters[p];
+            const chId = `${c.id}-ch${p + 1}`;
+            await pool.query(
+              `INSERT INTO "Chapter"
+                 (id, title, description, duration, "videoUrl", position,
+                  "isPublished", "isFree", "courseId", "createdAt", "updatedAt")
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+              [chId, ch.title, ch.description, ch.duration,
+               (ch.isFree || p === 0) ? DEMO_VIDEO : null,
+               p + 1, ch.isPublished, ch.isFree, c.id, created, updated]
+            );
+            chaptersCount++;
+          }
+          coursesCount++;
+          log.push(`✅ /courses/${c.id} — ${c.title} (${c.chapters.length} chapters)`);
+        }
+
+        res.json({
+          ok: true,
+          teacher: TEACHER_EMAIL,
+          courses: coursesCount,
+          chapters: chaptersCount,
+          urls: COURSES.map(c => `/courses/${c.id}`),
+          log,
+        });
+      } catch (e) {
+        console.error('[seed:courses]', e);
+        res.status(500).json({ error: e.message, log });
+      }
+    });
+  }
+
   // ─ Stats / Progress ───────────────────────────────────────
   app.get('/api/exam-stats', (_req, res) => res.json({ totalExams: 0, avgScore: 0, completed: 0 }));
   app.get('/api/courses-progress', (_req, res) => res.json({ progress: [] }));
