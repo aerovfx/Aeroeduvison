@@ -989,6 +989,96 @@ function makeProxy(target, label, pathFilter) {
       client.release();
     }
   });
+
+  // ── POST /api/teacher/question-bank/import-latex ──────────
+  // Import LaTeX template → strip + extract via fal.ai → INSERT từng câu
+  // vào Question table (status='Hoạt động', humanReviewed=true vì source
+  // là teacher upload, không phải AI tự sinh).
+  // Body: { content, subject, grade, topic? }
+  app.post('/api/teacher/question-bank/import-latex', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const userId = getQuizUserId(req);
+      if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized' });
+      const pool = getQPool();
+      if (!pool) return res.status(503).json({ success: false, error: 'DB không khả dụng' });
+
+      const content = String(req.body?.content || '').trim();
+      const subject = String(req.body?.subject || 'Vật lí').trim();
+      const grade = String(req.body?.grade || '11').trim();
+      const topic = req.body?.topic ? String(req.body.topic).trim() : null;
+      if (content.length < 50) return res.status(400).json({ success: false, error: 'LaTeX content quá ngắn' });
+      if (content.length > 200_000) return res.status(413).json({ success: false, error: 'LaTeX quá lớn (>200KB)' });
+
+      // Strip LaTeX commands phổ biến để text sạch hơn cho AI parse
+      const stripped = content
+        .replace(/\\documentclass[^\n]*\n/g, '')
+        .replace(/\\usepackage[^\n]*\n/g, '')
+        .replace(/\\begin\{document\}|\\end\{document\}/g, '')
+        .replace(/\\geometry\{[^}]*\}/g, '')
+        .replace(/\\setlength\{[^}]*\}\{[^}]*\}/g, '')
+        .replace(/\\begin\{center\}|\\end\{center\}/g, '')
+        .replace(/\\begin\{minipage\}[^\n]*|\\end\{minipage\}/g, '')
+        .replace(/\\begin\{enumerate\}[^\n]*|\\end\{enumerate\}/g, '')
+        .replace(/\\textbf\{([^}]*)\}/g, '$1')
+        .replace(/\\textit\{([^}]*)\}/g, '$1')
+        .replace(/\\section\*?\{([^}]*)\}/g, '\n\n=== $1 ===\n')
+        .replace(/\\hfill|\\\\|\\noindent|\\vspace\{[^}]*\}/g, '\n')
+        .replace(/\\rule\{[^}]*\}\{[^}]*\}/g, '')
+        .replace(/\\framebox\[[^\]]*\]\[[^\]]*\]\{([^}]*)\}/g, '$1')
+        .trim();
+
+      const { extractQuestionsFromText } = require('./lib/fal-quiz-extractor.cjs');
+      console.log(`[bank-import] ⏳ user=${userId.slice(0,8)} subject=${subject} grade=${grade} chars=${stripped.length}`);
+      const result = await extractQuestionsFromText(stripped, {
+        subject, grade, language: 'Vietnamese', count: 50,
+      });
+      const questions = result.questions || [];
+      if (questions.length === 0) {
+        return res.status(422).json({ success: false, error: 'Không trích xuất được câu hỏi nào' });
+      }
+
+      // INSERT vào Question table
+      const { randomUUID: bUUID } = require('crypto');
+      const now = new Date();
+      let inserted = 0, skipped = 0;
+      for (const q of questions) {
+        try {
+          const qid = bUUID();
+          await pool.query(
+            `INSERT INTO "Question"
+               (id, topic, subject, grade, "questionType", difficulty, content,
+                options, "correctAnswer", explanation, "qualityScore", "usageCount",
+                "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+             VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,false,true,'Hoạt động',$10,$11,$11)`,
+            [
+              qid,
+              (q.topic && String(q.topic).trim()) || topic || subject,
+              subject, grade,
+              String(q.questionType || 'MULTIPLE_CHOICE'),
+              String(q.content || ''),
+              Array.isArray(q.options) ? q.options.map(String) : [],
+              String(q.correctAnswer || ''),
+              q.explanation || '',
+              userId, now,
+            ]
+          );
+          inserted++;
+        } catch (insErr) {
+          console.warn(`[bank-import] insert skip: ${insErr.message.slice(0, 100)}`);
+          skipped++;
+        }
+      }
+      console.log(`[bank-import] ✅ user=${userId.slice(0,8)} inserted=${inserted} skipped=${skipped} took=${Date.now()-t0}ms`);
+      return res.json({
+        success: true,
+        data: { inserted, skipped, total: questions.length, subject, grade, topic },
+      });
+    } catch (err) {
+      console.error('[bank-import] ❌', err.message.slice(0, 300));
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -163,9 +163,9 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   }
 
   const handleFile = async (f: File) => {
-    const validExt = /\.(xlsx|xls|csv|json)$/i
+    const validExt = /\.(xlsx|xls|csv|json|tex)$/i
     if (!validExt.test(f.name)) {
-      toast.error("Chỉ hỗ trợ file Excel (.xlsx, .xls), CSV, JSON")
+      toast.error("Chỉ hỗ trợ file Excel (.xlsx, .xls), CSV, JSON, LaTeX (.tex)")
       return
     }
     setFile(f)
@@ -173,7 +173,31 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
     try {
       let rawRows: any[] = []
 
-      if (f.name.endsWith(".json")) {
+      if (f.name.endsWith(".tex")) {
+        // LaTeX → AI extract via dedicated endpoint
+        const text = await f.text()
+        const t = toast.loading("AI đang trích xuất câu hỏi từ LaTeX… (~30-60s)")
+        try {
+          const { api } = await import("@/services/api")
+          const res = await api.post<{ success: boolean; data?: { inserted: number; skipped: number; total: number } }>(
+            "/teacher/question-bank/import-latex",
+            { content: text, subject, grade }
+          )
+          if (res.data?.success && res.data.data) {
+            const { inserted, skipped, total } = res.data.data
+            toast.success(`✅ Đã import ${inserted}/${total} câu vào ngân hàng${skipped ? ` (bỏ qua ${skipped})` : ''}`, { id: t, duration: 5000 })
+            setSavedCount(inserted)
+            onSuccess(inserted)
+            setImportStep("complete")
+          } else {
+            throw new Error("Import thất bại")
+          }
+        } catch (err: unknown) {
+          const e = err as { response?: { data?: { error?: string } }; message?: string }
+          toast.error(e.response?.data?.error || e.message || "Không trích xuất được câu hỏi", { id: t })
+        }
+        return
+      } else if (f.name.endsWith(".json")) {
         const text = await f.text()
         rawRows = await parseJsonFile(text)
       } else if (f.name.endsWith(".csv")) {
@@ -322,7 +346,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                 <input
                   ref={inputRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv,.json"
+                  accept=".xlsx,.xls,.csv,.json,.tex"
                   onChange={handleChange}
                   className="hidden"
                 />
@@ -339,7 +363,9 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                         Kéo thả file vào đây hoặc <span className="text-purple-600">click để chọn</span>
                       </p>
                       <p className="text-xs text-slate-500 mt-1">
-                        Hỗ trợ: Excel (.xlsx, .xls), CSV, JSON
+                        Hỗ trợ: Excel (.xlsx, .xls), CSV, JSON, LaTeX (.tex)
+                        <br />
+                        <span className="text-purple-300 font-medium">✨ .tex</span> = upload đề thi LaTeX → AI tự trích xuất câu hỏi vào ngân hàng
                       </p>
                     </div>
                   </div>
