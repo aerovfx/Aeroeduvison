@@ -2673,30 +2673,49 @@ if (USE_NODEJS_QUESTIONS) {
           try {
             const { generateQuestionsByTopic } = require('./lib/fal-quiz-extractor.cjs');
             const { randomUUID: qbUUID } = require('crypto');
-            // Chia batch nhỏ (max 10 câu/lần) để tránh fal.ai timeout khi
-            // generate nhiều câu cùng lúc. 30 câu = 3 batch song song.
-            const BATCH = 10;
+            // Batch 5 câu/lần (giảm từ 10 → 5) — output ngắn hơn ⇒
+            // ít chance LLM hết max_tokens và cắt JSON giữa chừng.
+            // 30 câu = 6 batches song song.
+            const BATCH = 5;
             const batches = [];
             for (let i = 0; i < missing; i += BATCH) {
               batches.push(Math.min(BATCH, missing - i));
             }
-            console.log(`[exam-prep:create] 🤖 AI generate ${missing} câu cho ${subject}-${grade}${topic ? `-${topic}` : ''} (${batches.length} batches)`);
+            console.log(`[exam-prep:create] 🤖 AI generate ${missing} câu cho ${subject}-${grade}${topic ? `-${topic}` : ''} (${batches.length} batches × ${BATCH})`);
+
+            // Helper: gọi 1 batch + retry 1 lần nếu JSON parse fail
+            const callBatchWithRetry = async (count) => {
+              try {
+                return await generateQuestionsByTopic({
+                  subject, grade,
+                  topic: topic || `${subject} lớp ${grade}`,
+                  count, difficulty: 'medium',
+                });
+              } catch (err) {
+                // Retry 1 lần nếu lỗi JSON (không phải timeout)
+                if (/JSON|parse|Salvage/i.test(err.message)) {
+                  console.log(`[exam-prep:create] retry batch (${count}) after JSON fail`);
+                  return await generateQuestionsByTopic({
+                    subject, grade,
+                    topic: topic || `${subject} lớp ${grade}`,
+                    count, difficulty: 'medium',
+                  });
+                }
+                throw err;
+              }
+            };
+
             // Promise.allSettled — batch fail không kéo các batch khác fail
-            const results = await Promise.allSettled(
-              batches.map(count => generateQuestionsByTopic({
-                subject, grade,
-                topic: topic || `${subject} lớp ${grade}`,
-                count, difficulty: 'medium',
-              }))
-            );
+            const results = await Promise.allSettled(batches.map(callBatchWithRetry));
             const newQs = [];
             for (const r of results) {
               if (r.status === 'fulfilled' && r.value?.questions) {
                 newQs.push(...r.value.questions);
               } else if (r.status === 'rejected') {
-                console.warn(`[exam-prep:create] batch fail: ${r.reason?.message?.slice(0, 100) || r.reason}`);
+                console.warn(`[exam-prep:create] batch fail: ${r.reason?.message?.slice(0, 200) || r.reason}`);
               }
             }
+            console.log(`[exam-prep:create] AI batches done: collected ${newQs.length}/${missing} questions`);
 
             // INSERT từng câu vào Question table (lưu cho lần sau)
             const now = new Date();
