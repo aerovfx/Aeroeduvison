@@ -7749,6 +7749,163 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       }
     });
 
+    // ══════════════════════════════════════════════════════════
+    // EXAM XP — Cộng điểm thưởng sau khi làm bài
+    // ══════════════════════════════════════════════════════════
+    async function ensureXpTables() {
+      const pool = getCPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "UserXP" (
+          "userId"    TEXT PRIMARY KEY,
+          "totalXp"   INTEGER NOT NULL DEFAULT 0,
+          "examCount" INTEGER NOT NULL DEFAULT 0,
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "ExamXpReward" (
+          id           TEXT PRIMARY KEY,
+          "userId"     TEXT NOT NULL,
+          "examId"     TEXT NOT NULL,
+          "playerName" TEXT,
+          percentage   INTEGER NOT NULL,
+          "xpEarned"   INTEGER NOT NULL,
+          "isFirstTry" BOOLEAN NOT NULL DEFAULT true,
+          "earnedAt"   TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE ("userId", "examId")
+        )
+      `);
+    }
+
+    function calcXp(percentage, isFirstTry, perfect) {
+      // Base: 0-50 XP theo %
+      let xp = Math.round(Math.max(0, Math.min(100, percentage)) / 2);
+      // Bonus first-try
+      if (isFirstTry) xp += 10;
+      // Perfect bonus
+      if (perfect) xp += 20;
+      // Min 5 XP cho participation
+      return Math.max(5, xp);
+    }
+
+    // POST /api/exam-xp/award  body: { examId, percentage, playerName? }
+    app.post('/api/exam-xp/award', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureXpTables();
+        const { examId, percentage, playerName } = req.body || {};
+        if (!examId || typeof percentage !== 'number') {
+          return res.status(400).json({ error: 'Thiếu examId hoặc percentage' });
+        }
+        const pct = Math.round(Math.max(0, Math.min(100, percentage)));
+        const perfect = pct === 100;
+
+        // Check first-try
+        const prior = await pool.query(
+          `SELECT id, "xpEarned" FROM "ExamXpReward" WHERE "userId" = $1 AND "examId" = $2`,
+          [user.id, examId]
+        );
+        const isFirstTry = prior.rows.length === 0;
+        const xp = calcXp(pct, isFirstTry, perfect);
+
+        if (isFirstTry) {
+          // First time → insert + bump total
+          const { randomUUID } = require('crypto');
+          await pool.query(
+            `INSERT INTO "ExamXpReward" (id, "userId", "examId", "playerName", percentage, "xpEarned", "isFirstTry")
+             VALUES ($1,$2,$3,$4,$5,$6,true)`,
+            [randomUUID(), user.id, examId, playerName || null, pct, xp]
+          );
+          await pool.query(
+            `INSERT INTO "UserXP" ("userId", "totalXp", "examCount", "updatedAt")
+             VALUES ($1, $2, 1, NOW())
+             ON CONFLICT ("userId") DO UPDATE SET
+               "totalXp" = "UserXP"."totalXp" + EXCLUDED."totalXp",
+               "examCount" = "UserXP"."examCount" + 1,
+               "updatedAt" = NOW()`,
+            [user.id, xp]
+          );
+        }
+        // Retake không trao XP nữa (chỉ retake bonus nhỏ 5xp đã tính ở base)
+        // Nhưng vẫn cập nhật percentage nếu cao hơn lần trước
+        else if (pct > (prior.rows[0].percentage || 0)) {
+          await pool.query(
+            `UPDATE "ExamXpReward" SET percentage = $1, "earnedAt" = NOW()
+              WHERE "userId" = $2 AND "examId" = $3`,
+            [pct, user.id, examId]
+          );
+        }
+
+        // Trả tổng
+        const total = await pool.query(
+          `SELECT "totalXp", "examCount" FROM "UserXP" WHERE "userId" = $1`,
+          [user.id]
+        );
+        const totalXp = total.rows[0]?.totalXp ?? xp;
+        const examCount = total.rows[0]?.examCount ?? 1;
+        // Tính cấp: mỗi level 100 XP
+        const level = Math.floor(totalXp / 100) + 1;
+        const nextLevelXp = level * 100;
+        const xpToNext = Math.max(0, nextLevelXp - totalXp);
+
+        res.json({
+          xpEarned: isFirstTry ? xp : 0,
+          isFirstTry,
+          perfect,
+          totalXp,
+          examCount,
+          level,
+          xpToNext,
+          nextLevelXp,
+          message: isFirstTry
+            ? perfect
+              ? `🎉 Hoàn hảo! +${xp} XP (gồm +20 thưởng đạt 100%)`
+              : `+${xp} XP (gồm +10 thưởng lần đầu)`
+            : 'Đây là lần làm lại — không cộng XP mới',
+        });
+      } catch (e) {
+        console.error('[xp:award]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/exam-xp/me — tổng XP + lịch sử gần
+    app.get('/api/exam-xp/me', async (req, res) => {
+      const user = getUserFromAuth(req);
+      if (!user) return res.json({ totalXp: 0, examCount: 0, level: 1, history: [] });
+      const pool = getCPool();
+      if (!pool) return res.json({ totalXp: 0, examCount: 0, level: 1, history: [] });
+      try {
+        await ensureXpTables();
+        const total = await pool.query(
+          `SELECT "totalXp", "examCount" FROM "UserXP" WHERE "userId" = $1`,
+          [user.id]
+        );
+        const history = await pool.query(
+          `SELECT id, "examId", percentage, "xpEarned", "earnedAt"
+             FROM "ExamXpReward" WHERE "userId" = $1
+             ORDER BY "earnedAt" DESC LIMIT 10`,
+          [user.id]
+        );
+        const totalXp = total.rows[0]?.totalXp ?? 0;
+        const examCount = total.rows[0]?.examCount ?? 0;
+        const level = Math.floor(totalXp / 100) + 1;
+        res.json({
+          totalXp, examCount, level,
+          nextLevelXp: level * 100,
+          xpToNext: Math.max(0, level * 100 - totalXp),
+          history: history.rows,
+        });
+      } catch (e) {
+        console.error('[xp:me]', e.message);
+        res.json({ totalXp: 0, examCount: 0, level: 1, history: [] });
+      }
+    });
+
     // ── AI entitlement check ─────────────────────────────────
     // GET /api/entitlements/check?feature=ai_tutor
     // Return { allowed: bool, plan: 'FREE'|'PREMIUM'|'PRO', reason: string }

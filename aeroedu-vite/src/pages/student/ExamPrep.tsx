@@ -16,6 +16,8 @@ import { formatRelativeTime } from "@/lib/utils"
 import { QuickScanQr } from "@/components/common/QuickScanQr"
 import { MathText } from "@/components/common/MathText"
 import { DocRef } from "@/components/docs/DocRef"
+import { NameStartModal } from "@/components/exam/NameStartModal"
+import { api } from "@/services/api"
 import type {
   PracticeExam,
   GradeResult,
@@ -79,6 +81,18 @@ export default function ExamPrepPage() {
 
   const [result, setResult] = useState<GradeResult | null>(null)
   const [history, setHistory] = useState<ExamPrepHistoryItem[]>([])
+
+  // Name-picker modal + XP state
+  const [nameModalOpen, setNameModalOpen] = useState(false)
+  const [pendingStart, setPendingStart] = useState<null | (() => void)>(null)
+  const [pendingExamTitle, setPendingExamTitle] = useState<string>('')
+  const [xpAward, setXpAward] = useState<null | {
+    xpEarned: number; isFirstTry: boolean; perfect: boolean;
+    totalXp: number; level: number; xpToNext: number; message: string;
+  }>(null)
+  const [playerName, setPlayerName] = useState<string>(() => {
+    try { return sessionStorage.getItem('aero_player_name') || '' } catch { return '' }
+  })
 
   const [formData, setFormData] = useState({
     subject: "Toán học",
@@ -188,8 +202,22 @@ export default function ExamPrepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* ─── Yêu cầu nhập tên trước khi bắt đầu (Wayground-style) ─────
+   * Nếu chưa có playerName → mở NameStartModal, lưu xong gọi doStart().
+   * Nếu đã có → gọi doStart() luôn.
+   */
+  const requireName = (examTitle: string, doStart: () => void) => {
+    if (playerName && playerName.trim().length >= 2) {
+      doStart()
+      return
+    }
+    setPendingExamTitle(examTitle || 'Bài làm')
+    setPendingStart(() => doStart)
+    setNameModalOpen(true)
+  }
+
   /* ─── Create exam from Question Bank ──────────────── */
-  const startFromBank = async () => {
+  const _startFromBank = async () => {
     setLoading(true)
     try {
       const p = await examPrepService.createFromBank({
@@ -251,9 +279,14 @@ export default function ExamPrepPage() {
       setLoading(false)
     }
   }
+  // Wrapper public — hỏi tên trước rồi mới start
+  const startFromBank = () => {
+    const examTitle = `${formData.subject} — ${formData.examType}`
+    requireName(examTitle, _startFromBank)
+  }
 
   /* ─── Create from Teacher Exam ────────────────────── */
-  const startFromTeacherExam = async (examId: string, type: "exam" | "matrix") => {
+  const _startFromTeacherExam = async (examId: string, type: "exam" | "matrix") => {
     setLoading(true)
     try {
       const p = await examPrepService.createFromTeacherExam(examId, type)
@@ -273,6 +306,10 @@ export default function ExamPrepPage() {
     } finally {
       setLoading(false)
     }
+  }
+  // Wrapper: hỏi tên trước. Tham số phụ "title" để hiển thị trong modal.
+  const startFromTeacherExam = (examId: string, type: "exam" | "matrix", title?: string) => {
+    requireName(title || 'Đề từ giáo viên', () => _startFromTeacherExam(examId, type))
   }
 
   /* ─── Load History ────────────────────────────────── */
@@ -307,6 +344,23 @@ export default function ExamPrepPage() {
         toast.success(autoSubmit ? "Hết giờ! Đã tự động nộp bài." : "Đã nộp bài!")
         refetchStats()
         refetchCommunity()
+        // Cộng XP — chạy fire-and-forget, không chặn UX
+        ;(async () => {
+          try {
+            const { data } = await api.post('/exam-xp/award', {
+              examId: practice.id,
+              percentage: gradeResult.percentage,
+              playerName,
+            })
+            setXpAward(data)
+            if (data?.isFirstTry && data?.xpEarned > 0) {
+              toast.success(`✨ +${data.xpEarned} XP! Cấp ${data.level}`, { duration: 4000 })
+            }
+          } catch (err) {
+            // im lặng — không ảnh hưởng UX
+            if (import.meta.env.DEV) console.warn('[xp:award] fail', err)
+          }
+        })()
       } else {
         toast.error("Không nộp được bài — hãy thử lại")
       }
@@ -471,6 +525,7 @@ export default function ExamPrepPage() {
           <div className="max-w-4xl mx-auto space-y-5">
             {/* Score Banner */}
             <div className="bg-gradient-to-r from-[hsl(245,85%,55%)] to-[hsl(280,75%,55%)] rounded-2xl p-8 text-center text-white shadow-[0_0_30px_rgba(120,100,255,0.2)]">
+              {playerName && <div className="text-base opacity-80 mb-2">🎉 {playerName}</div>}
               <div className="text-6xl font-bold mb-2">{result.percentage}%</div>
               <div className="text-xl opacity-80">{result.score}/{result.total} câu đúng</div>
               {communityStats && communityStats.averagePercentage > 0 && (
@@ -483,6 +538,42 @@ export default function ExamPrepPage() {
                 </div>
               )}
             </div>
+
+            {/* XP Reward Banner — gamification */}
+            {xpAward && (
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/15 via-pink-500/10 to-purple-500/15 border-2 border-amber-500/40 p-5 sm:p-6">
+                <div className="absolute -top-12 -right-8 w-40 h-40 rounded-full bg-amber-500/20 blur-3xl pointer-events-none" />
+                <div className="relative flex flex-col sm:flex-row items-center gap-4">
+                  <div className="text-5xl sm:text-6xl flex-shrink-0">
+                    {xpAward.perfect ? '🏆' : xpAward.xpEarned > 30 ? '⭐' : '✨'}
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="inline-flex items-center gap-2 text-amber-300 font-black text-2xl sm:text-3xl mb-1">
+                      {xpAward.isFirstTry ? `+${xpAward.xpEarned} XP` : 'Đã làm rồi'}
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200">
+                        Cấp {xpAward.level}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/75 leading-relaxed">
+                      {xpAward.message}
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-2 rounded-full bg-white/[0.08] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-pink-500"
+                          style={{
+                            width: `${Math.max(8, Math.round(((xpAward.totalXp % 100) / 100) * 100))}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs text-white/65 tabular-nums font-semibold">
+                        {xpAward.totalXp} XP · còn {xpAward.xpToNext} lên cấp
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Stats cards */}
             <div className="grid grid-cols-3 gap-4">
@@ -570,7 +661,7 @@ export default function ExamPrepPage() {
                 <Search className="h-4 w-4" /> Xem lại đáp án
               </button>
               <button
-                onClick={() => { setView("home"); setResult(null); setPractice(null); setAnswers({}) }}
+                onClick={() => { setView("home"); setResult(null); setPractice(null); setAnswers({}); setXpAward(null) }}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white hover:brightness-110 transition-all text-sm font-medium"
               >
                 <RotateCcw className="h-4 w-4" /> Làm Đề Khác
@@ -923,7 +1014,7 @@ export default function ExamPrepPage() {
                               exam={ex}
                               theme={inferExamTheme(ex, idx)}
                               loading={loading}
-                              onStart={() => startFromTeacherExam(ex.id, "exam")}
+                              onStart={() => startFromTeacherExam(ex.id, "exam", ex.title)}
                             />
                           ))}
                         </div>
@@ -1004,7 +1095,7 @@ export default function ExamPrepPage() {
                                     </span>
                                   </div>
                                   <button
-                                    onClick={() => startFromTeacherExam(ex.id, "exam")}
+                                    onClick={() => startFromTeacherExam(ex.id, "exam", ex.title)}
                                     disabled={loading}
                                     className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-white font-bold text-xs sm:text-sm shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
                                     style={{
@@ -1096,6 +1187,23 @@ export default function ExamPrepPage() {
           />
         </div>
       </div>
+
+      {/* Name picker modal (Wayground-style) — hỏi tên trước khi vào đề */}
+      <NameStartModal
+        open={nameModalOpen}
+        onClose={() => { setNameModalOpen(false); setPendingStart(null) }}
+        defaultName={user?.name || ''}
+        title="Bắt đầu làm bài"
+        examTitle={pendingExamTitle}
+        subtitle="Tên hiển thị trên bảng xếp hạng cộng đồng"
+        onStart={({ name }) => {
+          setPlayerName(name)
+          setNameModalOpen(false)
+          const fn = pendingStart
+          setPendingStart(null)
+          if (fn) fn()
+        }}
+      />
     </div>
   )
 }
