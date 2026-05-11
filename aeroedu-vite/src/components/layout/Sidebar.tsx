@@ -11,7 +11,7 @@ import {
   Calendar, Shield, AlertTriangle, Activity, Settings, Upload,
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
-  CircuitBoard, FunctionSquare,
+  CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -58,6 +58,14 @@ const studentSections: RouteSection[] = [
       { icon: Activity, labelKey: 'routeProgress',    href: '/student/progress' },
       { icon: Heart,    labelKey: 'routeEmotion',     href: '/dashboard/emotion' },
       { icon: FileEdit, labelKey: 'routeAssignments', href: '/dashboard/assignments' },
+      { icon: Calendar, labelKey: 'routeSchedule',    href: '/student/schedule' },
+    ],
+  },
+  {
+    titleKey: 'sectionStore',
+    routes: [
+      { icon: Bookmark,    labelKey: 'routeWishlist',  href: '/student/wishlist' },
+      { icon: ShoppingBag, labelKey: 'routePurchase',  href: '/student/purchase-history' },
     ],
   },
   {
@@ -94,6 +102,7 @@ const teacherSections: RouteSection[] = [
   {
     titleKey: 'sectionExam',
     routes: [
+      { icon: Wand2,     labelKey: 'routeTaodethi',      href: '/teacher/taodethi',         isHighlighted: true },
       { icon: Grid3x3,   labelKey: 'routeExamMatrix',   href: '/teacher/exam-matrix' },
       { icon: HelpCircle,labelKey: 'routeQuestionBank',  href: '/teacher/question-bank' },
       { icon: FileText,  labelKey: 'routeExams',         href: '/teacher/exams',            badge: 'AI' },
