@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import * as XLSX from 'xlsx'
+import { api } from '@/services/api'
 
 interface Class {
   id: string
@@ -130,12 +131,7 @@ function AddStudentsModal({
     if (!selected.length) return
     setAdding(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentIds: selected }),
-      })
-      if (!res.ok) throw new Error('Failed')
+      await api.post(`/classes/${classId}/students`, { studentIds: selected })
       toast.success(`Đã thêm ${selected.length} học sinh vào lớp`)
       onAdded()
     } catch {
@@ -308,32 +304,22 @@ function ImportModal({
       let targetClassId = classId
       // Create class if no existing class selected
       if (!targetClassId) {
-        const res = await fetch('/api/classes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: parsed.className,
-            grade: classGrade,
-            schoolYear: classYear,
-            description: `Import từ file ${fileName}`,
-          }),
+        const res = await api.post('/classes', {
+          name: parsed.className,
+          grade: classGrade,
+          schoolYear: classYear,
+          description: `Import từ file ${fileName}`,
         })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Không thể tạo lớp')
-        targetClassId = data.class?.id || data.id
+        targetClassId = res.data.class?.id || res.data.id
       }
 
       // Call bulk import API
-      const importRes = await fetch(`/api/classes/${targetClassId}/students/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: parsed.students }),
-      })
-      const importData = await importRes.json()
-      if (!importRes.ok) throw new Error(importData.error || 'Import thất bại')
-
-      setResult(importData.results)
-      toast.success(importData.message || 'Import thành công!')
+      const importRes = await api.post<{ message: string; results: ImportResult }>(
+        `/classes/${targetClassId}/students/import`,
+        { students: parsed.students }
+      )
+      setResult(importRes.data.results)
+      toast.success(importRes.data.message || 'Import thành công!')
       onDone()
     } catch (err: any) {
       toast.error(err.message)
@@ -556,17 +542,10 @@ export default function ClassesPage() {
   const fetchClasses = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/classes')
-      if (!res.ok) throw new Error('Failed')
-      const data = await res.json()
-      setClasses(data.classes || [])
+      const res = await api.get<{ classes: Class[] }>('/classes')
+      setClasses(res.data?.classes || [])
     } catch {
-      // Demo fallback
-      setClasses([
-        { id: '1', name: 'Lớp 9A1', grade: 'Khối 9', schoolYear: '2025-2026', studentCount: 32, createdAt: new Date().toISOString() },
-        { id: '2', name: 'Lớp 10B2', grade: 'Khối 10', schoolYear: '2025-2026', studentCount: 28, createdAt: new Date().toISOString() },
-        { id: '3', name: 'Lớp 11C3', grade: 'Khối 11', schoolYear: '2025-2026', studentCount: 0, createdAt: new Date().toISOString() },
-      ])
+      setClasses([])
     } finally {
       setLoading(false)
     }
@@ -578,25 +557,20 @@ export default function ClassesPage() {
       return
     }
     try {
-      const res = await fetch('/api/classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClass),
-      })
-      if (!res.ok) throw new Error('Failed')
+      await api.post('/classes', newClass)
       toast.success('Đã tạo lớp học thành công')
       setCreateOpen(false)
       setNewClass({ name: '', grade: 'Khối 9', schoolYear: '2025-2026', description: '' })
       fetchClasses()
-    } catch {
-      toast.error('Không thể tạo lớp học')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể tạo lớp học')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/classes/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed')
+      await api.delete(`/classes/${id}`)
       toast.success('Đã xóa lớp học')
       setDeleteOpen(false)
       setClassToDelete(null)

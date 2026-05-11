@@ -6949,9 +6949,245 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
   // ─ Teacher / Class management ─────────────────────────────
   app.get('/api/teacher/students', (_req, res) => res.json({ students: [] }));
   app.get('/api/teacher/students/:id', (req, res) => res.json({ id: req.params.id, name: '—', email: '—' }));
-  app.get('/api/classes', (_req, res) => res.json({ classes: [] }));
-  app.get('/api/classes/:id', emptyObj);
-  app.post('/api/classes', notImpl('Tạo lớp đang phát triển'));
+  // ─ Class management — built-in CRUD + bulk import students từ Excel ─
+  // Tables auto-create. Authentication: Bearer JWT.
+  {
+    const { Pool: ClsPool } = require('pg');
+    const clsJwt = require('jsonwebtoken');
+    const { randomUUID: clsUUID } = require('crypto');
+    let _clsPool = null;
+    let _clsReady = null;
+    function getClsPool() {
+      if (!_clsPool) {
+        const url = process.env.DATABASE_URL;
+        if (!url) return null;
+        _clsPool = new ClsPool({ connectionString: url, max: 5,
+          idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+      }
+      return _clsPool;
+    }
+    async function ensureClsTables() {
+      if (_clsReady) return _clsReady;
+      const pool = getClsPool();
+      if (!pool) return null;
+      _clsReady = (async () => {
+        await pool.query(`CREATE TABLE IF NOT EXISTS "TeacherClass" (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          grade TEXT,
+          subject TEXT,
+          "schoolYear" TEXT,
+          description TEXT,
+          "teacherId" TEXT NOT NULL,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          "updatedAt" TIMESTAMP DEFAULT NOW()
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "TeacherClass_teacherId_idx"
+          ON "TeacherClass"("teacherId")`);
+        await pool.query(`CREATE TABLE IF NOT EXISTS "ClassStudent" (
+          id TEXT PRIMARY KEY,
+          "classId" TEXT NOT NULL,
+          stt INT,
+          mssv TEXT,
+          name TEXT NOT NULL,
+          dob TEXT,
+          gender TEXT,
+          email TEXT,
+          phone TEXT,
+          "createdAt" TIMESTAMP DEFAULT NOW(),
+          UNIQUE("classId", mssv)
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "ClassStudent_classId_idx"
+          ON "ClassStudent"("classId")`);
+        console.log('[classes] ✅ tables ready');
+      })().catch(e => { console.error('[classes] ❌ ensureTables', e.message); _clsReady = null; });
+      return _clsReady;
+    }
+    const CLS_JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+      || 'dev-secret-fallback-change-in-production!!';
+    function getClsTeacherId(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        return clsJwt.verify(auth.slice(7), CLS_JWT_SECRET).sub || null;
+      } catch { return null; }
+    }
+
+    // GET /api/classes — list classes của teacher
+    app.get('/api/classes', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.json({ classes: [] });
+        const pool = getClsPool();
+        if (!pool) return res.json({ classes: [] });
+        await ensureClsTables();
+        const { rows } = await pool.query(
+          `SELECT c.*,
+                  (SELECT COUNT(*)::int FROM "ClassStudent" s WHERE s."classId" = c.id) AS "studentCount"
+             FROM "TeacherClass" c
+            WHERE c."teacherId" = $1
+            ORDER BY c."createdAt" DESC`,
+          [tid]
+        );
+        return res.json({ classes: rows });
+      } catch (err) {
+        console.error('[classes:list] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /api/classes/:id — class detail
+    app.get('/api/classes/:id', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureClsTables();
+        const { rows } = await pool.query(
+          `SELECT * FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2 LIMIT 1`,
+          [req.params.id, tid]
+        );
+        if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        return res.json({ class: rows[0] });
+      } catch (err) {
+        console.error('[classes:get] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // GET /api/classes/:id/students — list students của class
+    app.get('/api/classes/:id/students', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.json({ students: [] });
+        await ensureClsTables();
+        // Verify ownership
+        const own = await pool.query(`SELECT 1 FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2`,
+          [req.params.id, tid]);
+        if (own.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        const { rows } = await pool.query(
+          `SELECT * FROM "ClassStudent" WHERE "classId"=$1 ORDER BY stt ASC NULLS LAST, name ASC`,
+          [req.params.id]
+        );
+        return res.json({ students: rows });
+      } catch (err) {
+        console.error('[classes:students:list] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // POST /api/classes — tạo class mới
+    // Body: { name, grade, schoolYear, subject?, description? }
+    app.post('/api/classes', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureClsTables();
+
+        const { name, grade, schoolYear, subject, description } = req.body || {};
+        if (!name) return res.status(400).json({ error: 'Tên lớp là bắt buộc' });
+        const id = clsUUID();
+        const now = new Date();
+        const { rows } = await pool.query(
+          `INSERT INTO "TeacherClass" (id, name, grade, subject, "schoolYear", description, "teacherId", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) RETURNING *`,
+          [id, String(name).slice(0, 200), grade || null, subject || null,
+           schoolYear || null, description || null, tid, now]
+        );
+        console.log(`[classes:create] ✅ id=${id.slice(0,8)} name=${name} teacher=${tid.slice(0,8)}`);
+        return res.status(201).json({ success: true, class: rows[0], id });
+      } catch (err) {
+        console.error('[classes:create] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // POST /api/classes/:id/students/import — bulk import từ Excel parsed
+    // Body: { students: [{stt, hoTen, ngaySinh, gioiTinh, maDinhDanh}] }
+    app.post('/api/classes/:id/students/import', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureClsTables();
+
+        // Verify ownership
+        const own = await pool.query(`SELECT 1 FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2`,
+          [req.params.id, tid]);
+        if (own.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+
+        const students = Array.isArray(req.body?.students) ? req.body.students : [];
+        if (students.length === 0) return res.status(400).json({ error: 'Không có học sinh nào để import' });
+
+        let inserted = 0, updated = 0, skipped = 0;
+        const now = new Date();
+        for (const s of students) {
+          const name = String(s.hoTen || s.name || '').trim();
+          const mssv = String(s.maDinhDanh || s.mssv || '').trim();
+          if (!name) { skipped++; continue; }
+          try {
+            // Upsert by (classId, mssv)
+            const { rowCount } = await pool.query(
+              `INSERT INTO "ClassStudent" (id, "classId", stt, mssv, name, dob, gender, "createdAt")
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+               ON CONFLICT ("classId", mssv) DO UPDATE
+                 SET name = EXCLUDED.name,
+                     stt = EXCLUDED.stt,
+                     dob = EXCLUDED.dob,
+                     gender = EXCLUDED.gender`,
+              [clsUUID(), req.params.id,
+               s.stt ? Number(s.stt) : null,
+               mssv || null, name,
+               s.ngaySinh || s.dob || null,
+               s.gioiTinh || s.gender || null,
+               now]
+            );
+            if (rowCount > 0) inserted++;
+          } catch (err) {
+            console.warn(`[classes:import] skip "${name}": ${err.message.slice(0, 80)}`);
+            skipped++;
+          }
+        }
+        console.log(`[classes:import] ✅ class=${req.params.id.slice(0,8)} inserted=${inserted} updated=${updated} skipped=${skipped}`);
+        return res.json({
+          success: true,
+          message: `Đã import ${inserted} học sinh${skipped ? ` (bỏ qua ${skipped})` : ''}`,
+          results: { inserted, updated, skipped, total: students.length },
+        });
+      } catch (err) {
+        console.error('[classes:import] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // DELETE /api/classes/:id
+    app.delete('/api/classes/:id', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await pool.query(`DELETE FROM "ClassStudent" WHERE "classId" IN
+          (SELECT id FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2)`,
+          [req.params.id, tid]);
+        const { rowCount } = await pool.query(
+          `DELETE FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2`,
+          [req.params.id, tid]
+        );
+        if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        return res.json({ success: true });
+      } catch (err) {
+        console.error('[classes:delete] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
 
   // ─ Stats / Progress ───────────────────────────────────────
   app.get('/api/exam-stats', (_req, res) => res.json({ totalExams: 0, avgScore: 0, completed: 0 }));
