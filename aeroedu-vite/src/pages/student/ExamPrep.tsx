@@ -5,6 +5,7 @@ import {
   XCircle, ChevronLeft, ChevronRight, RotateCcw, FileText,
   GraduationCap, BarChart3, History, Loader2, Search,
   Users, Medal, Sparkles, RefreshCw,
+  Rocket, Mountain, Gamepad2, Target, Zap, ArrowRight, QrCode,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { useQuery } from "@tanstack/react-query"
@@ -671,116 +672,157 @@ export default function ExamPrepPage() {
     )
   }
 
-  /* ─── RENDER: Home ────────────────────────────────── */
+  /* ─── RENDER: Home (Wayground-style, mobile-first big text) ───────────── */
+  // Greeting theo giờ trong ngày để cá nhân hoá hero
+  const greeting = (() => {
+    const h = new Date().getHours()
+    if (h < 11) return 'Chào buổi sáng'
+    if (h < 14) return 'Chào buổi trưa'
+    if (h < 18) return 'Chào buổi chiều'
+    return 'Chào buổi tối'
+  })()
+  const firstName = user?.name?.split(' ').pop() || 'bạn'
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Ôn Thi Thông Minh" description="Luyện tập với đề thi từ ngân hàng đề và bài kiểm tra của giáo viên" docSlug="student-guide" docAnchor="exam-prep" />
 
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-5">
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center transition-all hover:-translate-y-0.5 hover:bg-white/[0.04]">
-              <BookOpen className="h-6 w-6 text-[hsl(210,90%,60%)] mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white/90">{statsLoading ? "..." : stats?.totalExams || 0}</div>
-              <div className="text-[0.65rem] text-white/40 uppercase tracking-wider mt-1">Đã làm</div>
-            </div>
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center transition-all hover:-translate-y-0.5 hover:bg-white/[0.04]">
-              <Trophy className="h-6 w-6 text-[hsl(35,90%,55%)] mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white/90">{statsLoading ? "..." : stats?.avgScore || 0}%</div>
-              <div className="text-[0.65rem] text-white/40 uppercase tracking-wider mt-1">Điểm TB</div>
-            </div>
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center transition-all hover:-translate-y-0.5 hover:bg-white/[0.04]">
-              <TrendingUp className="h-6 w-6 text-[hsl(175,80%,50%)] mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white/90">{statsLoading ? "..." : stats?.bestScore || 0}%</div>
-              <div className="text-[0.65rem] text-white/40 uppercase tracking-wider mt-1">Cao nhất</div>
-            </div>
-            <div
-              className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center transition-all hover:-translate-y-0.5 hover:bg-white/[0.04] cursor-pointer"
-              onClick={() => { loadHistory(); setView("history") }}
-            >
-              <History className="h-6 w-6 text-[hsl(280,75%,60%)] mx-auto mb-2" />
-              <div className="text-2xl font-bold text-white/90">{statsLoading ? "..." : stats?.questionBankCount || 0}</div>
-              <div className="text-[0.65rem] text-white/40 uppercase tracking-wider mt-1">Ngân hàng</div>
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto space-y-5 sm:space-y-6">
+
+          {/* ── Hero greeting + Quick action ─────────────────────── */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[hsl(262,83%,30%)] via-[hsl(245,75%,28%)] to-[hsl(210,80%,25%)] p-5 sm:p-7">
+            <div className="absolute -top-12 -right-8 w-48 h-48 rounded-full bg-[hsl(175,80%,50%)]/15 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-12 -left-8 w-48 h-48 rounded-full bg-[hsl(280,75%,55%)]/20 blur-3xl pointer-events-none" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Sparkles className="h-4 w-4 text-[hsl(50,100%,70%)]" />
+                <span className="text-xs sm:text-sm font-medium text-white/70 uppercase tracking-wider">
+                  {greeting}, {firstName}!
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-4xl font-black text-white leading-tight mb-1">
+                Sẵn sàng cho 1 đề thi?
+              </h2>
+              <p className="text-sm sm:text-base text-white/70 mb-4 sm:mb-5">
+                Chọn đề từ giáo viên hoặc luyện tập từ ngân hàng câu hỏi.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => setActiveTab("teacher")}
+                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white text-[hsl(262,83%,30%)] font-bold text-sm sm:text-base shadow-lg hover:scale-[1.02] transition-transform"
+                >
+                  <Rocket className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Bắt đầu ngay
+                </button>
+                <button
+                  onClick={() => { loadHistory(); setView("history") }}
+                  className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-white/10 backdrop-blur text-white font-semibold text-sm sm:text-base border border-white/20 hover:bg-white/20 transition"
+                >
+                  <History className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Lịch sử
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* QR truy cập nhanh — quét là vào thẳng trang ôn thi trên điện thoại */}
-          <QuickScanQr
-            accent="emerald"
-            title="Quét QR để làm đề ngay trên điện thoại"
-            description="Học sinh mở camera quét QR là vào thẳng trang ôn thi này — không cần gõ link, không cần điều hướng qua menu. Giáo viên có thể tải PNG để in ra dán lớp."
-            downloadName="examprep-qr.png"
-          />
+          {/* ── Stats — 3 tiles BIG text ──────────────────────────── */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <StatTile
+              icon={<BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />}
+              value={statsLoading ? "—" : `${stats?.totalExams || 0}`}
+              label="Đã làm"
+              accent="hsl(210,90%,60%)"
+            />
+            <StatTile
+              icon={<Trophy className="h-5 w-5 sm:h-6 sm:w-6" />}
+              value={statsLoading ? "—" : `${stats?.avgScore || 0}%`}
+              label="Điểm TB"
+              accent="hsl(35,90%,55%)"
+            />
+            <StatTile
+              icon={<TrendingUp className="h-5 w-5 sm:h-6 sm:w-6" />}
+              value={statsLoading ? "—" : `${stats?.bestScore || 0}%`}
+              label="Cao nhất"
+              accent="hsl(175,80%,50%)"
+            />
+          </div>
 
-          {/* Tabs: Đề thi giáo viên (mặc định) / Ngân hàng câu hỏi */}
-          <div className="flex gap-2">
+          {/* ── Tabs (BIG, Wayground-style pill) ──────────────────── */}
+          <div className="flex gap-2 sm:gap-3 p-1.5 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
             <button
               onClick={() => setActiveTab("teacher")}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 sm:py-4 px-3 rounded-xl text-base sm:text-lg font-bold transition-all ${
                 activeTab === "teacher"
-                  ? "bg-[hsl(175,80%,45%)]/15 text-[hsl(175,80%,60%)] border border-[hsl(175,80%,45%)]/30"
-                  : "bg-white/[0.02] text-white/50 border border-white/[0.06] hover:bg-white/[0.04]"
+                  ? "bg-gradient-to-br from-[hsl(175,80%,45%)] to-[hsl(190,80%,40%)] text-white shadow-lg"
+                  : "text-white/55 hover:text-white/80"
               }`}
             >
-              <GraduationCap className="h-4 w-4 inline-block mr-2" />
-              Đề thi giáo viên
+              <GraduationCap className="h-5 w-5" />
+              <span className="hidden xs:inline">Đề thi</span> giáo viên
             </button>
             <button
               onClick={() => setActiveTab("bank")}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-1 flex items-center justify-center gap-2 py-3.5 sm:py-4 px-3 rounded-xl text-base sm:text-lg font-bold transition-all ${
                 activeTab === "bank"
-                  ? "bg-[hsl(245,85%,60%)]/15 text-[hsl(245,85%,75%)] border border-[hsl(245,85%,60%)]/30"
-                  : "bg-white/[0.02] text-white/50 border border-white/[0.06] hover:bg-white/[0.04]"
+                  ? "bg-gradient-to-br from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white shadow-lg"
+                  : "text-white/55 hover:text-white/80"
               }`}
             >
-              <BookOpen className="h-4 w-4 inline-block mr-2" />
-              Ngân hàng câu hỏi
+              <BookOpen className="h-5 w-5" />
+              Ngân hàng
             </button>
           </div>
 
-          {/* TAB: Question Bank */}
+          {/* TAB: Question Bank — Wayground-style big-text form */}
           {activeTab === "bank" && (
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-4">
-              <h3 className="font-semibold text-lg text-white/90">Tạo Đề Thi Thử từ Ngân Hàng</h3>
-              <p className="text-xs text-white/40">Hệ thống tự động chọn câu hỏi theo tỉ lệ: 40% Dễ, 30% Trung bình, 30% Khó</p>
+            <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-5 sm:p-7 space-y-5">
+              <div>
+                <h3 className="font-bold text-xl sm:text-2xl text-white leading-tight">
+                  Luyện tập từ Ngân hàng
+                </h3>
+                <p className="text-sm sm:text-base text-white/55 mt-1">
+                  Tự động chọn theo tỉ lệ <span className="text-emerald-300/80">40% Dễ</span> ·
+                  {' '}<span className="text-amber-300/80">30% TB</span> ·
+                  {' '}<span className="text-rose-300/80">30% Khó</span>
+                </p>
+              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-white/50 text-xs mb-1.5">Môn học</label>
-                  <select value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} className={selectClass}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <FieldBig label="Môn học">
+                  <select value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} className="exam-select-big">
                     {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-white/50 text-xs mb-1.5">Khối lớp</label>
-                  <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value })} className={selectClass}>
+                </FieldBig>
+                <FieldBig label="Khối lớp">
+                  <select value={formData.grade} onChange={(e) => setFormData({ ...formData, grade: e.target.value })} className="exam-select-big">
                     {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                       <option key={n} value={`Khối ${n}`}>Khối {n}</option>
                     ))}
                   </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-white/50 text-xs mb-1.5">Chủ đề (Topic)</label>
-                  <select
-                    value={formData.topic}
-                    onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                    className={selectClass}
-                    disabled={topicsLoading}
-                  >
-                    <option value="__all__">
-                      {topicsLoading ? "Đang tải chủ đề..." : "Tất cả chủ đề"}
-                    </option>
-                    {availableTopics.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
+                </FieldBig>
+                <div className="sm:col-span-2">
+                  <FieldBig label="Chủ đề">
+                    <select
+                      value={formData.topic}
+                      onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-medium focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                      disabled={topicsLoading}
+                    >
+                      <option value="__all__">
+                        {topicsLoading ? "Đang tải chủ đề…" : "Tất cả chủ đề"}
+                      </option>
+                      {availableTopics.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </FieldBig>
                   {availableTopics.length > 0 && formData.topic === "__all__" && (
-                    <p className="text-[10px] text-white/30 mt-1">{availableTopics.length} chủ đề có sẵn</p>
+                    <p className="text-xs text-white/35 mt-1.5">{availableTopics.length} chủ đề có sẵn</p>
                   )}
                   {stats?.weakTopics && stats.weakTopics.length > 0 && formData.topic === "__all__" && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      <span className="text-[10px] text-amber-400/70">Yếu:</span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      <span className="text-xs text-amber-400/80 font-medium">💪 Chủ đề yếu:</span>
                       {stats.weakTopics.slice(0, 3).map((wt) => (
                         <button
                           key={wt}
@@ -790,9 +832,9 @@ export default function ExamPrepPage() {
                               setFormData({ ...formData, topic: wt })
                             }
                           }}
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-all ${
+                          className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
                             availableTopics.includes(wt)
-                              ? "border-amber-500/30 text-amber-400/80 hover:bg-amber-500/10 cursor-pointer"
+                              ? "border-amber-500/40 text-amber-300 hover:bg-amber-500/15 cursor-pointer"
                               : "border-white/[0.06] text-white/30 cursor-default"
                           }`}
                         >
@@ -802,116 +844,167 @@ export default function ExamPrepPage() {
                     </div>
                   )}
                 </div>
-                <div>
-                  <label className="block text-white/50 text-xs mb-1.5">Loại kiểm tra</label>
-                  <select value={formData.examType} onChange={(e) => setFormData({ ...formData, examType: e.target.value })} className={selectClass}>
+                <FieldBig label="Loại kiểm tra">
+                  <select value={formData.examType} onChange={(e) => setFormData({ ...formData, examType: e.target.value })} className="exam-select-big">
                     {EXAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
-                </div>
-                <div>
-                  <label className="block text-white/50 text-xs mb-1.5">Số câu hỏi</label>
-                  <input
-                    type="number"
-                    value={formData.questionCount}
-                    onChange={(e) => setFormData({ ...formData, questionCount: parseInt(e.target.value) || 10 })}
-                    min={5}
-                    max={100}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-white/50 text-xs mb-1.5">Thời gian (phút)</label>
-                  <input
-                    type="number"
-                    value={formData.timeLimit}
-                    onChange={(e) => setFormData({ ...formData, timeLimit: parseInt(e.target.value) || 15 })}
-                    min={5}
-                    max={180}
-                    className={inputClass}
-                  />
+                </FieldBig>
+                <div className="grid grid-cols-2 gap-3">
+                  <FieldBig label="Số câu">
+                    <input
+                      type="number"
+                      value={formData.questionCount}
+                      onChange={(e) => setFormData({ ...formData, questionCount: parseInt(e.target.value) || 10 })}
+                      min={5}
+                      max={100}
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                    />
+                  </FieldBig>
+                  <FieldBig label="Phút">
+                    <input
+                      type="number"
+                      value={formData.timeLimit}
+                      onChange={(e) => setFormData({ ...formData, timeLimit: parseInt(e.target.value) || 15 })}
+                      min={5}
+                      max={180}
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                    />
+                  </FieldBig>
                 </div>
               </div>
 
               <button
                 onClick={startFromBank}
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white font-medium text-sm shadow-[0_0_20px_rgba(120,100,255,0.2)] hover:shadow-[0_0_30px_rgba(120,100,255,0.35)] hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2.5 py-4 sm:py-5 px-6 rounded-2xl bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white font-bold text-lg sm:text-xl shadow-[0_8px_32px_rgba(120,100,255,0.35)] hover:shadow-[0_12px_40px_rgba(120,100,255,0.5)] hover:brightness-110 active:scale-[0.99] transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang tạo đề (có thể sinh thêm bằng AI)…</> : "Bắt Đầu Làm Bài"}
+                {loading
+                  ? <><Loader2 className="h-5 w-5 animate-spin" /> Đang tạo đề…</>
+                  : <><Rocket className="h-5 w-5" /> Bắt đầu làm bài</>
+                }
               </button>
 
-              {/* Hint AI auto-fill */}
-              <p className="text-[11px] text-white/35 text-center -mt-1 leading-relaxed">
-                💡 Nếu chủ đề chưa có đủ câu trong ngân hàng, AI sẽ tự sinh thêm và{' '}
-                <span className="text-purple-300/80">lưu lại cho lần sau</span> — bạn càng dùng, ngân hàng càng phong phú.
+              <p className="text-xs sm:text-sm text-white/40 text-center leading-relaxed">
+                💡 Thiếu câu? AI sẽ tự sinh thêm và{' '}
+                <span className="text-purple-300/90 font-medium">lưu cho lần sau</span>.
               </p>
             </div>
           )}
 
-          {/* TAB: Teacher Exams */}
+          {/* TAB: Teacher Exams — Big colored cards */}
           {activeTab === "teacher" && (
             <div className="space-y-4">
               {teacherExamsLoading ? (
-                <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-12 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-white/30 mx-auto mb-3" />
-                  <p className="text-white/40 text-sm">Đang tải danh sách đề thi...</p>
+                <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-12 text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-white/30 mx-auto mb-3" />
+                  <p className="text-white/55 text-base">Đang tải danh sách đề thi…</p>
                 </div>
               ) : (
                 <>
-                  {/* Exam Matrices */}
-                  {/* Mục "Ma Trận Đề" đã ẩn — học sinh chỉ thấy đề hoàn chỉnh
-                      do giáo viên xuất bản, không phải template ma trận. */}
-
-                  {/* Teacher Exams */}
                   {teacherExams.length > 0 && (
-                    <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
-                      <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2">
-                        <GraduationCap className="h-5 w-5 text-[hsl(210,90%,60%)]" />
-                        Đề Thi ({teacherExams.length})
-                      </h3>
-                      <div className="space-y-3">
-                        {teacherExams.map((ex) => (
-                          <div key={ex.id} className="flex items-center justify-between p-4 rounded-xl border border-white/[0.06] hover:bg-white/[0.03] transition-all gap-2">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-white/85">{ex.title}</h4>
-                              <p className="text-xs text-white/40 mt-1">
-                                {ex.examType} | {ex.totalQuestions} câu | {ex.duration}p | {ex.totalScore} điểm
-                              </p>
-                              {ex.user?.name && <p className="text-xs text-white/30 mt-0.5">GV: {ex.user.name}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <QuickScanQr
-                                variant="compact"
-                                accent="indigo"
-                                title={`Quét QR — ${ex.title}`}
-                                downloadName={`qr-exam-${ex.id}.png`}
-                                targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
-                              />
-                              <button
-                                onClick={() => startFromTeacherExam(ex.id, "exam")}
-                                disabled={loading}
-                                className="px-3 py-1.5 rounded-lg bg-[hsl(210,90%,50%)] hover:bg-[hsl(210,90%,55%)] text-white text-xs font-medium transition-all disabled:opacity-50"
-                              >
-                                Làm bài
-                              </button>
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <h3 className="font-bold text-white text-lg sm:text-xl flex items-center gap-2">
+                          <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-[hsl(175,80%,55%)]" />
+                          {teacherExams.length} đề từ giáo viên
+                        </h3>
+                      </div>
+                      {teacherExams.map((ex, idx) => {
+                        // Xoay 5 màu theme Wayground cho từng card
+                        const themes = [
+                          { from: 'hsl(0,73%,45%)',   to: 'hsl(340,75%,40%)', name: 'crimson'  },
+                          { from: 'hsl(175,80%,40%)', to: 'hsl(190,80%,35%)', name: 'teal'     },
+                          { from: 'hsl(25,90%,55%)',  to: 'hsl(15,85%,50%)',  name: 'orange'   },
+                          { from: 'hsl(218,55%,32%)', to: 'hsl(230,55%,28%)', name: 'navy'     },
+                          { from: 'hsl(280,75%,55%)', to: 'hsl(260,70%,50%)', name: 'violet'   },
+                        ]
+                        const t = themes[idx % themes.length]
+                        return (
+                          <div
+                            key={ex.id}
+                            className="relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] hover:border-white/[0.2] transition-all"
+                          >
+                            {/* Colored top stripe */}
+                            <div
+                              className="h-2 sm:h-2.5"
+                              style={{ background: `linear-gradient(90deg, ${t.from}, ${t.to})` }}
+                            />
+                            <div className="p-4 sm:p-5">
+                              <h4 className="font-bold text-white text-lg sm:text-xl leading-tight mb-2 line-clamp-2">
+                                {ex.title}
+                              </h4>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-white/65 mb-3 sm:mb-4">
+                                <Chip>{ex.examType}</Chip>
+                                <Chip>📝 {ex.totalQuestions} câu</Chip>
+                                <Chip>⏱ {ex.duration}p</Chip>
+                                <Chip>🎯 {ex.totalScore}đ</Chip>
+                              </div>
+                              {ex.user?.name && (
+                                <p className="text-xs sm:text-sm text-white/40 mb-3">👨‍🏫 GV: {ex.user.name}</p>
+                              )}
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <button
+                                  onClick={() => startFromTeacherExam(ex.id, "exam")}
+                                  disabled={loading}
+                                  className="flex-1 inline-flex items-center justify-center gap-2 py-3 sm:py-3.5 rounded-xl text-white font-bold text-base sm:text-lg shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                    boxShadow: `0 4px 20px ${t.from}40`,
+                                  }}
+                                >
+                                  <Rocket className="h-5 w-5" />
+                                  Bắt đầu
+                                </button>
+                                <QuickScanQr
+                                  variant="compact"
+                                  accent="indigo"
+                                  title={`Quét QR — ${ex.title}`}
+                                  downloadName={`qr-exam-${ex.id}.png`}
+                                  targetUrl={`${window.location.origin}/student/exam-prep?startExam=${ex.id}&type=exam`}
+                                />
+                              </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        )
+                      })}
                     </div>
                   )}
 
                   {teacherExams.length === 0 && (
-                    <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-12 text-center">
-                      <GraduationCap className="h-12 w-12 text-white/15 mx-auto mb-3" />
-                      <p className="text-white/40 text-sm">Chưa có đề thi nào từ giáo viên.</p>
-                      <p className="text-white/25 text-xs mt-1">Khi giáo viên tạo và công bố đề thi, bạn sẽ thấy tại đây.</p>
+                    <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-10 sm:p-12 text-center">
+                      <GraduationCap className="h-14 w-14 sm:h-16 sm:w-16 text-white/15 mx-auto mb-4" />
+                      <h3 className="text-white/85 text-lg sm:text-xl font-bold mb-1">
+                        Chưa có đề thi
+                      </h3>
+                      <p className="text-white/45 text-sm sm:text-base max-w-sm mx-auto">
+                        Khi giáo viên công bố đề mới, bạn sẽ thấy tại đây. Trong lúc đợi, thử
+                        {' '}<button onClick={() => setActiveTab("bank")} className="text-purple-300 underline font-medium">luyện tập từ ngân hàng câu hỏi</button>.
+                      </p>
                     </div>
                   )}
                 </>
               )}
             </div>
           )}
+
+          {/* ── QR scan (collapsed at bottom for less clutter) ─────── */}
+          <details className="rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+            <summary className="cursor-pointer px-5 py-4 flex items-center justify-between text-white/80 font-semibold text-base hover:bg-white/[0.04]">
+              <span className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-emerald-300" />
+                Quét QR để mở trên điện thoại
+              </span>
+              <span className="text-xs text-white/40">Hiện</span>
+            </summary>
+            <div className="p-5 pt-0">
+              <QuickScanQr
+                accent="emerald"
+                title="Quét QR để làm đề ngay trên điện thoại"
+                description="Mở camera điện thoại quét QR là vào thẳng trang ôn thi — không cần gõ link."
+                downloadName="examprep-qr.png"
+              />
+            </div>
+          </details>
 
           {/* Weak topics warning — filter ra các topic markers nội bộ */}
           {stats && (() => {
@@ -1136,6 +1229,46 @@ function CommunityStatsPanel({
         </div>
       ) : null}
     </div>
+  )
+}
+
+/* ─── Wayground-style helpers cho home view ──────────────── */
+
+function StatTile({
+  icon, value, label, accent,
+}: { icon: React.ReactNode; value: string; label: string; accent: string }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-2xl bg-white/[0.03] border border-white/[0.08] p-3 sm:p-5 text-center hover:border-white/[0.15] transition-all"
+      style={{ boxShadow: `inset 0 0 0 0 ${accent}` }}
+    >
+      <div
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ background: accent, opacity: 0.7 }}
+      />
+      <div className="flex items-center justify-center mb-1.5 sm:mb-2" style={{ color: accent }}>
+        {icon}
+      </div>
+      <div className="text-2xl sm:text-3xl font-black text-white leading-none tabular-nums">{value}</div>
+      <div className="text-[10px] sm:text-xs text-white/45 uppercase tracking-wider mt-1 sm:mt-1.5 font-semibold">{label}</div>
+    </div>
+  )
+}
+
+function FieldBig({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-white/60 text-sm font-medium mb-1.5">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Chip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center text-xs sm:text-sm bg-white/[0.05] px-2.5 py-1 rounded-md text-white/80 font-medium">
+      {children}
+    </span>
   )
 }
 
