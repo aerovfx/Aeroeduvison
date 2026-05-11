@@ -1,0 +1,69 @@
+# AeroEdu Rust workspace — unifies all backend Rust services and the
+# Overleaf-style LaTeX compiler under one Cargo workspace so they share
+# a target/ directory, Cargo.lock, and dependency versions.
+#
+# This is a virtual manifest (no [package]) — it only defines workspace
+# membership and shared dependencies. Each member retains its own
+# Cargo.toml and is buildable in isolation via `cargo build -p <name>`.
+#
+# Run `cargo check --workspace` to validate all members.
+
+[workspace]
+resolver = "2"
+members = [
+    "rust-services/admin-service",
+    "rust-services/aero-backend",
+    "rust-services/auth-service",
+    "rust-services/camera-iot-service",
+    "rust-services/course-service",
+    "rust-services/grading-service",
+    "rust-services/media-service",
+    "rust-services/stem-service",
+    "rust-services/student-service",
+    "rust-services/vector-sim-service",
+    "latex-compiler",
+]
+# ai-service is intentionally excluded: it depends on `openfang-core/openfang-*`
+# via path, and `openfang-core/Cargo.toml` is its own nested workspace. Including
+# ai-service here would create a "multiple workspace roots" conflict. To bring
+# ai-service into this workspace, consolidate openfang-core sub-crates into root
+# members and remove openfang-core/Cargo.toml's [workspace] section.
+exclude = ["rust-services/ai-service", "openfang-core"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "Proprietary"
+
+# Shared dependency versions. Members declare `dep.workspace = true`
+# and may add their own `features = [...]` on top.
+[workspace.dependencies]
+tokio = { version = "1" }
+axum = { version = "0.7" }
+tower-http = { version = "0.5", features = ["cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.21"
+num_cpus = "1"
+tempfile = "3"
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+
+# Build profile shared by all members.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+debug = 1
