@@ -60,7 +60,7 @@ export default function ExamPrepPage() {
 
   type ViewState = "home" | "taking" | "result" | "review" | "history"
   const [view, setView] = useState<ViewState>("home")
-  const [activeTab, setActiveTab] = useState<"bank" | "teacher">("bank")
+  const [activeTab, setActiveTab] = useState<"bank" | "teacher">("teacher")
 
   const [loading, setLoading] = useState(false)
 
@@ -707,19 +707,8 @@ export default function ExamPrepPage() {
             downloadName="examprep-qr.png"
           />
 
-          {/* Tabs: Ngân hàng đề / Đề thi giáo viên */}
+          {/* Tabs: Đề thi giáo viên (mặc định) / Ngân hàng câu hỏi */}
           <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab("bank")}
-              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                activeTab === "bank"
-                  ? "bg-[hsl(245,85%,60%)]/15 text-[hsl(245,85%,75%)] border border-[hsl(245,85%,60%)]/30"
-                  : "bg-white/[0.02] text-white/50 border border-white/[0.06] hover:bg-white/[0.04]"
-              }`}
-            >
-              <BookOpen className="h-4 w-4 inline-block mr-2" />
-              Ngân hàng câu hỏi
-            </button>
             <button
               onClick={() => setActiveTab("teacher")}
               className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
@@ -730,6 +719,17 @@ export default function ExamPrepPage() {
             >
               <GraduationCap className="h-4 w-4 inline-block mr-2" />
               Đề thi giáo viên
+            </button>
+            <button
+              onClick={() => setActiveTab("bank")}
+              className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+                activeTab === "bank"
+                  ? "bg-[hsl(245,85%,60%)]/15 text-[hsl(245,85%,75%)] border border-[hsl(245,85%,60%)]/30"
+                  : "bg-white/[0.02] text-white/50 border border-white/[0.06] hover:bg-white/[0.04]"
+              }`}
+            >
+              <BookOpen className="h-4 w-4 inline-block mr-2" />
+              Ngân hàng câu hỏi
             </button>
           </div>
 
