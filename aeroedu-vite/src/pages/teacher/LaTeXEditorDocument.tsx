@@ -425,6 +425,36 @@ export default function LaTeXEditorDocument() {
           Biên dịch
         </button>
 
+        {/* Convert to Exam — chuẩn Bộ GD&ĐT */}
+        <button
+          onClick={async () => {
+            if (!id || !confirm('Tạo đề thi từ tài liệu này? AI sẽ trích xuất câu hỏi.')) return
+            const t = toast.loading('Đang trích xuất câu hỏi…')
+            try {
+              const res = await api.post<{ examId: string; totalQuestions: number }>(
+                `/latex-projects/${id}/to-exam`, { subject: 'Vật lí', grade: '11' }
+              )
+              toast.success(`✅ Đã tạo đề ${res.data.totalQuestions} câu — chuyển sang trang làm bài`, { id: t })
+              setTimeout(() => { window.open(`/exam-sheet/${res.data.examId}`, '_blank') }, 500)
+            } catch (err: unknown) {
+              const e = err as { response?: { data?: { error?: string } } }
+              toast.error(e.response?.data?.error || 'Không tạo được đề thi', { id: t })
+            }
+          }}
+          disabled={!id || compiling}
+          title="Trích xuất câu hỏi từ tài liệu LaTeX → tạo đề thi chuẩn Bộ GD&ĐT"
+          style={{
+            background: 'linear-gradient(90deg, #ec4899, #a855f7)',
+            border: 'none', borderRadius: 8, color: '#fff',
+            cursor: 'pointer',
+            padding: '6px 14px', fontSize: 13, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(168,85,247,0.3)',
+          }}
+        >
+          📋 Tạo đề thi
+        </button>
+
         {/* History button */}
         <div style={{ position: 'relative' }}>
           <IconBtn onClick={() => setHistoryOpen(!historyOpen)} active={historyOpen} title="Lịch sử phiên bản">

@@ -5348,6 +5348,73 @@ if (!USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // POST /api/exams/:id/grade — chấm bài exam-sheet (Bộ-style)
+  // Body: { answers: { questionId: 'A'|'B'|'TFFT'|'0.4'|... } }
+  // Logic: load Question.correctAnswer cho từng câu, so sánh, tính %.
+  app.post('/api/exams/:id/grade', async (req, res) => {
+    try {
+      const xpool = getXPool();
+      if (!xpool) return res.status(503).json({ error: 'DB not available' });
+      const userAnswers = req.body?.answers || {};
+      const examId = req.params.id;
+
+      // Lấy questions của exam (correctAnswer cho server-side grade)
+      const { rows: qs } = await xpool.query(
+        `SELECT q.id, q."questionType", q."correctAnswer"
+           FROM "ExamQuestion" eq
+           JOIN "Question" q ON q.id = eq."questionId"
+          WHERE eq."examId" = $1 ORDER BY eq."order" ASC`,
+        [examId]
+      );
+      if (qs.length === 0) return res.status(404).json({ error: 'Đề không có câu hỏi' });
+
+      // Normalize giống logic của quiz-rooms (xử lý "D. xxx" → "D")
+      const norm = (s) => {
+        s = String(s ?? '').trim();
+        if (!s) return '';
+        if (/^[A-Z]$/i.test(s)) return s.toUpperCase();
+        const m = s.match(/^([A-Z])[\.\)\s]/i);
+        if (m) return m[1].toUpperCase();
+        const numStr = s.replace(/,/g, '.').replace(/\s+/g, '');
+        if (numStr !== '' && !isNaN(Number(numStr))) return String(Number(numStr));
+        return s.toLowerCase();
+      };
+
+      let correct = 0;
+      for (const q of qs) {
+        const userAns = userAnswers[q.id];
+        if (userAns == null || userAns === '') continue;
+        const t = (q.questionType || '').toUpperCase();
+        if (t.includes('TRUE') || t.includes('FALSE')) {
+          // True/False: answer là string 4 ký tự "TFFT" — so sánh từng ký tự
+          // Question.correctAnswer cũng nên là "TFFT" hoặc "TTFT"
+          const u = String(userAns).slice(0, 4).padEnd(4, '-');
+          const c = String(q.correctAnswer || '').slice(0, 4).padEnd(4, '-');
+          // Tính số ký tự khớp / 4 → quy đổi 1 câu (1 đúng cả = 1, 3/4 = 0.75, ...)
+          let subCorrect = 0;
+          for (let i = 0; i < 4; i++) {
+            if (u[i] !== '-' && u[i] === c[i]) subCorrect++;
+          }
+          if (subCorrect === 4) correct += 1;
+          else if (subCorrect >= 3) correct += 0.5;  // 3/4 = 0.5 điểm theo Bộ
+        } else {
+          if (norm(userAns) === norm(q.correctAnswer)) correct += 1;
+        }
+      }
+      const total = qs.length;
+      const percentage = total > 0 ? (correct / total) * 100 : 0;
+      const score = Math.round((correct / total) * 100) / 10;  // thang 10
+      console.log(`[exam:grade] ✅ exam=${examId.slice(0,8)} ${correct}/${total} (${Math.round(percentage)}%)`);
+      return res.json({
+        correct: Math.round(correct * 10) / 10,
+        total, percentage, score,
+      });
+    } catch (err) {
+      console.error('[exam:grade] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/exams/:id — detail + questions, cho học sinh xem trước khi làm.
   // Cho phép xem nếu (a) là exam công khai + status "Đang diễn ra", hoặc
   // (b) là chủ đề thi (Bearer token khớp userId).
@@ -6419,6 +6486,113 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
       return res.json({ versions: rows });
     } catch (err) {
       console.error('[latex:versions] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/latex-projects/:id/to-exam — convert LaTeX → Exam + Questions
+  // Pipeline: LatexProject.mainContent → fal.ai extract → INSERT Exam + Question
+  // → return {examId} để UI navigate sang trang làm bài chuẩn Bộ.
+  app.post('/api/latex-projects/:id/to-exam', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getLPool();
+
+      // Fetch project
+      const { rows: prjRows } = await pool.query(
+        `SELECT * FROM "LatexProject" WHERE id = $1 AND "userId" = $2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!prjRows[0]) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+      const project = prjRows[0];
+      const content = String(project.mainContent || '').trim();
+      if (content.length < 50) return res.status(400).json({ error: 'Tài liệu quá ngắn để extract' });
+
+      // Strip một số LaTeX commands khó parse (giữ text + công thức)
+      const stripped = content
+        .replace(/\\documentclass[^\n]*\n/g, '')
+        .replace(/\\usepackage[^\n]*\n/g, '')
+        .replace(/\\begin\{document\}|\\end\{document\}/g, '')
+        .replace(/\\geometry\{[^}]*\}/g, '')
+        .replace(/\\textbf\{([^}]*)\}/g, '$1')
+        .replace(/\\textit\{([^}]*)\}/g, '$1')
+        .replace(/\\hfill|\\\\|\\noindent|\\vspace\{[^}]*\}/g, '\n')
+        .trim();
+
+      // Extract via fal.ai (text mode)
+      const { extractQuestionsFromText } = require('./lib/fal-quiz-extractor.cjs');
+      const { subject, grade, count } = req.body || {};
+      const result = await extractQuestionsFromText(stripped, {
+        subject: subject || 'Vật lí',
+        grade: grade || '11',
+        language: 'Vietnamese',
+        count: Number(count) || 40,
+      });
+      const questions = result.questions || [];
+      if (questions.length === 0) {
+        return res.status(422).json({ error: 'Không trích xuất được câu hỏi nào từ tài liệu' });
+      }
+
+      // Insert Exam + ExamQuestion + Question (transaction)
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const examId = latexUUID();
+        const now = new Date();
+        const examTitle = `${project.title} — Đề thi`;
+        const desc = JSON.stringify({
+          subject: subject || 'Vật lí',
+          grade: String(grade || '11'),
+          source: 'latex-import',
+          notes: `Tạo từ tài liệu LaTeX: ${project.title}`,
+          public: false,
+          publishedAt: now.toISOString(),
+        });
+
+        await client.query(
+          `INSERT INTO "Exam"
+             (id, title, description, "examType", duration, "totalScore",
+              "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3,'Trắc nghiệm',45,$4,$5,'Nháp',NULL,$6,$7,$7)`,
+          [examId, examTitle, desc, questions.length, questions.length, userId, now]
+        );
+
+        for (let i = 0; i < questions.length; i++) {
+          const q = questions[i];
+          const qid = latexUUID();
+          await client.query(
+            `INSERT INTO "Question"
+               (id, topic, subject, grade, "questionType", difficulty, content,
+                options, "correctAnswer", explanation, "qualityScore", "usageCount",
+                "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+             VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,true,false,'active',$10,$11,$11)`,
+            [
+              qid, 'latex-import', subject || 'Vật lí', String(grade || '11'),
+              String(q.questionType || 'MULTIPLE_CHOICE'),
+              String(q.content || ''),
+              Array.isArray(q.options) ? q.options.map(String) : [],
+              String(q.correctAnswer || ''),
+              q.explanation || '',
+              userId, now,
+            ]
+          );
+          await client.query(
+            `INSERT INTO "ExamQuestion" (id, "examId", "questionId", "order", points)
+             VALUES ($1,$2,$3,$4,1)`,
+            [latexUUID(), examId, qid, i + 1]
+          );
+        }
+        await client.query('COMMIT');
+        console.log(`[latex:to-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (${questions.length}Q, ${Date.now()-t0}ms)`);
+        return res.json({ ok: true, examId, totalQuestions: questions.length });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally { client.release(); }
+    } catch (err) {
+      console.error('[latex:to-exam] ❌', err.message.slice(0, 300));
       return res.status(500).json({ error: err.message });
     }
   });

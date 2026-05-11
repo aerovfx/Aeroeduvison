@@ -109,6 +109,7 @@ const ExamDetailPage        = lazy(() => import('@/pages/teacher/ExamDetail'))
 const ExamHostPage          = lazy(() => import('@/pages/teacher/ExamHost'))
 const PlayJoinPage          = lazy(() => import('@/pages/play/PlayJoin'))
 const PlayRoomPage          = lazy(() => import('@/pages/play/PlayRoom'))
+const ExamSheetPage         = lazy(() => import('@/pages/student/ExamSheet'))
 const PricingPage2          = lazy(() => import('@/pages/payment/Pricing'))
 const PaymentDetailPage     = lazy(() => import('@/pages/payment/PaymentDetail'))
 const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
@@ -225,6 +226,8 @@ export function AppRouter() {
         ══════════════════════════════════════════════════ */}
         <Route path="/play"            element={<PlayJoinPage />} />
         <Route path="/play/:code"      element={<PlayRoomPage />} />
+        {/* Bộ-style answer sheet — học sinh làm đề chuẩn Bộ GD&ĐT */}
+        <Route path="/exam-sheet/:examId" element={<ExamSheetPage />} />
 
         {/* ══════════════════════════════════════════════════
             PROTECTED ROUTES (yêu cầu đăng nhập)
