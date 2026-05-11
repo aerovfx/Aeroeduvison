@@ -7661,20 +7661,187 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
   app.get('/api/openfang-service', emptyObj);
   app.post('/api/openfang-service/chat', notImpl('Service đang nâng cấp'));
 
-  // ─ Learning service stubs (UI gọi nhiều endpoint, BE Rust chưa có) ─
-  // Trả empty array/object để UI không crash. Khi cần thật → wire vào pg.
-  app.get('/api/learning/my-courses', (_req, res) => res.json({ courses: [] }));
-  app.get('/api/learning/purchase-history', (_req, res) => res.json({ history: [] }));
-  app.get('/api/learning/wishlist', (_req, res) => res.json({ wishlist: [] }));
-  app.post('/api/learning/wishlist/:courseId', okMsg);
-  app.delete('/api/learning/wishlist/:courseId', okMsg);
+  // ─ Learning service: Wishlist + Purchase History (Postgres-backed) ─
+  // FE shape: WishlistItem[] / Enrollment[] (array trực tiếp, KHÔNG bọc object).
+  // Các endpoint còn lại (videos/assets/reviews/...) → empty array đúng shape.
+  {
+    const { Pool: LPool } = require('pg');
+    const ljwt = require('jsonwebtoken');
+    const LJWT_SECRET = process.env.JWT_SECRET
+      || process.env.NEXTAUTH_SECRET
+      || 'dev-secret-fallback-change-in-production!!';
+    let _lpool = null;
+    function getLPool() {
+      if (!_lpool && process.env.DATABASE_URL) {
+        _lpool = new LPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _lpool;
+    }
+    function getLearnUserId(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = ljwt.verify(auth.slice(7), LJWT_SECRET);
+        return d.sub || d.userId || d.email || null;
+      } catch { return null; }
+    }
+    let _wishTableReady = false;
+    async function ensureWishlistTable() {
+      if (_wishTableReady) return;
+      const pool = getLPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "Wishlist" (
+          id          TEXT PRIMARY KEY,
+          "userId"    TEXT NOT NULL,
+          "courseId"  TEXT NOT NULL,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE ("userId", "courseId")
+        )
+      `);
+      _wishTableReady = true;
+    }
+
+    // GET /api/learning/wishlist → WishlistItem[]
+    app.get('/api/learning/wishlist', async (req, res) => {
+      const userId = getLearnUserId(req);
+      if (!userId) return res.json([]); // chưa login → empty (UI hiển thị empty state)
+      const pool = getLPool();
+      if (!pool) return res.json([]);
+      try {
+        await ensureWishlistTable();
+        // LEFT JOIN Course để lấy thông tin hiển thị; nếu course đã xoá → vẫn trả entry
+        const { rows } = await pool.query(
+          `SELECT w.id, w."userId", w."courseId", w."createdAt",
+                  c.id AS c_id, c.title AS c_title, c."imageUrl" AS c_image,
+                  c.price AS c_price, c."userId" AS c_owner_id
+             FROM "Wishlist" w
+             LEFT JOIN "Course" c ON c.id = w."courseId"
+            WHERE w."userId" = $1
+            ORDER BY w."createdAt" DESC`,
+          [userId]
+        );
+        const items = rows.map(r => ({
+          id: r.id,
+          userId: r.userId,
+          courseId: r.courseId,
+          createdAt: r.createdAt,
+          course: {
+            id: r.c_id || r.courseId,
+            title: r.c_title || 'Khoá học không còn khả dụng',
+            slug: r.c_id || r.courseId,
+            image: r.c_image || null,
+            regularPrice: Number(r.c_price || 0),
+            beforePrice: 0,
+            lessons: 0,
+            user: { id: r.c_owner_id || '', name: 'AeroEduVision', image: null },
+          },
+        }));
+        res.json(items);
+      } catch (e) {
+        console.error('[learning:wishlist:GET]', e.message);
+        res.json([]); // never 500 cho UI list
+      }
+    });
+
+    // POST /api/learning/wishlist/:courseId
+    app.post('/api/learning/wishlist/:courseId', async (req, res) => {
+      const userId = getLearnUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getLPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureWishlistTable();
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        await pool.query(
+          `INSERT INTO "Wishlist" (id, "userId", "courseId")
+           VALUES ($1, $2, $3)
+           ON CONFLICT ("userId", "courseId") DO NOTHING`,
+          [id, userId, req.params.courseId]
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[learning:wishlist:POST]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/learning/wishlist/:courseId
+    app.delete('/api/learning/wishlist/:courseId', async (req, res) => {
+      const userId = getLearnUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getLPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureWishlistTable();
+        await pool.query(
+          `DELETE FROM "Wishlist" WHERE "userId"=$1 AND "courseId"=$2`,
+          [userId, req.params.courseId]
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[learning:wishlist:DELETE]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/learning/purchase-history → Enrollment[]
+    // Nguồn dữ liệu: PaymentOrder (status=PAID) — map plan → "course" để FE hiển thị.
+    app.get('/api/learning/purchase-history', async (req, res) => {
+      const userId = getLearnUserId(req);
+      if (!userId) return res.json([]);
+      const pool = getLPool();
+      if (!pool) return res.json([]);
+      try {
+        // Truy vấn PaymentOrder; nếu bảng chưa tồn tại → empty
+        const { rows } = await pool.query(
+          `SELECT id, "userId", "userEmail", "planId", "planName", amount,
+                  status, "createdAt", "approvedAt"
+             FROM "PaymentOrder"
+            WHERE ("userId" = $1 OR "userEmail" = $1) AND status = 'PAID'
+            ORDER BY COALESCE("approvedAt", "createdAt") DESC`,
+          [userId]
+        );
+        const items = rows.map(r => ({
+          id: r.id,
+          userId: r.userId || userId,
+          courseId: r.planId,
+          price: Number(r.amount || 0),
+          createdAt: r.approvedAt || r.createdAt,
+          course: {
+            id: r.planId,
+            title: r.planName || r.planId,
+            slug: r.planId,
+            image: null,
+            duration: null,
+            lessons: 0,
+            accessTime: null,
+            user: { id: 'aeroedu', name: 'AeroEduVision', image: null },
+          },
+        }));
+        res.json(items);
+      } catch (e) {
+        // PaymentOrder chưa tồn tại trên DB → trả empty, không 500
+        if (/relation .* does not exist/i.test(e.message)) return res.json([]);
+        console.error('[learning:purchase-history]', e.message);
+        res.json([]);
+      }
+    });
+  }
+
+  // ─ Learning service: các endpoint khác (empty đúng shape) ─
+  app.get('/api/learning/my-courses', emptyArr);
   app.get('/api/learning/certificate/:courseId',
     notImpl('Chứng chỉ chưa khả dụng — hoàn thành khoá học để nhận'));
-  app.get('/api/learning/course/:courseId/videos', (_req, res) => res.json({ videos: [] }));
-  app.get('/api/learning/course/:courseId/assets', (_req, res) => res.json({ assets: [] }));
-  app.get('/api/learning/course/:courseId/reviews', (_req, res) => res.json({ reviews: [] }));
+  app.get('/api/learning/course/:courseId/videos', emptyArr);
+  app.get('/api/learning/course/:courseId/assets', emptyArr);
+  app.get('/api/learning/course/:courseId/reviews', emptyArr);
   app.post('/api/learning/course/:courseId/reviews', okMsg);
-  app.get('/api/learning/my-courses-activity', (_req, res) => res.json({ activity: [] }));
+  // my-courses-activity đã có handler thật ở trên (line ~2226), không stub đè.
   // Catch-all học sinh đăng ký khoá học, like, bookmark...
   app.post('/api/learning/enroll/:courseId', okMsg);
   app.post('/api/learning/like/:courseId', okMsg);
