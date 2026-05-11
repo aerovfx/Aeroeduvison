@@ -206,7 +206,17 @@ export default function ExamPrepPage() {
       setCurrentQ(0)
       setTimeLeft(p.timeLimit * 60)
       setView("taking")
-      toast.success(`Đề thi ${p.questions.length} câu đã sẵn sàng!`)
+      // Nếu BE đã sinh thêm bằng AI → báo cho học sinh biết
+      const ai = (p as { aiAdded?: number }).aiAdded ?? 0
+      if (ai > 0) {
+        toast.success(
+          `🤖 AI đã tạo thêm ${ai} câu mới cho chủ đề "${formData.topic === '__all__' ? formData.subject : formData.topic}" — đã lưu vào ngân hàng cho lần sau!`,
+          { duration: 5000 }
+        )
+        setTimeout(() => toast.success(`Đề thi ${p.questions.length} câu đã sẵn sàng!`), 800)
+      } else {
+        toast.success(`Đề thi ${p.questions.length} câu đã sẵn sàng!`)
+      }
     } catch (err) {
       // BE trả 400/404/500 với body { success:false, error, message }.
       // Axios throw → err.response.data.message mới là nguồn chính xác.
@@ -821,8 +831,14 @@ export default function ExamPrepPage() {
                 disabled={loading}
                 className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-gradient-to-r from-[hsl(245,85%,60%)] to-[hsl(280,75%,55%)] text-white font-medium text-sm shadow-[0_0_20px_rgba(120,100,255,0.2)] hover:shadow-[0_0_30px_rgba(120,100,255,0.35)] hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang tạo đề...</> : "Bắt Đầu Làm Bài"}
+                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang tạo đề (có thể sinh thêm bằng AI)…</> : "Bắt Đầu Làm Bài"}
               </button>
+
+              {/* Hint AI auto-fill */}
+              <p className="text-[11px] text-white/35 text-center -mt-1 leading-relaxed">
+                💡 Nếu chủ đề chưa có đủ câu trong ngân hàng, AI sẽ tự sinh thêm và{' '}
+                <span className="text-purple-300/80">lưu lại cho lần sau</span> — bạn càng dùng, ngân hàng càng phong phú.
+              </p>
             </div>
           )}
 

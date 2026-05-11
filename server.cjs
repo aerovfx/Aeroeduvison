@@ -2572,22 +2572,78 @@ if (USE_NODEJS_QUESTIONS) {
           : [subject, grade, questionCount * 5];
         const { rows } = await pool.query(sql, params);
 
-        if (rows.length === 0) {
-          return res.status(400).json({
-            success: false,
-            error: 'no_questions',
-            message: `Ngân hàng câu hỏi chưa có câu nào cho ${subject} - ${grade}${topic ? ' (' + topic + ')' : ''}. Hãy liên hệ giáo viên để bổ sung.`,
-          });
+        // ── AI Auto-fill: nếu ngân hàng KHÔNG đủ → generate qua AI + lưu lại ──
+        // Workflow: lấy hết existing + sinh phần thiếu + INSERT vào Question
+        // (status='Hoạt động', aiGenerated=true) → lần sau topic này có sẵn.
+        let augmented = [...rows];
+        let aiAdded = 0;
+
+        if (augmented.length < questionCount) {
+          const missing = questionCount - augmented.length;
+          try {
+            const { generateQuestionsByTopic } = require('./lib/fal-quiz-extractor.cjs');
+            const { randomUUID: qbUUID } = require('crypto');
+            console.log(`[exam-prep:create] 🤖 AI generate ${missing} câu cho ${subject}-${grade}${topic ? `-${topic}` : ''}`);
+            const result = await generateQuestionsByTopic({
+              subject, grade,
+              topic: topic || `${subject} lớp ${grade}`,
+              count: missing,
+              difficulty: 'medium',
+            });
+            const newQs = result.questions || [];
+
+            // INSERT từng câu vào Question table (lưu cho lần sau)
+            const now = new Date();
+            for (const q of newQs) {
+              const qid = qbUUID();
+              try {
+                await pool.query(
+                  `INSERT INTO "Question"
+                     (id, topic, subject, grade, "questionType", difficulty, content,
+                      options, "correctAnswer", explanation, "qualityScore", "usageCount",
+                      "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+                   VALUES ($1,$2,$3,$4,$5,'medium',$6,$7,$8,$9,0,0,true,false,'Hoạt động',NULL,$10,$10)`,
+                  [
+                    qid,
+                    (q.topic && String(q.topic).trim()) || topic || subject,
+                    subject, String(grade),
+                    String(q.questionType || 'MULTIPLE_CHOICE'),
+                    String(q.content || ''),
+                    Array.isArray(q.options) ? q.options.map(String) : [],
+                    String(q.correctAnswer || ''),
+                    q.explanation || '',
+                    now,
+                  ]
+                );
+                augmented.push({
+                  id: qid,
+                  topic: (q.topic && String(q.topic).trim()) || topic || subject,
+                  subject, grade, questionType: q.questionType || 'MULTIPLE_CHOICE',
+                  difficulty: 'medium',
+                  content: q.content, options: q.options || [],
+                  correctAnswer: q.correctAnswer, explanation: q.explanation || '',
+                  status: 'Hoạt động',
+                });
+                aiAdded++;
+              } catch (insErr) {
+                console.warn(`[exam-prep:create] insert AI question failed: ${insErr.message.slice(0, 100)}`);
+              }
+            }
+          } catch (aiErr) {
+            console.warn(`[exam-prep:create] AI generate failed: ${aiErr.message.slice(0, 200)}`);
+            // Tiếp tục với augmented hiện tại (có thể < questionCount)
+          }
         }
-        if (rows.length < Math.ceil(questionCount * 0.5)) {
-          return res.status(400).json({
+
+        if (augmented.length === 0) {
+          return res.status(503).json({
             success: false,
-            error: 'insufficient_questions',
-            message: `Chỉ có ${rows.length} câu hỏi phù hợp trong ngân hàng (cần ít nhất ${Math.ceil(questionCount * 0.5)} cho đề ${questionCount} câu).`,
+            error: 'no_questions_no_ai',
+            message: `Không có câu hỏi nào cho ${subject} - ${grade}${topic ? ' (' + topic + ')' : ''} và AI tạm thời không khả dụng. Vui lòng thử lại sau hoặc đổi chủ đề.`,
           });
         }
 
-        const picked = pickByDifficulty(rows, questionCount);
+        const picked = pickByDifficulty(augmented, Math.min(questionCount, augmented.length));
         const questions = picked.map((r, i) => toClientQuestion(r, i + 1));
 
         const id = newIdEP();
@@ -2599,12 +2655,14 @@ if (USE_NODEJS_QUESTIONS) {
           [id, user.id, subject, grade, examType, questions.length, timeLimit, JSON.stringify(questions)]
         );
 
+        console.log(`[exam-prep:create] ✅ practice=${id.slice(0,8)} bank=${rows.length} +AI=${aiAdded} → total=${questions.length}`);
         return res.json({
           success: true,
           data: {
             practice: {
               id, subject, grade, examType,
-              source: 'bank',
+              source: aiAdded > 0 ? 'bank+ai' : 'bank',
+              aiAdded,  // Số câu AI sinh thêm (UI có thể hiện banner)
               questions,
               timeLimit,
             },
