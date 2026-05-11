@@ -1672,6 +1672,38 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
             </div>
           )}
 
+          {/* Ngành Hot xu thế 2026 — predefined list từ server, hiện luôn */}
+          {stats.trendingCareers2026 && stats.trendingCareers2026.length > 0 && (
+            <div className="bg-gradient-to-br from-orange-500/[0.05] to-pink-500/[0.05] rounded-xl border border-orange-500/20 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">🔥</span>
+                <h4 className="text-xs font-semibold text-orange-300">
+                  Ngành nghề Hot xu thế 2026 — phù hợp thị trường lao động hiện tại
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {stats.trendingCareers2026.slice(0, 12).map((t) => (
+                  <div
+                    key={t.label}
+                    className="flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.06] transition-colors"
+                  >
+                    <div className="flex flex-col items-center min-w-[32px]">
+                      <span className="text-orange-400 text-xs font-black">{t.heat}/5</span>
+                      <span className="text-[8px] text-orange-400/60 uppercase tracking-wider">Heat</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white/85 font-medium">{t.label}</p>
+                      <p className="text-[10px] text-white/45 mt-0.5">{t.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-white/35 mt-3 italic">
+                💡 Khi ngành nghề bài test gợi ý cho bạn nằm trong danh sách này, nó sẽ có badge 🔥 ở bảng dưới.
+              </p>
+            </div>
+          )}
+
           {/* Top careers */}
           {stats.topCareers.length > 0 && (
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
@@ -1700,7 +1732,19 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
                         <td className="py-2 text-[0.7rem] text-white/30 font-mono">
                           {i + 1}
                         </td>
-                        <td className="py-2 text-xs text-white/75">{row.name}</td>
+                        <td className="py-2 text-xs text-white/75">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{row.name}</span>
+                            {row.trending && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-orange-500/15 text-orange-300 border border-orange-500/30"
+                                title={`Hot xu thế 2026: ${row.trending.reason}`}
+                              >
+                                🔥 Hot {row.trending.heat}/5
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2 text-[0.7rem] text-white/50 text-right font-mono">
                           {row.count}
                         </td>

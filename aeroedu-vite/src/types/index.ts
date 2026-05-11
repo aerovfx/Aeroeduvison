@@ -341,6 +341,18 @@ export interface CareerCommunityStats {
     name: string
     count: number
     percentage: number
+    /** Match với danh sách Hot xu thế 2026 — nếu có thì hiện badge 🔥 */
+    trending?: {
+      label: string
+      reason: string
+      heat: number  // 1-5
+    } | null
+  }>
+  /** Danh sách ngành Hot xu thế 2026 (server cung cấp, UI hiển thị riêng) */
+  trendingCareers2026?: Array<{
+    label: string
+    reason: string
+    heat: number
   }>
   /** Người đã hoàn thành gần nhất — hiển thị để học sinh tham khảo */
   recentTakers: Array<{

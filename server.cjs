@@ -5393,6 +5393,293 @@ if (!USE_NODEJS_QUESTIONS) {
 app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
 
 // ══════════════════════════════════════════════════════════════
+// CAREER PROFILE — lưu kết quả bài test hướng nghiệp (MBTI + Holland)
+// + thống kê cộng đồng + đề xuất ngành Hot xu thế 2026.
+// ──────────────────────────────────────────────────────────────
+// POST /api/personality-test  body{action:'save', ...}     → lưu
+// GET  /api/personality-test?action=history (auth)         → lịch sử cá nhân
+// GET  /api/personality-test?action=community-stats        → thống kê + trending
+// ══════════════════════════════════════════════════════════════
+{
+  const { Pool: CpPool } = require('pg');
+  const cpJwt = require('jsonwebtoken');
+  const { randomUUID: cpUUID } = require('crypto');
+
+  let _cpPool = null;
+  let _cpReady = null;
+  function getCpPool() {
+    if (!_cpPool) {
+      const url = process.env.DATABASE_URL;
+      if (!url) return null;
+      _cpPool = new CpPool({ connectionString: url, max: 5,
+        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+    }
+    return _cpPool;
+  }
+  async function ensureCpTable() {
+    if (_cpReady) return _cpReady;
+    const pool = getCpPool();
+    if (!pool) return null;
+    _cpReady = (async () => {
+      await pool.query(`CREATE TABLE IF NOT EXISTS "CareerProfile" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userName" TEXT,
+        "userImage" TEXT,
+        "userYearOfBirth" INT,
+        "mbtiType" TEXT,
+        "mbtiScores" JSONB,
+        "hollandCode" TEXT,
+        "hollandScores" JSONB,
+        "personalityName" TEXT,
+        careers TEXT[],
+        answers JSONB,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CareerProfile_userId_idx"
+        ON "CareerProfile"("userId")`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CareerProfile_createdAt_idx"
+        ON "CareerProfile"("createdAt" DESC)`);
+      console.log('[career] ✅ CareerProfile table ready');
+    })().catch(e => { console.error('[career] ❌ ensureCpTable', e.message); _cpReady = null; });
+    return _cpReady;
+  }
+  const CP_JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+    || 'dev-secret-fallback-change-in-production!!';
+  function getCpUserId(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      return cpJwt.verify(auth.slice(7), CP_JWT_SECRET).sub || null;
+    } catch { return null; }
+  }
+
+  // Danh sách ngành Hot xu thế 2026 (cross-reference với careers từ test result).
+  // Match nhẹ: lowercase + contains keyword. Mỗi ngành có lý do trending.
+  const TRENDING_2026 = [
+    { keyword: ['ai','machine learning','trí tuệ nhân tạo','ml engineer'],
+      label: 'AI / Machine Learning Engineer', reason: 'Bùng nổ AI generative + ứng dụng doanh nghiệp', heat: 5 },
+    { keyword: ['data scientist','khoa học dữ liệu','phân tích dữ liệu'],
+      label: 'Data Scientist / Data Analyst', reason: 'Doanh nghiệp Việt Nam số hoá, nhu cầu phân tích lớn', heat: 5 },
+    { keyword: ['cyber','an ninh mạng','bảo mật'],
+      label: 'Cybersecurity / An ninh mạng', reason: 'Tấn công mạng tăng → vai trò critical', heat: 5 },
+    { keyword: ['cloud','devops','sre'],
+      label: 'Cloud / DevOps Engineer', reason: 'Mọi startup VN dùng AWS/GCP/Azure', heat: 4 },
+    { keyword: ['renewable','năng lượng tái tạo','solar','wind'],
+      label: 'Năng lượng tái tạo', reason: 'Cam kết Net-Zero 2050 + đầu tư điện gió/mặt trời', heat: 4 },
+    { keyword: ['bác sĩ','y tá','y khoa','điều dưỡng','dược'],
+      label: 'Y tế / Healthcare', reason: 'Già hoá dân số + nhu cầu chăm sóc sức khoẻ', heat: 5 },
+    { keyword: ['tâm lý','counselor','tham vấn'],
+      label: 'Tâm lý học / Tham vấn tâm lý', reason: 'Sức khoẻ tinh thần được quan tâm hơn', heat: 4 },
+    { keyword: ['biotech','sinh học','công nghệ sinh học','di truyền'],
+      label: 'Công nghệ sinh học', reason: 'Vaccine, GMO, công nghệ gen', heat: 4 },
+    { keyword: ['robot','automation','tự động hoá','cơ điện tử'],
+      label: 'Robotics / Tự động hoá', reason: 'Industry 4.0 trong sản xuất Việt Nam', heat: 4 },
+    { keyword: ['ux','ui','thiết kế trải nghiệm','product designer'],
+      label: 'UX/UI Designer', reason: 'Sản phẩm số bùng nổ, cần thiết kế tốt', heat: 4 },
+    { keyword: ['content creator','sáng tạo nội dung','marketing số','digital marketing'],
+      label: 'Digital Content Creator / Marketing', reason: 'Creator economy + thương mại điện tử', heat: 4 },
+    { keyword: ['kỹ sư phần mềm','software engineer','lập trình','developer'],
+      label: 'Kỹ sư Phần mềm', reason: 'Outsourcing + product VN tiếp tục phát triển', heat: 5 },
+    { keyword: ['fintech','tài chính số','blockchain'],
+      label: 'Fintech / Blockchain', reason: 'Chuyển đổi số ngân hàng + thanh toán điện tử', heat: 4 },
+    { keyword: ['logistics','chuỗi cung ứng','supply chain'],
+      label: 'Logistics / Supply Chain', reason: 'Thương mại điện tử + xuất khẩu tăng trưởng', heat: 3 },
+    { keyword: ['esg','sustainability','phát triển bền vững'],
+      label: 'ESG / Phát triển bền vững', reason: 'Doanh nghiệp ép tuân thủ tiêu chuẩn xanh', heat: 3 },
+  ];
+  function matchTrending(careerName) {
+    const n = String(careerName || '').toLowerCase();
+    return TRENDING_2026.find(t => t.keyword.some(k => n.includes(k))) || null;
+  }
+
+  // POST /api/personality-test  { action: 'save', ... }
+  // (dùng POST cho cả save thay vì query string để body không bị log/cache)
+  app.post('/api/personality-test', async (req, res) => {
+    try {
+      const action = String(req.body?.action || 'save').toLowerCase();
+      if (action !== 'save') return res.status(400).json({ success: false, error: 'invalid_action' });
+
+      const pool = getCpPool();
+      if (!pool) return res.status(503).json({ success: false, error: 'DB not available' });
+      await ensureCpTable();
+
+      // userId optional — học sinh có thể làm bài chưa login (ẩn danh)
+      const tokenUserId = getCpUserId(req);
+      const body = req.body || {};
+      const userId = tokenUserId || body.userId || null;
+
+      const id = cpUUID();
+      const now = new Date();
+      await pool.query(
+        `INSERT INTO "CareerProfile"
+           (id, "userId", "userName", "userImage", "userYearOfBirth",
+            "mbtiType", "mbtiScores", "hollandCode", "hollandScores",
+            "personalityName", careers, answers, "createdAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        [
+          id, userId,
+          String(body.userName || '').slice(0, 100) || null,
+          body.userImage || null,
+          body.userYearOfBirth ? Number(body.userYearOfBirth) : null,
+          String(body.mbtiType || '').slice(0, 8),
+          JSON.stringify(body.mbtiScores || {}),
+          String(body.hollandCode || '').slice(0, 8),
+          JSON.stringify(body.hollandScores || {}),
+          String(body.personalityName || '').slice(0, 200),
+          Array.isArray(body.careers) ? body.careers.map(String).slice(0, 30) : [],
+          JSON.stringify(body.answers || {}),
+          now,
+        ]
+      );
+      console.log(`[career:save] ✅ id=${id.slice(0,8)} user=${userId?.slice(0,8) || 'anon'} mbti=${body.mbtiType} holland=${body.hollandCode}`);
+      return res.json({
+        success: true,
+        data: {
+          id, userId,
+          user: body.userName ? { id: userId || 'anon', name: body.userName, image: body.userImage || null } : null,
+          mbtiType: body.mbtiType, mbtiScores: body.mbtiScores,
+          hollandCode: body.hollandCode, hollandScores: body.hollandScores,
+          personalityName: body.personalityName, careers: body.careers,
+          createdAt: now.toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error('[career:save] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/personality-test?action=history|community-stats
+  app.get('/api/personality-test', async (req, res) => {
+    try {
+      const pool = getCpPool();
+      if (!pool) return res.status(503).json({ success: false, error: 'DB not available' });
+      await ensureCpTable();
+      const action = String(req.query.action || '').toLowerCase();
+
+      if (action === 'history') {
+        const userId = getCpUserId(req);
+        if (!userId) return res.status(401).json({ success: false, error: 'unauthorized' });
+        const { rows } = await pool.query(
+          `SELECT id, "userId", "userName", "userImage", "mbtiType", "mbtiScores",
+                  "hollandCode", "hollandScores", "personalityName", careers, "createdAt"
+             FROM "CareerProfile"
+            WHERE "userId" = $1
+            ORDER BY "createdAt" DESC LIMIT 20`,
+          [userId]
+        );
+        return res.json({
+          success: true,
+          data: rows.map(r => ({
+            id: r.id, userId: r.userId,
+            user: r.userName ? { id: r.userId, name: r.userName, image: r.userImage } : null,
+            mbtiType: r.mbtiType, mbtiScores: r.mbtiScores,
+            hollandCode: r.hollandCode, hollandScores: r.hollandScores,
+            personalityName: r.personalityName, careers: r.careers || [],
+            createdAt: r.createdAt,
+          })),
+        });
+      }
+
+      if (action === 'community-stats') {
+        // Aggregate từ TOÀN BỘ CareerProfile (public stats)
+        const [overall, mbtiQ, careersQ, recentQ, yobQ] = await Promise.all([
+          pool.query(`SELECT COUNT(*)::int AS total, COUNT(DISTINCT "userId")::int AS users,
+                             MAX("createdAt") AS last_at FROM "CareerProfile"`),
+          pool.query(`SELECT "mbtiType", COUNT(*)::int AS count
+                        FROM "CareerProfile" WHERE "mbtiType" <> ''
+                        GROUP BY "mbtiType" ORDER BY count DESC`),
+          // careers TEXT[] → unnest để đếm từng ngành
+          pool.query(`SELECT career, COUNT(*)::int AS count
+                        FROM "CareerProfile", unnest(careers) AS career
+                       GROUP BY career
+                       ORDER BY count DESC LIMIT 30`),
+          pool.query(`SELECT "userName", "userImage", "userYearOfBirth", "mbtiType",
+                             "personalityName", "hollandCode", "createdAt"
+                        FROM "CareerProfile" WHERE "userName" IS NOT NULL
+                        ORDER BY "createdAt" DESC LIMIT 10`),
+          pool.query(`SELECT "userYearOfBirth" AS year, COUNT(*)::int AS count
+                        FROM "CareerProfile" WHERE "userYearOfBirth" IS NOT NULL
+                        GROUP BY "userYearOfBirth" ORDER BY count DESC LIMIT 10`),
+        ]);
+        const total = overall.rows[0].total || 0;
+        const pct = (n) => total ? Math.round((n / total) * 1000) / 10 : 0;
+
+        // Holland distribution: derive bằng cách tách ký tự đầu của hollandCode
+        const hollandQ = await pool.query(
+          `SELECT LEFT("hollandCode", 1) AS code, COUNT(*)::int AS count
+             FROM "CareerProfile" WHERE "hollandCode" <> ''
+             GROUP BY LEFT("hollandCode", 1)`
+        );
+        const HOLLAND_LABELS = {
+          R: 'Realistic - Thực tế', I: 'Investigative - Nghiên cứu',
+          A: 'Artistic - Nghệ thuật', S: 'Social - Xã hội',
+          E: 'Enterprising - Quản lý', C: 'Conventional - Quy tắc',
+        };
+        const MBTI_NAMES = {
+          INTJ:'Nhà chiến lược',INTP:'Nhà tư duy',ENTJ:'Nhà chỉ huy',ENTP:'Nhà tranh luận',
+          INFJ:'Người che chở',INFP:'Người hoà giải',ENFJ:'Người dẫn dắt',ENFP:'Người truyền cảm hứng',
+          ISTJ:'Người nề nếp',ISFJ:'Người bảo vệ',ESTJ:'Nhà điều hành',ESFJ:'Người chăm sóc',
+          ISTP:'Nghệ nhân',ISFP:'Nghệ sĩ',ESTP:'Doanh nhân',ESFP:'Người giải trí',
+        };
+
+        // Đánh dấu trending cho topCareers
+        const topCareers = careersQ.rows.map(r => ({
+          name: r.career,
+          count: r.count,
+          percentage: pct(r.count),
+          trending: matchTrending(r.career),
+        }));
+
+        return res.json({
+          success: true,
+          data: {
+            totalAttempts: total,
+            totalUsers: overall.rows[0].users || 0,
+            updatedAt: overall.rows[0].last_at || new Date().toISOString(),
+            mbtiDistribution: mbtiQ.rows.map(r => ({
+              type: r.mbtiType,
+              name: MBTI_NAMES[r.mbtiType] || r.mbtiType,
+              count: r.count,
+              percentage: pct(r.count),
+            })),
+            hollandDistribution: hollandQ.rows.map(r => ({
+              code: r.code,
+              label: HOLLAND_LABELS[r.code] || r.code,
+              count: r.count,
+              percentage: pct(r.count),
+            })),
+            topCareers,
+            recentTakers: recentQ.rows.map(r => ({
+              userName: r.userName,
+              userImage: r.userImage,
+              userYearOfBirth: r.userYearOfBirth,
+              mbtiType: r.mbtiType,
+              personalityName: r.personalityName,
+              hollandCode: r.hollandCode,
+              createdAt: r.createdAt,
+            })),
+            yearOfBirthDistribution: yobQ.rows.map(r => ({
+              year: r.year, count: r.count, percentage: pct(r.count),
+            })),
+            // Bonus: full trending list 2026 (UI có thể hiện ngay cả khi 0 ai chọn)
+            trendingCareers2026: TRENDING_2026.map(t => ({
+              label: t.label, reason: t.reason, heat: t.heat,
+            })),
+          },
+        });
+      }
+
+      return res.status(400).json({ success: false, error: 'invalid_action' });
+    } catch (err) {
+      console.error('[career:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
 // LEADERBOARD REAL-TIME — top học sinh dẫn đầu với chỉ số
 // cảm xúc + tương tác. Aggregate từ PracticeExam + LessonHistory
 // + QuizRoomParticipant. Dùng chung cho Teacher + Student dashboard.
