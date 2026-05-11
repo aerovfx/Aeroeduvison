@@ -45,7 +45,12 @@ export default function LatexDocumentEditorPage() {
   const [saving, setSaving] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [compiling, setCompiling] = useState(false);
-  const [compileError, setCompileError] = useState<string | null>(null);
+  const [compileError, setCompileError] = useState<{
+    status: number;
+    code: string;
+    message: string;
+    log: string;
+  } | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(true);
   const [versions, setVersions] = useState<{ id: string; titleSnapshot: string | null; trigger: string; createdAt: string }[]>([]);
@@ -184,9 +189,14 @@ export default function LatexDocumentEditorPage() {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const msg = data.error ?? "Biên dịch thất bại";
-        setCompileError(data.log ?? msg);
+        setCompileError({
+          status: res.status,
+          code: data.code ?? (res.status === 503 ? "COMPILE_NOT_AVAILABLE" : "COMPILE_ERROR"),
+          message: msg,
+          log: data.log ?? "",
+        });
         if (res.status === 503) {
-          toast.error("Dịch vụ biên dịch chưa sẵn sàng. Cấu hình Docker TeX Live hoặc thử lại sau.");
+          toast.error("Compile LaTeX server-side chưa khả dụng. Liên hệ quản trị để cài TeX Live/Tectonic hoặc cấu hình LATEX_SERVICE_URL.");
         } else {
           toast.error(msg);
         }
@@ -486,15 +496,54 @@ export default function LatexDocumentEditorPage() {
           <div className="flex-1 min-h-0 overflow-hidden bg-gray-100">
             {compileError ? (
               <div className="h-full overflow-auto p-4">
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                  <p className="text-sm font-semibold text-red-700">Biên dịch thất bại (422)</p>
-                  <p className="mt-1 text-xs text-red-700">
-                    Đây là lỗi nội dung LaTeX hoặc package/font, không phải lỗi đăng nhập.
-                  </p>
-                </div>
-                <pre className="mt-3 whitespace-pre-wrap rounded-lg border border-gray-200 bg-white p-3 text-xs text-gray-700">
-                  {compileError}
-                </pre>
+                {compileError.status === 503 ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-sm font-semibold text-amber-800">
+                      Compile LaTeX server-side chưa khả dụng (503)
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      Server chưa cài TeX Live/Tectonic hoặc dịch vụ biên dịch (LATEX_SERVICE_URL) chưa phản hồi. Liên hệ quản trị viên để cài đặt.
+                    </p>
+                    <p className="mt-2 text-xs text-amber-700">
+                      <strong>Gợi ý:</strong> Linux <code className="bg-amber-100 px-1 rounded">sudo apt install texlive-xetex texlive-latex-extra</code> · macOS <code className="bg-amber-100 px-1 rounded">brew install --cask mactex</code> · hoặc <code className="bg-amber-100 px-1 rounded">cargo install tectonic</code>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                    <p className="text-sm font-semibold text-red-700">
+                      Biên dịch thất bại ({compileError.status})
+                    </p>
+                    <p className="mt-1 text-xs text-red-700">
+                      Đây là lỗi nội dung LaTeX hoặc package/font, không phải lỗi đăng nhập.
+                    </p>
+                    <p className="mt-1 text-xs text-red-700">{compileError.message}</p>
+                    {(() => {
+                      const lines = compileError.log.split("\n");
+                      const errLines = lines
+                        .map((l, i) => ({ l, i }))
+                        .filter(({ l }) => /^!|^l\.\d+|^.*Error:|^.*Undefined control sequence|LaTeX Error/i.test(l))
+                        .slice(0, 5);
+                      if (errLines.length === 0) return null;
+                      return (
+                        <ul className="mt-2 list-disc list-inside text-xs text-red-800 space-y-0.5">
+                          {errLines.map(({ l, i }) => (
+                            <li key={i} className="font-mono">{l.trim()}</li>
+                          ))}
+                        </ul>
+                      );
+                    })()}
+                  </div>
+                )}
+                {compileError.log && (
+                  <details className="mt-3 rounded-lg border border-gray-200 bg-white">
+                    <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50">
+                      Xem log đầy đủ
+                    </summary>
+                    <pre className="whitespace-pre-wrap border-t border-gray-200 p-3 text-xs text-gray-700 max-h-[400px] overflow-auto">
+                      {compileError.log}
+                    </pre>
+                  </details>
+                )}
               </div>
             ) : pdfBlobUrl ? (
               <iframe

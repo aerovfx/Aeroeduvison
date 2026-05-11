@@ -40,7 +40,8 @@ export async function POST(request: NextRequest) {
     const result = await compileLatexToPdfOptimized(content);
 
     if (result.error) {
-      return NextResponse.json({ error: result.error, code: result.code ?? "COMPILE_ERROR", log: result.log, cached: result.cached }, { status: 422 });
+      const status = result.code === "COMPILE_NOT_AVAILABLE" ? 503 : 422;
+      return NextResponse.json({ error: result.error, code: result.code ?? "COMPILE_ERROR", log: result.log, cached: result.cached }, { status });
     }
 
     if (!result.pdf) {
