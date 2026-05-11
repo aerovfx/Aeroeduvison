@@ -315,7 +315,7 @@ export default function ExamDetailPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {questions.map((q, idx) => (
-                <QuestionRow key={q.id} q={q} idx={idx} />
+                <QuestionRow key={q.id} q={q} idx={idx} onSaved={refetch} />
               ))}
             </div>
           )}
@@ -325,11 +325,148 @@ export default function ExamDetailPage() {
   )
 }
 
-function QuestionRow({ q, idx }: { q: Question; idx: number }) {
+function QuestionRow({ q, idx, onSaved }: { q: Question; idx: number; onSaved: () => void }) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [content, setContent] = useState(q.content)
+  const [options, setOptions] = useState<string[]>(q.options || [])
+  const [correctAnswer, setCorrectAnswer] = useState(q.correctAnswer || '')
+  const [explanation, setExplanation] = useState(q.explanation || '')
+
+  const startEdit = () => {
+    setContent(q.content)
+    setOptions(q.options || [])
+    setCorrectAnswer(q.correctAnswer || '')
+    setExplanation(q.explanation || '')
+    setEditing(true)
+  }
+  const cancel = () => setEditing(false)
+
+  const save = async () => {
+    if (!content.trim()) {
+      toast.error('Nội dung câu hỏi không được rỗng')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.put(`/questions/${q.id}`, {
+        content: content.trim(),
+        options: options.map(o => o.trim()).filter(Boolean),
+        correctAnswer: correctAnswer.trim(),
+        explanation: explanation.trim() || null,
+      })
+      toast.success('Đã cập nhật câu hỏi')
+      setEditing(false)
+      onSaved()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không lưu được')
+    } finally { setSaving(false) }
+  }
+
+  if (editing) {
+    return (
+      <div style={{
+        background: 'var(--ai-tabs-bg)', border: '2px solid hsl(var(--primary))',
+        borderRadius: 10, padding: 14,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ background: 'hsl(var(--primary))', color: '#fff', padding: '3px 10px', borderRadius: 4, fontWeight: 700, fontSize: 11 }}>
+            ✎ Đang sửa câu {idx + 1}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--ai-muted-text)' }}>{q.questionType.replace('_', ' ')}</span>
+        </div>
+
+        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Nội dung câu hỏi</label>
+        <textarea value={content} onChange={e => setContent(e.target.value)} rows={3}
+          style={{
+            width: '100%', padding: 8, fontSize: 13, fontFamily: 'inherit',
+            background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
+            borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
+          }} />
+
+        {q.options?.length > 0 && (
+          <>
+            <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>4 đáp án (tô đậm = đúng)</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+              {options.map((opt, oi) => {
+                const letter = String.fromCharCode(65 + oi)
+                const isCorrect = correctAnswer.toUpperCase().startsWith(letter)
+                return (
+                  <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <button type="button" onClick={() => setCorrectAnswer(letter)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 6, fontWeight: 700, fontSize: 12,
+                        background: isCorrect ? '#22c55e' : 'var(--ai-card-bg)',
+                        color: isCorrect ? '#fff' : 'var(--ai-muted-text)',
+                        border: `1px solid ${isCorrect ? '#22c55e' : 'var(--ai-card-border)'}`,
+                        cursor: 'pointer', flexShrink: 0,
+                      }}>{letter}</button>
+                    <input type="text" value={opt}
+                      onChange={e => {
+                        const next = [...options]; next[oi] = e.target.value
+                        setOptions(next)
+                      }}
+                      style={{
+                        flex: 1, padding: '6px 10px', fontSize: 13,
+                        background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
+                        borderRadius: 6, color: 'inherit',
+                      }} />
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {q.questionType === 'SHORT_ANSWER' && (
+          <>
+            <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Đáp án đúng</label>
+            <input type="text" value={correctAnswer} onChange={e => setCorrectAnswer(e.target.value)}
+              style={{
+                width: '100%', padding: 8, fontSize: 13,
+                background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
+                borderRadius: 6, color: 'inherit', marginBottom: 10,
+              }} />
+          </>
+        )}
+
+        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Giải thích (không bắt buộc)</label>
+        <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}
+          placeholder="Giải thích cách giải, công thức áp dụng…"
+          style={{
+            width: '100%', padding: 8, fontSize: 12, fontFamily: 'inherit',
+            background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
+            borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
+          }} />
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={cancel} disabled={saving}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 600,
+              background: 'transparent', border: '1px solid var(--ai-card-border)',
+              borderRadius: 6, color: 'var(--ai-muted-text)', cursor: 'pointer',
+            }}>Huỷ</button>
+          <button onClick={save} disabled={saving}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 700,
+              background: 'hsl(var(--primary))', border: 'none',
+              borderRadius: 6, color: '#fff', cursor: 'pointer',
+              opacity: saving ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}>
+            {saving ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={12} />}
+            {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── View mode ───────────────────────────────────────
   return (
     <div style={{
       background: 'var(--ai-tabs-bg)', border: '1px solid var(--ai-card-border)',
-      borderRadius: 10, padding: 14,
+      borderRadius: 10, padding: 14, position: 'relative',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 11, color: 'var(--ai-muted-text)' }}>
         <span style={{ background: 'var(--ai-card-bg)', padding: '2px 8px', borderRadius: 4, fontWeight: 700 }}>
@@ -338,6 +475,15 @@ function QuestionRow({ q, idx }: { q: Question; idx: number }) {
         <span style={{ letterSpacing: 0.5 }}>
           {q.questionType.replace('_', ' ')} · {q.points} điểm
         </span>
+        <button onClick={startEdit}
+          style={{
+            marginLeft: 'auto', padding: '3px 10px', fontSize: 11, fontWeight: 600,
+            background: 'transparent', border: '1px solid var(--ai-card-border)',
+            borderRadius: 4, color: 'var(--ai-muted-text)', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          }}>
+          <Edit3 size={11} /> Sửa
+        </button>
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: q.options?.length ? 10 : 4, lineHeight: 1.55 }}>
         <MathText as="span">{q.content}</MathText>
@@ -368,6 +514,15 @@ function QuestionRow({ q, idx }: { q: Question; idx: number }) {
           color: '#22c55e', fontWeight: 600,
         }}>
           Đáp án: {q.correctAnswer}
+        </div>
+      )}
+      {q.explanation && (
+        <div style={{
+          marginTop: 8, padding: '6px 10px', fontSize: 12,
+          background: 'rgba(245,158,11,0.08)', borderRadius: 6,
+          color: 'rgb(217 119 6)', borderLeft: '2px solid #f59e0b',
+        }}>
+          💡 {q.explanation}
         </div>
       )}
     </div>
