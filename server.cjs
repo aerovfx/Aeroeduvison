@@ -3368,11 +3368,40 @@ if (USE_NODEJS_QUESTIONS) {
           return s.toLowerCase();
         };
 
+        // Khi user_ans là text option thuần (không có prefix "A. "), tìm
+        // index trong q.options để quy về letter. Bug fix: trước đây HS bấm
+        // "C=C1+C2" → BE compare với correctAnswer "A" → false sai. Giờ map
+        // text → letter trước khi normalize.
+        const collapseSpace = (t) => String(t ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const userAnswerToLetter = (rawAns, options) => {
+          const a = String(rawAns ?? '').trim();
+          if (!a) return a;
+          // Nếu đã là letter hoặc có prefix "A. " thì giữ nguyên
+          if (/^[A-Z]$/i.test(a)) return a.toUpperCase();
+          if (/^[A-Z][\.\)\s]/i.test(a)) return a;
+          // Tìm trong options array (so trùng case-insensitive, bỏ space)
+          if (Array.isArray(options) && options.length > 0) {
+            const target = collapseSpace(a);
+            for (let i = 0; i < options.length; i++) {
+              const opt = collapseSpace(options[i]);
+              // Chấp nhận match trực tiếp HOẶC option có prefix vd "A. xxx"
+              const stripped = opt.replace(/^[a-z][\.\)\s]+/i, '').trim();
+              if (opt === target || stripped === target) {
+                return String.fromCharCode(65 + i); // A/B/C/D
+              }
+            }
+          }
+          return a;
+        };
+
         for (const q of questions) {
           const qid = q.questionId;
-          const user_ans = answers[qid];
+          const user_ans_raw = answers[qid];
           const correct_ans = q.correctAnswer || '';
-          const isAnswered = user_ans !== undefined && user_ans !== null && String(user_ans).length > 0;
+          const isAnswered = user_ans_raw !== undefined && user_ans_raw !== null && String(user_ans_raw).length > 0;
+
+          // Map text option → letter trước khi normalize (fix MCQ no-prefix bug)
+          const user_ans = isAnswered ? userAnswerToLetter(user_ans_raw, q.options) : user_ans_raw;
 
           let isCorrect = false;
           if (isAnswered && correct_ans) {
@@ -3404,7 +3433,7 @@ if (USE_NODEJS_QUESTIONS) {
             questionId: qid,
             position: q.position,
             content: q.content,
-            userAnswer: isAnswered ? String(user_ans) : null,
+            userAnswer: isAnswered ? String(user_ans_raw) : null,
             correctAnswer: correct_ans,
             isCorrect,
             explanation: q.explanation || undefined,
