@@ -6019,7 +6019,10 @@ if (!USE_NODEJS_QUESTIONS) {
       const p = JSON.parse(description);
       return { subject: p.subject || null, grade: p.grade || null,
         notes: p.notes || null, isPublic: !!p.public,
-        publishedAt: p.publishedAt || null };
+        publishedAt: p.publishedAt || null,
+        examMode: p.examMode || null,
+        sectionCounts: p.sectionCounts || null,
+        latexProjectId: p.latexProjectId || null };
     } catch { return { notes: description }; }
   }
   function mapRow(row) {
@@ -6032,6 +6035,9 @@ if (!USE_NODEJS_QUESTIONS) {
       totalScore: parseFloat(row.totalScore) || 10,
       totalQuestions: row.totalQuestions, status: row.status,
       matrixId: row.matrixId || null, userId: row.userId,
+      examMode: m.examMode || null,
+      sectionCounts: m.sectionCounts || null,
+      pdfUrl: m.examMode === 'pdf-only' ? `/api/exams/${row.id}/pdf` : null,
       createdAt: row.createdAt, updatedAt: row.updatedAt,
     };
   }
@@ -6060,7 +6066,10 @@ if (!USE_NODEJS_QUESTIONS) {
 
   // POST /api/exams/:id/grade — chấm bài exam-sheet (Bộ-style)
   // Body: { answers: { questionId: 'A'|'B'|'TFFT'|'0.4'|... } }
-  // Logic: load Question.correctAnswer cho từng câu, so sánh, tính %.
+  // Logic:
+  //   - Mặc định: load Question.correctAnswer cho từng câu, so sánh, tính %.
+  //   - Nếu exam có description.examMode='pdf-only': dùng answerKey trong
+  //     description thay vì Question table (PDF-only mode, không có Question).
   app.post('/api/exams/:id/grade', async (req, res) => {
     try {
       const xpool = getXPool();
@@ -6068,6 +6077,71 @@ if (!USE_NODEJS_QUESTIONS) {
       const userAnswers = req.body?.answers || {};
       const examId = req.params.id;
 
+      // Check exam mode trước
+      const { rows: examRows } = await xpool.query(
+        `SELECT description FROM "Exam" WHERE id = $1 LIMIT 1`, [examId]
+      );
+      const examDesc = (() => {
+        try { return JSON.parse(examRows[0]?.description || '{}'); } catch { return {}; }
+      })();
+
+      // ── PDF-only mode: chấm bằng answerKey trong description ─────
+      if (examDesc.examMode === 'pdf-only' && examDesc.answerKey) {
+        const ak = examDesc.answerKey;
+        const normLetter = (s) => {
+          const t = String(s ?? '').trim().toUpperCase();
+          if (/^[A-D]$/.test(t)) return t;
+          const m = t.match(/^([A-D])[\.\)\s]/);
+          if (m) return m[1];
+          return '';
+        };
+        const normNum = (s) => {
+          const t = String(s ?? '').trim().replace(/,/g, '.').replace(/\s+/g, '');
+          if (t === '' || isNaN(Number(t))) return t.toLowerCase();
+          return String(Number(t));
+        };
+        let correctCount = 0;
+        let totalCount = 0;
+        // PHẦN I
+        const phanI = String(ak.phanI || '');
+        for (let i = 0; i < phanI.length; i++) {
+          totalCount++;
+          const ua = userAnswers[`phanI-${i + 1}`];
+          if (normLetter(ua) === phanI[i].toUpperCase()) correctCount++;
+        }
+        // PHẦN II — TFFT 4 ký tự, 1 câu = 4 sub-statements
+        const phanII = Array.isArray(ak.phanII) ? ak.phanII : [];
+        for (let i = 0; i < phanII.length; i++) {
+          totalCount++;
+          const ua = String(userAnswers[`phanII-${i + 1}`] || '').padEnd(4, '-').slice(0, 4).toUpperCase();
+          const ca = String(phanII[i] || '').padEnd(4, '-').slice(0, 4).toUpperCase();
+          let sub = 0;
+          for (let k = 0; k < 4; k++) if (ua[k] !== '-' && ua[k] === ca[k]) sub++;
+          if (sub === 4) correctCount += 1;
+          else if (sub >= 3) correctCount += 0.5;
+        }
+        // PHẦN III
+        const phanIII = Array.isArray(ak.phanIII) ? ak.phanIII : [];
+        for (let i = 0; i < phanIII.length; i++) {
+          totalCount++;
+          const ua = userAnswers[`phanIII-${i + 1}`];
+          if (normNum(ua) === normNum(phanIII[i])) correctCount++;
+        }
+        const percentage = totalCount > 0 ? (correctCount / totalCount) * 100 : 0;
+        const score = totalCount > 0
+          ? Math.round((correctCount / totalCount) * 100) / 10
+          : 0;
+        console.log(`[exam:grade:pdf-only] ✅ exam=${examId.slice(0,8)} ${correctCount}/${totalCount} (${Math.round(percentage)}%)`);
+        return res.json({
+          correct: Math.round(correctCount * 10) / 10,
+          total: totalCount,
+          percentage,
+          score,
+          mode: 'pdf-only',
+        });
+      }
+
+      // ── Mode mặc định: load Question table ─────
       // Lấy questions của exam (correctAnswer + options + points cho weighted grade)
       const { rows: qs } = await xpool.query(
         `SELECT q.id, q."questionType", q."correctAnswer", q.options, eq.points
@@ -7408,6 +7482,170 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       } finally { client.release(); }
     } catch (err) {
       console.error('[latex:to-exam] ❌', err.message.slice(0, 300));
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════
+  // PDF-ONLY EXAM — KHÔNG trích xuất câu hỏi.
+  // GV xem PDF làm hình đề; HS quan sát PDF + tô đáp án bên phải.
+  // ══════════════════════════════════════════════════════════
+
+  // POST /api/latex-projects/:id/to-pdf-exam
+  // Body: {
+  //   title?: string,
+  //   phanIAnswers?: "ABCDA..." (chuỗi nhiều ký tự A-D, mỗi ký tự = 1 câu),
+  //   phanIIAnswers?: ["TFFT", "TTFF", ...] (mỗi phần tử là 4 ký tự T/F),
+  //   phanIIIAnswers?: ["0.4", "12.5", ...] (mỗi phần tử là 1 số/chuỗi),
+  //   subject?, grade?, duration?, public?
+  // }
+  // Tạo Exam KHÔNG có Question rows. Học sinh dùng /exam-sheet để xem PDF
+  // + tô bảng trả lời. Backend chấm bằng answerKey lưu trong description.
+  app.post('/api/latex-projects/:id/to-pdf-exam', async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getLPool();
+      const { rows: prjRows } = await pool.query(
+        `SELECT id, title, "mainContent" FROM "LatexProject"
+          WHERE id = $1 AND "userId" = $2 LIMIT 1`,
+        [req.params.id, userId]
+      );
+      if (!prjRows[0]) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+      const project = prjRows[0];
+
+      // Sanitize answer key from body
+      const body = req.body || {};
+      const phanIRaw = String(body.phanIAnswers || '').toUpperCase().replace(/[^ABCD]/g, '');
+      const phanII = Array.isArray(body.phanIIAnswers)
+        ? body.phanIIAnswers.map(s => {
+            const t = String(s || '').toUpperCase().replace(/[^TF\-]/g, '');
+            return t.slice(0, 4).padEnd(4, '-');
+          })
+        : [];
+      const phanIII = Array.isArray(body.phanIIIAnswers)
+        ? body.phanIIIAnswers.map(s => String(s ?? '').trim())
+        : [];
+
+      const sectionCounts = {
+        phanI:   phanIRaw.length,
+        phanII:  phanII.length,
+        phanIII: phanIII.length,
+      };
+      const totalQuestions = sectionCounts.phanI + sectionCounts.phanII + sectionCounts.phanIII;
+      if (totalQuestions === 0) {
+        return res.status(400).json({
+          error: 'Cần nhập ít nhất 1 đáp án (PHẦN I / II / III)',
+        });
+      }
+
+      const isPublic = body.public !== false;
+      const examStatus = body.status || (isPublic ? 'Đang diễn ra' : 'Nháp');
+      const duration = Number(body.duration) || 90;
+      const examId = latexUUID();
+      const now = new Date();
+      const examTitle = String(body.title || `${project.title} — Đề thi PDF`).slice(0, 200);
+      const desc = JSON.stringify({
+        subject: body.subject || 'Vật lí',
+        grade: String(body.grade || '11'),
+        source: 'pdf-only',
+        examMode: 'pdf-only',
+        latexProjectId: project.id,
+        sectionCounts,
+        answerKey: {
+          phanI: phanIRaw,
+          phanII,
+          phanIII,
+        },
+        notes: `Đề PDF-only từ tài liệu LaTeX: ${project.title}`,
+        public: isPublic,
+        publishedAt: now.toISOString(),
+      });
+      await pool.query(
+        `INSERT INTO "Exam"
+           (id, title, description, "examType", duration, "totalScore",
+            "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,'PDF + Phiếu trả lời',$4,$5,$5,$6,NULL,$7,$8,$8)`,
+        [examId, examTitle, desc, duration, totalQuestions, examStatus, userId, now]
+      );
+      console.log(`[latex:to-pdf-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (I=${sectionCounts.phanI}, II=${sectionCounts.phanII}, III=${sectionCounts.phanIII}, ${Date.now()-t0}ms)`);
+      return res.json({
+        ok: true,
+        examId,
+        examTitle,
+        totalQuestions,
+        sectionCounts,
+        isPublic,
+        status: examStatus,
+      });
+    } catch (err) {
+      console.error('[latex:to-pdf-exam] ❌', err.message.slice(0, 300));
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/exams/:id/pdf — stream PDF của LaTeX project gốc (cho pdf-only exam)
+  // Public nếu exam isPublic, owner luôn được.
+  app.get('/api/exams/:id/pdf', async (req, res) => {
+    try {
+      const pool = getLPool();
+      // Fetch exam
+      const { rows: examRows } = await pool.query(
+        `SELECT id, description, "userId" FROM "Exam" WHERE id = $1 LIMIT 1`,
+        [req.params.id]
+      );
+      if (!examRows[0]) return res.status(404).json({ error: 'Đề thi không tồn tại' });
+      const desc = (() => { try { return JSON.parse(examRows[0].description || '{}'); } catch { return {}; } })();
+      const userId = getLatexUserId(req);
+      const isOwner = userId && examRows[0].userId === userId;
+      if (!isOwner && !desc.public) {
+        return res.status(403).json({ error: 'Đề chưa công khai' });
+      }
+      if (desc.examMode !== 'pdf-only' || !desc.latexProjectId) {
+        return res.status(400).json({ error: 'Đề này không phải dạng PDF-only' });
+      }
+      // Fetch LaTeX content
+      const { rows: prjRows } = await pool.query(
+        `SELECT "mainContent" FROM "LatexProject" WHERE id = $1 LIMIT 1`,
+        [desc.latexProjectId]
+      );
+      if (!prjRows[0]) return res.status(404).json({ error: 'Tài liệu nguồn không tồn tại' });
+      const content = String(prjRows[0].mainContent || '');
+      if (!content) return res.status(404).json({ error: 'Tài liệu rỗng' });
+
+      // Compile via tectonic (giống endpoint /api/latex-projects/compile)
+      const { spawn } = require('child_process');
+      const fs = require('fs').promises;
+      const os = require('os');
+      const path = require('path');
+      const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pdfexam-'));
+      const inFile = path.join(tmpDir, 'input.tex');
+      const outFile = path.join(tmpDir, 'input.pdf');
+      try {
+        await fs.writeFile(inFile, content, 'utf8');
+        await new Promise((resolve, reject) => {
+          const proc = spawn('tectonic',
+            ['--outdir', tmpDir, '--keep-logs', '--reruns', '1',
+             '--chatter', 'minimal', inFile],
+            { stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 }
+          );
+          let stderr = '';
+          proc.stdout.on('data', d => stderr += d.toString());
+          proc.stderr.on('data', d => stderr += d.toString());
+          proc.on('close', code => code === 0 ? resolve() : reject(new Error(`tectonic exit ${code}: ${stderr.slice(0, 400)}`)));
+          proc.on('error', err => reject(err));
+        });
+        const pdf = await fs.readFile(outFile);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Length', pdf.length);
+        res.setHeader('Cache-Control', 'public, max-age=600'); // cache 10 phút
+        res.send(pdf);
+      } finally {
+        try { await fs.rm(tmpDir, { recursive: true, force: true }); } catch {}
+      }
+    } catch (err) {
+      console.error('[exams:pdf] ❌', err.message.slice(0, 300));
       return res.status(500).json({ error: err.message });
     }
   });

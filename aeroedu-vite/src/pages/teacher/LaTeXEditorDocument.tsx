@@ -85,6 +85,13 @@ export default function LaTeXEditorDocument() {
   const [shareExamTotalQ, setShareExamTotalQ] = useState(0)
   const [shareCopied, setShareCopied] = useState(false)
 
+  // PDF-only exam modal — GV nhập đáp án trực tiếp, không AI extract
+  const [pdfExamModalOpen, setPdfExamModalOpen] = useState(false)
+  const [pdfExamPhanI, setPdfExamPhanI] = useState('')
+  const [pdfExamPhanII, setPdfExamPhanII] = useState<string[]>(['', '', '', ''])
+  const [pdfExamPhanIII, setPdfExamPhanIII] = useState<string[]>(['', '', '', '', '', ''])
+  const [pdfExamSubmitting, setPdfExamSubmitting] = useState(false)
+
   const [versions, setVersions] = useState<Version[]>([])
   const [historyOpen, setHistoryOpen] = useState(false)
   const [restoringId, setRestoringId] = useState<string | null>(null)
@@ -470,6 +477,23 @@ export default function LaTeXEditorDocument() {
           }}
         >
           📋 Tạo đề thi
+        </button>
+
+        {/* PDF-only exam — không AI extract, GV nhập đáp án thủ công */}
+        <button
+          onClick={() => setPdfExamModalOpen(true)}
+          disabled={!id || compiling}
+          title="HS xem PDF làm hình đề và tô đáp án bên phải — bạn nhập đáp án chuẩn"
+          style={{
+            background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
+            border: 'none', borderRadius: 8, color: '#fff',
+            cursor: 'pointer',
+            padding: '6px 14px', fontSize: 13, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(239,68,68,0.3)',
+          }}
+        >
+          📄 Tạo đề PDF
         </button>
 
         {/* History button */}
@@ -862,6 +886,210 @@ export default function LaTeXEditorDocument() {
                   color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                 }}>
                 Chỉnh sửa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PDF-only exam modal — GV nhập đáp án thủ công ── */}
+      {pdfExamModalOpen && (
+        <div
+          onClick={() => !pdfExamSubmitting && setPdfExamModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: 720, width: '100%', maxHeight: '90vh', overflowY: 'auto',
+              background: D.card, border: `1px solid ${D.border2}`, borderRadius: 16,
+              padding: 24, color: D.text,
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+              📄 Tạo đề từ PDF — Nhập đáp án
+            </h2>
+            <p style={{ fontSize: 13, color: D.muted, margin: '0 0 16px' }}>
+              Học sinh sẽ xem file PDF làm đề và tô đáp án ở bảng bên phải. Bạn chỉ cần nhập đáp án chuẩn dưới đây.
+            </p>
+
+            {/* PHẦN I */}
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: 'block', fontWeight: 700, marginBottom: 6, fontSize: 13 }}>
+                PHẦN I — Trắc nghiệm (A/B/C/D)
+              </label>
+              <input
+                type="text"
+                value={pdfExamPhanI}
+                onChange={e => setPdfExamPhanI(e.target.value.toUpperCase().replace(/[^ABCD\s]/g, '').replace(/\s/g, ''))}
+                placeholder="ABCDABCDDC… (vd: ACBDABCDAB cho 10 câu)"
+                style={{
+                  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+                  background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 8,
+                  color: D.text, fontSize: 14, fontFamily: 'ui-monospace, monospace',
+                  letterSpacing: '0.1em',
+                }}
+              />
+              <p style={{ fontSize: 11, color: D.muted, marginTop: 4 }}>
+                {pdfExamPhanI.length} câu · Chỉ dùng ký tự A/B/C/D, mỗi ký tự là 1 câu
+              </p>
+            </div>
+
+            {/* PHẦN II */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontWeight: 700, fontSize: 13 }}>
+                  PHẦN II — Đúng/Sai (4 mệnh đề a/b/c/d mỗi câu)
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPdfExamPhanII(prev => prev.length > 1 ? prev.slice(0, -1) : prev)}
+                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
+                  >−</button>
+                  <span style={{ fontSize: 12, color: D.muted, minWidth: 30, textAlign: 'center' }}>{pdfExamPhanII.length}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPdfExamPhanII(prev => prev.length < 12 ? [...prev, ''] : prev)}
+                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
+                  >+</button>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                {pdfExamPhanII.map((val, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: D.muted, minWidth: 36 }}>Câu {i + 1}:</span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={e => {
+                        const v = e.target.value.toUpperCase().replace(/[^TF\-]/g, '').slice(0, 4)
+                        setPdfExamPhanII(prev => prev.map((p, j) => j === i ? v : p))
+                      }}
+                      placeholder="TFFT"
+                      maxLength={4}
+                      style={{
+                        flex: 1, padding: '6px 10px', boxSizing: 'border-box',
+                        background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6,
+                        color: D.text, fontSize: 13, fontFamily: 'ui-monospace, monospace',
+                        letterSpacing: '0.2em', textAlign: 'center', textTransform: 'uppercase',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 11, color: D.muted, marginTop: 4 }}>
+                Mỗi ô 4 ký tự T (Đúng) / F (Sai) cho 4 mệnh đề a/b/c/d
+              </p>
+            </div>
+
+            {/* PHẦN III */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontWeight: 700, fontSize: 13 }}>
+                  PHẦN III — Trả lời ngắn (số / biểu thức)
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPdfExamPhanIII(prev => prev.length > 0 ? prev.slice(0, -1) : prev)}
+                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
+                  >−</button>
+                  <span style={{ fontSize: 12, color: D.muted, minWidth: 30, textAlign: 'center' }}>{pdfExamPhanIII.length}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPdfExamPhanIII(prev => prev.length < 12 ? [...prev, ''] : prev)}
+                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
+                  >+</button>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
+                {pdfExamPhanIII.map((val, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: D.muted, minWidth: 36 }}>Câu {i + 1}:</span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={e => {
+                        const v = e.target.value
+                        setPdfExamPhanIII(prev => prev.map((p, j) => j === i ? v : p))
+                      }}
+                      placeholder="0.4"
+                      style={{
+                        flex: 1, padding: '6px 10px', boxSizing: 'border-box',
+                        background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6,
+                        color: D.text, fontSize: 13, fontFamily: 'ui-monospace, monospace',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Submit */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => !pdfExamSubmitting && setPdfExamModalOpen(false)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: D.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Huỷ
+              </button>
+              <button
+                disabled={pdfExamSubmitting}
+                onClick={async () => {
+                  if (!id) return
+                  const totalCount = pdfExamPhanI.length
+                    + pdfExamPhanII.filter(x => x.replace(/-/g, '').length > 0).length
+                    + pdfExamPhanIII.filter(x => x.trim().length > 0).length
+                  if (totalCount === 0) {
+                    toast.error('Nhập ít nhất 1 đáp án trước khi tạo đề')
+                    return
+                  }
+                  setPdfExamSubmitting(true)
+                  const t = toast.loading('Đang tạo đề PDF…')
+                  try {
+                    const res = await api.post<{
+                      examId: string; examTitle: string; totalQuestions: number;
+                      sectionCounts: { phanI: number; phanII: number; phanIII: number }
+                    }>(
+                      `/latex-projects/${id}/to-pdf-exam`,
+                      {
+                        phanIAnswers: pdfExamPhanI,
+                        phanIIAnswers: pdfExamPhanII.filter(x => x.replace(/-/g, '').length > 0),
+                        phanIIIAnswers: pdfExamPhanIII.filter(x => x.trim().length > 0),
+                        public: true,
+                      }
+                    )
+                    toast.success(`✅ Đề ${res.data.totalQuestions} câu sẵn sàng (PHẦN I=${res.data.sectionCounts.phanI}, II=${res.data.sectionCounts.phanII}, III=${res.data.sectionCounts.phanIII})`, { id: t, duration: 4000 })
+                    setPdfExamModalOpen(false)
+                    setShareExamUrl(`${window.location.origin}/exam-sheet/${res.data.examId}`)
+                    setShareExamId(res.data.examId)
+                    setShareExamTitle(res.data.examTitle)
+                    setShareExamTotalQ(res.data.totalQuestions)
+                    setShareModalOpen(true)
+                  } catch (err: unknown) {
+                    const e = err as { response?: { data?: { error?: string } } }
+                    toast.error(e.response?.data?.error || 'Không tạo được đề', { id: t })
+                  } finally {
+                    setPdfExamSubmitting(false)
+                  }
+                }}
+                style={{
+                  flex: 1.5, padding: '10px 16px', borderRadius: 10, border: 'none',
+                  background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
+                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  opacity: pdfExamSubmitting ? 0.6 : 1,
+                }}
+              >
+                {pdfExamSubmitting ? 'Đang tạo…' : 'Tạo đề ngay →'}
               </button>
             </div>
           </div>

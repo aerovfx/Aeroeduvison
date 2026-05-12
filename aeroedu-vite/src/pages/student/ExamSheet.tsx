@@ -36,6 +36,10 @@ interface Exam {
   totalQuestions: number
   totalScore: number
   status: string
+  // pdf-only fields
+  examMode?: string | null
+  pdfUrl?: string | null
+  sectionCounts?: { phanI: number; phanII: number; phanIII: number } | null
 }
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -59,13 +63,41 @@ export default function ExamSheetPage() {
       try {
         const res = await axios.get<{ exam: Exam; questions: Question[] }>(`/api/exams/${examId}`)
         if (cancelled) return
-        setExam(res.data.exam)
-        // Apply shuffle prefs từ ExamModes settings (localStorage)
+        const exam = res.data.exam
+        setExam(exam)
+        setTimeLeft((exam?.duration || 45) * 60)
+
+        // ── PDF-only mode: synthesize virtual questions theo sectionCounts ──
+        if (exam.examMode === 'pdf-only' && exam.sectionCounts) {
+          const sc = exam.sectionCounts
+          const synth: Question[] = []
+          for (let i = 0; i < sc.phanI; i++) {
+            synth.push({
+              id: `phanI-${i + 1}`, questionType: 'MULTIPLE_CHOICE',
+              content: '', options: [], order: i + 1, points: 1,
+            })
+          }
+          for (let i = 0; i < sc.phanII; i++) {
+            synth.push({
+              id: `phanII-${i + 1}`, questionType: 'TRUE_FALSE',
+              content: '', options: [], order: sc.phanI + i + 1, points: 1,
+            })
+          }
+          for (let i = 0; i < sc.phanIII; i++) {
+            synth.push({
+              id: `phanIII-${i + 1}`, questionType: 'SHORT_ANSWER',
+              content: '', options: [], order: sc.phanI + sc.phanII + i + 1, points: 1,
+            })
+          }
+          setQuestions(synth)
+          return
+        }
+
+        // Mode mặc định: shuffle questions từ DB
         const prefs = readShufflePrefs()
         const seed = `${examId}-sheet`
         const qs = shuffleQuestions(res.data.questions || [], { ...prefs, seed })
         setQuestions(qs)
-        setTimeLeft((res.data.exam?.duration || 45) * 60)
       } catch (err: unknown) {
         const e = err as { response?: { data?: { error?: string } } }
         toast.error(e.response?.data?.error || 'Không tải được đề thi')
@@ -214,26 +246,43 @@ export default function ExamSheetPage() {
       {/* Main split-pane layout */}
       <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
 
-        {/* ═══ LEFT: Question content ═══ */}
+        {/* ═══ LEFT: Question content (hoặc PDF nếu pdf-only) ═══ */}
         <div className="space-y-4">
-          {questions.map((q, idx) => (
-            <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm">
-              <div className="flex items-start gap-2 mb-2">
-                <span className="font-bold text-slate-700">Câu {idx + 1}.</span>
-                <MathText as="span" className="text-slate-800 leading-relaxed">{q.content}</MathText>
+          {exam.examMode === 'pdf-only' ? (
+            // PDF-only mode: nhúng PDF iframe, HS xem PDF làm hình đề
+            <>
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style={{ minHeight: '85vh' }}>
+                <iframe
+                  src={`/api/exams/${exam.id}/pdf#toolbar=1&navpanes=0`}
+                  title={exam.title}
+                  className="w-full"
+                  style={{ height: '85vh', border: 0, display: 'block' }}
+                />
               </div>
-              {q.options?.length > 0 && (
-                <div className="ml-6 space-y-1.5 mt-2">
-                  {q.options.map((opt, i) => (
-                    <div key={i} className="flex items-start gap-2 text-slate-700 text-[15px]">
-                      <span className="font-semibold text-slate-500 shrink-0">{LETTERS[i]}.</span>
-                      <MathText as="span">{opt.replace(/^[A-D]\.\s*/, '')}</MathText>
-                    </div>
-                  ))}
+              <p className="text-center text-xs text-slate-500">
+                Xem PDF làm đề và tô đáp án ở bảng bên phải. Có thể zoom / scroll bên trong khung PDF.
+              </p>
+            </>
+          ) : (
+            questions.map((q, idx) => (
+              <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm">
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="font-bold text-slate-700">Câu {idx + 1}.</span>
+                  <MathText as="span" className="text-slate-800 leading-relaxed">{q.content}</MathText>
                 </div>
-              )}
-            </div>
-          ))}
+                {q.options?.length > 0 && (
+                  <div className="ml-6 space-y-1.5 mt-2">
+                    {q.options.map((opt, i) => (
+                      <div key={i} className="flex items-start gap-2 text-slate-700 text-[15px]">
+                        <span className="font-semibold text-slate-500 shrink-0">{LETTERS[i]}.</span>
+                        <MathText as="span">{opt.replace(/^[A-D]\.\s*/, '')}</MathText>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
           <div className="text-center py-4">
             <button onClick={() => handleSubmit(false)} disabled={submitting}
               className="px-8 py-3 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-base inline-flex items-center gap-2 shadow-lg disabled:opacity-50">
