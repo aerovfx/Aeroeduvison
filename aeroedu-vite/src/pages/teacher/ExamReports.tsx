@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import {
-  BarChart, TrendingUp, Users, Target, Award,
+  BarChart, Users, Target, Award,
   Download, FileText, CheckCircle2, AlertCircle,
-  Loader2, Activity,
+  Loader2, Activity, User as UserIcon, Clock, Trophy, Hash,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
@@ -59,6 +59,58 @@ interface ExamAnalytics {
   reliability: { cronbach_alpha: number }
 }
 
+// Cá nhân — PracticeExam attempts
+interface IndividualAttempt {
+  id: string
+  studentId: string | null
+  studentName: string
+  studentEmail: string | null
+  studentImage: string | null
+  score: number
+  percentage: number
+  completed: boolean
+  answeredCount: number
+  totalQuestions: number
+  startedAt: string
+  completedAt: string | null
+  durationSec: number | null
+  source: 'individual'
+}
+
+// Nhóm — QuizRoom (1 phòng = 1 lượt thi nhóm)
+interface GroupParticipant {
+  id: string
+  studentName: string
+  avatar: string | null
+  score: number
+  correctCount: number
+  joinedAt: string
+  source: 'group'
+}
+interface GroupRoom {
+  roomId: string
+  code: string
+  status: string
+  startedAt: string | null
+  endedAt: string | null
+  createdAt: string
+  participantCount: number
+  participants: GroupParticipant[]
+}
+
+interface AttemptsData {
+  examId: string
+  summary: {
+    individualCount: number
+    individualCompleted: number
+    groupRoomCount: number
+    groupParticipantCount: number
+    totalUniqueStudents: number
+  }
+  individual: IndividualAttempt[]
+  group: GroupRoom[]
+}
+
 // ── Mock fallback ─────────────────────────────────────────────────────────────
 function generateMockAnalytics(): ExamAnalytics {
   return {
@@ -112,10 +164,12 @@ export default function ExamReports() {
   const [exams, setExams]               = useState<Exam[]>([])
   const [selectedExamId, setSelectedExamId] = useState<string>("")
   const [analytics, setAnalytics]       = useState<ExamAnalytics | null>(null)
+  const [attempts, setAttempts]         = useState<AttemptsData | null>(null)
+  const [attemptsLoading, setAttemptsLoading] = useState(false)
   const [loading, setLoading]           = useState(true)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [searchQuery, setSearchQuery]   = useState("")
-  const [activeTab, setActiveTab]       = useState<"overview" | "questions" | "distribution" | "time">("overview")
+  const [activeTab, setActiveTab]       = useState<"overview" | "students" | "questions" | "distribution" | "time">("overview")
 
   // Load exams list
   useEffect(() => {
@@ -135,19 +189,28 @@ export default function ExamReports() {
     return () => { cancelled = true }
   }, [])
 
-  // Load analytics when exam is selected
+  // Load analytics + attempts khi đề được chọn
   useEffect(() => {
-    if (!selectedExamId) { setAnalytics(null); return }
+    if (!selectedExamId) { setAnalytics(null); setAttempts(null); return }
     let cancelled = false
     ;(async () => {
       setAnalyticsLoading(true)
+      setAttemptsLoading(true)
       try {
-        const { data } = await api.get(`/teacher/exams/${selectedExamId}/analytics`)
-        if (!cancelled) setAnalytics(data)
-      } catch {
-        if (!cancelled) setAnalytics(generateMockAnalytics())
+        const [aRes, atRes] = await Promise.allSettled([
+          api.get<ExamAnalytics>(`/teacher/exams/${selectedExamId}/analytics`),
+          api.get<AttemptsData>(`/teacher/exams/${selectedExamId}/attempts`),
+        ])
+        if (cancelled) return
+        if (aRes.status === 'fulfilled') setAnalytics(aRes.value.data)
+        else setAnalytics(generateMockAnalytics())
+        if (atRes.status === 'fulfilled') setAttempts(atRes.value.data)
+        else setAttempts(null)
       } finally {
-        if (!cancelled) setAnalyticsLoading(false)
+        if (!cancelled) {
+          setAnalyticsLoading(false)
+          setAttemptsLoading(false)
+        }
       }
     })()
     return () => { cancelled = true }
@@ -178,10 +241,30 @@ export default function ExamReports() {
 
   const TABS = [
     { key: "overview"      as const, label: "Tổng quan" },
+    { key: "students"      as const, label: "Học sinh đã làm" },
     { key: "questions"     as const, label: "Phân tích câu hỏi" },
     { key: "distribution"  as const, label: "Phân bố điểm" },
     { key: "time"          as const, label: "Thời gian" },
   ]
+
+  // Helper format thời gian (giây → "1m 23s")
+  const formatDuration = (sec: number | null) => {
+    if (!sec || sec <= 0) return '—'
+    if (sec < 60) return `${sec}s`
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return s ? `${m}m ${s}s` : `${m}m`
+  }
+  const formatDate = (iso: string | null) => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mn = String(d.getMinutes()).padStart(2, '0')
+    return `${dd}/${mm} ${hh}:${mn}`
+  }
+  const scoreColor = (s: number) => s >= 8 ? '#34d399' : s >= 6.5 ? '#60a5fa' : s >= 5 ? '#fbbf24' : '#f87171'
 
   return (
     <div style={{ minHeight: "100vh", background: D.bg }}>
@@ -364,6 +447,187 @@ export default function ExamReports() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {/* ── Tab: Học sinh đã làm (cá nhân + nhóm) ── */}
+                {activeTab === "students" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+                    {attemptsLoading ? (
+                      <div style={{ textAlign: "center", padding: "40px 0", color: D.muted }}>
+                        <Loader2 style={{ width: 32, height: 32, color: "#60a5fa", margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
+                        <p style={{ fontSize: 13 }}>Đang tải danh sách bài làm…</p>
+                      </div>
+                    ) : !attempts ? (
+                      <div style={{ textAlign: "center", padding: "40px 0", color: D.muted }}>
+                        <Users style={{ width: 40, height: 40, margin: "0 auto 12px", opacity: 0.4 }} />
+                        <p>Chưa có dữ liệu bài làm — học sinh nào chưa thử đề này.</p>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Summary tiles */}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+                          <StatCard label="Cá nhân (đã nộp)" value={attempts.summary.individualCompleted} color="#60a5fa" />
+                          <StatCard label="Cá nhân (đang làm)" value={attempts.summary.individualCount - attempts.summary.individualCompleted} color="#fbbf24" />
+                          <StatCard label="Phòng thi nhóm" value={attempts.summary.groupRoomCount} color="#a78bfa" />
+                          <StatCard label="Lượt tham gia nhóm" value={attempts.summary.groupParticipantCount} color="#f472b6" />
+                        </div>
+
+                        {/* ── INDIVIDUAL — bảng học sinh làm cá nhân ── */}
+                        <div style={{ background: D.card2, borderRadius: 12, border: `1px solid ${D.border2}`, padding: 16 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                            <UserIcon style={{ width: 18, height: 18, color: "#60a5fa" }} />
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: D.text }}>
+                              Cá nhân ({attempts.individual.length})
+                            </h3>
+                          </div>
+                          {attempts.individual.length === 0 ? (
+                            <p style={{ fontSize: 13, color: D.muted, padding: "12px 0" }}>
+                              Chưa có học sinh nào tự làm đề này.
+                            </p>
+                          ) : (
+                            <div style={{ overflowX: "auto" }}>
+                              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                <thead>
+                                  <tr style={{ borderBottom: `1px solid ${D.border}`, color: D.muted }}>
+                                    <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>#</th>
+                                    <th style={{ textAlign: "left", padding: "8px 10px", fontWeight: 600 }}>Học sinh</th>
+                                    <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600 }}>Điểm</th>
+                                    <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600 }}>%</th>
+                                    <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600 }}>Đã trả lời</th>
+                                    <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600 }}>Thời gian</th>
+                                    <th style={{ textAlign: "right", padding: "8px 10px", fontWeight: 600 }}>Nộp lúc</th>
+                                    <th style={{ textAlign: "center", padding: "8px 10px", fontWeight: 600 }}>Trạng thái</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {attempts.individual.map((a, idx) => (
+                                    <tr key={a.id} style={{ borderBottom: `1px solid ${D.border}` }}>
+                                      <td style={{ padding: "10px", color: D.muted, fontVariantNumeric: "tabular-nums" }}>{idx + 1}</td>
+                                      <td style={{ padding: "10px" }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                          {a.studentImage ? (
+                                            <img src={a.studentImage} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} />
+                                          ) : (
+                                            <div style={{ width: 24, height: 24, borderRadius: "50%", background: D.border2, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: D.muted }}>
+                                              {a.studentName.slice(0, 1).toUpperCase()}
+                                            </div>
+                                          )}
+                                          <span style={{ fontWeight: 600, color: D.text }}>{a.studentName}</span>
+                                        </div>
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: a.completed ? scoreColor(a.score) : D.muted }}>
+                                        {a.completed ? a.score.toFixed(1) : '—'}
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "right", fontVariantNumeric: "tabular-nums", color: a.completed ? scoreColor(a.score) : D.muted }}>
+                                        {a.completed ? `${a.percentage}%` : '—'}
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "right", color: D.muted, fontVariantNumeric: "tabular-nums" }}>
+                                        {a.answeredCount}/{a.totalQuestions}
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "right", color: D.muted, fontVariantNumeric: "tabular-nums" }}>
+                                        {formatDuration(a.durationSec)}
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "right", color: D.muted, fontVariantNumeric: "tabular-nums" }}>
+                                        {formatDate(a.completedAt)}
+                                      </td>
+                                      <td style={{ padding: "10px", textAlign: "center" }}>
+                                        {a.completed ? (
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#34d399", fontWeight: 600 }}>
+                                            <CheckCircle2 style={{ width: 12, height: 12 }} /> Hoàn thành
+                                          </span>
+                                        ) : (
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: "#fbbf24", fontWeight: 600 }}>
+                                            <Loader2 style={{ width: 12, height: 12 }} /> Đang làm
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ── GROUP — phòng thi nhóm với bảng xếp hạng ── */}
+                        <div style={{ background: D.card2, borderRadius: 12, border: `1px solid ${D.border2}`, padding: 16 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                            <Users style={{ width: 18, height: 18, color: "#a78bfa" }} />
+                            <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: D.text }}>
+                              Phòng thi nhóm ({attempts.group.length})
+                            </h3>
+                          </div>
+                          {attempts.group.length === 0 ? (
+                            <p style={{ fontSize: 13, color: D.muted, padding: "12px 0" }}>
+                              Chưa có phòng thi nhóm nào (Wayground-style live) cho đề này.
+                            </p>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                              {attempts.group.map(room => (
+                                <div key={room.roomId} style={{ background: D.card, borderRadius: 10, border: `1px solid ${D.border}`, padding: 14 }}>
+                                  {/* Room header */}
+                                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${D.border}` }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: D.card2, fontSize: 12, fontWeight: 700, color: "#a78bfa", letterSpacing: 1.5 }}>
+                                        <Hash style={{ width: 12, height: 12 }} /> {room.code}
+                                      </span>
+                                      <span style={{ fontSize: 12, color: D.muted }}>
+                                        {room.participantCount} HS · {formatDate(room.createdAt)}
+                                      </span>
+                                    </div>
+                                    <span style={{
+                                      fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 6,
+                                      background: room.status === 'ended' ? "rgba(52,211,153,0.15)" : room.status === 'playing' ? "rgba(251,191,36,0.15)" : "rgba(148,163,184,0.15)",
+                                      color: room.status === 'ended' ? "#34d399" : room.status === 'playing' ? "#fbbf24" : D.muted,
+                                      border: `1px solid ${room.status === 'ended' ? "#34d39933" : room.status === 'playing' ? "#fbbf2433" : D.border2}`,
+                                    }}>
+                                      {room.status === 'ended' ? 'Đã kết thúc' : room.status === 'playing' ? 'Đang chơi' : 'Đang chờ'}
+                                    </span>
+                                  </div>
+                                  {/* Participant ranking */}
+                                  {room.participants.length === 0 ? (
+                                    <p style={{ fontSize: 12, color: D.muted, padding: "8px 0", margin: 0 }}>
+                                      Phòng này chưa có HS tham gia.
+                                    </p>
+                                  ) : (
+                                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                                      <thead>
+                                        <tr style={{ color: D.muted }}>
+                                          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>#</th>
+                                          <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>HS</th>
+                                          <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>Đúng</th>
+                                          <th style={{ textAlign: "right", padding: "6px 8px", fontWeight: 600, fontSize: 11 }}>Điểm</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {room.participants.map((p, i) => (
+                                          <tr key={p.id} style={{ borderTop: `1px solid ${D.border}` }}>
+                                            <td style={{ padding: "8px", color: i === 0 ? "#fbbf24" : D.muted, fontWeight: i < 3 ? 700 : 500, fontVariantNumeric: "tabular-nums" }}>
+                                              {i === 0 ? <Trophy style={{ width: 14, height: 14, display: "inline" }} /> : `#${i + 1}`}
+                                            </td>
+                                            <td style={{ padding: "8px" }}>
+                                              <span style={{ marginRight: 6 }}>{p.avatar || '👤'}</span>
+                                              <span style={{ fontWeight: 600, color: D.text }}>{p.studentName}</span>
+                                            </td>
+                                            <td style={{ padding: "8px", textAlign: "right", color: "#34d399", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                              {p.correctCount}
+                                            </td>
+                                            <td style={{ padding: "8px", textAlign: "right", color: "#a78bfa", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+                                              {p.score.toLocaleString('vi-VN')}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 

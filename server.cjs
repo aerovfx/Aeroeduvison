@@ -788,6 +788,264 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ══════════════════════════════════════════════════════════
+  // BÁO CÁO & KẾT QUẢ HỌC SINH (cá nhân + nhóm)
+  // ══════════════════════════════════════════════════════════
+
+  // GET /api/teacher/exams/:id/attempts
+  // Trả: { individual: [...], group: [{room, participants}] }
+  // - individual: PracticeExam where sourceExamId = :id (HS làm cá nhân từ /student/exam-prep)
+  // - group: QuizRoom where examId = :id, teacherId = current (live phòng thi)
+  app.get('/api/teacher/exams/:id/attempts', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { id: examId } = req.params;
+      const pool = getEPool();
+      // Verify ownership
+      const own = await pool.query(
+        `SELECT 1 FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+
+      // ── INDIVIDUAL attempts (PracticeExam) ──
+      // Join với User để lấy tên + email HS
+      let individual = [];
+      try {
+        const r = await pool.query(
+          `SELECT pe."id", pe."studentId", pe."score", pe."percentage",
+                  pe."completed", pe."createdAt", pe."completedAt",
+                  pe."questions", pe."answers",
+                  u.name AS student_name, u.email AS student_email, u.image AS student_image
+             FROM "PracticeExam" pe
+             LEFT JOIN "User" u ON u.id = pe."studentId"
+            WHERE pe."sourceExamId" = $1
+            ORDER BY pe."completedAt" DESC NULLS LAST, pe."createdAt" DESC
+            LIMIT 200`,
+          [examId]
+        );
+        individual = r.rows.map(row => {
+          const qs = Array.isArray(row.questions) ? row.questions : [];
+          const ans = row.answers && typeof row.answers === 'object' ? row.answers : {};
+          const answeredCount = qs.filter(q => ans[q.questionId] !== undefined && ans[q.questionId] !== null).length;
+          const durationSec = row.completedAt && row.createdAt
+            ? Math.max(0, Math.round((new Date(row.completedAt) - new Date(row.createdAt)) / 1000))
+            : null;
+          return {
+            id:           row.id,
+            studentId:    row.studentId,
+            studentName:  row.student_name || row.student_email || 'Học sinh ẩn',
+            studentEmail: row.student_email || null,
+            studentImage: row.student_image || null,
+            score:        Number(row.score) || 0,
+            percentage:   Number(row.percentage) || 0,
+            completed:    !!row.completed,
+            answeredCount,
+            totalQuestions: qs.length,
+            startedAt:    row.createdAt,
+            completedAt:  row.completedAt,
+            durationSec,
+            source:       'individual',
+          };
+        });
+      } catch (e) {
+        if (!/relation .* does not exist/i.test(e.message)) {
+          console.warn('[attempts:individual]', e.message);
+        }
+      }
+
+      // ── GROUP attempts (QuizRoom + QuizRoomParticipant) ──
+      let group = [];
+      try {
+        const rooms = await pool.query(
+          `SELECT id, code, status, "currentQuestion", "startedAt", "endedAt", "createdAt"
+             FROM "QuizRoom"
+            WHERE "examId" = $1 AND "teacherId" = $2
+            ORDER BY "createdAt" DESC
+            LIMIT 50`,
+          [examId, userId]
+        );
+        for (const room of rooms.rows) {
+          const parts = await pool.query(
+            `SELECT id, name, avatar, score, "correctCount", "joinedAt"
+               FROM "QuizRoomParticipant"
+              WHERE "roomId" = $1
+              ORDER BY score DESC, "correctCount" DESC`,
+            [room.id]
+          );
+          group.push({
+            roomId:    room.id,
+            code:      room.code,
+            status:    room.status,
+            startedAt: room.startedAt,
+            endedAt:   room.endedAt,
+            createdAt: room.createdAt,
+            participantCount: parts.rows.length,
+            participants: parts.rows.map(p => ({
+              id:           p.id,
+              studentName:  p.name,
+              avatar:       p.avatar,
+              score:        Number(p.score) || 0,
+              correctCount: Number(p.correctCount) || 0,
+              joinedAt:     p.joinedAt,
+              source:       'group',
+            })),
+          });
+        }
+      } catch (e) {
+        if (!/relation .* does not exist/i.test(e.message)) {
+          console.warn('[attempts:group]', e.message);
+        }
+      }
+
+      const summary = {
+        individualCount: individual.length,
+        individualCompleted: individual.filter(a => a.completed).length,
+        groupRoomCount: group.length,
+        groupParticipantCount: group.reduce((s, r) => s + r.participantCount, 0),
+        totalUniqueStudents: new Set([
+          ...individual.map(a => a.studentId).filter(Boolean),
+          ...group.flatMap(r => r.participants.map(p => p.studentName)),
+        ]).size,
+      };
+
+      res.json({ examId, summary, individual, group });
+    } catch (err) {
+      console.error('[teacher:exams:attempts] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/teacher/exams/:id/analytics
+  // Aggregate stats từ individual + group attempts
+  app.get('/api/teacher/exams/:id/analytics', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { id: examId } = req.params;
+      const pool = getEPool();
+      const own = await pool.query(
+        `SELECT id, "totalQuestions", "totalScore"
+           FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const examMeta = own.rows[0];
+
+      // Pull completed PracticeExam attempts for stats
+      let scores = [];
+      let durations = [];
+      let completed = 0, inProgress = 0;
+      try {
+        const r = await pool.query(
+          `SELECT score, percentage, "completed", "createdAt", "completedAt"
+             FROM "PracticeExam"
+            WHERE "sourceExamId" = $1`,
+          [examId]
+        );
+        for (const row of r.rows) {
+          if (row.completed) {
+            completed++;
+            const s = Number(row.score) || 0;
+            scores.push(s);
+            if (row.completedAt && row.createdAt) {
+              const mins = (new Date(row.completedAt) - new Date(row.createdAt)) / 60000;
+              if (mins > 0 && mins < 24 * 60) durations.push(mins);
+            }
+          } else {
+            inProgress++;
+          }
+        }
+      } catch (e) {
+        if (!/relation .* does not exist/i.test(e.message)) {
+          console.warn('[analytics:individual]', e.message);
+        }
+      }
+      // Pull QuizRoom participant scores (group results)
+      try {
+        const r = await pool.query(
+          `SELECT p.score, r."totalQuestions" AS room_total
+             FROM "QuizRoomParticipant" p
+             JOIN "QuizRoom" r ON r.id = p."roomId"
+            WHERE r."examId" = $1 AND r."teacherId" = $2`,
+          [examId, userId]
+        );
+        for (const row of r.rows) {
+          // QuizRoom score là điểm tích luỹ — quy về thang 10 cho dễ so sánh
+          // Giả định mỗi câu group ≈ 1000 điểm; chuẩn hoá: score / (totalQ * 1000) * 10
+          const totalQ = Number(row.room_total || examMeta.totalQuestions || 1);
+          const norm = totalQ > 0 ? Math.min(10, Number(row.score) / (totalQ * 100)) : 0;
+          if (Number.isFinite(norm) && norm >= 0) {
+            scores.push(norm);
+            completed++;
+          }
+        }
+      } catch (e) {
+        if (!/relation .* does not exist/i.test(e.message)) {
+          console.warn('[analytics:group]', e.message);
+        }
+      }
+
+      const total = scores.length;
+      const sum = scores.reduce((a, b) => a + b, 0);
+      const avg = total ? sum / total : 0;
+      const sorted = [...scores].sort((a, b) => a - b);
+      const median = total ? (
+        total % 2 === 1
+          ? sorted[(total - 1) / 2]
+          : (sorted[total / 2 - 1] + sorted[total / 2]) / 2
+      ) : 0;
+      const high = total ? Math.max(...scores) : 0;
+      const low = total ? Math.min(...scores) : 0;
+      const variance = total > 1
+        ? scores.reduce((a, b) => a + (b - avg) ** 2, 0) / (total - 1)
+        : 0;
+      const stdDev = Math.sqrt(variance);
+      const passCount = scores.filter(s => s >= 5).length;
+      const passRate = total ? (passCount / total) * 100 : 0;
+
+      // Grade distribution
+      const grade_distribution = { '9-10': 0, '8-8.9': 0, '7-7.9': 0, '6-6.9': 0, '5-5.9': 0, '0-4.9': 0 };
+      for (const s of scores) {
+        if (s >= 9)      grade_distribution['9-10']++;
+        else if (s >= 8) grade_distribution['8-8.9']++;
+        else if (s >= 7) grade_distribution['7-7.9']++;
+        else if (s >= 6) grade_distribution['6-6.9']++;
+        else if (s >= 5) grade_distribution['5-5.9']++;
+        else             grade_distribution['0-4.9']++;
+      }
+
+      const time_analysis = durations.length ? {
+        average_time_minutes: Math.round(durations.reduce((a, b) => a + b, 0) / durations.length),
+        median_time_minutes:  Math.round(durations.sort((a, b) => a - b)[Math.floor(durations.length / 2)]),
+        fastest_completion:   Math.round(Math.min(...durations)),
+        slowest_completion:   Math.round(Math.max(...durations)),
+      } : { average_time_minutes: 0, median_time_minutes: 0, fastest_completion: 0, slowest_completion: 0 };
+
+      res.json({
+        overview: {
+          total_submissions: total + inProgress,
+          completed: completed,
+          in_progress: inProgress,
+          average_score: Number(avg.toFixed(2)),
+          median_score:  Number(median.toFixed(2)),
+          highest_score: Number(high.toFixed(2)),
+          lowest_score:  Number(low.toFixed(2)),
+          std_deviation: Number(stdDev.toFixed(2)),
+          pass_rate:     Number(passRate.toFixed(1)),
+        },
+        grade_distribution,
+        question_analysis: [], // Cần phân tích từ answers JSON — skip phase này
+        time_analysis,
+        reliability: { cronbach_alpha: 0 },
+      });
+    } catch (err) {
+      console.error('[teacher:exams:analytics] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── PUT /api/teacher/exams/:id ─────────────────────────────
   // Body: { title?, duration?, description?, status? }
   app.put('/api/teacher/exams/:id', async (req, res) => {
@@ -2386,6 +2644,11 @@ if (USE_NODEJS_QUESTIONS) {
     await pool.query(`CREATE INDEX IF NOT EXISTS "PracticeExam_student_idx" ON "PracticeExam" ("studentId", "createdAt" DESC);`);
     await pool.query(`CREATE INDEX IF NOT EXISTS "PracticeExam_subject_idx" ON "PracticeExam" ("subject");`);
     await pool.query(`CREATE INDEX IF NOT EXISTS "PracticeExam_grade_idx" ON "PracticeExam" ("grade");`);
+    // Migration: thêm sourceExamId để link về Teacher Exam gốc (báo cáo).
+    try {
+      await pool.query(`ALTER TABLE "PracticeExam" ADD COLUMN IF NOT EXISTS "sourceExamId" TEXT`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "PracticeExam_sourceExamId_idx" ON "PracticeExam" ("sourceExamId")`);
+    } catch (e) { console.warn('[exam-prep] sourceExamId migration:', e.message); }
     _peReady = true;
     console.log('[exam-prep] ✅ PracticeExam table & indexes ready');
   }
@@ -2970,9 +3233,9 @@ if (USE_NODEJS_QUESTIONS) {
         await pool.query(
           `INSERT INTO "PracticeExam"
              ("id","studentId","subject","grade","examType","questionCount","timeLimit",
-              "questions","answers","completed","createdAt")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'[]'::jsonb,FALSE,NOW())`,
-          [id, user.id, subject, grade, exam.examType || 'Đề giáo viên', questions.length, exam.duration || 45, JSON.stringify(questions)]
+              "questions","answers","completed","createdAt","sourceExamId")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'[]'::jsonb,FALSE,NOW(),$9)`,
+          [id, user.id, subject, grade, exam.examType || 'Đề giáo viên', questions.length, exam.duration || 45, JSON.stringify(questions), examId]
         );
 
         return res.json({
