@@ -317,7 +317,7 @@ export default function ExamDetailPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {questions.map((q, idx) => (
-                <QuestionRow key={q.id} q={q} idx={idx} onSaved={refetch} />
+                <QuestionRow key={q.id} q={q} idx={idx} examId={exam.id} onSaved={refetch} />
               ))}
             </div>
           )}
@@ -335,19 +335,21 @@ export default function ExamDetailPage() {
   )
 }
 
-function QuestionRow({ q, idx, onSaved }: { q: Question; idx: number; onSaved: () => void }) {
+function QuestionRow({ q, idx, examId, onSaved }: { q: Question; idx: number; examId: string; onSaved: () => void }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [content, setContent] = useState(q.content)
   const [options, setOptions] = useState<string[]>(q.options || [])
   const [correctAnswer, setCorrectAnswer] = useState(q.correctAnswer || '')
   const [explanation, setExplanation] = useState(q.explanation || '')
+  const [points, setPoints] = useState<number>(Number(q.points) > 0 ? Number(q.points) : 1)
 
   const startEdit = () => {
     setContent(q.content)
     setOptions(q.options || [])
     setCorrectAnswer(q.correctAnswer || '')
     setExplanation(q.explanation || '')
+    setPoints(Number(q.points) > 0 ? Number(q.points) : 1)
     setEditing(true)
   }
   const cancel = () => setEditing(false)
@@ -357,14 +359,23 @@ function QuestionRow({ q, idx, onSaved }: { q: Question; idx: number; onSaved: (
       toast.error('Nội dung câu hỏi không được rỗng')
       return
     }
+    if (!Number.isFinite(points) || points < 0) {
+      toast.error('Điểm phải là số ≥ 0')
+      return
+    }
     setSaving(true)
     try {
+      // 1. Update question content/options/correctAnswer/explanation
       await api.put(`/questions/${q.id}`, {
         content: content.trim(),
         options: options.map(o => o.trim()).filter(Boolean),
         correctAnswer: correctAnswer.trim(),
         explanation: explanation.trim() || null,
       })
+      // 2. Update per-exam points (ExamQuestion.points) + auto-recalc Exam.totalScore
+      if (Number(q.points) !== points) {
+        await api.patch(`/teacher/exams/${examId}/questions/${q.id}`, { points })
+      }
       toast.success('Đã cập nhật câu hỏi')
       setEditing(false)
       onSaved()
@@ -440,6 +451,29 @@ function QuestionRow({ q, idx, onSaved }: { q: Question; idx: number; onSaved: (
               }} />
           </>
         )}
+
+        {/* Points — riêng cho cặp (đề, câu) qua ExamQuestion.points; recalc totalScore auto */}
+        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>
+          Điểm câu này
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <input
+            type="number"
+            step="0.25"
+            min={0}
+            max={100}
+            value={Number.isFinite(points) ? points : ''}
+            onChange={e => setPoints(parseFloat(e.target.value) || 0)}
+            style={{
+              width: 110, padding: '8px 10px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
+              borderRadius: 6, color: 'inherit', textAlign: 'right',
+            }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--ai-muted-text)' }}>
+            Tổng điểm đề sẽ tự cập nhật theo tổng điểm các câu.
+          </span>
+        </div>
 
         <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Giải thích (không bắt buộc)</label>
         <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}

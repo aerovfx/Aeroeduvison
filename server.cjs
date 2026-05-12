@@ -742,6 +742,52 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── PATCH /api/teacher/exams/:examId/questions/:questionId ─
+  // Body: { points?: number }
+  // Cập nhật điểm cho cặp (exam, question) trong ExamQuestion,
+  // rồi tự động recalc Exam.totalScore = SUM(eq.points).
+  app.patch('/api/teacher/exams/:examId/questions/:questionId', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { examId, questionId } = req.params;
+      const points = Number(req.body?.points);
+      if (!Number.isFinite(points) || points < 0 || points > 100) {
+        return res.status(400).json({ error: 'points phải là số ≥ 0' });
+      }
+      const pool = getEPool();
+      // Verify ownership của exam trước khi update join row
+      const own = await pool.query(
+        `SELECT 1 FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const upd = await pool.query(
+        `UPDATE "ExamQuestion" SET points=$3
+          WHERE "examId"=$1 AND "questionId"=$2
+          RETURNING points`,
+        [examId, questionId, points]
+      );
+      if (!upd.rowCount) {
+        return res.status(404).json({ error: 'Không tìm thấy câu hỏi trong đề' });
+      }
+      // Recalc totalScore từ tổng points
+      const sum = await pool.query(
+        `SELECT COALESCE(SUM(points), 0)::float AS total FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      const totalScore = Number(sum.rows[0]?.total ?? 0);
+      await pool.query(
+        `UPDATE "Exam" SET "totalScore"=$2, "updatedAt"=NOW() WHERE id=$1`,
+        [examId, totalScore]
+      );
+      return res.json({ ok: true, points, totalScore });
+    } catch (err) {
+      console.error('[teacher:exam-question:points] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── PUT /api/teacher/exams/:id ─────────────────────────────
   // Body: { title?, duration?, description?, status? }
   app.put('/api/teacher/exams/:id', async (req, res) => {
@@ -2414,6 +2460,10 @@ if (USE_NODEJS_QUESTIONS) {
 
   /** Project a DB Question row into the shape the frontend expects. */
   function toClientQuestion(row, position) {
+    // points: ưu tiên row.eq_points (alias từ join ExamQuestion.points),
+    // fallback row.points, mặc định 1.0 để không vỡ existing flow.
+    const rawPts = row.eq_points ?? row.points ?? 1;
+    const points = Number(rawPts);
     return {
       questionId: row.id,
       position,
@@ -2424,6 +2474,7 @@ if (USE_NODEJS_QUESTIONS) {
       explanation: row.explanation || '',
       difficulty: String(row.difficulty || 'MEDIUM').toUpperCase(),
       topic: row.topic || undefined,
+      points: Number.isFinite(points) && points > 0 ? points : 1,
     };
   }
 
@@ -2899,7 +2950,8 @@ if (USE_NODEJS_QUESTIONS) {
 
         const qRes = await pool.query(
           `SELECT q.id, q.topic, q.subject, q.grade, q."questionType", q.difficulty,
-                  q.content, q.options, q."correctAnswer", q.explanation, eq."order"
+                  q.content, q.options, q."correctAnswer", q.explanation,
+                  eq."order", eq.points AS eq_points
              FROM "ExamQuestion" eq
              JOIN "Question" q ON q.id = eq."questionId"
             WHERE eq."examId" = $1
@@ -3020,6 +3072,13 @@ if (USE_NODEJS_QUESTIONS) {
         const questions = Array.isArray(pe.questions) ? pe.questions : [];
         const total = questions.length;
 
+        // Tổng điểm theo `points` của từng câu (fallback 1.0 cho legacy data)
+        const totalPoints = questions.reduce(
+          (sum, q) => sum + (Number(q.points) > 0 ? Number(q.points) : 1),
+          0
+        );
+        let pointsEarned = 0;
+
         let correct = 0, incorrect = 0, unanswered = 0;
         const byTopic = {};
         const byDifficulty = { EASY: { correct: 0, total: 0, accuracy: 0 }, MEDIUM: { correct: 0, total: 0, accuracy: 0 }, HARD: { correct: 0, total: 0, accuracy: 0 } };
@@ -3061,6 +3120,12 @@ if (USE_NODEJS_QUESTIONS) {
           else if (isCorrect) correct++;
           else incorrect++;
 
+          // Weighted: cộng dồn points của câu đúng
+          if (isCorrect) {
+            const qPts = Number(q.points) > 0 ? Number(q.points) : 1;
+            pointsEarned += qPts;
+          }
+
           const topic = q.topic || 'Khác';
           if (!byTopic[topic]) byTopic[topic] = { correct: 0, total: 0, accuracy: 0 };
           byTopic[topic].total++;
@@ -3094,8 +3159,13 @@ if (USE_NODEJS_QUESTIONS) {
           b.accuracy = b.total ? Math.round((b.correct / b.total) * 100) / 100 : 0;
         }
 
-        const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
-        const score = total > 0 ? Math.round((correct / total) * 100) / 10 : 0; // 0–10 scale
+        // Weighted scoring:
+        //   percentage = pointsEarned / totalPoints (theo TRỌNG SỐ điểm, không phải số câu)
+        //   score = pointsEarned scale theo thang 10 (totalPoints → 10đ)
+        const percentage = totalPoints > 0 ? Math.round((pointsEarned / totalPoints) * 100) : 0;
+        const score = totalPoints > 0
+          ? Math.round((pointsEarned / totalPoints) * 100) / 10
+          : 0; // 0–10 scale
 
         // Recommendations: weakest topics + difficulty-level hints
         // Loại bỏ topic markers nội bộ (wayground-import / latex-import / ...)
