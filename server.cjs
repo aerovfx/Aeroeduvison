@@ -7212,7 +7212,10 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       const DATABASE_URL = process.env.DATABASE_URL;
       if (!DATABASE_URL) throw new Error('DATABASE_URL env var not set');
       _lpool = new LPool({ connectionString: DATABASE_URL, max: 5,
-        idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+        idleTimeoutMillis: 30000,
+        // Bump 5s → 15s để xử lý Neon serverless cold-start
+        // (đã thấy "Connection terminated due to connection timeout" khi pool wake-up).
+        connectionTimeoutMillis: 15000 });
     }
     return _lpool;
   }
@@ -7580,11 +7583,24 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
   // + tô bảng trả lời. Backend chấm bằng answerKey lưu trong description.
   app.post('/api/latex-projects/:id/to-pdf-exam', async (req, res) => {
     const t0 = Date.now();
+    // Helper retry 1 lần nếu pool timeout (Neon cold start)
+    const queryWithRetry = async (pool, sql, params) => {
+      try {
+        return await pool.query(sql, params);
+      } catch (err) {
+        if (/Connection terminated|connection timeout|timeout/i.test(err.message)) {
+          console.warn('[latex:to-pdf-exam] pool retry after:', err.message);
+          await new Promise(r => setTimeout(r, 500));
+          return await pool.query(sql, params);
+        }
+        throw err;
+      }
+    };
     try {
       const userId = getLatexUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const pool = getLPool();
-      const { rows: prjRows } = await pool.query(
+      const { rows: prjRows } = await queryWithRetry(pool,
         `SELECT id, title, "mainContent" FROM "LatexProject"
           WHERE id = $1 AND "userId" = $2 LIMIT 1`,
         [req.params.id, userId]
@@ -7654,7 +7670,7 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       // totalScore = tổng điểm Phần I/II/III (1đ/câu) + sum maxScore Phần IV
       const totalScore = (sectionCounts.phanI + sectionCounts.phanII + sectionCounts.phanIII)
         + phanIV.reduce((s, q) => s + (Number(q.maxScore) || 0), 0);
-      await pool.query(
+      await queryWithRetry(pool,
         `INSERT INTO "Exam"
            (id, title, description, "examType", duration, "totalScore",
             "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
