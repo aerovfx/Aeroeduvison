@@ -39,7 +39,7 @@ interface Exam {
   // pdf-only fields
   examMode?: string | null
   pdfUrl?: string | null
-  sectionCounts?: { phanI: number; phanII: number; phanIII: number } | null
+  sectionCounts?: { phanI: number; phanII: number; phanIII: number; phanIV?: number } | null
 }
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -53,7 +53,12 @@ export default function ExamSheetPage() {
   const [loading, setLoading] = useState(true)
   const [answers, setAnswers] = useState<Record<string, string>>({})  // questionId → answer
   const [submitting, setSubmitting] = useState(false)
-  const [result, setResult] = useState<{ score: number; total: number; percentage: number; correct: number } | null>(null)
+  const [result, setResult] = useState<{
+    score: number; total: number; percentage: number; correct: number
+    phanIV?: Array<{ index: number; score: number; maxScore: number; feedback: string }>
+    phanIVMax?: number
+    phanIVEarned?: number
+  } | null>(null)
   const [timeLeft, setTimeLeft] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -87,6 +92,14 @@ export default function ExamSheetPage() {
             synth.push({
               id: `phanIII-${i + 1}`, questionType: 'SHORT_ANSWER',
               content: '', options: [], order: sc.phanI + sc.phanII + i + 1, points: 1,
+            })
+          }
+          const phanIVCount = sc.phanIV || 0
+          for (let i = 0; i < phanIVCount; i++) {
+            synth.push({
+              id: `phanIV-${i + 1}`, questionType: 'ESSAY',
+              content: '', options: [],
+              order: sc.phanI + sc.phanII + sc.phanIII + i + 1, points: 1,
             })
           }
           setQuestions(synth)
@@ -124,18 +137,23 @@ export default function ExamSheetPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exam, result])
 
-  // Phân loại câu hỏi vào 3 phần
+  // Phân loại câu hỏi vào 4 phần (PHẦN IV = Tự luận, AI chấm)
   const sections = useMemo(() => {
     const phanI: Question[] = []   // MULTIPLE_CHOICE
     const phanII: Question[] = []  // TRUE_FALSE
     const phanIII: Question[] = [] // SHORT_ANSWER (or others)
+    const phanIV: Question[] = []  // ESSAY
     for (const q of questions) {
       const t = (q.questionType || '').toUpperCase()
-      if (t.includes('TRUE') || t.includes('FALSE')) phanII.push(q)
-      else if (t.includes('SHORT') || t.includes('ESSAY') || t.includes('ANSWER')) phanIII.push(q)
+      // Trong pdf-only mode, id có dạng phanI-N / phanII-N / phanIII-N / phanIV-N.
+      // Ưu tiên check id để route đúng (cùng questionType 'ESSAY' có thể tới
+      // cả III và IV trong các đề khác).
+      if (q.id.startsWith('phanIV-') || t.includes('ESSAY')) phanIV.push(q)
+      else if (t.includes('TRUE') || t.includes('FALSE')) phanII.push(q)
+      else if (t.includes('SHORT') || t.includes('ANSWER')) phanIII.push(q)
       else phanI.push(q)
     }
-    return { phanI, phanII, phanIII }
+    return { phanI, phanII, phanIII, phanIV }
   }, [questions])
 
   const handleSubmit = async (auto = false) => {
@@ -155,7 +173,11 @@ export default function ExamSheetPage() {
       let scored = 0
       const total = questions.length
       // Submit answers tới backend grading endpoint
-      const res = await axios.post<{ correct: number; total: number; percentage: number; score: number }>(
+      const res = await axios.post<{
+        correct: number; total: number; percentage: number; score: number;
+        phanIV?: Array<{ index: number; score: number; maxScore: number; feedback: string }>;
+        phanIVMax?: number; phanIVEarned?: number;
+      }>(
         `/api/exams/${examId}/grade`,
         { answers },
       ).catch(() => null)
@@ -203,8 +225,38 @@ export default function ExamSheetPage() {
             <p className="text-5xl font-black">{pct}%</p>
             <p className="text-sm font-medium mt-1">
               {result.correct} / {result.total} câu đúng
+              {result.phanIVMax ? ` · Tự luận ${(result.phanIVEarned ?? 0).toFixed(1)}/${result.phanIVMax}đ` : ''}
             </p>
           </div>
+
+          {/* PHẦN IV feedback từ AI */}
+          {result.phanIV && result.phanIV.length > 0 && (
+            <div className="mt-6 text-left bg-amber-50 border-2 border-amber-200 rounded-2xl p-5">
+              <h3 className="font-bold text-amber-800 mb-3 flex items-center gap-2">
+                ✨ AI chấm phần Tự luận
+              </h3>
+              <ul className="space-y-3">
+                {result.phanIV.map((p) => {
+                  const pctP = p.maxScore > 0 ? (p.score / p.maxScore) * 100 : 0
+                  const toneP = pctP >= 80 ? 'bg-green-100 text-green-700'
+                    : pctP >= 50 ? 'bg-yellow-100 text-yellow-700'
+                    : 'bg-red-100 text-red-700'
+                  return (
+                    <li key={p.index} className="bg-white border border-amber-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-slate-700 text-sm">Câu {p.index}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${toneP}`}>
+                          {p.score.toFixed(2)} / {p.maxScore}đ
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 leading-relaxed">{p.feedback}</p>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
           <div className="flex gap-3 mt-8">
             <button onClick={() => navigate('/student/exam-prep')}
               className="flex-1 px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold">
@@ -336,6 +388,33 @@ export default function ExamSheetPage() {
                       placeholder="Đáp số"
                       className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-pink-400 text-slate-700 text-sm font-mono"
                     />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* PHẦN IV: Tự luận — AI chấm theo rubric */}
+          {sections.phanIV.length > 0 && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4">
+              <h3 className="text-center text-amber-700 font-black text-sm tracking-widest mb-1">PHẦN IV</h3>
+              <p className="text-center text-[11px] text-amber-700/80 mb-3">Tự luận — AI sẽ phân tích &amp; chấm</p>
+              <div className="space-y-3">
+                {sections.phanIV.map((q, i) => (
+                  <div key={q.id}>
+                    <label className="block text-slate-700 font-semibold text-sm mb-1">
+                      Câu {i + 1}.
+                    </label>
+                    <textarea
+                      value={answers[q.id] || ''}
+                      onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+                      placeholder="Trình bày cách giải đầy đủ các bước. AI sẽ chấm theo rubric do GV thiết lập."
+                      rows={5}
+                      className="w-full px-3 py-2 rounded-lg border border-amber-300 focus:outline-none focus:border-amber-500 text-slate-700 text-sm resize-y bg-white"
+                    />
+                    <p className="text-[10px] text-amber-700/60 mt-1">
+                      💡 Viết rõ từng bước (công thức, thay số, đơn vị) để AI chấm chính xác.
+                    </p>
                   </div>
                 ))}
               </div>

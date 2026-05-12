@@ -6127,17 +6127,94 @@ if (!USE_NODEJS_QUESTIONS) {
           const ua = userAnswers[`phanIII-${i + 1}`];
           if (normNum(ua) === normNum(phanIII[i])) correctCount++;
         }
-        const percentage = totalCount > 0 ? (correctCount / totalCount) * 100 : 0;
-        const score = totalCount > 0
-          ? Math.round((correctCount / totalCount) * 100) / 10
-          : 0;
-        console.log(`[exam:grade:pdf-only] ✅ exam=${examId.slice(0,8)} ${correctCount}/${totalCount} (${Math.round(percentage)}%)`);
+        // PHẦN IV — Tự luận: AI chấm bằng rubric, trả về score + feedback/câu
+        // Weighted: maxScore của mỗi câu cộng vào totalPointsIV; aiScore vào earnedIV.
+        const phanIV = Array.isArray(ak.phanIV) ? ak.phanIV : [];
+        const phanIVResults = [];
+        let phanIVMax = 0, phanIVEarned = 0;
+        if (phanIV.length > 0) {
+          const { complete } = require('./lib/fal-client.cjs');
+          for (let i = 0; i < phanIV.length; i++) {
+            const { rubric, maxScore } = phanIV[i];
+            const ms = Math.max(0.5, Math.min(10, Number(maxScore) || 1));
+            phanIVMax += ms;
+            const ua = String(userAnswers[`phanIV-${i + 1}`] || '').trim();
+            if (!ua) {
+              phanIVResults.push({ index: i + 1, score: 0, maxScore: ms, feedback: 'HS bỏ trống câu này.' });
+              continue;
+            }
+            const aiPrompt = [
+              `Bạn là giáo viên chấm bài tự luận môn ${examDesc.subject || 'Vật lí'} lớp ${examDesc.grade || '11'}.`,
+              ``,
+              `--- TIÊU CHÍ CHẤM (RUBRIC) CỦA GIÁO VIÊN — ĐIỂM TỐI ĐA ${ms}đ ---`,
+              rubric,
+              `--- HẾT RUBRIC ---`,
+              ``,
+              `--- BÀI LÀM CỦA HỌC SINH ---`,
+              ua,
+              `--- HẾT BÀI LÀM ---`,
+              ``,
+              `Hãy chấm điểm bài làm theo rubric trên. Yêu cầu output CHỈ JSON:`,
+              `{ "score": <số thực 0 đến ${ms}>, "feedback": "<nhận xét 1-3 câu, nêu rõ làm đúng/sai gì>" }`,
+              `KHÔNG markdown, KHÔNG giải thích thêm. Chỉ JSON.`,
+            ].join('\n');
+            try {
+              const resp = await complete({
+                system: 'Bạn là trợ lý chấm bài chính xác. CHỈ trả JSON đúng định dạng yêu cầu.',
+                messages: [{ role: 'user', content: aiPrompt }],
+              });
+              const raw = String(resp.content || '').trim();
+              // Trích JSON từ output (loại bỏ markdown fences nếu có)
+              const jsonMatch = raw.match(/\{[\s\S]*\}/);
+              if (!jsonMatch) throw new Error('AI output không có JSON');
+              const parsed = JSON.parse(jsonMatch[0]);
+              const aiScore = Math.max(0, Math.min(ms, Number(parsed.score) || 0));
+              const feedback = String(parsed.feedback || '').slice(0, 500);
+              phanIVEarned += aiScore;
+              phanIVResults.push({ index: i + 1, score: aiScore, maxScore: ms, feedback });
+            } catch (aiErr) {
+              console.warn(`[exam:grade:phanIV-${i+1}] AI fail:`, aiErr.message.slice(0, 200));
+              phanIVResults.push({
+                index: i + 1, score: 0, maxScore: ms,
+                feedback: 'Không thể chấm tự động — vui lòng nhờ giáo viên chấm tay.',
+                error: 'ai_unavailable',
+              });
+            }
+          }
+        }
+        // Tổng hợp: PHẦN I/II/III tính theo CÂU (mỗi câu 1 unit), PHẦN IV tính theo ĐIỂM
+        // Để chuẩn hoá: nếu có phanIV, weighted theo tổng (mỗi câu PI/II/III = maxScoreUnit điểm)
+        const phanIVCount = phanIV.length;
+        totalCount += phanIVCount; // include in count for display
+        // Score thang 10:
+        const otherTotal = (ak.phanI?.length || 0) + (Array.isArray(ak.phanII) ? ak.phanII.length : 0) + (Array.isArray(ak.phanIII) ? ak.phanIII.length : 0);
+        // Coi mỗi câu PI/II/III = 1 đơn vị; PHẦN IV cộng thêm điểm thực.
+        // Chuẩn hoá final score = (correctCount + phanIVEarned/phanIVMax * otherTotal) / (otherTotal + ?) — phức tạp.
+        // Đơn giản: percentage = (correctCount/otherTotal + phanIVEarned/phanIVMax) / 2 nếu có cả 2.
+        let percentage;
+        if (otherTotal > 0 && phanIVMax > 0) {
+          // Weighted 50/50 giữa MCQ và Tự luận
+          const mcqPct = correctCount / otherTotal;
+          const essayPct = phanIVEarned / phanIVMax;
+          percentage = ((mcqPct + essayPct) / 2) * 100;
+        } else if (otherTotal > 0) {
+          percentage = (correctCount / otherTotal) * 100;
+        } else if (phanIVMax > 0) {
+          percentage = (phanIVEarned / phanIVMax) * 100;
+        } else {
+          percentage = 0;
+        }
+        const score = Math.round(percentage) / 10;
+        console.log(`[exam:grade:pdf-only] ✅ exam=${examId.slice(0,8)} I/II/III=${correctCount}/${otherTotal}, IV=${phanIVEarned.toFixed(1)}/${phanIVMax} → ${Math.round(percentage)}%`);
         return res.json({
           correct: Math.round(correctCount * 10) / 10,
           total: totalCount,
           percentage,
           score,
           mode: 'pdf-only',
+          phanIV: phanIVResults,        // cho FE hiển thị feedback từng câu tự luận
+          phanIVMax,
+          phanIVEarned: Math.round(phanIVEarned * 10) / 10,
         });
       }
 
@@ -7527,16 +7604,27 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       const phanIII = Array.isArray(body.phanIIIAnswers)
         ? body.phanIIIAnswers.map(s => String(s ?? '').trim())
         : [];
+      // PHẦN IV — Tự luận: mỗi câu có rubric (tiêu chí chấm) + maxScore.
+      // AI sẽ so sánh bài làm HS với rubric để chấm.
+      const phanIV = Array.isArray(body.phanIVQuestions)
+        ? body.phanIVQuestions
+            .map(q => ({
+              rubric: String(q?.rubric ?? '').trim(),
+              maxScore: Math.max(0, Math.min(10, Number(q?.maxScore) || 1)),
+            }))
+            .filter(q => q.rubric.length > 0)
+        : [];
 
       const sectionCounts = {
         phanI:   phanIRaw.length,
         phanII:  phanII.length,
         phanIII: phanIII.length,
+        phanIV:  phanIV.length,
       };
-      const totalQuestions = sectionCounts.phanI + sectionCounts.phanII + sectionCounts.phanIII;
+      const totalQuestions = sectionCounts.phanI + sectionCounts.phanII + sectionCounts.phanIII + sectionCounts.phanIV;
       if (totalQuestions === 0) {
         return res.status(400).json({
-          error: 'Cần nhập ít nhất 1 đáp án (PHẦN I / II / III)',
+          error: 'Cần nhập ít nhất 1 đáp án (PHẦN I / II / III / IV)',
         });
       }
 
@@ -7557,6 +7645,7 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
           phanI: phanIRaw,
           phanII,
           phanIII,
+          phanIV,  // [{ rubric, maxScore }]
         },
         notes: `Đề PDF-only từ tài liệu LaTeX: ${project.title}`,
         public: isPublic,
@@ -7569,7 +7658,7 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
          VALUES ($1,$2,$3,'PDF + Phiếu trả lời',$4,$5,$5,$6,NULL,$7,$8,$8)`,
         [examId, examTitle, desc, duration, totalQuestions, examStatus, userId, now]
       );
-      console.log(`[latex:to-pdf-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (I=${sectionCounts.phanI}, II=${sectionCounts.phanII}, III=${sectionCounts.phanIII}, ${Date.now()-t0}ms)`);
+      console.log(`[latex:to-pdf-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (I=${sectionCounts.phanI}, II=${sectionCounts.phanII}, III=${sectionCounts.phanIII}, IV=${sectionCounts.phanIV}, ${Date.now()-t0}ms)`);
       return res.json({
         ok: true,
         examId,

@@ -94,6 +94,9 @@ export default function LaTeXEditorDocument() {
   const [pdfExamPhanII, setPdfExamPhanII] = useState<string[]>(() => Array(4).fill('----'))
   // Mỗi phần tử: chuỗi text đáp số (vd "0.4")
   const [pdfExamPhanIII, setPdfExamPhanIII] = useState<string[]>(() => Array(6).fill(''))
+  // PHẦN IV — Tự luận: mỗi câu { rubric, maxScore }. AI sẽ chấm bài làm HS
+  // theo rubric (tiêu chí chấm) GV nhập.
+  const [pdfExamPhanIV, setPdfExamPhanIV] = useState<{ rubric: string; maxScore: number }[]>(() => [])
   const [pdfExamSubmitting, setPdfExamSubmitting] = useState(false)
 
   const [versions, setVersions] = useState<Version[]>([])
@@ -939,6 +942,12 @@ export default function LaTeXEditorDocument() {
               onChange={setPdfExamPhanIII}
             />
 
+            {/* ── PHẦN IV — Tự luận (AI chấm) ── */}
+            <PhanIVSheet
+              questions={pdfExamPhanIV}
+              onChange={setPdfExamPhanIV}
+            />
+
             {/* Submit */}
             <div style={{ display: 'flex', gap: 10, marginTop: 18, padding: '14px 0 0', borderTop: '1px solid #fbcfe8' }}>
               <button
@@ -961,7 +970,9 @@ export default function LaTeXEditorDocument() {
                   // Đếm câu PHẦN II có ít nhất 1 đáp án (T or F)
                   const phanII = pdfExamPhanII.filter(x => /[TF]/.test(x))
                   const phanIII = pdfExamPhanIII.filter(x => x.trim().length > 0)
-                  const total = phanIClean.length + phanII.length + phanIII.length
+                  // PHẦN IV: chỉ giữ câu có rubric không rỗng
+                  const phanIV = pdfExamPhanIV.filter(q => q.rubric.trim().length > 0)
+                  const total = phanIClean.length + phanII.length + phanIII.length + phanIV.length
                   if (total === 0) {
                     toast.error('Hãy tô ít nhất 1 đáp án trước khi tạo đề')
                     return
@@ -971,17 +982,18 @@ export default function LaTeXEditorDocument() {
                   try {
                     const res = await api.post<{
                       examId: string; examTitle: string; totalQuestions: number;
-                      sectionCounts: { phanI: number; phanII: number; phanIII: number }
+                      sectionCounts: { phanI: number; phanII: number; phanIII: number; phanIV: number }
                     }>(
                       `/latex-projects/${id}/to-pdf-exam`,
                       {
                         phanIAnswers: phanIClean,
                         phanIIAnswers: phanII,
                         phanIIIAnswers: phanIII,
+                        phanIVQuestions: phanIV,
                         public: true,
                       }
                     )
-                    toast.success(`✅ Đề ${res.data.totalQuestions} câu (PHẦN I=${res.data.sectionCounts.phanI}, II=${res.data.sectionCounts.phanII}, III=${res.data.sectionCounts.phanIII})`, { id: t, duration: 4000 })
+                    toast.success(`✅ Đề ${res.data.totalQuestions} câu (I=${res.data.sectionCounts.phanI}, II=${res.data.sectionCounts.phanII}, III=${res.data.sectionCounts.phanIII}, IV=${res.data.sectionCounts.phanIV})`, { id: t, duration: 4000 })
                     setPdfExamModalOpen(false)
                     setShareExamUrl(`${window.location.origin}/exam-sheet/${res.data.examId}`)
                     setShareExamId(res.data.examId)
@@ -1166,6 +1178,102 @@ function PhanIISheet({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function PhanIVSheet({
+  questions, onChange,
+}: {
+  questions: { rubric: string; maxScore: number }[]
+  onChange: (next: { rubric: string; maxScore: number }[]) => void
+}) {
+  const total = questions.length
+  return (
+    <div style={{
+      background: '#fef3c7', border: '2px solid #f59e0b', borderRadius: 14,
+      padding: 14, marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#78350f', letterSpacing: '0.05em' }}>
+          PHẦN IV — Tự luận (AI chấm theo rubric)
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: '#78350f' }}>Số câu:</span>
+          <button
+            onClick={() => total > 0 && onChange(questions.slice(0, total - 1))}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #fbbf24', color: '#b45309', fontWeight: 700, cursor: 'pointer' }}
+          >−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#78350f', minWidth: 26, textAlign: 'center' }}>{total}</span>
+          <button
+            onClick={() => total < 8 && onChange([...questions, { rubric: '', maxScore: 1 }])}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #fbbf24', color: '#b45309', fontWeight: 700, cursor: 'pointer' }}
+          >+</button>
+        </div>
+      </div>
+      <p style={{ fontSize: 12, color: '#92400e', margin: '0 0 10px' }}>
+        Nhập tiêu chí chấm cho từng câu tự luận. AI sẽ đối chiếu bài làm của học sinh với rubric để chấm điểm tự động.
+      </p>
+      {total === 0 ? (
+        <p style={{ fontSize: 13, color: '#92400e', textAlign: 'center', padding: '10px 0', margin: 0 }}>
+          Bấm <strong>+</strong> để thêm câu tự luận nếu đề PDF có
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {questions.map((q, qi) => (
+            <div key={qi} style={{ background: 'white', borderRadius: 8, padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 13, color: '#0f172a' }}>Câu {qi + 1}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <label style={{ fontSize: 11, color: '#64748b' }}>Điểm tối đa:</label>
+                  <input
+                    type="number"
+                    step="0.25"
+                    min={0.25}
+                    max={10}
+                    value={q.maxScore}
+                    onChange={e => {
+                      const v = Math.max(0.25, Math.min(10, parseFloat(e.target.value) || 1))
+                      const next = [...questions]
+                      next[qi] = { ...next[qi], maxScore: v }
+                      onChange(next)
+                    }}
+                    style={{
+                      width: 70, padding: '4px 8px',
+                      border: '1px solid #cbd5e1', borderRadius: 6,
+                      fontSize: 13, fontWeight: 700, textAlign: 'right',
+                      color: '#0f172a',
+                    }}
+                  />
+                </div>
+              </div>
+              <textarea
+                value={q.rubric}
+                onChange={e => {
+                  const next = [...questions]
+                  next[qi] = { ...next[qi], rubric: e.target.value }
+                  onChange(next)
+                }}
+                placeholder={
+                  'Vd:\n' +
+                  '- Bước 1: Viết phương trình bảo toàn năng lượng (0.5đ)\n' +
+                  '- Bước 2: Tính v khi qua VTCB = √(2gh) (0.5đ)\n' +
+                  '- Bước 3: Kết quả số v ≈ 3.13 m/s (0.5đ)\n' +
+                  '- Đơn vị + làm tròn đúng (0.5đ)'
+                }
+                rows={5}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '8px 10px',
+                  border: '1px solid #fbbf24', borderRadius: 6,
+                  fontSize: 13, fontFamily: 'inherit',
+                  color: '#0f172a', resize: 'vertical',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
