@@ -6068,9 +6068,9 @@ if (!USE_NODEJS_QUESTIONS) {
       const userAnswers = req.body?.answers || {};
       const examId = req.params.id;
 
-      // Lấy questions của exam (correctAnswer cho server-side grade)
+      // Lấy questions của exam (correctAnswer + options + points cho weighted grade)
       const { rows: qs } = await xpool.query(
-        `SELECT q.id, q."questionType", q."correctAnswer"
+        `SELECT q.id, q."questionType", q."correctAnswer", q.options, eq.points
            FROM "ExamQuestion" eq
            JOIN "Question" q ON q.id = eq."questionId"
           WHERE eq."examId" = $1 ORDER BY eq."order" ASC`,
@@ -6078,7 +6078,6 @@ if (!USE_NODEJS_QUESTIONS) {
       );
       if (qs.length === 0) return res.status(404).json({ error: 'Đề không có câu hỏi' });
 
-      // Normalize giống logic của quiz-rooms (xử lý "D. xxx" → "D")
       const norm = (s) => {
         s = String(s ?? '').trim();
         if (!s) return '';
@@ -6089,35 +6088,63 @@ if (!USE_NODEJS_QUESTIONS) {
         if (numStr !== '' && !isNaN(Number(numStr))) return String(Number(numStr));
         return s.toLowerCase();
       };
+      // Map text option → letter (fix HS chọn option text báo sai)
+      const collapse = (t) => String(t ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+      const toLetter = (raw, options) => {
+        const a = String(raw ?? '').trim();
+        if (!a) return a;
+        if (/^[A-Z]$/i.test(a)) return a.toUpperCase();
+        if (/^[A-Z][\.\)\s]/i.test(a)) return a;
+        if (Array.isArray(options) && options.length > 0) {
+          const target = collapse(a);
+          for (let i = 0; i < options.length; i++) {
+            const opt = collapse(options[i]);
+            const stripped = opt.replace(/^[a-z][\.\)\s]+/i, '').trim();
+            if (opt === target || stripped === target) {
+              return String.fromCharCode(65 + i);
+            }
+          }
+        }
+        return a;
+      };
 
-      let correct = 0;
+      let pointsEarned = 0;
+      let totalPoints = 0;
+      let correctCount = 0;
       for (const q of qs) {
+        const qPts = Number(q.points) > 0 ? Number(q.points) : 1;
+        totalPoints += qPts;
         const userAns = userAnswers[q.id];
         if (userAns == null || userAns === '') continue;
         const t = (q.questionType || '').toUpperCase();
         if (t.includes('TRUE') || t.includes('FALSE')) {
-          // True/False: answer là string 4 ký tự "TFFT" — so sánh từng ký tự
-          // Question.correctAnswer cũng nên là "TFFT" hoặc "TTFT"
           const u = String(userAns).slice(0, 4).padEnd(4, '-');
           const c = String(q.correctAnswer || '').slice(0, 4).padEnd(4, '-');
-          // Tính số ký tự khớp / 4 → quy đổi 1 câu (1 đúng cả = 1, 3/4 = 0.75, ...)
           let subCorrect = 0;
           for (let i = 0; i < 4; i++) {
             if (u[i] !== '-' && u[i] === c[i]) subCorrect++;
           }
-          if (subCorrect === 4) correct += 1;
-          else if (subCorrect >= 3) correct += 0.5;  // 3/4 = 0.5 điểm theo Bộ
+          // Trọng số theo điểm câu: đúng cả 4 = full, 3/4 = 50% điểm
+          if (subCorrect === 4) { pointsEarned += qPts; correctCount += 1; }
+          else if (subCorrect >= 3) { pointsEarned += qPts * 0.5; correctCount += 0.5; }
         } else {
-          if (norm(userAns) === norm(q.correctAnswer)) correct += 1;
+          if (norm(toLetter(userAns, q.options)) === norm(q.correctAnswer)) {
+            pointsEarned += qPts;
+            correctCount += 1;
+          }
         }
       }
       const total = qs.length;
-      const percentage = total > 0 ? (correct / total) * 100 : 0;
-      const score = Math.round((correct / total) * 100) / 10;  // thang 10
-      console.log(`[exam:grade] ✅ exam=${examId.slice(0,8)} ${correct}/${total} (${Math.round(percentage)}%)`);
+      const percentage = totalPoints > 0 ? (pointsEarned / totalPoints) * 100 : 0;
+      const score = totalPoints > 0
+        ? Math.round((pointsEarned / totalPoints) * 100) / 10
+        : 0;
+      console.log(`[exam:grade] ✅ exam=${examId.slice(0,8)} ${pointsEarned.toFixed(2)}/${totalPoints} pts (${Math.round(percentage)}%)`);
       return res.json({
-        correct: Math.round(correct * 10) / 10,
+        correct: Math.round(correctCount * 10) / 10,
         total, percentage, score,
+        pointsEarned: Math.round(pointsEarned * 100) / 100,
+        totalPoints,
       });
     } catch (err) {
       console.error('[exam:grade] ❌', err.message);

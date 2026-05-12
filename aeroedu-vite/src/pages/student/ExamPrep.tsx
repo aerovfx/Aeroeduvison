@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
 import {
   Clock, BookOpen, Trophy, TrendingUp, AlertCircle, CheckCircle2,
   XCircle, ChevronLeft, ChevronRight, RotateCcw, FileText,
@@ -68,6 +69,7 @@ function PageHeader({ title, description, docSlug, docAnchor }: { title: string;
 /* ─── Main Component ────────────────────────────────── */
 export default function ExamPrepPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
 
   type ViewState = "home" | "taking" | "result" | "review" | "history"
   const [view, setView] = useState<ViewState>("home")
@@ -287,27 +289,33 @@ export default function ExamPrepPage() {
     requireName(examTitle, _startFromBank)
   }
 
-  /* ─── Create from Teacher Exam ────────────────────── */
-  const _startFromTeacherExam = async (examId: string, type: "exam" | "matrix") => {
-    setLoading(true)
-    try {
-      const p = await examPrepService.createFromTeacherExam(examId, type)
-      if (!p) {
-        toast.error("Không tạo được đề từ giáo viên")
-        return
-      }
-      setPractice(p)
-      setAnswers({})
-      setCurrentQ(0)
-      setTimeLeft(p.timeLimit * 60)
-      setView("taking")
-      toast.success(`Đề thi ${p.questions.length} câu đã sẵn sàng!`)
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Không thể tạo đề thi"
-      toast.error(msg)
-    } finally {
-      setLoading(false)
+  /* ─── Open Teacher Exam in Bộ-GD&ĐT answer sheet UI ───
+   * Đề từ giáo viên (đặc biệt từ LaTeX → /teacher/latex-documents)
+   * → mở trực tiếp /exam-sheet/:examId (chuẩn Bộ + phiếu tô đáp án).
+   * Trước đây mở inline 5-mode picker; giờ navigate thẳng cho gọn. */
+  const _startFromTeacherExam = (examId: string, type: "exam" | "matrix") => {
+    if (type === "matrix") {
+      // Matrix → vẫn dùng inline flow (chưa có sheet UI cho matrix)
+      setLoading(true)
+      examPrepService.createFromTeacherExam(examId, type)
+        .then(p => {
+          if (!p) { toast.error("Không tạo được đề từ ma trận"); return }
+          setPractice(p)
+          setAnswers({})
+          setCurrentQ(0)
+          setTimeLeft(p.timeLimit * 60)
+          setView("taking")
+          toast.success(`Đề thi ${p.questions.length} câu đã sẵn sàng!`)
+        })
+        .catch(err => {
+          const msg = err instanceof Error ? err.message : "Không thể tạo đề thi"
+          toast.error(msg)
+        })
+        .finally(() => setLoading(false))
+      return
     }
+    // Đề công khai từ GV → phiếu tô đáp án Bộ-GD&ĐT
+    navigate(`/exam-sheet/${examId}`)
   }
   // Wrapper: hỏi tên trước. Tham số phụ "title" để hiển thị trong modal.
   const startFromTeacherExam = (examId: string, type: "exam" | "matrix", title?: string) => {
