@@ -7310,16 +7310,34 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
       // Extract via fal.ai (text mode)
       const { extractQuestionsFromText } = require('./lib/fal-quiz-extractor.cjs');
       const { subject, grade, count } = req.body || {};
-      const result = await extractQuestionsFromText(stripped, {
-        subject: subject || 'Vật lí',
-        grade: grade || '11',
-        language: 'Vietnamese',
-        count: Number(count) || 40,
-      });
+      let result;
+      try {
+        result = await extractQuestionsFromText(stripped, {
+          subject: subject || 'Vật lí',
+          grade: grade || '11',
+          language: 'Vietnamese',
+          count: Number(count) || 40,
+        });
+      } catch (extractErr) {
+        console.error('[latex:to-exam] extract failed:', extractErr.message.slice(0, 500));
+        return res.status(422).json({
+          error: 'AI không đọc được nội dung đề. Hãy kiểm tra: (1) tài liệu đã có câu hỏi rõ ràng, (2) cấu trúc 3 phần (PHẦN I trắc nghiệm / PHẦN II Đúng-Sai / PHẦN III trả lời ngắn) nếu theo chuẩn Bộ.',
+          detail: extractErr.message.slice(0, 300),
+        });
+      }
       const questions = result.questions || [];
       if (questions.length === 0) {
-        return res.status(422).json({ error: 'Không trích xuất được câu hỏi nào từ tài liệu' });
+        return res.status(422).json({
+          error: 'AI trích xuất xong nhưng không tìm thấy câu hỏi nào. Đảm bảo tài liệu có các câu "Câu 1.", "Câu 2." rõ ràng kèm các đáp án A/B/C/D.',
+        });
       }
+      // Đếm theo từng phần để log
+      const counts = {
+        mcq:  questions.filter(q => q.questionType === 'MULTIPLE_CHOICE').length,
+        tf:   questions.filter(q => q.questionType === 'TRUE_FALSE').length,
+        sa:   questions.filter(q => q.questionType === 'SHORT_ANSWER').length,
+      };
+      console.log(`[latex:to-exam] AI extracted ${questions.length}Q: PHẦN I=${counts.mcq}, II=${counts.tf}, III=${counts.sa}`);
 
       // Insert Exam + ExamQuestion + Question (transaction)
       // Default public=true vì teacher đang share với học sinh ngay sau khi
