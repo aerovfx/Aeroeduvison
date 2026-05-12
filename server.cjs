@@ -7651,12 +7651,15 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
         public: isPublic,
         publishedAt: now.toISOString(),
       });
+      // totalScore = tổng điểm Phần I/II/III (1đ/câu) + sum maxScore Phần IV
+      const totalScore = (sectionCounts.phanI + sectionCounts.phanII + sectionCounts.phanIII)
+        + phanIV.reduce((s, q) => s + (Number(q.maxScore) || 0), 0);
       await pool.query(
         `INSERT INTO "Exam"
            (id, title, description, "examType", duration, "totalScore",
             "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
-         VALUES ($1,$2,$3,'PDF + Phiếu trả lời',$4,$5,$5,$6,NULL,$7,$8,$8)`,
-        [examId, examTitle, desc, duration, totalQuestions, examStatus, userId, now]
+         VALUES ($1,$2,$3,'PDF + Phiếu trả lời',$4,$5,$6,$7,NULL,$8,$9,$9)`,
+        [examId, examTitle, desc, duration, totalScore, totalQuestions, examStatus, userId, now]
       );
       console.log(`[latex:to-pdf-exam] ✅ project=${project.id.slice(0,8)} → exam=${examId.slice(0,8)} (I=${sectionCounts.phanI}, II=${sectionCounts.phanII}, III=${sectionCounts.phanIII}, IV=${sectionCounts.phanIV}, ${Date.now()-t0}ms)`);
       return res.json({
