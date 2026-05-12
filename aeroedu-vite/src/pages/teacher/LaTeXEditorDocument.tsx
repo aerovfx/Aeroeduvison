@@ -85,11 +85,15 @@ export default function LaTeXEditorDocument() {
   const [shareExamTotalQ, setShareExamTotalQ] = useState(0)
   const [shareCopied, setShareCopied] = useState(false)
 
-  // PDF-only exam modal — GV nhập đáp án trực tiếp, không AI extract
+  // PDF-only exam modal — GV nhập đáp án trực tiếp, không AI extract.
+  // State giờ là array để dùng visual bubble UI (click thay vì gõ chữ).
   const [pdfExamModalOpen, setPdfExamModalOpen] = useState(false)
-  const [pdfExamPhanI, setPdfExamPhanI] = useState('')
-  const [pdfExamPhanII, setPdfExamPhanII] = useState<string[]>(['', '', '', ''])
-  const [pdfExamPhanIII, setPdfExamPhanIII] = useState<string[]>(['', '', '', '', '', ''])
+  // Mỗi phần tử: '' | 'A' | 'B' | 'C' | 'D' (1 câu)
+  const [pdfExamPhanI, setPdfExamPhanI] = useState<string[]>(() => Array(40).fill(''))
+  // Mỗi phần tử: 4 ký tự T/F/- cho 4 mệnh đề a/b/c/d
+  const [pdfExamPhanII, setPdfExamPhanII] = useState<string[]>(() => Array(4).fill('----'))
+  // Mỗi phần tử: chuỗi text đáp số (vd "0.4")
+  const [pdfExamPhanIII, setPdfExamPhanIII] = useState<string[]>(() => Array(6).fill(''))
   const [pdfExamSubmitting, setPdfExamSubmitting] = useState(false)
 
   const [versions, setVersions] = useState<Version[]>([])
@@ -892,7 +896,7 @@ export default function LaTeXEditorDocument() {
         </div>
       )}
 
-      {/* ── PDF-only exam modal — GV nhập đáp án thủ công ── */}
+      {/* ── PDF-only exam modal — Phiếu trả lời trực quan ── */}
       {pdfExamModalOpen && (
         <div
           onClick={() => !pdfExamSubmitting && setPdfExamModalOpen(false)}
@@ -905,139 +909,44 @@ export default function LaTeXEditorDocument() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: 720, width: '100%', maxHeight: '90vh', overflowY: 'auto',
-              background: D.card, border: `1px solid ${D.border2}`, borderRadius: 16,
-              padding: 24, color: D.text,
+              maxWidth: 1200, width: '100%', maxHeight: '92vh', overflowY: 'auto',
+              background: '#fdf2f8', border: `2px solid #f9a8d4`, borderRadius: 16,
+              padding: 20, color: '#1f2937',
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
-              📄 Tạo đề từ PDF — Nhập đáp án
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, textAlign: 'center', color: '#0f172a', textTransform: 'uppercase' }}>
+              Phiếu trả lời trắc nghiệm
             </h2>
-            <p style={{ fontSize: 13, color: D.muted, margin: '0 0 16px' }}>
-              Học sinh sẽ xem file PDF làm đề và tô đáp án ở bảng bên phải. Bạn chỉ cần nhập đáp án chuẩn dưới đây.
+            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center', margin: '4px 0 18px' }}>
+              Click vào ô để chọn đáp án đúng — chính giáo viên ra đề tô vào phiếu mẫu
             </p>
 
-            {/* PHẦN I */}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', fontWeight: 700, marginBottom: 6, fontSize: 13 }}>
-                PHẦN I — Trắc nghiệm (A/B/C/D)
-              </label>
-              <input
-                type="text"
-                value={pdfExamPhanI}
-                onChange={e => setPdfExamPhanI(e.target.value.toUpperCase().replace(/[^ABCD\s]/g, '').replace(/\s/g, ''))}
-                placeholder="ABCDABCDDC… (vd: ACBDABCDAB cho 10 câu)"
-                style={{
-                  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-                  background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 8,
-                  color: D.text, fontSize: 14, fontFamily: 'ui-monospace, monospace',
-                  letterSpacing: '0.1em',
-                }}
-              />
-              <p style={{ fontSize: 11, color: D.muted, marginTop: 4 }}>
-                {pdfExamPhanI.length} câu · Chỉ dùng ký tự A/B/C/D, mỗi ký tự là 1 câu
-              </p>
-            </div>
+            {/* ── PHẦN I — Trắc nghiệm A/B/C/D ── */}
+            <PhanISheet
+              answers={pdfExamPhanI}
+              onChange={setPdfExamPhanI}
+            />
 
-            {/* PHẦN II */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ fontWeight: 700, fontSize: 13 }}>
-                  PHẦN II — Đúng/Sai (4 mệnh đề a/b/c/d mỗi câu)
-                </label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPdfExamPhanII(prev => prev.length > 1 ? prev.slice(0, -1) : prev)}
-                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
-                  >−</button>
-                  <span style={{ fontSize: 12, color: D.muted, minWidth: 30, textAlign: 'center' }}>{pdfExamPhanII.length}</span>
-                  <button
-                    type="button"
-                    onClick={() => setPdfExamPhanII(prev => prev.length < 12 ? [...prev, ''] : prev)}
-                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
-                  >+</button>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                {pdfExamPhanII.map((val, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11, color: D.muted, minWidth: 36 }}>Câu {i + 1}:</span>
-                    <input
-                      type="text"
-                      value={val}
-                      onChange={e => {
-                        const v = e.target.value.toUpperCase().replace(/[^TF\-]/g, '').slice(0, 4)
-                        setPdfExamPhanII(prev => prev.map((p, j) => j === i ? v : p))
-                      }}
-                      placeholder="TFFT"
-                      maxLength={4}
-                      style={{
-                        flex: 1, padding: '6px 10px', boxSizing: 'border-box',
-                        background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6,
-                        color: D.text, fontSize: 13, fontFamily: 'ui-monospace, monospace',
-                        letterSpacing: '0.2em', textAlign: 'center', textTransform: 'uppercase',
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: 11, color: D.muted, marginTop: 4 }}>
-                Mỗi ô 4 ký tự T (Đúng) / F (Sai) cho 4 mệnh đề a/b/c/d
-              </p>
-            </div>
+            {/* ── PHẦN II — Đúng/Sai 4 mệnh đề ── */}
+            <PhanIISheet
+              answers={pdfExamPhanII}
+              onChange={setPdfExamPhanII}
+            />
 
-            {/* PHẦN III */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ fontWeight: 700, fontSize: 13 }}>
-                  PHẦN III — Trả lời ngắn (số / biểu thức)
-                </label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={() => setPdfExamPhanIII(prev => prev.length > 0 ? prev.slice(0, -1) : prev)}
-                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
-                  >−</button>
-                  <span style={{ fontSize: 12, color: D.muted, minWidth: 30, textAlign: 'center' }}>{pdfExamPhanIII.length}</span>
-                  <button
-                    type="button"
-                    onClick={() => setPdfExamPhanIII(prev => prev.length < 12 ? [...prev, ''] : prev)}
-                    style={{ padding: '2px 10px', background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6, color: D.muted, fontSize: 12, cursor: 'pointer' }}
-                  >+</button>
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-                {pdfExamPhanIII.map((val, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 11, color: D.muted, minWidth: 36 }}>Câu {i + 1}:</span>
-                    <input
-                      type="text"
-                      value={val}
-                      onChange={e => {
-                        const v = e.target.value
-                        setPdfExamPhanIII(prev => prev.map((p, j) => j === i ? v : p))
-                      }}
-                      placeholder="0.4"
-                      style={{
-                        flex: 1, padding: '6px 10px', boxSizing: 'border-box',
-                        background: D.card2, border: `1px solid ${D.border2}`, borderRadius: 6,
-                        color: D.text, fontSize: 13, fontFamily: 'ui-monospace, monospace',
-                      }}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* ── PHẦN III — Trả lời ngắn ── */}
+            <PhanIIISheet
+              answers={pdfExamPhanIII}
+              onChange={setPdfExamPhanIII}
+            />
 
             {/* Submit */}
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, marginTop: 18, padding: '14px 0 0', borderTop: '1px solid #fbcfe8' }}>
               <button
                 onClick={() => !pdfExamSubmitting && setPdfExamModalOpen(false)}
                 style={{
-                  flex: 1, padding: '10px 16px', borderRadius: 10,
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: D.muted, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  flex: 1, padding: '12px 18px', borderRadius: 10,
+                  background: 'white', border: '1px solid #cbd5e1',
+                  color: '#475569', fontSize: 14, fontWeight: 600, cursor: 'pointer',
                 }}
               >
                 Huỷ
@@ -1046,11 +955,15 @@ export default function LaTeXEditorDocument() {
                 disabled={pdfExamSubmitting}
                 onClick={async () => {
                   if (!id) return
-                  const totalCount = pdfExamPhanI.length
-                    + pdfExamPhanII.filter(x => x.replace(/-/g, '').length > 0).length
-                    + pdfExamPhanIII.filter(x => x.trim().length > 0).length
-                  if (totalCount === 0) {
-                    toast.error('Nhập ít nhất 1 đáp án trước khi tạo đề')
+                  const phanIStr = pdfExamPhanI.map(x => x || '-').join('').replace(/-+$/, '')
+                  // Trim trailing letters chỉ giữ phần đầu liên tiếp
+                  const phanIClean = phanIStr.replace(/-/g, '')
+                  // Đếm câu PHẦN II có ít nhất 1 đáp án (T or F)
+                  const phanII = pdfExamPhanII.filter(x => /[TF]/.test(x))
+                  const phanIII = pdfExamPhanIII.filter(x => x.trim().length > 0)
+                  const total = phanIClean.length + phanII.length + phanIII.length
+                  if (total === 0) {
+                    toast.error('Hãy tô ít nhất 1 đáp án trước khi tạo đề')
                     return
                   }
                   setPdfExamSubmitting(true)
@@ -1062,13 +975,13 @@ export default function LaTeXEditorDocument() {
                     }>(
                       `/latex-projects/${id}/to-pdf-exam`,
                       {
-                        phanIAnswers: pdfExamPhanI,
-                        phanIIAnswers: pdfExamPhanII.filter(x => x.replace(/-/g, '').length > 0),
-                        phanIIIAnswers: pdfExamPhanIII.filter(x => x.trim().length > 0),
+                        phanIAnswers: phanIClean,
+                        phanIIAnswers: phanII,
+                        phanIIIAnswers: phanIII,
                         public: true,
                       }
                     )
-                    toast.success(`✅ Đề ${res.data.totalQuestions} câu sẵn sàng (PHẦN I=${res.data.sectionCounts.phanI}, II=${res.data.sectionCounts.phanII}, III=${res.data.sectionCounts.phanIII})`, { id: t, duration: 4000 })
+                    toast.success(`✅ Đề ${res.data.totalQuestions} câu (PHẦN I=${res.data.sectionCounts.phanI}, II=${res.data.sectionCounts.phanII}, III=${res.data.sectionCounts.phanIII})`, { id: t, duration: 4000 })
                     setPdfExamModalOpen(false)
                     setShareExamUrl(`${window.location.origin}/exam-sheet/${res.data.examId}`)
                     setShareExamId(res.data.examId)
@@ -1083,18 +996,230 @@ export default function LaTeXEditorDocument() {
                   }
                 }}
                 style={{
-                  flex: 1.5, padding: '10px 16px', borderRadius: 10, border: 'none',
+                  flex: 2, padding: '12px 18px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
-                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer',
                   opacity: pdfExamSubmitting ? 0.6 : 1,
+                  boxShadow: '0 4px 14px rgba(239,68,68,0.3)',
                 }}
               >
-                {pdfExamSubmitting ? 'Đang tạo…' : 'Tạo đề ngay →'}
+                {pdfExamSubmitting ? 'Đang tạo…' : '📄 Tạo đề PDF ngay →'}
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Phiếu trả lời trực quan — GV click bubble thay vì gõ chữ
+   Style match với ảnh mẫu Phiếu Trả Lời Trắc Nghiệm Bộ-GD&ĐT 2026
+   ────────────────────────────────────────────────────────────── */
+
+const LETTERS_PI = ['A', 'B', 'C', 'D']
+
+function PhanISheet({
+  answers, onChange,
+}: { answers: string[]; onChange: (next: string[]) => void }) {
+  // Group 40 questions vào 4 cột × 10 dòng giống mẫu phiếu
+  const COLS = 4, ROWS = 10
+  const total = answers.length
+  return (
+    <div style={{
+      background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 14,
+      padding: 14, marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#831843', letterSpacing: '0.05em' }}>
+          PHẦN I — Trắc nghiệm A/B/C/D
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: '#831843' }}>Số câu:</span>
+          <button
+            onClick={() => total > 1 && onChange(answers.slice(0, total - 1))}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#831843', minWidth: 26, textAlign: 'center' }}>{total}</span>
+          <button
+            onClick={() => total < 60 && onChange([...answers, ''])}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >+</button>
+          <button
+            onClick={() => onChange(Array(total).fill(''))}
+            style={{ marginLeft: 6, padding: '3px 10px', borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+          >Xoá hết</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 1fr)`, gap: 14 }}>
+        {Array.from({ length: COLS }).map((_, colIdx) => (
+          <div key={colIdx} style={{ background: 'white', borderRadius: 8, padding: '10px 8px' }}>
+            {/* Header row A B C D */}
+            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 1fr 1fr', marginBottom: 6, fontSize: 12, fontWeight: 800, color: '#dc2626' }}>
+              <span></span>
+              {LETTERS_PI.map(L => <span key={L} style={{ textAlign: 'center' }}>{L}</span>)}
+            </div>
+            {Array.from({ length: ROWS }).map((_, r) => {
+              const qIdx = colIdx * ROWS + r
+              if (qIdx >= total) return null
+              const selected = answers[qIdx]
+              return (
+                <div key={r} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 1fr 1fr', alignItems: 'center', padding: '2px 0' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#475569' }}>{qIdx + 1}</span>
+                  {LETTERS_PI.map(L => (
+                    <button
+                      key={L}
+                      onClick={() => {
+                        const next = [...answers]
+                        next[qIdx] = next[qIdx] === L ? '' : L
+                        onChange(next)
+                      }}
+                      style={{
+                        margin: '0 auto', width: 18, height: 18, borderRadius: '50%',
+                        background: selected === L ? '#0f172a' : 'white',
+                        border: `1.5px solid ${selected === L ? '#0f172a' : '#fbbf24'}`,
+                        cursor: 'pointer', padding: 0,
+                      }}
+                      aria-label={`Câu ${qIdx + 1} đáp án ${L}`}
+                    />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PhanIISheet({
+  answers, onChange,
+}: { answers: string[]; onChange: (next: string[]) => void }) {
+  const SUBS = ['a', 'b', 'c', 'd']
+  const total = answers.length
+  const setSub = (qi: number, sj: number, val: 'T' | 'F') => {
+    const next = [...answers]
+    const cur = (next[qi] || '----').padEnd(4, '-').slice(0, 4).split('')
+    cur[sj] = cur[sj] === val ? '-' : val
+    next[qi] = cur.join('')
+    onChange(next)
+  }
+  return (
+    <div style={{
+      background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 14,
+      padding: 14, marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#831843', letterSpacing: '0.05em' }}>
+          PHẦN II — Đúng/Sai (4 mệnh đề a/b/c/d mỗi câu)
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: '#831843' }}>Số câu:</span>
+          <button
+            onClick={() => total > 1 && onChange(answers.slice(0, total - 1))}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#831843', minWidth: 26, textAlign: 'center' }}>{total}</span>
+          <button
+            onClick={() => total < 12 && onChange([...answers, '----'])}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >+</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        {answers.map((val, qi) => {
+          const cur = (val || '----').padEnd(4, '-').slice(0, 4)
+          return (
+            <div key={qi} style={{ background: 'white', borderRadius: 8, padding: '8px 10px' }}>
+              <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, color: '#0f172a', margin: '0 0 6px' }}>Câu {qi + 1}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr', gap: 4, marginBottom: 4, fontSize: 10, fontWeight: 800, color: '#dc2626', textAlign: 'center' }}>
+                <span></span><span>Đúng</span><span>Sai</span>
+              </div>
+              {SUBS.map((s, si) => (
+                <div key={s} style={{ display: 'grid', gridTemplateColumns: '20px 1fr 1fr', gap: 4, alignItems: 'center', marginBottom: 3 }}>
+                  <span style={{ fontSize: 11, color: '#475569' }}>{s})</span>
+                  <button
+                    onClick={() => setSub(qi, si, 'T')}
+                    style={{
+                      margin: '0 auto', width: 16, height: 16, borderRadius: '50%',
+                      background: cur[si] === 'T' ? '#0f172a' : 'white',
+                      border: `1.5px solid ${cur[si] === 'T' ? '#0f172a' : '#fca5a5'}`,
+                      cursor: 'pointer', padding: 0,
+                    }}
+                    aria-label={`Câu ${qi + 1} ${s} đúng`}
+                  />
+                  <button
+                    onClick={() => setSub(qi, si, 'F')}
+                    style={{
+                      margin: '0 auto', width: 16, height: 16, borderRadius: '50%',
+                      background: cur[si] === 'F' ? '#0f172a' : 'white',
+                      border: `1.5px solid ${cur[si] === 'F' ? '#0f172a' : '#fca5a5'}`,
+                      cursor: 'pointer', padding: 0,
+                    }}
+                    aria-label={`Câu ${qi + 1} ${s} sai`}
+                  />
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function PhanIIISheet({
+  answers, onChange,
+}: { answers: string[]; onChange: (next: string[]) => void }) {
+  const total = answers.length
+  return (
+    <div style={{
+      background: '#fce7f3', border: '2px solid #ec4899', borderRadius: 14,
+      padding: 14, marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#831843', letterSpacing: '0.05em' }}>
+          PHẦN III — Trả lời ngắn (số / biểu thức)
+        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 11, color: '#831843' }}>Số câu:</span>
+          <button
+            onClick={() => total > 1 && onChange(answers.slice(0, total - 1))}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >−</button>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#831843', minWidth: 26, textAlign: 'center' }}>{total}</span>
+          <button
+            onClick={() => total < 12 && onChange([...answers, ''])}
+            style={{ width: 26, height: 26, borderRadius: 6, background: 'white', border: '1px solid #f9a8d4', color: '#be185d', fontWeight: 700, cursor: 'pointer' }}
+          >+</button>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+        {answers.map((val, qi) => (
+          <div key={qi} style={{ background: 'white', borderRadius: 8, padding: '8px 10px' }}>
+            <p style={{ textAlign: 'center', fontWeight: 700, fontSize: 12, color: '#0f172a', margin: '0 0 6px' }}>Câu {qi + 1}</p>
+            <input
+              type="text"
+              value={val}
+              onChange={e => {
+                const next = [...answers]
+                next[qi] = e.target.value
+                onChange(next)
+              }}
+              placeholder="0.4"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '8px 10px',
+                border: '1.5px solid #fca5a5', borderRadius: 6,
+                fontSize: 14, fontFamily: 'ui-monospace, monospace',
+                textAlign: 'center', fontWeight: 700, color: '#0f172a',
+              }}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
