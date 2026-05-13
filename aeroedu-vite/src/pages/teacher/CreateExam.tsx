@@ -6,6 +6,7 @@
  * Tab 2 — Nhập từ PDF   (upload PDF + phiếu trả lời tương tác)
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { useDraftPersistence } from '@/hooks/useDraftPersistence'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Clock, BookOpen, AlignLeft,
@@ -831,6 +832,30 @@ export default function CreateExamPage() {
   const [useAIForMissing, setUseAIForMissing] = useState(true)
   const [generatingFromMatrix, setGeneratingFromMatrix] = useState(false)
 
+  // ── Draft persistence (cross-tab + cross-refresh) ─────
+  // Bundle các field draftable thành 1 object để hook auto-sync localStorage.
+  // Loại trừ pdfFile/Blob (không serialize được).
+  type DraftBundle = {
+    activeTab: 'manual' | 'matrix' | 'pdf'
+    selectedMatrixId: string | null
+    matrixTitle: string
+    useAIForMissing: boolean
+  }
+  const draftBundle: DraftBundle = {
+    activeTab, selectedMatrixId, matrixTitle, useAIForMissing,
+  }
+  const setDraftBundle = (next: DraftBundle) => {
+    setActiveTab(next.activeTab)
+    setSelectedMatrixId(next.selectedMatrixId)
+    setMatrixTitle(next.matrixTitle)
+    setUseAIForMissing(next.useAIForMissing)
+  }
+  const tabsDraft = useDraftPersistence<DraftBundle>(
+    'aero_create_exam_tabs_v1',
+    draftBundle,
+    setDraftBundle,
+  )
+
   // Load matrices khi switch sang tab matrix
   useEffect(() => {
     if (activeTab !== 'matrix' || matrices.length > 0) return
@@ -856,6 +881,8 @@ export default function CreateExamPage() {
         `✅ Đã tạo đề ${d.totalQuestions} câu${d.aiAdded > 0 ? ` (AI bổ sung ${d.aiAdded})` : ''}`,
         { id: t, duration: 4000 }
       )
+      // Xoá draft tabs sau khi tạo thành công
+      tabsDraft.clear()
       setTimeout(() => navigate(`/teacher/exams/${d.examId}/edit`), 600)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
@@ -874,6 +901,13 @@ export default function CreateExamPage() {
     shuffle:        false,
   })
   const [saving, setSaving] = useState(false)
+
+  // Draft cho manual form (title/subject/examType/...)
+  const formDraft = useDraftPersistence<CreateExamForm>(
+    'aero_create_exam_manual_v1',
+    form,
+    setForm,
+  )
 
   const set = <K extends keyof CreateExamForm>(key: K, val: CreateExamForm[K]) =>
     setForm(f => ({ ...f, [key]: val }))
@@ -895,6 +929,9 @@ export default function CreateExamPage() {
         status:         'Nháp',
       })
       toast.success('Đã tạo đề thi thành công!')
+      // Xoá draft sau khi tạo thành công
+      formDraft.clear()
+      tabsDraft.clear()
       const examId = data?.id ?? data?.exam?.id
       navigate(examId ? `/teacher/exams/${examId}` : '/teacher/exams')
     } catch (err: unknown) {
@@ -935,6 +972,26 @@ export default function CreateExamPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Draft indicator — hiện thị khi đã có nháp lưu trữ */}
+            {(formDraft.hasDraft || tabsDraft.hasDraft) && (
+              <DraftIndicator
+                lastSavedAt={Math.max(formDraft.lastSavedAt || 0, tabsDraft.lastSavedAt || 0)}
+                onClear={() => {
+                  if (!confirm('Xoá toàn bộ nháp đang lưu? Form sẽ về trạng thái mặc định.')) return
+                  formDraft.clear()
+                  tabsDraft.clear()
+                  // Reset state về default
+                  setForm({
+                    title: '', subject: 'Vật lý', examType: 'Trắc nghiệm', duration: 45,
+                    description: '', totalQuestions: 40, passingScore: 50, shuffle: false,
+                  })
+                  setActiveTab('manual')
+                  setSelectedMatrixId(null)
+                  setMatrixTitle('')
+                  setUseAIForMissing(true)
+                }}
+              />
+            )}
             <button type="button" onClick={() => navigate('/teacher/exams')}
               className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
               style={{ background: 'transparent', border: `1px solid ${D.border2}`, color: D.muted }}
@@ -1325,6 +1382,46 @@ export default function CreateExamPage() {
         )}
 
       </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   DraftIndicator — "Đã lưu nháp N giây trước" + "Xoá"
+   ───────────────────────────────────────────────────── */
+function DraftIndicator({
+  lastSavedAt, onClear,
+}: { lastSavedAt: number; onClear: () => void }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  const ago = Math.max(0, Math.round((now - lastSavedAt) / 1000))
+  const text = ago < 5
+    ? 'Vừa lưu'
+    : ago < 60
+      ? `${ago}s trước`
+      : ago < 3600
+        ? `${Math.round(ago / 60)} phút trước`
+        : `${Math.round(ago / 3600)} giờ trước`
+  return (
+    <div className="flex items-center gap-2 text-[11px]" style={{ color: D.muted }}>
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md"
+        style={{ background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.30)', color: '#34d399' }}>
+        💾 Đã lưu nháp · {text}
+      </span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="px-2 py-1 rounded-md text-[10px] font-medium transition-colors"
+        style={{ background: 'transparent', border: `1px solid ${D.border2}`, color: D.muted }}
+        onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
+        onMouseLeave={e => (e.currentTarget.style.color = D.muted)}
+        title="Xoá nháp đang lưu"
+      >
+        Xoá
+      </button>
     </div>
   )
 }

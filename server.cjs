@@ -653,6 +653,57 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── POST /api/teacher/exams ─────────────────────────────
+  // Tạo đề thi mới (manual). Body:
+  //   { title, subject?, grade?, examType, duration, description?,
+  //     totalQuestions?, totalScore?, passingScore?, shuffle?, status? }
+  // Trả về { id, exam } để FE navigate /teacher/exams/:id sau khi tạo.
+  app.post('/api/teacher/exams', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const body = req.body || {};
+      const title = String(body.title || '').trim();
+      if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề đề thi' });
+
+      const pool = getEPool();
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const now = new Date();
+      const examType = String(body.examType || 'Trắc nghiệm');
+      const duration = Math.max(1, Number(body.duration) || 45);
+      const totalQuestions = Math.max(0, Number(body.totalQuestions) || 0);
+      const totalScore = Number(body.totalScore) || 10;
+      const status = String(body.status || 'Nháp');
+
+      // Đóng gói metadata phụ vào description JSON (giống các handler khác)
+      const desc = JSON.stringify({
+        subject: body.subject || 'Vật lý',
+        grade: String(body.grade || ''),
+        passingScore: Number(body.passingScore) || 50,
+        shuffle: !!body.shuffle,
+        notes: String(body.description || '').trim() || undefined,
+        public: !!body.public,
+        publishedAt: body.public ? now.toISOString() : null,
+        source: 'manual',
+      });
+
+      await pool.query(
+        `INSERT INTO "Exam"
+           (id, title, description, "examType", duration, "totalScore",
+            "totalQuestions", status, "matrixId", "userId", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9,$10,$10)`,
+        [id, title, desc, examType, duration, totalScore, totalQuestions, status, userId, now]
+      );
+      console.log(`[teacher:exams:create] ✅ ${id} title="${title.slice(0,40)}"`);
+      const { rows } = await pool.query(`SELECT * FROM "Exam" WHERE id = $1`, [id]);
+      return res.status(201).json({ id, exam: mapExam(rows[0]) });
+    } catch (err) {
+      console.error('[teacher:exams:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── DELETE /api/teacher/exams/:id ─────────────────────────
   app.delete('/api/teacher/exams/:id', async (req, res) => {
     try {
