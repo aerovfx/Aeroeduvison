@@ -317,9 +317,9 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ExamGrading() {
-  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "graded">("answerkey")
+  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "graded" | "library">("answerkey")
   const [gradedRefreshKey, setGradedRefreshKey] = useState(0)
-  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "graded") => {
+  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "graded" | "library") => {
     setActiveTab_(tab)
     if (tab === "graded") setGradedRefreshKey(k => k + 1)
   }, [])
@@ -417,6 +417,7 @@ export default function ExamGrading() {
     { key: "answerkey" as const, label: "① Nhập đáp án", Icon: ListChecks },
     { key: "scan"      as const, label: "② Quét & Chấm", Icon: ScanLine   },
     { key: "graded"    as const, label: "③ Đã chấm",     Icon: Clock      },
+    { key: "library"   as const, label: "④ Thư viện",    Icon: FileText   },
   ]
 
   return (
@@ -920,7 +921,169 @@ export default function ExamGrading() {
         {activeTab === "graded" && (
           <GradedResults key={`graded-${gradedRefreshKey}`} savedKeys={savedKeys} />
         )}
+
+        {/* ── Tab: Thư viện đề (archive theo năm) ── */}
+        {activeTab === "library" && (
+          <LibrarySection
+            savedKeys={savedKeys}
+            onPickKey={(idx) => {
+              setSelectedKeyIdx(idx)
+              setActiveTab("scan")
+            }}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   LibrarySection — Thư viện đề chấm theo năm
+   Group savedKeys theo năm (parse từ examDate hoặc createdAt)
+   ───────────────────────────────────────────────────── */
+function LibrarySection({
+  savedKeys, onPickKey,
+}: {
+  savedKeys: AnswerKey[]
+  onPickKey: (idx: number) => void
+}) {
+  // Parse year từ examDate "DD/MM/YYYY" hoặc fallback createdAt
+  const parseYear = (k: AnswerKey): string => {
+    const m = (k.examDate || '').match(/(\d{4})/)
+    if (m) return m[1]
+    if (k.createdAt) {
+      const y = new Date(k.createdAt).getFullYear()
+      if (!isNaN(y)) return String(y)
+    }
+    return 'Khác'
+  }
+
+  // Group by year DESC, mỗi nhóm sort theo examDate DESC
+  const byYear = new Map<string, { idx: number; key: AnswerKey }[]>()
+  savedKeys.forEach((k, idx) => {
+    const y = parseYear(k)
+    if (!byYear.has(y)) byYear.set(y, [])
+    byYear.get(y)!.push({ idx, key: k })
+  })
+  const years = Array.from(byYear.keys()).sort((a, b) => b.localeCompare(a))
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Hero card */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.10), rgba(168,85,247,0.05))',
+        border: `1px solid rgba(168,85,247,0.30)`,
+        borderRadius: 14, padding: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <FileText style={{ width: 28, height: 28, color: '#a78bfa' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: D.text, margin: 0 }}>Thư viện bài chấm</h2>
+        </div>
+        <p style={{ fontSize: 13, color: D.muted, margin: 0 }}>
+          Lưu trữ tất cả đáp án đã tạo, nhóm theo năm để tham khảo cho các kỳ thi sau.
+          Bấm vào một đề để dùng lại đáp án và quét bài.
+        </p>
+      </div>
+
+      {savedKeys.length === 0 ? (
+        <div style={{
+          background: D.card, borderRadius: 12, border: `1px solid ${D.border}`,
+          padding: 48, textAlign: 'center',
+        }}>
+          <FileText style={{ width: 48, height: 48, color: D.muted, margin: '0 auto 12px', opacity: 0.4 }} />
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, marginBottom: 6 }}>
+            Thư viện trống
+          </h3>
+          <p style={{ fontSize: 13, color: D.muted }}>
+            Tạo đáp án ở tab "① Nhập đáp án" để xây dựng thư viện. Mỗi đề tự động xếp theo năm thi.
+          </p>
+        </div>
+      ) : (
+        years.map(year => {
+          const items = byYear.get(year)!
+          return (
+            <div key={year}>
+              <div style={{
+                display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10,
+                padding: '0 4px',
+              }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: D.text, margin: 0 }}>
+                  {year === 'Khác' ? 'Không rõ năm' : `Năm ${year}`}
+                </h3>
+                <span style={{ fontSize: 12, color: D.muted }}>
+                  · {items.length} đề
+                </span>
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12,
+              }}>
+                {items.map(({ idx, key }) => {
+                  const part1Count = Object.values(key.part1 || {}).filter(v => v != null).length
+                  const part2Count = Object.values(key.part2 || {}).filter(v => v != null).length
+                  const part3Count = Object.values(key.part3 || {}).filter(v => v != null).length
+                  return (
+                    <button
+                      key={key.id || idx}
+                      onClick={() => onPickKey(idx)}
+                      style={{
+                        background: D.card, border: `1px solid ${D.border}`,
+                        borderRadius: 12, padding: 16, textAlign: 'left',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                        color: D.text,
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = 'rgba(168,85,247,0.4)'
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = D.border
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: D.text, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {key.examName || 'Đề chưa đặt tên'}
+                          </p>
+                          <p style={{ fontSize: 11, color: D.muted, margin: 0 }}>
+                            {key.examCode ? `Mã ${key.examCode} · ` : ''}
+                            {key.examDate || (key.createdAt ? new Date(key.createdAt).toLocaleDateString('vi-VN') : 'N/A')}
+                          </p>
+                        </div>
+                      </div>
+                      {key.examSite && (
+                        <p style={{ fontSize: 11, color: D.muted, marginBottom: 10, opacity: 0.8 }}>
+                          📍 {key.examSite}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {part1Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(159,18,57,0.15)', color: '#fb7185', fontWeight: 600,
+                          }}>I · {part1Count} câu</span>
+                        )}
+                        {part2Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(245,158,11,0.15)', color: '#fbbf24', fontWeight: 600,
+                          }}>II · {part2Count} câu</span>
+                        )}
+                        {part3Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', fontWeight: 600,
+                          }}>III · {part3Count} câu</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })
+      )}
     </div>
   )
 }

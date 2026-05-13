@@ -2686,6 +2686,24 @@ export default function ScanGrading(props: ScanGradingProps) {
 
       if (processedFiles.length === 0) return;
 
+      // ── Compress images > 500KB trước khi upload ──
+      // Tiết kiệm 60-90% dung lượng ảnh chụp điện thoại (4-12MB → 0.5-2MB).
+      // Dùng canvas resize max 1920px + JPEG q=0.85, không gửi qua server.
+      try {
+        const { compressImageBatch, formatSize } = await import('@/lib/imageCompression');
+        const result = await compressImageBatch(processedFiles, { maxWidth: 1920, quality: 0.85 });
+        if (result.compressedCount > 0) {
+          const { default: toast } = await import('react-hot-toast');
+          toast.success(
+            `🗜 Đã nén ${result.compressedCount} ảnh — tiết kiệm ${formatSize(result.savedKB)}`,
+            { duration: 3000 }
+          );
+        }
+        processedFiles = result.files;
+      } catch (e) {
+        console.warn('[scan] image compression skipped:', e);
+      }
+
       const newSheets: ScannedSheet[] = processedFiles.map(file => ({
         id: Math.random().toString(36),
         fileName: file.name,
