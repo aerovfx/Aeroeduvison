@@ -18,6 +18,8 @@ interface AuthContextValue {
   register: (name: string, email: string, password: string, role?: 'STUDENT' | 'TEACHER') => Promise<void>
   googleLogin: (credential: string) => Promise<void>
   logout: () => Promise<void>
+  /** Refetch user từ /api/auth/me — gọi sau khi update profile để UI reflect */
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -85,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [])
 
+  // Refetch user — gọi sau khi update profile để Navbar/Sidebar/etc. cập nhật
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await authService.getMe()
+      setUser(me)
+    } catch (err) {
+      // Im lặng — nếu fail giữ user cũ, không kick logout
+      if (import.meta.env.DEV) console.warn('[refreshUser] fail:', err)
+    }
+  }, [])
+
   return (
     <AuthContext.Provider
       value={{
@@ -95,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         googleLogin,
         logout,
+        refreshUser,
       }}
     >
       {children}

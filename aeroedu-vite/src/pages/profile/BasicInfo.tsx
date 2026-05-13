@@ -20,7 +20,7 @@ interface FormValues {
 }
 
 export default function BasicInfo() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
 
   const {
     register,
@@ -44,8 +44,15 @@ export default function BasicInfo() {
 
   const update = useMutation({
     mutationFn: learningService.updateProfile,
-    onSuccess: () => toast.success('Hồ sơ đã được cập nhật!'),
-    onError: () => toast.error('Có lỗi xảy ra, thử lại nhé.'),
+    onSuccess: async () => {
+      toast.success('Hồ sơ đã được cập nhật!')
+      // Refetch user → Navbar / Sidebar / mọi nơi dùng useAuth.user sẽ thấy tên mới
+      await refreshUser()
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Có lỗi xảy ra, thử lại nhé.')
+    },
   })
 
   const inputCls = (err?: any) =>
@@ -172,7 +179,11 @@ export default function BasicInfo() {
             disabled
             className="w-full rounded-lg bg-white/5 border border-white/5 px-4 py-3 text-sm text-gray-500 cursor-not-allowed"
           />
-          <p className="mt-1 text-xs text-gray-600">Email không thể thay đổi.</p>
+          <p className="mt-1 text-xs text-gray-500 leading-relaxed">
+            🔒 <strong>Email là định danh tài khoản</strong>, không thể đổi để tránh ảnh hưởng phiên đăng nhập,
+            mã kích hoạt gói cước, và đề thi đã chia sẻ.
+            Nếu cần dùng email mới, hãy đăng ký tài khoản mới hoặc liên hệ admin.
+          </p>
         </div>
 
         <div className="pt-2">

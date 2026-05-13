@@ -9341,10 +9341,108 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
   app.get('/api/agents/progress-tracker', emptyObj);
 
   // ─ User profile ───────────────────────────────────────────
-  // PATCH /api/profile (UI Settings update name/avatar/...) — stub trả ok
-  app.get('/api/profile', (_req, res) => res.json({ profile: {} }));
-  app.patch('/api/profile', okMsg);
-  app.put('/api/profile', okMsg);
+  // GET  /api/profile          → trả thông tin user hiện tại (mở rộng cột bio/phone/website)
+  // PATCH/PUT /api/profile     → update name/bio/phone/website (KHÔNG cho đổi email)
+  // Email là identity binding → đổi cần verification flow riêng.
+  {
+    const { Pool: PPool } = require('pg');
+    let _ppool = null;
+    function getPPool() {
+      if (!_ppool && process.env.DATABASE_URL) {
+        _ppool = new PPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _ppool;
+    }
+    function getProfileUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const tok = auth.slice(7);
+        const d = jwt.verify(tok, JWT_SECRET);
+        return { id: d.sub || d.userId || d.id, email: d.email };
+      } catch { return null; }
+    }
+    let _profileColsReady = false;
+    async function ensureProfileColumns() {
+      if (_profileColsReady) return;
+      const pool = getPPool();
+      if (!pool) return;
+      // Migration: thêm cột bio/phone/website vào User nếu chưa có
+      for (const [col, kind] of [['bio','TEXT'],['phone','TEXT'],['website','TEXT']]) {
+        try {
+          await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`);
+        } catch (e) {
+          console.warn(`[profile] migrate ${col}:`, e.message);
+        }
+      }
+      _profileColsReady = true;
+    }
+
+    app.get('/api/profile', async (req, res) => {
+      const user = getProfileUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getPPool();
+      if (!pool) return res.json({ profile: {} });
+      try {
+        await ensureProfileColumns();
+        const { rows } = await pool.query(
+          `SELECT id, email, name, role, image, bio, phone, website,
+                  "createdAt", "updatedAt"
+             FROM "User" WHERE id = $1 LIMIT 1`,
+          [user.id]
+        );
+        if (!rows.length) return res.status(404).json({ error: 'User not found' });
+        res.json({ profile: rows[0] });
+      } catch (err) {
+        console.error('[profile:get]', err.message);
+        res.json({ profile: {} });
+      }
+    });
+
+    const updateProfileHandler = async (req, res) => {
+      const user = getProfileUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureProfileColumns();
+        const body = req.body || {};
+        // Allowed fields — KHÔNG bao gồm email/role/id
+        const sets = [];
+        const vals = [user.id];
+        let i = 2;
+        if (body.name !== undefined) {
+          const n = String(body.name).trim();
+          if (n.length < 2) return res.status(400).json({ error: 'Tên phải ≥ 2 ký tự' });
+          sets.push(`name = $${i++}`); vals.push(n.slice(0, 100));
+        }
+        if (body.bio !== undefined)     { sets.push(`bio = $${i++}`);     vals.push(String(body.bio).slice(0, 500)); }
+        if (body.phone !== undefined)   { sets.push(`phone = $${i++}`);   vals.push(String(body.phone).slice(0, 20)); }
+        if (body.website !== undefined) { sets.push(`website = $${i++}`); vals.push(String(body.website).slice(0, 200)); }
+        if (body.image !== undefined)   { sets.push(`image = $${i++}`);   vals.push(String(body.image).slice(0, 500)); }
+        if (sets.length === 0) {
+          return res.status(400).json({ error: 'Không có field nào để update' });
+        }
+        sets.push(`"updatedAt" = NOW()`);
+        const { rows } = await pool.query(
+          `UPDATE "User" SET ${sets.join(', ')} WHERE id = $1
+             RETURNING id, email, name, role, image, bio, phone, website, "updatedAt"`,
+          vals
+        );
+        if (!rows.length) return res.status(404).json({ error: 'User not found' });
+        console.log(`[profile:update] ✅ ${user.id} fields=${sets.length - 1}`);
+        res.json({ ok: true, profile: rows[0], user: rows[0] });
+      } catch (err) {
+        console.error('[profile:update]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    };
+    app.patch('/api/profile', updateProfileHandler);
+    app.put('/api/profile', updateProfileHandler);
+  }
 
   // ─ Emotion ────────────────────────────────────────────────
   app.get('/api/emotion', (_req, res) => res.json({ records: [] }));
