@@ -187,7 +187,7 @@ export function Navbar() {
                   </div>
                   <div className="p-1">
                     <Link
-                      to="/settings/profile"
+                      to="/profile/basic-information"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition"
                     >
@@ -195,7 +195,7 @@ export function Navbar() {
                       {t('profile')}
                     </Link>
                     <Link
-                      to="/settings"
+                      to="/dashboard/settings"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition"
                     >

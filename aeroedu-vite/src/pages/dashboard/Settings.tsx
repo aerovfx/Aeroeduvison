@@ -20,7 +20,9 @@ import {
   Eye, EyeOff, Save, ChevronRight, Moon, Sun, Monitor,
   Volume2, Mail, Smartphone, Globe,
   GraduationCap, Trophy, Zap, LogOut,
+  Crown, Ticket, CheckCircle2, Calendar, Copy,
 } from 'lucide-react'
+import { api } from '@/services/api'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -31,11 +33,13 @@ import { authService } from '@/services/auth.service'
 // ─────────────────────────────────────────────────────────────────
 // Types & constants
 // ─────────────────────────────────────────────────────────────────
-type TabKey = 'profile' | 'password' | 'notifications' | 'appearance' | 'privacy'
+type TabKey = 'profile' | 'password' | 'subscription' | 'activation' | 'notifications' | 'appearance' | 'privacy'
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'profile',       label: 'Hồ sơ',          icon: <User className="w-4 h-4" /> },
   { key: 'password',      label: 'Bảo mật',         icon: <Lock className="w-4 h-4" /> },
+  { key: 'subscription',  label: 'Gói đăng ký',     icon: <Crown className="w-4 h-4" /> },
+  { key: 'activation',    label: 'Mã kích hoạt',    icon: <Ticket className="w-4 h-4" /> },
   { key: 'notifications', label: 'Thông báo',       icon: <Bell className="w-4 h-4" /> },
   { key: 'appearance',    label: 'Giao diện',       icon: <Palette className="w-4 h-4" /> },
   { key: 'privacy',       label: 'Quyền riêng tư',  icon: <Shield className="w-4 h-4" /> },
@@ -776,6 +780,12 @@ export default function SettingsPage() {
         saving={passwordSaving}
       />
     ),
+    subscription: (
+      <SubscriptionTab />
+    ),
+    activation: (
+      <ActivationTab />
+    ),
     notifications: (
       <NotificationsTab
         state={notif}
@@ -883,3 +893,327 @@ export default function SettingsPage() {
 // Đảm bảo các icon dùng nội bộ không bị tree-shaker xoá nhầm
 // (import-only guard — không ảnh hưởng runtime)
 void X
+
+// ─────────────────────────────────────────────────────────────────
+// SubscriptionTab — Hiển thị các gói đăng ký đang hoạt động
+// GET /api/entitlements/me — danh sách entitlements (active + expired)
+// ─────────────────────────────────────────────────────────────────
+interface Entitlement {
+  id?: string
+  features: string[]
+  plan?: string
+  code?: string
+  expiresAt?: string | null
+  activatedAt?: string | null
+  status?: 'active' | 'expired' | string
+}
+
+function SubscriptionTab() {
+  const [loading, setLoading] = useState(true)
+  const [entitlements, setEntitlements] = useState<Entitlement[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await api.get<{ entitlements: Entitlement[] }>('/entitlements/me')
+        if (!cancelled) setEntitlements(data.entitlements || [])
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string } } }
+        if (!cancelled) setError(e.response?.data?.error || 'Không tải được danh sách gói')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const now = Date.now()
+  const active = entitlements.filter(e =>
+    !e.expiresAt || new Date(e.expiresAt).getTime() > now
+  )
+  const expired = entitlements.filter(e =>
+    e.expiresAt && new Date(e.expiresAt).getTime() <= now
+  )
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-8 text-center text-white/55">
+        Đang tải danh sách gói…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-white mb-1">Gói đăng ký của bạn</h2>
+        <p className="text-sm text-white/55">
+          Theo dõi các gói &amp; quyền truy cập tính năng AI đang hoạt động.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-300 flex gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {error}
+        </div>
+      )}
+
+      {/* Active */}
+      <div>
+        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Crown className="w-4 h-4 text-amber-400" />
+          Đang hoạt động ({active.length})
+        </h3>
+        {active.length === 0 ? (
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 text-center">
+            <Crown className="w-10 h-10 text-white/15 mx-auto mb-2" />
+            <p className="text-white/55 text-sm mb-3">
+              Bạn chưa có gói trả phí nào.
+            </p>
+            <a
+              href="/pricing"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:scale-[1.02] transition-transform"
+            >
+              Xem các gói <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {active.map((e, i) => (
+              <EntitlementCard key={e.id || e.code || i} ent={e} active />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Expired */}
+      {expired.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-white/55 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-white/35" />
+            Đã hết hạn ({expired.length})
+          </h3>
+          <ul className="space-y-2 opacity-60">
+            {expired.map((e, i) => (
+              <EntitlementCard key={e.id || e.code || i} ent={e} active={false} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EntitlementCard({ ent, active }: { ent: Entitlement; active: boolean }) {
+  const exp = ent.expiresAt ? new Date(ent.expiresAt) : null
+  const daysLeft = exp ? Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86400_000)) : null
+  return (
+    <li className={`rounded-xl border p-4 ${active ? 'bg-gradient-to-br from-amber-500/10 to-purple-500/10 border-amber-500/30' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="font-bold text-white text-base">
+            {ent.plan || 'Gói Premium'}
+          </p>
+          {ent.code && (
+            <p className="text-xs text-white/55 font-mono mt-0.5">Mã: {ent.code}</p>
+          )}
+        </div>
+        {active && daysLeft != null && (
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+            daysLeft <= 7 ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+          }`}>
+            Còn {daysLeft} ngày
+          </span>
+        )}
+      </div>
+      {ent.features && ent.features.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {ent.features.map((f) => (
+            <span
+              key={f}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-white/[0.05] text-white/75"
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+      {ent.activatedAt && (
+        <p className="text-[11px] text-white/40 mt-2">
+          Kích hoạt: {new Date(ent.activatedAt).toLocaleDateString('vi-VN')}
+          {exp && ` · Hết hạn: ${exp.toLocaleDateString('vi-VN')}`}
+        </p>
+      )}
+    </li>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ActivationTab — Nhập mã + xem mã đã kích hoạt
+// POST /api/entitlements/activate { code } — kích hoạt
+// GET /api/entitlements/me — danh sách (tái sử dụng)
+// ─────────────────────────────────────────────────────────────────
+function ActivationTab() {
+  const [code, setCode] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [activated, setActivated] = useState<Entitlement[]>([])
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const loadActivated = useCallback(async () => {
+    try {
+      const { data } = await api.get<{ entitlements: Entitlement[] }>('/entitlements/me')
+      // Sort: mới nhất trước
+      const list = (data.entitlements || []).slice().sort((a, b) => {
+        const ta = a.activatedAt ? new Date(a.activatedAt).getTime() : 0
+        const tb = b.activatedAt ? new Date(b.activatedAt).getTime() : 0
+        return tb - ta
+      })
+      setActivated(list)
+    } catch {
+      setActivated([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadActivated() }, [loadActivated])
+
+  const onActivate = async () => {
+    const c = code.trim().toUpperCase()
+    if (!c) { toast.error('Hãy nhập mã'); return }
+    setSubmitting(true)
+    try {
+      await api.post('/entitlements/activate', { code: c })
+      toast.success(`✅ Đã kích hoạt mã ${c}`)
+      setCode('')
+      loadActivated()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Mã không hợp lệ hoặc đã dùng')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const copyCode = async (c: string) => {
+    try {
+      await navigator.clipboard.writeText(c)
+      setCopied(c)
+      setTimeout(() => setCopied(null), 1500)
+    } catch { /* noop */ }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-white mb-1">Mã kích hoạt</h2>
+        <p className="text-sm text-white/55">
+          Nhập mã `AERO-XXXXXX` từ email/Telegram sau khi thanh toán để mở khoá tính năng.
+        </p>
+      </div>
+
+      {/* Input + activate */}
+      <div className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-amber-500/5 border border-purple-500/25 p-5">
+        <label className="block text-sm font-semibold text-white mb-2">
+          Nhập mã kích hoạt
+        </label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') onActivate() }}
+            placeholder="AERO-XXXXXX"
+            className="flex-1 px-4 py-3 rounded-xl bg-black/30 border border-white/[0.1] text-white text-base font-mono tracking-wider focus:outline-none focus:border-purple-400"
+          />
+          <button
+            onClick={onActivate}
+            disabled={submitting || !code.trim()}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
+          >
+            {submitting ? 'Đang kích hoạt…' : 'Kích hoạt'}
+          </button>
+        </div>
+        <p className="text-xs text-white/55 mt-2">
+          💡 Mã hợp lệ sẽ mở tính năng AI tương ứng ngay lập tức.
+          Cần mua gói? <a href="/pricing" className="text-purple-300 underline">Xem các gói →</a>
+        </p>
+      </div>
+
+      {/* Lịch sử mã đã kích hoạt */}
+      <div>
+        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Ticket className="w-4 h-4 text-purple-400" />
+          Mã đã kích hoạt ({activated.length})
+        </h3>
+        {loading ? (
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-6 text-center text-white/55 text-sm">
+            Đang tải…
+          </div>
+        ) : activated.length === 0 ? (
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-6 text-center text-white/55 text-sm">
+            Bạn chưa kích hoạt mã nào.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {activated.map((e, i) => {
+              const exp = e.expiresAt ? new Date(e.expiresAt) : null
+              const isExpired = exp && exp.getTime() <= Date.now()
+              return (
+                <li
+                  key={e.id || e.code || i}
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
+                    isExpired
+                      ? 'bg-white/[0.02] border-white/[0.06] opacity-60'
+                      : 'bg-emerald-500/5 border-emerald-500/20'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <button
+                        onClick={() => e.code && copyCode(e.code)}
+                        className="font-mono text-sm font-bold text-white hover:text-purple-300 transition inline-flex items-center gap-1"
+                        title="Sao chép mã"
+                      >
+                        {e.code || '(không rõ mã)'}
+                        {copied === e.code ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 opacity-50" />
+                        )}
+                      </button>
+                      {isExpired ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.08] text-white/55 font-semibold uppercase">
+                          Hết hạn
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold uppercase">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-white/55">
+                      {e.plan || 'Gói Premium'}
+                      {e.features?.length ? ` · ${e.features.length} tính năng` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right text-[11px] text-white/45 flex-shrink-0">
+                    {e.activatedAt && (
+                      <div>KH: {new Date(e.activatedAt).toLocaleDateString('vi-VN')}</div>
+                    )}
+                    {exp && <div>HH: {exp.toLocaleDateString('vi-VN')}</div>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
