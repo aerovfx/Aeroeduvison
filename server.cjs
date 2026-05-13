@@ -742,6 +742,177 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── POST /api/teacher/exams/:examId/questions ──────────────
+  // Body: { content, questionType?, options?, correctAnswer?, explanation?, points? }
+  // Tạo Question mới + INSERT ExamQuestion link, append vào cuối exam.
+  // Tự recalc Exam.totalScore + totalQuestions.
+  app.post('/api/teacher/exams/:examId/questions', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { examId } = req.params;
+      const pool = getEPool();
+      // Verify ownership
+      const own = await pool.query(
+        `SELECT subject, grade FROM "Exam" e
+           LEFT JOIN LATERAL (SELECT description::jsonb AS d) j ON true
+          WHERE e.id=$1 AND e."userId"=$2 LIMIT 1`,
+        [examId, userId]
+      ).catch(() => ({ rows: [] }));
+      const ownCheck = await pool.query(
+        `SELECT description FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!ownCheck.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      let examMeta = {};
+      try { examMeta = JSON.parse(ownCheck.rows[0].description || '{}'); } catch { /* keep {} */ }
+
+      const body = req.body || {};
+      const content = String(body.content || '').trim();
+      if (!content) return res.status(400).json({ error: 'Thiếu nội dung câu hỏi' });
+      const points = Math.max(0, Math.min(10, Number(body.points) || 1));
+
+      const { randomUUID } = require('crypto');
+      const qid = randomUUID();
+      const now = new Date();
+      // INSERT Question
+      await pool.query(
+        `INSERT INTO "Question"
+           (id, topic, subject, grade, "questionType", difficulty, content,
+            options, "correctAnswer", explanation, "qualityScore", "usageCount",
+            "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,0,0,false,false,'Hoạt động',$11,$12,$12)`,
+        [
+          qid,
+          String(body.topic || examMeta.subject || ''),
+          String(body.subject || examMeta.subject || 'Vật lí'),
+          String(body.grade || examMeta.grade || '11'),
+          String(body.questionType || 'MULTIPLE_CHOICE'),
+          String(body.difficulty || 'medium'),
+          content,
+          Array.isArray(body.options) ? body.options.map(String) : [],
+          String(body.correctAnswer || ''),
+          String(body.explanation || ''),
+          userId, now,
+        ]
+      );
+      // Find next order
+      const ord = await pool.query(
+        `SELECT COALESCE(MAX("order"), 0) + 1 AS next FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      const nextOrder = Number(ord.rows[0]?.next) || 1;
+      await pool.query(
+        `INSERT INTO "ExamQuestion" (id, "examId", "questionId", "order", points)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [randomUUID(), examId, qid, nextOrder, points]
+      );
+      // Recalc totalScore + totalQuestions
+      const sums = await pool.query(
+        `SELECT COUNT(*)::int AS cnt, COALESCE(SUM(points), 0)::float AS total
+           FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      const cnt = Number(sums.rows[0]?.cnt || 0);
+      const totalScore = Number(sums.rows[0]?.total || 0);
+      await pool.query(
+        `UPDATE "Exam" SET "totalQuestions"=$2, "totalScore"=$3, "updatedAt"=NOW()
+          WHERE id=$1`,
+        [examId, cnt, totalScore]
+      );
+      return res.status(201).json({
+        ok: true,
+        questionId: qid,
+        order: nextOrder,
+        points,
+        totalQuestions: cnt,
+        totalScore,
+      });
+    } catch (err) {
+      console.error('[teacher:exam-question:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/exams/:examId/questions/:questionId ──
+  // Xoá ExamQuestion (link) — KHÔNG xoá Question gốc (có thể dùng ở đề khác).
+  // Tự recalc + reorder.
+  app.delete('/api/teacher/exams/:examId/questions/:questionId', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { examId, questionId } = req.params;
+      const pool = getEPool();
+      const own = await pool.query(
+        `SELECT 1 FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const del = await pool.query(
+        `DELETE FROM "ExamQuestion" WHERE "examId"=$1 AND "questionId"=$2`,
+        [examId, questionId]
+      );
+      if (!del.rowCount) return res.status(404).json({ error: 'Câu hỏi không thuộc đề này' });
+      // Compact order: 1, 2, 3, ...
+      const remaining = await pool.query(
+        `SELECT id FROM "ExamQuestion" WHERE "examId"=$1 ORDER BY "order" ASC`,
+        [examId]
+      );
+      for (let i = 0; i < remaining.rows.length; i++) {
+        await pool.query(`UPDATE "ExamQuestion" SET "order"=$2 WHERE id=$1`, [remaining.rows[i].id, i + 1]);
+      }
+      // Recalc Exam totals
+      const sums = await pool.query(
+        `SELECT COUNT(*)::int AS cnt, COALESCE(SUM(points), 0)::float AS total
+           FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      await pool.query(
+        `UPDATE "Exam" SET "totalQuestions"=$2, "totalScore"=$3, "updatedAt"=NOW()
+          WHERE id=$1`,
+        [examId, Number(sums.rows[0]?.cnt || 0), Number(sums.rows[0]?.total || 0)]
+      );
+      return res.json({
+        ok: true,
+        totalQuestions: Number(sums.rows[0]?.cnt || 0),
+        totalScore: Number(sums.rows[0]?.total || 0),
+      });
+    } catch (err) {
+      console.error('[teacher:exam-question:delete] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/exams/:examId/questions/reorder ──
+  // Body: { questionIds: [...] } — mảng questionId theo thứ tự mới
+  app.post('/api/teacher/exams/:examId/questions/reorder', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { examId } = req.params;
+      const ids = Array.isArray(req.body?.questionIds) ? req.body.questionIds : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'Thiếu questionIds' });
+      const pool = getEPool();
+      const own = await pool.query(
+        `SELECT 1 FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      for (let i = 0; i < ids.length; i++) {
+        await pool.query(
+          `UPDATE "ExamQuestion" SET "order"=$3
+            WHERE "examId"=$1 AND "questionId"=$2`,
+          [examId, ids[i], i + 1]
+        );
+      }
+      await pool.query(`UPDATE "Exam" SET "updatedAt"=NOW() WHERE id=$1`, [examId]);
+      return res.json({ ok: true, count: ids.length });
+    } catch (err) {
+      console.error('[teacher:exam-question:reorder] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── PATCH /api/teacher/exams/:examId/questions/:questionId ─
   // Body: { points?: number }
   // Cập nhật điểm cho cặp (exam, question) trong ExamQuestion,
