@@ -7719,8 +7719,34 @@ app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
         [desc.latexProjectId]
       );
       if (!prjRows[0]) return res.status(404).json({ error: 'Tài liệu nguồn không tồn tại' });
-      const content = String(prjRows[0].mainContent || '');
-      if (!content) return res.status(404).json({ error: 'Tài liệu rỗng' });
+      const rawContent = String(prjRows[0].mainContent || '');
+      if (!rawContent) return res.status(404).json({ error: 'Tài liệu rỗng' });
+
+      // Pre-process giống /api/latex-projects/compile: strip pdflatex packages,
+      // inject fontspec cho Vietnamese, strip "\\" đầu dòng (vertical mode bug).
+      // Trước đây endpoint này KHÔNG có preprocess → fail "There's no line here".
+      let content = rawContent;
+      content = content.replace(/\\usepackage\s*(\[[^\]]*\])?\s*\{inputenc\}\s*\n?/g, '');
+      content = content.replace(/\\usepackage\s*\[\s*[A-Za-z0-9]+\s*\]\s*\{fontenc\}\s*\n?/g, '');
+      content = content.replace(/\\usepackage\s*\{fontenc\}\s*\n?/g, '');
+      content = content.replace(/\\usepackage\s*\{(vntex|vncaps)\}\s*\n?/g, '');
+      const hasVietnamesebabel = /\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}/.test(content);
+      if (hasVietnamesebabel) {
+        content = content.replace(/\\usepackage\s*\[\s*vietnamese\s*\]\s*\{babel\}\s*\n?/g, '');
+      }
+      const hasFontspec = /\\usepackage\s*(\[[^\]]*\])?\s*\{fontspec\}/.test(content);
+      const hasVietnamese = hasVietnamesebabel || /[À-ỿ]/.test(content);
+      if (hasVietnamese && !hasFontspec) {
+        content = content.replace(
+          /(\\documentclass[^\n]*\n)/,
+          '$1% [auto-injected for tectonic XeLaTeX]\n'
+          + '\\usepackage{fontspec}\n'
+          + '\\defaultfontfeatures{Ligatures=TeX}\n'
+          + '\\setmainfont{Latin Modern Roman}\n'
+        );
+      }
+      // Strip "\\" ở đầu dòng (vertical mode → "There's no line here to end")
+      content = content.replace(/^[ \t]*\\\\(\s)/gm, '$1');
 
       // Compile via tectonic (giống endpoint /api/latex-projects/compile)
       const { spawn } = require('child_process');
