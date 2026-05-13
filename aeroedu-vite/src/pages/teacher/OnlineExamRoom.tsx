@@ -7,6 +7,7 @@ import {
   Loader2, FileText, Timer, Globe, Lock, LogIn,
   BookOpen, CheckCircle2, AlertTriangle, CalendarClock,
   Zap, ChevronDown, ChevronUp, CalendarPlus, Pencil, Save, X,
+  Trophy, Medal, Crown,
 } from "lucide-react"
 import toast from "react-hot-toast"
 
@@ -416,6 +417,9 @@ export default function OnlineExamRoomPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+
+        {/* ── Bảng vàng thành tích — top HS theo điểm + thời gian ── */}
+        <LeaderboardSection exams={exams} />
 
         {/* ── Public rooms ────────────────────────────────── */}
         {publicRooms.length > 0 && (
@@ -1147,6 +1151,237 @@ export default function OnlineExamRoomPage() {
           </div>{/* /right col */}
         </div>{/* /grid */}
       </div>{/* /main */}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// LeaderboardSection — Bảng vàng thành tích
+// Lấy data từ GET /api/teacher/leaderboard?examId=...
+// Hiển thị: podium top 3 + table top 4-20
+// ──────────────────────────────────────────────────────────────────
+interface LbEntry {
+  rank: number
+  id: string
+  studentName: string
+  studentImage?: string | null
+  score: number
+  percentage: number
+  durationSec: number | null
+  completedAt: string | null
+  examTitle: string
+  examId: string
+  source: 'individual' | 'group'
+}
+
+function LeaderboardSection({
+  exams,
+}: {
+  exams: { id: string; title: string; totalQuestions: number; examType: string }[]
+}) {
+  const [items, setItems] = useState<LbEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState<string>('')   // '' = tất cả
+  const [collapsed, setCollapsed] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filter) params.set('examId', filter)
+      params.set('limit', '20')
+      const { data } = await api.get<{ items: LbEntry[] }>(`/teacher/leaderboard?${params.toString()}`)
+      setItems(data.items || [])
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  const top3 = items.slice(0, 3)
+  const rest = items.slice(3, 20)
+
+  const fmtDur = (s: number | null) => {
+    if (!s) return '—'
+    const m = Math.floor(s / 60)
+    const ss = s % 60
+    if (m === 0) return `${ss}s`
+    return `${m}p${ss > 0 ? ` ${ss}s` : ''}`
+  }
+
+  const rankIcon = (rank: number) => {
+    if (rank === 1) return <Crown className="w-5 h-5" style={{ color: '#fbbf24' }} />
+    if (rank === 2) return <Medal className="w-5 h-5" style={{ color: '#cbd5e1' }} />
+    if (rank === 3) return <Medal className="w-5 h-5" style={{ color: '#fb923c' }} />
+    return <span style={{ color: D.muted, fontSize: 13, fontWeight: 700 }}>#{rank}</span>
+  }
+  const podiumStyle = (rank: number): React.CSSProperties => {
+    if (rank === 1) return {
+      background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.08))',
+      border: '2px solid rgba(251,191,36,0.5)', transform: 'scale(1.05)',
+    }
+    if (rank === 2) return {
+      background: 'linear-gradient(135deg, rgba(203,213,225,0.15), rgba(148,163,184,0.05))',
+      border: '2px solid rgba(203,213,225,0.4)',
+    }
+    return {
+      background: 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(234,88,12,0.05))',
+      border: '2px solid rgba(251,146,60,0.4)',
+    }
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{
+      background: 'linear-gradient(180deg, rgba(251,191,36,0.08), transparent)',
+      border: '1px solid rgba(251,191,36,0.25)',
+    }}>
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center justify-between px-5 py-4 cursor-pointer transition-colors hover:bg-white/[0.02]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+            <Trophy className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left">
+            <h2 className="font-bold text-base" style={{ color: D.text }}>
+              🏆 Bảng vàng thành tích
+            </h2>
+            <p className="text-xs" style={{ color: D.muted }}>
+              {items.length > 0
+                ? `Top ${items.length} học sinh xuất sắc · Sắp xếp theo điểm + thời gian`
+                : 'Chưa có dữ liệu — học sinh sẽ xuất hiện sau khi nộp bài'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!collapsed && (
+            <select
+              value={filter}
+              onChange={(e) => { e.stopPropagation(); setFilter(e.target.value) }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: D.card2, border: `1px solid ${D.border2}`,
+                color: D.text, padding: '6px 10px', borderRadius: 8,
+                fontSize: 12, minWidth: 180,
+              }}
+            >
+              <option value="">Tất cả đề thi</option>
+              {exams.map(ex => (
+                <option key={ex.id} value={ex.id}>{ex.title}</option>
+              ))}
+            </select>
+          )}
+          {collapsed ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} /> : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {/* Body */}
+      {!collapsed && (
+        <div className="px-5 pb-5">
+          {loading ? (
+            <div className="py-12 text-center" style={{ color: D.muted }}>
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Đang tải bảng vàng…</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-12 text-center" style={{ color: D.muted }}>
+              <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Chưa có học sinh nào làm bài. Khi có kết quả, bảng vàng sẽ xuất hiện.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Podium top 3 */}
+              {top3.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  {/* Re-order: rank 2 (left), rank 1 (center, scaled), rank 3 (right) */}
+                  {[top3[1], top3[0], top3[2]].filter(Boolean).map(p => (
+                    <div
+                      key={p.id}
+                      className="rounded-xl p-4 text-center"
+                      style={podiumStyle(p.rank)}
+                    >
+                      <div className="flex justify-center mb-2">{rankIcon(p.rank)}</div>
+                      <div className="text-3xl font-black mb-1" style={{
+                        color: p.rank === 1 ? '#fbbf24' : p.rank === 2 ? '#cbd5e1' : '#fb923c',
+                      }}>
+                        {p.score.toFixed(1)}
+                      </div>
+                      <p className="font-bold text-sm mb-0.5 truncate" style={{ color: D.text }}>
+                        {p.studentName}
+                      </p>
+                      <p className="text-[11px] truncate" style={{ color: D.muted }}>{p.examTitle}</p>
+                      <div className="mt-2 flex items-center justify-center gap-3 text-[11px]" style={{ color: D.muted }}>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {fmtDur(p.durationSec)}
+                        </span>
+                        <span>·</span>
+                        <span>{p.source === 'group' ? 'Phòng live' : 'Cá nhân'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Rest as a table */}
+              {rest.length > 0 && (
+                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.border}` }}>
+                  <div className="grid grid-cols-[36px_1fr_140px_70px_90px_110px] gap-2 px-3 py-2 text-[10px] font-bold uppercase"
+                    style={{ background: D.card2, color: D.muted, letterSpacing: '0.05em' }}>
+                    <div>#</div>
+                    <div>Học sinh</div>
+                    <div>Đề thi</div>
+                    <div className="text-right">Điểm</div>
+                    <div className="text-right">Thời gian</div>
+                    <div className="text-right">Nguồn</div>
+                  </div>
+                  {rest.map(p => (
+                    <div
+                      key={p.id}
+                      className="grid grid-cols-[36px_1fr_140px_70px_90px_110px] gap-2 px-3 py-2 items-center border-t"
+                      style={{ borderColor: D.border, color: D.text }}
+                    >
+                      <div className="text-xs font-bold" style={{ color: D.muted }}>#{p.rank}</div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {p.studentImage ? (
+                          <img src={p.studentImage} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                            {p.studentName.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-sm truncate">{p.studentName}</span>
+                      </div>
+                      <div className="text-xs truncate" style={{ color: D.muted }}>{p.examTitle}</div>
+                      <div className={`text-right text-sm font-bold ${
+                        p.score >= 8 ? 'text-emerald-400' : p.score >= 5 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {p.score.toFixed(1)}
+                      </div>
+                      <div className="text-right text-xs" style={{ color: D.muted }}>{fmtDur(p.durationSec)}</div>
+                      <div className="text-right">
+                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-md"
+                          style={{
+                            background: p.source === 'group' ? 'rgba(124,58,237,0.15)' : 'rgba(34,197,94,0.12)',
+                            color: p.source === 'group' ? '#a78bfa' : '#34d399',
+                          }}>
+                          {p.source === 'group' ? 'Phòng live' : 'Cá nhân'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
