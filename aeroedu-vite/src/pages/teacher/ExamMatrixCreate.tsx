@@ -594,13 +594,44 @@ export default function ExamMatrixCreatePage() {
                 </div>
               </div>
 
-              {/* ── Tỉ lệ NB/TH/VD/VDC (giữ thông tin tỷ lệ Bloom) ── */}
-              <div className="mt-4 pt-3 border-t border-white/[0.06] grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className="text-xs text-white/55">Tỉ lệ Bloom:</div>
-                <DiffStat n={topicTotals.nb} pct={pct(topicTotals.nb)} color="green-400" target={40} />
-                <DiffStat n={topicTotals.th} pct={pct(topicTotals.th)} color="yellow-400" target={30} />
-                <DiffStat n={topicTotals.vd} pct={pct(topicTotals.vd)} color="orange-400" target={20} />
-                <DiffStat n={topicTotals.vdc} pct={pct(topicTotals.vdc)} color="red-400" target={10} />
+              {/* ── Tỉ lệ NB/TH/VD/VDC + tỉ lệ chuẩn Bộ-GDĐT 2025 ── */}
+              <div className="mt-4 pt-3 border-t border-white/[0.06]">
+                <div className="text-[11px] text-white/55 mb-2 flex items-center gap-3 flex-wrap">
+                  <span>📐 Tỉ lệ chuẩn Bộ GD&amp;ĐT:</span>
+                  <span><span className="text-green-400 font-bold">NB</span> 40%</span>
+                  <span><span className="text-yellow-400 font-bold">TH</span> 30%</span>
+                  <span><span className="text-orange-400 font-bold">VD</span> + <span className="text-red-400 font-bold">VDC</span> 30%</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  <div className="text-xs text-white/55 self-center">Tỉ lệ Bloom hiện tại:</div>
+                  <DiffStat n={topicTotals.nb} pct={pct(topicTotals.nb)} color="green-400" target={40} />
+                  <DiffStat n={topicTotals.th} pct={pct(topicTotals.th)} color="yellow-400" target={30} />
+                  <DiffStat n={topicTotals.vd} pct={pct(topicTotals.vd)} color="orange-400" target={20} />
+                  <DiffStat n={topicTotals.vdc} pct={pct(topicTotals.vdc)} color="red-400" target={10} />
+                </div>
+                {/* Compliance summary VD+VDC vs 30% */}
+                {(() => {
+                  const vdvdc = topicTotals.vd + topicTotals.vdc
+                  const p = totalByDifficulty > 0 ? Math.round((vdvdc / totalByDifficulty) * 100) : 0
+                  const diff = p - 30
+                  const absDiff = Math.abs(diff)
+                  const tone = absDiff <= 5
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : absDiff <= 10
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                  if (totalByDifficulty === 0) return null
+                  return (
+                    <div className={`mt-3 px-3 py-1.5 rounded-md border text-xs ${tone} flex items-center justify-between`}>
+                      <span className="text-white/85">
+                        Tổng <span className="text-orange-400 font-bold">VD</span> + <span className="text-red-400 font-bold">VDC</span>: <span className="font-black">{p}%</span> ({vdvdc}/{totalByDifficulty} câu)
+                      </span>
+                      <span className="font-bold">
+                        {absDiff <= 5 ? '✓ Đạt chuẩn 30%' : `${diff > 0 ? '+' : ''}${diff}% so chuẩn 30%`}
+                      </span>
+                    </div>
+                  )
+                })()}
               </div>
 
               {totalByDifficulty !== totalQuestions && (
@@ -638,13 +669,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function DiffStat({ n, pct, color, target }: { n: number; pct: number; color: string; target: number }) {
-  const ok = Math.abs(pct - target) <= 5
+  const diff = pct - target
+  const absDiff = Math.abs(diff)
+  // 3-tier compliance: ≤5% = ✓ xanh, ≤10% = ~ vàng, >10% = ! đỏ
+  const compClass = absDiff <= 5 ? 'text-emerald-400'
+    : absDiff <= 10 ? 'text-amber-400'
+    : 'text-rose-400'
+  const compIcon = absDiff <= 5 ? '✓' : absDiff <= 10 ? '~' : '!'
   return (
     <div className={`text-center font-bold text-xs text-${color}`}>
-      <div>{n}</div>
-      <div className={`text-[9px] ${ok ? 'opacity-100' : 'opacity-60'}`}>
-        {pct}% {ok && '✓'}
+      <div className="text-base">{n}</div>
+      <div className="text-[10px] mt-0.5">
+        <span className="opacity-90">{pct}%</span>
+        {' '}
+        <span className={compClass} title={`Chuẩn ${target}%${diff !== 0 ? ` (lệch ${diff > 0 ? '+' : ''}${diff}%)` : ''}`}>
+          {compIcon}
+        </span>
       </div>
+      <div className="text-[9px] opacity-50">chuẩn {target}%</div>
     </div>
   )
 }

@@ -292,35 +292,96 @@ export function AiExamDialog({
             </div>
           </div>
 
-          {/* Difficulty breakdown */}
+          {/* Difficulty breakdown — kèm % vs tỉ lệ chuẩn Bộ-GDĐT */}
           <div>
             <label style={label}>
               Phân bổ câu hỏi theo độ khó — <span style={{ color: D.text, fontWeight: 700 }}>tổng: {total} câu</span>
             </label>
+            {/* Tỉ lệ chuẩn Bộ: NB 40% / TH 30% / VD+VDC 30% */}
+            <div style={{
+              fontSize: 11, color: D.muted, marginBottom: 8,
+              display: 'flex', flexWrap: 'wrap', gap: 12,
+            }}>
+              <span style={{ color: '#cbd5e1' }}>📐 Tỉ lệ chuẩn Bộ GD&ĐT 2025:</span>
+              <span><span style={{ color: '#22c55e', fontWeight: 700 }}>NB</span> 40%</span>
+              <span><span style={{ color: '#f59e0b', fontWeight: 700 }}>TH</span> 30%</span>
+              <span><span style={{ color: '#ef4444', fontWeight: 700 }}>VD</span> + <span style={{ color: '#a78bfa', fontWeight: 700 }}>VDC</span> 30%</span>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
               {([
-                { key: 'easy', label: 'Nhận biết (NB)', v: easy, set: setEasy, color: '#22c55e' },
-                { key: 'medium', label: 'Thông hiểu (TH)', v: medium, set: setMedium, color: '#f59e0b' },
-                { key: 'hard', label: 'Vận dụng (VD)', v: hard, set: setHard, color: '#ef4444' },
-                { key: 'veryHard', label: 'Vận dụng cao (VDC)', v: veryHard, set: setVeryHard, color: '#a78bfa' },
-              ] as const).map((d) => (
-                <div key={d.key} style={{
-                  border: `1px solid ${D.border2}`, borderRadius: 10, padding: 10,
-                  background: D.bg2, display: 'flex', flexDirection: 'column', gap: 6,
-                }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: d.color }}>{d.label}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={50}
-                    value={d.v}
-                    onChange={(e) => d.set(Math.max(0, Number(e.target.value) || 0))}
-                    style={smallInput}
-                    disabled={busy}
-                  />
-                </div>
-              ))}
+                { key: 'easy',     label: 'Nhận biết (NB)',     v: easy,     set: setEasy,     color: '#22c55e', target: 40 },
+                { key: 'medium',   label: 'Thông hiểu (TH)',    v: medium,   set: setMedium,   color: '#f59e0b', target: 30 },
+                { key: 'hard',     label: 'Vận dụng (VD)',      v: hard,     set: setHard,     color: '#ef4444', target: 20 },
+                { key: 'veryHard', label: 'Vận dụng cao (VDC)', v: veryHard, set: setVeryHard, color: '#a78bfa', target: 10 },
+              ] as const).map((d) => {
+                const pct = total > 0 ? Math.round((d.v / total) * 100) : 0
+                const diff = pct - d.target
+                // Compliance color: ≤5% lệch = OK xanh, ≤10% = vàng, >10% = đỏ
+                const absDiff = Math.abs(diff)
+                const compColor = absDiff <= 5 ? '#22c55e'
+                  : absDiff <= 10 ? '#f59e0b'
+                  : '#ef4444'
+                const compIcon = absDiff <= 5 ? '✓' : absDiff <= 10 ? '~' : '!'
+                return (
+                  <div key={d.key} style={{
+                    border: `1px solid ${D.border2}`, borderRadius: 10, padding: 10,
+                    background: D.bg2, display: 'flex', flexDirection: 'column', gap: 6,
+                  }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: d.color }}>{d.label}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={d.v}
+                      onChange={(e) => d.set(Math.max(0, Number(e.target.value) || 0))}
+                      style={smallInput}
+                      disabled={busy}
+                    />
+                    {/* % so với tổng + so sánh với tỉ lệ chuẩn */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      fontSize: 10, paddingTop: 4, borderTop: `1px dashed ${D.border}`,
+                    }}>
+                      <span style={{ color: d.color, fontWeight: 700 }}>
+                        {pct}%
+                      </span>
+                      <span style={{ color: compColor, fontWeight: 600 }}>
+                        {compIcon} chuẩn {d.target}%
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+            {/* Tổng VD+VDC vs 30% chuẩn */}
+            {total > 0 && (() => {
+              const vdvdc = hard + veryHard
+              const pct = Math.round((vdvdc / total) * 100)
+              const diff = pct - 30
+              const absDiff = Math.abs(diff)
+              const compColor = absDiff <= 5 ? '#22c55e'
+                : absDiff <= 10 ? '#f59e0b'
+                : '#ef4444'
+              return (
+                <div style={{
+                  marginTop: 8, padding: '6px 12px', borderRadius: 8,
+                  background: `${compColor}15`, border: `1px solid ${compColor}40`,
+                  fontSize: 11, color: D.text,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span>
+                    Tổng <span style={{ color: '#ef4444', fontWeight: 700 }}>VD</span>
+                    {' + '}
+                    <span style={{ color: '#a78bfa', fontWeight: 700 }}>VDC</span>:
+                    {' '}<span style={{ color: compColor, fontWeight: 800 }}>{pct}%</span>
+                    {' '}({vdvdc}/{total} câu)
+                  </span>
+                  <span style={{ color: compColor, fontWeight: 700 }}>
+                    {absDiff <= 5 ? '✓ Đạt chuẩn 30%' : absDiff <= 10 ? `~ Lệch ${diff > 0 ? '+' : ''}${diff}%` : `! Lệch ${diff > 0 ? '+' : ''}${diff}% khỏi chuẩn`}
+                  </span>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Meta */}
