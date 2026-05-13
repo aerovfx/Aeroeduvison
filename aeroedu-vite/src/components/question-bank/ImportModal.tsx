@@ -1,8 +1,113 @@
 import { useState, useRef } from "react"
 import {
-  Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Trash2,
+  Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Trash2, Download,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
+import * as XLSX from "xlsx"
+
+// ── Template generators ──────────────────────────────────────
+// 4 sample questions cho mỗi mức (NB/TH/VD/VDC) để giáo viên thấy ngay
+// cách điền cho từng tình huống. Cấu trúc khớp parser bên dưới.
+const TEMPLATE_HEADERS = [
+  'content', 'A', 'B', 'C', 'D', 'correctAnswer',
+  'subject', 'grade', 'difficulty', 'topic', 'explanation',
+] as const
+const TEMPLATE_ROWS = [
+  {
+    content: 'Đơn vị của lực trong hệ SI là?',
+    A: 'Newton (N)', B: 'Joule (J)', C: 'Watt (W)', D: 'Pascal (Pa)',
+    correctAnswer: 'A', subject: 'Vật lý', grade: 'Khối 10', difficulty: 'easy',
+    topic: 'Lực và chuyển động', explanation: 'Lực được đo bằng Newton (N) trong hệ SI.',
+  },
+  {
+    content: 'Một vật khối lượng 2 kg chịu lực 10 N. Gia tốc của vật là?',
+    A: '2 m/s²', B: '5 m/s²', C: '10 m/s²', D: '20 m/s²',
+    correctAnswer: 'B', subject: 'Vật lý', grade: 'Khối 10', difficulty: 'medium',
+    topic: 'Định luật II Newton', explanation: 'a = F/m = 10/2 = 5 m/s².',
+  },
+  {
+    content: 'Năng lượng của con lắc đơn dao động điều hòa là?',
+    A: 'Toàn phần là động năng', B: 'Toàn phần là thế năng',
+    C: 'Cơ năng bảo toàn', D: 'Phụ thuộc vị trí và thời gian',
+    correctAnswer: 'C', subject: 'Vật lý', grade: 'Khối 12', difficulty: 'hard',
+    topic: 'Dao động cơ', explanation: 'Bỏ qua ma sát, cơ năng = động năng + thế năng = const.',
+  },
+]
+const TEMPLATE_README = [
+  '# HƯỚNG DẪN ĐIỀN MẪU CÂU HỎI',
+  '',
+  'Cột bắt buộc: content, correctAnswer',
+  'Cột tuỳ chọn: A/B/C/D (với MCQ), subject, grade, difficulty, topic, explanation',
+  '',
+  'Quy ước:',
+  '- correctAnswer: chữ A/B/C/D (hoặc nội dung đáp án đúng)',
+  '- difficulty: easy / medium / hard (Nhận biết / Thông hiểu / Vận dụng+)',
+  '- grade: "Khối 10", "Khối 11", "Khối 12"',
+  '- subject: "Vật lý" / "Toán học" / "Hóa học" / "Sinh học" / ...',
+  '- explanation: lời giải/giải thích ngắn (không bắt buộc)',
+  '',
+  'Format hỗ trợ: .xlsx, .xls, .csv, .json, .tex (LaTeX → AI extract)',
+]
+
+function escapeCsvCell(s: string | number | undefined): string {
+  const v = String(s ?? '')
+  if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+  return v
+}
+function buildCsv(): string {
+  const lines = [TEMPLATE_HEADERS.join(',')]
+  for (const r of TEMPLATE_ROWS) {
+    lines.push(TEMPLATE_HEADERS.map(h => escapeCsvCell((r as Record<string, string>)[h])).join(','))
+  }
+  return '﻿' + lines.join('\n')  // BOM cho Excel mở UTF-8
+}
+function buildJson(): string {
+  return JSON.stringify({
+    _readme: TEMPLATE_README,
+    questions: TEMPLATE_ROWS.map(r => ({
+      content: r.content,
+      options: [r.A, r.B, r.C, r.D],
+      correctAnswer: r.correctAnswer,
+      subject: r.subject,
+      grade: r.grade,
+      difficulty: r.difficulty,
+      topic: r.topic,
+      explanation: r.explanation,
+    })),
+  }, null, 2)
+}
+function buildXlsx(): Blob {
+  const wb = XLSX.utils.book_new()
+  // Sheet 1: Template
+  const wsData = [TEMPLATE_HEADERS as readonly string[], ...TEMPLATE_ROWS.map(r =>
+    TEMPLATE_HEADERS.map(h => (r as Record<string, string>)[h] ?? '')
+  )]
+  const ws = XLSX.utils.aoa_to_sheet(wsData)
+  // Đặt độ rộng cột cho dễ đọc
+  ws['!cols'] = [
+    { wch: 50 }, { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 22 },
+    { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 22 }, { wch: 40 },
+  ]
+  XLSX.utils.book_append_sheet(wb, ws, 'Câu hỏi')
+  // Sheet 2: Hướng dẫn
+  const wsHelp = XLSX.utils.aoa_to_sheet(TEMPLATE_README.map(line => [line]))
+  wsHelp['!cols'] = [{ wch: 90 }]
+  XLSX.utils.book_append_sheet(wb, wsHelp, 'Hướng dẫn')
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  return new Blob([wbout], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+}
+function downloadFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 interface ImportModalProps {
   isOpen: boolean
@@ -372,12 +477,56 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                 )}
               </div>
 
-              {/* Format hint */}
-              <div className="bg-blue-950/20 border border-blue-700/40 rounded-xl p-4">
-                <p className="text-sm font-medium text-blue-300 mb-2">Định dạng file Excel / CSV:</p>
-                <p className="text-xs text-blue-400 font-mono">
-                  content | A | B | C | D | correctAnswer | subject | grade | difficulty | explanation
-                </p>
+              {/* Format hint + Template download */}
+              <div className="bg-blue-950/20 border border-blue-700/40 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-blue-300 mb-1.5">Định dạng file Excel / CSV / JSON:</p>
+                  <p className="text-xs text-blue-400 font-mono">
+                    content | A | B | C | D | correctAnswer | subject | grade | difficulty | topic | explanation
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-blue-700/30">
+                  <p className="text-xs text-blue-300/80 mb-2">
+                    📥 Chưa biết bắt đầu? Tải mẫu sẵn có dữ liệu mẫu (3 câu) để chỉnh sửa:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        downloadFile(buildXlsx(), 'mau-cau-hoi.xlsx')
+                        toast.success('Đã tải mẫu Excel')
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 transition"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Excel (.xlsx)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        downloadFile(new Blob([buildCsv()], { type: 'text/csv;charset=utf-8' }), 'mau-cau-hoi.csv')
+                        toast.success('Đã tải mẫu CSV')
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/25 transition"
+                    >
+                      <Download className="w-3.5 h-3.5" /> CSV
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        downloadFile(new Blob([buildJson()], { type: 'application/json' }), 'mau-cau-hoi.json')
+                        toast.success('Đã tải mẫu JSON')
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition"
+                    >
+                      <Download className="w-3.5 h-3.5" /> JSON
+                    </button>
+                  </div>
+                  <ul className="text-[11px] text-blue-300/60 mt-2 space-y-0.5 list-disc pl-4">
+                    <li><strong>Excel</strong>: 2 sheet (Câu hỏi + Hướng dẫn). Cột rộng sẵn, hỗ trợ tiếng Việt.</li>
+                    <li><strong>CSV</strong>: BOM UTF-8 → mở Excel không lỗi font.</li>
+                    <li><strong>JSON</strong>: cấu trúc <code className="text-blue-300">{`{questions:[...]}`}</code>, có README inline.</li>
+                  </ul>
+                </div>
               </div>
             </>
           )}
