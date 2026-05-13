@@ -34,14 +34,49 @@ interface Section {
   difficultyHint: string
 }
 
+// Mức Bloom trong 1 phần — chuẩn Bộ GD&ĐT 2025
+interface PhanLevels {
+  nb: number  // Nhận biết
+  th: number  // Thông hiểu
+  vd: number  // Vận dụng
+}
+
 interface Topic {
   id: string
   name: string
   description: string
-  nb: number  // Nhận biết
-  th: number  // Thông hiểu
-  vd: number  // Vận dụng
-  vdc: number // Vận dụng cao
+  soTiet: number  // Số tiết dạy chủ đề này
+  // Phân bố theo từng PHẦN của đề (Bộ-GDĐT 2025)
+  byPhan: {
+    I:   PhanLevels  // Trắc nghiệm 4 lựa chọn
+    II:  PhanLevels  // Trắc nghiệm Đúng/Sai
+    III: PhanLevels  // Trả lời ngắn / Tự luận
+  }
+  // ── Legacy fields (kept for backward compat / save) ──
+  // Sẽ được sync từ byPhan khi save: nb = sum(byPhan[*].nb), etc.
+  nb: number
+  th: number
+  vd: number
+  vdc: number
+}
+
+const emptyLevels = (): PhanLevels => ({ nb: 0, th: 0, vd: 0 })
+const emptyByPhan = (): Topic['byPhan'] => ({
+  I:   emptyLevels(),
+  II:  emptyLevels(),
+  III: emptyLevels(),
+})
+function syncLegacyFromByPhan(t: Pick<Topic, 'byPhan'>) {
+  const allP = [t.byPhan.I, t.byPhan.II, t.byPhan.III]
+  return {
+    nb:  allP.reduce((s, p) => s + (p.nb  || 0), 0),
+    th:  allP.reduce((s, p) => s + (p.th  || 0), 0),
+    vd:  allP.reduce((s, p) => s + (p.vd  || 0), 0),
+    vdc: 0,
+  }
+}
+function topicTotal(t: Topic): number {
+  return t.nb + t.th + t.vd + t.vdc
 }
 
 const DEFAULT_SECTIONS: Section[] = [
@@ -69,11 +104,31 @@ export default function ExamMatrixCreatePage() {
   const [description, setDescription] = useState('')
 
   const [sections, setSections] = useState<Section[]>(DEFAULT_SECTIONS)
-  const [topics, setTopics] = useState<Topic[]>([
-    { id: '1', name: 'Cân bằng lực, Moment lực', description: 'M, ngẫu lực, điều kiện cân bằng', nb: 3, th: 2, vd: 1, vdc: 0 },
-    { id: '2', name: 'Công và Năng lượng',       description: 'Công phát động, công cản',         nb: 3, th: 1, vd: 1, vdc: 0 },
-    { id: '3', name: 'Động năng, Thế năng, Cơ năng', description: 'Bảo toàn cơ năng, rơi tự do',  nb: 2, th: 2, vd: 1, vdc: 1 },
-    { id: '4', name: 'Công suất',                 description: 'P = F.v, ý nghĩa công suất',       nb: 2, th: 1, vd: 1, vdc: 1 },
+  const [topics, setTopics] = useState<Topic[]>(() => [
+    {
+      id: '1', name: 'Cân bằng lực, Moment lực', description: 'M, ngẫu lực, điều kiện cân bằng',
+      soTiet: 4,
+      byPhan: { I: { nb: 4, th: 2, vd: 0 }, II: emptyLevels(), III: { nb: 0, th: 0, vd: 1 } },
+      nb: 4, th: 2, vd: 1, vdc: 0,
+    },
+    {
+      id: '2', name: 'Công và Năng lượng', description: 'Công phát động, công cản',
+      soTiet: 3,
+      byPhan: { I: { nb: 3, th: 2, vd: 0 }, II: { nb: 2, th: 2, vd: 0 }, III: emptyLevels() },
+      nb: 5, th: 4, vd: 0, vdc: 0,
+    },
+    {
+      id: '3', name: 'Động năng, Thế năng, Cơ năng', description: 'Bảo toàn cơ năng, rơi tự do',
+      soTiet: 4,
+      byPhan: { I: { nb: 4, th: 1, vd: 0 }, II: { nb: 2, th: 2, vd: 0 }, III: { nb: 0, th: 0, vd: 1 } },
+      nb: 6, th: 3, vd: 1, vdc: 0,
+    },
+    {
+      id: '4', name: 'Công suất và hiệu suất', description: 'P = F.v, ý nghĩa công suất',
+      soTiet: 2,
+      byPhan: { I: { nb: 2, th: 2, vd: 0 }, II: emptyLevels(), III: { nb: 0, th: 0, vd: 1 } },
+      nb: 2, th: 2, vd: 1, vdc: 0,
+    },
   ])
 
   // Edit mode: load matrix + pre-fill state
@@ -104,17 +159,38 @@ export default function ExamMatrixCreatePage() {
           setSections(m.sections)
         }
         if (Array.isArray(m.topics) && m.topics.length > 0) {
-          // Backend lưu topics dạng {name, description, counts:{nb,th,vd,vdc}}
-          // UI state dạng {id, name, description, nb, th, vd, vdc} → convert
-          setTopics(m.topics.map((t, i) => ({
-            id: String(i + 1),
-            name: String(t.name || ''),
-            description: String(t.description || ''),
-            nb: Number(t.counts?.nb ?? 0),
-            th: Number(t.counts?.th ?? 0),
-            vd: Number(t.counts?.vd ?? 0),
-            vdc: Number(t.counts?.vdc ?? 0),
-          })))
+          // Backend lưu topics có thể là 2 dạng:
+          //   (legacy) { name, description, counts: { nb, th, vd, vdc } }
+          //   (new)    { name, description, soTiet, byPhan: { I/II/III: {nb,th,vd} } }
+          // UI hỗ trợ cả 2 → migrate legacy về byPhan (dồn vào PHẦN I).
+          setTopics(m.topics.map((raw, i) => {
+            const t = raw as unknown as {
+              name?: string; description?: string; soTiet?: number;
+              counts?: { nb?: number; th?: number; vd?: number; vdc?: number };
+              byPhan?: { I?: PhanLevels; II?: PhanLevels; III?: PhanLevels };
+            }
+            const byPhan = t.byPhan
+              ? {
+                  I:   { nb: t.byPhan.I?.nb   ?? 0, th: t.byPhan.I?.th   ?? 0, vd: t.byPhan.I?.vd   ?? 0 },
+                  II:  { nb: t.byPhan.II?.nb  ?? 0, th: t.byPhan.II?.th  ?? 0, vd: t.byPhan.II?.vd  ?? 0 },
+                  III: { nb: t.byPhan.III?.nb ?? 0, th: t.byPhan.III?.th ?? 0, vd: t.byPhan.III?.vd ?? 0 },
+                }
+              : {
+                  // Legacy: dồn hết vào PHẦN I
+                  I: { nb: Number(t.counts?.nb || 0), th: Number(t.counts?.th || 0), vd: Number(t.counts?.vd || 0) + Number(t.counts?.vdc || 0) },
+                  II: emptyLevels(),
+                  III: emptyLevels(),
+                }
+            const legacy = syncLegacyFromByPhan({ byPhan })
+            return {
+              id: String(i + 1),
+              name: String(t.name || ''),
+              description: String(t.description || ''),
+              soTiet: Number(t.soTiet || 0),
+              byPhan,
+              ...legacy,
+            }
+          }))
         }
       } catch (err: unknown) {
         const e = err as { response?: { status?: number; data?: { error?: string } } }
@@ -137,12 +213,39 @@ export default function ExamMatrixCreatePage() {
   const totalByDifficulty = topicTotals.nb + topicTotals.th + topicTotals.vd + topicTotals.vdc
   const pct = (n: number) => totalByDifficulty > 0 ? Math.round((n / totalByDifficulty) * 100) : 0
 
+  // Sum per (phần, level) qua tất cả topics — dùng để render footer "Tổng"
+  const totalByPhan = useMemo(() => {
+    const init: Record<'I'|'II'|'III', PhanLevels> = { I: emptyLevels(), II: emptyLevels(), III: emptyLevels() }
+    for (const t of topics) {
+      for (const k of ['I','II','III'] as const) {
+        init[k].nb += t.byPhan[k].nb
+        init[k].th += t.byPhan[k].th
+        init[k].vd += t.byPhan[k].vd
+      }
+    }
+    return init
+  }, [topics])
+
   // ─── Topic ops ────────────────────────────────────────
   const addTopic = () => setTopics([...topics, {
-    id: String(Date.now()), name: 'Chủ đề mới', description: '', nb: 0, th: 0, vd: 0, vdc: 0,
+    id: String(Date.now()), name: 'Chủ đề mới', description: '', soTiet: 0,
+    byPhan: emptyByPhan(),
+    nb: 0, th: 0, vd: 0, vdc: 0,
   }])
   const removeTopic = (id: string) => setTopics(topics.filter(t => t.id !== id))
-  const updateTopic = (id: string, patch: Partial<Topic>) =>
+  // Update 1 ô (phần, level): tự sync legacy fields
+  const updateCell = (id: string, phan: 'I'|'II'|'III', level: 'nb'|'th'|'vd', value: number) => {
+    setTopics(topics.map(t => {
+      if (t.id !== id) return t
+      const nextByPhan = {
+        ...t.byPhan,
+        [phan]: { ...t.byPhan[phan], [level]: Math.max(0, value) },
+      }
+      const legacy = syncLegacyFromByPhan({ byPhan: nextByPhan })
+      return { ...t, byPhan: nextByPhan, ...legacy }
+    }))
+  }
+  const updateTopicMeta = (id: string, patch: Partial<Pick<Topic, 'name'|'description'|'soTiet'>>) =>
     setTopics(topics.map(t => t.id === id ? { ...t, ...patch } : t))
 
   const updateSection = (key: Section['key'], patch: Partial<Section>) => {
@@ -176,7 +279,9 @@ export default function ExamMatrixCreatePage() {
         })),
         topics: topics.map(t => ({
           name: t.name, description: t.description,
-          counts: { nb: t.nb, th: t.th, vd: t.vd, vdc: t.vdc },
+          soTiet: t.soTiet || 0,
+          byPhan: t.byPhan,   // mới (kết cấu theo Bộ-GDĐT 2025)
+          counts: { nb: t.nb, th: t.th, vd: t.vd, vdc: t.vdc },  // legacy
           total: t.nb + t.th + t.vd + t.vdc,
         })),
       }
@@ -341,65 +446,161 @@ export default function ExamMatrixCreatePage() {
           </div>
         )}
 
-        {/* TAB: Topics */}
+        {/* TAB: Topics — Layout chuẩn Bộ-GDĐT 2025: bảng chia theo PHẦN I/II/III */}
         {tab === 'topics' && (
           <div className="space-y-3">
-            <div className="bg-white/[0.04] rounded-2xl p-5 border border-white/[0.06]">
+            <div className="bg-white/[0.04] rounded-2xl p-4 sm:p-5 border border-white/[0.06]">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-bold">Phân bổ câu hỏi theo chủ đề</p>
+                <p className="text-sm font-bold">Phân bổ câu hỏi theo chủ đề × phần đề</p>
                 <button onClick={addTopic}
                   className="px-3 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium flex items-center gap-1">
                   <Plus className="w-3.5 h-3.5" /> Thêm chủ đề
                 </button>
               </div>
 
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_60px_60px_60px_60px_60px_36px] gap-1 px-2 mb-1.5 text-[10px] font-bold uppercase text-[hsl(var(--muted-foreground))]">
-                <div>Chủ đề</div>
-                <div className="text-center text-green-400">NB</div>
-                <div className="text-center text-yellow-400">TH</div>
-                <div className="text-center text-orange-400">VD</div>
-                <div className="text-center text-red-400">VDC</div>
-                <div className="text-center">Tổng</div>
-                <div></div>
-              </div>
-
-              <div className="space-y-2">
-                {topics.map(t => (
-                  <div key={t.id} className="grid grid-cols-[1fr_60px_60px_60px_60px_60px_36px] gap-1 items-center">
-                    <div className="space-y-1">
-                      <input type="text" value={t.name}
-                        onChange={e => updateTopic(t.id, { name: e.target.value })}
-                        placeholder="Tên chủ đề"
-                        className="w-full px-2 py-1.5 rounded-md bg-black/30 border border-white/[0.08] text-xs font-semibold focus:outline-none focus:border-purple-400" />
-                      <input type="text" value={t.description}
-                        onChange={e => updateTopic(t.id, { description: e.target.value })}
-                        placeholder="Mô tả ngắn (đơn vị kiến thức)"
-                        className="w-full px-2 py-1 rounded-md bg-black/20 border border-white/[0.05] text-[10px] text-[hsl(var(--muted-foreground))] italic focus:outline-none" />
+              {/* Wide table — horizontal scroll on mobile */}
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <div className="min-w-[920px] px-4 sm:px-0">
+                  {/* ── Header rows (grouped) ── */}
+                  <div className="grid grid-cols-[minmax(220px,1.4fr)_60px_180px_180px_180px_60px_40px] text-[11px] font-bold uppercase">
+                    {/* Top row */}
+                    <div className="bg-white/[0.05] rounded-tl-lg p-2 row-span-2 flex items-center justify-center text-center text-[hsl(var(--muted-foreground))]">
+                      Nội dung
                     </div>
-                    {(['nb','th','vd','vdc'] as const).map(d => (
-                      <input key={d} type="number" min={0} value={t[d]}
-                        onChange={e => updateTopic(t.id, { [d]: Number(e.target.value) || 0 })}
-                        className="w-full px-1 py-2 text-center rounded-md bg-black/30 border border-white/[0.08] text-sm" />
-                    ))}
-                    <span className="text-center text-yellow-300 font-bold">{t.nb + t.th + t.vd + t.vdc}</span>
-                    <button onClick={() => removeTopic(t.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-md text-red-400 hover:bg-red-500/10">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="bg-white/[0.05] p-2 flex items-center justify-center text-[hsl(var(--muted-foreground))]">
+                      Số tiết
+                    </div>
+                    <div className="bg-purple-500/10 border-l border-white/[0.06] p-2 text-center text-purple-300">
+                      PHẦN I<br/><span className="text-[9px] font-medium normal-case text-white/55">TN 4 lựa chọn</span>
+                    </div>
+                    <div className="bg-pink-500/10 border-l border-white/[0.06] p-2 text-center text-pink-300">
+                      PHẦN II<br/><span className="text-[9px] font-medium normal-case text-white/55">TN Đúng/Sai</span>
+                    </div>
+                    <div className="bg-amber-500/10 border-l border-white/[0.06] p-2 text-center text-amber-300">
+                      PHẦN III<br/><span className="text-[9px] font-medium normal-case text-white/55">Tự luận / Trả lời ngắn</span>
+                    </div>
+                    <div className="bg-white/[0.05] border-l border-white/[0.06] p-2 text-center text-yellow-300 row-span-2 flex items-center justify-center">
+                      Tổng
+                    </div>
+                    <div className="bg-white/[0.05] border-l border-white/[0.06] rounded-tr-lg row-span-2"></div>
                   </div>
-                ))}
+                  {/* Sub-row: NB / TH / VD per phần */}
+                  <div className="grid grid-cols-[minmax(220px,1.4fr)_60px_180px_180px_180px_60px_40px] text-[10px] font-bold uppercase">
+                    <div></div>
+                    <div></div>
+                    {(['I','II','III'] as const).map(p => (
+                      <div key={p} className="border-l border-white/[0.06] grid grid-cols-3 gap-px bg-white/[0.04]">
+                        <div className="bg-emerald-500/10 py-1 text-center text-emerald-300">NB</div>
+                        <div className="bg-yellow-500/10 py-1 text-center text-yellow-300">TH</div>
+                        <div className="bg-orange-500/10 py-1 text-center text-orange-300">VD</div>
+                      </div>
+                    ))}
+                    <div className="border-l border-white/[0.06]"></div>
+                    <div className="border-l border-white/[0.06]"></div>
+                  </div>
+
+                  {/* ── Topic rows ── */}
+                  <div className="divide-y divide-white/[0.04]">
+                    {topics.map(t => {
+                      const total = topicTotal(t)
+                      return (
+                        <div key={t.id} className="grid grid-cols-[minmax(220px,1.4fr)_60px_180px_180px_180px_60px_40px] items-center hover:bg-white/[0.02]">
+                          {/* Tên + mô tả */}
+                          <div className="p-2 space-y-1">
+                            <input type="text" value={t.name}
+                              onChange={e => updateTopicMeta(t.id, { name: e.target.value })}
+                              placeholder="Tên chủ đề"
+                              className="w-full px-2 py-1.5 rounded-md bg-black/30 border border-white/[0.08] text-sm font-semibold focus:outline-none focus:border-purple-400" />
+                            <input type="text" value={t.description}
+                              onChange={e => updateTopicMeta(t.id, { description: e.target.value })}
+                              placeholder="Mô tả ngắn (đơn vị kiến thức)"
+                              className="w-full px-2 py-1 rounded-md bg-black/20 border border-white/[0.05] text-[11px] text-[hsl(var(--muted-foreground))] italic focus:outline-none" />
+                          </div>
+                          {/* Số tiết */}
+                          <div className="p-1.5 border-l border-white/[0.04]">
+                            <input
+                              type="number" min={0} value={t.soTiet}
+                              onChange={e => updateTopicMeta(t.id, { soTiet: Math.max(0, Number(e.target.value) || 0) })}
+                              className="w-full px-1 py-1.5 text-center rounded-md bg-black/30 border border-white/[0.08] text-xs"
+                            />
+                          </div>
+                          {/* PHẦN I / II / III — mỗi phần 3 ô NB/TH/VD */}
+                          {(['I','II','III'] as const).map(p => (
+                            <div key={p} className="border-l border-white/[0.04] grid grid-cols-3 gap-px">
+                              {(['nb','th','vd'] as const).map(lv => {
+                                const v = t.byPhan[p][lv]
+                                return (
+                                  <input
+                                    key={lv}
+                                    type="number" min={0}
+                                    value={v || ''}
+                                    onChange={e => updateCell(t.id, p, lv, Number(e.target.value) || 0)}
+                                    placeholder="-"
+                                    className="w-full px-0 py-2 text-center bg-black/20 border-0 text-sm focus:outline-none focus:bg-purple-500/15"
+                                  />
+                                )
+                              })}
+                            </div>
+                          ))}
+                          {/* Tổng câu/topic */}
+                          <div className="text-center border-l border-white/[0.04] text-yellow-300 font-bold text-sm">{total}</div>
+                          {/* Delete */}
+                          <button onClick={() => removeTopic(t.id)}
+                            className="w-9 h-9 flex items-center justify-center text-red-400 hover:bg-red-500/10 border-l border-white/[0.04]">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* ── Footer: Tổng per phần per level ── */}
+                  <div className="grid grid-cols-[minmax(220px,1.4fr)_60px_180px_180px_180px_60px_40px] items-center bg-white/[0.03] border-t-2 border-white/[0.1] font-bold">
+                    <div className="p-2 text-sm">Tổng</div>
+                    <div className="p-1.5 text-center text-xs text-white/55 border-l border-white/[0.04]">
+                      {topics.reduce((s, t) => s + (t.soTiet || 0), 0)}
+                    </div>
+                    {(['I','II','III'] as const).map(p => (
+                      <div key={p} className="border-l border-white/[0.04] grid grid-cols-3 gap-px">
+                        <div className="py-2 text-center text-emerald-300 text-sm">{totalByPhan[p].nb}</div>
+                        <div className="py-2 text-center text-yellow-300 text-sm">{totalByPhan[p].th}</div>
+                        <div className="py-2 text-center text-orange-300 text-sm">{totalByPhan[p].vd}</div>
+                      </div>
+                    ))}
+                    <div className="text-center text-yellow-300 font-black text-base border-l border-white/[0.04]">
+                      {totalByDifficulty}
+                    </div>
+                    <div className="border-l border-white/[0.04]"></div>
+                  </div>
+
+                  {/* ── Điểm row: total per phần (từ sections cấu trúc) ── */}
+                  <div className="grid grid-cols-[minmax(220px,1.4fr)_60px_180px_180px_180px_60px_40px] items-center bg-white/[0.02] border-t border-white/[0.06] font-bold">
+                    <div className="p-2 text-sm text-amber-300">Điểm</div>
+                    <div className="border-l border-white/[0.04]"></div>
+                    {(['I','II','III'] as const).map(p => {
+                      const sec = sections.find(s => s.key === p)
+                      const pts = sec ? sec.totalPoints : 0
+                      return (
+                        <div key={p} className="border-l border-white/[0.04] py-2.5 text-center text-amber-300 text-base">
+                          {pts}đ
+                        </div>
+                      )
+                    })}
+                    <div className="text-center border-l border-white/[0.04] text-amber-300 text-base">
+                      {totalPoints}đ
+                    </div>
+                    <div className="border-l border-white/[0.04]"></div>
+                  </div>
+                </div>
               </div>
 
-              {/* Totals + percentages */}
-              <div className="grid grid-cols-[1fr_60px_60px_60px_60px_60px_36px] gap-1 mt-3 pt-3 border-t border-white/[0.06] items-center">
-                <div className="font-bold text-sm">Tổng / Tỉ lệ</div>
+              {/* ── Tỉ lệ NB/TH/VD/VDC (giữ thông tin tỷ lệ Bloom) ── */}
+              <div className="mt-4 pt-3 border-t border-white/[0.06] grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="text-xs text-white/55">Tỉ lệ Bloom:</div>
                 <DiffStat n={topicTotals.nb} pct={pct(topicTotals.nb)} color="green-400" target={40} />
                 <DiffStat n={topicTotals.th} pct={pct(topicTotals.th)} color="yellow-400" target={30} />
                 <DiffStat n={topicTotals.vd} pct={pct(topicTotals.vd)} color="orange-400" target={20} />
                 <DiffStat n={topicTotals.vdc} pct={pct(topicTotals.vdc)} color="red-400" target={10} />
-                <span className="text-center text-yellow-300 font-black text-lg">{totalByDifficulty}</span>
-                <div></div>
               </div>
 
               {totalByDifficulty !== totalQuestions && (
