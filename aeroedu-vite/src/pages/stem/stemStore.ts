@@ -29,6 +29,49 @@ export interface Feedback {
   type: 'suggestion' | 'approval' | 'revision'
 }
 
+// ─── Mở rộng cho hồ sơ + tiến độ chi tiết ────────────────────────────────────
+
+/** Nhật ký cập nhật hằng ngày — ghi nhận "Hôm nay đã làm gì" */
+export interface ProgressLog {
+  id: string
+  date: string                      // ISO timestamp
+  author: string                    // tên HS/GV log
+  content: string                   // nội dung cập nhật
+  hours?: number                    // số giờ làm trong session này
+  photoUrl?: string                 // URL ảnh tiến độ (optional)
+}
+
+/** Vấn đề gặp phải + giải pháp */
+export interface Issue {
+  id: string
+  date: string
+  title: string
+  description: string
+  severity: 'low' | 'medium' | 'high'
+  status: 'open' | 'resolved'
+  resolution?: string
+  resolvedAt?: string
+}
+
+/** Tài liệu/link tham khảo */
+export interface Resource {
+  id: string
+  type: 'link' | 'video' | 'paper' | 'datasheet'
+  title: string
+  url: string
+  notes?: string
+}
+
+/** BOM linh kiện với trạng thái mua sắm */
+export interface BOMItem {
+  id: string
+  name: string
+  qty: number
+  unitPrice: number                 // VND
+  status: 'planned' | 'ordered' | 'received' | 'used'
+  notes?: string
+}
+
 export interface STEMProject {
   id: string
   title: string
@@ -46,6 +89,29 @@ export interface STEMProject {
   milestones: Milestone[]
   feedback: Feedback[]
   isPublic: boolean
+
+  // ── Hồ sơ chi tiết (optional, backward compat) ──
+  objective?: string                // Mục tiêu cụ thể
+  methodology?: string              // Phương pháp khoa học áp dụng
+  expectedOutcomes?: string         // Kết quả mong đợi (sản phẩm/báo cáo/video)
+  subject?: string                  // Môn học liên kết (Vật lí/Hoá/Sinh/...)
+  schoolYear?: string               // Năm học (vd "2025-2026")
+  coverImage?: string               // URL ảnh bìa
+
+  // ── BOM + ngân sách ──
+  bom?: BOMItem[]
+  budgetTotal?: number              // Ngân sách tổng dự kiến VND
+
+  // ── Tiến độ ──
+  progressLogs?: ProgressLog[]
+  totalHoursSpent?: number          // Tự cộng dồn từ progressLogs
+  lastWorkedAt?: string
+
+  // ── Vấn đề ──
+  issues?: Issue[]
+
+  // ── Tài nguyên tham khảo ──
+  resources?: Resource[]
 }
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────

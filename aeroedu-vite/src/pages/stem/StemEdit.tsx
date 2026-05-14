@@ -1,13 +1,37 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ArrowLeft, FileText, Tag, Calendar, Users, Trash2, Eye, AlertCircle } from 'lucide-react'
+import {
+  ArrowLeft, FileText, Tag, Calendar, Users, Trash2, Eye, AlertCircle,
+  Target, Beaker, Package, AlertTriangle, BookOpen, Plus, ExternalLink,
+  Wallet,
+} from 'lucide-react'
 import {
   loadProjects,
   saveProjects,
   type STEMProject,
-  type TeamMember,
   type Milestone,
+  type Issue,
+  type Resource,
+  type BOMItem,
 } from './stemStore'
+
+const ISSUE_SEVERITY: Record<Issue['severity'], { label: string; cls: string }> = {
+  low:    { label: 'Thấp',    cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30'      },
+  medium: { label: 'Trung bình', cls: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' },
+  high:   { label: 'Cao',     cls: 'bg-red-500/15 text-red-300 border-red-500/30'        },
+}
+
+const BOM_STATUS: Record<BOMItem['status'], { label: string; cls: string }> = {
+  planned:  { label: 'Dự kiến',  cls: 'bg-white/[0.06] text-white/60 border-white/[0.1]'    },
+  ordered:  { label: 'Đã đặt',   cls: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' },
+  received: { label: 'Đã về',    cls: 'bg-blue-500/15 text-blue-300 border-blue-500/30'    },
+  used:     { label: 'Đã dùng',  cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+}
+
+function fmtVND(n: number): string {
+  if (!n) return '0đ'
+  return n.toLocaleString('vi-VN') + 'đ'
+}
 
 const CAT_GRADIENT: Record<string, string> = {
   Science: 'from-blue-600 to-cyan-500',
@@ -29,6 +53,9 @@ export default function StemEdit() {
   const [newTag, setNewTag] = useState('')
   const [newMilestone, setNewMilestone] = useState({ title: '', dueDate: '' })
   const [newMember, setNewMember] = useState({ name: '', role: '' })
+  const [newBom, setNewBom] = useState({ name: '', qty: 1, unitPrice: 0 })
+  const [newIssue, setNewIssue] = useState({ title: '', description: '', severity: 'medium' as Issue['severity'] })
+  const [newResource, setNewResource] = useState({ type: 'link' as Resource['type'], title: '', url: '' })
 
   // Load project
   useEffect(() => {
@@ -196,6 +223,108 @@ export default function StemEdit() {
 
   const updateProjectField = (field: keyof STEMProject, value: any) => {
     setProject({ ...project, [field]: value })
+    setHasChanges(true)
+  }
+
+  // ── BOM handlers ─────────────────────────────────
+  const addBom = () => {
+    if (!newBom.name.trim()) return
+    const updated = {
+      ...project,
+      bom: [
+        ...(project.bom || []),
+        {
+          id: `bom_${Date.now()}`,
+          name: newBom.name.trim(),
+          qty: Math.max(1, Number(newBom.qty) || 1),
+          unitPrice: Math.max(0, Number(newBom.unitPrice) || 0),
+          status: 'planned' as BOMItem['status'],
+        },
+      ],
+    }
+    setProject(updated)
+    setNewBom({ name: '', qty: 1, unitPrice: 0 })
+    setHasChanges(true)
+  }
+  const removeBom = (bomId: string) => {
+    const updated = { ...project, bom: (project.bom || []).filter(b => b.id !== bomId) }
+    setProject(updated)
+    setHasChanges(true)
+  }
+  const cycleBomStatus = (bomId: string) => {
+    const order: BOMItem['status'][] = ['planned', 'ordered', 'received', 'used']
+    const updated = {
+      ...project,
+      bom: (project.bom || []).map(b => {
+        if (b.id !== bomId) return b
+        const next = order[(order.indexOf(b.status) + 1) % order.length]
+        return { ...b, status: next }
+      }),
+    }
+    setProject(updated)
+    setHasChanges(true)
+  }
+  const bomTotal = (project.bom || []).reduce((s, b) => s + b.qty * b.unitPrice, 0)
+
+  // ── Issue handlers ───────────────────────────────
+  const addIssue = () => {
+    if (!newIssue.title.trim()) return
+    const updated = {
+      ...project,
+      issues: [
+        ...(project.issues || []),
+        {
+          id: `iss_${Date.now()}`,
+          date: new Date().toISOString(),
+          title: newIssue.title.trim(),
+          description: newIssue.description.trim(),
+          severity: newIssue.severity,
+          status: 'open' as Issue['status'],
+        },
+      ],
+    }
+    setProject(updated)
+    setNewIssue({ title: '', description: '', severity: 'medium' })
+    setHasChanges(true)
+  }
+  const removeIssue = (issueId: string) => {
+    const updated = { ...project, issues: (project.issues || []).filter(i => i.id !== issueId) }
+    setProject(updated)
+    setHasChanges(true)
+  }
+  const resolveIssue = (issueId: string, resolution: string) => {
+    const updated = {
+      ...project,
+      issues: (project.issues || []).map(i => i.id !== issueId ? i : ({
+        ...i, status: 'resolved' as const, resolution, resolvedAt: new Date().toISOString(),
+      })),
+    }
+    setProject(updated)
+    setHasChanges(true)
+  }
+
+  // ── Resource handlers ───────────────────────────
+  const addResource = () => {
+    if (!newResource.title.trim() || !newResource.url.trim()) return
+    const updated = {
+      ...project,
+      resources: [
+        ...(project.resources || []),
+        {
+          id: `res_${Date.now()}`,
+          type: newResource.type,
+          title: newResource.title.trim(),
+          url: newResource.url.trim(),
+        },
+      ],
+    }
+    setProject(updated)
+    setNewResource({ type: 'link', title: '', url: '' })
+    setHasChanges(true)
+  }
+  const removeResource = (resId: string) => {
+    const updated = { ...project, resources: (project.resources || []).filter(r => r.id !== resId) }
+    setProject(updated)
     setHasChanges(true)
   }
 
@@ -564,6 +693,315 @@ export default function StemEdit() {
                   Thêm
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* ───────── Mục tiêu & Phương pháp khoa học ───────── */}
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Target className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-semibold text-white">Mục tiêu & Phương pháp</h2>
+              <span className="text-xs text-white/30">(Hồ sơ khoa học)</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/60 mb-2">
+                🎯 Mục tiêu cụ thể của dự án
+              </label>
+              <textarea
+                value={project.objective || ''}
+                onChange={e => updateProjectField('objective', e.target.value)}
+                rows={3}
+                placeholder="VD: Thiết kế hệ thống đo nồng độ CO₂ trong lớp học, cảnh báo khi vượt 1000ppm..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/80 w-full text-sm focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/60 mb-2">
+                <Beaker className="w-3.5 h-3.5 inline mr-1" />Phương pháp tiếp cận
+              </label>
+              <textarea
+                value={project.methodology || ''}
+                onChange={e => updateProjectField('methodology', e.target.value)}
+                rows={3}
+                placeholder="VD: Sử dụng cảm biến MQ-135, đọc giá trị qua ADC, hiệu chuẩn theo công thức Henderson..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/80 w-full text-sm focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/60 mb-2">
+                ✨ Kết quả mong đợi (sản phẩm / báo cáo / video)
+              </label>
+              <textarea
+                value={project.expectedOutcomes || ''}
+                onChange={e => updateProjectField('expectedOutcomes', e.target.value)}
+                rows={2}
+                placeholder="VD: 1 mạch hoàn chỉnh + báo cáo PDF 10 trang + video demo 3 phút..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/80 w-full text-sm focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-2">📚 Môn học liên kết</label>
+                <input
+                  type="text"
+                  value={project.subject || ''}
+                  onChange={e => updateProjectField('subject', e.target.value)}
+                  placeholder="Vật lí / Hoá / Sinh / Tin học"
+                  className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/80 w-full text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/60 mb-2">📅 Năm học</label>
+                <input
+                  type="text"
+                  value={project.schoolYear || ''}
+                  onChange={e => updateProjectField('schoolYear', e.target.value)}
+                  placeholder="2025-2026"
+                  className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white/80 w-full text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ───────── BOM linh kiện ───────── */}
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Package className="w-5 h-5 text-blue-400" />
+              <h2 className="text-lg font-semibold text-white">BOM linh kiện</h2>
+              <span className="text-xs text-white/30">(Bill of Materials)</span>
+              {bomTotal > 0 && (
+                <span className="ml-auto text-sm font-bold text-emerald-300">
+                  Tổng: {fmtVND(bomTotal)}
+                </span>
+              )}
+            </div>
+
+            {(project.bom || []).length > 0 && (
+              <div className="space-y-2">
+                {(project.bom || []).map(b => (
+                  <div key={b.id} className="grid grid-cols-12 items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg">
+                    <div className="col-span-5 text-sm font-medium text-white/85 truncate">{b.name}</div>
+                    <div className="col-span-1 text-xs text-white/50 text-center">×{b.qty}</div>
+                    <div className="col-span-2 text-xs text-white/50 text-right font-mono">{fmtVND(b.unitPrice)}</div>
+                    <div className="col-span-2 text-xs font-bold text-emerald-300 text-right font-mono">{fmtVND(b.qty * b.unitPrice)}</div>
+                    <button
+                      onClick={() => cycleBomStatus(b.id)}
+                      className={`col-span-1 px-1.5 py-0.5 rounded border text-[10px] font-semibold ${BOM_STATUS[b.status].cls}`}
+                      title="Click để đổi trạng thái"
+                    >
+                      {BOM_STATUS[b.status].label}
+                    </button>
+                    <button
+                      onClick={() => removeBom(b.id)}
+                      className="col-span-1 text-white/30 hover:text-red-400 text-center"
+                    >×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-12 gap-2">
+              <input
+                type="text"
+                value={newBom.name}
+                onChange={e => setNewBom({ ...newBom, name: e.target.value })}
+                placeholder="Tên linh kiện (vd Arduino UNO)"
+                className="col-span-6 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm focus:outline-none focus:border-blue-500/50"
+              />
+              <input
+                type="number" min={1}
+                value={newBom.qty}
+                onChange={e => setNewBom({ ...newBom, qty: Number(e.target.value) || 1 })}
+                placeholder="SL"
+                className="col-span-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm text-center focus:outline-none focus:border-blue-500/50"
+              />
+              <input
+                type="number" min={0}
+                value={newBom.unitPrice}
+                onChange={e => setNewBom({ ...newBom, unitPrice: Number(e.target.value) || 0 })}
+                placeholder="Đơn giá"
+                className="col-span-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm font-mono focus:outline-none focus:border-blue-500/50"
+              />
+              <button
+                onClick={addBom}
+                className="col-span-2 px-3 py-2 bg-blue-600/30 hover:bg-blue-600/40 border border-blue-500/30 rounded-xl text-sm font-medium text-white/80"
+              >
+                <Plus className="w-3.5 h-3.5 inline mr-1" />Thêm
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-white/60 mb-2">
+                <Wallet className="w-3.5 h-3.5 inline mr-1" />Ngân sách dự kiến (tham khảo)
+              </label>
+              <input
+                type="number" min={0}
+                value={project.budgetTotal || ''}
+                onChange={e => updateProjectField('budgetTotal', Number(e.target.value) || undefined)}
+                placeholder="VD: 500000"
+                className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-2 text-white/80 w-full text-sm font-mono focus:outline-none focus:border-blue-500/50"
+              />
+              {project.budgetTotal != null && bomTotal > 0 && (
+                <p className={`text-xs mt-1 ${bomTotal > project.budgetTotal ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {bomTotal > project.budgetTotal
+                    ? `⚠️ Vượt ngân sách ${fmtVND(bomTotal - project.budgetTotal)}`
+                    : `✓ Còn lại ${fmtVND(project.budgetTotal - bomTotal)}`}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* ───────── Vấn đề & Giải pháp ───────── */}
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-5 h-5 text-yellow-400" />
+              <h2 className="text-lg font-semibold text-white">Vấn đề gặp phải</h2>
+              {(project.issues || []).filter(i => i.status === 'open').length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-300 ml-auto">
+                  {(project.issues || []).filter(i => i.status === 'open').length} đang mở
+                </span>
+              )}
+            </div>
+
+            {(project.issues || []).length > 0 && (
+              <div className="space-y-2">
+                {(project.issues || []).map(iss => (
+                  <div
+                    key={iss.id}
+                    className={`p-3 rounded-lg border ${iss.status === 'resolved'
+                      ? 'bg-emerald-500/5 border-emerald-500/20 opacity-70'
+                      : 'bg-yellow-500/5 border-yellow-500/20'}`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2 flex-1">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${ISSUE_SEVERITY[iss.severity].cls}`}>
+                          {ISSUE_SEVERITY[iss.severity].label}
+                        </span>
+                        <span className={`text-sm font-medium ${iss.status === 'resolved' ? 'text-white/60 line-through' : 'text-white/85'}`}>
+                          {iss.title}
+                        </span>
+                      </div>
+                      <button onClick={() => removeIssue(iss.id)} className="text-white/30 hover:text-red-400 text-sm">×</button>
+                    </div>
+                    {iss.description && <p className="text-xs text-white/50 mb-1.5 ml-1">{iss.description}</p>}
+                    <div className="flex items-center justify-between text-[10px] text-white/30 ml-1">
+                      <span>{new Date(iss.date).toLocaleDateString('vi-VN')}</span>
+                      {iss.status === 'open' ? (
+                        <button
+                          onClick={() => {
+                            const r = prompt('Mô tả giải pháp đã áp dụng:')
+                            if (r?.trim()) resolveIssue(iss.id, r.trim())
+                          }}
+                          className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 text-[10px] font-semibold"
+                        >
+                          ✓ Đánh dấu đã giải quyết
+                        </button>
+                      ) : (
+                        <span className="text-emerald-400">✓ Giải quyết: {iss.resolution}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-2">
+                <input
+                  type="text"
+                  value={newIssue.title}
+                  onChange={e => setNewIssue({ ...newIssue, title: e.target.value })}
+                  placeholder="Tiêu đề vấn đề..."
+                  className="col-span-7 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm focus:outline-none focus:border-yellow-500/50"
+                />
+                <select
+                  value={newIssue.severity}
+                  onChange={e => setNewIssue({ ...newIssue, severity: e.target.value as Issue['severity'] })}
+                  className="col-span-3 bg-white/[0.04] border border-white/[0.08] rounded-xl px-2 py-2 text-white/80 text-sm focus:outline-none focus:border-yellow-500/50"
+                >
+                  <option value="low">Mức Thấp</option>
+                  <option value="medium">Mức TB</option>
+                  <option value="high">Mức Cao</option>
+                </select>
+                <button
+                  onClick={addIssue}
+                  className="col-span-2 px-3 py-2 bg-yellow-600/30 hover:bg-yellow-600/40 border border-yellow-500/30 rounded-xl text-sm font-medium text-white/80"
+                >
+                  <Plus className="w-3.5 h-3.5 inline mr-1" />Thêm
+                </button>
+              </div>
+              <textarea
+                value={newIssue.description}
+                onChange={e => setNewIssue({ ...newIssue, description: e.target.value })}
+                rows={2}
+                placeholder="Mô tả chi tiết vấn đề (optional)..."
+                className="bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 w-full text-sm focus:outline-none focus:border-yellow-500/50 resize-none"
+              />
+            </div>
+          </div>
+
+          {/* ───────── Tài nguyên tham khảo ───────── */}
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-1">
+              <BookOpen className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-lg font-semibold text-white">Tài nguyên tham khảo</h2>
+            </div>
+
+            {(project.resources || []).length > 0 && (
+              <div className="space-y-1.5">
+                {(project.resources || []).map(r => (
+                  <div key={r.id} className="flex items-center gap-2 px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg">
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-semibold uppercase">
+                      {r.type}
+                    </span>
+                    <a
+                      href={r.url} target="_blank" rel="noreferrer"
+                      className="flex-1 text-sm text-white/85 hover:text-cyan-300 truncate flex items-center gap-1.5"
+                    >
+                      {r.title}
+                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                    </a>
+                    <button onClick={() => removeResource(r.id)} className="text-white/30 hover:text-red-400">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-12 gap-2">
+              <select
+                value={newResource.type}
+                onChange={e => setNewResource({ ...newResource, type: e.target.value as Resource['type'] })}
+                className="col-span-2 bg-white/[0.04] border border-white/[0.08] rounded-xl px-2 py-2 text-white/80 text-sm focus:outline-none focus:border-cyan-500/50"
+              >
+                <option value="link">Link</option>
+                <option value="video">Video</option>
+                <option value="paper">Bài báo</option>
+                <option value="datasheet">Datasheet</option>
+              </select>
+              <input
+                type="text"
+                value={newResource.title}
+                onChange={e => setNewResource({ ...newResource, title: e.target.value })}
+                placeholder="Tiêu đề tài liệu"
+                className="col-span-4 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm focus:outline-none focus:border-cyan-500/50"
+              />
+              <input
+                type="url"
+                value={newResource.url}
+                onChange={e => setNewResource({ ...newResource, url: e.target.value })}
+                placeholder="https://..."
+                className="col-span-4 bg-white/[0.04] border border-white/[0.08] rounded-xl px-3 py-2 text-white/80 text-sm font-mono focus:outline-none focus:border-cyan-500/50"
+              />
+              <button
+                onClick={addResource}
+                className="col-span-2 px-3 py-2 bg-cyan-600/30 hover:bg-cyan-600/40 border border-cyan-500/30 rounded-xl text-sm font-medium text-white/80"
+              >
+                <Plus className="w-3.5 h-3.5 inline mr-1" />Thêm
+              </button>
             </div>
           </div>
         </div>
