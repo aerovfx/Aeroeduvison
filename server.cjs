@@ -9788,10 +9788,230 @@ if (!USE_NODEJS_QUESTIONS) {
   app.get(/^\/api\/xp\/analyze\/.+/, (_req, res) => res.json({ totalXp: 0, recent: [] }));
 
   // ─ Grading ────────────────────────────────────────────────
-  app.get('/api/grading/answer-keys', (_req, res) => res.json({ keys: [] }));
-  app.post('/api/grading/answer-keys', okMsg);
-  app.get('/api/grading/graded-sheets', (_req, res) => res.json({ sheets: [] }));
-  app.post('/api/grading/graded-sheets', okMsg);
+  // ── Grading: AnswerKey + GradedSheet (DB-backed, JSON column cho flexibility) ──
+  {
+    const { Pool: GrPool } = require('pg');
+    let _grpool = null;
+    function getGrPool() {
+      if (!_grpool && process.env.DATABASE_URL) {
+        _grpool = new GrPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _grpool;
+    }
+    const _grjwt = require('jsonwebtoken');
+    const _grSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getGrTeacher(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = _grjwt.verify(auth.slice(7), _grSecret, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id };
+      } catch { return null; }
+    }
+    let _grReady = false;
+    async function ensureGradingTables() {
+      if (_grReady) return;
+      const pool = getGrPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "AnswerKey" (
+          id           TEXT PRIMARY KEY,
+          "teacherId"  TEXT NOT NULL,
+          "examName"   TEXT,
+          "examCode"   TEXT,
+          "examDate"   TEXT,
+          "examSite"   TEXT,
+          "examRoom"   TEXT,
+          payload      JSONB NOT NULL DEFAULT '{}'::jsonb,
+          "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "AnswerKey_teacher_idx" ON "AnswerKey" ("teacherId", "createdAt" DESC)`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "GradedSheet" (
+          id              TEXT PRIMARY KEY,
+          "teacherId"     TEXT NOT NULL,
+          "answerKeyId"   TEXT,
+          "studentName"   TEXT,
+          "studentId"     TEXT,
+          "examCode"      TEXT,
+          "className"     TEXT,
+          score           DOUBLE PRECISION,
+          "maxScore"      DOUBLE PRECISION,
+          payload         JSONB NOT NULL DEFAULT '{}'::jsonb,
+          "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "GradedSheet_teacher_idx" ON "GradedSheet" ("teacherId", "createdAt" DESC)`);
+      _grReady = true;
+    }
+    function akToClient(row) {
+      const p = row.payload || {};
+      return {
+        id: row.id,
+        examName: row.examName || p.examName || '',
+        examCode: row.examCode || p.examCode || '',
+        examDate: row.examDate || p.examDate || '',
+        examSite: row.examSite || p.examSite || '',
+        examRoom: row.examRoom || p.examRoom || '',
+        studentName: p.studentName || '',
+        studentId: p.studentId || '',
+        dob: p.dob || '',
+        part1: p.part1 || {},
+        part2: p.part2 || {},
+        part3: p.part3 || {},
+        essayQuestions: Array.isArray(p.essayQuestions) ? p.essayQuestions : [],
+        createdAt: row.createdAt,
+      };
+    }
+
+    // GET /api/grading/answer-keys → list của teacher
+    app.get('/api/grading/answer-keys', async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.json({ keys: [] });  // không lỗi để FE không vỡ
+      const pool = getGrPool();
+      if (!pool) return res.json({ keys: [] });
+      try {
+        await ensureGradingTables();
+        const { rows } = await pool.query(
+          `SELECT * FROM "AnswerKey" WHERE "teacherId" = $1 ORDER BY "createdAt" DESC`,
+          [user.id]
+        );
+        res.json({ keys: rows.map(akToClient) });
+      } catch (e) {
+        console.error('[grading:answer-keys:list]', e.message);
+        res.json({ keys: [] });
+      }
+    });
+
+    // POST /api/grading/answer-keys → tạo mới, trả { key }
+    app.post('/api/grading/answer-keys', express.json({ limit: '5mb' }), async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getGrPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureGradingTables();
+        const body = req.body || {};
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        // Tách field index (search-friendly) khỏi payload (tự do)
+        const { examName, examCode, examDate, examSite, examRoom, ...rest } = body;
+        const payload = { ...body };  // lưu full để load lại đầy đủ
+        await pool.query(
+          `INSERT INTO "AnswerKey"
+             (id, "teacherId", "examName", "examCode", "examDate", "examSite", "examRoom", payload)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, user.id,
+           String(examName || '').slice(0, 200),
+           String(examCode || '').slice(0, 50),
+           String(examDate || '').slice(0, 50),
+           String(examSite || '').slice(0, 200),
+           String(examRoom || '').slice(0, 50),
+           JSON.stringify(payload)]
+        );
+        const { rows } = await pool.query(`SELECT * FROM "AnswerKey" WHERE id = $1`, [id]);
+        console.log(`[grading:answer-keys:create] ✅ ${id} "${examName || '(no name)'}"`);
+        res.status(201).json({ ok: true, key: akToClient(rows[0]) });
+      } catch (e) {
+        console.error('[grading:answer-keys:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/grading/answer-keys/:id
+    app.delete('/api/grading/answer-keys/:id', async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getGrPool();
+      try {
+        const { rowCount } = await pool.query(
+          `DELETE FROM "AnswerKey" WHERE id = $1 AND "teacherId" = $2`,
+          [req.params.id, user.id]
+        );
+        if (!rowCount) return res.status(404).json({ error: 'Not found' });
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[grading:answer-keys:delete]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/grading/graded-sheets → list (filter optional ?keyId=)
+    app.get('/api/grading/graded-sheets', async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.json({ sheets: [] });
+      const pool = getGrPool();
+      if (!pool) return res.json({ sheets: [] });
+      try {
+        await ensureGradingTables();
+        const params = [user.id];
+        let where = `"teacherId" = $1`;
+        if (req.query.keyId) {
+          where += ` AND "answerKeyId" = $2`;
+          params.push(String(req.query.keyId));
+        }
+        const { rows } = await pool.query(
+          `SELECT * FROM "GradedSheet" WHERE ${where} ORDER BY "createdAt" DESC LIMIT 500`,
+          params
+        );
+        res.json({
+          sheets: rows.map(r => ({
+            id: r.id,
+            answerKeyId: r.answerKeyId,
+            studentName: r.studentName,
+            studentId: r.studentId,
+            examCode: r.examCode,
+            className: r.className,
+            score: r.score,
+            maxScore: r.maxScore,
+            createdAt: r.createdAt,
+            ...(r.payload || {}),
+          })),
+        });
+      } catch (e) {
+        console.error('[grading:graded-sheets:list]', e.message);
+        res.json({ sheets: [] });
+      }
+    });
+
+    // POST /api/grading/graded-sheets → save graded result
+    app.post('/api/grading/graded-sheets', express.json({ limit: '5mb' }), async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getGrPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureGradingTables();
+        const body = req.body || {};
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        await pool.query(
+          `INSERT INTO "GradedSheet"
+             (id, "teacherId", "answerKeyId", "studentName", "studentId",
+              "examCode", "className", score, "maxScore", payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+          [id, user.id,
+           body.answerKeyId || null,
+           String(body.studentName || '').slice(0, 200),
+           String(body.studentId || '').slice(0, 50),
+           String(body.examCode || '').slice(0, 50),
+           String(body.className || '').slice(0, 50),
+           Number(body.score) || 0,
+           Number(body.maxScore) || 10,
+           JSON.stringify(body)]
+        );
+        res.status(201).json({ ok: true, id });
+      } catch (e) {
+        console.error('[grading:graded-sheets:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+  }
 
   // POST /api/grading/ocr — Vision AI extract thông tin học sinh từ phiếu trả lời
   // Body JSON: { image: base64String, mimeType: 'image/jpeg', language?: 'vi' }
