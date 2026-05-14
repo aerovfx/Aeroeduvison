@@ -504,6 +504,74 @@ if (USE_NODEJS_AUTH) {
 
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
       const user = rows[0];
+
+      // ── Auto-link nếu role=STUDENT và email match ClassStudent đã import ──
+      // GV import HS với cột email → khi HS đăng ký bằng email đó, tự động
+      // được kết nối với GV đã import. KHÔNG cần GV duyệt (vì GV đã chủ động
+      // import = đã chấp nhận). Notification gửi cho GV biết HS vừa join.
+      if (safeRole === 'STUDENT') {
+        try {
+          // Đảm bảo bảng tồn tại trước khi query (lazy init nếu chưa có)
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS "TeacherStudentLink" (
+              id           TEXT PRIMARY KEY,
+              "teacherId"  TEXT NOT NULL,
+              "studentId"  TEXT NOT NULL,
+              status       TEXT NOT NULL,
+              "initiatedBy" TEXT NOT NULL,
+              message      TEXT,
+              "approvedAt" TIMESTAMPTZ,
+              "rejectedAt" TIMESTAMPTZ,
+              "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              UNIQUE("teacherId", "studentId")
+            )
+          `).catch(() => {});
+          // Tìm các (classId, teacherId) HS này đã được import
+          const matches = await pool.query(`
+            SELECT DISTINCT tc."teacherId", tc.name AS "className", tc.subject
+              FROM "ClassStudent" cs
+              JOIN "TeacherClass" tc ON tc.id = cs."classId"
+             WHERE LOWER(cs.email) = LOWER($1)
+               AND tc."teacherId" IS NOT NULL
+               AND tc."teacherId" != $2
+          `, [user.email, user.id]).catch(() => ({ rows: [] }));
+          let autoLinks = 0;
+          for (const row of matches.rows) {
+            try {
+              await pool.query(`
+                INSERT INTO "TeacherStudentLink"
+                  (id, "teacherId", "studentId", status, "initiatedBy", "approvedAt")
+                VALUES ($1, $2, $3, 'approved', 'auto', NOW())
+                ON CONFLICT ("teacherId", "studentId") DO NOTHING
+              `, [randomUUID(), row.teacherId, user.id]);
+              autoLinks++;
+              // Notification cho GV (best-effort, không fail register nếu lỗi)
+              try {
+                await pool.query(`
+                  INSERT INTO "Notification"
+                    (id, "userId", "fromUserId", type, title, body, link, metadata)
+                  VALUES ($1, $2, $3, 'link_approved', $4, $5, $6, $7)
+                `, [randomUUID(), row.teacherId, user.id,
+                    `Học sinh ${user.name} vừa đăng ký`,
+                    `${user.name} đã được tự động kết nối vào lớp "${row.className}" mà bạn đã import.`,
+                    '/teacher/student-requests',
+                    JSON.stringify({ studentId: user.id, className: row.className, subject: row.subject, autoLinked: true })]);
+              } catch { /* notification fail không ảnh hưởng */ }
+            } catch (e) {
+              if (!/already exists|duplicate/i.test(e.message)) {
+                console.warn('[auth:register:auto-link]', e.message.slice(0, 100));
+              }
+            }
+          }
+          if (autoLinks > 0) {
+            console.log(`[auth:register] 🔗 auto-linked ${user.email} với ${autoLinks} GV (đã import lớp)`);
+          }
+        } catch (linkErr) {
+          // Auto-link thất bại không cản đăng ký
+          console.warn('[auth:register:auto-link-block]', linkErr.message.slice(0, 100));
+        }
+      }
+
       const token = issueToken(user);
       console.log(`[auth:register] ✅ ${user.email}`);
       return res.status(201).json({
@@ -4932,6 +5000,363 @@ if (USE_NODEJS_QUESTIONS) {
     } catch (err) {
       console.error('[notifications:read-all] ❌', err.message);
       return res.status(500).json({ success: false, error: 'internal' });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  // TEACHER ↔ STUDENT LINK — Sync data riêng tư giữa GV và HS
+  // ────────────────────────────────────────────────────────────────
+  // Many-to-many: 1 HS có thể kết nối nhiều GV (theo môn).
+  // 3 luồng:
+  //   - Auto: khi HS đăng ký + email match ClassStudent → status=approved
+  //   - Student-init: HS request → notification GV → approve/reject
+  //   - Teacher-init: GV mời → notification HS → approve/reject
+  // Sau khi approved: assignment + grade + notification chỉ flow giữa cặp.
+  // Reject anti-spam: 30 ngày không cho request lại cùng cặp.
+  // Disconnect: data cũ giữ (read-only), chỉ stop sync mới.
+  // ════════════════════════════════════════════════════════════════
+  let _tslReady = false;
+  async function ensureTSLTable() {
+    if (_tslReady) return;
+    const pool = getAsgnPool();
+    if (!pool) return;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "TeacherStudentLink" (
+        id            TEXT PRIMARY KEY,
+        "teacherId"   TEXT NOT NULL,
+        "studentId"   TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        "initiatedBy" TEXT NOT NULL,
+        message       TEXT,
+        "approvedAt"  TIMESTAMPTZ,
+        "rejectedAt"  TIMESTAMPTZ,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE("teacherId", "studentId")
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "TSL_teacher_idx"
+      ON "TeacherStudentLink"("teacherId", status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "TSL_student_idx"
+      ON "TeacherStudentLink"("studentId", status)`);
+    _tslReady = true;
+  }
+
+  // Helper: gửi notification, fail silent
+  async function sendNotif(pool, userId, fromUserId, type, title, body, link, metadata) {
+    try {
+      await pool.query(
+        `INSERT INTO "Notification"
+           (id, "userId", "fromUserId", type, title, body, link, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [newAsgnId('nt_'), userId, fromUserId, type, title, body || null, link || null,
+         metadata ? JSON.stringify(metadata) : '{}']
+      );
+    } catch (e) { console.warn('[notif:send]', e.message.slice(0, 80)); }
+  }
+
+  // ── POST /api/teacher-student-link/request ── HS gửi request tới GV
+  // Body: { teacherEmail OR teacherId, message? }
+  app.post('/api/teacher-student-link/request', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!/STUDENT/i.test(user.role || '')) return res.status(403).json({ error: 'Chỉ học sinh được dùng endpoint này' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const { teacherEmail, teacherId: tId, message } = req.body || {};
+      if (!teacherEmail && !tId) return res.status(400).json({ error: 'Thiếu teacherEmail hoặc teacherId' });
+      // Resolve teacher
+      let teacher;
+      if (tId) {
+        const r = await pool.query(`SELECT id, email, name FROM "User" WHERE id=$1 AND UPPER(role)='TEACHER' LIMIT 1`, [tId]);
+        teacher = r.rows[0];
+      } else {
+        const r = await pool.query(`SELECT id, email, name FROM "User" WHERE LOWER(email)=LOWER($1) AND UPPER(role)='TEACHER' LIMIT 1`, [teacherEmail]);
+        teacher = r.rows[0];
+      }
+      if (!teacher) return res.status(404).json({ error: 'Không tìm thấy giáo viên' });
+      if (teacher.id === user.id) return res.status(400).json({ error: 'Không thể tự kết nối với chính mình' });
+      // Check existing link
+      const existing = await pool.query(
+        `SELECT id, status, "rejectedAt" FROM "TeacherStudentLink" WHERE "teacherId"=$1 AND "studentId"=$2`,
+        [teacher.id, user.id]
+      );
+      if (existing.rows[0]) {
+        const e = existing.rows[0];
+        if (e.status === 'approved')  return res.status(409).json({ error: 'Đã kết nối với GV này rồi' });
+        if (e.status === 'pending')   return res.status(409).json({ error: 'Đã gửi yêu cầu, đang chờ duyệt' });
+        if (e.status === 'rejected') {
+          // Anti-spam: 30 ngày không cho request lại
+          const daysSince = (Date.now() - new Date(e.rejectedAt).getTime()) / 86_400_000;
+          if (daysSince < 30) {
+            return res.status(429).json({ error: `GV đã từ chối — vui lòng chờ ${Math.ceil(30 - daysSince)} ngày nữa` });
+          }
+          // Hết 30 ngày → reset link để request lại
+          await pool.query(`DELETE FROM "TeacherStudentLink" WHERE id=$1`, [e.id]);
+        }
+      }
+      const id = newAsgnId('tsl_');
+      await pool.query(
+        `INSERT INTO "TeacherStudentLink"
+           (id, "teacherId", "studentId", status, "initiatedBy", message)
+         VALUES ($1, $2, $3, 'pending', 'student', $4)`,
+        [id, teacher.id, user.id, message ? String(message).slice(0, 500) : null]
+      );
+      // Notify teacher
+      await sendNotif(pool, teacher.id, user.id, 'link_request',
+        `Học sinh ${user.email} muốn kết nối`,
+        message ? String(message).slice(0, 200) : 'Bấm để xem chi tiết và duyệt yêu cầu',
+        '/teacher/student-requests',
+        { linkId: id, studentId: user.id, studentEmail: user.email });
+      return res.status(201).json({ ok: true, linkId: id });
+    } catch (err) {
+      console.error('[tsl:request]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher-student-link/invite ── GV mời HS
+  // Body: { studentEmail, message? }
+  app.post('/api/teacher-student-link/invite', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!/TEACHER|ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Chỉ giáo viên được dùng endpoint này' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const { studentEmail, message } = req.body || {};
+      if (!studentEmail) return res.status(400).json({ error: 'Thiếu studentEmail' });
+      const r = await pool.query(`SELECT id, email, name FROM "User" WHERE LOWER(email)=LOWER($1) LIMIT 1`, [studentEmail]);
+      const student = r.rows[0];
+      if (!student) return res.status(404).json({ error: 'HS chưa có tài khoản — họ cần đăng ký với email này trước' });
+      if (student.id === user.id) return res.status(400).json({ error: 'Không thể tự mời chính mình' });
+      const existing = await pool.query(
+        `SELECT id, status FROM "TeacherStudentLink" WHERE "teacherId"=$1 AND "studentId"=$2`,
+        [user.id, student.id]
+      );
+      if (existing.rows[0]?.status === 'approved') return res.status(409).json({ error: 'Đã kết nối với HS này' });
+      if (existing.rows[0]?.status === 'pending')  return res.status(409).json({ error: 'Đã gửi lời mời, đang chờ HS duyệt' });
+      if (existing.rows[0]) {
+        await pool.query(`DELETE FROM "TeacherStudentLink" WHERE id=$1`, [existing.rows[0].id]);
+      }
+      const id = newAsgnId('tsl_');
+      await pool.query(
+        `INSERT INTO "TeacherStudentLink"
+           (id, "teacherId", "studentId", status, "initiatedBy", message)
+         VALUES ($1, $2, $3, 'pending', 'teacher', $4)`,
+        [id, user.id, student.id, message ? String(message).slice(0, 500) : null]
+      );
+      await sendNotif(pool, student.id, user.id, 'link_request',
+        `Giáo viên ${user.email} mời bạn kết nối`,
+        message ? String(message).slice(0, 200) : 'Bấm để duyệt — bài tập sẽ được đồng bộ sau khi đồng ý',
+        '/student/teachers',
+        { linkId: id, teacherId: user.id, teacherEmail: user.email });
+      return res.status(201).json({ ok: true, linkId: id });
+    } catch (err) {
+      console.error('[tsl:invite]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher-student-link/:id/approve ── người nhận đồng ý
+  app.post('/api/teacher-student-link/:id/approve', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      // Phải là người nhận của request (initiatedBy != user role)
+      const r = await pool.query(`SELECT * FROM "TeacherStudentLink" WHERE id=$1`, [req.params.id]);
+      const link = r.rows[0];
+      if (!link) return res.status(404).json({ error: 'Yêu cầu không tồn tại' });
+      if (link.status !== 'pending') return res.status(400).json({ error: 'Yêu cầu đã được xử lý' });
+      const isReceiverOfStudentReq = link.initiatedBy === 'student' && link.teacherId === user.id;
+      const isReceiverOfTeacherReq = link.initiatedBy === 'teacher' && link.studentId === user.id;
+      if (!isReceiverOfStudentReq && !isReceiverOfTeacherReq) {
+        return res.status(403).json({ error: 'Bạn không phải người nhận yêu cầu này' });
+      }
+      await pool.query(`UPDATE "TeacherStudentLink" SET status='approved', "approvedAt"=NOW() WHERE id=$1`, [req.params.id]);
+      // Notify initiator
+      const initiatorId = link.initiatedBy === 'student' ? link.studentId : link.teacherId;
+      await sendNotif(pool, initiatorId, user.id, 'link_approved',
+        `${user.email} đã đồng ý kết nối`,
+        'Bài tập + điểm số sẽ được đồng bộ từ giờ',
+        link.initiatedBy === 'student' ? '/student/teachers' : '/teacher/student-requests',
+        { linkId: link.id });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[tsl:approve]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher-student-link/:id/reject
+  app.post('/api/teacher-student-link/:id/reject', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const r = await pool.query(`SELECT * FROM "TeacherStudentLink" WHERE id=$1`, [req.params.id]);
+      const link = r.rows[0];
+      if (!link) return res.status(404).json({ error: 'Yêu cầu không tồn tại' });
+      if (link.status !== 'pending') return res.status(400).json({ error: 'Yêu cầu đã được xử lý' });
+      const isReceiverOfStudentReq = link.initiatedBy === 'student' && link.teacherId === user.id;
+      const isReceiverOfTeacherReq = link.initiatedBy === 'teacher' && link.studentId === user.id;
+      if (!isReceiverOfStudentReq && !isReceiverOfTeacherReq) {
+        return res.status(403).json({ error: 'Bạn không phải người nhận' });
+      }
+      await pool.query(`UPDATE "TeacherStudentLink" SET status='rejected', "rejectedAt"=NOW() WHERE id=$1`, [req.params.id]);
+      const initiatorId = link.initiatedBy === 'student' ? link.studentId : link.teacherId;
+      await sendNotif(pool, initiatorId, user.id, 'link_rejected',
+        `Yêu cầu kết nối bị từ chối`,
+        '30 ngày sau bạn có thể gửi lại nếu muốn', null, { linkId: link.id });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher-student-link/pending ── inbox của user (có cả request gửi đi và nhận về)
+  app.get('/api/teacher-student-link/pending', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.json({ incoming: [], outgoing: [] });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      // Incoming: yêu cầu cần tôi duyệt
+      const incomingQ = await pool.query(`
+        SELECT tsl.*,
+               other.email AS "otherEmail",
+               other.name  AS "otherName",
+               other.image AS "otherImage"
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" other ON other.id = CASE
+            WHEN tsl."initiatedBy" = 'student' THEN tsl."studentId"
+            WHEN tsl."initiatedBy" = 'teacher' THEN tsl."teacherId"
+          END
+         WHERE tsl.status = 'pending'
+           AND ((tsl."initiatedBy" = 'student' AND tsl."teacherId" = $1)
+                OR (tsl."initiatedBy" = 'teacher' AND tsl."studentId" = $1))
+         ORDER BY tsl."createdAt" DESC
+      `, [user.id]);
+      // Outgoing: yêu cầu tôi đã gửi đang chờ
+      const outgoingQ = await pool.query(`
+        SELECT tsl.*,
+               other.email AS "otherEmail",
+               other.name  AS "otherName",
+               other.image AS "otherImage"
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" other ON other.id = CASE
+            WHEN tsl."initiatedBy" = 'student' THEN tsl."teacherId"
+            WHEN tsl."initiatedBy" = 'teacher' THEN tsl."studentId"
+          END
+         WHERE tsl.status = 'pending'
+           AND ((tsl."initiatedBy" = 'student' AND tsl."studentId" = $1)
+                OR (tsl."initiatedBy" = 'teacher' AND tsl."teacherId" = $1))
+         ORDER BY tsl."createdAt" DESC
+      `, [user.id]);
+      return res.json({ incoming: incomingQ.rows, outgoing: outgoingQ.rows });
+    } catch (err) {
+      console.error('[tsl:pending]', err.message);
+      return res.json({ incoming: [], outgoing: [] });
+    }
+  });
+
+  // ── GET /api/teacher/my-students ── list HS approved của GV
+  app.get('/api/teacher/my-students', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(`
+        SELECT tsl.id AS "linkId", tsl."initiatedBy", tsl."approvedAt",
+               u.id, u.email, u.name, u.image
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" u ON u.id = tsl."studentId"
+         WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+         ORDER BY tsl."approvedAt" DESC NULLS LAST
+      `, [user.id]);
+      return res.json({ students: rows });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/student/my-teachers ── list GV approved của HS
+  app.get('/api/student/my-teachers', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(`
+        SELECT tsl.id AS "linkId", tsl."initiatedBy", tsl."approvedAt",
+               u.id, u.email, u.name, u.image
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" u ON u.id = tsl."teacherId"
+         WHERE tsl."studentId" = $1 AND tsl.status = 'approved'
+         ORDER BY tsl."approvedAt" DESC NULLS LAST
+      `, [user.id]);
+      return res.json({ teachers: rows });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher-student-link/:id ── 1 trong 2 phía gỡ link
+  // KHÔNG xoá data cũ (assignments + grades giữ nguyên), chỉ stop sync mới
+  app.delete('/api/teacher-student-link/:id', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const r = await pool.query(`SELECT * FROM "TeacherStudentLink" WHERE id=$1`, [req.params.id]);
+      const link = r.rows[0];
+      if (!link) return res.status(404).json({ error: 'Link không tồn tại' });
+      if (link.teacherId !== user.id && link.studentId !== user.id) {
+        return res.status(403).json({ error: 'Bạn không có quyền gỡ link này' });
+      }
+      await pool.query(`DELETE FROM "TeacherStudentLink" WHERE id=$1`, [req.params.id]);
+      // Notify phía còn lại
+      const otherId = link.teacherId === user.id ? link.studentId : link.teacherId;
+      await sendNotif(pool, otherId, user.id, 'link_rejected',
+        `${user.email} đã gỡ kết nối`,
+        'Dữ liệu cũ vẫn được lưu, chỉ ngừng đồng bộ mới', null, { linkId: link.id });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/users/search?q=... ── search user (cho UI tìm GV/HS để link)
+  // Limit 20 results, search by email or name (LOWER), filter optional role
+  app.get('/api/users/search', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const q = String(req.query.q || '').trim().toLowerCase();
+      const role = String(req.query.role || '').toUpperCase();
+      if (q.length < 2) return res.json({ users: [] });
+      const params = [`%${q}%`];
+      let where = `(LOWER(email) LIKE $1 OR LOWER(name) LIKE $1)`;
+      if (role === 'TEACHER' || role === 'STUDENT') {
+        where += ` AND UPPER(role) = $2`;
+        params.push(role);
+      }
+      // Loại trừ chính mình
+      params.push(user.id);
+      where += ` AND id != $${params.length}`;
+      const { rows } = await pool.query(
+        `SELECT id, email, name, image, role FROM "User" WHERE ${where} ORDER BY name ASC LIMIT 20`,
+        params
+      );
+      return res.json({ users: rows });
+    } catch (err) {
+      return res.json({ users: [] });
     }
   });
 
