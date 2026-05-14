@@ -9792,7 +9792,85 @@ if (!USE_NODEJS_QUESTIONS) {
   app.post('/api/grading/answer-keys', okMsg);
   app.get('/api/grading/graded-sheets', (_req, res) => res.json({ sheets: [] }));
   app.post('/api/grading/graded-sheets', okMsg);
-  app.post('/api/grading/ocr', notImpl('OCR phiếu chấm đang phát triển'));
+
+  // POST /api/grading/ocr — Vision AI extract thông tin học sinh từ phiếu trả lời
+  // Body JSON: { image: base64String, mimeType: 'image/jpeg', language?: 'vi' }
+  // Trả về { success: true, exam_info: { student_name, student_id, exam_code, class_name } }
+  // Phiếu chuẩn Bộ GD&ĐT có các ô: SBD (số báo danh), Mã đề, Họ tên, Lớp.
+  app.post('/api/grading/ocr', express.json({ limit: '20mb' }), async (req, res) => {
+    try {
+      const { image, mimeType = 'image/jpeg' } = req.body || {};
+      if (!image || typeof image !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Thiếu trường image (base64). Gửi JSON: { image, mimeType }',
+        });
+      }
+      // Strip data:URI prefix nếu có
+      const base64 = image.replace(/^data:[^,]+,/, '');
+      // Gọi fal vision để extract fields
+      const { completeWithVision } = require('./lib/fal-client.cjs');
+      const prompt = [
+        'Đây là Phiếu Trả Lời Trắc Nghiệm chuẩn Bộ GD&ĐT 2025 của Việt Nam.',
+        'Hãy trích xuất các thông tin sau từ phần header phiếu (KHÔNG cần đọc đáp án bubble):',
+        '',
+        'YÊU CẦU OUTPUT — CHỈ trả JSON hợp lệ, không markdown, không giải thích:',
+        '{',
+        '  "student_name": "<Họ và tên thí sinh>",',
+        '  "student_id":   "<Số báo danh — chuỗi số 6-8 chữ số>",',
+        '  "exam_code":    "<Mã đề thi — chuỗi 3 chữ số, vd 132/209/357/485>",',
+        '  "class_name":   "<Lớp — vd 12A1, 11B3>",',
+        '  "exam_session": "<Kỳ thi nếu có — vd Giữa kỳ I 2025>"',
+        '}',
+        '',
+        'Quy tắc:',
+        '- Nếu không đọc được trường nào, để chuỗi rỗng "".',
+        '- KHÔNG suy đoán, chỉ extract những gì thấy rõ trên phiếu.',
+        '- Nếu SBD có ô tô bubble số → đọc theo bubble đã tô (không đọc số in sẵn).',
+        '- Tên thí sinh: giữ nguyên dấu tiếng Việt (vd "Nguyễn Văn A").',
+        '',
+        'Trả JSON ngay:',
+      ].join('\n');
+      const t0 = Date.now();
+      const resp = await completeWithVision({
+        system: 'Bạn là OCR engine chuyên đọc phiếu trắc nghiệm Việt Nam. CHỈ trả JSON.',
+        messages: [{ role: 'user', content: prompt }],
+        images: [{ data: base64, mimeType }],
+      });
+      const raw = String(resp.content || '').trim();
+      // Trích JSON object từ output
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) {
+        console.warn('[grading:ocr] AI output không có JSON:', raw.slice(0, 200));
+        return res.status(502).json({
+          success: false,
+          error: 'AI không trả về JSON hợp lệ',
+          raw: raw.slice(0, 300),
+        });
+      }
+      let parsed;
+      try { parsed = JSON.parse(m[0]); }
+      catch (e) {
+        return res.status(502).json({
+          success: false,
+          error: `JSON parse fail: ${e.message}`,
+          raw: m[0].slice(0, 300),
+        });
+      }
+      const exam_info = {
+        student_name: String(parsed.student_name || '').trim(),
+        student_id:   String(parsed.student_id   || '').trim(),
+        exam_code:    String(parsed.exam_code    || '').trim(),
+        class_name:   String(parsed.class_name   || '').trim(),
+        exam_session: String(parsed.exam_session || '').trim(),
+      };
+      console.log(`[grading:ocr] ✅ ${Date.now()-t0}ms ${JSON.stringify(exam_info)}`);
+      return res.json({ success: true, exam_info, tookMs: Date.now() - t0 });
+    } catch (err) {
+      console.error('[grading:ocr] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
   // ─ Documents ──────────────────────────────────────────────
   app.get('/api/documents', (_req, res) => res.json({ documents: [] }));

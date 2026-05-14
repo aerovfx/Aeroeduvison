@@ -2854,12 +2854,19 @@ export default function ScanGrading(props: ScanGradingProps) {
           try {
             const file = processedFiles.find(f => f.name === newSheet.fileName);
             if (file) {
-              const ocrForm = new FormData();
-              ocrForm.append('image', file);
-              ocrForm.append('mode', 'ocr');
+              // Convert file → base64 (strip data: prefix), gửi JSON tới backend
+              // /api/grading/ocr (Vision AI extract student_name/id/exam_code).
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.onerror = () => reject(new Error('FileReader fail'));
+                reader.readAsDataURL(file);
+              });
+              const base64 = dataUrl.replace(/^data:[^,]+,/, '');
               const ocrResp = await fetch('/api/grading/ocr', {
                 method: 'POST',
-                body: ocrForm,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: base64, mimeType: file.type || 'image/jpeg' }),
               });
               if (ocrResp.ok) {
                 const ocrData = await ocrResp.json();
