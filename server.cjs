@@ -6131,11 +6131,26 @@ if (USE_NODEJS_QUESTIONS) {
     } catch { return null; }
   }
 
+  // Lazy migration: ExamMatrix gốc (Prisma) không có cột description.
+  // UI mới lưu metadata (sections/topics/schoolYear/notes) vào JSON ở cột này.
+  // Tự ALTER ADD COLUMN IF NOT EXISTS lần đầu gọi.
+  let _matrixDescReady = false;
+  async function ensureMatrixDescription() {
+    if (_matrixDescReady) return;
+    try {
+      await getMPool().query(`ALTER TABLE "ExamMatrix" ADD COLUMN IF NOT EXISTS description TEXT`);
+      _matrixDescReady = true;
+    } catch (e) {
+      console.warn('[matrix] ALTER description:', e.message);
+    }
+  }
+
   // GET /api/exam-matrices?subject=&grade=&status=
   app.get('/api/exam-matrices', async (req, res) => {
     try {
       const userId = getMatrixUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      await ensureMatrixDescription();
       const wheres = [`"userId" = $1`];
       const vals = [userId];
       let i = 2;
@@ -6160,6 +6175,7 @@ if (USE_NODEJS_QUESTIONS) {
     try {
       const userId = getMatrixUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      await ensureMatrixDescription();
       const { rows } = await getMPool().query(
         `SELECT * FROM "ExamMatrix" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
         [req.params.id, userId]
@@ -6215,13 +6231,12 @@ if (USE_NODEJS_QUESTIONS) {
          Number(duration) || 45, Number(totalScore) || 10,
          Number(totalQuestions) || 0, type || 'manual', userId, now]
       );
-      // Try optional update description column với metadata JSON (nếu column tồn tại)
-      try {
-        await getMPool().query(
-          `UPDATE "ExamMatrix" SET description=$1 WHERE id=$2`,
-          [JSON.stringify(meta), id]
-        );
-      } catch { /* description column có thể không tồn tại — ignore */ }
+      // Đảm bảo column description tồn tại (idempotent ALTER) rồi update metadata
+      await ensureMatrixDescription();
+      await getMPool().query(
+        `UPDATE "ExamMatrix" SET description=$1 WHERE id=$2`,
+        [JSON.stringify(meta), id]
+      );
       console.log(`[matrix:create] ✅ ${id} user=${userId} sections=${meta.sections.length} topics=${meta.topics.length}`);
       return res.status(201).json({ ...rows[0], ...meta, id });
     } catch (err) {
@@ -6239,6 +6254,7 @@ if (USE_NODEJS_QUESTIONS) {
     try {
       const userId = getMatrixUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      await ensureMatrixDescription();
       const pool = getMPool();
       const body = req.body || {};
 
