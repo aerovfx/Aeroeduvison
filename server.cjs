@@ -10782,6 +10782,98 @@ if (!USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ─ STEM AI Project Generator ─────────────────────────────
+  // Blueprint.am-style: GV/HS mô tả ý tưởng → AI sinh project plan
+  // Body: { prompt: string, level?: 'easy'|'medium'|'hard' }
+  // Returns: { title, description, difficulty, durationHours, category,
+  //           components[], steps[], learningOutcomes[], tags[] }
+  app.post('/api/stem/ai-generate', express.json({ limit: '50kb' }), async (req, res) => {
+    try {
+      const prompt = String(req.body?.prompt || '').trim();
+      const level = String(req.body?.level || 'medium');
+      if (!prompt || prompt.length < 5) {
+        return res.status(400).json({ error: 'Vui lòng nhập mô tả ý tưởng (≥ 5 ký tự)' });
+      }
+      const { complete } = require('./lib/fal-client.cjs');
+      const sysPrompt = [
+        'Bạn là chuyên gia STEM education hỗ trợ học sinh/giáo viên Việt Nam thiết kế dự án',
+        'sử dụng Arduino, ESP32, cảm biến, lập trình. Phong cách giải thích đơn giản, thực tế,',
+        'phù hợp với HS THPT (lớp 10-12). CHỈ trả về JSON hợp lệ, không markdown, không lời mở đầu.',
+      ].join(' ');
+      const userPrompt = [
+        `Ý tưởng dự án: "${prompt}"`,
+        `Trình độ mong muốn: ${level === 'easy' ? 'dễ (mới học)' : level === 'hard' ? 'nâng cao' : 'trung bình'}`,
+        '',
+        'Hãy sinh kế hoạch dự án STEM hoàn chỉnh dưới dạng JSON với schema:',
+        '{',
+        '  "title": "Tên dự án ngắn gọn (≤60 ký tự)",',
+        '  "description": "Mô tả 2-3 câu về dự án",',
+        '  "difficulty": "easy" | "medium" | "hard",',
+        '  "durationHours": <số giờ ước tính, vd 4>,',
+        '  "category": "Science" | "Technology" | "Engineering" | "Math",',
+        '  "components": [{"name": "Tên linh kiện", "qty": <số lượng>, "estimatedPrice": <giá VND>}],',
+        '  "steps": ["Bước 1...", "Bước 2...", "Bước 3..." (tối thiểu 5 bước, tối đa 10)],',
+        '  "learningOutcomes": ["Kỹ năng/kiến thức 1", "Kỹ năng 2", ...],',
+        '  "tags": ["tag1", "tag2", ...]',
+        '}',
+        '',
+        'YÊU CẦU:',
+        '- components phải khả thi, có bán ở VN (vd: Arduino UNO, cảm biến DHT22, LED, servo MG90S)',
+        '- estimatedPrice tính VND, dùng giá thị trường tham khảo',
+        '- steps phải cụ thể (Bước 1: lắp mạch theo sơ đồ X, Bước 2: viết code...)',
+        '- learningOutcomes liên quan kiến thức vật lý/hoá/sinh/lập trình',
+        '- Trả JSON đầy đủ, KHÔNG thêm chữ "json" hay backticks markdown',
+      ].join('\n');
+      const t0 = Date.now();
+      const resp = await complete({
+        system: sysPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        temperature: 0.7,
+      });
+      const raw = String(resp.content || '').trim();
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (!m) {
+        return res.status(502).json({ error: 'AI không trả về JSON hợp lệ', raw: raw.slice(0, 300) });
+      }
+      let parsed;
+      try { parsed = JSON.parse(m[0]); }
+      catch (e) {
+        return res.status(502).json({ error: `JSON parse fail: ${e.message}`, raw: m[0].slice(0, 300) });
+      }
+      // Sanitize + defaults
+      const project = {
+        title: String(parsed.title || prompt.slice(0, 60)),
+        description: String(parsed.description || ''),
+        difficulty: ['easy','medium','hard'].includes(parsed.difficulty) ? parsed.difficulty : level,
+        durationHours: Number(parsed.durationHours) || 4,
+        category: ['Science','Technology','Engineering','Math'].includes(parsed.category)
+          ? parsed.category : 'Technology',
+        components: Array.isArray(parsed.components)
+          ? parsed.components.slice(0, 20).map(c => ({
+              name: String(c.name || '').slice(0, 100),
+              qty: Number(c.qty) || 1,
+              estimatedPrice: Number(c.estimatedPrice) || 0,
+            }))
+          : [],
+        steps: Array.isArray(parsed.steps)
+          ? parsed.steps.slice(0, 12).map(s => String(s).slice(0, 500))
+          : [],
+        learningOutcomes: Array.isArray(parsed.learningOutcomes)
+          ? parsed.learningOutcomes.slice(0, 8).map(s => String(s).slice(0, 200))
+          : [],
+        tags: Array.isArray(parsed.tags)
+          ? parsed.tags.slice(0, 8).map(s => String(s).slice(0, 30))
+          : [],
+      };
+      const totalCost = project.components.reduce((s, c) => s + c.qty * c.estimatedPrice, 0);
+      console.log(`[stem:ai-generate] ✅ "${project.title}" ${project.components.length} parts ${totalCost.toLocaleString()}đ ${Date.now()-t0}ms`);
+      return res.json({ success: true, project, totalCost, tookMs: Date.now() - t0 });
+    } catch (err) {
+      console.error('[stem:ai-generate] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─ Documents ──────────────────────────────────────────────
   app.get('/api/documents', (_req, res) => res.json({ documents: [] }));
   app.post('/api/documents/upload', notImpl('Upload tài liệu đang phát triển'));
