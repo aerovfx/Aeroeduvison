@@ -146,6 +146,7 @@ const teacherSections: RouteSection[] = [
     titleKey: 'sectionManage',
     routes: [
       { icon: BookOpenCheck,labelKey: 'routeClasses',     href: '/teacher/classes' },
+      { icon: Users,        labelKey: 'routeStudentRequests', href: '/teacher/student-requests' },
       { icon: ClipboardList,labelKey: 'routeGradeBook',   href: '/teacher/gradebook' },
       { icon: MonitorPlay,  labelKey: 'routeCameraClass', href: '/teacher/camera-management', badge: 'Live' },
       { icon: Thermometer,  labelKey: 'routeEnvironment', href: '/teacher/environment-monitoring', badge: 'IoT' },

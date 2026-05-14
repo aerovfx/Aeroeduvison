@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText } from 'lucide-react'
+import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
@@ -322,9 +322,17 @@ function NotificationBell() {
                   >
                     <div className={cn(
                       'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                      n.type === 'assignment' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-500'
+                      n.type === 'assignment'    ? 'bg-blue-500/20 text-blue-500' :
+                      n.type === 'link_request'  ? 'bg-yellow-500/20 text-yellow-500' :
+                      n.type === 'link_approved' ? 'bg-emerald-500/20 text-emerald-500' :
+                      n.type === 'link_rejected' ? 'bg-red-500/20 text-red-500' :
+                      'bg-gray-500/20 text-gray-500'
                     )}>
-                      {n.type === 'assignment' ? <FileText className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                      {n.type === 'assignment'    ? <FileText className="w-4 h-4" /> :
+                       n.type === 'link_request'  ? <UserPlus className="w-4 h-4" /> :
+                       n.type === 'link_approved' ? <UserCheck className="w-4 h-4" /> :
+                       n.type === 'link_rejected' ? <UserX className="w-4 h-4" /> :
+                       <Bell className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={cn('text-sm truncate', !n.read ? 'font-semibold text-foreground' : 'text-foreground/80')}>
