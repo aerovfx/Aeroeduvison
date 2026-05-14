@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Users, Trash2, UserPlus,
   BarChart3, Calendar, GraduationCap, Loader2, School, X,
-  Upload, FileSpreadsheet, CheckCircle2, AlertCircle,
+  Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import * as XLSX from 'xlsx'
@@ -202,6 +202,103 @@ function AddStudentsModal({
   )
 }
 
+// ── Excel template generator ─────────────────────────────────
+// Sinh file mẫu khớp 100% với layout TT58 (Thông tư 58/2011 sửa đổi 22/2021):
+//   Rows 1-5: Thông tin trường/năm/môn (giáo viên điền tay)
+//   Row 7  : Tiêu đề cột — STT, Mã định danh BộGD&ĐT, Họ tên, Ngày sinh,
+//            Giới tính, ĐĐGtx (5 cột), ĐĐGgk, ĐĐGck
+//   Row 8  : Sub-header (1,2,3,4,5 cho 5 cột ĐĐGtx)
+//   Row 9+ : 3 dòng học sinh mẫu (xoá đi rồi điền danh sách thật)
+// → Khi giáo viên download → điền vào → upload lại, parseExcelStudents()
+//   match đúng "STT" ở cột A và bắt đầu đọc data từ row 9.
+function downloadClassImportTemplate(opts?: {
+  className?: string
+  schoolName?: string
+  schoolYear?: string
+  semester?: string
+  subject?: string
+  teacherName?: string
+}) {
+  const cls       = opts?.className   || '10A1'
+  const subject   = opts?.subject     || 'VẬT LÍ'
+  const school    = opts?.schoolName  || 'TRƯỜNG THPT ___________'
+  const year      = opts?.schoolYear  || '2025-2026'
+  const semester  = opts?.semester    || 'I'
+  const teacher   = opts?.teacherName || '___________'
+
+  // 2D array tới sheet — mỗi inner array là 1 row
+  const aoa: (string | number | Date | null)[][] = [
+    ['SỞ GIÁO DỤC VÀ ĐÀO TẠO ___________'],                                 // row 1
+    [school],                                                               // row 2
+    ['BẢNG ĐIỂM HỌC KỲ'],                                                   // row 3
+    [`Năm học: ${year} - Học kỳ: ${semester}`],                             // row 4
+    [`Môn học: ${subject} - GV: ${teacher}`],                               // row 5
+    [],                                                                     // row 6 (blank)
+    [
+      'STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Ngày sinh', 'Giới tính',
+      'ĐĐGtx', null, null, null, null, 'ĐĐGgk', 'ĐĐGck',                    // row 7
+    ],
+    [null, null, null, null, null, 1, 2, 3, 4, 5],                          // row 8 (sub-header)
+    // Sample students (xoá đi điền lại):
+    [1, '7727940812', 'Nguyễn Văn An',     '15/03/2010', 'Nam'],            // row 9
+    [2, '7727940813', 'Trần Thị Bình',     '22/07/2010', 'Nữ'],             // row 10
+    [3, '7727940814', 'Lê Hoàng Cường',    '08/11/2010', 'Nam'],            // row 11
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Column widths để dễ nhìn khi mở Excel
+  ws['!cols'] = [
+    { wch: 5  },  // STT
+    { wch: 18 },  // Mã định danh
+    { wch: 28 },  // Họ và tên
+    { wch: 12 },  // Ngày sinh
+    { wch: 9  },  // Giới tính
+    { wch: 6  }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },  // ĐĐGtx 1-5
+    { wch: 7  },  // ĐĐGgk
+    { wch: 7  },  // ĐĐGck
+  ]
+
+  // Merge cells cho 4 dòng tiêu đề trên (cosmetic — span 12 cột)
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 11 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 11 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 11 } },
+    { s: { r: 6, c: 5 }, e: { r: 6, c: 9 } },   // "ĐĐGtx" merge 5 cột
+  ]
+
+  // Sheet name dùng làm class name khi import → đặt theo "<Lớp> <Môn>"
+  // VD "10A1 Vat li" → parser auto-suy ra "Lớp 10A1"
+  const sheetName = `${cls} ${subject.replace(/Í/g,'i').replace(/Ậ/g,'a').toLowerCase().slice(0,20)}`
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+
+  // Hướng dẫn ngắn ở sheet thứ 2
+  const helpRows = [
+    ['HƯỚNG DẪN ĐIỀN'],
+    [],
+    ['1. Sheet "' + sheetName + '" là sheet chính — KHÔNG đổi tên sheet.'],
+    ['2. Sửa thông tin lớp/trường ở rows 1-5 cho khớp thực tế.'],
+    ['3. Cột bắt buộc khi import: STT, Mã định danh, Họ và tên.'],
+    ['4. Mã định danh Bộ GD&ĐT: 10 chữ số do Bộ cấp khi đăng ký HS.'],
+    ['5. Ngày sinh: định dạng dd/mm/yyyy (vd 15/03/2010).'],
+    ['6. Giới tính: viết "Nam" hoặc "Nữ" (có dấu).'],
+    ['7. Các cột ĐĐGtx/gk/ck (điểm) KHÔNG cần điền khi import danh sách —'],
+    ['   chỉ dùng khi xuất bảng điểm sau này.'],
+    ['8. Xoá 3 dòng học sinh mẫu (rows 9-11) trước khi điền danh sách thật.'],
+    [],
+    ['Mọi thắc mắc → liên hệ admin@inphysic.com'],
+  ]
+  const helpWs = XLSX.utils.aoa_to_sheet(helpRows)
+  helpWs['!cols'] = [{ wch: 80 }]
+  XLSX.utils.book_append_sheet(wb, helpWs, 'Hướng dẫn')
+
+  // Trigger download
+  const fileName = `mau-import-lop-${cls}.xlsx`
+  XLSX.writeFile(wb, fileName)
+}
+
 // ── Excel parser ─────────────────────────────────────────────
 function parseExcelStudents(file: File): Promise<{ students: ImportStudent[]; className: string }> {
   return new Promise((resolve, reject) => {
@@ -352,23 +449,57 @@ function ImportModal({
         <div className="p-6 space-y-5">
           {/* Drop zone */}
           {!parsed ? (
-            <div
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/40 transition-all group"
-            >
-              <Upload className="w-10 h-10 mx-auto mb-3 text-purple-300 group-hover:text-purple-500 transition-colors" />
-              <p className="font-semibold text-gray-700 mb-1">Kéo thả file Excel vào đây</p>
-              <p className="text-sm text-gray-500">hoặc click để chọn file .xlsx</p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-            </div>
+            <>
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => e.preventDefault()}
+                onClick={() => fileRef.current?.click()}
+                className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/40 transition-all group"
+              >
+                <Upload className="w-10 h-10 mx-auto mb-3 text-purple-300 group-hover:text-purple-500 transition-colors" />
+                <p className="font-semibold text-gray-700 mb-1">Kéo thả file Excel vào đây</p>
+                <p className="text-sm text-gray-500">hoặc click để chọn file .xlsx</p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </div>
+
+              {/* Tải file mẫu — giúp giáo viên chưa có file TT58 sẵn */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Chưa có file?</p>
+                    <p className="text-xs text-gray-600">
+                      Tải mẫu Excel chuẩn TT58 (Bộ GD&ĐT) — gồm các cột STT, Mã định
+                      danh, Họ tên, Ngày sinh, Giới tính.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    try {
+                      downloadClassImportTemplate({})
+                      toast.success('Đã tải file mẫu — mở Excel, điền danh sách rồi upload lại')
+                    } catch (err: any) {
+                      toast.error('Lỗi tạo file mẫu: ' + err.message)
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Tải mẫu
+                </button>
+              </div>
+            </>
           ) : result ? (
             /* Result */
             <div className="bg-green-50 border border-green-200 rounded-xl p-5">
