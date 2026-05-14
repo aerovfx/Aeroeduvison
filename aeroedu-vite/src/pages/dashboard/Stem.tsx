@@ -9,7 +9,7 @@
  *   🎯 Mẫu khởi đầu         — 6 starter templates 1-click
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Plus, Search, Eye, Edit, Trash2, MoreHorizontal, Zap,
@@ -17,7 +17,7 @@ import {
   Target, CheckCircle, AlertCircle, Clock, MessageSquare,
   Download, Share, UserCheck, Sparkles, Loader2, Package,
   Layers, X, BookOpen, ChevronRight, Lightbulb, Github, Star,
-  Code2,
+  Code2, Trophy, TrendingUp, Rocket, Award,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
@@ -793,6 +793,360 @@ function ProjectCard({ project, onDelete }: { project: STEMProject; onDelete: ()
   )
 }
 
+// ═════════════════════════════════════════════════════════════
+// STARTUP POTENTIAL LEADERBOARD
+// ─────────────────────────────────────────────────────────────
+// Đánh giá dự án có tiềm năng startup dựa trên 6 tiêu chí (0-100 mỗi chiều).
+// Heuristic công khai để HS biết phải làm gì để tăng điểm.
+// Total = trung bình có trọng số.
+// ═════════════════════════════════════════════════════════════
+interface ScoreBreakdown {
+  innovation:    number  // Tính sáng tạo (category bonus + difficulty + tags độ rộng)
+  feasibility:   number  // Khả thi (BOM hoàn chỉnh + budget hợp lý + có hồ sơ KH)
+  execution:     number  // Mức độ thực thi (progress + milestones + logs gần đây)
+  impact:        number  // Tác động xã hội (subject relevance + outcomes mô tả)
+  team:          number  // Sức mạnh đội ngũ (số HV + giảng viên + roles đa dạng)
+  community:     number  // Cộng đồng quan tâm (feedback + isPublic + resources)
+  total:         number  // Trung bình có trọng số
+}
+
+const SCORE_WEIGHTS = {
+  innovation: 0.20,
+  feasibility: 0.20,
+  execution: 0.25,
+  impact: 0.15,
+  team: 0.10,
+  community: 0.10,
+} as const
+
+function clamp(n: number, min = 0, max = 100): number {
+  return Math.max(min, Math.min(max, n))
+}
+
+function computeStartupScore(p: STEMProject): ScoreBreakdown {
+  // ── 1. INNOVATION ──
+  // Engineering/Tech > Math/Science cho startup. Difficulty advanced > beginner.
+  const catBonus = ({ Engineering: 35, Technology: 35, Science: 25, Math: 20 } as const)[p.category] || 20
+  const diffBonus = ({ advanced: 35, intermediate: 22, beginner: 12 } as const)[p.difficulty] || 12
+  const tagBreadth = Math.min(20, p.tags.length * 4)        // mỗi tag +4, cap 20
+  const aiTagBonus = (p.tags.some(t => /\bai|ml|iot|robot|automation|smart\b/i.test(t)) ? 10 : 0)
+  const innovation = clamp(catBonus + diffBonus + tagBreadth + aiTagBonus)
+
+  // ── 2. FEASIBILITY ──
+  // BOM đầy + budget defined + objective/methodology mô tả = feasible
+  const bomCount = (p.bom || []).length
+  const bomScore = bomCount === 0 ? 0 : clamp(bomCount * 8, 0, 40)
+  const budgetOK = p.budgetTotal && p.budgetTotal > 0 ? 15 : 0
+  const objScore = (p.objective?.length || 0) > 50 ? 15 : (p.objective?.length || 0) > 0 ? 7 : 0
+  const methScore = (p.methodology?.length || 0) > 50 ? 15 : (p.methodology?.length || 0) > 0 ? 7 : 0
+  const issuesResolved = (p.issues || []).filter(i => i.status === 'resolved').length
+  const resolveBonus = Math.min(15, issuesResolved * 5)     // giải quyết vấn đề = chứng minh khả thi
+  const feasibility = clamp(bomScore + budgetOK + objScore + methScore + resolveBonus)
+
+  // ── 3. EXECUTION ──
+  // Progress + milestones completed + logs gần đây = đang chạy thật
+  const progressScore = clamp(p.progress * 0.45, 0, 45)        // 100% progress = 45đ
+  const mileTotal = p.milestones.length || 1
+  const mileDone = p.milestones.filter(m => m.status === 'completed').length
+  const milestoneScore = (mileDone / mileTotal) * 25            // hoàn thành milestones
+  const logsCount = (p.progressLogs || []).length
+  const logScore = Math.min(20, logsCount * 2)                  // mỗi log +2, cap 20
+  const recencyBonus = (() => {
+    if (!p.lastWorkedAt) return 0
+    const daysSince = (Date.now() - new Date(p.lastWorkedAt).getTime()) / 86_400_000
+    if (daysSince < 7)  return 10
+    if (daysSince < 30) return 5
+    return 0
+  })()
+  const execution = clamp(progressScore + milestoneScore + logScore + recencyBonus)
+
+  // ── 4. IMPACT ──
+  // expectedOutcomes mô tả + subject + STEM phổ biến = social impact tiềm năng
+  const outcomeScore = (p.expectedOutcomes?.length || 0) > 80 ? 35 :
+                       (p.expectedOutcomes?.length || 0) > 30 ? 20 :
+                       (p.expectedOutcomes?.length || 0) > 0  ? 10 : 0
+  const subjectScore = p.subject ? 15 : 0
+  const descLen = p.description?.length || 0
+  const descScore = descLen > 200 ? 20 : descLen > 100 ? 12 : descLen > 0 ? 5 : 0
+  const publishBonus = p.status === 'published' ? 30 : p.status === 'completed' ? 20 : 0
+  const impact = clamp(outcomeScore + subjectScore + descScore + publishBonus)
+
+  // ── 5. TEAM ──
+  // Đội ngũ 2-5 HV + giảng viên = balanced; quá ít = personal, quá nhiều = lộn xộn
+  const memCount = p.teamMembers.length
+  const teamSize = memCount >= 2 && memCount <= 5 ? 50 :
+                   memCount === 1 ? 25 :
+                   memCount > 5    ? 35 : 0
+  const instructorScore = p.instructor?.name && p.instructor.name !== 'Tự tạo' ? 25 : 0
+  const roleVariety = new Set(p.teamMembers.map(m => m.role)).size
+  const varietyScore = Math.min(25, roleVariety * 8)
+  const team = clamp(teamSize + instructorScore + varietyScore)
+
+  // ── 6. COMMUNITY ──
+  // feedback (proxy cho engagement) + public + resources (research depth)
+  const fbCount = p.feedback.length
+  const fbScore = Math.min(40, fbCount * 8)
+  const publicBonus = p.isPublic ? 25 : 0
+  const resCount = (p.resources || []).length
+  const resScore = Math.min(35, resCount * 7)                   // mỗi tài liệu +7, cap 35
+  const community = clamp(fbScore + publicBonus + resScore)
+
+  // ── TOTAL: weighted average ──
+  const total = Math.round(
+    innovation   * SCORE_WEIGHTS.innovation +
+    feasibility  * SCORE_WEIGHTS.feasibility +
+    execution    * SCORE_WEIGHTS.execution +
+    impact       * SCORE_WEIGHTS.impact +
+    team         * SCORE_WEIGHTS.team +
+    community    * SCORE_WEIGHTS.community
+  )
+  return { innovation, feasibility, execution, impact, team, community, total }
+}
+
+// Tier dựa trên total score
+function getTier(total: number): { label: string; color: string; bg: string; emoji: string } {
+  if (total >= 80) return { label: 'UNICORN',   color: 'text-fuchsia-300', bg: 'bg-fuchsia-500/15 border-fuchsia-500/40', emoji: '🦄' }
+  if (total >= 65) return { label: 'SERIES A',  color: 'text-emerald-300', bg: 'bg-emerald-500/15 border-emerald-500/40', emoji: '🚀' }
+  if (total >= 50) return { label: 'SEED',      color: 'text-blue-300',    bg: 'bg-blue-500/15 border-blue-500/40',       emoji: '🌱' }
+  if (total >= 35) return { label: 'PRE-SEED',  color: 'text-yellow-300',  bg: 'bg-yellow-500/15 border-yellow-500/40',   emoji: '💡' }
+  return            { label: 'IDEA',       color: 'text-white/50',     bg: 'bg-white/[0.05] border-white/10',         emoji: '🧠' }
+}
+
+function ScoreBar({ label, value, color = 'bg-purple-500' }: { label: string; value: number; color?: string }) {
+  return (
+    <div className="flex items-center gap-2 text-[11px]">
+      <span className="text-white/50 w-20 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+        <div className={`h-full ${color} transition-all`} style={{ width: `${value}%` }} />
+      </div>
+      <span className="text-white/70 font-mono w-7 text-right">{Math.round(value)}</span>
+    </div>
+  )
+}
+
+function StartupLeaderboard({ projects }: { projects: STEMProject[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const [showCriteria, setShowCriteria] = useState(false)
+
+  const ranked: { project: STEMProject; score: ScoreBreakdown }[] = useMemo(() => {
+    return projects
+      .map(p => ({ project: p, score: computeStartupScore(p) }))
+      .sort((a, b) => b.score.total - a.score.total)
+  }, [projects])
+
+  if (ranked.length === 0) return null
+
+  const display = expanded ? ranked : ranked.slice(0, 5)
+  const topTotal = ranked[0]?.score.total || 0
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-yellow-600/10 via-orange-600/8 to-pink-600/10 border border-yellow-500/30 p-6 mb-8 relative overflow-hidden">
+      <div className="absolute -top-32 -right-32 w-80 h-80 bg-yellow-500/10 blur-3xl rounded-full pointer-events-none" />
+      <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-pink-500/10 blur-3xl rounded-full pointer-events-none" />
+
+      <div className="relative">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+              <Trophy className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                Startup Potential Leaderboard
+                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-semibold">
+                  BETA
+                </span>
+              </h2>
+              <p className="text-sm text-white/50">
+                Xếp hạng dự án theo tiềm năng giai đoạn startup — 6 tiêu chí, công thức công khai
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowCriteria(!showCriteria)}
+            className="text-xs text-yellow-400 hover:text-yellow-300 underline"
+          >
+            {showCriteria ? 'Ẩn' : 'Xem'} công thức
+          </button>
+        </div>
+
+        {/* Criteria explanation (collapsible) */}
+        {showCriteria && (
+          <div className="bg-black/30 border border-white/10 rounded-xl p-4 mb-4 grid md:grid-cols-3 gap-3 text-xs">
+            <div>
+              <p className="font-bold text-purple-300 mb-1">⚡ Innovation (20%)</p>
+              <p className="text-white/50">Category Tech/Eng + difficulty + tags rộng + bonus AI/IoT/Robot</p>
+            </div>
+            <div>
+              <p className="font-bold text-blue-300 mb-1">🔧 Feasibility (20%)</p>
+              <p className="text-white/50">BOM đầy + budget defined + mô tả objective/methodology + giải quyết issues</p>
+            </div>
+            <div>
+              <p className="font-bold text-emerald-300 mb-1">🚀 Execution (25%)</p>
+              <p className="text-white/50">Progress % + milestones done + số log gần đây + recency (≤7 ngày)</p>
+            </div>
+            <div>
+              <p className="font-bold text-pink-300 mb-1">🌍 Impact (15%)</p>
+              <p className="text-white/50">expectedOutcomes mô tả rõ + subject + description đầy + đã publish</p>
+            </div>
+            <div>
+              <p className="font-bold text-cyan-300 mb-1">👥 Team (10%)</p>
+              <p className="text-white/50">2-5 HV (sweet spot) + có giảng viên + đa dạng vai trò</p>
+            </div>
+            <div>
+              <p className="font-bold text-yellow-300 mb-1">🌐 Community (10%)</p>
+              <p className="text-white/50">Số feedback + isPublic + số resources tham khảo</p>
+            </div>
+            <div className="md:col-span-3 pt-2 border-t border-white/10 text-white/40">
+              <p className="font-mono">Total = 0.20·I + 0.20·F + 0.25·E + 0.15·Im + 0.10·T + 0.10·C</p>
+              <p className="mt-1">Tier: 🦄 ≥80 UNICORN · 🚀 ≥65 SERIES A · 🌱 ≥50 SEED · 💡 ≥35 PRE-SEED · 🧠 IDEA</p>
+            </div>
+          </div>
+        )}
+
+        {/* Top 3 podium (if we have ≥3) */}
+        {ranked.length >= 3 && !expanded && (
+          <div className="grid grid-cols-3 gap-3 mb-5">
+            {[1, 0, 2].map(idx => {  // order: 2nd, 1st, 3rd cho podium feel
+              const r = ranked[idx]
+              if (!r) return <div key={idx} />
+              const tier = getTier(r.score.total)
+              const podiumStyle = idx === 0
+                ? 'border-yellow-400/60 bg-gradient-to-b from-yellow-500/15 to-transparent scale-105'
+                : idx === 1
+                  ? 'border-gray-300/40 bg-gradient-to-b from-gray-400/10 to-transparent'
+                  : 'border-orange-400/40 bg-gradient-to-b from-orange-500/10 to-transparent'
+              const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'
+              return (
+                <div key={r.project.id} className={`rounded-xl border p-3 text-center ${podiumStyle}`}>
+                  <div className="text-3xl mb-1">{medal}</div>
+                  <Link
+                    to={`/dashboard/stem/${r.project.id}`}
+                    className="text-xs font-semibold text-white/85 hover:text-purple-300 line-clamp-2 leading-tight mb-1.5 block min-h-[2.2rem]"
+                  >
+                    {r.project.title}
+                  </Link>
+                  <div className="text-2xl font-bold text-white mb-0.5">{r.score.total}</div>
+                  <div className={`text-[9px] font-bold inline-block px-1.5 py-0.5 rounded border ${tier.bg} ${tier.color}`}>
+                    {tier.emoji} {tier.label}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Full ranked list */}
+        <div className="space-y-2">
+          {display.map((r, i) => {
+            const tier = getTier(r.score.total)
+            const isTop3 = i < 3
+            return (
+              <div
+                key={r.project.id}
+                className={`rounded-xl border p-3 ${isTop3 && !expanded
+                  ? 'bg-white/[0.04] border-white/10'
+                  : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.15] hover:bg-white/[0.04] transition-colors'}`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Rank */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 ${
+                    i === 0 ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40' :
+                    i === 1 ? 'bg-gray-300/20 text-gray-300 border border-gray-300/40' :
+                    i === 2 ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40' :
+                    'bg-white/[0.04] text-white/40'
+                  }`}>
+                    {i < 3 ? (i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉') : `#${i + 1}`}
+                  </div>
+
+                  {/* Title + category */}
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/dashboard/stem/${r.project.id}`}
+                      className="text-sm font-semibold text-white/85 hover:text-purple-300 truncate block"
+                    >
+                      {r.project.title}
+                    </Link>
+                    <div className="flex items-center gap-2 text-[10px] text-white/40 mt-0.5">
+                      <span className={getCategoryClasses(r.project.category).icon}>
+                        {getCategoryIcon(r.project.category, 'h-3 w-3')}
+                      </span>
+                      <span>{r.project.category}</span>
+                      <span>•</span>
+                      <span>{r.project.progress}% xong</span>
+                      {r.project.teamMembers.length > 0 && (
+                        <>
+                          <span>•</span>
+                          <span>{r.project.teamMembers.length} HV</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Score breakdown bars (chỉ hiện khi expanded hoặc top 3) */}
+                  {(expanded || isTop3) && (
+                    <div className="hidden md:flex flex-col gap-0.5 w-48 flex-shrink-0">
+                      <ScoreBar label="Innovation" value={r.score.innovation}  color="bg-purple-500" />
+                      <ScoreBar label="Feasibility" value={r.score.feasibility} color="bg-blue-500" />
+                      <ScoreBar label="Execution"  value={r.score.execution}   color="bg-emerald-500" />
+                    </div>
+                  )}
+
+                  {/* Total + tier */}
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-white">{r.score.total}</span>
+                      <span className="text-xs text-white/40">/100</span>
+                    </div>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${tier.bg} ${tier.color}`}>
+                      {tier.emoji} {tier.label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Expanded breakdown — hiện all 6 metrics ở row dưới */}
+                {expanded && (
+                  <div className="mt-3 pt-3 border-t border-white/[0.06] grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+                    <ScoreBar label="Impact"     value={r.score.impact}     color="bg-pink-500" />
+                    <ScoreBar label="Team"       value={r.score.team}       color="bg-cyan-500" />
+                    <ScoreBar label="Community"  value={r.score.community}  color="bg-yellow-500" />
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Toggle expand */}
+        {ranked.length > 5 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-4 w-full py-2 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-xs font-medium text-white/70 hover:text-white/90 transition-colors flex items-center justify-center gap-1.5"
+          >
+            {expanded
+              ? <>Thu gọn (top 5) <ChevronRight className="w-3 h-3 rotate-90" /></>
+              : <>Xem hết {ranked.length} dự án <ChevronRight className="w-3 h-3 -rotate-90" /></>
+            }
+          </button>
+        )}
+
+        {/* Insight footer */}
+        <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5 text-white/50">
+            <Rocket className="w-3.5 h-3.5 text-yellow-400" />
+            <span>Top score: <span className="text-yellow-300 font-bold">{topTotal}</span> · Trung bình: <span className="text-white/70 font-semibold">{Math.round(ranked.reduce((s: number, r) => s + r.score.total, 0) / ranked.length)}</span></span>
+          </div>
+          <div className="flex items-center gap-1.5 text-white/40">
+            <Award className="w-3.5 h-3.5" />
+            <span>Cập nhật real-time theo dữ liệu dự án</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────
@@ -890,6 +1244,9 @@ export default function StemPage() {
 
         {/* ── AI Generator hero ── */}
         <AIGenerator />
+
+        {/* ── Startup Potential Leaderboard ── */}
+        <StartupLeaderboard projects={projects} />
 
         {/* ── Tab nav ── */}
         <div className="flex items-center gap-1 mb-5 border-b border-white/[0.08]">
