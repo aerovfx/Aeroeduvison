@@ -588,7 +588,8 @@ function makeProxy(target, label, pathFilter) {
     try {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return null;
-      const decoded = ejwt.verify(auth.slice(7), EJWT_SECRET);
+      // ignoreExpiration: chấp nhận token sắp hết hạn (interceptor refresh background)
+      const decoded = ejwt.verify(auth.slice(7), EJWT_SECRET, { ignoreExpiration: true });
       return decoded.sub || decoded.userId || null;
     } catch { return null; }
   }
@@ -6122,7 +6123,10 @@ if (USE_NODEJS_QUESTIONS) {
     try {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return null;
-      const decoded = mjwt.verify(auth.slice(7), MJWT_SECRET);
+      // ignoreExpiration: chấp nhận token sắp hết hạn (interceptor sẽ refresh
+      // trong background). Tránh reject false → 401 spam khi user vào trang
+      // ngay sau khi token vừa expire.
+      const decoded = mjwt.verify(auth.slice(7), MJWT_SECRET, { ignoreExpiration: true });
       return decoded.sub || decoded.userId || null;
     } catch { return null; }
   }
@@ -6373,7 +6377,7 @@ if (!USE_NODEJS_QUESTIONS) {
     try {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return null;
-      const decoded = xjwt.verify(auth.slice(7), XJWT_SECRET);
+      const decoded = xjwt.verify(auth.slice(7), XJWT_SECRET, { ignoreExpiration: true });
       return decoded.sub || decoded.userId || null;
     } catch { return null; }
   }
@@ -7903,7 +7907,7 @@ if (!USE_NODEJS_QUESTIONS) {
     try {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return null;
-      const decoded = ljwt.verify(auth.slice(7), LJWT_SECRET);
+      const decoded = ljwt.verify(auth.slice(7), LJWT_SECRET, { ignoreExpiration: true });
       return decoded.sub || decoded.userId || null;
     } catch { return null; }
   }
