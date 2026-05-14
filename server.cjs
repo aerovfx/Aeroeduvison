@@ -6721,17 +6721,326 @@ if (!USE_NODEJS_QUESTIONS) {
 // Đang phát triển — hiện stub empty/501 để UI /teacher/online-exam-room
 // không 503. Thực thi đầy đủ sẽ làm sau.
 // ══════════════════════════════════════════════════════════════
-app.get('/api/online-exam-room', (_req, res) => res.json({ rooms: [] }));
-app.get('/api/online-exam-room/:id/schedule', (req, res) =>
-  res.json({ roomId: req.params.id, schedules: [] }));
-app.post('/api/online-exam-room', (_req, res) =>
-  res.status(501).json({ error: 'Tạo phòng thi online đang phát triển — dùng LIVE quiz ở /teacher/exams/:id/play để mở phòng nhanh.' }));
-app.post('/api/online-exam-room/join', (_req, res) =>
-  res.status(501).json({ error: 'Join phòng online đang phát triển — học sinh có thể vào /play để join LIVE quiz qua mã số.' }));
-app.post('/api/online-exam-room/:id/schedule', (_req, res) =>
-  res.status(501).json({ error: 'Đặt lịch thi đang phát triển' }));
-app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
-  res.status(501).json({ error: 'Kích hoạt lịch thi đang phát triển' }));
+// ── ExamRoom CRUD (online exam room — phòng thi có lịch + access code) ──
+{
+  const { Pool: ERPool } = require('pg');
+  let _erpool = null;
+  function getERPool() {
+    if (!_erpool && process.env.DATABASE_URL) {
+      _erpool = new ERPool({
+        connectionString: process.env.DATABASE_URL,
+        max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+      });
+    }
+    return _erpool;
+  }
+  function getERTeacher(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const d = jwt.verify(auth.slice(7), JWT_SECRET);
+      return { id: d.sub || d.userId || d.id, email: d.email, role: d.role };
+    } catch { return null; }
+  }
+  let _erReady = false;
+  async function ensureExamRoomTables() {
+    if (_erReady) return;
+    const pool = getERPool();
+    if (!pool) return;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ExamRoom" (
+        id           TEXT PRIMARY KEY,
+        name         TEXT NOT NULL,
+        description  TEXT,
+        "examId"     TEXT NOT NULL,
+        "teacherId"  TEXT NOT NULL,
+        "startTime"  TIMESTAMPTZ,
+        "endTime"    TIMESTAMPTZ,
+        duration     INTEGER NOT NULL DEFAULT 45,
+        "accessCode" VARCHAR(8),
+        "isPublic"   BOOLEAN NOT NULL DEFAULT false,
+        "maxStudents" INTEGER,
+        status       VARCHAR(20) NOT NULL DEFAULT 'draft',
+        "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "ExamRoom_teacher_idx" ON "ExamRoom" ("teacherId")`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "ExamRoom_public_idx" ON "ExamRoom" ("isPublic", status) WHERE "isPublic" = true`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "ExamRoom_code_idx" ON "ExamRoom" ("accessCode") WHERE "accessCode" IS NOT NULL`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ExamRoomParticipant" (
+        id           TEXT PRIMARY KEY,
+        "roomId"     TEXT NOT NULL,
+        "userId"     TEXT,
+        "studentName" TEXT,
+        "joinedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        score        DOUBLE PRECISION,
+        "submittedAt" TIMESTAMPTZ,
+        UNIQUE ("roomId", "userId")
+      )
+    `);
+    _erReady = true;
+  }
+  function makeAccessCode() {
+    // 6-char alphanumeric, capital — vd "X7K9PB"
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // bỏ I,O,0,1 (gây nhầm)
+    let s = '';
+    for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+  function mapRoom(r, exam, teacher, count) {
+    return {
+      id: r.id, name: r.name, description: r.description,
+      status: r.status,
+      startTime: r.startTime, endTime: r.endTime,
+      duration: r.duration,
+      accessCode: r.accessCode,
+      isPublic: !!r.isPublic,
+      maxStudents: r.maxStudents,
+      Teacher: teacher ? { id: teacher.id, name: teacher.name } : null,
+      ExamMatrix: exam ? {
+        id: exam.id, name: exam.title,
+        grade: exam.grade || '', examType: exam.examType || '',
+      } : null,
+      _count: { participants: Number(count?.participants) || 0, questions: Number(count?.questions) || 0 },
+    };
+  }
+
+  // GET /api/online-exam-room — list teacher's rooms + public rooms
+  app.get('/api/online-exam-room', async (req, res) => {
+    const user = getERTeacher(req);
+    const pool = getERPool();
+    if (!pool) return res.json({ rooms: [], publicRooms: [] });
+    try {
+      await ensureExamRoomTables();
+      // My rooms (teacher only)
+      let rooms = [];
+      if (user) {
+        const r = await pool.query(
+          `SELECT er.*,
+                  e.title AS exam_title, e."examType",
+                  u.name AS teacher_name,
+                  (SELECT COUNT(*) FROM "ExamRoomParticipant" p WHERE p."roomId" = er.id) AS participants,
+                  (SELECT COUNT(*) FROM "ExamQuestion" eq WHERE eq."examId" = er."examId") AS questions
+             FROM "ExamRoom" er
+             LEFT JOIN "Exam" e ON e.id = er."examId"
+             LEFT JOIN "User" u ON u.id = er."teacherId"
+            WHERE er."teacherId" = $1
+            ORDER BY er."createdAt" DESC`,
+          [user.id]
+        );
+        rooms = r.rows.map(row => mapRoom(
+          row,
+          row.exam_title ? { id: row.examId, title: row.exam_title, examType: row.examType } : null,
+          row.teacher_name ? { id: row.teacherId, name: row.teacher_name } : null,
+          row,
+        ));
+      }
+      // Public rooms (everyone)
+      const pr = await pool.query(
+        `SELECT er.*,
+                e.title AS exam_title, e."examType",
+                u.name AS teacher_name,
+                (SELECT COUNT(*) FROM "ExamRoomParticipant" p WHERE p."roomId" = er.id) AS participants,
+                (SELECT COUNT(*) FROM "ExamQuestion" eq WHERE eq."examId" = er."examId") AS questions
+           FROM "ExamRoom" er
+           LEFT JOIN "Exam" e ON e.id = er."examId"
+           LEFT JOIN "User" u ON u.id = er."teacherId"
+          WHERE er."isPublic" = true AND er.status IN ('draft', 'active')
+          ORDER BY er."startTime" ASC NULLS LAST
+          LIMIT 30`,
+      );
+      const publicRooms = pr.rows.map(row => mapRoom(
+        row,
+        row.exam_title ? { id: row.examId, title: row.exam_title, examType: row.examType } : null,
+        row.teacher_name ? { id: row.teacherId, name: row.teacher_name } : null,
+        row,
+      ));
+      res.json({ rooms, publicRooms });
+    } catch (err) {
+      console.error('[exam-room:list]', err.message);
+      res.json({ rooms: [], publicRooms: [] });
+    }
+  });
+
+  // POST /api/online-exam-room — create
+  app.post('/api/online-exam-room', async (req, res) => {
+    const user = getERTeacher(req);
+    if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập' });
+    const pool = getERPool();
+    if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+    try {
+      await ensureExamRoomTables();
+      const body = req.body || {};
+      const name = String(body.name || '').trim();
+      const examId = String(body.examId || '').trim();
+      if (!name) return res.status(400).json({ error: 'Thiếu tên phòng' });
+      if (!examId) return res.status(400).json({ error: 'Thiếu examId — phải gắn 1 đề thi' });
+      // Verify exam tồn tại + thuộc teacher
+      const ex = await pool.query(`SELECT id, "userId" FROM "Exam" WHERE id = $1`, [examId]);
+      if (!ex.rows.length) return res.status(404).json({ error: 'Đề thi không tồn tại' });
+      if (ex.rows[0].userId !== user.id) {
+        return res.status(403).json({ error: 'Bạn không sở hữu đề thi này' });
+      }
+      const startTime = body.startTime ? new Date(body.startTime) : null;
+      const endTime = body.endTime ? new Date(body.endTime) : null;
+      const duration = Math.max(1, Math.min(600, Number(body.duration) || 45));
+      const isPublic = !!body.isPublic;
+      const maxStudents = body.maxStudents != null ? Math.max(1, Number(body.maxStudents)) : null;
+      // Tạo accessCode unique cho phòng bí mật
+      let accessCode = null;
+      if (!isPublic) {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const c = makeAccessCode();
+          const dup = await pool.query(`SELECT 1 FROM "ExamRoom" WHERE "accessCode" = $1`, [c]);
+          if (!dup.rows.length) { accessCode = c; break; }
+        }
+        if (!accessCode) return res.status(500).json({ error: 'Không tạo được mã phòng — thử lại' });
+      }
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      await pool.query(
+        `INSERT INTO "ExamRoom"
+           (id, name, description, "examId", "teacherId", "startTime", "endTime",
+            duration, "accessCode", "isPublic", "maxStudents", status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'draft')`,
+        [id, name, String(body.description || '').slice(0, 500),
+         examId, user.id, startTime, endTime, duration,
+         accessCode, isPublic, maxStudents]
+      );
+      console.log(`[exam-room:create] ✅ ${id} "${name}" by ${user.id}`);
+      const { rows } = await pool.query(`SELECT * FROM "ExamRoom" WHERE id = $1`, [id]);
+      const exTitle = await pool.query(`SELECT title, "examType" FROM "Exam" WHERE id = $1`, [examId]);
+      res.status(201).json({
+        ok: true,
+        examRoom: mapRoom(
+          rows[0],
+          exTitle.rows[0] ? { id: examId, title: exTitle.rows[0].title, examType: exTitle.rows[0].examType } : null,
+          { id: user.id, name: user.email },
+          { participants: 0, questions: 0 },
+        ),
+      });
+    } catch (err) {
+      console.error('[exam-room:create]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/online-exam-room/:id — update (status / name / time)
+  app.put('/api/online-exam-room/:id', async (req, res) => {
+    const user = getERTeacher(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const pool = getERPool();
+    try {
+      await ensureExamRoomTables();
+      const { id } = req.params;
+      const own = await pool.query(
+        `SELECT 1 FROM "ExamRoom" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [id, user.id]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Phòng không tồn tại hoặc không thuộc bạn' });
+      const body = req.body || {};
+      const sets = [];
+      const vals = [id];
+      let i = 2;
+      const allowed = ['name','description','status','isPublic','duration','startTime','endTime','maxStudents'];
+      for (const key of allowed) {
+        if (body[key] === undefined) continue;
+        let v = body[key];
+        if (key === 'startTime' || key === 'endTime') v = v ? new Date(v) : null;
+        sets.push(`"${key}" = $${i++}`);
+        vals.push(v);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'Không có field nào để update' });
+      sets.push(`"updatedAt" = NOW()`);
+      const { rows } = await pool.query(
+        `UPDATE "ExamRoom" SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+        vals
+      );
+      res.json({ ok: true, examRoom: rows[0] });
+    } catch (err) {
+      console.error('[exam-room:update]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/online-exam-room/:id
+  app.delete('/api/online-exam-room/:id', async (req, res) => {
+    const user = getERTeacher(req);
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    const pool = getERPool();
+    try {
+      const { rowCount } = await pool.query(
+        `DELETE FROM "ExamRoom" WHERE id = $1 AND "teacherId" = $2`,
+        [req.params.id, user.id]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Phòng không tồn tại' });
+      // Xoá participants luôn
+      await pool.query(`DELETE FROM "ExamRoomParticipant" WHERE "roomId" = $1`, [req.params.id]);
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[exam-room:delete]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/online-exam-room/join { accessCode? | roomId? }
+  // - Nếu có accessCode: tìm phòng bí mật theo mã
+  // - Nếu có roomId: join phòng public theo id
+  app.post('/api/online-exam-room/join', async (req, res) => {
+    const user = getERTeacher(req);
+    if (!user) return res.status(401).json({ error: 'Vui lòng đăng nhập trước' });
+    const pool = getERPool();
+    try {
+      await ensureExamRoomTables();
+      const { accessCode, roomId } = req.body || {};
+      let room = null;
+      if (accessCode) {
+        const r = await pool.query(
+          `SELECT * FROM "ExamRoom" WHERE "accessCode" = $1 LIMIT 1`,
+          [String(accessCode).trim().toUpperCase()]
+        );
+        room = r.rows[0];
+      } else if (roomId) {
+        const r = await pool.query(
+          `SELECT * FROM "ExamRoom" WHERE id = $1 AND "isPublic" = true LIMIT 1`,
+          [roomId]
+        );
+        room = r.rows[0];
+      } else {
+        return res.status(400).json({ error: 'Thiếu accessCode hoặc roomId' });
+      }
+      if (!room) return res.status(404).json({ error: 'Phòng không tồn tại hoặc mã sai' });
+      if (room.status === 'completed' || room.status === 'cancelled') {
+        return res.status(400).json({ error: 'Phòng đã kết thúc' });
+      }
+      // Insert participant (idempotent)
+      const { randomUUID } = require('crypto');
+      await pool.query(
+        `INSERT INTO "ExamRoomParticipant" (id, "roomId", "userId", "studentName")
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT ("roomId", "userId") DO NOTHING`,
+        [randomUUID(), room.id, user.id, user.email]
+      );
+      res.json({
+        ok: true,
+        room: { id: room.id, name: room.name, examId: room.examId, status: room.status, duration: room.duration },
+      });
+    } catch (err) {
+      console.error('[exam-room:join]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/online-exam-room/:id/schedule — placeholder (chưa làm scheduling sâu)
+  app.get('/api/online-exam-room/:id/schedule', (req, res) =>
+    res.json({ roomId: req.params.id, schedules: [] }));
+  app.post('/api/online-exam-room/:id/schedule', (_req, res) =>
+    res.status(501).json({ error: 'Đặt lịch thi nâng cao đang phát triển — dùng startTime/endTime trong tạo phòng' }));
+  app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
+    res.status(501).json({ error: 'Kích hoạt lịch thi đang phát triển' }));
+}
 
 // ══════════════════════════════════════════════════════════════
 // CAREER PROFILE — lưu kết quả bài test hướng nghiệp (MBTI + Holland)
