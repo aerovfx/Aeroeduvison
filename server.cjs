@@ -6734,11 +6734,14 @@ if (!USE_NODEJS_QUESTIONS) {
     }
     return _erpool;
   }
+  // Self-contained: require + secret từ env (tránh dựa vào const ở scope khác)
+  const _erjwt = require('jsonwebtoken');
+  const _erSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
   function getERTeacher(req) {
     try {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return null;
-      const d = jwt.verify(auth.slice(7), JWT_SECRET);
+      const d = _erjwt.verify(auth.slice(7), _erSecret, { ignoreExpiration: true });
       return { id: d.sub || d.userId || d.id, email: d.email, role: d.role };
     } catch { return null; }
   }
@@ -9665,12 +9668,16 @@ if (!USE_NODEJS_QUESTIONS) {
       }
       return _ppool;
     }
+    // Tự require jsonwebtoken + đọc secret từ env (không dựa vào JWT_SECRET
+    // const ở scope khác — cách scoping của file này khá rối, dễ undefined).
+    const _pjwt = require('jsonwebtoken');
+    const _pSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
     function getProfileUser(req) {
       try {
         const auth = req.headers.authorization || '';
         if (!auth.startsWith('Bearer ')) return null;
         const tok = auth.slice(7);
-        const d = jwt.verify(tok, JWT_SECRET);
+        const d = _pjwt.verify(tok, _pSecret, { ignoreExpiration: true });
         return { id: d.sub || d.userId || d.id, email: d.email };
       } catch { return null; }
     }
