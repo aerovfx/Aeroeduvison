@@ -978,11 +978,14 @@ export default function ClassesPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate(`/teacher/classes/${cls.id}`)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                  onClick={() => navigate(
+                    `/teacher/gradebook?grade=${encodeURIComponent(cls.grade)}&classId=${cls.id}&semester=HK2`
+                  )}
+                  title="Mở sổ điểm TT58"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
                 >
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  Xem chi tiết
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  Sổ điểm
                 </button>
                 <button
                   onClick={() => {
@@ -993,6 +996,13 @@ export default function ClassesPage() {
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   Thêm HS
+                </button>
+                <button
+                  onClick={() => navigate(`/teacher/classes/${cls.id}`)}
+                  title="Xem chi tiết"
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => {

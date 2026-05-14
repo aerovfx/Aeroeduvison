@@ -133,6 +133,7 @@ const TeacherAnalyticsPage     = lazy(() => import('@/pages/teacher/Analytics'))
 const EmotionMapPage           = lazy(() => import('@/pages/teacher/EmotionMap'))
 const TeacherClassesPage       = lazy(() => import('@/pages/teacher/Classes'))
 const ClassDetailPage          = lazy(() => import('@/pages/teacher/ClassDetail'))
+const GradeBookPage            = lazy(() => import('@/pages/teacher/GradeBook'))
 const TeacherCalendarPage      = lazy(() => import('@/pages/teacher/Calendar'))
 const TeacherAssignmentsPage   = lazy(() => import('@/pages/teacher/Assignments'))
 const MeetingNotesPage         = lazy(() => import('@/pages/teacher/MeetingNotes'))
@@ -425,6 +426,7 @@ export function AppRouter() {
               <Route path="/teacher/camera-management"             element={<CameraManagementPage />} />
               <Route path="/teacher/classes"                       element={<TeacherClassesPage />} />
               <Route path="/teacher/classes/:id"                   element={<ClassDetailPage />} />
+              <Route path="/teacher/gradebook"                     element={<GradeBookPage />} />
               <Route path="/teacher/document-digitization"         element={<DocumentDigitizationPage />} />
               <Route path="/teacher/document-digitization/:id/review" element={<DocumentDigitizationReviewPage />} />
               <Route path="/teacher/emotion-map"                   element={<EmotionMapPage />} />

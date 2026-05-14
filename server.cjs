@@ -8869,6 +8869,256 @@ if (!USE_NODEJS_QUESTIONS) {
         return res.status(500).json({ error: err.message });
       }
     });
+
+    // ════════════════════════════════════════════════════════════════
+    // TEACHER SUBJECTS + STUDENT GRADES — Hồ sơ dạy học TT58/22-2021
+    // ────────────────────────────────────────────────────────────────
+    // 1 giáo viên có thể dạy nhiều môn trong 1 lớp:
+    //   TeacherSubject(teacherId, classId, subject) — UNIQUE composite
+    // Điểm theo TT58 (sửa đổi 22/2021/TT-BGDĐT):
+    //   ĐĐGtx[]  — đánh giá thường xuyên (3-5 cột mỗi học kỳ)
+    //   ĐĐGgk    — đánh giá giữa kỳ (hệ số 2)
+    //   ĐĐGck    — đánh giá cuối kỳ (hệ số 3)
+    //   ĐTBmhk   = (Σ ĐĐGtx + 2 ĐĐGgk + 3 ĐĐGck) / (số ĐĐGtx + 5)
+    //   ĐTBmcn   = (ĐTBmhk1 + 2 ĐTBmhk2) / 3
+    // ════════════════════════════════════════════════════════════════
+    let _gradeReady = false;
+    async function ensureGradeTables() {
+      if (_gradeReady) return;
+      const pool = getClsPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "TeacherSubject" (
+          id           TEXT PRIMARY KEY,
+          "teacherId"  TEXT NOT NULL,
+          "classId"    TEXT NOT NULL,
+          subject      TEXT NOT NULL,
+          "schoolYear" TEXT,
+          "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE("teacherId", "classId", subject)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "TeacherSubject_class_idx"
+        ON "TeacherSubject"("classId")`);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "StudentGrade" (
+          id              TEXT PRIMARY KEY,
+          "classId"       TEXT NOT NULL,
+          "studentId"     TEXT NOT NULL,
+          "teacherId"     TEXT NOT NULL,
+          subject         TEXT NOT NULL,
+          semester        TEXT NOT NULL,
+          ddgtx           JSONB NOT NULL DEFAULT '[]'::jsonb,
+          ddggk           NUMERIC(4,2),
+          ddgck           NUMERIC(4,2),
+          "noteProgress"  TEXT,
+          "noteRecord"    TEXT,
+          "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE("classId", "studentId", subject, semester)
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "StudentGrade_lookup_idx"
+        ON "StudentGrade"("classId", subject, semester)`);
+      _gradeReady = true;
+    }
+
+    // ── GET /api/classes/:id/subjects ── liệt kê môn GV này dạy ở lớp này
+    // Bao gồm cả môn mặc định ghi trong TeacherClass.subject (nếu có) để
+    // không vỡ data cũ trước feature này.
+    app.get('/api/classes/:id/subjects', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.json({ subjects: [] });
+        await ensureClsTables();
+        await ensureGradeTables();
+        // Verify ownership
+        const own = await pool.query(
+          `SELECT subject FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2 LIMIT 1`,
+          [req.params.id, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        const defaultSubject = own.rows[0].subject;
+        const { rows } = await pool.query(
+          `SELECT subject, "schoolYear", "createdAt"
+             FROM "TeacherSubject"
+            WHERE "teacherId"=$1 AND "classId"=$2
+            ORDER BY "createdAt" ASC`,
+          [tid, req.params.id]
+        );
+        const subjects = rows.map(r => r.subject);
+        // Auto-include legacy default subject if not yet in TeacherSubject
+        if (defaultSubject && !subjects.includes(defaultSubject)) {
+          subjects.unshift(defaultSubject);
+        }
+        return res.json({ subjects });
+      } catch (err) {
+        console.error('[classes:subjects:list]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/classes/:id/subjects { subject }
+    app.post('/api/classes/:id/subjects', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureGradeTables();
+        const subject = String(req.body?.subject || '').trim();
+        if (!subject) return res.status(400).json({ error: 'Thiếu tên môn' });
+        const own = await pool.query(
+          `SELECT "schoolYear" FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2 LIMIT 1`,
+          [req.params.id, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        await pool.query(
+          `INSERT INTO "TeacherSubject" (id, "teacherId", "classId", subject, "schoolYear")
+           VALUES ($1,$2,$3,$4,$5)
+           ON CONFLICT ("teacherId","classId",subject) DO NOTHING`,
+          [clsUUID(), tid, req.params.id, subject.slice(0, 100), own.rows[0].schoolYear || null]
+        );
+        return res.status(201).json({ ok: true, subject });
+      } catch (err) {
+        console.error('[classes:subjects:add]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── DELETE /api/classes/:id/subjects/:subject
+    app.delete('/api/classes/:id/subjects/:subject', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        await pool.query(
+          `DELETE FROM "TeacherSubject"
+            WHERE "teacherId"=$1 AND "classId"=$2 AND subject=$3`,
+          [tid, req.params.id, decodeURIComponent(req.params.subject)]
+        );
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[classes:subjects:del]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/teacher/gradebook ── full ma trận điểm
+    // Query: classId, subject, semester (HK1|HK2)
+    // Trả về { students: [{id, stt, name, mssv, dob, gender}],
+    //          grades: { [studentId]: { ddgtx, ddggk, ddgck, noteProgress, noteRecord } } }
+    app.get('/api/teacher/gradebook', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.json({ students: [], grades: {} });
+        await ensureClsTables();
+        await ensureGradeTables();
+        const classId = String(req.query.classId || '').trim();
+        const subject = String(req.query.subject || '').trim();
+        const semester = String(req.query.semester || 'HK2').trim();
+        if (!classId || !subject) {
+          return res.status(400).json({ error: 'Thiếu classId hoặc subject' });
+        }
+        // Ownership check
+        const own = await pool.query(
+          `SELECT 1 FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2 LIMIT 1`,
+          [classId, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        // Students
+        const sRes = await pool.query(
+          `SELECT id, stt, mssv, name, dob, gender
+             FROM "ClassStudent"
+            WHERE "classId"=$1
+            ORDER BY stt ASC NULLS LAST, name ASC`,
+          [classId]
+        );
+        // Grades
+        const gRes = await pool.query(
+          `SELECT "studentId", ddgtx, ddggk, ddgck, "noteProgress", "noteRecord"
+             FROM "StudentGrade"
+            WHERE "classId"=$1 AND subject=$2 AND semester=$3`,
+          [classId, subject, semester]
+        );
+        const grades = {};
+        for (const g of gRes.rows) {
+          grades[g.studentId] = {
+            ddgtx: Array.isArray(g.ddgtx) ? g.ddgtx : [],
+            ddggk: g.ddggk == null ? null : Number(g.ddggk),
+            ddgck: g.ddgck == null ? null : Number(g.ddgck),
+            noteProgress: g.noteProgress || '',
+            noteRecord: g.noteRecord || '',
+          };
+        }
+        return res.json({ students: sRes.rows, grades, classId, subject, semester });
+      } catch (err) {
+        console.error('[gradebook:get]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/teacher/gradebook ── bulk save
+    // Body: { classId, subject, semester, rows: [{studentId, ddgtx[], ddggk, ddgck, noteProgress, noteRecord}] }
+    app.post('/api/teacher/gradebook', express.json({ limit: '2mb' }), async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureGradeTables();
+        const { classId, subject, semester, rows } = req.body || {};
+        if (!classId || !subject || !semester || !Array.isArray(rows)) {
+          return res.status(400).json({ error: 'Thiếu classId/subject/semester/rows' });
+        }
+        const own = await pool.query(
+          `SELECT 1 FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2 LIMIT 1`,
+          [classId, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        const clampScore = (v) => {
+          if (v === null || v === undefined || v === '') return null;
+          const n = Number(v);
+          if (!Number.isFinite(n)) return null;
+          return Math.max(0, Math.min(10, n));
+        };
+        let saved = 0;
+        for (const r of rows) {
+          if (!r.studentId) continue;
+          const ddgtx = Array.isArray(r.ddgtx)
+            ? r.ddgtx.map(clampScore).filter(x => x !== null)
+            : [];
+          await pool.query(
+            `INSERT INTO "StudentGrade"
+               (id, "classId", "studentId", "teacherId", subject, semester,
+                ddgtx, ddggk, ddgck, "noteProgress", "noteRecord", "updatedAt")
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())
+             ON CONFLICT ("classId","studentId",subject,semester) DO UPDATE SET
+               ddgtx        = EXCLUDED.ddgtx,
+               ddggk        = EXCLUDED.ddggk,
+               ddgck        = EXCLUDED.ddgck,
+               "noteProgress" = EXCLUDED."noteProgress",
+               "noteRecord"   = EXCLUDED."noteRecord",
+               "updatedAt"  = NOW()`,
+            [clsUUID(), classId, r.studentId, tid, subject, semester,
+             JSON.stringify(ddgtx),
+             clampScore(r.ddggk), clampScore(r.ddgck),
+             r.noteProgress ? String(r.noteProgress).slice(0, 1000) : null,
+             r.noteRecord   ? String(r.noteRecord).slice(0, 1000)   : null]
+          );
+          saved++;
+        }
+        console.log(`[gradebook:save] ✅ class=${classId.slice(0,8)} subj="${subject}" sem=${semester} rows=${saved}`);
+        return res.json({ ok: true, saved });
+      } catch (err) {
+        console.error('[gradebook:save]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
   }
 
   // ─ Public courses (Postgres-backed) ──────────────────────

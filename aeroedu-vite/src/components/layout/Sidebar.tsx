@@ -12,6 +12,7 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
+  ClipboardList,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -144,6 +145,7 @@ const teacherSections: RouteSection[] = [
     titleKey: 'sectionManage',
     routes: [
       { icon: BookOpenCheck,labelKey: 'routeClasses',     href: '/teacher/classes' },
+      { icon: ClipboardList,labelKey: 'routeGradeBook',   href: '/teacher/gradebook' },
       { icon: MonitorPlay,  labelKey: 'routeCameraClass', href: '/teacher/camera-management', badge: 'Live' },
       { icon: Thermometer,  labelKey: 'routeEnvironment', href: '/teacher/environment-monitoring', badge: 'IoT' },
       { icon: FileEdit,     labelKey: 'routeAssignments', href: '/teacher/assignments' },
