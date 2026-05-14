@@ -9816,8 +9816,16 @@ if (!USE_NODEJS_QUESTIONS) {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return res.status(401).json({ success: false, error: 'Unauthorized' });
       let userId;
-      try { userId = gjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!').sub; }
+      try {
+        const d = gjwt.verify(
+          auth.slice(7),
+          process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!',
+          { ignoreExpiration: true }
+        );
+        userId = d.sub || d.userId || d.id;
+      }
       catch { return res.status(401).json({ success: false, error: 'Invalid token' }); }
+      if (!userId) return res.status(401).json({ success: false, error: 'Token thiếu userId' });
       const matrixId = String(req.query.matrixId || '');
       if (!matrixId) return res.status(400).json({ success: false, error: 'matrixId required' });
       const pool = new GfmPool({ connectionString: url, max: 2, connectionTimeoutMillis: 5000 });
@@ -9857,8 +9865,16 @@ if (!USE_NODEJS_QUESTIONS) {
       const auth = req.headers.authorization || '';
       if (!auth.startsWith('Bearer ')) return res.status(401).json({ success: false, error: 'Unauthorized' });
       let userId;
-      try { userId = gjwt.verify(auth.slice(7), process.env.JWT_SECRET || 'dev-secret-fallback-change-in-production!!').sub; }
+      try {
+        const d = gjwt.verify(
+          auth.slice(7),
+          process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!',
+          { ignoreExpiration: true }
+        );
+        userId = d.sub || d.userId || d.id;
+      }
       catch { return res.status(401).json({ success: false, error: 'Invalid token' }); }
+      if (!userId) return res.status(401).json({ success: false, error: 'Token thiếu userId' });
 
       const { matrixId, title: customTitle, useAIForMissing = true } = req.body || {};
       if (!matrixId) return res.status(400).json({ success: false, error: 'matrixId required' });
@@ -9886,15 +9902,25 @@ if (!USE_NODEJS_QUESTIONS) {
         const DIFF_MAP = { nb: 'easy', th: 'medium', vd: 'hard', vdc: 'hard' };
 
         for (const topic of topics) {
-          const counts = topic.counts || {};
+          // Hỗ trợ 2 schema: legacy counts {nb,th,vd,vdc} hoặc new byPhan {I/II/III: {nb,th,vd}}
+          // Gộp về flat counts để query Question bank.
+          let counts = topic.counts || {};
+          if (topic.byPhan && typeof topic.byPhan === 'object') {
+            const sum = (k) => ['I','II','III'].reduce((s, p) => s + Number(topic.byPhan[p]?.[k] || 0), 0);
+            counts = { nb: sum('nb'), th: sum('th'), vd: sum('vd'), vdc: counts.vdc || 0 };
+          }
           for (const [diffKey, n] of Object.entries(counts)) {
             const need = Number(n) || 0;
             if (need <= 0) continue;
             const dbDiff = DIFF_MAP[diffKey] || 'medium';
-            // Pick từ bank
+            // Pick từ bank — match topic case-insensitive + lowercase difficulty
             const qRes = await pool.query(
               `SELECT id FROM "Question"
-                WHERE subject=$1 AND grade=$2 AND difficulty=$3 AND topic=$4 AND status='Hoạt động'
+                WHERE subject = $1
+                  AND grade = $2
+                  AND LOWER(difficulty) = LOWER($3)
+                  AND LOWER(topic) = LOWER($4)
+                  AND (status = 'Hoạt động' OR status = 'active' OR status IS NULL)
                 ORDER BY RANDOM() LIMIT $5`,
               [subject, grade, dbDiff, topic.name, need]
             );
@@ -9945,9 +9971,21 @@ if (!USE_NODEJS_QUESTIONS) {
         }
 
         if (allPicked.length === 0) {
+          // Trả về chi tiết để giáo viên biết bank vs AI bị gì
+          const aiErrors = (typeof results !== 'undefined' ? results : [])
+            .filter(r => r?._err)
+            .map(r => r._err.slice(0, 100));
           return res.status(503).json({
             success: false,
-            error: 'Không pick được câu nào (bank rỗng + AI fail). Hãy import câu vào ngân hàng trước.',
+            error: `Không pick được câu nào. ${
+              aiNeeded.length === 0
+                ? 'Ngân hàng rỗng cho subject/grade/topic này.'
+                : useAIForMissing
+                  ? `AI fail tất cả ${aiNeeded.length} group: ${aiErrors[0] || 'không rõ lý do'}.`
+                  : 'Bank thiếu câu và AI tắt — bật useAIForMissing để AI sinh tiếp.'
+            } Cần: ${aiNeeded.reduce((s, g) => s + g.count, 0)} câu, có: ${allPicked.length}.`,
+            aiErrors,
+            needed: aiNeeded.map(g => `${g.topic} (${g.difficulty}) × ${g.count}`),
           });
         }
 
