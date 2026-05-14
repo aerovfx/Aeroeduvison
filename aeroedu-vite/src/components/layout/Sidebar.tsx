@@ -48,6 +48,7 @@ const studentSections: RouteSection[] = [
     routes: [
       { icon: Brain,        labelKey: 'routeAiTutor',      href: '/ai-tutor',             isHighlighted: true },
       { icon: BookOpen,     labelKey: 'routeMyCourses',    href: '/student/my-courses',   badge: 'LMS' },
+      { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },
       { icon: Map,          labelKey: 'routeLearningPath',  href: '/learning-paths' },
       { icon: FileText,     labelKey: 'routeExamPrep',      href: '/student/exam-prep' },
       { icon: GraduationCap,labelKey: 'routeCareer',        href: '/student/career' },

@@ -7,6 +7,7 @@ import { BookOpen, CheckCircle2, Clock, TrendingUp, Award, Brain } from 'lucide-
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
+import { ConnectTeacherBanner } from '@/pages/student/MyTeachers'
 
 const DEMO_STATS = [
   { label: 'Khóa học đang học', value: 4, icon: BookOpen, color: 'bg-blue-100 text-blue-600' },
@@ -44,6 +45,9 @@ export default function StudentDashboard() {
         </h1>
         <p className="text-muted-foreground mt-1">Đây là tổng quan học tập của bạn hôm nay.</p>
       </div>
+
+      {/* Banner nhắc kết nối GV nếu chưa có link nào */}
+      <ConnectTeacherBanner />
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

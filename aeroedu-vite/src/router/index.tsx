@@ -155,6 +155,7 @@ const StudentDashboardPage            = lazy(() => import('@/pages/student/Dashb
 const StudentProgressPage             = lazy(() => import('@/pages/student/Progress'))
 const StudentSchedulePage             = lazy(() => import('@/pages/student/Schedule'))
 const StudentMyCoursesPage            = lazy(() => import('@/pages/student/MyCourses'))
+const StudentMyTeachersPage           = lazy(() => import('@/pages/student/MyTeachers'))
 const StudentPurchaseHistoryPage      = lazy(() => import('@/pages/student/PurchaseHistory'))
 const StudentWishlistPage             = lazy(() => import('@/pages/student/Wishlist'))
 const StudentCertificatePage          = lazy(() => import('@/pages/student/Certificate'))
@@ -389,6 +390,7 @@ export function AppRouter() {
               <Route path="/student/progress"          element={<StudentProgressPage />} />
               <Route path="/student/schedule"          element={<StudentSchedulePage />} />
               <Route path="/student/my-courses"        element={<StudentMyCoursesPage />} />
+              <Route path="/student/teachers"          element={<StudentMyTeachersPage />} />
               <Route path="/student/purchase-history"  element={<StudentPurchaseHistoryPage />} />
               <Route path="/student/wishlist"          element={<StudentWishlistPage />} />
               <Route path="/student/certificate/:courseId" element={<StudentCertificatePage />} />
