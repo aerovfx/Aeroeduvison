@@ -1147,10 +1147,399 @@ function StartupLeaderboard({ projects }: { projects: STEMProject[] }) {
   )
 }
 
+// ═════════════════════════════════════════════════════════════
+// STARTUP LESSONS — Khởi nghiệp 101 cho HS STEM
+// ─────────────────────────────────────────────────────────────
+// 8 bài học cốt lõi: từ Lean Canvas đến Pitch Deck, có VD VN cụ thể.
+// Mỗi bài có "Áp dụng vào dự án STEM" để liên kết với leaderboard.
+// ═════════════════════════════════════════════════════════════
+interface Lesson {
+  id: string
+  emoji: string
+  title: string
+  subtitle: string
+  duration: string             // thời gian đọc ước tính
+  level: 'basic' | 'intermediate' | 'advanced'
+  whyMatters: string           // Tại sao bài này quan trọng
+  keyPoints: string[]          // 3-5 điểm chính
+  example: { name: string; story: string }   // Case study VN
+  applyToStem: string          // Áp dụng vào dự án STEM ngay
+  scoreBoost?: string          // Tác động lên Startup Leaderboard score
+}
+
+const STARTUP_LESSONS: Lesson[] = [
+  {
+    id: 'lean-canvas',
+    emoji: '📋',
+    title: 'Lean Canvas — Kế hoạch dự án trên 1 trang',
+    subtitle: 'Thay vì viết business plan 50 trang, dùng 9 ô để rõ ý tưởng trong 30 phút',
+    duration: '8 phút đọc',
+    level: 'basic',
+    whyMatters:
+      'Một kế hoạch tốt KHÔNG cần dài. Lean Canvas (Ash Maurya) thay business plan truyền thống bằng 9 ô giúp bạn ép mình suy nghĩ rõ về vấn đề, giải pháp, khách hàng và unit economics — tất cả trên 1 trang A4 dán tường.',
+    keyPoints: [
+      '1️⃣ Problem — 3 vấn đề lớn nhất bạn giải quyết',
+      '2️⃣ Customer Segments — Ai là khách hàng đầu tiên (specific!)',
+      '3️⃣ Unique Value Proposition — 1 câu giải thích vì sao bạn KHÁC',
+      '4️⃣ Solution — Phiên bản đơn giản nhất giải quyết được',
+      '5️⃣ Channels — Cách tiếp cận khách (online/offline/B2B)',
+      '6️⃣ Revenue Streams — Nguồn thu (one-time / subscription / freemium)',
+      '7️⃣ Cost Structure — Chi phí cố định + biến đổi',
+      '8️⃣ Key Metrics — 3-5 chỉ số đo lường thành công',
+      '9️⃣ Unfair Advantage — Lợi thế đối thủ KHÓ sao chép',
+    ],
+    example: {
+      name: 'Tiki (2010)',
+      story: 'Trần Ngọc Thái Sơn không viết plan dài. Lean Canvas của Tiki ban đầu cực ngắn: Problem = "Mua sách online ở VN khó, ship chậm, không có review" / Customers = "Sinh viên + nhân viên văn phòng HN-HCM" / UVP = "Sách giảm 30% + ship trong ngày" / Solution = "1 website + kho ở HN" / Revenue = "Giá bán - giá nhập - ship". Bắt đầu từ 1 phòng trọ, nay có 4M users.',
+    },
+    applyToStem:
+      '👉 Vẽ Lean Canvas cho dự án STEM của bạn ngay hôm nay. Nếu chưa rõ "Customer Segment" cụ thể là AI thì dự án vẫn là idea, chưa phải startup.',
+    scoreBoost: '+15đ Feasibility (objective + methodology) khi điền chi tiết',
+  },
+  {
+    id: 'customer-discovery',
+    emoji: '🔍',
+    title: 'Customer Discovery — Đừng giả sử, hãy hỏi',
+    subtitle: 'Steve Blank: "No business plan survives first contact with customers"',
+    duration: '10 phút đọc',
+    level: 'basic',
+    whyMatters:
+      'Lý do startup chết #1 (theo CB Insights 2023) = "No market need" (35%). Customer Discovery = đi PHỎNG VẤN khách hàng tiềm năng TRƯỚC khi build, để biết vấn đề có THẬT không, có ai chịu trả tiền không, mức bao nhiêu.',
+    keyPoints: [
+      '🎯 Mục tiêu: VALIDATE problem, KHÔNG sell solution',
+      '❌ KHÔNG hỏi: "Bạn có thấy hệ thống này hay không?" (leading)',
+      '✅ NÊN hỏi: "Lần cuối bạn gặp vấn đề X là khi nào? Bạn đã làm gì?"',
+      '📝 5 câu mở "Mom Test" (Rob Fitzpatrick): tập trung HÀNH VI quá khứ, KHÔNG dự đoán tương lai',
+      '🎯 10-15 phỏng vấn 30 phút trước khi viết 1 dòng code',
+      '📊 Track patterns: nếu 7/10 nói cùng vấn đề → real',
+    ],
+    example: {
+      name: 'Dropbox (2008)',
+      story: 'Drew Houston không build sản phẩm trước. Anh quay 1 video 3 phút demo "tưởng tượng" Dropbox hoạt động thế nào, post lên Hacker News. Qua 1 đêm có 75.000 người đăng ký waitlist. ĐÓ là validate. Sau đó mới build thật. Bài học: Test demand bằng Smoke Test (landing page + waitlist) TRƯỚC khi build.',
+    },
+    applyToStem:
+      '👉 Trước khi làm tiếp dự án, hãy phỏng vấn 10 bạn cùng lớp (hoặc 5 GV) về vấn đề bạn giải quyết. Ghi câu trả lời, tìm pattern. Nếu KHÔNG ai quan tâm → pivot ngay.',
+    scoreBoost: '+10đ Impact khi mô tả Expected Outcomes dựa trên feedback thật',
+  },
+  {
+    id: 'mvp',
+    emoji: '🛠️',
+    title: 'MVP — Sản phẩm tối giản (Minimum Viable Product)',
+    subtitle: 'Build → Measure → Learn loop. Càng nhanh càng tốt.',
+    duration: '7 phút đọc',
+    level: 'basic',
+    whyMatters:
+      'Eric Ries (Lean Startup): MVP là phiên bản đơn giản NHẤT có thể RUN qua chu trình Build-Measure-Learn. Mục đích KHÔNG phải bán hàng, mà là HỌC nhanh nhất với chi phí thấp nhất. Sai sớm = rẻ, sai muộn = đắt.',
+    keyPoints: [
+      '⏱ Time-box: 2-4 tuần MAX cho MVP đầu tiên',
+      '🎯 Chỉ làm 1 chức năng cốt lõi (90% bị cắt)',
+      '🧪 Định nghĩa "thành công" TRƯỚC khi launch (vd: 30% click rate)',
+      '📈 Track 1 metric duy nhất (North Star Metric)',
+      '🔄 Lặp lại mỗi 2 tuần dựa trên data',
+      '💡 "If you\'re not embarrassed by your first version, you launched too late" — Reid Hoffman',
+    ],
+    example: {
+      name: 'Buffer (2010)',
+      story: 'Joel Gascoigne không viết code. MVP đầu tiên của Buffer là 2 trang web: trang 1 mô tả chức năng, trang 2 nói "App đang phát triển, để lại email". Khi nhiều người đăng ký, anh thêm trang 3 hỏi "Bạn sẵn sàng trả $5/tháng?" Khi có người trả, mới bắt đầu code. Giờ Buffer doanh thu $20M/năm.',
+    },
+    applyToStem:
+      '👉 Phiên bản v0 của dự án STEM: chỉ 1 cảm biến + 1 LED + lập trình 50 dòng. ĐỦ để demo cho 5 người và lấy feedback. Đừng add bluetooth, Wi-Fi, app điện thoại ở v0.',
+    scoreBoost: '+25đ Execution khi có MVP chạy thật + log progress đều',
+  },
+  {
+    id: 'tam-sam-som',
+    emoji: '📊',
+    title: 'TAM-SAM-SOM — Đo lường thị trường',
+    subtitle: '3 vòng tròn lồng nhau giúp đầu tư biết dự án có "đáng" không',
+    duration: '6 phút đọc',
+    level: 'intermediate',
+    whyMatters:
+      'Khi pitch nhà đầu tư, câu đầu họ hỏi: "Thị trường to bao nhiêu?" Nếu trả lời "Trẻ em VN" — out. Nếu trả lời "TAM 5 tỷ USD, SAM 500 triệu USD, SOM 50 triệu USD trong 3 năm" — họ nghe tiếp. TAM-SAM-SOM là cách trả lời CHUẨN.',
+    keyPoints: [
+      '🌍 TAM (Total Addressable Market) — Toàn bộ thị trường nếu 100% mua',
+      '🎯 SAM (Serviceable Addressable Market) — Phần TAM mà bạn có thể TIẾP CẬN (ngôn ngữ/khu vực/kênh)',
+      '🏹 SOM (Serviceable Obtainable Market) — Phần thực tế CHIẾM được trong 3-5 năm (5-15% SAM là realistic)',
+      '🔢 Tính bottom-up: số khách × giá × tần suất × thời gian',
+      '📚 Top-down: dùng số liệu Statista / Decision Lab / Gartner',
+      '⚠️ Tránh "TAM = dân số VN × giá sản phẩm" — quá ngây thơ',
+    ],
+    example: {
+      name: 'Sky Mavis (Axie Infinity, 2018)',
+      story: 'Founder Trung Nguyễn pitch: TAM = thị trường gaming toàn cầu $200B / SAM = blockchain gaming $5B / SOM = play-to-earn $500M trong 3 năm. Investor (Andreessen Horowitz) đầu tư $7.5M Series A. 2021 Axie đỉnh cao $4B valuation. Bài học: TAM-SAM-SOM phải có CON SỐ + nguồn rõ ràng.',
+    },
+    applyToStem:
+      '👉 Cho dự án STEM của bạn, tính: VN có ~6 triệu HS THPT (TAM users) × giá thiết bị 200k = 1200 tỷ TAM. SAM = chỉ HS THPT đam mê STEM ≈ 600.000 (10%) → 120 tỷ. SOM = chiếm 1% trong 3 năm = 6.000 user × 200k = 1.2 tỷ. Đủ pitch nhỏ!',
+  },
+  {
+    id: 'unit-economics',
+    emoji: '💰',
+    title: 'Unit Economics — Mỗi sản phẩm lời bao nhiêu?',
+    subtitle: 'Nếu bán càng nhiều LỖ càng nhiều, đó KHÔNG phải startup',
+    duration: '8 phút đọc',
+    level: 'intermediate',
+    whyMatters:
+      'Uber từng đốt 4 tỷ USD/năm vì unit economics ÂM (mỗi chuyến lỗ). WeWork phá sản IPO cũng vì lý do tương tự. Trước khi nghĩ scale, phải chứng minh: bán 1 sản phẩm có lời. Công thức = LTV / CAC > 3.',
+    keyPoints: [
+      '💵 LTV (Lifetime Value) = Tổng tiền 1 khách trả trong toàn bộ thời gian',
+      '🎯 CAC (Customer Acquisition Cost) = Chi phí có được 1 khách (marketing + sales)',
+      '✅ LTV/CAC ≥ 3 — Healthy. Apple ≥ 10. SaaS B2B trung bình 4-5',
+      '⏱ CAC Payback Period — Bao lâu thu hồi CAC (≤ 12 tháng tốt)',
+      '📈 Gross Margin — Doanh thu - Cost trực tiếp / Doanh thu (SaaS ≥ 70%)',
+      '🔄 Churn — % khách rời mỗi tháng (≤ 5% B2C, ≤ 1% B2B tốt)',
+    ],
+    example: {
+      name: 'MoMo (2010-2024)',
+      story: 'MoMo (Phạm Thành Đức) ban đầu LTV/CAC ≈ 0.5 — đốt tiền marketing nhưng user không trung thành. Pivot: thay vì giảm giá, build network effects (super-app: nạp điện, trả hoá đơn, vay tín chấp). LTV tăng 8x, CAC giảm 60%. 2024: 30M users, valuation $2.7B. Bài học: KHÔNG có growth bền vững nếu unit economics âm.',
+    },
+    applyToStem:
+      '👉 Cho dự án STEM bán thiết bị: LTV = giá bán × repeat purchase + upsell. CAC = chi phí marketing + commission. Nếu LTV/CAC < 1.5, hãy tăng giá HOẶC tìm khách mua nhiều hơn (B2B school thay vì B2C cá nhân).',
+  },
+  {
+    id: 'pitch-deck',
+    emoji: '🎤',
+    title: 'Pitch Deck — Slide 10 phút đổi 100k USD',
+    subtitle: 'Quy tắc 10-20-30 của Guy Kawasaki: 10 slides, 20 phút, font 30',
+    duration: '12 phút đọc',
+    level: 'intermediate',
+    whyMatters:
+      'Nhà đầu tư nhận hàng trăm pitch/tuần. Slide deck DỞ = bị từ chối trong 30 giây. Slide GIỎI = mở cửa funding. Pitch deck KHÔNG phải về sản phẩm, mà về STORY: vấn đề lớn → giải pháp đặc biệt → đội ngũ làm được → cơ hội đầu tư.',
+    keyPoints: [
+      '1️⃣ Cover — Tên + tagline 1 câu',
+      '2️⃣ Problem — Vấn đề cụ thể, có data đau (vd 80% HS không hứng học STEM)',
+      '3️⃣ Solution — Demo trực quan (1 slide hình ảnh > 100 lời)',
+      '4️⃣ Why now — Tại sao THỜI ĐIỂM này là chín muồi',
+      '5️⃣ Market — TAM/SAM/SOM số rõ ràng',
+      '6️⃣ Product — Screenshot/video sản phẩm',
+      '7️⃣ Business Model — Cách kiếm tiền',
+      '8️⃣ Traction — Số liệu hiện tại (users/MRR/growth %)',
+      '9️⃣ Team — Tại sao TEAM bạn làm được, đối thủ không',
+      '🔟 Ask — Số tiền + dùng để làm gì + milestone đạt',
+    ],
+    example: {
+      name: 'Topica (2008)',
+      story: 'Phạm Minh Tuấn pitch lần đầu: 8 slides, 12 phút. Slide 1: "VN có 6 triệu sinh viên muốn học tiếng Anh, 90% học không hiệu quả". Slide cuối: "Cần $2M để mở rộng sang 5 nước Đông Nam Á trong 18 tháng". Singapore VC đầu tư $500k. Năm 2018 nhận $50M Series D từ Northstar. Bài học: Pitch SHORT, problem-driven, có ask CỤ THỂ.',
+    },
+    applyToStem:
+      '👉 Chuẩn bị pitch deck 10 slides cho dự án STEM. Test với GV chủ nhiệm — nếu họ không hiểu trong 5 phút, viết lại. Lưu file PDF, đem theo demo hardware khi gặp ai quan tâm.',
+  },
+  {
+    id: 'funding',
+    emoji: '🚀',
+    title: 'Các vòng gọi vốn — Pre-seed → IPO',
+    subtitle: 'Từ "ý tưởng" đến "lên sàn": hành trình tiền của 1 startup',
+    duration: '9 phút đọc',
+    level: 'advanced',
+    whyMatters:
+      'Mỗi vòng gọi vốn có đặc điểm riêng: số tiền, valuation, người cho vay, milestone đòi hỏi. Hiểu rõ giúp bạn KHÔNG raise quá sớm (mất share quá nhiều) hoặc quá muộn (hết tiền vận hành).',
+    keyPoints: [
+      '🌱 Pre-seed ($50k-$500k): từ founder/family/angel — chứng minh ý tưởng có thật',
+      '🌿 Seed ($500k-$3M): từ angel/early VC — build MVP + first customers',
+      '🌳 Series A ($3M-$15M): từ VC top — scale + product-market fit',
+      '🌲 Series B ($15M-$50M): mở rộng địa lý + team',
+      '🏔 Series C+ ($50M+): chuẩn bị IPO/acquisition',
+      '💎 Valuation × pha: Pre-seed ~$1-5M, Seed ~$5-25M, Series A ~$25-100M',
+      '⚖️ Quy tắc: mỗi vòng dilute 15-25% equity. Sau 4-5 vòng còn ~30-40% cho founders',
+    ],
+    example: {
+      name: 'VinFast (2017-2024)',
+      story: 'VinFast khác vì có Vingroup backing — bỏ qua giai đoạn seed/Series. 2017: Vingroup đầu tư $3.5B trực tiếp (như Series D). 2021: Crédit Suisse $1.5B convertible bond. 2023: SPAC IPO trên Nasdaq, valuation $23B. Lessons: nếu có corporate parent thì có thể skip funding stages, nhưng startup bình thường phải đi qua từng vòng.',
+    },
+    applyToStem:
+      '👉 Cho dự án STEM còn ở "ý tưởng" → tham gia cuộc thi STEM (Solve for Tomorrow, Sci-Hack) để raise pre-seed grant. Nhiều quỹ VN cho HS-SV: ICT Awards, Vietnam Startup Hub, Topica Founder Institute.',
+  },
+  {
+    id: 'vn-ecosystem',
+    emoji: '🇻🇳',
+    title: 'Hệ sinh thái startup Việt Nam',
+    subtitle: 'Quỹ, vườn ươm, sự kiện và unicorn VN bạn cần biết',
+    duration: '8 phút đọc',
+    level: 'basic',
+    whyMatters:
+      'VN xếp #59 toàn cầu (StartupBlink 2024) về startup ecosystem, top 3 ASEAN. Hơn 3.800 startups, 4 unicorns ($1B+ valuation). Biết hệ sinh thái = biết tìm partner, mentor, funding ở đâu.',
+    keyPoints: [
+      '🦄 4 Unicorns VN: VNG, VNLife (VinID/VNPay), MoMo, Sky Mavis',
+      '💰 Top VC: Vietnam Investments Group, IDG Ventures VN, Mekong Capital, VinaCapital, ESP Capital, Genesia Ventures',
+      '🌐 Quỹ ngoại tích cực: 500 Startups VN, Antler, Sequoia SEA, Northstar',
+      '🏢 Vườn ươm: VSV (Vietnam Silicon Valley), Topica Founder Institute, Antler VN, NIC (National Innovation Center)',
+      '🏆 Sự kiện lớn: Techfest VN (tháng 11), Vietnam Innovation Summit, Forbes 30U30 VN',
+      '📱 Communities: Founders Hub VN, VietnamWorks Tech, Lan Huong (Telegram), TechInAsia',
+      '🎓 Cuộc thi HS-SV: Solve for Tomorrow (Samsung), VinTech Startup, Sci-Hack, Hult Prize',
+    ],
+    example: {
+      name: 'Sky Mavis (2018-2024)',
+      story: 'Startup VN đầu tiên đạt unicorn từ HS-SV. Founder Trung Nguyễn (sinh 1992, tốt nghiệp NUS Singapore) build Axie Infinity từ 2018. 2020: nhận seed $1.5M từ Pangea + Konvoy. 2021: Series A $7.5M Andreessen Horowitz. 2021: Series B $152M, valuation $3B (unicorn!). Bài học: Founder VN có thể build global product nếu code mạnh + community thật.',
+    },
+    applyToStem:
+      '👉 Tham gia 1 cuộc thi STEM lớn năm nay (Samsung Solve for Tomorrow VN có giải $50k). Theo dõi Techfest, kết nối mentor qua Founders Hub VN. Nếu sản phẩm có traction, gửi pitch đến VinTech Startup hoặc 500 Startups VN.',
+  },
+]
+
+const LEVEL_BADGE: Record<Lesson['level'], { label: string; cls: string }> = {
+  basic:        { label: 'CƠ BẢN',      cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  intermediate: { label: 'TRUNG BÌNH',  cls: 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' },
+  advanced:     { label: 'NÂNG CAO',    cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
+}
+
+function StartupLessonsTab() {
+  const [openIds, setOpenIds] = useState<Set<string>>(new Set())
+  const [filter, setFilter] = useState<'all' | Lesson['level']>('all')
+
+  const toggle = (id: string) => {
+    const next = new Set(openIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setOpenIds(next)
+  }
+
+  const filtered = filter === 'all' ? STARTUP_LESSONS : STARTUP_LESSONS.filter(l => l.level === filter)
+  const totalDuration = filtered.reduce((s, l) => s + parseInt(l.duration), 0)
+
+  return (
+    <div>
+      {/* Hero intro */}
+      <div className="rounded-2xl bg-gradient-to-br from-orange-600/15 via-pink-600/10 to-purple-600/10 border border-orange-500/30 p-5 mb-5 relative overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-60 h-60 bg-orange-500/15 blur-3xl rounded-full pointer-events-none" />
+        <div className="relative flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center shadow-lg shadow-orange-500/30 flex-shrink-0">
+            <Rocket className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-white mb-1">Khởi nghiệp 101 cho HS STEM</h2>
+            <p className="text-sm text-white/60">
+              {STARTUP_LESSONS.length} bài học cốt lõi giúp biến dự án STEM thành startup tiềm năng.
+              Mỗi bài có VD case study Việt Nam thực tế + cách áp dụng ngay vào dự án của bạn.
+            </p>
+            <div className="flex items-center gap-3 mt-2 text-xs text-white/50">
+              <span>📚 {filtered.length} bài hiển thị</span>
+              <span>•</span>
+              <span>⏱ ~{totalDuration} phút đọc tổng</span>
+              <span>•</span>
+              <span className="text-orange-300">💡 Đọc xong → tăng điểm Startup Leaderboard</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Level filter */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <span className="text-xs text-white/50 mr-1">Lọc theo trình độ:</span>
+        {([
+          { key: 'all'         as const, label: `Tất cả (${STARTUP_LESSONS.length})` },
+          { key: 'basic'       as const, label: `Cơ bản (${STARTUP_LESSONS.filter(l => l.level === 'basic').length})` },
+          { key: 'intermediate' as const, label: `Trung bình (${STARTUP_LESSONS.filter(l => l.level === 'intermediate').length})` },
+          { key: 'advanced'    as const, label: `Nâng cao (${STARTUP_LESSONS.filter(l => l.level === 'advanced').length})` },
+        ]).map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              filter === f.key
+                ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Lesson cards */}
+      <div className="space-y-3">
+        {filtered.map((lesson, idx) => {
+          const open = openIds.has(lesson.id)
+          return (
+            <div
+              key={lesson.id}
+              className={`rounded-2xl border transition-all ${open
+                ? 'bg-white/[0.04] border-orange-500/30'
+                : 'bg-white/[0.02] border-white/[0.06] hover:border-white/[0.15]'}`}
+            >
+              {/* Header (always visible, clickable) */}
+              <button
+                onClick={() => toggle(lesson.id)}
+                className="w-full text-left p-5 flex items-center gap-4"
+              >
+                <div className="text-4xl flex-shrink-0">{lesson.emoji}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] text-white/40 font-mono">Bài {idx + 1}/{STARTUP_LESSONS.length}</span>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${LEVEL_BADGE[lesson.level].cls}`}>
+                      {LEVEL_BADGE[lesson.level].label}
+                    </span>
+                    <span className="text-[10px] text-white/40">⏱ {lesson.duration}</span>
+                  </div>
+                  <h3 className="text-base font-bold text-white/90 mb-1">{lesson.title}</h3>
+                  <p className="text-xs text-white/50 line-clamp-1">{lesson.subtitle}</p>
+                </div>
+                <ChevronRight className={`w-5 h-5 text-white/40 flex-shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+              </button>
+
+              {/* Expanded content */}
+              {open && (
+                <div className="px-5 pb-5 pt-0 space-y-4 border-t border-white/[0.06] animate-fade-in">
+                  {/* Why matters */}
+                  <div className="bg-white/[0.03] rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-white/70 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Lightbulb className="w-3.5 h-3.5 text-yellow-400" />
+                      Tại sao bài này quan trọng
+                    </h4>
+                    <p className="text-sm text-white/75 leading-relaxed">{lesson.whyMatters}</p>
+                  </div>
+
+                  {/* Key points */}
+                  <div className="bg-white/[0.03] rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                      <Target className="w-3.5 h-3.5 text-purple-400" />
+                      Điểm chính cần nhớ
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {lesson.keyPoints.map((p, i) => (
+                        <li key={i} className="text-sm text-white/75 leading-relaxed">{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Case study */}
+                  <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-blue-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5" />
+                      Case study: {lesson.example.name}
+                    </h4>
+                    <p className="text-sm text-white/80 leading-relaxed italic">"{lesson.example.story}"</p>
+                  </div>
+
+                  {/* Apply to STEM */}
+                  <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-emerald-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Rocket className="w-3.5 h-3.5" />
+                      Áp dụng ngay vào dự án STEM của bạn
+                    </h4>
+                    <p className="text-sm text-white/85 leading-relaxed">{lesson.applyToStem}</p>
+                    {lesson.scoreBoost && (
+                      <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-semibold border border-emerald-500/40">
+                        <TrendingUp className="w-3 h-3" />
+                        Tác động Leaderboard: {lesson.scoreBoost}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer hint */}
+      <div className="mt-5 p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center text-xs text-white/40">
+        💡 Mẹo: Mở 1 bài, đọc xong áp dụng vào dự án thật. Sau đó quay về <span className="text-yellow-300">Startup Leaderboard</span> ở trên để xem điểm tăng.
+      </div>
+    </div>
+  )
+}
+
 // ─────────────────────────────────────────────
 // MAIN PAGE
 // ─────────────────────────────────────────────
-type Tab = 'projects' | 'library' | 'templates'
+type Tab = 'projects' | 'library' | 'templates' | 'startup'
 
 export default function StemPage() {
   const [tab, setTab] = useState<Tab>('projects')
@@ -1254,6 +1643,7 @@ export default function StemPage() {
             { key: 'projects'  as const, label: 'Dự án của tôi',     icon: Layers,     count: projects.length },
             { key: 'library'   as const, label: 'Thư viện linh kiện', icon: Cpu,        count: COMPONENT_LIB.length },
             { key: 'templates' as const, label: 'Mẫu khởi đầu',      icon: Sparkles,   count: TEMPLATES.length },
+            { key: 'startup'   as const, label: 'Học startup',       icon: Rocket,     count: STARTUP_LESSONS.length },
           ]).map(({ key, label, icon: Icon, count }) => (
             <button
               key={key}
@@ -1356,6 +1746,9 @@ export default function StemPage() {
 
         {/* ── Tab: Templates ── */}
         {tab === 'templates' && <TemplatesTab onUseTemplate={useTemplate} />}
+
+        {/* ── Tab: Startup Lessons ── */}
+        {tab === 'startup' && <StartupLessonsTab />}
       </div>
     </div>
   )
