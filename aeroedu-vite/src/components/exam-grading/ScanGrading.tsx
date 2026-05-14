@@ -6,6 +6,7 @@ import {
   FileText, Image, Camera, RotateCcw, Download, ZoomIn, Search, Filter,
   ArrowUpDown, Printer, ClipboardCheck, BarChart3, AlertCircle
 } from 'lucide-react';
+import { api } from '@/services/api';
 
 // ===================== HEIC CONVERSION =====================
 
@@ -2642,13 +2643,9 @@ export default function ScanGrading(props: ScanGradingProps) {
         };
       });
 
-      const res = await fetch('/api/grading/graded-sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheets: payload }),
-      });
-
-      if (!res.ok) throw new Error('Failed to save');
+      // Bug fix: dùng api (axios) để có Authorization Bearer header
+      // — raw fetch() không attach token → BE 401
+      await api.post('/grading/graded-sheets', { sheets: payload });
       setSaveStatus('saved');
     } catch (err) {
       console.error('Failed to save graded results:', err);
@@ -2863,20 +2860,19 @@ export default function ScanGrading(props: ScanGradingProps) {
                 reader.readAsDataURL(file);
               });
               const base64 = dataUrl.replace(/^data:[^,]+,/, '');
-              const ocrResp = await fetch('/api/grading/ocr', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: base64, mimeType: file.type || 'image/jpeg' }),
-              });
-              if (ocrResp.ok) {
-                const ocrData = await ocrResp.json();
+              try {
+                const ocrResp = await api.post<{
+                  success: boolean
+                  exam_info?: { student_name?: string; student_id?: string; exam_code?: string }
+                }>('/grading/ocr', { image: base64, mimeType: file.type || 'image/jpeg' });
+                const ocrData = ocrResp.data;
                 if (ocrData.success && ocrData.exam_info) {
                   ocrStudentName = ocrData.exam_info.student_name || '';
-                  ocrStudentId = ocrData.exam_info.student_id || '';
-                  ocrExamCode = ocrData.exam_info.exam_code || '';
+                  ocrStudentId   = ocrData.exam_info.student_id   || '';
+                  ocrExamCode    = ocrData.exam_info.exam_code    || '';
                   console.log('[OCR] Extracted:', ocrData.exam_info);
                 }
-              }
+              } catch (e) { /* silent — không block scanning flow nếu OCR fail */ }
             }
           } catch (ocrErr) {
             console.warn('[OCR] Service unavailable, skipping text recognition:', ocrErr);

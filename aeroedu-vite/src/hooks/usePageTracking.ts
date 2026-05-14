@@ -14,7 +14,13 @@ import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 
 const SESSION_KEY = 'aeroedu_session_id'
-const ENDPOINT = '/api/analytics/pageview'
+// Bug fix sau deploy 199: ENDPOINT_BEACON dùng absolute /api/... cho
+// navigator.sendBeacon (raw fetch, không qua axios), ENDPOINT_AXIOS dùng
+// relative cho api.post() (axios đã có baseURL='/api'). Trước đây dùng
+// chung 1 const → axios duplicate prefix → POST /api/api/analytics/pageview
+// → 503 spam console mỗi route change.
+const ENDPOINT_BEACON = '/api/analytics/pageview'
+const ENDPOINT_AXIOS  = '/analytics/pageview'
 
 function getSessionId(): string {
   let sid = sessionStorage.getItem(SESSION_KEY)
@@ -31,11 +37,11 @@ function sendBeacon(payload: Record<string, unknown>) {
     // Prefer sendBeacon (survives page unload) — fall back to fetch
     if (navigator.sendBeacon) {
       const blob = new Blob([body], { type: 'application/json' })
-      navigator.sendBeacon(ENDPOINT, blob)
+      navigator.sendBeacon(ENDPOINT_BEACON, blob)
     } else {
       // axios chứa Authorization header tự động — quan trọng để biết role
       // nhưng sendBeacon không gửi header tuỳ chỉnh được. Dùng fetch keepalive.
-      fetch(ENDPOINT, {
+      fetch(ENDPOINT_BEACON, {
         method: 'POST',
         body,
         headers: { 'Content-Type': 'application/json' },
@@ -78,7 +84,7 @@ export function usePageTracking() {
     if (currentPath !== prevPathRef.current) {
       // Dynamic import api để tránh circular dep với services/api.ts
       import('@/services/api').then(({ api }) => {
-        api.post(ENDPOINT, {
+        api.post(ENDPOINT_AXIOS, {
           path: currentPath,
           referrer: prevPathRef.current || prevReferrerRef.current,
           sessionId,

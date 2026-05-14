@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react"
+import { api } from "@/services/api"
 import {
   CheckCircle2, Clock, FileText, Sparkles,
   ScanLine, ListChecks, Camera, RotateCcw,
@@ -331,13 +332,14 @@ export default function ExamGrading() {
   const [loadingKeys, setLoadingKeys]       = useState(true)
 
   // Load saved answer keys
+  // Bug fix: trước dùng raw fetch() → không có Authorization Bearer header
+  // → BE trả 401. Đổi sang `api` (axios với interceptor) để token tự attach.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/grading/answer-keys")
-        if (!res.ok) throw new Error("Failed to load")
-        const { keys } = await res.json()
+        const res = await api.get<{ keys: any[] }>("/grading/answer-keys")
+        const { keys } = res.data
         if (cancelled) return
         const mapped: AnswerKey[] = (keys ?? []).map((k: any) => ({
           dbId: k.id,
@@ -368,13 +370,11 @@ export default function ExamGrading() {
   const handleSaveKey = useCallback(async () => {
     setSavingKey(true)
     try {
-      const res = await fetch("/api/grading/answer-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftKey),
-      })
-      if (!res.ok) throw new Error("Save failed")
-      const { key } = await res.json()
+      const res = await api.post<{ ok: boolean; key: { id: string } }>(
+        "/grading/answer-keys",
+        draftKey,
+      )
+      const { key } = res.data
       const saved: AnswerKey = { ...draftKey, dbId: key.id }
       setSavedKeys(prev => {
         const next = [...prev, saved]
@@ -397,11 +397,9 @@ export default function ExamGrading() {
     if (!confirm(`Xoá đáp án "${key.examName || `Đề #${idx + 1}`}"?`)) return
     if (key.dbId) {
       try {
-        await fetch("/api/grading/answer-keys", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: key.dbId }),
-        })
+        // BE handler: DELETE /api/grading/answer-keys/:id (id trong URL path,
+        // KHÔNG phải body). Trước đây gửi body {id} → 404 vì missing :id param.
+        await api.delete(`/grading/answer-keys/${encodeURIComponent(key.dbId)}`)
       } catch (err) {
         console.error("Failed to delete answer key:", err)
       }
