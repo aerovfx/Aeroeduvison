@@ -10822,6 +10822,253 @@ if (!USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ════════════════════════════════════════════════════════════════
+  // PAGE VIEW ANALYTICS — YouTube-style tracking cho admin
+  // ────────────────────────────────────────────────────────────────
+  // Track lượt truy cập + thời gian xem từng route để admin biết:
+  //   - Trang nào được dùng nhiều nhất
+  //   - Lúc nào user active nhất (peak hour)
+  //   - Bao nhiêu unique users mỗi ngày
+  //   - Tỷ lệ bounce (xem < 5s)
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: AnPool } = require('pg');
+    const anJwt = require('jsonwebtoken');
+    let _anPool = null;
+    function getAnPool() {
+      if (!_anPool && process.env.DATABASE_URL) {
+        _anPool = new AnPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _anPool;
+    }
+    const AN_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getAnUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = anJwt.verify(auth.slice(7), AN_SECRET, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id, role: d.role || 'STUDENT', email: d.email };
+      } catch { return null; }
+    }
+    let _anReady = false;
+    async function ensurePageViewTable() {
+      if (_anReady) return;
+      const pool = getAnPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "PageView" (
+          id           TEXT PRIMARY KEY,
+          "userId"     TEXT,
+          "userRole"   TEXT,
+          path         TEXT NOT NULL,
+          referrer     TEXT,
+          "userAgent"  TEXT,
+          ip           TEXT,
+          "sessionId"  TEXT,
+          "viewMs"     INTEGER,
+          "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "PageView_path_idx"
+        ON "PageView"(path, "createdAt" DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "PageView_user_idx"
+        ON "PageView"("userId", "createdAt" DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "PageView_recent_idx"
+        ON "PageView"("createdAt" DESC)`);
+      // Cleanup view older than 90 days (keep DB small) — chạy lazy 1 lần
+      pool.query(`DELETE FROM "PageView" WHERE "createdAt" < NOW() - INTERVAL '90 days'`)
+        .catch(() => {});
+      _anReady = true;
+    }
+
+    // Normalize path để gom các route :id thành 1 bucket
+    // Ví dụ: /dashboard/stem/abc123 → /dashboard/stem/:id
+    function normalizePath(raw) {
+      if (!raw) return '/';
+      let p = String(raw).split('?')[0].split('#')[0].slice(0, 200);
+      // UUIDs → :uuid
+      p = p.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, ':uuid');
+      // Numeric IDs → :id
+      p = p.replace(/\/\d+(?=\/|$)/g, '/:id');
+      // Hash IDs (10+ chars alphanumeric) → :id
+      p = p.replace(/\/[a-zA-Z0-9_-]{10,}(?=\/|$)/g, '/:id');
+      return p;
+    }
+
+    // ── POST /api/analytics/pageview ── public, no auth required
+    // Body: { path, referrer?, sessionId, viewMs? }
+    // Trả 204 No Content (fire-and-forget cho FE)
+    app.post('/api/analytics/pageview', express.json({ limit: '4kb' }), async (req, res) => {
+      try {
+        const pool = getAnPool();
+        if (!pool) return res.status(204).end();
+        await ensurePageViewTable();
+        const b = req.body || {};
+        const path = normalizePath(b.path);
+        if (!path || path.length < 1) return res.status(400).json({ error: 'path required' });
+        // Bỏ qua nếu path là API endpoint hoặc static asset
+        if (path.startsWith('/api/') || path.startsWith('/assets/') || path.match(/\.(js|css|png|jpg|svg|ico)$/)) {
+          return res.status(204).end();
+        }
+        const user = getAnUser(req);
+        const ip = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '')
+          .toString().split(',')[0].trim().slice(0, 45);
+        const ua = (req.headers['user-agent'] || '').toString().slice(0, 300);
+        const sid = String(b.sessionId || '').slice(0, 64) || null;
+        const ref = String(b.referrer || '').slice(0, 200) || null;
+        const viewMs = b.viewMs != null && Number.isFinite(Number(b.viewMs))
+          ? Math.min(Number(b.viewMs), 86_400_000)  // cap 1 ngày
+          : null;
+        const { randomUUID } = require('crypto');
+        await pool.query(
+          `INSERT INTO "PageView"
+             (id, "userId", "userRole", path, referrer, "userAgent", ip, "sessionId", "viewMs")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [randomUUID(), user?.id || null, user?.role || null, path, ref, ua, ip, sid, viewMs]
+        );
+        return res.status(204).end();
+      } catch (err) {
+        console.warn('[analytics:pv] insert fail:', err.message.slice(0, 100));
+        return res.status(204).end();   // never fail FE tracking
+      }
+    });
+
+    // ── GET /api/admin/analytics/overview ── admin only
+    app.get('/api/admin/analytics/overview', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({});
+      try {
+        await ensurePageViewTable();
+
+        // Tổng quan: today / week / month + unique users + avg duration
+        const [totalsRes, uniquesRes, durationRes, dailyRes, byRoleRes] = await Promise.all([
+          pool.query(`
+            SELECT
+              COUNT(*) FILTER (WHERE "createdAt" >= NOW() - INTERVAL '24 hours')::int  AS today,
+              COUNT(*) FILTER (WHERE "createdAt" >= NOW() - INTERVAL '7 days')::int    AS week,
+              COUNT(*) FILTER (WHERE "createdAt" >= NOW() - INTERVAL '30 days')::int   AS month,
+              COUNT(*)::int                                                            AS all_time
+            FROM "PageView"
+          `),
+          pool.query(`
+            SELECT
+              COUNT(DISTINCT "sessionId") FILTER (WHERE "sessionId" IS NOT NULL AND "createdAt" >= NOW() - INTERVAL '24 hours')::int AS sessions_today,
+              COUNT(DISTINCT "userId")    FILTER (WHERE "userId" IS NOT NULL    AND "createdAt" >= NOW() - INTERVAL '24 hours')::int AS users_today,
+              COUNT(DISTINCT "userId")    FILTER (WHERE "userId" IS NOT NULL    AND "createdAt" >= NOW() - INTERVAL '7 days')::int   AS users_week
+            FROM "PageView"
+          `),
+          pool.query(`
+            SELECT AVG("viewMs")::int AS avg_ms
+            FROM "PageView"
+            WHERE "viewMs" IS NOT NULL AND "viewMs" > 1000
+              AND "createdAt" >= NOW() - INTERVAL '7 days'
+          `),
+          pool.query(`
+            SELECT DATE_TRUNC('day', "createdAt") AS day, COUNT(*)::int AS views
+            FROM "PageView"
+            WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+            GROUP BY day
+            ORDER BY day ASC
+          `),
+          pool.query(`
+            SELECT COALESCE("userRole", 'GUEST') AS role, COUNT(*)::int AS views
+            FROM "PageView"
+            WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+            GROUP BY role
+            ORDER BY views DESC
+          `),
+        ]);
+        return res.json({
+          totals: totalsRes.rows[0] || { today: 0, week: 0, month: 0, all_time: 0 },
+          uniques: uniquesRes.rows[0] || { sessions_today: 0, users_today: 0, users_week: 0 },
+          avgViewMs: Number(durationRes.rows[0]?.avg_ms) || 0,
+          daily: dailyRes.rows.map(r => ({ day: r.day, views: r.views })),
+          byRole: byRoleRes.rows,
+        });
+      } catch (err) {
+        console.error('[analytics:overview]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/analytics/routes ── top routes với chi tiết
+    // Query: days (default 7), limit (default 30)
+    app.get('/api/admin/analytics/routes', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ routes: [] });
+      try {
+        await ensurePageViewTable();
+        const days = Math.min(90, Math.max(1, Number(req.query.days) || 7));
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
+        const { rows } = await pool.query(`
+          SELECT
+            path,
+            COUNT(*)::int                                  AS views,
+            COUNT(DISTINCT "sessionId")::int               AS unique_sessions,
+            COUNT(DISTINCT "userId") FILTER (WHERE "userId" IS NOT NULL)::int AS unique_users,
+            AVG("viewMs") FILTER (WHERE "viewMs" > 1000)::int AS avg_view_ms,
+            COUNT(*) FILTER (WHERE "viewMs" IS NOT NULL AND "viewMs" < 5000)::int AS bounces,
+            MAX("createdAt")                               AS last_view
+          FROM "PageView"
+          WHERE "createdAt" >= NOW() - ($1::int || ' days')::interval
+          GROUP BY path
+          ORDER BY views DESC
+          LIMIT $2
+        `, [days, limit]);
+        return res.json({
+          routes: rows.map(r => ({
+            path: r.path,
+            views: r.views,
+            uniqueSessions: r.unique_sessions,
+            uniqueUsers: r.unique_users,
+            avgViewMs: Number(r.avg_view_ms) || 0,
+            bounces: r.bounces,
+            bounceRate: r.views > 0 ? Math.round((r.bounces / r.views) * 100) : 0,
+            lastView: r.last_view,
+          })),
+        });
+      } catch (err) {
+        console.error('[analytics:routes]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/analytics/realtime ── active users last 5 min
+    app.get('/api/admin/analytics/realtime', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ activeNow: 0, recent: [] });
+      try {
+        const { rows } = await pool.query(`
+          SELECT
+            COUNT(DISTINCT "sessionId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '5 minutes')::int AS active_now,
+            (SELECT json_agg(t) FROM (
+              SELECT path, "userRole", "createdAt"
+              FROM "PageView"
+              WHERE "createdAt" >= NOW() - INTERVAL '15 minutes'
+              ORDER BY "createdAt" DESC
+              LIMIT 20
+            ) t) AS recent
+          FROM "PageView"
+        `);
+        return res.json({
+          activeNow: Number(rows[0]?.active_now) || 0,
+          recent: rows[0]?.recent || [],
+        });
+      } catch (err) {
+        return res.json({ activeNow: 0, recent: [] });
+      }
+    });
+  }
+
   // ─ STEM AI Project Generator ─────────────────────────────
   // Blueprint.am-style: GV/HS mô tả ý tưởng → AI sinh project plan
   // Body: { prompt: string, level?: 'easy'|'medium'|'hard' }

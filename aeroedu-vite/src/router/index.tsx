@@ -20,6 +20,7 @@ import { RoleGuard } from '@/components/auth/RoleGuard'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import PageFallback from '@/pages/common/PageFallback'
 import { RouteErrorBoundary } from '@/components/common/ErrorBoundary'
+import { usePageTracking } from '@/hooks/usePageTracking'
 
 // Loading spinner
 function PageLoader() {
@@ -199,14 +200,22 @@ const AdminEmotionPage      = lazy(() => import('@/pages/admin/Emotion'))
 const AdminContentPage      = lazy(() => import('@/pages/admin/Content'))
 const AdminOperationsPage   = lazy(() => import('@/pages/admin/Operations'))
 const AdminCategoriesPage   = lazy(() => import('@/pages/admin/Categories'))
+const AdminAnalyticsPage    = lazy(() => import('@/pages/admin/Analytics'))
 
 // ── Fallback (PageFallback) dùng trực tiếp không cần lazy ────
 // vì component rất nhẹ (chỉ là iframe)
+
+// Track lượt truy cập từng route → bảng PageView, hiện ở /admin/analytics
+function PageTracker() {
+  usePageTracking()
+  return null
+}
 
 export function AppRouter() {
   return (
     <RouteErrorBoundary>
       <Suspense fallback={<PageLoader />}>
+        <PageTracker />
         <Routes>
 
         {/* ══════════════════════════════════════════════════
@@ -492,6 +501,7 @@ export function AppRouter() {
               <Route path="/admin/emotion"             element={<AdminEmotionPage />} />
               <Route path="/admin/operations"          element={<AdminOperationsPage />} />
               <Route path="/admin/categories"          element={<AdminCategoriesPage />} />
+              <Route path="/admin/analytics"           element={<AdminAnalyticsPage />} />
             </Route>
 
           </Route>{/* /DashboardLayout */}
