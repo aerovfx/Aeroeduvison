@@ -34,10 +34,10 @@ interface ImportStudent {
 }
 
 interface ImportResult {
-  created: number
-  existing: number
-  enrolled: number
+  inserted: number
+  updated: number
   skipped: number
+  total: number
 }
 
 // ── Mini components ──────────────────────────────────────────
@@ -90,7 +90,14 @@ function Modal({
   )
 }
 
-// ── AddStudentsModal (inline replacement) ───────────────────
+// ── AddStudentsModal ─────────────────────────────────────────
+// Thêm HS thủ công (1 hoặc nhiều dòng). Trước đây dùng /api/users?role=STUDENT
+// + POST /classes/:id/students nhưng cả 2 endpoint đều 503 (proxy về aero-backend
+// không còn tồn tại) → modal hiện "Không tìm thấy học sinh" mãi mãi, click "Thêm"
+// cũng fail.
+//
+// Giờ: 2 mode — "Form" (gõ từng HS) và "Dán" (paste từ Word/Excel, tự tách dòng/cột).
+// POST tới endpoint import đang chạy /classes/:id/students/import → reuse hạ tầng có sẵn.
 function AddStudentsModal({
   open,
   onClose,
@@ -102,86 +109,230 @@ function AddStudentsModal({
   classId: string
   onAdded: () => void
 }) {
-  const [students, setStudents] = useState<Student[]>([])
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'form' | 'paste'>('form')
+  const [rows, setRows] = useState<ImportStudent[]>([
+    { stt: 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' },
+  ])
+  const [pasteText, setPasteText] = useState('')
   const [adding, setAdding] = useState(false)
 
+  // Reset state khi đóng/mở modal
   useEffect(() => {
     if (!open) return
-    setLoading(true)
-    fetch('/api/users?role=STUDENT')
-      .then(r => r.json())
-      .then(d => setStudents(d.users || d || []))
-      .catch(() => setStudents([]))
-      .finally(() => setLoading(false))
+    setMode('form')
+    setRows([{ stt: 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' }])
+    setPasteText('')
+    setAdding(false)
   }, [open])
 
-  const filtered = students.filter(
-    s =>
-      s.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const addRow = () => setRows(r => [
+    ...r,
+    { stt: r.length + 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' },
+  ])
+  const removeRow = (i: number) => setRows(r => r.filter((_, idx) => idx !== i).map((x, idx) => ({ ...x, stt: idx + 1 })))
+  const updateRow = (i: number, patch: Partial<ImportStudent>) =>
+    setRows(r => r.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))
 
-  const toggle = (id: string) =>
-    setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  // Parse paste: mỗi dòng = 1 HS, cột phân tách bằng tab/dấu phẩy/dấu chấm phẩy
+  // Format: [stt] hoTen [maDinhDanh] [ngaySinh] [gioiTinh]
+  //   - 1 cột → chỉ hoTen
+  //   - 2 cột → hoTen + maDinhDanh
+  //   - 4-5 cột → STT + maDinhDanh + hoTen + ngaySinh [+ gioiTinh]  (TT58 order)
+  const parsePaste = (): ImportStudent[] => {
+    const lines = pasteText.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    const out: ImportStudent[] = []
+    let stt = 1
+    for (const line of lines) {
+      const cols = line.split(/\t|,(?! )|;/).map(c => c.trim()).filter(Boolean)
+      let row: Partial<ImportStudent> = { stt }
+      if (cols.length === 1) {
+        row.hoTen = cols[0]
+      } else if (cols.length === 2) {
+        row.hoTen = cols[0]
+        row.maDinhDanh = cols[1]
+      } else if (cols.length >= 4) {
+        // TT58 layout: stt | maDinhDanh | hoTen | ngaySinh | [gioiTinh]
+        const c0Num = Number(cols[0])
+        if (!isNaN(c0Num) && c0Num > 0 && c0Num < 10000) {
+          row.stt = c0Num
+          row.maDinhDanh = cols[1]
+          row.hoTen = cols[2]
+          row.ngaySinh = cols[3]
+          row.gioiTinh = cols[4] || 'Nam'
+        } else {
+          // Không có STT đầu dòng → maDinhDanh | hoTen | ngaySinh | gioiTinh
+          row.maDinhDanh = cols[0]
+          row.hoTen = cols[1]
+          row.ngaySinh = cols[2]
+          row.gioiTinh = cols[3] || 'Nam'
+        }
+      } else {
+        // 3 cột: hoTen | maDinhDanh | ngaySinh
+        row.hoTen = cols[0]
+        row.maDinhDanh = cols[1] || ''
+        row.ngaySinh = cols[2] || ''
+      }
+      if (!row.hoTen) continue
+      out.push({
+        stt: row.stt!,
+        hoTen: row.hoTen,
+        maDinhDanh: row.maDinhDanh || '',
+        ngaySinh: row.ngaySinh || '',
+        gioiTinh: row.gioiTinh || 'Nam',
+      })
+      stt = (row.stt || stt) + 1
+    }
+    return out
+  }
 
   const handleAdd = async () => {
-    if (!selected.length) return
+    const students = mode === 'paste' ? parsePaste() : rows.filter(r => r.hoTen.trim())
+    if (students.length === 0) {
+      toast.error(mode === 'paste' ? 'Không parse được học sinh từ text dán vào' : 'Vui lòng nhập ít nhất 1 học sinh')
+      return
+    }
     setAdding(true)
     try {
-      await api.post(`/classes/${classId}/students`, { studentIds: selected })
-      toast.success(`Đã thêm ${selected.length} học sinh vào lớp`)
+      const res = await api.post<{ message?: string; results?: ImportResult }>(
+        `/classes/${classId}/students/import`,
+        { students },
+      )
+      toast.success(res.data?.message || `Đã thêm ${students.length} học sinh`)
       onAdded()
-    } catch {
-      toast.error('Không thể thêm học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể thêm học sinh')
     } finally {
       setAdding(false)
     }
   }
 
+  if (!open) return null
   return (
-    <Modal open={open} onClose={onClose} title="Thêm học sinh vào lớp">
-      <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm học sinh..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl z-10 max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-purple-600" />
+            Thêm học sinh thủ công
+          </h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div className="max-h-64 overflow-y-auto space-y-2">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-sm">Không tìm thấy học sinh</p>
-          ) : (
-            filtered.map(s => (
-              <label
-                key={s.id}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(s.id)}
-                  onChange={() => toggle(s.id)}
-                  className="w-4 h-4 rounded text-purple-600"
-                />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{s.name}</p>
-                  <p className="text-xs text-gray-500">{s.email}</p>
+
+        {/* Mode tabs */}
+        <div className="px-6 pt-4 flex gap-2 border-b border-gray-100">
+          {([
+            { key: 'form'  as const, label: 'Nhập từng dòng' },
+            { key: 'paste' as const, label: 'Dán từ Word/Excel' },
+          ]).map(t => (
+            <button
+              key={t.key}
+              onClick={() => setMode(t.key)}
+              className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                mode === t.key
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body — scrollable */}
+        <div className="px-6 py-4 overflow-y-auto flex-1">
+          {mode === 'form' ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                <div className="col-span-1">STT</div>
+                <div className="col-span-4">Họ và tên *</div>
+                <div className="col-span-3">Mã định danh</div>
+                <div className="col-span-2">Ngày sinh</div>
+                <div className="col-span-1">G.tính</div>
+                <div className="col-span-1"></div>
+              </div>
+              {rows.map((row, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <input
+                    type="number"
+                    value={row.stt}
+                    onChange={e => updateRow(i, { stt: Number(e.target.value) || i + 1 })}
+                    className="col-span-1 px-2 py-1.5 border border-gray-200 rounded text-sm text-center"
+                  />
+                  <input
+                    type="text"
+                    value={row.hoTen}
+                    onChange={e => updateRow(i, { hoTen: e.target.value })}
+                    placeholder="Nguyễn Văn A"
+                    className="col-span-4 px-2 py-1.5 border border-gray-200 rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={row.maDinhDanh}
+                    onChange={e => updateRow(i, { maDinhDanh: e.target.value })}
+                    placeholder="7727940812"
+                    className="col-span-3 px-2 py-1.5 border border-gray-200 rounded text-sm font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={row.ngaySinh}
+                    onChange={e => updateRow(i, { ngaySinh: e.target.value })}
+                    placeholder="dd/mm/yyyy"
+                    className="col-span-2 px-2 py-1.5 border border-gray-200 rounded text-sm"
+                  />
+                  <select
+                    value={row.gioiTinh}
+                    onChange={e => updateRow(i, { gioiTinh: e.target.value })}
+                    className="col-span-1 px-1 py-1.5 border border-gray-200 rounded text-sm bg-white"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                  <button
+                    onClick={() => removeRow(i)}
+                    disabled={rows.length === 1}
+                    className="col-span-1 w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </label>
-            ))
+              ))}
+              <button
+                onClick={addRow}
+                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 border border-dashed border-purple-300 rounded-lg hover:bg-purple-50 w-full justify-center"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm dòng
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">
+                Dán danh sách từ Word/Excel — mỗi học sinh 1 dòng, cột phân tách bằng <b>Tab</b>, <b>dấu phẩy</b>, hoặc <b>chấm phẩy</b>.
+                Hỗ trợ format: <code className="bg-gray-100 px-1 py-0.5 rounded">STT, Mã định danh, Họ tên, Ngày sinh, Giới tính</code>
+              </p>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                placeholder={`1\t7727940812\tNguyễn Văn An\t15/03/2010\tNam\n2\t7727940813\tTrần Thị Bình\t22/07/2010\tNữ\n...`}
+                rows={10}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+              {pasteText && (
+                <p className="mt-2 text-xs text-purple-600">
+                  Sẽ thêm <b>{parsePaste().length}</b> học sinh
+                </p>
+              )}
+            </div>
           )}
         </div>
-        <div className="flex gap-2 pt-2">
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -190,15 +341,15 @@ function AddStudentsModal({
           </button>
           <button
             onClick={handleAdd}
-            disabled={!selected.length || adding}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={adding}
+            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-            Thêm ({selected.length})
+            Thêm vào lớp
           </button>
         </div>
       </div>
-    </Modal>
+    </div>
   )
 }
 
@@ -509,10 +660,10 @@ function ImportModal({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Tài khoản mới tạo', value: result.created, color: 'text-purple-600' },
-                  { label: 'Đã tồn tại', value: result.existing, color: 'text-blue-600' },
-                  { label: 'Đăng ký vào lớp', value: result.enrolled, color: 'text-green-600' },
-                  { label: 'Đã trong lớp', value: result.skipped, color: 'text-gray-500' },
+                  { label: 'Học sinh mới thêm', value: result.inserted, color: 'text-purple-600' },
+                  { label: 'Đã cập nhật',       value: result.updated,  color: 'text-blue-600' },
+                  { label: 'Bỏ qua (lỗi)',      value: result.skipped,  color: 'text-gray-500' },
+                  { label: 'Tổng dòng đọc',     value: result.total,    color: 'text-green-600' },
                 ].map(item => (
                   <div key={item.label} className="bg-white rounded-lg p-3 border border-green-100">
                     <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
