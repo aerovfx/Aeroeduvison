@@ -55,9 +55,13 @@ interface ContentForm {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Step indicator
+// Step indicator (chuẩn elearniv PageNavigation)
 // ─────────────────────────────────────────────────────────────
-function StepNav({ current, courseId }: { current: Step; courseId?: string }) {
+function StepNav({ current, courseId, onJump }: {
+  current: Step
+  courseId?: string
+  onJump: (step: Step) => void
+}) {
   return (
     <div className="flex items-center gap-0 mb-8">
       {STEPS.map((label, i) => {
@@ -69,12 +73,7 @@ function StepNav({ current, courseId }: { current: Step; courseId?: string }) {
             <button
               type="button"
               disabled={disabled}
-              onClick={() => {
-                if (!disabled && courseId) {
-                  // handled by parent
-                  document.dispatchEvent(new CustomEvent('stepto', { detail: i }))
-                }
-              }}
+              onClick={() => { if (!disabled) onJump(i as Step) }}
               className={cn(
                 'flex flex-col items-center gap-1 group',
                 disabled && 'cursor-not-allowed opacity-40'
@@ -830,20 +829,10 @@ export default function CourseEditor() {
   const [basicData, setBasicData] = useState<BasicForm | null>(null)
   const [contentData, setContentData] = useState<ContentForm | null>(null)
 
-  // Listen to step jumps from StepNav buttons
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const target = (e as CustomEvent).detail as Step
-      setStep(target)
-    }
-    document.addEventListener('stepto', handler)
-    return () => document.removeEventListener('stepto', handler)
-  }, [])
-
-  // Sync step to URL
+  // Sync step → URL (replace for clean history)
   useEffect(() => {
     setSearchParams({ step: String(step) }, { replace: true })
-  }, [step])
+  }, [step, setSearchParams])
 
   // Load existing course in edit mode
   const { data: course } = useQuery({
@@ -979,8 +968,38 @@ export default function CourseEditor() {
         </div>
       )}
 
+      {/* Slug + preview link (chỉ hiện sau khi đã save Bước 1) */}
+      {isEditMode && course && (course.slug || course.id) && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20">
+          <LinkIcon className="w-4 h-4 text-purple-400 flex-shrink-0" />
+          <span className="text-xs text-gray-400">URL công khai:</span>
+          <code className="text-xs text-purple-300 font-mono truncate flex-1">
+            /courses/{course.slug || course.id}
+          </code>
+          <a
+            href={`/courses/${course.slug || course.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-purple-300 hover:bg-purple-500/10 transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" /> Xem trước
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/courses/${course.slug || course.id}`)
+              toast.success('Đã copy link')
+            }}
+            className="text-xs text-gray-400 hover:text-purple-300 px-2 py-1"
+            title="Copy link"
+          >
+            📋
+          </button>
+        </div>
+      )}
+
       {/* Step indicator */}
-      <StepNav current={step} courseId={courseId} />
+      <StepNav current={step} courseId={courseId} onJump={setStep} />
 
       {/* Step content */}
       <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-6">

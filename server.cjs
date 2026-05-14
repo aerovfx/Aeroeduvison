@@ -1989,23 +1989,67 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
     }
   }
 
+  // ── LMS standard column migration (chuẩn elearniv ref) ────
+  // Mở rộng Course table với các cột: slug, before_price, lessons, duration,
+  // access_time + 3 cột nội dung dài (requirements, what_you_will_learn,
+  // who_is_this_course_for). Lazy ALTER lần đầu request.
+  let _courseColsReady = false;
+  async function ensureCourseColumns() {
+    if (_courseColsReady) return;
+    const pool = getIPool();
+    if (!pool) return;
+    const adds = [
+      ['slug',                'TEXT'],
+      ['before_price',        'NUMERIC'],
+      ['lessons_count',       'INTEGER'],
+      ['duration_text',       'TEXT'],
+      ['access_time',         'TEXT'],
+      ['requirements',        'TEXT'],
+      ['what_you_will_learn', 'TEXT'],
+      ['who_is_this_course_for', 'TEXT'],
+    ];
+    for (const [col, kind] of adds) {
+      try { await pool.query(`ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); }
+      catch (e) { console.warn(`[course] migrate ${col}:`, e.message); }
+    }
+    try { await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS "Course_slug_uq" ON "Course"(slug)`); } catch {}
+    _courseColsReady = true;
+  }
+  function slugifyTitle(s) {
+    return String(s || '').toLowerCase().normalize('NFD')
+      .replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'd')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'khoa-hoc'
+  }
+  async function uniqueSlug(pool, base) {
+    let s = base;
+    for (let i = 0; i < 5; i++) {
+      const r = await pool.query(`SELECT 1 FROM "Course" WHERE slug=$1 LIMIT 1`, [s]);
+      if (!r.rows.length) return s;
+      s = `${base}-${Math.floor(Math.random() * 900) + 100}`;
+    }
+    return s;
+  }
+
   // Map DB Course row → InstructorCourse shape expected by frontend
   function mapCourse(row, category, enrollments, chapters) {
+    const computedLessons = (chapters || []).filter(c => c.ispublished).length;
     return {
       id:                 row.id,
       userId:             row.userId,
       title:              row.title,
-      slug:               row.id, // no slug column — use id
+      slug:               row.slug || row.id,                        // dùng slug nếu có, fallback id
       overview:           row.description || null,
       image:              row.imageUrl || null,
       regularPrice:       parseFloat(row.price) || 0,
-      beforePrice:        0,
-      lessons:            (chapters || []).filter(c => c.ispublished).length,
-      duration:           null,
-      accessTime:         null,
-      requirements:       null,
-      whatYouWillLearn:   null,
-      whoIsThisCourseFor: null,
+      beforePrice:        parseFloat(row.before_price) || 0,         // ✅ now persisted
+      lessons:            row.lessons_count != null
+                            ? Number(row.lessons_count)
+                            : computedLessons,                       // fallback computed
+      duration:           row.duration_text || null,                 // ✅ now persisted
+      accessTime:         row.access_time || null,                   // ✅ now persisted
+      requirements:       row.requirements || null,                  // ✅ now persisted
+      whatYouWillLearn:   row.what_you_will_learn || null,           // ✅ now persisted
+      whoIsThisCourseFor: row.who_is_this_course_for || null,        // ✅ now persisted
       isPublished:        row.isPublished,
       categoryId:         row.categoryId || null,
       category:           category || null,
@@ -2025,6 +2069,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const pool = getIPool();
+      await ensureCourseColumns();
       const { rows: courses } = await pool.query(
         `SELECT c.*, u.name AS "userName", u.image AS "userImage",
                 cat.id AS "catId", cat.name AS "catName"
@@ -2081,6 +2126,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const pool = getIPool();
+      await ensureCourseColumns();
       const { rows } = await pool.query(
         `SELECT c.*, u.name AS "userName", u.image AS "userImage",
                 cat.id AS "catId", cat.name AS "catName"
@@ -2163,15 +2209,18 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
   });
 
   // ── POST /api/instructor/courses ──────────────────────────
-  // Tạo course mới. Required: title. Other fields optional.
+  // Tạo course mới. Required: title. Tất cả field LMS chuẩn elearniv:
+  //   { title, categoryId, regularPrice, beforePrice, lessons, duration,
+  //     accessTime, image, overview, requirements, whatYouWillLearn,
+  //     whoIsThisCourseFor }
+  // FE gửi nhiều shape: { title, regularPrice, image, overview, ... }
+  // Tự auto-generate slug + ensure unique.
   app.post('/api/instructor/courses', async (req, res) => {
     try {
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const pool = getIPool();
-      const { title, description, price, imageUrl, categoryId } = req.body || {};
-      if (!title) return res.status(400).json({ error: 'title required' });
-      // Try to auto-create Course table if missing
+      // Tự auto-create Course table nếu chưa có
       try {
         await pool.query(`CREATE TABLE IF NOT EXISTS "Course" (
           id TEXT PRIMARY KEY,
@@ -2186,19 +2235,54 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
           "updatedAt" TIMESTAMP DEFAULT NOW()
         )`);
       } catch {}
+      await ensureCourseColumns();
+
+      const b = req.body || {};
+      const title = String(b.title || '').trim();
+      if (!title) return res.status(400).json({ error: 'title required' });
+
+      const slug = await uniqueSlug(pool, slugifyTitle(title));
       const { randomUUID } = require('crypto');
       const id = randomUUID();
       const now = new Date();
-      const { rows } = await pool.query(
-        `INSERT INTO "Course" (id, "userId", title, description, "imageUrl", price, "categoryId", "isPublished", "createdAt", "updatedAt")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,false,$8,$8) RETURNING *`,
-        [id, userId, String(title).slice(0, 200),
-         description || null, imageUrl || null,
-         price ? Number(price) : null,
-         categoryId || null, now]
+      // Accept cả shape Next.js (overview) lẫn shape mới (description)
+      const overview = b.overview || b.description || null;
+      const image    = b.image    || b.imageUrl    || null;
+      const regular  = b.regularPrice != null ? Number(b.regularPrice) : (b.price != null ? Number(b.price) : null);
+      const before   = b.beforePrice  != null ? Number(b.beforePrice)  : null;
+
+      await pool.query(
+        `INSERT INTO "Course"
+           (id, "userId", title, slug, description, "imageUrl", price, before_price,
+            lessons_count, duration_text, access_time, "categoryId",
+            requirements, what_you_will_learn, who_is_this_course_for,
+            "isPublished", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,$16,$16)`,
+        [id, userId, title.slice(0, 200), slug,
+         overview, image, regular, before,
+         b.lessons != null ? Number(b.lessons) : null,
+         b.duration || null,
+         b.accessTime || null,
+         b.categoryId || null,
+         b.requirements || null,
+         b.whatYouWillLearn || null,
+         b.whoIsThisCourseFor || null,
+         now]
       );
-      console.log(`[instructor:create] ✅ ${id.slice(0,8)} title="${title}"`);
-      return res.status(201).json(rows[0]);
+      // Re-load + map để FE nhận đầy đủ shape
+      const { rows } = await pool.query(
+        `SELECT c.*, u.name AS "userName", u.image AS "userImage",
+                cat.id AS "catId", cat.name AS "catName"
+           FROM "Course" c
+           LEFT JOIN "User" u ON u.id = c."userId"
+           LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+          WHERE c.id = $1 LIMIT 1`,
+        [id]
+      );
+      const row = rows[0];
+      const cat = row.catId ? { id: row.catId, name: row.catName } : null;
+      console.log(`[instructor:create] ✅ ${id.slice(0,8)} slug="${slug}" title="${title.slice(0,40)}"`);
+      return res.status(201).json(mapCourse(row, cat, [], []));
     } catch (err) {
       console.error('[instructor:create] ❌', err.message);
       return res.status(500).json({ error: err.message });
@@ -2206,18 +2290,50 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
   });
 
   // ── PATCH /api/instructor/courses/:id ─────────────────────
+  // Whitelist mở rộng cho LMS-standard fields (chuẩn elearniv).
   app.patch('/api/instructor/courses/:id', async (req, res) => {
     try {
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const pool = getIPool();
-      const allowed = ['title','description','imageUrl','price','categoryId'];
+      await ensureCourseColumns();
+      // Map FE field name → DB column name
+      const fieldMap = {
+        title:                'title',
+        description:          'description',
+        overview:             'description',           // alias
+        imageUrl:             '"imageUrl"',
+        image:                '"imageUrl"',            // alias
+        price:                'price',
+        regularPrice:         'price',                 // alias
+        beforePrice:          'before_price',
+        lessons:              'lessons_count',
+        duration:             'duration_text',
+        accessTime:           'access_time',
+        categoryId:           '"categoryId"',
+        requirements:         'requirements',
+        whatYouWillLearn:     'what_you_will_learn',
+        whoIsThisCourseFor:   'who_is_this_course_for',
+      };
       const sets = []; const vals = [req.params.id, userId]; let i = 3;
-      for (const k of allowed) {
-        if (req.body && req.body[k] !== undefined) {
-          sets.push(`"${k}" = $${i++}`);
-          vals.push(req.body[k]);
+      for (const [feKey, dbCol] of Object.entries(fieldMap)) {
+        if (req.body && req.body[feKey] !== undefined) {
+          // Avoid duplicate set when both `image` and `imageUrl` are provided
+          if (sets.some(s => s.startsWith(dbCol + ' '))) continue;
+          sets.push(`${dbCol} = $${i++}`);
+          let v = req.body[feKey];
+          if (feKey === 'price' || feKey === 'regularPrice' || feKey === 'beforePrice') {
+            v = v === '' || v == null ? null : Number(v);
+          } else if (feKey === 'lessons') {
+            v = v === '' || v == null ? null : Number(v);
+          }
+          vals.push(v);
         }
+      }
+      // Slug auto-update khi đổi title
+      if (req.body?.title) {
+        const newSlug = await uniqueSlug(pool, slugifyTitle(req.body.title));
+        sets.push(`slug = $${i++}`); vals.push(newSlug);
       }
       if (!sets.length) return res.status(400).json({ error: 'No fields' });
       sets.push(`"updatedAt" = $${i++}`); vals.push(new Date());
@@ -2225,7 +2341,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
         `UPDATE "Course" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`, vals
       );
       if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
-      return res.json({ ok: true });
+      return res.json({ ok: true, updated: sets.length - 1 });
     } catch (err) {
       console.error('[instructor:update] ❌', err.message);
       return res.status(500).json({ error: err.message });
