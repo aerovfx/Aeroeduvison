@@ -5,12 +5,13 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell } from 'lucide-react'
+import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { cn } from '@/lib/utils'
+import { notificationsService, type Notification } from '@/services/notifications.service'
 
 // Quick-navigate routes cho Command Palette
 const quickRoutes = [
@@ -151,13 +152,8 @@ export function Navbar() {
           <LanguagePicker />
 
           {/* Notifications */}
-          <button
-            aria-label={t('notifications')}
-            className="relative p-2 rounded-lg hover:bg-accent transition text-muted-foreground hover:text-foreground"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-[hsl(262,83%,58%)]" />
-          </button>
+          <NotificationBell />
+
 
           {/* User menu */}
           <div className="relative">
@@ -219,5 +215,136 @@ export function Navbar() {
 
       <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} />
     </>
+  )
+}
+
+// ─── NotificationBell ──────────────────────────────────────────────────────
+// Polling 30s khi mounted. Click → dropdown 20 latest. Click 1 thông báo →
+// mark read + navigate tới link (vd /student/assignments?focus=<id>).
+function NotificationBell() {
+  const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
+  const [list, setList] = useState<Notification[]>([])
+  const [unread, setUnread] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const { isAuthenticated } = useAuth()
+
+  const fetchList = useCallback(async () => {
+    if (!isAuthenticated) return
+    try {
+      const r = await notificationsService.list({ limit: 20 })
+      setList(r.notifications)
+      setUnread(r.unreadCount)
+    } catch { /* silent — bell không cần spam toast */ }
+  }, [isAuthenticated])
+
+  // Initial + poll mỗi 30s khi tab visible
+  useEffect(() => {
+    fetchList()
+    if (!isAuthenticated) return
+    const id = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchList()
+    }, 30_000)
+    return () => clearInterval(id)
+  }, [fetchList, isAuthenticated])
+
+  const handleClickItem = async (n: Notification) => {
+    setOpen(false)
+    if (!n.read) {
+      try {
+        await notificationsService.markRead(n.id)
+        setList(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x))
+        setUnread(u => Math.max(0, u - 1))
+      } catch {}
+    }
+    if (n.link) navigate(n.link)
+  }
+
+  const handleMarkAll = async () => {
+    setLoading(true)
+    try {
+      const r = await notificationsService.markAllRead()
+      if (r.marked > 0) {
+        setList(prev => prev.map(x => ({ ...x, read: true })))
+        setUnread(0)
+      }
+    } catch {} finally { setLoading(false) }
+  }
+
+  if (!isAuthenticated) return null
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-label="Thông báo"
+        className="relative p-2 rounded-lg hover:bg-accent transition text-muted-foreground hover:text-foreground"
+      >
+        <Bell className="w-4 h-4" />
+        {unread > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-[190]" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-80 bg-card border border-border rounded-xl shadow-lg z-[200] overflow-hidden animate-fade-in">
+            <div className="px-3 py-2.5 border-b border-border flex items-center justify-between">
+              <p className="text-sm font-semibold text-foreground">Thông báo</p>
+              {unread > 0 && (
+                <button
+                  onClick={handleMarkAll}
+                  disabled={loading}
+                  className="text-xs text-purple-500 hover:text-purple-600 flex items-center gap-1 disabled:opacity-50"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  Đánh dấu tất cả đã đọc
+                </button>
+              )}
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {list.length === 0 ? (
+                <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+                  <Bell className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  Chưa có thông báo nào.
+                </div>
+              ) : (
+                list.map(n => (
+                  <button
+                    key={n.id}
+                    onClick={() => handleClickItem(n)}
+                    className={cn(
+                      'w-full text-left px-3 py-2.5 border-b border-border last:border-0 hover:bg-accent transition flex gap-3',
+                      !n.read && 'bg-purple-500/5'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+                      n.type === 'assignment' ? 'bg-blue-500/20 text-blue-500' : 'bg-gray-500/20 text-gray-500'
+                    )}>
+                      {n.type === 'assignment' ? <FileText className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-sm truncate', !n.read ? 'font-semibold text-foreground' : 'text-foreground/80')}>
+                        {n.title}
+                      </p>
+                      {n.body && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{n.body}</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        {new Date(n.createdAt).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    {!n.read && <span className="w-2 h-2 rounded-full bg-purple-500 flex-shrink-0 mt-1.5" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }

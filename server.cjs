@@ -4495,6 +4495,330 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ════════════════════════════════════════════════════════════════
+  // ASSIGNMENT TARGETING + IN-APP NOTIFICATIONS
+  // ────────────────────────────────────────────────────────────────
+  // Cho phép giáo viên:
+  //   1. Tạo assignment từ Exam có sẵn (POST /from-exam)
+  //   2. Giao bài cho student/class cụ thể (POST :id/targets)
+  //   3. Học sinh được giao tự động nhận Notification trong app
+  // ════════════════════════════════════════════════════════════════
+  let _asgnTargetReady = false;
+  async function ensureAsgnTargetTables() {
+    if (_asgnTargetReady) return;
+    const pool = getAsgnPool();
+    if (!pool) return;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AssignmentTarget" (
+        id            TEXT PRIMARY KEY,
+        "assignmentId" TEXT NOT NULL,
+        "targetType"  TEXT NOT NULL,
+        "targetId"    TEXT NOT NULL,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE("assignmentId", "targetType", "targetId")
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "AssignmentTarget_assignment_idx"
+      ON "AssignmentTarget"("assignmentId")`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Notification" (
+        id           TEXT PRIMARY KEY,
+        "userId"     TEXT NOT NULL,
+        "fromUserId" TEXT,
+        type         TEXT NOT NULL,
+        title        TEXT NOT NULL,
+        body         TEXT,
+        link         TEXT,
+        metadata     JSONB NOT NULL DEFAULT '{}'::jsonb,
+        read         BOOLEAN NOT NULL DEFAULT false,
+        "createdAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "Notification_user_idx"
+      ON "Notification"("userId", "createdAt" DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "Notification_unread_idx"
+      ON "Notification"("userId") WHERE read = false`);
+    _asgnTargetReady = true;
+  }
+
+  // ── POST /api/assignments/from-exam — convert Exam → Assignment ──
+  // Body: { examId, title?, description?, dueDate?, duration? }
+  app.post('/api/assignments/from-exam', async (req, res) => {
+    try {
+      await ensureAsgnReady();
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const { examId } = req.body || {};
+      if (!examId) return res.status(400).json({ success: false, error: 'examId_required' });
+
+      // Verify exam ownership + load metadata
+      const ex = await pool.query(
+        `SELECT id, title, description, "examType", duration, "totalScore", "totalQuestions"
+           FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, user.id]
+      );
+      if (!ex.rows.length) {
+        return res.status(404).json({ success: false, error: 'exam_not_found' });
+      }
+      const exam = ex.rows[0];
+      let meta = {};
+      try { meta = JSON.parse(exam.description || '{}'); } catch {}
+
+      const id = newAsgnId();
+      const qrToken = newQrToken();
+      const title = String(req.body.title || exam.title || 'Bài tập từ đề thi');
+      const subject = meta.subject || 'Chung';
+      const dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
+      const duration = Number(req.body.duration) || Number(exam.duration) || 45;
+
+      await pool.query(
+        `INSERT INTO assignments
+           (id, title, description, subject, assignment_type, status, difficulty,
+            duration, xp_reward, user_id, teacher_id, qr_token, max_score, due_date,
+            content, tags, ai_generated)
+         VALUES ($1,$2,$3,$4,'quiz','published','medium',$5,100,$6,$6,$7,$8,$9,$10,$11,false)`,
+        [id, title,
+         String(req.body.description || meta.notes || `Đề thi gồm ${exam.totalQuestions} câu`),
+         subject, duration, user.id, qrToken,
+         Number(exam.totalScore) || 10, dueDate,
+         JSON.stringify({ examId, examTitle: exam.title }),
+         JSON.stringify(['from-exam'])]
+      );
+      const q = await pool.query(`SELECT * FROM assignments WHERE id=$1`, [id]);
+      const created = asgnToClient(q.rows[0], {
+        scanUrl: scanUrlFor(req, qrToken),
+        submissionCount: 0, avgScore: 0,
+      });
+      console.log(`[assignments:from-exam] ✅ exam=${examId.slice(0,8)} → asgn=${id.slice(0,8)}`);
+      return res.status(201).json(created);
+    } catch (err) {
+      console.error('[assignments:from-exam] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal', message: err.message });
+    }
+  });
+
+  // ── GET /api/assignments/:id/targets — list targets ─────────────
+  app.get('/api/assignments/:id/targets', async (req, res) => {
+    try {
+      await ensureAsgnReady();
+      await ensureAsgnTargetTables();
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      // Ownership check
+      const own = await pool.query(
+        `SELECT 1 FROM assignments WHERE id=$1 AND (user_id=$2 OR teacher_id=$2) LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (!own.rows.length) return res.status(404).json({ success: false, error: 'not_found' });
+
+      const tRes = await pool.query(
+        `SELECT * FROM "AssignmentTarget" WHERE "assignmentId"=$1 ORDER BY "createdAt" DESC`,
+        [req.params.id]
+      );
+      // Enrich với tên class/student để FE hiển thị
+      const targets = [];
+      for (const t of tRes.rows) {
+        let label = '—';
+        try {
+          if (t.targetType === 'class') {
+            const r = await pool.query(`SELECT name FROM "TeacherClass" WHERE id=$1 LIMIT 1`, [t.targetId]);
+            label = r.rows[0]?.name || `Lớp ${t.targetId.slice(0,8)}`;
+          } else if (t.targetType === 'student') {
+            const r = await pool.query(`SELECT name FROM "ClassStudent" WHERE id=$1 LIMIT 1`, [t.targetId]);
+            label = r.rows[0]?.name || `HS ${t.targetId.slice(0,8)}`;
+          }
+        } catch {}
+        targets.push({ id: t.id, type: t.targetType, targetId: t.targetId, label, createdAt: t.createdAt });
+      }
+      return res.json({ targets });
+    } catch (err) {
+      console.error('[assignments:targets:list] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal' });
+    }
+  });
+
+  // ── POST /api/assignments/:id/targets — assign to classes/students
+  // Body: { classIds: [], studentIds: [] }
+  // Side effect: tạo Notification cho mỗi HS được giao (qua ClassStudent.email →
+  // User lookup; nếu không có User account thì skip notification, vẫn giao bài).
+  app.post('/api/assignments/:id/targets', async (req, res) => {
+    try {
+      await ensureAsgnReady();
+      await ensureAsgnTargetTables();
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const aRes = await pool.query(
+        `SELECT id, title, qr_token FROM assignments WHERE id=$1 AND (user_id=$2 OR teacher_id=$2) LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (!aRes.rows.length) return res.status(404).json({ success: false, error: 'not_found' });
+      const asgn = aRes.rows[0];
+      const classIds   = Array.isArray(req.body?.classIds)   ? req.body.classIds.filter(Boolean) : [];
+      const studentIds = Array.isArray(req.body?.studentIds) ? req.body.studentIds.filter(Boolean) : [];
+      if (classIds.length === 0 && studentIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'no_targets' });
+      }
+
+      // Insert AssignmentTarget rows
+      let added = 0;
+      for (const cid of classIds) {
+        try {
+          const { rowCount } = await pool.query(
+            `INSERT INTO "AssignmentTarget" (id, "assignmentId", "targetType", "targetId")
+             VALUES ($1,$2,'class',$3)
+             ON CONFLICT ("assignmentId","targetType","targetId") DO NOTHING`,
+            [newAsgnId('tg_'), req.params.id, cid]
+          );
+          if (rowCount) added++;
+        } catch {}
+      }
+      for (const sid of studentIds) {
+        try {
+          const { rowCount } = await pool.query(
+            `INSERT INTO "AssignmentTarget" (id, "assignmentId", "targetType", "targetId")
+             VALUES ($1,$2,'student',$3)
+             ON CONFLICT ("assignmentId","targetType","targetId") DO NOTHING`,
+            [newAsgnId('tg_'), req.params.id, sid]
+          );
+          if (rowCount) added++;
+        } catch {}
+      }
+
+      // Resolve student userIds (qua email match) để gửi notification
+      // ClassStudent có cột email → JOIN User để lấy id của user account
+      const studentRowIds = new Set(studentIds);
+      if (classIds.length > 0) {
+        const r = await pool.query(
+          `SELECT id FROM "ClassStudent" WHERE "classId" = ANY($1::text[])`,
+          [classIds]
+        );
+        for (const row of r.rows) studentRowIds.add(row.id);
+      }
+      let notified = 0;
+      if (studentRowIds.size > 0) {
+        const userRes = await pool.query(
+          `SELECT u.id AS uid
+             FROM "ClassStudent" cs
+             JOIN "User" u ON LOWER(u.email) = LOWER(cs.email)
+            WHERE cs.id = ANY($1::text[]) AND cs.email IS NOT NULL`,
+          [Array.from(studentRowIds)]
+        );
+        const link = `/student/assignments?focus=${encodeURIComponent(req.params.id)}`;
+        for (const ur of userRes.rows) {
+          try {
+            await pool.query(
+              `INSERT INTO "Notification"
+                 (id, "userId", "fromUserId", type, title, body, link, metadata)
+               VALUES ($1,$2,$3,'assignment',$4,$5,$6,$7)`,
+              [newAsgnId('nt_'), ur.uid, user.id,
+               `Bài tập mới: ${asgn.title}`,
+               'Giáo viên vừa giao bài cho bạn. Bấm để xem.',
+               link,
+               JSON.stringify({ assignmentId: req.params.id, qrToken: asgn.qr_token })]
+            );
+            notified++;
+          } catch (e) {
+            console.warn('[notify:assignment] insert fail:', e.message.slice(0, 80));
+          }
+        }
+      }
+      console.log(`[assignments:targets:assign] ✅ asgn=${req.params.id.slice(0,8)} added=${added} notified=${notified}`);
+      return res.json({ ok: true, added, notified });
+    } catch (err) {
+      console.error('[assignments:targets:assign] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal', message: err.message });
+    }
+  });
+
+  // ── DELETE /api/assignments/:id/targets/:targetType/:targetId
+  app.delete('/api/assignments/:id/targets/:targetType/:targetId', async (req, res) => {
+    try {
+      await ensureAsgnTargetTables();
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const own = await pool.query(
+        `SELECT 1 FROM assignments WHERE id=$1 AND (user_id=$2 OR teacher_id=$2) LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (!own.rows.length) return res.status(404).json({ success: false, error: 'not_found' });
+      await pool.query(
+        `DELETE FROM "AssignmentTarget"
+          WHERE "assignmentId"=$1 AND "targetType"=$2 AND "targetId"=$3`,
+        [req.params.id, req.params.targetType, req.params.targetId]
+      );
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[assignments:targets:del] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal' });
+    }
+  });
+
+  // ── GET /api/notifications — list user's notifications
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      await ensureAsgnTargetTables();
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.json({ notifications: [], unreadCount: 0 });
+      const pool = getAsgnPool();
+      const onlyUnread = req.query.unread === '1';
+      const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+      const where = onlyUnread ? `"userId"=$1 AND read=false` : `"userId"=$1`;
+      const r = await pool.query(
+        `SELECT * FROM "Notification" WHERE ${where} ORDER BY "createdAt" DESC LIMIT $2`,
+        [user.id, limit]
+      );
+      const cRes = await pool.query(
+        `SELECT COUNT(*)::int AS n FROM "Notification" WHERE "userId"=$1 AND read=false`,
+        [user.id]
+      );
+      return res.json({
+        notifications: r.rows,
+        unreadCount: Number(cRes.rows[0]?.n) || 0,
+      });
+    } catch (err) {
+      console.error('[notifications:list] ❌', err.message);
+      return res.json({ notifications: [], unreadCount: 0 });
+    }
+  });
+
+  // ── PATCH /api/notifications/:id/read
+  app.patch('/api/notifications/:id/read', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      await pool.query(
+        `UPDATE "Notification" SET read=true WHERE id=$1 AND "userId"=$2`,
+        [req.params.id, user.id]
+      );
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[notifications:read] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal' });
+    }
+  });
+
+  // ── POST /api/notifications/read-all
+  app.post('/api/notifications/read-all', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "Notification" SET read=true WHERE "userId"=$1 AND read=false`,
+        [user.id]
+      );
+      return res.json({ ok: true, marked: rowCount });
+    } catch (err) {
+      console.error('[notifications:read-all] ❌', err.message);
+      return res.status(500).json({ success: false, error: 'internal' });
+    }
+  });
+
   // ── GET /api/public/assignments/:token  (no auth) ────────────────
   app.get('/api/public/assignments/:token', async (req, res) => {
     try {

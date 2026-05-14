@@ -114,8 +114,22 @@ export const assignmentsService = {
   create: (input: CreateAssignmentInput) =>
     api.post<Assignment>('/assignments', input).then((r) => r.data),
 
+  /** Tạo assignment từ Exam có sẵn */
+  createFromExam: (input: { examId: string; title?: string; description?: string; dueDate?: string | null; duration?: number }) =>
+    api.post<Assignment>('/assignments/from-exam', input).then((r) => r.data),
+
   remove: (id: string) =>
     api.delete<{ success: boolean; id: string }>(`/assignments/${id}`).then((r) => r.data),
+
+  /** Targeting: giao bài cho lớp/HS cụ thể, BE tự gửi notification */
+  listTargets: (id: string) =>
+    api.get<{ targets: Array<{ id: string; type: 'class' | 'student'; targetId: string; label: string; createdAt: string }> }>(`/assignments/${id}/targets`).then(r => r.data),
+
+  assignTo: (id: string, payload: { classIds?: string[]; studentIds?: string[] }) =>
+    api.post<{ ok: boolean; added: number; notified: number }>(`/assignments/${id}/targets`, payload).then(r => r.data),
+
+  removeTarget: (id: string, type: 'class' | 'student', targetId: string) =>
+    api.delete<{ ok: boolean }>(`/assignments/${id}/targets/${type}/${encodeURIComponent(targetId)}`).then(r => r.data),
 
   getSubmissions: (id: string) =>
     api.get<AssignmentSubmission[]>(`/assignments/${id}/submissions`).then((r) => r.data),
