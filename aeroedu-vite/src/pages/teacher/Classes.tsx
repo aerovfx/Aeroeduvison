@@ -39,6 +39,13 @@ interface ImportResult {
   skipped: number
   total: number
 }
+interface ImportResponse {
+  success?: boolean
+  message?: string
+  results?: ImportResult
+  /** Tối đa 3 ví dụ lỗi đầu tiên (debug) */
+  errors?: string[]
+}
 
 // ── Mini components ──────────────────────────────────────────
 function StatusBadge({
@@ -517,11 +524,12 @@ function ImportModal({
   const [classYear, setClassYear] = useState('2025-2026')
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [errors, setErrors] = useState<string[]>([])
 
   const reset = () => {
     setParsed(null); setFileName(''); setClassId('')
     setClassGrade('Khối 10'); setClassYear('2025-2026')
-    setImporting(false); setResult(null)
+    setImporting(false); setResult(null); setErrors([])
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -562,15 +570,23 @@ function ImportModal({
       }
 
       // Call bulk import API
-      const importRes = await api.post<{ message: string; results: ImportResult }>(
+      const importRes = await api.post<ImportResponse>(
         `/classes/${targetClassId}/students/import`,
         { students: parsed.students }
       )
-      setResult(importRes.data.results)
-      toast.success(importRes.data.message || 'Import thành công!')
+      const data = importRes.data
+      setResult(data.results || null)
+      setErrors(data.errors || [])
+      // Toast: success nếu có HS được thêm/cập nhật, else error
+      const r = data.results
+      if (r && (r.inserted > 0 || r.updated > 0)) {
+        toast.success(data.message || 'Import thành công!')
+      } else {
+        toast.error(data.message || 'Không import được HS nào — xem chi tiết lỗi bên dưới')
+      }
       onDone()
     } catch (err: any) {
-      toast.error(err.message)
+      toast.error(err?.response?.data?.error || err.message)
     } finally {
       setImporting(false)
     }
@@ -653,25 +669,60 @@ function ImportModal({
             </>
           ) : result ? (
             /* Result */
-            <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-6 h-6 text-green-500" />
-                <h3 className="font-bold text-green-700 text-base">Import thành công!</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Học sinh mới thêm', value: result.inserted, color: 'text-purple-600' },
-                  { label: 'Đã cập nhật',       value: result.updated,  color: 'text-blue-600' },
-                  { label: 'Bỏ qua (lỗi)',      value: result.skipped,  color: 'text-gray-500' },
-                  { label: 'Tổng dòng đọc',     value: result.total,    color: 'text-green-600' },
-                ].map(item => (
-                  <div key={item.label} className="bg-white rounded-lg p-3 border border-green-100">
-                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{item.label}</p>
+            (() => {
+              const ok = result.inserted > 0 || result.updated > 0
+              const themeBg     = ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+              const themeIcon   = ok ? 'text-green-500' : 'text-red-500'
+              const themeTitle  = ok ? 'text-green-700' : 'text-red-700'
+              const themeChip   = ok ? 'border-green-100' : 'border-red-100'
+              return (
+              <div className={`${themeBg} border rounded-xl p-5`}>
+                <div className="flex items-center gap-2 mb-4">
+                  {ok
+                    ? <CheckCircle2 className={`w-6 h-6 ${themeIcon}`} />
+                    : <AlertCircle  className={`w-6 h-6 ${themeIcon}`} />}
+                  <h3 className={`font-bold ${themeTitle} text-base`}>
+                    {ok ? 'Import thành công!' : 'Import thất bại'}
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Học sinh mới thêm', value: result.inserted, color: 'text-purple-600' },
+                    { label: 'Đã cập nhật',       value: result.updated,  color: 'text-blue-600' },
+                    { label: 'Bỏ qua (lỗi)',      value: result.skipped,  color: result.skipped > 0 ? 'text-red-600' : 'text-gray-500' },
+                    { label: 'Tổng dòng đọc',     value: result.total,    color: 'text-gray-700' },
+                  ].map(item => (
+                    <div key={item.label} className={`bg-white rounded-lg p-3 border ${themeChip}`}>
+                      <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Sample errors — giúp giáo viên (và dev) thấy nguyên nhân thật */}
+                {errors.length > 0 && (
+                  <div className="mt-4 bg-white rounded-lg p-3 border border-red-100">
+                    <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Chi tiết lỗi (3 ví dụ đầu):
+                    </p>
+                    <ul className="space-y-1">
+                      {errors.map((e, i) => (
+                        <li key={i} className="text-xs text-gray-600 font-mono leading-snug">
+                          • {e}
+                        </li>
+                      ))}
+                    </ul>
+                    {!ok && result.skipped > 0 && (
+                      <p className="mt-2 text-[11px] text-red-600">
+                        Nếu thấy lỗi <code className="bg-red-50 px-1 rounded">no unique or exclusion constraint</code>,
+                        hãy báo admin để chạy migration UNIQUE constraint trên bảng ClassStudent.
+                      </p>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+              )
+            })()
           ) : (
             /* Preview */
             <div>

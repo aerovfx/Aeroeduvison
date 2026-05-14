@@ -9231,6 +9231,16 @@ if (!USE_NODEJS_QUESTIONS) {
 
     // POST /api/classes/:id/students/import — bulk import từ Excel parsed
     // Body: { students: [{stt, hoTen, ngaySinh, gioiTinh, maDinhDanh}] }
+    //
+    // Bug fix: trước dùng `ON CONFLICT ("classId", mssv) DO UPDATE` → require
+    // UNIQUE constraint phải tồn tại. CREATE TABLE IF NOT EXISTS có khai báo
+    // nhưng nếu table đã tồn tại từ trước KHÔNG có constraint, IF NOT EXISTS
+    // không update schema → mọi INSERT throw "no unique or exclusion constraint
+    // matching the ON CONFLICT specification" → catch → tất cả HS bị skip.
+    //
+    // Giờ: SELECT-then-INSERT/UPDATE explicit, không phụ thuộc constraint.
+    // Cũng track riêng inserted vs updated cho user biết bao nhiêu HS mới vs cập nhật.
+    // Trả về 3 sample errors đầu tiên để debug nếu vẫn fail.
     app.post('/api/classes/:id/students/import', async (req, res) => {
       try {
         const tid = getClsTeacherId(req);
@@ -9248,39 +9258,69 @@ if (!USE_NODEJS_QUESTIONS) {
         if (students.length === 0) return res.status(400).json({ error: 'Không có học sinh nào để import' });
 
         let inserted = 0, updated = 0, skipped = 0;
+        const errSamples = [];   // tối đa 3 ví dụ lỗi đầu tiên để debug
         const now = new Date();
         for (const s of students) {
           const name = String(s.hoTen || s.name || '').trim();
           const mssv = String(s.maDinhDanh || s.mssv || '').trim();
-          if (!name) { skipped++; continue; }
+          const stt  = s.stt != null && !isNaN(Number(s.stt)) ? Number(s.stt) : null;
+          const dob  = String(s.ngaySinh || s.dob || '').trim() || null;
+          const gen  = String(s.gioiTinh || s.gender || '').trim() || null;
+          if (!name) {
+            skipped++;
+            if (errSamples.length < 3) errSamples.push(`Dòng STT=${s.stt}: thiếu họ tên`);
+            continue;
+          }
           try {
-            // Upsert by (classId, mssv)
-            const { rowCount } = await pool.query(
-              `INSERT INTO "ClassStudent" (id, "classId", stt, mssv, name, dob, gender, "createdAt")
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-               ON CONFLICT ("classId", mssv) DO UPDATE
-                 SET name = EXCLUDED.name,
-                     stt = EXCLUDED.stt,
-                     dob = EXCLUDED.dob,
-                     gender = EXCLUDED.gender`,
-              [clsUUID(), req.params.id,
-               s.stt ? Number(s.stt) : null,
-               mssv || null, name,
-               s.ngaySinh || s.dob || null,
-               s.gioiTinh || s.gender || null,
-               now]
-            );
-            if (rowCount > 0) inserted++;
+            // Tìm row đã tồn tại theo (classId, mssv) — chỉ khi mssv có giá trị
+            // Nếu mssv rỗng → luôn INSERT mới (mỗi import là HS riêng)
+            let existingId = null;
+            if (mssv) {
+              const r = await pool.query(
+                `SELECT id FROM "ClassStudent" WHERE "classId"=$1 AND mssv=$2 LIMIT 1`,
+                [req.params.id, mssv]
+              );
+              existingId = r.rows[0]?.id || null;
+            }
+            if (existingId) {
+              await pool.query(
+                `UPDATE "ClassStudent"
+                    SET stt=$2, name=$3, dob=$4, gender=$5
+                  WHERE id=$1`,
+                [existingId, stt, name, dob, gen]
+              );
+              updated++;
+            } else {
+              await pool.query(
+                `INSERT INTO "ClassStudent"
+                   (id, "classId", stt, mssv, name, dob, gender, "createdAt")
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+                [clsUUID(), req.params.id, stt, mssv || null, name, dob, gen, now]
+              );
+              inserted++;
+            }
           } catch (err) {
-            console.warn(`[classes:import] skip "${name}": ${err.message.slice(0, 80)}`);
+            const msg = err.message.slice(0, 200);
+            console.warn(`[classes:import] skip "${name}" (mssv=${mssv}): ${msg}`);
+            if (errSamples.length < 3) errSamples.push(`HS "${name}" (MSSV ${mssv || 'rỗng'}): ${msg}`);
             skipped++;
           }
         }
-        console.log(`[classes:import] ✅ class=${req.params.id.slice(0,8)} inserted=${inserted} updated=${updated} skipped=${skipped}`);
+        const total = students.length;
+        console.log(`[classes:import] ✅ class=${req.params.id.slice(0,8)} inserted=${inserted} updated=${updated} skipped=${skipped} total=${total}`);
+        // Compose user-friendly message
+        const parts = [];
+        if (inserted > 0) parts.push(`thêm mới ${inserted} HS`);
+        if (updated  > 0) parts.push(`cập nhật ${updated} HS`);
+        if (skipped  > 0) parts.push(`bỏ qua ${skipped}`);
+        const message = parts.length
+          ? 'Đã ' + parts.join(', ')
+          : `Không xử lý được HS nào / ${total} dòng`;
         return res.json({
-          success: true,
-          message: `Đã import ${inserted} học sinh${skipped ? ` (bỏ qua ${skipped})` : ''}`,
-          results: { inserted, updated, skipped, total: students.length },
+          success: inserted > 0 || updated > 0,
+          message,
+          results: { inserted, updated, skipped, total },
+          ...(errSamples.length ? { errors: errSamples } : {}),
         });
       } catch (err) {
         console.error('[classes:import] ❌', err.message);
