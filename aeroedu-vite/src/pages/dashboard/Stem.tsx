@@ -16,7 +16,8 @@ import {
   FlaskConical, Cpu, Wrench, Calculator, Users, Calendar,
   Target, CheckCircle, AlertCircle, Clock, MessageSquare,
   Download, Share, UserCheck, Sparkles, Loader2, Package,
-  Layers, X, BookOpen, ChevronRight, Lightbulb,
+  Layers, X, BookOpen, ChevronRight, Lightbulb, Github, Star,
+  Code2,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
@@ -94,14 +95,18 @@ interface Component {
 const COMPONENT_LIB: Component[] = [
   { name: 'Arduino UNO R3',        category: 'controller', price: 180_000, desc: 'MCU phổ biến nhất cho người mới',                specs: ['ATmega328P', '14 chân digital', '6 chân analog', '5V/3.3V'] },
   { name: 'ESP32 DevKit',          category: 'controller', price: 150_000, desc: 'Wi-Fi + Bluetooth tích hợp, mạnh hơn Arduino',  specs: ['240MHz dual-core', 'Wi-Fi 2.4GHz', 'BLE 4.2', '34 GPIO'] },
+  { name: 'ESP32-S3 N16R8',        category: 'controller', price: 250_000, desc: 'ESP32 thế hệ mới, USB native + nhiều RAM (dùng trong Mini Deck)', specs: ['Xtensa LX7 dual-core', '512KB SRAM + 8MB PSRAM', '16MB Flash', 'USB-OTG'] },
   { name: 'Raspberry Pi Pico W',   category: 'controller', price: 220_000, desc: 'Linux-free MCU với Wi-Fi, Python/C',            specs: ['RP2040 ARM', '264KB SRAM', 'Wi-Fi b/g/n', '26 GPIO'] },
   { name: 'DHT22 (cảm biến)',      category: 'sensor',     price: 65_000,  desc: 'Đo nhiệt độ + độ ẩm chính xác cao',             specs: ['-40~80°C ±0.5°C', '0-100% RH', '1 dây dữ liệu', '3.3-5V'] },
   { name: 'HC-SR04 (siêu âm)',     category: 'sensor',     price: 18_000,  desc: 'Đo khoảng cách 2cm-4m, dùng cho robot',         specs: ['Tầm 2-400cm', 'Độ chính xác 3mm', 'Trigger + Echo', '5V'] },
   { name: 'MPU6050 (gia tốc/gyro)',category: 'sensor',     price: 55_000,  desc: 'Cảm biến 6-trục đo độ nghiêng, chuyển động',    specs: ['3 trục accel', '3 trục gyro', 'I2C', '±2/4/8/16g'] },
+  { name: 'KY-040 Rotary Encoder', category: 'sensor',     price: 22_000,  desc: 'Encoder xoay vô hạn + nút bấm, dùng cho menu',  specs: ['20 xung/vòng', 'Nút SW tích hợp', 'CLK+DT+SW', '3.3-5V'] },
   { name: 'Servo SG90',            category: 'actuator',   price: 35_000,  desc: 'Động cơ servo nhỏ quay 180°, cho cánh tay robot',specs: ['180° quay', 'Torque 1.8kg.cm', '4.8-6V', 'PWM 50Hz'] },
   { name: 'Motor DC + L298N',      category: 'actuator',   price: 45_000,  desc: 'Combo điều khiển 2 động cơ cho robot 2 bánh',   specs: ['Driver 2 kênh', '0-46V', '2A/kênh', 'PWM'] },
   { name: 'LCD 16x2 I2C',          category: 'display',    price: 50_000,  desc: 'Màn hình 2 dòng 16 ký tự, giao tiếp I2C đơn giản', specs: ['16×2 ký tự', 'I2C address 0x27', '5V', 'Backlight'] },
   { name: 'OLED 0.96"',            category: 'display',    price: 70_000,  desc: 'Màn hình OLED nhỏ độ phân giải 128x64',          specs: ['128×64 pixel', 'I2C/SPI', '3.3-5V', 'Đen-trắng'] },
+  { name: 'TFT ST7735 1.44"',      category: 'display',    price: 95_000,  desc: 'Màn LCD màu nhỏ 128×128 SPI (Mini Deck dùng)',   specs: ['128×128 pixel', '65K màu', 'SPI 4 chân', '3.3V'] },
+  { name: 'TFT ST7789 1.69"',      category: 'display',    price: 130_000, desc: 'Màn LCD màu IPS lớn hơn, dùng cho dashboard',   specs: ['240×280 pixel', '262K màu', 'SPI', '3.3V'] },
   { name: 'Breadboard 830 lỗ',     category: 'misc',       price: 30_000,  desc: 'Bo cắm linh kiện không cần hàn',                 specs: ['830 điểm cắm', '2 thanh nguồn', 'Tái sử dụng nhiều lần'] },
   { name: 'Pin sạc 18650 + bo',    category: 'misc',       price: 90_000,  desc: 'Nguồn cho dự án di động (robot, IoT)',          specs: ['3.7V 2200mAh', 'TP4056 sạc', '5V output', 'Bảo vệ'] },
 ]
@@ -445,10 +450,170 @@ function ComponentLibrary() {
 }
 
 // ─────────────────────────────────────────────
+// FEATURED OPEN-SOURCE — Mini Deck (3e8 Systems)
+// Tham khảo: https://github.com/3E8-Systems/minideck
+// Real-world ESP32-S3 + KY-040 + ST7735 project HS có thể fork
+// ─────────────────────────────────────────────
+const MINIDECK_CODE_SAMPLE = `// Đọc encoder KY-040 qua ngắt (ISR) — trích từ music.ino
+#define CLK_PIN 14
+#define DT_PIN  12
+#define SW_PIN  13
+
+volatile int16_t gEncoderSteps = 0;
+volatile uint8_t gLastClk = 0;
+
+void IRAM_ATTR onEncoderClk() {
+  const int clk = digitalRead(CLK_PIN);
+  if (clk != (int)gLastClk && clk == LOW) {
+    // Cùng pha → quay phải, lệch pha → quay trái
+    if (digitalRead(DT_PIN) != clk) gEncoderSteps++;
+    else                            gEncoderSteps--;
+  }
+  gLastClk = (uint8_t)(clk != 0);
+}
+
+void setup() {
+  pinMode(CLK_PIN, INPUT_PULLUP);
+  pinMode(DT_PIN,  INPUT_PULLUP);
+  pinMode(SW_PIN,  INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(CLK_PIN), onEncoderClk, CHANGE);
+}`
+
+function MiniDeckShowcase({ onUseTemplate }: { onUseTemplate: (t: Template) => void }) {
+  const [codeOpen, setCodeOpen] = useState(false)
+  const useThis = () => {
+    onUseTemplate({
+      id: 'minideck',
+      title: 'Mini Deck — Bộ điều khiển dial + màn hình',
+      description: 'Clone open-source của 3e8 Systems: ESP32-S3 + KY-040 rotary encoder + ST7735 1.44" TFT. Điều khiển nhạc Mac, Pomodoro, push-to-talk Claude qua USB serial.',
+      difficulty: 'hard',
+      duration: '8 giờ',
+      category: 'Engineering',
+      components: 5,
+      emoji: '🎛️',
+      outcomes: [
+        'ISR đọc encoder không miss xung',
+        'Giao tiếp SPI với màn TFT (Adafruit_ST7735)',
+        'Serial protocol host ↔ device (Python bridge)',
+      ],
+    })
+  }
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-indigo-600/15 via-purple-600/10 to-pink-600/10 border border-indigo-500/30 p-6 mb-6 relative overflow-hidden">
+      <div className="absolute -top-32 -right-32 w-80 h-80 bg-indigo-500/10 blur-3xl rounded-full pointer-events-none" />
+      <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-pink-500/10 blur-3xl rounded-full pointer-events-none" />
+
+      <div className="relative">
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex items-start gap-3">
+            <div className="text-5xl">🎛️</div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40">
+                  ⭐ NỔI BẬT
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                  MÃ NGUỒN MỞ
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-500/15 text-red-300 border border-red-500/30">
+                  NÂNG CAO
+                </span>
+              </div>
+              <h3 className="text-xl font-bold text-white mb-1">Mini Deck</h3>
+              <p className="text-sm text-white/60 max-w-xl">
+                One dial. Infinite control. Bộ điều khiển desktop bằng dial xoay + màn TFT màu chạy ESP32-S3 —
+                điều khiển nhạc Mac, Pomodoro, push-to-talk Claude. Open-source bởi 3e8 Systems.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://github.com/3E8-Systems/minideck"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 text-xs font-medium whitespace-nowrap"
+          >
+            <Github className="w-3.5 h-3.5" />GitHub<Star className="w-3 h-3" />
+          </a>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          {/* BOM */}
+          <div className="rounded-xl bg-black/30 border border-white/10 p-4">
+            <h4 className="text-xs font-bold text-white/70 mb-2.5 flex items-center gap-1.5 uppercase tracking-wider">
+              <Package className="w-3.5 h-3.5 text-indigo-400" />Linh kiện cần dùng
+            </h4>
+            <ul className="space-y-1.5 text-xs">
+              <li className="flex justify-between text-white/70"><span>× 1 ESP32-S3 N16R8</span><span className="text-white/40 font-mono">250k</span></li>
+              <li className="flex justify-between text-white/70"><span>× 1 TFT ST7735 1.44" (128×128)</span><span className="text-white/40 font-mono">95k</span></li>
+              <li className="flex justify-between text-white/70"><span>× 1 KY-040 Rotary Encoder</span><span className="text-white/40 font-mono">22k</span></li>
+              <li className="flex justify-between text-white/70"><span>× 1 Breadboard 830 lỗ</span><span className="text-white/40 font-mono">30k</span></li>
+              <li className="flex justify-between text-white/70"><span>× 1 cáp USB-C + dây jumper</span><span className="text-white/40 font-mono">40k</span></li>
+              <li className="flex justify-between border-t border-white/10 pt-1.5 mt-1.5 font-bold text-white/90"><span>Tổng ước tính</span><span className="text-emerald-300">~437.000đ</span></li>
+            </ul>
+          </div>
+
+          {/* Outcomes */}
+          <div className="rounded-xl bg-black/30 border border-white/10 p-4">
+            <h4 className="text-xs font-bold text-white/70 mb-2.5 flex items-center gap-1.5 uppercase tracking-wider">
+              <BookOpen className="w-3.5 h-3.5 text-emerald-400" />Học được gì
+            </h4>
+            <ul className="space-y-1.5 text-xs text-white/70">
+              <li className="flex gap-2"><CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />ISR (Interrupt Service Routine) đọc encoder không miss xung</li>
+              <li className="flex gap-2"><CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />Giao tiếp SPI với TFT qua thư viện Adafruit_ST7735</li>
+              <li className="flex gap-2"><CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />Debouncing nút bấm + state machine UI</li>
+              <li className="flex gap-2"><CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />Serial protocol host (Python) ↔ ESP32 hai chiều</li>
+              <li className="flex gap-2"><CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0 mt-0.5" />Lập trình firmware Arduino C++ chuẩn pro</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Code snippet collapsible */}
+        <button
+          onClick={() => setCodeOpen(!codeOpen)}
+          className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-black/40 hover:bg-black/50 border border-white/10 text-xs font-medium text-white/70 mb-3"
+        >
+          <span className="flex items-center gap-2">
+            <Code2 className="w-4 h-4 text-pink-400" />
+            Xem trước code: đọc encoder bằng ISR (Arduino C++)
+          </span>
+          <ChevronRight className={`w-4 h-4 transition-transform ${codeOpen ? 'rotate-90' : ''}`} />
+        </button>
+        {codeOpen && (
+          <pre className="bg-[#0d0d1a] border border-white/10 rounded-lg p-4 text-[11px] text-white/80 font-mono overflow-x-auto mb-3 leading-relaxed">
+            <code>{MINIDECK_CODE_SAMPLE}</code>
+          </pre>
+        )}
+
+        <div className="flex gap-2">
+          <a
+            href="https://github.com/3E8-Systems/minideck/blob/main/music.ino"
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white/80 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+          >
+            <Code2 className="w-4 h-4" />Xem firmware đầy đủ (music.ino)
+          </a>
+          <button
+            onClick={useThis}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 transition-colors"
+          >
+            <Plus className="w-4 h-4" />Fork làm dự án của tôi
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
 // TEMPLATES TAB
 // ─────────────────────────────────────────────
 function TemplatesTab({ onUseTemplate }: { onUseTemplate: (t: Template) => void }) {
   return (
+    <div>
+      <MiniDeckShowcase onUseTemplate={onUseTemplate} />
+      <h3 className="text-sm font-bold text-white/70 uppercase tracking-wider mb-3">Mẫu cho người mới bắt đầu</h3>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {TEMPLATES.map(t => (
         <div key={t.id} className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-5 hover:border-purple-500/30 transition-colors group">
@@ -487,6 +652,7 @@ function TemplatesTab({ onUseTemplate }: { onUseTemplate: (t: Template) => void 
           </button>
         </div>
       ))}
+      </div>
     </div>
   )
 }
