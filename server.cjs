@@ -2012,8 +2012,24 @@ function makeProxy(target, label, pathFilter) {
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [] }));
 app.get('/api/teacher/students/:id', (req, res) => res.json({ id: req.params.id, name: '—', email: '—' }));
 
+// ── BUG FIX deploy 200: routing collision với teacher-service proxy ──
+// Các endpoint TeacherStudentLink + my-students được đăng ký Ở DƯỚI line 2016
+// nên proxy chặn trước → 503. Forward 4 path này tới next() để Express tìm
+// handler thật ở dưới.
+function _passToExpress(req, res, next) { return next() }
+app.use('/api/teacher-student-link', _passToExpress);
+app.use('/api/teacher/my-students', _passToExpress);
+
 // ── /api/teacher/* → teacher-service ───────────────────────
-app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
+// Skip proxy nếu path là /api/teacher-student-link/* hoặc /api/teacher/my-students
+// (pathFilter function dùng pathname dạng "/api/teacher-..." sau khi mount).
+app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
+  // Loại trừ TSL endpoints (do collision: '/api/teacher-...' string-prefix-match)
+  if (pathname.startsWith('/api/teacher-student-link/')) return false;
+  if (pathname.startsWith('/api/teacher/my-students'))   return false;
+  // Mọi /api/teacher/* khác (exams, leaderboard, gradebook, ...) → proxy bình thường
+  return pathname.startsWith('/api/teacher');
+}));
 
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN INSTRUCTOR COURSE MANAGEMENT
