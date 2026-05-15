@@ -621,12 +621,192 @@ function KeyboardBridge({ inputsRef }: { inputsRef: React.MutableRefObject<Contr
     const k = getKeys() as Record<string, boolean>
     const pads = navigator.getGamepads ? navigator.getGamepads() : []
     if (Array.from(pads).some(p => p && p.connected)) return
+    // Nếu touch input đang active (touched) thì keyboard không override
+    if (touchActiveRef.left || touchActiveRef.right) return
     inputsRef.current.throttle = (k.throttleUp ? 1 : 0) - (k.throttleDown ? 1 : 0)
     inputsRef.current.yaw = (k.yawRight ? 1 : 0) - (k.yawLeft ? 1 : 0)
     inputsRef.current.pitch = (k.pitchUp ? 1 : 0) - (k.pitchDown ? 1 : 0)
     inputsRef.current.roll = (k.rollRight ? 1 : 0) - (k.rollLeft ? 1 : 0)
   })
   return null
+}
+
+// ═════════════════════════════════════════════════════════════
+// MOBILE TOUCH — 2 virtual sticks (Mode 2 RC layout)
+// ═════════════════════════════════════════════════════════════
+// Module-scoped ref để KeyboardBridge biết khi touch đang active
+// (avoid keyboard reset inputs khi user đang giữ stick)
+const touchActiveRef = { left: false, right: false }
+
+function isMobile(): boolean {
+  return typeof window !== 'undefined' && (
+    'ontouchstart' in window ||
+    navigator.maxTouchPoints > 0 ||
+    /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  )
+}
+
+interface StickProps {
+  side: 'left' | 'right'
+  label: string
+  axisLabels: { x: string; y: string }
+  inputsRef: React.MutableRefObject<ControlInputs>
+  /** Map (dx, dy) ∈ [-1, 1] → 2 trục input */
+  onMove: (dx: number, dy: number, inputs: ControlInputs) => void
+  /** Khi nhả stick: reset 2 trục về 0 (hoặc giữ nguyên) */
+  onRelease: (inputs: ControlInputs) => void
+}
+
+/** Virtual joystick — outer base + inner knob theo dõi finger.
+ * Knob clamp trong base radius. Auto-snap về center khi release.
+ * Throttle stick (left Y) KHÔNG snap vì cần giữ throttle.
+ */
+function VirtualStick({ side, label, axisLabels, inputsRef, onMove, onRelease }: StickProps) {
+  const baseRef = useRef<HTMLDivElement>(null)
+  const [knobPos, setKnobPos] = useState({ x: 0, y: 0 })
+  const [active, setActive] = useState(false)
+  const RADIUS = 60   // px — outer base radius
+
+  const updateFromTouch = useCallback((clientX: number, clientY: number) => {
+    if (!baseRef.current) return
+    const r = baseRef.current.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const cy = r.top + r.height / 2
+    let dx = clientX - cx
+    let dy = clientY - cy
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (dist > RADIUS) { dx = (dx / dist) * RADIUS; dy = (dy / dist) * RADIUS }
+    setKnobPos({ x: dx, y: dy })
+    // Map sang [-1, 1], invert Y (touch Y down = positive nhưng game up = positive)
+    onMove(dx / RADIUS, -dy / RADIUS, inputsRef.current)
+  }, [inputsRef, onMove])
+
+  const handleStart = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault()
+    setActive(true)
+    touchActiveRef[side] = true
+    const t = 'touches' in e ? e.touches[0] : e
+    updateFromTouch(t.clientX, t.clientY)
+  }, [side, updateFromTouch])
+
+  const handleMove = useCallback((e: React.TouchEvent | React.MouseEvent) => {
+    if (!active) return
+    e.preventDefault()
+    const t = 'touches' in e ? e.touches[0] : e
+    updateFromTouch(t.clientX, t.clientY)
+  }, [active, updateFromTouch])
+
+  const handleEnd = useCallback(() => {
+    setActive(false)
+    touchActiveRef[side] = false
+    setKnobPos({ x: 0, y: 0 })
+    onRelease(inputsRef.current)
+  }, [side, inputsRef, onRelease])
+
+  // Global mouseup/touchend listener (vì user có thể release ngoài stick area)
+  useEffect(() => {
+    if (!active) return
+    const onMu = () => handleEnd()
+    const onMm = (e: MouseEvent) => updateFromTouch(e.clientX, e.clientY)
+    const onTm = (e: TouchEvent) => {
+      if (e.touches[0]) updateFromTouch(e.touches[0].clientX, e.touches[0].clientY)
+    }
+    window.addEventListener('mouseup', onMu)
+    window.addEventListener('mousemove', onMm)
+    window.addEventListener('touchend', onMu)
+    window.addEventListener('touchmove', onTm, { passive: false })
+    return () => {
+      window.removeEventListener('mouseup', onMu)
+      window.removeEventListener('mousemove', onMm)
+      window.removeEventListener('touchend', onMu)
+      window.removeEventListener('touchmove', onTm)
+    }
+  }, [active, handleEnd, updateFromTouch])
+
+  return (
+    <div style={{
+      position: 'absolute', bottom: 24, [side]: 24,
+      width: RADIUS * 2 + 20, padding: 10,
+      pointerEvents: 'auto', userSelect: 'none', touchAction: 'none',
+    } as React.CSSProperties}>
+      <div style={{
+        textAlign: 'center', fontSize: 10, color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'monospace', marginBottom: 6, fontWeight: 'bold',
+      }}>
+        {label}
+      </div>
+      <div
+        ref={baseRef}
+        onMouseDown={handleStart}
+        onTouchStart={handleStart}
+        onMouseMove={handleMove}
+        onTouchMove={handleMove}
+        style={{
+          position: 'relative', width: RADIUS * 2, height: RADIUS * 2, margin: '0 auto',
+          borderRadius: '50%',
+          background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+          border: `2px solid ${active ? '#ec4899' : 'rgba(148, 163, 184, 0.4)'}`,
+          backdropFilter: 'blur(4px)',
+          transition: active ? 'none' : 'background 0.2s',
+        }}
+      >
+        {/* Crosshair lines */}
+        <div style={{ position: 'absolute', top: '50%', left: 4, right: 4, height: 1, background: 'rgba(255,255,255,0.15)' }} />
+        <div style={{ position: 'absolute', left: '50%', top: 4, bottom: 4, width: 1, background: 'rgba(255,255,255,0.15)' }} />
+        {/* Axis labels */}
+        <div style={{ position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)',
+          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.y}+</div>
+        <div style={{ position: 'absolute', bottom: 2, left: '50%', transform: 'translateX(-50%)',
+          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.y}-</div>
+        <div style={{ position: 'absolute', top: '50%', right: 4, transform: 'translateY(-50%)',
+          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.x}+</div>
+        <div style={{ position: 'absolute', top: '50%', left: 4, transform: 'translateY(-50%)',
+          fontSize: 9, color: 'rgba(255,255,255,0.5)' }}>{axisLabels.x}-</div>
+        {/* Knob */}
+        <div style={{
+          position: 'absolute', top: '50%', left: '50%',
+          width: 38, height: 38, marginLeft: -19, marginTop: -19,
+          transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
+          borderRadius: '50%',
+          background: active
+            ? 'linear-gradient(135deg, #ec4899, #8b5cf6)'
+            : 'rgba(100, 116, 139, 0.7)',
+          border: '2px solid rgba(255, 255, 255, 0.3)',
+          boxShadow: active ? '0 0 16px rgba(236, 72, 153, 0.6)' : '0 2px 6px rgba(0,0,0,0.4)',
+          transition: active ? 'none' : 'transform 0.15s',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+/** Render 2 sticks (Mode 2 RC standard).
+ * LEFT stick: Y=throttle (KHÔNG snap về 0 khi release để giữ throttle), X=yaw
+ * RIGHT stick: Y=pitch, X=roll (cả 2 snap về 0 khi release)
+ */
+function MobileTouchSticks({ inputsRef }: { inputsRef: React.MutableRefObject<ControlInputs> }) {
+  return (
+    <>
+      <VirtualStick
+        side="left" label="THROTTLE / YAW"
+        axisLabels={{ x: 'YAW', y: 'THR' }}
+        inputsRef={inputsRef}
+        onMove={(dx, dy, ins) => { ins.throttle = dy; ins.yaw = dx }}
+        onRelease={(ins) => {
+          // Throttle KHÔNG reset (giữ giá trị cuối) — yaw reset 0
+          ins.yaw = 0
+          // throttle giữ nguyên — user phải kéo lại stick xuống nếu muốn hạ
+        }}
+      />
+      <VirtualStick
+        side="right" label="PITCH / ROLL"
+        axisLabels={{ x: 'ROLL', y: 'PITCH' }}
+        inputsRef={inputsRef}
+        onMove={(dx, dy, ins) => { ins.pitch = dy; ins.roll = dx }}
+        onRelease={(ins) => { ins.pitch = 0; ins.roll = 0 }}
+      />
+    </>
+  )
 }
 
 // ═════════════════════════════════════════════════════════════
@@ -727,9 +907,10 @@ function GameHUD({
 // ═════════════════════════════════════════════════════════════
 // SCREEN: SETUP — device detection + instructions
 // ═════════════════════════════════════════════════════════════
-function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard') => void }) {
+function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard' | 'mobile') => void }) {
   const [gamepadId, setGamepadId] = useState<string | null>(null)
   const [vrSupport, setVrSupport] = useState<'checking' | 'yes' | 'no'>('checking')
+  const mobile = isMobile()
 
   useEffect(() => {
     const checkPad = () => {
@@ -845,11 +1026,16 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard') => vo
             <p style={{ marginTop: 12, padding: 12, background: 'rgba(245, 158, 11, 0.1)', borderRadius: 8, border: '1px solid rgba(245, 158, 11, 0.3)' }}>
               💡 <b>Không có thiết bị?</b> Chọn "<b style={{ color: '#22c55e' }}>Bàn phím luyện tập</b>" bên dưới — vẫn chơi đủ 5 levels với W/S throttle, A/D yaw, ↑↓ pitch, ←→ roll.
             </p>
+            {mobile && (
+              <p style={{ marginTop: 8, padding: 12, background: 'rgba(34, 197, 94, 0.08)', borderRadius: 8, border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+                📱 <b>Đang dùng điện thoại?</b> Chọn "<b style={{ color: '#10b981' }}>Bay trên điện thoại</b>" — 2 cần joystick ảo Mode 2: trái = throttle/yaw (giữ throttle khi nhả), phải = pitch/roll (snap về 0). Xoay ngang điện thoại để có không gian rộng.
+              </p>
+            )}
           </div>
         </div>
 
         {/* Start buttons */}
-        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             onClick={() => onStart('device')}
             disabled={!gamepadId}
@@ -862,6 +1048,19 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard') => vo
           >
             🚁 Bắt đầu với thiết bị
           </button>
+          {mobile && (
+            <button
+              onClick={() => onStart('mobile')}
+              style={{
+                padding: '14px 28px', borderRadius: 12, border: 'none', fontSize: 15, fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #10b981, #06b6d4)',
+                color: 'white', cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+              }}
+            >
+              📱 Bay trên điện thoại
+            </button>
+          )}
           <button
             onClick={() => onStart('keyboard')}
             style={{
@@ -1123,6 +1322,8 @@ function GameScreen({
         <GameHUD telemetry={telemetry} gamepadId={gamepadId} level={level}
           gateProgress={gateProgress} hoverProgress={hoverProgress} timeRemaining={timeRemaining} />
         <VRButton glRef={glRef} />
+        {/* Mobile touch sticks — chỉ hiện trên touch device khi không có gamepad */}
+        {isMobile() && !gamepadId && <MobileTouchSticks inputsRef={inputsRef} />}
         {/* Abort button top-left of canvas */}
         <button onClick={onAbort} style={{
           position: 'absolute', top: 12, right: 110, padding: '6px 12px',
