@@ -416,24 +416,28 @@ export default function GradeBook() {
                 {students.map((s, r) => {
                   const g = grades[s.id] || emptyGrade()
                   const dtb = computeDTBmhk(g)
+                  // Force consistent contrast (như sổ điểm Excel/Bộ GD&ĐT) —
+                  // KHÔNG để theme dark mode override gây trắng-trên-trắng vô hình.
+                  // Pattern: zebra row light-gray vs white, text always slate-900.
+                  const rowBg = r % 2 ? 'bg-slate-100' : 'bg-white'
                   return (
-                    <tr key={s.id} className={r % 2 ? 'bg-gray-50' : 'bg-white'}>
-                      <td className="px-2 py-1.5 text-center text-gray-500 border border-gray-200">{s.stt ?? r + 1}</td>
-                      <td className="px-2 py-1.5 font-mono text-xs text-gray-700 border border-gray-200">{s.mssv || '—'}</td>
-                      <td className="px-2 py-1.5 font-medium text-gray-900 border border-gray-200">{s.name}</td>
+                    <tr key={s.id} className={`${rowBg} text-slate-900`}>
+                      <td className={`${rowBg} px-2 py-1.5 text-center text-slate-500 border border-slate-300`}>{s.stt ?? r + 1}</td>
+                      <td className={`${rowBg} px-2 py-1.5 font-mono text-xs text-slate-700 border border-slate-300`}>{s.mssv || '—'}</td>
+                      <td className={`${rowBg} px-2 py-1.5 font-semibold text-slate-900 border border-slate-300`}>{s.name}</td>
                       {showDob && (
                         <>
-                          <td className="px-2 py-1.5 text-xs text-gray-600 border border-gray-200">{s.dob || '—'}</td>
-                          <td className="px-2 py-1.5 text-xs text-center border border-gray-200">
-                            <span className={`px-1.5 rounded ${s.gender === 'Nữ' ? 'text-pink-600' : 'text-blue-600'}`}>
+                          <td className={`${rowBg} px-2 py-1.5 text-xs text-slate-600 border border-slate-300`}>{s.dob || '—'}</td>
+                          <td className={`${rowBg} px-2 py-1.5 text-xs text-center border border-slate-300`}>
+                            <span className={`px-1.5 rounded font-semibold ${s.gender === 'Nữ' ? 'text-pink-600 bg-pink-50' : 'text-blue-600 bg-blue-50'}`}>
                               {s.gender || '—'}
                             </span>
                           </td>
                         </>
                       )}
-                      {/* ĐĐGtx 1..5 */}
+                      {/* ĐĐGtx 1..5 — bg trắng đều cho dễ thấy điểm */}
                       {Array.from({ length: NUM_TX }, (_, i) => (
-                        <td key={i} className="p-0 border border-gray-200">
+                        <td key={i} className="p-0 border border-slate-300 bg-white">
                           <ScoreCell
                             value={fmtScore(g.ddgtx[i])}
                             data-cell={`${r}-${i}`}
@@ -442,49 +446,55 @@ export default function GradeBook() {
                           />
                         </td>
                       ))}
-                      {/* ĐĐGgk */}
-                      <td className="p-0 border border-gray-200 bg-yellow-50/40">
+                      {/* ĐĐGgk — vàng nhẹ phân biệt cột giữa kỳ */}
+                      <td className="p-0 border border-slate-300 bg-amber-50">
                         <ScoreCell
                           value={fmtScore(g.ddggk)}
                           data-cell={`${r}-${NUM_TX}`}
                           onChange={(v) => updateScore(s.id, 'ddggk', v)}
                           onKeyDown={(e) => handleKeyDown(e, r, NUM_TX)}
+                          highlight="amber"
                         />
                       </td>
-                      {/* ĐĐGck */}
-                      <td className="p-0 border border-gray-200 bg-orange-50/40">
+                      {/* ĐĐGck — cam đậm hơn phân biệt cột cuối kỳ */}
+                      <td className="p-0 border border-slate-300 bg-orange-100">
                         <ScoreCell
                           value={fmtScore(g.ddgck)}
                           data-cell={`${r}-${NUM_TX + 1}`}
                           onChange={(v) => updateScore(s.id, 'ddgck', v)}
                           onKeyDown={(e) => handleKeyDown(e, r, NUM_TX + 1)}
+                          highlight="orange"
                         />
                       </td>
-                      {/* ĐTBmhk auto */}
-                      <td className={`px-2 py-1.5 text-center font-bold border border-gray-200 ${
-                        dtb == null ? 'text-gray-300' : dtb >= 8 ? 'text-green-600' : dtb >= 6.5 ? 'text-blue-600' : dtb >= 5 ? 'text-yellow-600' : 'text-red-600'
+                      {/* ĐTBmhk auto — cell tô màu theo điểm để dễ thấy phân loại */}
+                      <td className={`px-2 py-2 text-center font-bold text-base border border-slate-300 ${
+                        dtb == null      ? 'bg-slate-50    text-slate-300'  :
+                        dtb >= 8         ? 'bg-green-100   text-green-700'  :
+                        dtb >= 6.5       ? 'bg-blue-100    text-blue-700'   :
+                        dtb >= 5         ? 'bg-yellow-100  text-yellow-700' :
+                                           'bg-red-100     text-red-700'
                       }`}>
                         {dtb != null ? dtb.toFixed(1) : '—'}
                       </td>
-                      {/* ĐTBmcn (chỉ tính ở HK2, cần cả HK1) */}
-                      <td className="px-2 py-1.5 text-center text-gray-400 border border-gray-200">
+                      {/* ĐTBmcn */}
+                      <td className={`${rowBg} px-2 py-1.5 text-center font-semibold text-slate-500 border border-slate-300`}>
                         {semester === 'HK2' && dtb != null ? dtb.toFixed(1) : '—'}
                       </td>
-                      {/* Notes */}
-                      <td className="p-0 border border-gray-200">
+                      {/* Notes — bg trắng để text đen rõ ràng */}
+                      <td className="p-0 border border-slate-300 bg-white">
                         <textarea
                           value={g.noteProgress}
                           onChange={e => updateNote(s.id, 'noteProgress', e.target.value)}
                           rows={1}
-                          className="w-full px-2 py-1.5 text-xs border-0 focus:outline-none focus:bg-blue-50 resize-y"
+                          className="w-full px-2 py-1.5 text-xs border-0 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-blue-50 resize-y"
                         />
                       </td>
-                      <td className="p-0 border border-gray-200">
+                      <td className="p-0 border border-slate-300 bg-white">
                         <textarea
                           value={g.noteRecord}
                           onChange={e => updateNote(s.id, 'noteRecord', e.target.value)}
                           rows={1}
-                          className="w-full px-2 py-1.5 text-xs border-0 focus:outline-none focus:bg-blue-50 resize-y"
+                          className="w-full px-2 py-1.5 text-xs border-0 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-blue-50 resize-y"
                         />
                       </td>
                     </tr>
@@ -566,18 +576,38 @@ interface ScoreCellProps {
   onChange: (val: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void
   'data-cell': string
+  /** Tone bg cho cột đặc biệt (ĐĐGgk vàng / ĐĐGck cam) */
+  highlight?: 'amber' | 'orange'
 }
-function ScoreCell({ value, onChange, onKeyDown, 'data-cell': dataCell }: ScoreCellProps) {
+function ScoreCell({ value, onChange, onKeyDown, 'data-cell': dataCell, highlight }: ScoreCellProps) {
+  // Bg explicit để KHÔNG bị dark mode override → text-on-text invisible.
+  // Pattern màu: empty cell có placeholder chấm "·" để biết đó là ô nhập.
+  const bgCls = highlight === 'amber'  ? 'bg-amber-50'   :
+                highlight === 'orange' ? 'bg-orange-100' :
+                                         'bg-white'
+  // Khi có giá trị → in đậm + tô màu theo điểm để đọc 1 phát thấy ngay
+  const num = value === '' ? null : Number(value)
+  const valueColor =
+    num == null || isNaN(num) ? 'text-slate-400' :
+    num >= 8                  ? 'text-green-700 font-bold' :
+    num >= 6.5                ? 'text-blue-700  font-semibold' :
+    num >= 5                  ? 'text-amber-700 font-semibold' :
+                                'text-red-700   font-bold'
   return (
     <input
       type="text"
       inputMode="decimal"
       value={value}
+      placeholder="·"
       onChange={e => onChange(e.target.value)}
       onKeyDown={onKeyDown}
       onFocus={e => e.target.select()}
       data-cell={dataCell}
-      className="w-full h-full px-1 py-1.5 text-center border-0 focus:outline-none focus:bg-blue-50 focus:ring-2 focus:ring-blue-300 text-sm font-medium"
+      className={`w-full h-full px-1 py-1.5 text-center border-0 text-sm
+        ${bgCls} ${valueColor}
+        placeholder:text-slate-300 placeholder:font-light
+        focus:outline-none focus:bg-blue-100 focus:ring-2 focus:ring-blue-400 focus:ring-inset focus:text-slate-900 focus:font-bold
+        transition-colors`}
     />
   )
 }
