@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `238b793` (deploy 241, 2026-05-15 — Pixel Odyssey RPG)
-- Commits since last deploy: `1/5` (this commit Knowledge Graph Explorer)
+- Commits since last deploy: `2/5` (c02ff19 KG Explorer, this commit KG Phase 2 AI extract)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

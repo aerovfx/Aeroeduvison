@@ -19,7 +19,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Search, X, Sparkles, RefreshCw, Network, Loader2,
-  ZoomIn, ZoomOut, Maximize2, ChevronRight, Info, BookOpen,
+  ZoomIn, ZoomOut, Maximize2, ChevronRight, Info, BookOpen, Wand2,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import {
@@ -27,6 +27,7 @@ import {
   NODE_TYPE_COLORS, NODE_TYPE_LABELS, REL_TYPE_LABELS, getNodeColor,
   type KgNode, type KgEdge, type KgNodeType, type KgNeighbor,
 } from '@/services/knowledge-graph.service'
+import AiExtractModal from '@/components/knowledge-graph/AiExtractModal'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -157,6 +158,7 @@ export default function KnowledgeGraph() {
   const [enabledTypes, setEnabledTypes] = useState<Set<string>>(
     new Set(Object.keys(NODE_TYPE_COLORS))
   )
+  const [extractOpen, setExtractOpen] = useState(false)
 
   // Camera
   const [zoom, setZoom] = useState(1)
@@ -439,6 +441,13 @@ export default function KnowledgeGraph() {
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
+            onClick={() => setExtractOpen(true)}
+            title="AI trích xuất tri thức từ văn bản hoặc giáo án"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-[1.02] inline-flex items-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-transform"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> Trích xuất AI
+          </button>
+          <button
             onClick={seed}
             disabled={seeding}
             title="Seed lại data Vật lí 11 (idempotent)"
@@ -449,6 +458,22 @@ export default function KnowledgeGraph() {
           </button>
         </div>
       </header>
+
+      {/* AI Extract Modal */}
+      <AiExtractModal
+        open={extractOpen}
+        onClose={() => setExtractOpen(false)}
+        onApplied={async (focusId) => {
+          // Sau khi extract xong → load graph với focus node mới
+          if (focusId) {
+            await loadFromNode(focusId, 2)
+            toast.success('Đã chuyển graph đến node mới', { icon: '🎯' })
+          } else {
+            // Fallback: reload graph hiện tại
+            if (startIdRef.current) await loadFromNode(startIdRef.current, 2)
+          }
+        }}
+      />
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: legend + filter */}

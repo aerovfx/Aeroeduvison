@@ -53,6 +53,42 @@ export interface KgExpandResult {
   depth: number
 }
 
+// ─── Phase 2 types ─────────────────────────────────────────────────
+export interface KgExtractInput {
+  /** Văn bản thô (≥30 chars, ≤30000 chars). Bỏ qua nếu cung cấp source. */
+  text?: string
+  /** Hoặc trích từ source DB sẵn có. */
+  source?: { type: 'lesson_plan' | 'transcript'; id: string }
+  /** Sau extract có tự động link similarity không (default true). */
+  autoLink?: boolean
+}
+
+export interface KgExtractResult {
+  extracted: {
+    topics: Array<{ label: string; description?: string }>
+    concepts: Array<{ label: string; description?: string }>
+    formulas: Array<{ label: string; description?: string; unit?: string }>
+    edges: Array<{ from: string; to: string; rel: string }>
+  }
+  persisted: {
+    newNodes: Array<{ id: string; label: string; type: string }>
+    reusedNodes: Array<{ id: string; label: string; type: string }>
+    newEdges: Array<{ from: string; to: string; rel: string }>
+    skippedEdges: number
+  }
+  autoLink: { linked: number } | null
+  sourceNodeId: string | null
+  tookMs: number
+}
+
+export interface KgLessonPlanSource {
+  id: string
+  title: string
+  subject?: string | null
+  wordCount?: number | null
+  updatedAt?: string | null
+}
+
 export const knowledgeGraphService = {
   /** Seed dữ liệu Vật lí 11 vào graph (idempotent). */
   seed: () =>
@@ -84,6 +120,25 @@ export const knowledgeGraphService = {
       startId: r.data.startId,
       depth: r.data.depth,
     })),
+
+  // ── Phase 2: AI extract + similarity linking ─────────────────────
+
+  /** AI extract entities từ text hoặc lesson_plan/transcript có sẵn. */
+  extract: (input: KgExtractInput, timeout: number = 90_000) =>
+    api.post<{ success: boolean } & KgExtractResult>('/kg/extract', input, { timeout })
+      .then(r => r.data),
+
+  /** Quét toàn bộ nodes, tạo RELATES_TO cho cặp có similarity ≥ threshold. */
+  linkSimilar: (opts?: { type?: string; threshold?: number }) =>
+    api.post<{ success: boolean; linked: number; scanned: number; threshold: number; tookMs: number }>(
+      '/kg/link-similar', opts || {}
+    ).then(r => r.data),
+
+  /** List lesson plans cho dropdown trong UI extract. */
+  listLessonPlans: (limit: number = 50) =>
+    api.get<{ success: boolean; items: KgLessonPlanSource[] }>('/kg/sources/lesson-plans', {
+      params: { limit },
+    }).then(r => r.data.items || []),
 }
 
 // ─── Helpers cho UI ────────────────────────────────────────────────

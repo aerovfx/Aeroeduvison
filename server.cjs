@@ -8305,6 +8305,344 @@ ${plan.content || '<p>(Trống)</p>'}
     }
   });
 
+  // ────────────────────────────────────────────────
+  // KG Phase 2 — AI auto-extract entities + similarity linking
+  // ────────────────────────────────────────────────
+
+  // Slugify Vietnamese label → ASCII id (idempotent)
+  function kgSlugify(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'node-' + Math.random().toString(36).slice(2, 7);
+  }
+
+  // Levenshtein-style normalized similarity 0..1 (đơn giản, không cần lib)
+  function kgSimilarity(a, b) {
+    const A = String(a || '').toLowerCase().trim();
+    const B = String(b || '').toLowerCase().trim();
+    if (!A || !B) return 0;
+    if (A === B) return 1;
+    // Word overlap ratio (fast, đủ tốt cho label ngắn)
+    const wa = new Set(A.split(/\s+/).filter(w => w.length > 1));
+    const wb = new Set(B.split(/\s+/).filter(w => w.length > 1));
+    if (wa.size === 0 || wb.size === 0) return 0;
+    let common = 0;
+    for (const w of wa) if (wb.has(w)) common++;
+    return common / Math.max(wa.size, wb.size);
+  }
+
+  /**
+   * Strip HTML tags, decode entities, collapse whitespace.
+   * Để feed vào AI prompt mà không bị token bloat.
+   */
+  function kgStripHtml(html) {
+    return String(html || '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // POST /api/kg/extract — AI extract entities từ text hoặc lesson_plan/transcript
+  // Body: { text?: string, source?: { type: 'lesson_plan'|'transcript'|'exam', id: string },
+  //         autoLink?: boolean (default true) }
+  app.post('/api/kg/extract', express.json({ limit: '512kb' }), async (req, res) => {
+    const t0 = Date.now();
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      let { text, source, autoLink } = req.body || {};
+      if (autoLink === undefined) autoLink = true;
+
+      // Resolve text từ source nếu chưa có
+      let sourceLabel = null;
+      let sourceNodeType = null;
+      if (!text && source?.type && source?.id) {
+        if (source.type === 'lesson_plan') {
+          const r = await pool.query(`SELECT id, title, content, subject FROM "LessonPlan" WHERE id=$1`, [source.id]);
+          if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'Lesson plan not found' });
+          text = kgStripHtml(r.rows[0].content || '');
+          sourceLabel = r.rows[0].title;
+          sourceNodeType = 'Lesson';
+        } else if (source.type === 'transcript') {
+          const r = await pool.query(`SELECT id, title, transcript FROM "Transcript" WHERE id=$1`, [source.id]);
+          if (r.rowCount === 0) return res.status(404).json({ success: false, error: 'Transcript not found' });
+          text = String(r.rows[0].transcript || '').slice(0, 30000);
+          sourceLabel = r.rows[0].title;
+          sourceNodeType = 'Lesson'; // transcript treat như Lesson
+        }
+      }
+      if (!text || text.length < 30) {
+        return res.status(400).json({ success: false, error: 'Cần text ≥30 ký tự (hoặc source với content hợp lệ)' });
+      }
+      if (text.length > 30000) text = text.slice(0, 30000);
+
+      // Gọi AI extract
+      const fal = require('./lib/fal-client.cjs');
+      const sysPrompt = [
+        'Bạn là chuyên gia phân tích nội dung giáo dục Việt Nam. Trích xuất các thực thể tri thức từ văn bản người dùng cung cấp.',
+        '',
+        'TRẢ VỀ duy nhất 1 JSON object (không markdown fence) theo schema:',
+        '{',
+        '  "topics":   [{ "label": "Chủ đề ngắn gọn", "description": "1 câu mô tả" }],',
+        '  "concepts": [{ "label": "Khái niệm khoa học", "description": "1 câu" }],',
+        '  "formulas": [{ "label": "Công thức (VD: F=ma)", "description": "Ý nghĩa", "unit": "đơn vị nếu có" }],',
+        '  "edges":    [{ "from": "label A", "to": "label B", "rel": "RELATES_TO|USES_FORMULA|USES_CONCEPT|REQUIRES" }]',
+        '}',
+        '',
+        'QUY TẮC:',
+        '1. Topics: chủ đề chính (max 8). VD: "Động lượng", "Va chạm đàn hồi"',
+        '2. Concepts: khái niệm/định luật trừu tượng (max 6). VD: "Bảo toàn năng lượng", "Quán tính"',
+        '3. Formulas: công thức toán/lý/hoá xuất hiện trong văn bản (max 8). Label đúng format: "F = m·a", "p = m·v"',
+        '4. Edges: liên kết giữa các entity vừa trích (max 12). dùng đúng label đã trích ở trên.',
+        '5. Tất cả label tiếng Việt (trừ ký hiệu công thức). KHÔNG markdown fence. CHỈ JSON thuần.',
+      ].join('\n');
+
+      const userPrompt = `VĂN BẢN:\n\n${text}\n\nHãy trích xuất theo schema.`;
+      const aiResult = await fal.complete({
+        messages: [{ role: 'user', content: userPrompt }],
+        system: sysPrompt,
+      });
+
+      let raw = (aiResult?.content || '').trim();
+      const fenceMatch = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+      if (fenceMatch) raw = fenceMatch[1].trim();
+
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {
+        console.warn('[kg:extract] AI returned non-JSON, raw preview:', raw.slice(0, 200));
+        return res.status(502).json({
+          success: false, error: 'AI trả về không phải JSON', rawPreview: raw.slice(0, 500),
+        });
+      }
+
+      const topics   = Array.isArray(parsed.topics)   ? parsed.topics   : [];
+      const concepts = Array.isArray(parsed.concepts) ? parsed.concepts : [];
+      const formulas = Array.isArray(parsed.formulas) ? parsed.formulas : [];
+      const aiEdges  = Array.isArray(parsed.edges)    ? parsed.edges    : [];
+
+      // ── Persist ──
+      const persisted = { newNodes: [], reusedNodes: [], newEdges: [], skippedEdges: 0 };
+
+      // Build labelMap: label → existing node id (cho dedup)
+      const allLabels = [
+        ...topics.map(t => t.label),
+        ...concepts.map(c => c.label),
+        ...formulas.map(f => f.label),
+      ].filter(Boolean);
+
+      const existingByLabel = new Map();
+      if (allLabels.length > 0) {
+        const er = await pool.query(
+          `SELECT id, label FROM kg_nodes WHERE LOWER(label) = ANY($1)`,
+          [allLabels.map(l => String(l).toLowerCase())]
+        );
+        for (const row of er.rows) existingByLabel.set(String(row.label).toLowerCase(), row.id);
+      }
+
+      const labelToId = new Map();   // label (lowercase) → id (sau khi insert/reuse)
+
+      const upsertNode = async (type, label, description, extraProps) => {
+        if (!label) return null;
+        const lower = String(label).toLowerCase().trim();
+        if (labelToId.has(lower)) return labelToId.get(lower);
+        const existing = existingByLabel.get(lower);
+        if (existing) {
+          labelToId.set(lower, existing);
+          persisted.reusedNodes.push({ id: existing, label, type });
+          return existing;
+        }
+        // Insert new
+        const id = `${type.toLowerCase().slice(0,4)}-${kgSlugify(label)}-${Math.random().toString(36).slice(2,5)}`;
+        await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties, source_type, source_id)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+           ON CONFLICT (id) DO NOTHING`,
+          [id, type, label, description || null, JSON.stringify(extraProps || {}),
+           source?.type || 'ai_extract', source?.id || null]
+        );
+        labelToId.set(lower, id);
+        persisted.newNodes.push({ id, label, type });
+        return id;
+      };
+
+      for (const t of topics)   await upsertNode('Topic',   t.label, t.description);
+      for (const c of concepts) await upsertNode('Concept', c.label, c.description);
+      for (const f of formulas) await upsertNode('Formula', f.label, f.description, f.unit ? { unit: f.unit } : {});
+
+      // Source node + edges nếu có source
+      let sourceNodeId = null;
+      if (source?.id && sourceNodeType && sourceLabel) {
+        sourceNodeId = `lesson-${source.id}`;
+        await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, source_type, source_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label`,
+          [sourceNodeId, sourceNodeType, sourceLabel, null, source.type, source.id]
+        );
+        // Tạo edges từ source → tất cả nodes mới/reused
+        for (const id of labelToId.values()) {
+          const edgeId = `${sourceNodeId}__MENTIONS__${id}`.slice(0, 200);
+          try {
+            const r = await pool.query(
+              `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+               VALUES ($1, $2, $3, 'MENTIONS_TOPIC')
+               ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+              [edgeId, sourceNodeId, id]
+            );
+            if (r.rowCount) persisted.newEdges.push({ from: sourceNodeId, to: id, rel: 'MENTIONS_TOPIC' });
+          } catch (e) { persisted.skippedEdges++; }
+        }
+      }
+
+      // Insert AI-suggested edges (resolve labels → ids)
+      const validRels = new Set(['RELATES_TO','USES_FORMULA','USES_CONCEPT','REQUIRES','HAS_TOPIC','APPLIED_IN_CAREER']);
+      for (const e of aiEdges) {
+        const fromId = labelToId.get(String(e.from || '').toLowerCase());
+        const toId   = labelToId.get(String(e.to   || '').toLowerCase());
+        const rel    = validRels.has(String(e.rel || '').toUpperCase()) ? e.rel.toUpperCase() : 'RELATES_TO';
+        if (!fromId || !toId || fromId === toId) { persisted.skippedEdges++; continue; }
+        const edgeId = `${fromId}__${rel}__${toId}`.slice(0, 200);
+        try {
+          const r = await pool.query(
+            `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+            [edgeId, fromId, toId, rel]
+          );
+          if (r.rowCount) persisted.newEdges.push({ from: fromId, to: toId, rel });
+          else persisted.skippedEdges++;
+        } catch (e2) { persisted.skippedEdges++; }
+      }
+
+      // Optional auto-link: chạy similarity linking cho nodes mới
+      let autoLinkResult = null;
+      if (autoLink && persisted.newNodes.length > 0) {
+        autoLinkResult = await kgAutoLinkNodes(pool, persisted.newNodes.map(n => n.id), 0.6);
+      }
+
+      console.log(`[kg:extract] ✅ extracted ${topics.length}T+${concepts.length}C+${formulas.length}F → newNodes=${persisted.newNodes.length} reused=${persisted.reusedNodes.length} newEdges=${persisted.newEdges.length} took=${Date.now() - t0}ms`);
+
+      return res.json({
+        success: true,
+        extracted: { topics, concepts, formulas, edges: aiEdges },
+        persisted,
+        autoLink: autoLinkResult,
+        sourceNodeId,
+        tookMs: Date.now() - t0,
+      });
+    } catch (err) {
+      console.error('[kg:extract] ❌', err?.message || err);
+      return res.status(500).json({ success: false, error: err?.message || 'Lỗi extract' });
+    }
+  });
+
+  // Helper: auto-link 1 set of node ids với existing nodes cùng type theo similarity ≥ threshold
+  async function kgAutoLinkNodes(pool, newNodeIds, threshold = 0.6) {
+    if (!newNodeIds || newNodeIds.length === 0) return { linked: 0 };
+    const newNodesQ = await pool.query(
+      `SELECT id, type, label FROM kg_nodes WHERE id = ANY($1)`, [newNodeIds]
+    );
+    const newNodes = newNodesQ.rows;
+    let linked = 0;
+    for (const nn of newNodes) {
+      const candidates = await pool.query(
+        `SELECT id, label FROM kg_nodes WHERE type = $1 AND id <> $2 LIMIT 200`,
+        [nn.type, nn.id]
+      );
+      for (const cand of candidates.rows) {
+        const sim = kgSimilarity(nn.label, cand.label);
+        if (sim < threshold) continue;
+        const edgeId = `${nn.id}__SIMILAR_TO__${cand.id}`.slice(0, 200);
+        try {
+          const r = await pool.query(
+            `INSERT INTO kg_edges (id, from_id, to_id, rel_type, weight)
+             VALUES ($1, $2, $3, 'RELATES_TO', $4)
+             ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+            [edgeId, nn.id, cand.id, sim]
+          );
+          if (r.rowCount) linked++;
+        } catch (_) { /* ignore */ }
+      }
+    }
+    return { linked };
+  }
+
+  // POST /api/kg/link-similar — quét toàn bộ nodes, tạo edges RELATES_TO cho các cặp có similarity ≥ threshold
+  // Body: { type?: string, threshold?: number (default 0.7) }
+  app.post('/api/kg/link-similar', express.json({ limit: '8kb' }), async (req, res) => {
+    const t0 = Date.now();
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const threshold = Math.max(0.5, Math.min(1.0, Number(req.body?.threshold) || 0.7));
+      const filterType = req.body?.type ? String(req.body.type) : null;
+      const q = filterType
+        ? await pool.query(`SELECT id, type, label FROM kg_nodes WHERE type=$1 LIMIT 500`, [filterType])
+        : await pool.query(`SELECT id, type, label FROM kg_nodes LIMIT 500`);
+      const nodes = q.rows;
+      let linked = 0; let scanned = 0;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (nodes[i].type !== nodes[j].type) continue;  // same-type only
+          scanned++;
+          const sim = kgSimilarity(nodes[i].label, nodes[j].label);
+          if (sim < threshold) continue;
+          const edgeId = `${nodes[i].id}__SIMILAR_TO__${nodes[j].id}`.slice(0, 200);
+          try {
+            const r = await pool.query(
+              `INSERT INTO kg_edges (id, from_id, to_id, rel_type, weight)
+               VALUES ($1, $2, $3, 'RELATES_TO', $4)
+               ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+              [edgeId, nodes[i].id, nodes[j].id, sim]
+            );
+            if (r.rowCount) linked++;
+          } catch (_) { /* ignore */ }
+        }
+      }
+      console.log(`[kg:link-similar] ✅ scanned=${scanned} linked=${linked} threshold=${threshold} took=${Date.now() - t0}ms`);
+      return res.json({ success: true, linked, scanned, threshold, tookMs: Date.now() - t0 });
+    } catch (err) {
+      console.error('[kg:link-similar] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/sources/lesson-plans?limit=50 — list LP cho dropdown trong UI extract
+  app.get('/api/kg/sources/lesson-plans', async (req, res) => {
+    try {
+      const pool = getKcPool();
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || '50'), 10)));
+      const r = await pool.query(
+        `SELECT id, title, subject, "wordCount", "updatedAt"
+         FROM "LessonPlan"
+         WHERE content IS NOT NULL AND LENGTH(content) > 100
+         ORDER BY "updatedAt" DESC NULLS LAST
+         LIMIT $1`, [limit]
+      );
+      return res.json({
+        success: true,
+        items: r.rows.map(x => ({
+          id: x.id, title: x.title, subject: x.subject,
+          wordCount: x.wordCount, updatedAt: x.updatedAt,
+        })),
+      });
+    } catch (err) {
+      console.warn('[kg:sources:lesson-plans] ⚠', err.message);
+      return res.json({ success: true, items: [] });
+    }
+  });
+
   // ════════════════════════════════════════════════
   // CLASSROOM MODE — public student routes (no auth, QR scan)
   // ════════════════════════════════════════════════
