@@ -12,7 +12,7 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
-  ClipboardList, Network,
+  ClipboardList, Network, Gamepad2,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -75,6 +75,7 @@ const studentSections: RouteSection[] = [
     routes: [
       { icon: FunctionSquare, labelKey: 'routeGraph',   href: '/dashboard/graph-lab', badge: 'Mới' },
       { icon: FlaskConical,   labelKey: 'routeLabTwin', href: '/dashboard/labtwin',   badge: 'Lab' },
+      { icon: Gamepad2,       labelKey: 'routeGames',   href: '/dashboard/games',     badge: 'Game' },
       { icon: Sparkles,       labelKey: 'routeAura',    href: '/dashboard/aura',      badge: '3D' },
       { icon: CircuitBoard,   labelKey: 'routeCircuit', href: '/dashboard/iot-lab',   badge: 'IoT' },
       { icon: Zap,            labelKey: 'routeStem',    href: '/dashboard/stem' },

@@ -904,6 +904,421 @@ Một vật dao động điều hoà với phương trình $x = 4\\cos(2\\pi t)$
       </>
     ),
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // NEW (2026-05-15): các tính năng mới sau deploy 240-241
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Games Hub ─────────────────────────────────────────────────────────────
+  {
+    slug: 'games-hub',
+    title: 'Trò chơi học tập',
+    category: 'student',
+    role: 'all',
+    summary: 'Hub các trò chơi (Pixel Odyssey RPG, Pixel Agents, Kéo Co, Wayground) đã được tách khỏi Lab thí nghiệm.',
+    readTime: '5 phút',
+    content: (
+      <>
+        <P>
+          Từ tháng 5/2026, các trò chơi đã được <strong>tách khỏi mục Lab thí nghiệm</strong> để dễ
+          quản lí. Truy cập qua sidebar <Code>📺 Trò chơi học tập</Code> hoặc URL{' '}
+          <Code>/dashboard/games</Code>.
+        </P>
+
+        <H2 id="why-split">Vì sao tách Game khỏi Lab?</H2>
+        <Ul>
+          <li><strong>Lab</strong> = thí nghiệm khoa học (Aerodynamics, Chemistry, Optics...) — focus mô phỏng vật lý/hoá học.</li>
+          <li><strong>Game</strong> = trải nghiệm có cốt truyện / luật chơi / điểm số — focus giải trí + học.</li>
+          <li>Tách ra giúp HS không bị lẫn lộn, GV dễ chọn công cụ phù hợp tiết học.</li>
+        </Ul>
+
+        <H2 id="pixel-odyssey">🌟 Pixel Odyssey — Hành Trình Ánh Sao Lạc</H2>
+        <P>
+          RPG pixel adventure 4 chương về Kai (16 tuổi) tìm Mira sau khi thiên thạch rơi.
+          URL: <Code>/dashboard/games/pixel-odyssey</Code>.
+        </P>
+        <H3 id="po-controls">Điều khiển</H3>
+        <Ul>
+          <li><strong>WASD / Mũi tên</strong> — di chuyển 8 hướng</li>
+          <li><strong>Space / J</strong> — tấn công bằng Kiếm Ánh Sáng</li>
+          <li><strong>E</strong> — nói chuyện NPC (đến gần)</li>
+          <li><strong>P</strong> — tạm dừng · <strong>Esc</strong> — đóng dialogue</li>
+        </Ul>
+        <H3 id="po-flow">Luồng chơi chương 1-2</H3>
+        <Ol>
+          <li>Spawn ở làng Luneria → gặp Trưởng làng (🧓) để nghe hint.</li>
+          <li>Đi về phía Đông → vào portal tím → qua Crater (hố thiên thạch).</li>
+          <li>Tìm cô gái phát sáng (Mira ✨) → bấm E → unlock <strong>Star Core</strong>.</li>
+          <li>Chương 2 mở → quay về Luneria → 6 shadow creatures spawn → chiến đấu.</li>
+          <li>Sau khi clear → gặp Piko (🤖) trong làng để unlock chương 3.</li>
+        </Ol>
+        <H3 id="po-emotion">Hệ thống cảm xúc 4 trục</H3>
+        <Ul>
+          <li><strong>Hy vọng</strong> — tăng khi nhặt star</li>
+          <li><strong>Tò mò</strong> — tăng khi nói chuyện NPC</li>
+          <li><strong>Quyết tâm</strong> — tăng khi đánh enemy → <em>boost damage attack</em></li>
+          <li><strong>Sợ hãi</strong> — tăng khi bị đánh</li>
+        </Ul>
+        <Callout kind="tip">
+          Auto-save mỗi 10s vào localStorage. Bấm <Code>Lưu</Code> trong header để lưu manual.
+          Bấm <Code>Nhật ký cốt truyện</Code> để xem lại các sự kiện đã ghi.
+        </Callout>
+
+        <H2 id="pixel-agents">🤖 Pixel Agents — RPG đa môn</H2>
+        <P>
+          RPG học qua game — campus 7 toà nhà bộ môn (Toán, Lý, Hoá, Sinh, Văn, Tin, Mỹ thuật).
+          Mỗi NPC có personality AI riêng (socratic, fact, creative, strict, confused, hint).
+          Trả lời câu hỏi đúng → lên level + nhận coins.
+          URL: <Code>/dashboard/games/pixel-agents</Code>.
+        </P>
+
+        <H2 id="keo-co">🪢 Kéo Co Kiến Thức</H2>
+        <P>
+          Quiz đối kháng 2 đội. URL: <Code>/dashboard/games/keo-co</Code>. Hỗ trợ 3 chế độ:
+        </P>
+        <Ul>
+          <li><strong>Lớp học (Classroom)</strong> — GV tạo session → HS scan QR / nhập short code → join → kéo dây bằng kiến thức.</li>
+          <li><strong>Live 2 người</strong> — đấu nhanh giữa 2 HS qua link.</li>
+          <li><strong>Thách đấu 1v1</strong> — tạo link share, đối thủ chơi xong → so điểm.</li>
+        </Ul>
+        <H3 id="keo-co-catalog">Danh mục đề thi</H3>
+        <P>
+          Khi tạo session mới, GV có thể chọn đề từ <strong>danh mục thi đấu</strong> (đã add từ
+          {' '}<Code>/teacher/exams</Code> qua nút ⚔️ Swords). Khi chọn đề → auto-fill subject +
+          topic + question count.
+        </P>
+        <H3 id="keo-co-leaderboard">Bảng xếp hạng</H3>
+        <P>
+          Hiển thị top 10 người chơi cross-session: 🥇🥈🥉 + Wins / Total Played / Win Rate %
+          / Total Score. Click header để collapse/expand.
+        </P>
+
+        <H2 id="wayground">🎯 Wayground (Beta)</H2>
+        <P>
+          Sân chơi tự do — GV tạo game theo template (chạy mê cung, đố vui pixel, snake quiz...).
+          HS join qua mã 4 chữ số. Đang trong giai đoạn beta.
+        </P>
+
+        <H2 id="games-tips">Mẹo chung khi dùng game</H2>
+        <Ul>
+          <li>Game dạng RPG (Pixel Odyssey/Agents) phù hợp <strong>lúc rảnh</strong> hoặc tiết tự học — không nên giữa bài thi.</li>
+          <li>Kéo Co + Wayground phù hợp <strong>15 phút cuối tiết</strong> để củng cố kiến thức.</li>
+          <li>Tất cả progress đều save tự động — HS có thể chơi tiếp lần sau từ chỗ dừng.</li>
+        </Ul>
+      </>
+    ),
+  },
+
+  // ── Lesson Plan Pro ───────────────────────────────────────────────────────
+  {
+    slug: 'lesson-plan-pro',
+    title: 'Soạn giáo án nâng cao (AI · Word/PDF · Spreadsheet)',
+    category: 'teacher',
+    role: 'teacher',
+    summary: 'AI tạo giáo án LaTeX kiểu Gemini Canvas, tải .doc/.pdf, chèn bảng tính Excel-like với formula.',
+    readTime: '8 phút',
+    content: (
+      <>
+        <P>
+          Tháng 5/2026 đã ship 3 nâng cấp lớn cho hệ giáo án ở{' '}
+          <Code>/teacher/lesson-plans</Code> + <Code>/teacher/lesson-plans/[id]</Code>.
+        </P>
+
+        <H2 id="ai-latex">1. AI tạo giáo án LaTeX (kiểu Gemini Canvas)</H2>
+        <P>
+          Trên trang danh sách giáo án (<Code>/teacher/lesson-plans</Code>), bấm nút{' '}
+          <strong>🪄 Tạo bằng AI</strong> (gradient tím-hồng, cạnh nút "Tạo giáo án mới").
+          Mở modal 2 cột:
+        </P>
+        <H3 id="ai-latex-flow">Luồng 3 bước</H3>
+        <Ol>
+          <li><strong>Chọn template:</strong> 3 mẫu CV2345 builtin (Tiếng Việt 4 tiết, 6 tiết, generic 5 hoạt động) hoặc "Mẫu tự dán" (paste template LaTeX của bạn vào textarea).</li>
+          <li><strong>Mô tả yêu cầu:</strong> textarea + 5 prompt suggestion clickable (Vật lí Động lượng, Tiếng Việt lớp 2, Toán PT bậc 2, Hoá Liên kết H, Sinh Quang hợp).</li>
+          <li><strong>Sinh + Preview:</strong> AI điền nội dung vào template (giữ nguyên geometry/macro/package theo NĐ 30/2020/NĐ-CP) → preview LaTeX bên phải → "Tạo dự án" → tự navigate đến editor LaTeX.</li>
+        </Ol>
+        <Callout kind="tip">
+          AI sử dụng fal.ai/Claude với system prompt 9 quy tắc: KHÔNG đổi cấu trúc, KHÔNG đổi
+          geometry, fill placeholder thực tế, dùng đúng MathJax cho công thức Vật lí/Toán/Hoá.
+        </Callout>
+
+        <H2 id="export-doc-pdf">2. Tải về Word + PDF</H2>
+        <P>
+          Trong editor giáo án (<Code>/teacher/lesson-plans/[id]</Code>), header có 2 nút mới:
+        </P>
+        <Ul>
+          <li><strong>📄 Word</strong> (xanh dương) — tải file <Code>.doc</Code> mở native trong Microsoft Word, Google Docs, LibreOffice. Định dạng theo NĐ 30/2020/NĐ-CP: Times New Roman 13pt, line-height 1.5, justify, lề 2/2/3/2cm.</li>
+          <li><strong>🖨️ PDF</strong> (đỏ) — mở popup print dialog. Trong dialog → chọn destination "Save as PDF" để lưu.</li>
+        </Ul>
+        <Callout kind="info">
+          Cả 2 cách export đều giữ nguyên hình thức gốc: bảng (table border đầy đủ),
+          công thức KaTeX, bảng tính Excel-like (tự render với formula đã eval). Không cần
+          dependency ngoài.
+        </Callout>
+
+        <H2 id="spreadsheet">3. Bảng tính Excel-like trong WYSIWYG</H2>
+        <P>
+          Toolbar editor có icon <strong>📊 Sheet</strong> — bấm → prompt kích thước (mặc định
+          5x5, max 200x50) → chèn bảng tính inline trong giáo án.
+        </P>
+        <H3 id="sheet-features">Tính năng</H3>
+        <Ul>
+          <li>Header A,B,C... × 1,2,3... giống Excel.</li>
+          <li>Click cell → highlight + <strong>formula bar</strong> dưới (input + preview kết quả realtime).</li>
+          <li>Double-click → edit inline. Toolbar mini: + Hàng / − Hàng / + Cột / − Cột / 🗑 Xoá.</li>
+        </Ul>
+        <H3 id="sheet-formulas">Công thức hỗ trợ</H3>
+        <Ul>
+          <li><Code>=A1+B1</Code> — cộng cell</li>
+          <li><Code>=SUM(A1:A5)</Code> — tổng range</li>
+          <li><Code>=AVG(A1:B3)</Code> hoặc <Code>=AVERAGE(...)</Code> — trung bình</li>
+          <li><Code>=COUNT(A1:A10)</Code> — đếm cell có số</li>
+          <li><Code>=MIN(...)</Code> / <Code>=MAX(...)</Code></li>
+          <li><Code>=5*3+2</Code> — biểu thức số học thuần</li>
+        </Ul>
+        <Callout kind="tip">
+          Cell có formula → hiển thị <strong>giá trị tính được</strong> (chữ xanh dương đậm).
+          Click vào → cell hiện raw formula <Code>=...</Code> trong cell + preview kết quả ở
+          formula bar dưới.
+        </Callout>
+
+        <H2 id="lp-pro-tips">Mẹo phối hợp 3 tính năng</H2>
+        <Ol>
+          <li>Bấm 🪄 <strong>Tạo bằng AI</strong> để có khung giáo án nhanh.</li>
+          <li>Trong editor, chèn 📊 <strong>Spreadsheet</strong> để liệt kê điểm/bảng so sánh.</li>
+          <li>Cuối cùng, 📄 <strong>Tải Word</strong> để gửi tổ trưởng duyệt, hoặc 🖨️ <strong>PDF</strong> để in.</li>
+        </Ol>
+      </>
+    ),
+  },
+
+  // ── Knowledge Graph ───────────────────────────────────────────────────────
+  {
+    slug: 'knowledge-graph',
+    title: 'Đồ thị tri thức (Knowledge Graph)',
+    category: 'ai',
+    role: 'all',
+    summary: 'Tìm kiếm liên kết khái niệm, công thức, nghề nghiệp dạng mạng lưới trực quan. Hỗ trợ AI tự động extract entity từ giáo án.',
+    readTime: '6 phút',
+    content: (
+      <>
+        <P>
+          Đồ thị tri thức là cách <strong>mới</strong> để tìm hiểu kiến thức: thay vì đọc từng
+          bài tuyến tính, bạn thấy ngay mạng lưới các khái niệm/công thức/nghề liên quan
+          xung quanh chủ đề mình quan tâm.
+        </P>
+        <P>URL: <Code>/dashboard/knowledge-graph</Code>.</P>
+
+        <H2 id="kg-explore">1. Khám phá graph</H2>
+        <H3 id="kg-controls">Điều khiển canvas</H3>
+        <Ul>
+          <li><strong>Kéo node</strong> — di chuyển</li>
+          <li><strong>Double-click node</strong> — ghim/bỏ ghim 📌</li>
+          <li><strong>Click node</strong> — mở detail drawer bên phải</li>
+          <li><strong>Scroll wheel</strong> — zoom 30% – 300%</li>
+          <li><strong>Kéo nền</strong> — pan camera</li>
+          <li><strong>Search bar</strong> (header) — tìm fuzzy → click kết quả → graph tự xoay quanh node đó</li>
+        </Ul>
+
+        <H3 id="kg-types">10 loại node</H3>
+        <Ul>
+          <li><strong>Subject</strong> (xanh dương) — Môn học (VD: Vật lí)</li>
+          <li><strong>Chapter</strong> (tím) — Chương (VD: Cơ học)</li>
+          <li><strong>Topic</strong> (xanh lá) — Chủ đề (VD: Động lượng)</li>
+          <li><strong>Concept</strong> (vàng) — Khái niệm (VD: Bảo toàn)</li>
+          <li><strong>Formula</strong> (cam) — Công thức (VD: p=mv)</li>
+          <li><strong>Question</strong> (đỏ) — Câu hỏi</li>
+          <li><strong>Lesson</strong> (cyan) — Bài giảng</li>
+          <li><strong>Project</strong> (tím nhạt) — Dự án</li>
+          <li><strong>Career</strong> (hồng) — Nghề nghiệp</li>
+          <li><strong>Person</strong> (xám) — Người</li>
+        </Ul>
+        <P>Filter ở sidebar trái — toggle để ẩn/hiện từng loại.</P>
+
+        <H2 id="kg-detail">2. Detail drawer</H2>
+        <P>
+          Click 1 node → drawer phải hiện mô tả + thuộc tính (VD công thức có unit) +
+          danh sách <strong>liên kết</strong> (in/out + relation type tiếng Việt).
+        </P>
+        <Ul>
+          <li>Click 1 liên kết → mở detail drawer của node đó.</li>
+          <li>Bấm <strong>"Lấy node này làm tâm"</strong> → graph BFS depth=2 từ node mới.</li>
+        </Ul>
+
+        <H2 id="kg-extract">3. AI Extract — auto-sinh entity từ văn bản</H2>
+        <P>
+          Header có nút <strong>🪄 Trích xuất AI</strong> (gradient cyan-blue). Mở modal 2 tab:
+        </P>
+        <H3 id="kg-extract-text">Tab 1: Từ văn bản</H3>
+        <Ol>
+          <li>Paste 1 đoạn văn bản (≥30 chars, max 30k chars).</li>
+          <li>Bấm <strong>"Trích xuất bằng AI"</strong>.</li>
+          <li>AI trả về: Topics + Concepts + Formulas + Edges (max 8/6/8/12).</li>
+          <li>Preview entities → bấm <strong>"Mở graph với node mới"</strong> → graph tự xoay.</li>
+        </Ol>
+        <H3 id="kg-extract-lp">Tab 2: Từ giáo án</H3>
+        <P>
+          Dropdown lấy danh sách <Code>LessonPlan</Code> (sort updatedAt DESC). Chọn 1 → AI đọc
+          HTML content → trích entities. Tự tạo node Lesson + edges <Code>MENTIONS_TOPIC</Code>{' '}
+          từ Lesson đến tất cả Topics/Concepts/Formulas extracted.
+        </P>
+        <Callout kind="tip">
+          <strong>Dedup tự động:</strong> nếu label trùng (case-insensitive) với node đã có,
+          AI <em>reuse</em> id thay vì tạo duplicate. Auto-link similarity (≥0.6) cho new
+          nodes vs existing same-type nodes. Xem stats banner sau extract.
+        </Callout>
+
+        <H2 id="kg-link">4. Link similarity full graph</H2>
+        <P>
+          Sau extract → bấm nút "Link similarity full graph" để quét toàn bộ nodes (limit 500),
+          tạo edges <Code>RELATES_TO</Code> cho cặp same-type có similarity ≥ 0.65.
+        </P>
+
+        <H2 id="kg-usecase">Use case thực tế</H2>
+        <Ul>
+          <li><strong>HS</strong> gõ "động lượng" → graph xoay quanh Topic → thấy <Code>p=mv</Code>, <Code>Bảo toàn</Code>, <Code>Vector</Code>, <Code>Kỹ sư ô tô</Code>, <Code>Game dev</Code>.</li>
+          <li><strong>HS</strong> click Career "Kỹ sư điện" → thấy chuỗi Topic dẫn đến: Mạch điện ↔ Điện trường ↔ Cảm ứng điện từ.</li>
+          <li><strong>GV</strong> soạn xong giáo án → AI Extract → graph tự lớn theo content GV soạn.</li>
+          <li><strong>Admin</strong> xem graph để tìm gaps trong curriculum (concept ít kết nối).</li>
+        </Ul>
+      </>
+    ),
+  },
+
+  // ── Scrumboard Guide ──────────────────────────────────────────────────────
+  {
+    slug: 'scrumboard-guide',
+    title: 'Quản lí công việc bằng Scrumboard',
+    category: 'reference',
+    role: 'all',
+    summary: 'Kanban board cá nhân — kéo thả task, hệ thống điểm/XP, save tự động qua localStorage.',
+    readTime: '4 phút',
+    content: (
+      <>
+        <P>
+          Mỗi vai trò (HS, GV, Admin) có 1 Scrumboard riêng — dữ liệu hoàn toàn tách biệt qua
+          localStorage namespace. Không lẫn task giữa các role.
+        </P>
+
+        <H2 id="scrum-routes">3 route theo vai trò</H2>
+        <Ul>
+          <li><strong>HS</strong> — <Code>/dashboard/scrumboard</Code>: Cần làm → Đang học → Ôn tập → Hoàn thành ✓</li>
+          <li><strong>GV</strong> — <Code>/teacher/scrumboard</Code>: Cần làm → Đang thực hiện → Chờ duyệt → Hoàn thành ✓</li>
+          <li><strong>Admin</strong> — <Code>/admin/scrumboard</Code>: Backlog → Đang xử lý → Review → Đã đóng ✓</li>
+        </Ul>
+
+        <H2 id="scrum-subjects">Loại công việc theo role</H2>
+        <H3 id="scrum-student">HS (6 môn học)</H3>
+        <P>Vật lý, Toán học, Hoá học, Sinh học, Lập trình, Khác.</P>
+        <H3 id="scrum-teacher">GV (7 nhóm)</H3>
+        <P>Soạn bài, Chấm bài, Quản lý lớp, Họp/Sinh hoạt, Báo cáo, Bồi dưỡng, Khác.</P>
+        <H3 id="scrum-admin">Admin (7 nhóm)</H3>
+        <P>Vận hành, Hỗ trợ NSD, Hạ tầng IT, Tài chính, Marketing, Pháp lý/Tuân thủ, Khác.</P>
+
+        <H2 id="scrum-actions">Thao tác cơ bản</H2>
+        <Ul>
+          <li><strong>Tạo task</strong> — bấm "+ Task mới" header hoặc icon "+" trong từng cột.</li>
+          <li><strong>Di chuyển</strong> — kéo task giữa các cột (HTML5 drag-drop).</li>
+          <li><strong>Edit/Xoá</strong> — click "..." trên card → menu mở ra.</li>
+          <li><strong>Lùi/Tiến</strong> — menu có nút mũi tên để di chuyển không cần kéo.</li>
+        </Ul>
+
+        <H2 id="scrum-modal">Tạo/Edit task</H2>
+        <P>Modal có 6 trường:</P>
+        <Ul>
+          <li><strong>Tiêu đề*</strong> — bắt buộc</li>
+          <li><strong>Mô tả</strong> — chi tiết task</li>
+          <li><strong>Loại công việc</strong> — chọn từ list theo role</li>
+          <li><strong>Ưu tiên</strong> — Thấp / Trung bình / Cao (color-coded)</li>
+          <li><strong>Cột</strong> — chọn vào cột nào</li>
+          <li><strong>Điểm thưởng</strong> — XP/điểm 10–500 (HS dùng "XP", GV/Admin dùng "điểm")</li>
+          <li><strong>Thẻ</strong> — phân cách dấu phẩy (auto-slugify thành kebab-case)</li>
+        </Ul>
+
+        <H2 id="scrum-stats">Thống kê + Progress</H2>
+        <P>
+          Header hiển thị: tổng task, # xong, # đang làm, +XP/điểm earned. Cuối trang có
+          progress bar tổng thể (% task hoàn thành).
+        </P>
+
+        <Callout kind="info">
+          Dữ liệu lưu localStorage trên trình duyệt. Đổi browser/máy → mất task. Phase 2
+          (TBD): sync lên server với endpoint <Code>/api/scrumboard/...</Code>.
+        </Callout>
+      </>
+    ),
+  },
+
+  // ── Digital Logic Lab ─────────────────────────────────────────────────────
+  {
+    slug: 'digital-logic-lab',
+    title: 'Lab cổng logic số',
+    category: 'student',
+    role: 'all',
+    summary: 'Mô phỏng cổng AND/OR/NOT/NAND/NOR/XOR/XNOR + INPUT/OUTPUT/CLOCK kéo-thả + nối dây + bảng chân lý tự sinh.',
+    readTime: '5 phút',
+    content: (
+      <>
+        <P>
+          Trang lab dành cho HS THPT học chương "Đại số Boole" + "Mạch số" (Tin học 11/12).
+          URL: <Code>/dashboard/labtwin/labs/digital-logic-lab</Code>.
+        </P>
+
+        <H2 id="dl-palette">10 linh kiện trong palette</H2>
+        <Ul>
+          <li><strong>Cổng cơ bản:</strong> AND, OR, NOT</li>
+          <li><strong>Cổng kết hợp:</strong> NAND, NOR, XOR, XNOR</li>
+          <li><strong>I/O:</strong> INPUT (toggle 0/1), OUTPUT (đèn LED), CLOCK (xung 1Hz)</li>
+        </Ul>
+
+        <H2 id="dl-actions">Thao tác</H2>
+        <Ol>
+          <li><strong>Click linh kiện</strong> trong palette → thêm vào canvas (vị trí random).</li>
+          <li><strong>Kéo gate</strong> → di chuyển trên canvas SVG.</li>
+          <li><strong>Nối dây:</strong> click pin OUTPUT (xanh lá, bên phải gate) → click pin INPUT (xanh dương, bên trái gate) → wire bezier curve hiện ra.</li>
+          <li><strong>Click INPUT</strong> → toggle 0/1 ngay.</li>
+          <li><strong>Click gate</strong> → properties panel (label + xóa).</li>
+          <li><strong>Toolbar:</strong> Play/Pause, Mẫu, Bảng chân lý, Export, Import, Clear.</li>
+        </Ol>
+
+        <H2 id="dl-presets">6 mẫu chuẩn</H2>
+        <Ul>
+          <li><strong>XOR cơ bản</strong> — khởi đầu 2 input + 1 cổng</li>
+          <li><strong>Half Adder</strong> — Sum + Cout (XOR + AND)</li>
+          <li><strong>Full Adder</strong> — Sum + Cout với Cin (2 XOR + 2 AND + 1 OR)</li>
+          <li><strong>SR Latch</strong> — bộ nhớ 1 bit (2 NOR feedback)</li>
+          <li><strong>2:1 MUX</strong> — chọn A hoặc B theo Sel</li>
+          <li><strong>Clock + LED</strong> — đèn nhấp nháy 1Hz</li>
+        </Ul>
+
+        <H2 id="dl-truth">Bảng chân lý tự sinh</H2>
+        <P>
+          Auto-generate cho mạch có 1–4 INPUT và 1–4 OUTPUT. Hiển thị inline ở sidebar phải
+          + modal lớn (bấm icon Grid3x3 trong header). 2^n hàng, mỗi hàng eval simulate
+          độc lập với input set tương ứng. Highlight ô = 1 màu xanh lá đậm.
+        </P>
+
+        <H2 id="dl-engine">Engine mô phỏng</H2>
+        <P>
+          Iterative propagation tối đa 50 lần — xử lý cả feedback loop (SR latch).
+          CLOCK auto-tick mỗi giây. Wire màu xanh lá khi HIGH, xám khi LOW.
+        </P>
+
+        <H2 id="dl-storage">Lưu trữ</H2>
+        <Ul>
+          <li>Auto-save localStorage mỗi khi mạch thay đổi.</li>
+          <li>Export <Code>.json</Code> để chia sẻ mạch.</li>
+          <li>Import <Code>.json</Code> để load mạch người khác.</li>
+          <li>Clear All có confirm prompt.</li>
+        </Ul>
+
+        <Callout kind="tip">
+          Bắt đầu với mẫu <strong>XOR cơ bản</strong> để hiểu cơ chế nối dây. Sau đó thử
+          <strong> Half Adder</strong> để học cách build mạch tính toán. Cuối cùng thử
+          <strong> SR Latch</strong> — đây là bước nhảy vọt vì có feedback loop.
+        </Callout>
+      </>
+    ),
+  },
 ]
 
 // ── Helper to query articles ──────────────────────────────────────────────

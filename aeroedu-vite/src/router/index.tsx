@@ -87,6 +87,7 @@ const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
 const DigitalLogicLab    = lazy(() => import('@/pages/labs/DigitalLogicLab'))
 const PixelOdyssey       = lazy(() => import('@/pages/labs/PixelOdyssey'))
+const GamesIndexPage     = lazy(() => import('@/pages/games/GamesIndex'))
 const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
 const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
 const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
@@ -341,7 +342,15 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
             <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
-            <Route path="/dashboard/labtwin/labs/pixel-odyssey"           element={<PixelOdyssey />} />
+            {/* Pixel Odyssey moved to /dashboard/games — keep redirect cho link cũ */}
+            <Route path="/dashboard/labtwin/labs/pixel-odyssey"           element={<Navigate to="/dashboard/games/pixel-odyssey" replace />} />
+            {/* Games hub */}
+            <Route path="/dashboard/games"                                element={<GamesIndexPage />} />
+            <Route path="/dashboard/games/pixel-odyssey"                  element={<PixelOdyssey />} />
+            <Route path="/dashboard/games/pixel-agents"                   element={<PixelAgents />} />
+            <Route path="/dashboard/games/keo-co"                         element={<KeoCoApp />} />
+            <Route path="/dashboard/games/wayground"                      element={<Navigate to="/dashboard/labtwin/labs/wayground" replace />} />
+            <Route path="/dashboard/games/buffalo-runner"                 element={<PageFallback />} />
             <Route path="/dashboard/labtwin/labs/physics-motion"          element={<PhysicsMotion />} />
             <Route path="/dashboard/labtwin/labs/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
             {/* ── New native simulation labs ───────────────── */}
