@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Save, Loader2, FileCode2, Play, Download,
-  Printer, History, Share2, Trash2, Sparkles, BookOpen, Zap,
+  Printer, History, Share2, Trash2, Sparkles, BookOpen, Zap, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
@@ -11,6 +11,7 @@ import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
 import LatexSnippetsPanel from '@/components/latex-editor/LatexSnippetsPanel'
 import { LATEX_TEMPLATES, getTemplateById } from '@/lib/latex-templates'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
+import { lessonPlanService } from '@/services/lessonPlan.service'
 
 /* ── Dark palette ── */
 const D = {
@@ -111,6 +112,8 @@ export default function LaTeXEditorDocument() {
   const [addingCollab, setAddingCollab] = useState(false)
 
   const [templateSel, setTemplateSel] = useState('')
+  const [savingLessonPlan, setSavingLessonPlan] = useState(false)
+  const [savedAsLessonPlan, setSavedAsLessonPlan] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
   // ── Realtime preview + Snippets panel ──
@@ -246,6 +249,35 @@ export default function LaTeXEditorDocument() {
     const t = getTemplateById(templateId)
     if (t) { setContent(t.body); toast.success(`Đã áp dụng mẫu: ${t.name}`) }
     setTemplateSel('')
+  }
+
+  /** Lưu LaTeX project hiện tại thành 1 mục giáo án.
+   * Server tạo LessonPlan với format='latex', latexProjectId=this.id
+   * → xuất hiện ở /teacher/lesson-plans tab "Giáo án đã soạn".
+   * Idempotent: nếu đã có LessonPlan ref tới project này, sẽ UPDATE
+   * thay vì tạo mới (refresh content + title từ latex source).
+   */
+  const handleSaveAsLessonPlan = async () => {
+    if (!id || savingLessonPlan) return
+    setSavingLessonPlan(true)
+    try {
+      // Save LaTeX trước để latexProject.mainContent là phiên bản mới nhất
+      if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null }
+      saveContent(content)
+      // Sau đó cross-link tới lesson plan
+      const r = await lessonPlanService.saveFromLatex(id, { title: title.trim() || undefined })
+      setSavedAsLessonPlan(true)
+      toast.success(
+        r.action === 'created'
+          ? `Đã lưu vào danh mục giáo án (mới)`
+          : `Đã cập nhật giáo án trong danh mục`,
+        { duration: 3500 }
+      )
+      // Reset visual feedback sau 3s
+      setTimeout(() => setSavedAsLessonPlan(false), 3000)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Lỗi lưu vào danh mục giáo án')
+    } finally { setSavingLessonPlan(false) }
   }
 
   /* ── AI exam generator — nhận LaTeX và thay thế nội dung editor ── */
@@ -471,6 +503,30 @@ export default function LaTeXEditorDocument() {
           }
           Lưu
         </IconBtn>
+
+        {/* Lưu vào Giáo án — cross-link to /teacher/lesson-plans */}
+        <button
+          onClick={handleSaveAsLessonPlan}
+          disabled={savingLessonPlan}
+          title="Lưu LaTeX này vào danh mục giáo án — sẽ xuất hiện ở /teacher/lesson-plans"
+          style={{
+            background: savedAsLessonPlan ? '#16a34a' : 'rgba(124,58,237,0.18)',
+            border: `1px solid ${savedAsLessonPlan ? '#22c55e' : 'rgba(124,58,237,0.5)'}`,
+            borderRadius: 8,
+            color: savedAsLessonPlan ? '#fff' : '#a78bfa',
+            cursor: savingLessonPlan ? 'not-allowed' : 'pointer',
+            opacity: savingLessonPlan ? 0.6 : 1,
+            padding: '6px 12px', fontSize: 13, fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            transition: 'all 0.2s',
+          }}
+        >
+          {savingLessonPlan
+            ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            : <FileText size={14} />
+          }
+          {savedAsLessonPlan ? '✓ Đã lưu giáo án' : 'Lưu Giáo án'}
+        </button>
 
         {/* Compile */}
         <button

@@ -6357,8 +6357,8 @@ if (USE_NODEJS_QUESTIONS) {
       const cols = [
         ['"teacherId"',    'TEXT'],
         ['title',          `TEXT DEFAULT 'Giáo án mới'`],
-        ['content',        `TEXT DEFAULT ''`],         // HTML rendered
-        ['"contentJson"',  `JSONB DEFAULT '{}'::jsonb`], // TipTap doc JSON
+        ['content',        `TEXT DEFAULT ''`],         // HTML hoặc LaTeX source tuỳ format
+        ['"contentJson"',  `JSONB DEFAULT '{}'::jsonb`], // TipTap doc JSON (chỉ format=html)
         ['subject',        'TEXT'],
         ['grade',          'TEXT'],
         ['tags',           `JSONB DEFAULT '[]'::jsonb`],
@@ -6366,6 +6366,8 @@ if (USE_NODEJS_QUESTIONS) {
         ['"isArchived"',   'BOOLEAN DEFAULT false'],
         ['"gcsBackupUrl"', 'TEXT'],                     // URL snapshot GCS
         ['"gcsBackupAt"',  'TIMESTAMPTZ'],
+        ['format',         `TEXT DEFAULT 'html'`],      // 'html' | 'latex'
+        ['"latexProjectId"', 'TEXT'],                   // FK soft tới LatexProject (khi format=latex)
         ['"lastSavedAt"',  'TIMESTAMPTZ DEFAULT NOW()'],
         ['"createdAt"',    'TIMESTAMPTZ DEFAULT NOW()'],
         ['"updatedAt"',    'TIMESTAMPTZ DEFAULT NOW()'],
@@ -6392,6 +6394,7 @@ if (USE_NODEJS_QUESTIONS) {
         const knownCols = new Set([
           'id', 'teacherId', 'title', 'content', 'contentJson', 'subject', 'grade',
           'tags', 'wordCount', 'isArchived', 'gcsBackupUrl', 'gcsBackupAt',
+          'format', 'latexProjectId',
           'lastSavedAt', 'createdAt', 'updatedAt',
         ]);
         const { rows: schemaCols } = await pool.query(
@@ -6470,12 +6473,24 @@ if (USE_NODEJS_QUESTIONS) {
       isArchived: !!r.isArchived,
       gcsBackupUrl: r.gcsBackupUrl || null,
       gcsBackupAt: r.gcsBackupAt || null,
+      format: r.format || 'html',                    // 'html' | 'latex'
+      latexProjectId: r.latexProjectId || null,      // ref tới LatexProject khi format=latex
       lastSavedAt: r.lastSavedAt,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
     // List view: skip large content fields
-    if (summary) return { ...base, contentPreview: (r.content || '').replace(/<[^>]+>/g, '').slice(0, 160) };
+    if (summary) {
+      // Preview: nếu LaTeX, lấy phần text giữa \begin{document}…\end{document}
+      // strip LaTeX commands → readable preview
+      const preview = r.format === 'latex'
+        ? String(r.content || '')
+            .replace(/\\[a-zA-Z]+\*?(\[[^\]]*\])?(\{[^}]*\})?/g, ' ')
+            .replace(/\$[^$]*\$/g, '[công thức]')
+            .replace(/\s+/g, ' ').trim().slice(0, 160)
+        : String(r.content || '').replace(/<[^>]+>/g, '').slice(0, 160);
+      return { ...base, contentPreview: preview };
+    }
     return { ...base, content: r.content || '', contentJson: r.contentJson || {} };
   }
 
@@ -6594,6 +6609,81 @@ if (USE_NODEJS_QUESTIONS) {
     } catch (err) {
       console.error('[lesson-plan:update]', err.message);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/lesson-plans/from-latex ──
+  // Tạo bản LessonPlan từ 1 LatexProject (lưu copy LaTeX source vào danh
+  // mục giáo án). User soạn giáo án bằng LaTeX (template CV2345 LaTeX) →
+  // bấm "Lưu vào Giáo án" → endpoint này tạo LessonPlan mới với:
+  //   - format = 'latex'
+  //   - content = mainContent (LaTeX source)
+  //   - latexProjectId = ref về LatexProject gốc (để click ở list mở
+  //     lại đúng latex doc, không phải tạo mới).
+  app.post('/api/teacher/lesson-plans/from-latex', express.json({ limit: '256kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const { latexProjectId, title, subject, grade } = req.body || {};
+      if (!latexProjectId) return res.status(400).json({ error: 'Thiếu latexProjectId' });
+
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+
+      // Fetch LatexProject để verify ownership + lấy mainContent
+      const latex = await pool.query(
+        `SELECT id, title, "mainContent" FROM "LatexProject" WHERE id = $1 AND "userId" = $2 LIMIT 1`,
+        [latexProjectId, user.id]
+      ).catch(() => ({ rows: [] }));
+      if (latex.rows.length === 0) {
+        return res.status(404).json({ error: 'LaTeX project không tồn tại hoặc không phải của bạn' });
+      }
+      const lpx = latex.rows[0];
+      const finalTitle = (title || lpx.title || 'Giáo án LaTeX').trim();
+      const latexSource = lpx.mainContent || '';
+
+      // Check nếu đã có LessonPlan ref tới LatexProject này → update thay vì tạo mới
+      const existing = await pool.query(
+        `SELECT id FROM "LessonPlan" WHERE "teacherId" = $1 AND "latexProjectId" = $2 LIMIT 1`,
+        [user.id, latexProjectId]
+      ).catch(() => ({ rows: [] }));
+      if (existing.rows.length > 0) {
+        // UPDATE — refresh content + title từ latex
+        const upd = await pool.query(
+          `UPDATE "LessonPlan"
+              SET title = $1, content = $2, subject = COALESCE($3, subject),
+                  grade = COALESCE($4, grade),
+                  "lastSavedAt" = NOW(), "updatedAt" = NOW()
+            WHERE id = $5 AND "teacherId" = $6
+            RETURNING *`,
+          [finalTitle, latexSource, subject || null, grade || null, existing.rows[0].id, user.id]
+        );
+        return res.json({ plan: mapLessonPlan(upd.rows[0], false), action: 'updated' });
+      }
+
+      // INSERT mới
+      const id = lpsGenId();
+      const wordCount = computeWordCount(latexSource);
+      const ins = await pool.query(
+        `INSERT INTO "LessonPlan"
+          (id, "teacherId", title, content, "contentJson",
+           subject, grade, tags, "wordCount",
+           format, "latexProjectId",
+           "lastSavedAt", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9,$10,$11, NOW(), NOW(), NOW())
+         RETURNING *`,
+        [id, user.id, finalTitle, latexSource,
+         JSON.stringify({}),  // contentJson rỗng cho LaTeX
+         subject || null, grade || null,
+         JSON.stringify([]),
+         wordCount,
+         'latex', latexProjectId]
+      );
+      return res.json({ plan: mapLessonPlan(ins.rows[0], false), action: 'created' });
+    } catch (err) {
+      console.error('[lesson-plan:from-latex]', err.message,
+        '| code:', err.code, '| detail:', err.detail);
+      res.status(500).json({ error: err.message, detail: err.detail || null });
     }
   });
 

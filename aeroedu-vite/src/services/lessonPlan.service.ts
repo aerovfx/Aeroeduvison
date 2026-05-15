@@ -22,6 +22,8 @@ export interface LessonPlanSummary {
   contentPreview?: string
   gcsBackupUrl: string | null
   gcsBackupAt: string | null
+  format: 'html' | 'latex'                 // 'html' (TipTap) | 'latex' (LatexProject ref)
+  latexProjectId: string | null            // ref tới LatexProject khi format='latex'
   lastSavedAt: string
   createdAt: string
   updatedAt: string
@@ -65,6 +67,13 @@ export const lessonPlanService = {
 
   backup: (id: string) =>
     api.post<{ ok: boolean; url: string; backedUpAt: string }>(`/teacher/lesson-plans/${id}/backup`).then(r => r.data),
+
+  // ── Lưu LaTeX project thành 1 mục giáo án (cross-link) ──
+  saveFromLatex: (latexProjectId: string, opts: { title?: string; subject?: string; grade?: string } = {}) =>
+    api.post<{ plan: LessonPlan; action: 'created' | 'updated' }>('/teacher/lesson-plans/from-latex', {
+      latexProjectId,
+      ...opts,
+    }).then(r => r.data),
 
   // ── GCS snapshots — danh mục các giáo án đã sao lưu lên Drive ──
   listGcsSnapshots: () =>

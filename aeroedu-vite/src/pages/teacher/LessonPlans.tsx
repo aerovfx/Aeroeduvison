@@ -362,33 +362,51 @@ export default function LessonPlans() {
           </div>
         ) : (
           <div style={{ display: 'grid', gap: 12 }}>
-            {filtered.map(plan => (
+            {filtered.map(plan => {
+              // LaTeX format → click mở /teacher/latex-documents/{latexProjectId}
+              // HTML format → click mở /teacher/lesson-plans/{plan.id} (TipTap editor)
+              const isLatex = plan.format === 'latex' && plan.latexProjectId
+              const targetUrl = isLatex
+                ? `/teacher/latex-documents/${plan.latexProjectId}`
+                : `/teacher/lesson-plans/${plan.id}`
+              return (
               <div key={plan.id} style={{
-                background: '#10111e', border: '1px solid #1e2033', borderRadius: 12,
+                background: '#10111e',
+                border: `1px solid ${isLatex ? 'rgba(34,197,94,0.25)' : '#1e2033'}`,
+                borderRadius: 12,
                 padding: 16, display: 'flex', gap: 14, alignItems: 'center',
                 transition: 'all 0.15s',
               }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#1e2033'}
+                onMouseEnter={e => e.currentTarget.style.borderColor = isLatex ? '#22c55e' : 'rgba(124,58,237,0.4)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = isLatex ? 'rgba(34,197,94,0.25)' : '#1e2033'}
               >
                 <div style={{
                   width: 44, height: 44, borderRadius: 10,
-                  background: 'rgba(124,58,237,0.12)',
+                  background: isLatex ? 'rgba(34,197,94,0.12)' : 'rgba(124,58,237,0.12)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
                 }}>
-                  <FileText size={20} style={{ color: '#a78bfa' }} />
+                  <FileText size={20} style={{ color: isLatex ? '#4ade80' : '#a78bfa' }} />
                 </div>
-                <button onClick={() => navigate(`/teacher/lesson-plans/${plan.id}`)}
+                <button onClick={() => navigate(targetUrl)}
                   style={{
                     flex: 1, minWidth: 0, textAlign: 'left',
                     background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
                   }}>
-                  <h3 style={{
-                    fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: '0 0 4px',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {plan.title}
-                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <h3 style={{
+                      fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {plan.title}
+                    </h3>
+                    {isLatex && (
+                      <span style={{
+                        fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                        background: 'rgba(34,197,94,0.18)', color: '#4ade80',
+                        fontWeight: 800, letterSpacing: '0.05em', flexShrink: 0,
+                      }}>LATEX</span>
+                    )}
+                  </div>
                   {plan.contentPreview && (
                     <p style={{
                       color: '#94a3b8', fontSize: 12, margin: '0 0 6px',
@@ -429,12 +447,14 @@ export default function LessonPlans() {
                     )}
                   </div>
                 </button>
-                <button onClick={() => navigate(`/teacher/lesson-plans/${plan.id}`)}
-                  title="Mở để chỉnh sửa"
+                <button onClick={() => navigate(targetUrl)}
+                  title={isLatex ? 'Mở trong LaTeX editor' : 'Mở trong WYSIWYG editor'}
                   style={{
-                    padding: '7px 10px', background: 'rgba(124,58,237,0.12)',
-                    border: '1px solid rgba(124,58,237,0.3)', borderRadius: 8,
-                    cursor: 'pointer', color: '#a78bfa',
+                    padding: '7px 10px',
+                    background: isLatex ? 'rgba(34,197,94,0.12)' : 'rgba(124,58,237,0.12)',
+                    border: `1px solid ${isLatex ? 'rgba(34,197,94,0.3)' : 'rgba(124,58,237,0.3)'}`,
+                    borderRadius: 8, cursor: 'pointer',
+                    color: isLatex ? '#4ade80' : '#a78bfa',
                   }}>
                   <Edit3 size={13} />
                 </button>
@@ -448,7 +468,8 @@ export default function LessonPlans() {
                   <Trash2 size={13} />
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
           </>
