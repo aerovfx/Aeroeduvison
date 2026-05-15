@@ -84,6 +84,7 @@ const AerodynamicsLab    = lazy(() => import('@/pages/labs/Aerodynamics'))
 const AirflowCFDLab      = lazy(() => import('@/pages/labs/AirflowCFD'))
 const ChemistryLab       = lazy(() => import('@/pages/labs/Chemistry'))
 const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
+const DigitalLogicLab    = lazy(() => import('@/pages/labs/DigitalLogicLab'))
 const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
 const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
 const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
@@ -336,6 +337,7 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
+            <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
             <Route path="/dashboard/labtwin/labs/physics-motion"          element={<PhysicsMotion />} />
             <Route path="/dashboard/labtwin/labs/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
             {/* ── New native simulation labs ───────────────── */}

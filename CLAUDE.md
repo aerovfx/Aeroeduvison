@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `f5651d9` (deploy 239, 2026-05-15 — TranscriptRecording history page)
-- Commits since last deploy: `5/5` ✅ READY TO DEPLOY (c14e988, 681f972, da269db, 2a6ea7f, this commit Stem Blueprint + KeoCo leaderboard + game catalog)
+- Commits since last deploy: `6/5` ⚠️ OVERDUE (c14e988, 681f972, da269db, 2a6ea7f, e717ff8, this commit Digital Logic Lab)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

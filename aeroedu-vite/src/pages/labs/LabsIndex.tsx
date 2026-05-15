@@ -241,6 +241,13 @@ const POPULAR_LABS: PopularLab[] = [
     accent: 'indigo',
   },
   {
+    name: 'Digital Logic Lab',
+    emoji: '⚙️',
+    path: '/dashboard/labtwin/labs/digital-logic-lab',
+    desc: 'Cổng logic số · Boole · bảng chân lý',
+    accent: 'cyan',
+  },
+  {
     name: 'MechaForce',
     emoji: '🤖',
     path: '/dashboard/labtwin/labs/mechaforce',
