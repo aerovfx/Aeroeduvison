@@ -25,6 +25,10 @@ import {
 import { toast } from 'react-hot-toast'
 import { ArduinoRuntime, type RuntimeSnapshot, type StopSignal } from '@/lib/arduino-runtime'
 import { transpileArduino, executeSketch } from '@/lib/arduino-transpile'
+import {
+  ArduinoBoardSVG, LED, PushButton, Potentiometer, Resistor,
+  type LEDColor,
+} from '@/components/iot/ArduinoComponents'
 
 // ─── Preset sketches ───────────────────────────────────────────────
 interface Preset {
@@ -438,7 +442,7 @@ export default function ArduinoEmulator() {
             <h3 className="text-xs uppercase font-bold text-white/60 tracking-wider mb-2 flex items-center gap-1.5">
               <CircuitBoard className="w-3.5 h-3.5 text-cyan-400" /> Schematic
             </h3>
-            <Schematic snapshot={snapshot} onPin2Toggle={togglePin2} />
+            <Schematic snapshot={snapshot} onPin2Toggle={togglePin2} potValue={analogA0} />
           </div>
 
           {/* Analog input slider */}
@@ -492,29 +496,24 @@ export default function ArduinoEmulator() {
   )
 }
 
-// ─── Schematic component ───────────────────────────────────────────
+// ─── Schematic component (realistic) ──────────────────────────────
 function Schematic({
-  snapshot, onPin2Toggle,
-}: { snapshot: RuntimeSnapshot | null; onPin2Toggle: () => void }) {
+  snapshot, onPin2Toggle, potValue,
+}: { snapshot: RuntimeSnapshot | null; onPin2Toggle: () => void; potValue: number }) {
   const pins = snapshot?.pins || {}
 
-  // Helper: get pin state for rendering
-  const pinColor = (n: number): { fill: string; label: string } => {
-    const p = pins[n]
-    if (!p) return { fill: '#1e293b', label: '—' }
-    if (p.kind === 'analog-in') {
-      return { fill: '#7c3aed', label: String(p.value) }
-    }
-    if (p.kind === 'pwm') {
-      const brightness = p.value / 255
-      const r = Math.floor(brightness * 250)
-      const g = Math.floor(brightness * 200)
-      return { fill: `rgb(${r},${g},20)`, label: String(p.value) }
-    }
-    return { fill: p.value > 0 ? '#facc15' : '#1e293b', label: p.value ? 'H' : 'L' }
+  // LED color rotation cho external LEDs (mỗi pin 1 màu khác)
+  const ledColorMap: Record<number, LEDColor> = {
+    8: 'red', 9: 'yellow', 10: 'green', 11: 'blue', 12: 'orange', 13: 'yellow',
   }
 
-  const isLedOn = (n: number) => {
+  const ledBrightness = (n: number): number => {
+    const p = pins[n]
+    if (!p) return 0
+    if (p.kind === 'pwm') return p.value / 255
+    return p.value > 0 ? 1 : 0
+  }
+  const ledOn = (n: number): boolean => {
     const p = pins[n]
     if (!p) return false
     if (p.kind === 'pwm') return p.value > 8
@@ -522,97 +521,92 @@ function Schematic({
   }
 
   return (
-    <svg viewBox="0 0 380 340" className="w-full" style={{ background: '#06030f', borderRadius: 8 }}>
-      {/* Board outline (Arduino UNO style) */}
-      <rect x="40" y="40" width="300" height="260" rx="6" fill="#15803d" stroke="#22c55e" strokeWidth="1.5" />
-      <text x="190" y="60" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold" opacity="0.7">ARDUINO UNO</text>
+    <svg viewBox="0 0 540 460" className="w-full" style={{ background: '#06030f', borderRadius: 8 }}>
+      {/* Background grid (subtle) */}
+      <defs>
+        <pattern id="schemBg" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+        </pattern>
+      </defs>
+      <rect width="540" height="460" fill="url(#schemBg)" />
 
-      {/* Digital pins 0-13 (top row) */}
-      {Array.from({ length: 14 }).map((_, i) => {
-        const x = 60 + i * 18
-        const y = 90
-        const c = pinColor(i)
-        const isLED = i === 13
-        return (
-          <g key={`d${i}`}>
-            <rect x={x - 7} y={y - 7} width={14} height={14} rx={3}
-              fill={c.fill} stroke="#22c55e" strokeWidth="1" />
-            <text x={x} y={y + 4} textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">
-              {c.label}
-            </text>
-            <text x={x} y={y - 12} textAnchor="middle" fill="#86efac" fontSize="7">
-              D{i}
-            </text>
-            {/* PWM indicator */}
-            {[3, 5, 6, 9, 10, 11].includes(i) && (
-              <text x={x} y={y + 16} textAnchor="middle" fill="#facc15" fontSize="6">~</text>
-            )}
-            {/* LED visual for pin 13 (built-in LED) */}
-            {isLED && (
-              <circle cx={x} cy={y + 30} r="6"
-                fill={isLedOn(i) ? '#facc15' : '#475569'}
-                stroke="#fbbf24" strokeWidth="1"
-                style={{ filter: isLedOn(i) ? 'drop-shadow(0 0 6px #fbbf24)' : 'none' }}
+      {/* Arduino board PCB chi tiết */}
+      <ArduinoBoardSVG pinStates={pins as any} onPinClick={(p) => p === 2 && onPin2Toggle()} />
+
+      {/* External LEDs row dưới board (pin 8-13 sleek breadboard area) */}
+      <g>
+        {/* Connection wires từ board pin lên LED */}
+        {[8, 9, 10, 11, 12, 13].map((pin, idx) => {
+          const x = 100 + idx * 60
+          const on = ledOn(pin)
+          // Board pin position (D8-D13 in top header)
+          const boardPinX = 192 + (pin - 8) * 24
+          const boardPinY = 67
+          return (
+            <g key={`wire-${pin}`}>
+              <line
+                x1={boardPinX} y1={boardPinY}
+                x2={x} y2={400}
+                stroke={on ? '#fbbf24' : '#475569'}
+                strokeWidth={1.5}
+                opacity={on ? 0.8 : 0.5}
               />
-            )}
-          </g>
-        )
-      })}
+            </g>
+          )
+        })}
 
-      {/* Pin 2 button (clickable) */}
-      <g onClick={onPin2Toggle} style={{ cursor: 'pointer' }}>
-        <rect x={60 + 2 * 18 - 12} y={115} width={24} height={14} rx={3}
-          fill={pins[2]?.value ? '#16a34a' : '#7c2d12'} stroke="#fbbf24" strokeWidth="1.5" />
-        <text x={60 + 2 * 18} y={125} textAnchor="middle" fill="white" fontSize="7" fontWeight="bold">BTN</text>
+        {/* LEDs */}
+        {[8, 9, 10, 11, 12, 13].map((pin, idx) => {
+          const x = 100 + idx * 60
+          return (
+            <LED
+              key={`led-${pin}`}
+              cx={x} cy={400}
+              on={ledOn(pin)}
+              brightness={ledBrightness(pin)}
+              color={ledColorMap[pin]}
+              label={`D${pin}`}
+            />
+          )
+        })}
       </g>
 
-      {/* External LEDs at pin 8-12 (visualize chaser) */}
-      {[8, 9, 10, 11, 12, 13].map((pin, idx) => {
-        const x = 60 + 8 * 18 + idx * 22
-        const y = 200
-        const on = isLedOn(pin)
-        const p = pins[pin]
-        const brightness = p?.kind === 'pwm' ? p.value / 255 : on ? 1 : 0
-        return (
-          <g key={`led${pin}`}>
-            <circle cx={x} cy={y} r="8"
-              fill={on ? `rgba(250,204,21,${0.3 + brightness * 0.7})` : '#1e293b'}
-              stroke="#475569" strokeWidth="1"
-              style={{ filter: on ? `drop-shadow(0 0 ${brightness * 12}px #facc15)` : 'none' }}
-            />
-            <text x={x} y={y + 22} textAnchor="middle" fill="#94a3b8" fontSize="7">D{pin}</text>
-          </g>
-        )
-      })}
+      {/* Push button kết nối pin 2 (click để toggle) */}
+      <g onClick={onPin2Toggle}>
+        {/* Wire từ board D2 xuống button */}
+        <line
+          x1={192 + (2 - 0) * 24 /* D2 ở bottom row */} y1={284}
+          x2={70} y2={400}
+          stroke={pins[2]?.value ? '#22c55e' : '#475569'} strokeWidth={1.5}
+          opacity={0.7}
+        />
+        <PushButton cx={70} cy={400} pressed={!!pins[2]?.value} label="BTN→D2" />
+      </g>
 
-      {/* Analog pins A0-A5 (bottom row) */}
-      <text x="190" y="245" textAnchor="middle" fill="#a78bfa" fontSize="9" fontWeight="bold">ANALOG IN</text>
-      {Array.from({ length: 6 }).map((_, i) => {
-        const realPin = 14 + i
-        const x = 80 + i * 36
-        const y = 270
-        const p = pins[realPin]
-        const v = p?.value || 0
-        const pct = v / 1023
-        return (
-          <g key={`a${i}`}>
-            <rect x={x - 14} y={y - 8} width={28} height={16} rx={3}
-              fill="#1e1b4b" stroke="#a78bfa" strokeWidth="1" />
-            <rect x={x - 14} y={y - 8} width={28 * pct} height={16}
-              fill="rgba(167,139,250,0.5)" />
-            <text x={x} y={y + 3} textAnchor="middle" fill="white" fontSize="8" fontWeight="bold">{v}</text>
-            <text x={x} y={y - 13} textAnchor="middle" fill="#c4b5fd" fontSize="7">A{i}</text>
-          </g>
-        )
-      })}
+      {/* Resistor mẫu trang trí gần LED row */}
+      <Resistor cx={460} cy={420} bands={['red', 'red', 'brown', 'gold']} label="220Ω" />
 
-      {/* Uptime + running indicator */}
-      <text x="40" y="325" fill="#10b981" fontSize="10" fontFamily="monospace">
+      {/* Potentiometer kết nối A0 */}
+      <g>
+        <line x1={185} y1={279 /* A0 pin */} x2={500} y2={120} stroke="#a78bfa" strokeWidth={1.5} opacity={0.6} />
+        <Potentiometer cx={500} cy={120} value={potValue / 1023} label="POT→A0" />
+      </g>
+
+      {/* Status bar bottom */}
+      <text x={40} y={448} fill="#10b981" fontSize="11" fontFamily="monospace">
         ⏱ {snapshot ? (snapshot.uptimeMs / 1000).toFixed(1) : '0.0'}s
       </text>
       {snapshot?.running && (
-        <text x="340" y="325" textAnchor="end" fill="#10b981" fontSize="10" fontFamily="monospace">
-          ● RUNNING
+        <g>
+          <circle cx={490} cy={444} r={4} fill="#10b981">
+            <animate attributeName="opacity" values="1;0.3;1" dur="1s" repeatCount="indefinite" />
+          </circle>
+          <text x={500} y={448} fill="#10b981" fontSize="11" fontFamily="monospace" fontWeight="bold">RUNNING</text>
+        </g>
+      )}
+      {!snapshot && (
+        <text x={490} y={448} textAnchor="end" fill="#64748b" fontSize="10" fontFamily="monospace">
+          Bấm ▶ Chạy để khởi động
         </text>
       )}
     </svg>
