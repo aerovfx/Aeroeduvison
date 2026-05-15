@@ -246,6 +246,766 @@ Viết thêm tại đây.
 \\end{document}
 `,
   },
+
+  // ═══════════════════════════════════════════════════════════════
+  // 10 MẪU THÔNG DỤNG MỚI (5/2026) — bổ sung cho GV soạn nhanh
+  // ═══════════════════════════════════════════════════════════════
+
+  {
+    id: "de-toan-thpt",
+    name: "📐 Đề thi Toán THPT — TT22/2021",
+    description: "4 phần chuẩn BGD&ĐT cho Toán: TN nhiều lựa chọn + Đúng/Sai + Trả lời ngắn + Tự luận",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{6pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\begin{minipage}[t]{0.45\\textwidth}
+    \\centering
+    \\textbf{SỞ GD\\&ĐT ...} \\\\
+    \\textbf{TRƯỜNG THPT ...} \\\\
+    \\rule{5cm}{0.4pt}
+  \\end{minipage}%
+  \\begin{minipage}[t]{0.54\\textwidth}
+    \\centering
+    \\textbf{ĐỀ KIỂM TRA HỌC KỲ I} \\\\
+    \\textbf{NĂM HỌC 2025 -- 2026} \\\\
+    \\textbf{MÔN: TOÁN LỚP 11} \\\\
+    \\textit{Thời gian làm bài: 90 phút}
+  \\end{minipage}
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section*{PHẦN I (3,0 điểm). Trắc nghiệm nhiều phương án lựa chọn}
+\\textit{Học sinh trả lời từ câu 1 đến câu 12.}
+
+\\textbf{Câu 1.} Cho hàm số $f(x) = x^2 - 4x + 3$. Giá trị nhỏ nhất của $f$ trên $\\mathbb{R}$ là:
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=2cm]
+  \\item $-1$    \\item $0$    \\item $1$    \\item $3$
+\\end{enumerate}
+
+\\textbf{Câu 2.} Tập nghiệm của phương trình $\\sin x = \\dfrac{1}{2}$ trên $[0, 2\\pi]$ là:
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=2cm]
+  \\item $\\left\\{\\dfrac{\\pi}{6}\\right\\}$
+  \\item $\\left\\{\\dfrac{\\pi}{6}, \\dfrac{5\\pi}{6}\\right\\}$
+  \\item $\\left\\{\\dfrac{\\pi}{3}, \\dfrac{2\\pi}{3}\\right\\}$
+  \\item $\\left\\{\\dfrac{\\pi}{4}\\right\\}$
+\\end{enumerate}
+
+\\section*{PHẦN II (2,0 điểm). Trắc nghiệm Đúng/Sai}
+\\textit{Mỗi câu có 4 ý a, b, c, d. Chọn Đúng hoặc Sai cho từng ý.}
+
+\\textbf{Câu 1.} Cho parabol $(P): y = x^2 - 2x - 3$.
+\\begin{enumerate}[label=\\textbf{\\alph*)}, itemsep=2pt, leftmargin=1cm]
+  \\item Đỉnh của $(P)$ có toạ độ $(1, -4)$.
+  \\item Trục đối xứng của $(P)$ là $x = 1$.
+  \\item $(P)$ cắt trục hoành tại 2 điểm có hoành độ $-1$ và $3$.
+  \\item $(P)$ đi qua $M(2, -3)$.
+\\end{enumerate}
+
+\\section*{PHẦN III (2,0 điểm). Trả lời ngắn}
+
+\\textbf{Câu 1.} Tổng các nghiệm của $x^2 - 5x + 6 = 0$ bằng \\underline{\\hspace{2cm}}.
+
+\\textbf{Câu 2.} Giá trị $\\lim_{x \\to 2} \\dfrac{x^2 - 4}{x - 2}$ bằng \\underline{\\hspace{2cm}}.
+
+\\section*{PHẦN IV (3,0 điểm). Tự luận}
+
+\\textbf{Bài 1.} (1,5 điểm) Giải phương trình $x^2 - 5x + 6 = 0$.
+
+\\textbf{Bài 2.} (1,5 điểm) Tính diện tích tam giác $ABC$ biết $AB = 5$, $AC = 8$, $\\widehat{BAC} = 60^\\circ$.
+
+\\rule{\\textwidth}{0.4pt}
+\\begin{center} \\textit{--- HẾT ---} \\end{center}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "de-hoa-thpt",
+    name: "🧪 Đề thi Hoá học THPT",
+    description: "Đề Hoá có công thức phân tử, phản ứng (mhchem), bảng tuần hoàn",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage[version=4]{mhchem}   % Cho công thức hoá học
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{6pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large ĐỀ KIỂM TRA HOÁ HỌC LỚP 12} \\\\
+  \\textit{Thời gian: 50 phút — Năm học 2025-2026}
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section*{PHẦN TRẮC NGHIỆM}
+
+\\textbf{Câu 1.} Công thức phân tử của axit sunfuric là:
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=2cm]
+  \\item \\ce{H2SO3}
+  \\item \\ce{H2SO4}
+  \\item \\ce{HCl}
+  \\item \\ce{HNO3}
+\\end{enumerate}
+
+\\textbf{Câu 2.} Cho phản ứng: \\ce{Fe + H2SO4 -> FeSO4 + H2 ^}.
+Khi cho 5,6 g \\ce{Fe} tác dụng với dung dịch \\ce{H2SO4} loãng dư, thể tích khí
+\\ce{H2} (đktc) thu được là:
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=2cm]
+  \\item 1,12 L
+  \\item 2,24 L
+  \\item 3,36 L
+  \\item 4,48 L
+\\end{enumerate}
+
+\\section*{PHẦN TỰ LUẬN}
+
+\\textbf{Bài 1.} Cân bằng phương trình hoá học sau:
+\\begin{enumerate}[label=\\alph*),itemsep=4pt]
+  \\item \\ce{KMnO4 + HCl -> KCl + MnCl2 + Cl2 + H2O}
+  \\item \\ce{Cu + HNO3 -> Cu(NO3)2 + NO2 + H2O}
+  \\item \\ce{Al + H2SO4 -> Al2(SO4)3 + SO2 + H2O}
+\\end{enumerate}
+
+\\textbf{Bài 2.} Hoà tan hoàn toàn 8 g hỗn hợp gồm \\ce{Mg} và \\ce{MgO} vào dung
+dịch \\ce{HCl} dư thu được 2,24 L khí (đktc). Tính \\% khối lượng mỗi chất trong
+hỗn hợp ban đầu.
+
+\\rule{\\textwidth}{0.4pt}
+\\begin{center} \\textit{--- HẾT ---} \\end{center}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "bai-giang-co-ban",
+    name: "📖 Bài giảng cơ bản (lý thuyết + ví dụ)",
+    description: "Khung bài giảng: Mục tiêu, Lý thuyết, Ví dụ minh hoạ, Bài tập về nhà",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{xcolor}
+\\usepackage[most]{tcolorbox}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{6pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large BÀI GIẢNG: PHƯƠNG TRÌNH BẬC HAI MỘT ẨN} \\\\
+  \\textit{Lớp 9 — Tiết 5}
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section*{🎯 Mục tiêu bài học}
+\\begin{itemize}
+  \\item Hiểu định nghĩa phương trình bậc hai một ẩn.
+  \\item Áp dụng được công thức nghiệm để giải phương trình.
+  \\item Giải được các bài toán thực tế liên quan.
+\\end{itemize}
+
+\\section*{📚 1. Lý thuyết}
+
+\\textbf{Định nghĩa:} Phương trình bậc hai một ẩn là phương trình có dạng:
+\\[ ax^2 + bx + c = 0 \\quad (a \\neq 0) \\]
+
+\\textbf{Công thức nghiệm:}
+\\begin{itemize}
+  \\item Tính \\textbf{biệt thức:} $\\Delta = b^2 - 4ac$
+  \\item Nếu $\\Delta > 0$: phương trình có 2 nghiệm phân biệt
+  \\[ x_{1,2} = \\frac{-b \\pm \\sqrt{\\Delta}}{2a} \\]
+  \\item Nếu $\\Delta = 0$: phương trình có nghiệm kép $x = -\\dfrac{b}{2a}$
+  \\item Nếu $\\Delta < 0$: phương trình vô nghiệm.
+\\end{itemize}
+
+\\section*{✏️ 2. Ví dụ minh hoạ}
+
+\\begin{tcolorbox}[colback=blue!5,colframe=blue!50,title=Ví dụ 1]
+Giải phương trình $x^2 - 5x + 6 = 0$.
+
+\\textbf{Lời giải.} Ta có $a=1, b=-5, c=6$.
+\\[ \\Delta = (-5)^2 - 4 \\cdot 1 \\cdot 6 = 25 - 24 = 1 > 0 \\]
+Phương trình có 2 nghiệm phân biệt:
+\\[ x_1 = \\frac{5+1}{2} = 3, \\quad x_2 = \\frac{5-1}{2} = 2 \\]
+Vậy $S = \\{2, 3\\}$.
+\\end{tcolorbox}
+
+\\begin{tcolorbox}[colback=green!5,colframe=green!50,title=Ví dụ 2]
+Giải phương trình $4x^2 - 12x + 9 = 0$.
+
+\\textbf{Lời giải.} $\\Delta = 144 - 144 = 0$ → nghiệm kép $x = \\dfrac{12}{8} = \\dfrac{3}{2}$.
+\\end{tcolorbox}
+
+\\section*{📝 3. Bài tập về nhà}
+
+\\begin{enumerate}[label=\\textbf{Bài \\arabic*.}]
+  \\item Giải các phương trình:
+    \\begin{enumerate}[label=\\alph*),itemsep=2pt]
+      \\item $x^2 - 7x + 10 = 0$
+      \\item $2x^2 + 3x - 2 = 0$
+      \\item $x^2 - 4x + 4 = 0$
+    \\end{enumerate}
+  \\item Tìm $m$ để phương trình $x^2 - 2(m+1)x + m^2 - 1 = 0$ có nghiệm kép.
+\\end{enumerate}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "bai-tap-tu-luyen",
+    name: "🎯 Phiếu bài tập tự luyện",
+    description: "Phiếu bài tập đơn giản: 1 cột câu hỏi, có chỗ trống điền đáp án",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{8pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large PHIẾU BÀI TẬP TỰ LUYỆN — TUẦN 1} \\\\
+  \\textit{Môn: Toán 9 — GVCN: ...}
+\\end{center}
+
+\\vspace{6pt}
+\\textbf{Họ và tên:} \\underline{\\hspace{6cm}} \\hfill \\textbf{Lớp:} \\underline{\\hspace{2cm}}
+
+\\rule{\\textwidth}{0.4pt}
+
+\\begin{enumerate}[label=\\textbf{Bài \\arabic*.}, leftmargin=1.2cm]
+
+\\item Tính giá trị các biểu thức sau:
+\\begin{enumerate}[label=\\alph*),itemsep=2pt]
+  \\item $A = \\sqrt{16} + \\sqrt{25}$
+  \\item $B = \\sqrt{36} \\cdot \\sqrt{49}$
+  \\item $C = \\sqrt{(-3)^2} - \\sqrt{(-5)^2}$
+\\end{enumerate}
+
+\\textbf{Đáp số:} \\underline{\\hspace{12cm}}
+
+\\vspace{4pt}
+
+\\item Giải phương trình $3x - 7 = 2x + 5$.
+
+\\textbf{Đáp số:} $x = $ \\underline{\\hspace{4cm}}
+
+\\vspace{4pt}
+
+\\item So sánh $\\sqrt{17}$ và $4$.
+
+\\textbf{Trả lời:} \\underline{\\hspace{12cm}}
+
+\\vspace{4pt}
+
+\\item Cho hàm số $y = 2x + 1$. Tính:
+\\begin{enumerate}[label=\\alph*),itemsep=2pt]
+  \\item $y$ khi $x = 3$: \\underline{\\hspace{4cm}}
+  \\item $x$ khi $y = 7$: \\underline{\\hspace{4cm}}
+\\end{enumerate}
+
+\\item Một hình chữ nhật có chu vi $80$ cm và chiều dài hơn chiều rộng $10$ cm.
+Tính diện tích hình chữ nhật.
+
+\\textbf{Đáp số:} \\underline{\\hspace{6cm}} cm$^2$
+
+\\end{enumerate}
+
+\\vspace{12pt}
+\\rule{\\textwidth}{0.4pt}
+\\textit{Học sinh nộp bài vào đầu tiết tuần sau. Chúc các em làm bài tốt!}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "bao-cao-thinh-giang",
+    name: "📋 Báo cáo thực hành / thí nghiệm",
+    description: "Mẫu báo cáo thí nghiệm có mục đích, dụng cụ, tiến trình, kết quả, kết luận",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{graphicx}
+\\usepackage{array}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{6pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large BÁO CÁO THỰC HÀNH SỐ 1} \\\\
+  \\textbf{ĐO GIA TỐC RƠI TỰ DO}
+\\end{center}
+
+\\begin{tabular}{|p{4cm}|p{10cm}|}
+  \\hline
+  \\textbf{Họ và tên} & ... \\\\
+  \\hline
+  \\textbf{Lớp} & ... \\\\
+  \\hline
+  \\textbf{Nhóm} & ... \\\\
+  \\hline
+  \\textbf{Ngày làm} & .../.../2026 \\\\
+  \\hline
+\\end{tabular}
+
+\\section*{I. Mục đích}
+Đo gia tốc rơi tự do $g$ tại nơi làm thí nghiệm bằng phương pháp đo
+thời gian rơi và quãng đường rơi.
+
+\\section*{II. Dụng cụ}
+\\begin{enumerate}[label=\\arabic*.,itemsep=2pt]
+  \\item Bộ thí nghiệm rơi tự do (cần nam châm điện + sensor).
+  \\item Vật rơi (viên bi sắt).
+  \\item Thước dây 1\\,m, đồng hồ bấm giây điện tử.
+  \\item Giá đỡ.
+\\end{enumerate}
+
+\\section*{III. Tiến trình}
+\\begin{enumerate}[label=\\textbf{Bước \\arabic*.},itemsep=4pt]
+  \\item Lắp ráp dụng cụ theo sơ đồ.
+  \\item Đặt quãng đường rơi $s = 1\\,$m, đo thời gian rơi $t$.
+  \\item Lặp lại 5 lần, ghi vào bảng.
+\\end{enumerate}
+
+\\section*{IV. Kết quả}
+\\begin{center}
+\\begin{tabular}{|c|c|c|c|}
+  \\hline
+  Lần đo & $s$ (m) & $t$ (s) & $g = 2s/t^2$ (m/s$^2$) \\\\
+  \\hline
+  1 & 1.000 & 0.451 & 9.83 \\\\
+  2 & 1.000 & 0.452 & 9.79 \\\\
+  3 & 1.000 & 0.450 & 9.88 \\\\
+  4 & 1.000 & 0.453 & 9.74 \\\\
+  5 & 1.000 & 0.451 & 9.83 \\\\
+  \\hline
+  \\textbf{TB} & & & \\textbf{9.81} \\\\
+  \\hline
+\\end{tabular}
+\\end{center}
+
+\\section*{V. Tính sai số}
+\\[ \\bar{g} = \\frac{1}{5}\\sum_{i=1}^{5} g_i = 9.81 \\text{ m/s}^2 \\]
+\\[ \\Delta g = \\sqrt{\\frac{\\sum(g_i - \\bar{g})^2}{n(n-1)}} \\approx 0.025 \\text{ m/s}^2 \\]
+
+\\section*{VI. Kết luận}
+Gia tốc rơi tự do đo được: $g = (9.81 \\pm 0.03)$ m/s$^2$.
+
+So với giá trị tham chiếu $g = 9.80665$ m/s$^2$, sai số tương đối khoảng
+$0.05\\%$ — kết quả rất chính xác.
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "thu-moi-phu-huynh",
+    name: "✉️ Thư mời phụ huynh / Thông báo",
+    description: "Mẫu thư mời họp phụ huynh chuẩn — có tiêu đề, nội dung, lịch họp, ký tên",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\geometry{top=2cm,bottom=2cm,left=2.5cm,right=2cm}
+\\setlength{\\parindent}{1cm}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{TRƯỜNG ...} \\\\
+  \\textbf{Số: 001/TB-NHT} \\\\
+  \\rule{4cm}{0.4pt}
+
+  \\vspace{2pt}
+  \\textbf{CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM} \\\\
+  \\textbf{Độc lập -- Tự do -- Hạnh phúc} \\\\
+  \\rule{6cm}{0.4pt}
+\\end{center}
+
+\\vspace{8pt}
+\\hfill \\textit{TP. Hồ Chí Minh, ngày 15 tháng 5 năm 2026}
+
+\\vspace{18pt}
+\\begin{center}
+  \\textbf{\\Large THƯ MỜI HỌP PHỤ HUYNH HỌC SINH}
+\\end{center}
+
+\\vspace{6pt}
+\\textit{Kính gửi:} Quý phụ huynh học sinh lớp \\textbf{11A2}.
+
+Nhằm thông báo về tình hình học tập, rèn luyện và kết quả kiểm tra giữa
+học kỳ II năm học 2025-2026 của các em, đồng thời trao đổi các vấn đề
+cần phối hợp giữa nhà trường và gia đình, Ban Giám hiệu nhà trường trân
+trọng kính mời Quý phụ huynh đến tham dự buổi họp:
+
+\\vspace{4pt}
+\\begin{itemize}
+  \\item \\textbf{Thời gian:} 7h30 -- 11h00, Chủ Nhật ngày 25/05/2026
+  \\item \\textbf{Địa điểm:} Phòng 11A2, Tòa nhà A, Trường ...
+  \\item \\textbf{Nội dung:} Tổng kết học kỳ II + kế hoạch hè 2026
+\\end{itemize}
+
+Sự có mặt của Quý phụ huynh là sự động viên to lớn cho thầy cô và các em
+học sinh. Rất mong Quý phụ huynh sắp xếp công việc để tham dự đầy đủ.
+
+Trân trọng cảm ơn!
+
+\\vspace{20pt}
+\\hfill \\begin{minipage}{6cm}
+  \\centering
+  \\textbf{T/M BAN GIÁM HIỆU} \\\\
+  \\textbf{HIỆU TRƯỞNG}
+
+  \\vspace{36pt}
+  \\textbf{Nguyễn Văn A}
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "danh-sach-lop",
+    name: "👥 Danh sách lớp / Bảng điểm",
+    description: "Mẫu bảng danh sách HS có STT, họ tên, ngày sinh, điểm các môn",
+    body: `\\documentclass[12pt,a4paper,landscape]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\usepackage{array}
+\\usepackage{xcolor}
+\\usepackage{colortbl}
+\\geometry{top=1.5cm,bottom=1.5cm,left=1.5cm,right=1.5cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\definecolor{headblue}{HTML}{2563EB}
+\\definecolor{stripe}{HTML}{F1F5F9}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large DANH SÁCH LỚP 11A2 — HỌC KỲ II 2025-2026} \\\\
+  \\textit{Trường THPT ... — GVCN: ...}
+\\end{center}
+
+\\vspace{8pt}
+
+\\begin{center}
+\\renewcommand{\\arraystretch}{1.3}
+\\begin{tabular}{|>{\\centering\\arraybackslash}m{1cm}|m{4cm}|c|c|c|c|c|c|c|}
+  \\hline
+  \\rowcolor{headblue}
+  \\textcolor{white}{\\textbf{STT}} &
+  \\textcolor{white}{\\textbf{Họ và tên}} &
+  \\textcolor{white}{\\textbf{Ngày sinh}} &
+  \\textcolor{white}{\\textbf{Toán}} &
+  \\textcolor{white}{\\textbf{Lý}} &
+  \\textcolor{white}{\\textbf{Hoá}} &
+  \\textcolor{white}{\\textbf{Văn}} &
+  \\textcolor{white}{\\textbf{TB}} &
+  \\textcolor{white}{\\textbf{Hạnh kiểm}} \\\\
+  \\hline
+  1 & Nguyễn Minh Anh   & 12/03/2008 & 9.0 & 8.5 & 8.0 & 8.5 & \\textbf{8.5} & Tốt \\\\ \\hline
+  \\rowcolor{stripe}
+  2 & Trần Đức Bảo      & 25/06/2008 & 7.5 & 7.0 & 8.5 & 7.0 & \\textbf{7.5} & Khá \\\\ \\hline
+  3 & Lê Thị Cẩm        & 10/11/2008 & 8.0 & 9.0 & 8.5 & 9.0 & \\textbf{8.6} & Tốt \\\\ \\hline
+  \\rowcolor{stripe}
+  4 & Phạm Hoàng Dũng   & 03/02/2008 & 6.5 & 6.0 & 7.0 & 7.5 & \\textbf{6.8} & Khá \\\\ \\hline
+  5 & Hoàng Thúy Duyên  & 18/09/2008 & 9.5 & 9.0 & 9.5 & 8.5 & \\textbf{9.1} & Tốt \\\\ \\hline
+  % --- Thêm dòng tại đây ---
+\\end{tabular}
+\\end{center}
+
+\\vspace{12pt}
+\\hfill \\begin{minipage}{6cm}
+  \\centering
+  \\textit{Ngày ... tháng ... năm 2026} \\\\
+  \\textbf{GIÁO VIÊN CHỦ NHIỆM}
+
+  \\vspace{36pt}
+  \\textbf{...}
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "thoi-khoa-bieu",
+    name: "📅 Thời khoá biểu lớp",
+    description: "Bảng thời khoá biểu 6 tiết × 6 ngày (T2-T7), có màu phân biệt môn học",
+    body: `\\documentclass[12pt,a4paper,landscape]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\usepackage{array}
+\\usepackage{xcolor}
+\\usepackage{colortbl}
+\\geometry{top=1.5cm,bottom=1.5cm,left=1cm,right=1cm}
+\\setlength{\\parindent}{0pt}
+
+\\definecolor{toan}{HTML}{DBEAFE}
+\\definecolor{ly}{HTML}{FEE2E2}
+\\definecolor{hoa}{HTML}{D1FAE5}
+\\definecolor{van}{HTML}{FEF3C7}
+\\definecolor{anh}{HTML}{E0E7FF}
+\\definecolor{su}{HTML}{F3E8FF}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large THỜI KHOÁ BIỂU LỚP 11A2} \\\\
+  \\textit{Học kỳ II — Năm học 2025-2026 (áp dụng từ 04/03/2026)}
+\\end{center}
+
+\\vspace{8pt}
+\\renewcommand{\\arraystretch}{2.2}
+
+\\begin{center}
+\\begin{tabular}{|c|c|c|c|c|c|c|}
+  \\hline
+  \\textbf{Tiết} & \\textbf{Thứ 2} & \\textbf{Thứ 3} & \\textbf{Thứ 4} &
+  \\textbf{Thứ 5} & \\textbf{Thứ 6} & \\textbf{Thứ 7} \\\\
+  \\hline
+
+  \\textbf{1} \\newline 7h00-7h45 &
+  \\cellcolor{toan}Toán &
+  \\cellcolor{ly}Vật lý &
+  \\cellcolor{hoa}Hoá học &
+  \\cellcolor{van}Ngữ văn &
+  \\cellcolor{anh}Tiếng Anh &
+  \\cellcolor{su}Lịch sử \\\\
+  \\hline
+
+  \\textbf{2} \\newline 7h50-8h35 &
+  \\cellcolor{toan}Toán &
+  \\cellcolor{ly}Vật lý &
+  \\cellcolor{hoa}Hoá học &
+  \\cellcolor{van}Ngữ văn &
+  \\cellcolor{anh}Tiếng Anh &
+  \\cellcolor{su}Lịch sử \\\\
+  \\hline
+
+  \\textbf{3} \\newline 8h45-9h30 &
+  Tin học & GDCD & Sinh học & Toán & Vật lý & Hoá học \\\\
+  \\hline
+
+  \\textbf{4} \\newline 9h35-10h20 &
+  Tin học & GDCD & Sinh học & Toán & Vật lý & Hoá học \\\\
+  \\hline
+
+  \\textbf{5} \\newline 10h30-11h15 &
+  Thể dục & Địa lý & Tiếng Anh & Sinh hoạt & Công nghệ & --- \\\\
+  \\hline
+
+  \\textbf{6} \\newline 11h20-12h05 &
+  Thể dục & Địa lý & Tiếng Anh & Sinh hoạt & Công nghệ & --- \\\\
+  \\hline
+\\end{tabular}
+\\end{center}
+
+\\vspace{8pt}
+\\textit{Ghi chú: Học sinh có mặt trước 6h55. Vệ sinh trực nhật theo phân công của lớp trưởng.}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "de-trac-nghiem-100-cau",
+    name: "🔢 Đề trắc nghiệm 100% (50 câu)",
+    description: "Đề thi 50 câu trắc nghiệm 4 lựa chọn, dùng multicols cho 2 cột tiết kiệm giấy",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{multicol}
+\\geometry{top=1.5cm,bottom=1.5cm,left=1.5cm,right=1.5cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+
+\\setlist[enumerate]{itemsep=0pt, parsep=2pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large ĐỀ KIỂM TRA TRẮC NGHIỆM} \\\\
+  \\textbf{50 CÂU — 60 PHÚT — MÔN TIẾNG ANH 12} \\\\
+  \\textit{Mã đề: 123}
+\\end{center}
+
+\\textbf{Họ và tên:} \\dotfill \\hspace{6pt} \\textbf{SBD:} \\dotfill
+\\hrule
+\\vspace{6pt}
+
+\\begin{multicols}{2}
+\\begin{enumerate}[label=\\textbf{Câu \\arabic*.}, leftmargin=1.2cm]
+
+\\item Choose the word whose underlined part is pronounced differently:
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=1cm]
+  \\item w\\underline{a}lk
+  \\item t\\underline{a}lk
+  \\item h\\underline{a}ll
+  \\item b\\underline{a}ck
+\\end{enumerate}
+
+\\item Choose the best answer:
+"\\,If I \\underline{\\hspace{1.5cm}} you, I would study harder."
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=1cm]
+  \\item am   \\item was   \\item were   \\item be
+\\end{enumerate}
+
+\\item She \\underline{\\hspace{1.5cm}} English for 5 years.
+\\begin{enumerate}[label=\\textbf{\\Alph*.}, itemsep=0pt, leftmargin=1cm]
+  \\item learns
+  \\item is learning
+  \\item has learned
+  \\item learned
+\\end{enumerate}
+
+% ... Thêm các câu khác từ Câu 4 đến Câu 50 ở đây ...
+
+\\end{enumerate}
+\\end{multicols}
+
+\\vspace{8pt}
+\\hrule
+\\begin{center} \\textit{--- HẾT ---} \\end{center}
+
+\\end{document}
+`,
+  },
+
+  {
+    id: "ke-hoach-bai-day",
+    name: "📋 Kế hoạch bài dạy (Giáo án)",
+    description: "Mẫu giáo án chuẩn BGD&ĐT: thông tin tiết học, mục tiêu, hoạt động dạy-học, đánh giá",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\usepackage{array}
+\\usepackage{enumitem}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large KẾ HOẠCH BÀI DẠY} \\\\
+  \\textbf{(Giáo án)}
+\\end{center}
+
+\\vspace{4pt}
+\\begin{tabular}{|p{4cm}|p{11cm}|}
+  \\hline
+  \\textbf{Tên bài}       & Phương trình bậc hai một ẩn \\\\
+  \\hline
+  \\textbf{Môn / Lớp}     & Toán / Lớp 9 \\\\
+  \\hline
+  \\textbf{Tiết PPCT}     & 51 -- 52 (2 tiết) \\\\
+  \\hline
+  \\textbf{Ngày dạy}      & 20/05/2026 \\\\
+  \\hline
+  \\textbf{Giáo viên}     & ... \\\\
+  \\hline
+\\end{tabular}
+
+\\section*{I. MỤC TIÊU BÀI HỌC}
+
+\\textbf{1. Kiến thức:}
+\\begin{itemize}
+  \\item Hiểu được định nghĩa phương trình bậc hai một ẩn.
+  \\item Nắm được công thức nghiệm và cách giải.
+\\end{itemize}
+
+\\textbf{2. Kỹ năng:}
+\\begin{itemize}
+  \\item Giải được phương trình bậc hai bằng công thức nghiệm.
+  \\item Áp dụng vào bài toán thực tế.
+\\end{itemize}
+
+\\textbf{3. Thái độ:}
+\\begin{itemize}
+  \\item Cẩn thận trong tính toán, hợp tác trong nhóm.
+\\end{itemize}
+
+\\textbf{4. Năng lực hình thành:}
+\\begin{itemize}
+  \\item Tư duy logic, tính toán, giải quyết vấn đề.
+\\end{itemize}
+
+\\section*{II. CHUẨN BỊ}
+\\textbf{Giáo viên:} SGK, máy chiếu, phiếu bài tập. \\\\
+\\textbf{Học sinh:} SGK, vở ghi, máy tính casio.
+
+\\section*{III. HOẠT ĐỘNG DẠY HỌC}
+
+\\begin{tabular}{|p{1cm}|p{4cm}|p{6cm}|p{4cm}|}
+  \\hline
+  \\textbf{TG} & \\textbf{Hoạt động GV} & \\textbf{Hoạt động HS} & \\textbf{Nội dung ghi bảng} \\\\
+  \\hline
+  5' & \\textit{Khởi động:} Đặt câu hỏi nhắc lại PT bậc 1 đã học &
+        Trả lời cá nhân & — \\\\
+  \\hline
+  20' & \\textit{Hình thành kiến thức:} Trình bày dạng tổng quát + công thức nghiệm &
+        Ghi chép, đặt câu hỏi & I. Định nghĩa \\newline II. Công thức nghiệm \\\\
+  \\hline
+  15' & \\textit{Luyện tập:} Yêu cầu HS giải VD 1, 2 trên bảng &
+        Lên bảng làm, các em khác làm vào vở & VD 1, VD 2 \\\\
+  \\hline
+  5'  & \\textit{Củng cố:} Yêu cầu HS phát biểu lại công thức &
+        Phát biểu cá nhân & — \\\\
+  \\hline
+\\end{tabular}
+
+\\section*{IV. ĐÁNH GIÁ}
+\\begin{itemize}
+  \\item HS làm được bài tập 1, 2 trang 45 SGK.
+  \\item HS phát biểu được công thức nghiệm và biệt thức $\\Delta$.
+\\end{itemize}
+
+\\section*{V. DẶN DÒ}
+Học bài + làm bài tập 3, 4, 5 trang 46 SGK. Đọc trước bài "Định lý Viète".
+
+\\end{document}
+`,
+  },
 ];
 
 export function getTemplateById(id: string): LatexTemplateOption | undefined {
