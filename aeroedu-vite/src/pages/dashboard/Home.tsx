@@ -12,7 +12,7 @@ import { LevelXPCard } from '@/components/common/LevelXPCard';
 import {
   Brain, Target, Lightbulb, MessageCircle, Trophy, Calendar, Activity,
   Rocket, X, ChevronRight, CheckCircle, Clock, Award, Star, Play, ArrowRight,
-  TrendingUp, Zap, Cpu, Heart, Sparkles,
+  TrendingUp, Zap, Cpu, Heart, Sparkles, Network,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -460,6 +460,78 @@ export default function DashboardPage() {
 
         {/* ── LAYER 1: Stats Cards ── */}
         <StatsSection />
+
+        {/* ── Khám phá tri thức — featured Knowledge Graph hero ── */}
+        <Link
+          to="/dashboard/knowledge-graph"
+          className="group block relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-600/15 via-blue-600/10 to-violet-600/10 p-6 hover:border-cyan-400/50 transition-all hover:scale-[1.005]"
+        >
+          {/* Background glow */}
+          <div className="absolute -top-20 -right-20 w-80 h-80 bg-cyan-500/15 blur-3xl rounded-full pointer-events-none" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-violet-500/10 blur-3xl rounded-full pointer-events-none" />
+
+          {/* Animated mini-graph SVG illustration */}
+          <svg
+            className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30 group-hover:opacity-50 transition-opacity pointer-events-none hidden md:block"
+            width="220" height="160" viewBox="0 0 220 160"
+          >
+            {/* Edges */}
+            <line x1="110" y1="80" x2="40"  y2="40"  stroke="rgba(34,211,238,0.6)" strokeWidth="1.5" />
+            <line x1="110" y1="80" x2="180" y2="40"  stroke="rgba(167,139,250,0.6)" strokeWidth="1.5" />
+            <line x1="110" y1="80" x2="40"  y2="130" stroke="rgba(251,146,60,0.6)" strokeWidth="1.5" />
+            <line x1="110" y1="80" x2="180" y2="130" stroke="rgba(52,211,153,0.6)" strokeWidth="1.5" />
+            <line x1="110" y1="80" x2="170" y2="80"  stroke="rgba(250,204,21,0.6)" strokeWidth="1.5" />
+            <line x1="110" y1="80" x2="60"  y2="80"  stroke="rgba(244,114,182,0.6)" strokeWidth="1.5" />
+            {/* Nodes */}
+            <circle cx="40"  cy="40"  r="10" fill="rgba(34,211,238,0.25)" stroke="#22d3ee" strokeWidth="1.5">
+              <animate attributeName="r" values="9;12;9" dur="3s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="180" cy="40"  r="10" fill="rgba(167,139,250,0.25)" stroke="#a78bfa" strokeWidth="1.5" />
+            <circle cx="40"  cy="130" r="10" fill="rgba(251,146,60,0.25)" stroke="#fb923c" strokeWidth="1.5" />
+            <circle cx="180" cy="130" r="10" fill="rgba(52,211,153,0.25)" stroke="#34d399" strokeWidth="1.5">
+              <animate attributeName="r" values="9;13;9" dur="2.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="170" cy="80"  r="8"  fill="rgba(250,204,21,0.25)" stroke="#facc15" strokeWidth="1.5" />
+            <circle cx="60"  cy="80"  r="8"  fill="rgba(244,114,182,0.25)" stroke="#f472b6" strokeWidth="1.5" />
+            {/* Center node — bigger, animated */}
+            <circle cx="110" cy="80" r="18" fill="rgba(34,211,238,0.4)" stroke="#22d3ee" strokeWidth="2.5">
+              <animate attributeName="r" values="16;22;16" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <text x="110" y="84" textAnchor="middle" fontSize="9" fill="#fff" fontWeight="bold" style={{ userSelect: 'none' }}>
+              Vật lí
+            </text>
+          </svg>
+
+          {/* Content */}
+          <div className="relative max-w-2xl">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/40">
+                <Network className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-bold text-white">Khám phá Đồ thị Tri thức</h3>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-bold uppercase tracking-wider">
+                  ✨ Mới
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-white/75 leading-relaxed mb-4">
+              Thay vì học từng bài tuyến tính, hãy gõ <strong className="text-cyan-300">"động lượng"</strong> hoặc{' '}
+              <strong className="text-cyan-300">"phương trình Newton"</strong> để thấy ngay mạng lưới <strong>khái niệm</strong>,
+              {' '}<strong>công thức</strong>, <strong>bài tập</strong> và <strong>nghề nghiệp</strong> liên quan.
+              AI tự động liên kết kiến thức — bạn chỉ cần khám phá.
+            </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <span className="inline-flex items-center gap-2 text-cyan-300 font-bold text-sm group-hover:gap-3 transition-all">
+                <Sparkles className="w-4 h-4" /> Bắt đầu khám phá
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+              <span className="text-xs text-white/40">
+                · 80+ nodes Vật lí 11 sẵn sàng · AI extract từ giáo án
+              </span>
+            </div>
+          </div>
+        </Link>
 
         {/* ── LAYER 2: Competencies & Emotions ── */}
         <CompetenciesSection onSkillClick={handleSkillClick} />
