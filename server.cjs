@@ -2025,6 +2025,7 @@ const _TEACHER_LOCAL_PREFIXES = [
   '/api/teacher/gradebook',      // line 10076 (TT58 gradebook GET+POST)
   '/api/teacher/news',           // line 10426 (news compose)
   '/api/teacher/analytics',      // teacher analytics aggregate (real student data)
+  '/api/teacher/roster',         // teacher full roster (ClassStudent + TSL approved)
 ];
 
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
@@ -5733,6 +5734,87 @@ if (USE_NODEJS_QUESTIONS) {
     } catch (err) {
       console.error('[teacher:analytics]', err.message);
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/roster ──
+  // Roster đầy đủ HS GV quản lý (UNION: ClassStudent ∪ TSL approved).
+  // Đây là source of truth cho mọi UI cần "danh sách HS của GV":
+  // AI Dashboard, Analytics, Notifications, Bulk message...
+  //
+  // Trả về: [{ id, name, email, avatar, classNames[], isLinked, userId? }]
+  // Dedupe theo email (LOWER). Ưu tiên data TSL (có User.id).
+  app.get('/api/teacher/roster', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+
+      // 1. Students từ ClassStudent (đã import qua xls)
+      const { rows: classStudents } = await pool.query(`
+        SELECT cs.id, cs.name, cs.email, cs."classId", tc.name AS "className"
+          FROM "ClassStudent" cs
+          JOIN "TeacherClass" tc ON tc.id = cs."classId"
+         WHERE tc."teacherId" = $1
+         ORDER BY cs.name ASC
+      `, [user.id]).catch(e => { console.warn('[roster:cs]', e.message); return { rows: [] }; });
+
+      // 2. Students linked qua TSL (có User account)
+      const { rows: linkedStudents } = await pool.query(`
+        SELECT u.id AS "userId", u.name, u.email, u.image AS avatar
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" u ON u.id = tsl."studentId"
+         WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+      `, [user.id]).catch(e => { console.warn('[roster:tsl]', e.message); return { rows: [] }; });
+
+      // Dedupe theo email lowercase
+      const map = {};   // emailLower → { id, name, email, avatar, classNames[], userId, isLinked }
+      for (const r of classStudents) {
+        const k = String(r.email || '').toLowerCase().trim();
+        if (!k) continue;
+        if (!map[k]) map[k] = {
+          id: r.id,                     // ClassStudent.id (fallback nếu chưa link)
+          name: r.name, email: r.email,
+          avatar: null,
+          classNames: [],
+          userId: null, isLinked: false,
+        };
+        if (r.className && !map[k].classNames.includes(r.className)) {
+          map[k].classNames.push(r.className);
+        }
+      }
+      for (const r of linkedStudents) {
+        const k = String(r.email || '').toLowerCase().trim();
+        if (!k) continue;
+        if (!map[k]) {
+          map[k] = {
+            id: r.userId, name: r.name, email: r.email,
+            avatar: r.avatar || null,
+            classNames: [],
+            userId: r.userId, isLinked: true,
+          };
+        } else {
+          map[k].id = r.userId;     // ưu tiên User.id để match với leaderboard
+          map[k].userId = r.userId;
+          map[k].isLinked = true;
+          map[k].avatar = r.avatar || map[k].avatar;
+          if (!map[k].name) map[k].name = r.name;
+        }
+      }
+
+      const students = Object.values(map);
+      res.json({
+        students,
+        count: students.length,
+        meta: {
+          fromClassStudent: classStudents.length,
+          fromTSL: linkedStudents.length,
+        },
+      });
+    } catch (err) {
+      console.error('[teacher:roster]', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
