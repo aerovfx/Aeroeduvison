@@ -9562,7 +9562,34 @@ if (!USE_NODEJS_QUESTIONS) {
         )`);
         await pool.query(`CREATE INDEX IF NOT EXISTS "ClassStudent_classId_idx"
           ON "ClassStudent"("classId")`);
-        console.log('[classes] ✅ tables ready');
+
+        // ── Lazy schema migration cho prod table cũ ──
+        // CREATE TABLE IF NOT EXISTS không update schema nếu table đã có sẵn
+        // (vd Prisma migration cũ tạo trước với schema khác). Dùng ALTER TABLE
+        // ADD COLUMN IF NOT EXISTS (PG ≥9.6) để bổ sung column thiếu.
+        // Bug user gặp: prod table không có "mssv" → 44/44 import skip với
+        // 'column "mssv" does not exist'. Fix: ensure tất cả 9 column tồn tại.
+        const cols = [
+          ['stt',         'INT'],
+          ['mssv',        'TEXT'],
+          ['name',        'TEXT'],
+          ['dob',         'TEXT'],
+          ['gender',      'TEXT'],
+          ['email',       'TEXT'],
+          ['phone',       'TEXT'],
+        ];
+        for (const [col, kind] of cols) {
+          try {
+            await pool.query(`ALTER TABLE "ClassStudent" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`);
+          } catch (e) {
+            console.warn(`[classes] migrate col ${col}:`, e.message.slice(0, 100));
+          }
+        }
+        // createdAt thường đã có nhưng đảm bảo (idempotent)
+        try {
+          await pool.query(`ALTER TABLE "ClassStudent" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT NOW()`);
+        } catch {}
+        console.log('[classes] ✅ tables ready (lazy migration ran)');
       })().catch(e => { console.error('[classes] ❌ ensureTables', e.message); _clsReady = null; });
       return _clsReady;
     }
