@@ -631,13 +631,17 @@ $0.05\\%$ — kết quả rất chính xác.
 
   {
     id: "thu-moi-phu-huynh",
-    name: "✉️ Thư mời phụ huynh / Thông báo",
-    description: "Mẫu thư mời họp phụ huynh chuẩn — có tiêu đề, nội dung, lịch họp, ký tên",
+    name: "✉️ Thư mời phụ huynh / Thông báo (NĐ 30)",
+    description: "Mẫu thư mời họp phụ huynh chuẩn — có tiêu đề, nội dung, lịch họp, ký tên. Định dạng theo Nghị định 30/2020/NĐ-CP (lề 2/2/3/2cm, giãn dòng 1.5, justify).",
     body: `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[vietnamese]{babel}
 \\usepackage{geometry}
-\\geometry{top=2cm,bottom=2cm,left=2.5cm,right=2cm}
+\\usepackage{setspace}
+% Định dạng theo Nghị định 30/2020/NĐ-CP — văn bản hành chính:
+% Lề: trên 2cm, dưới 2cm, trái 3cm, phải 2cm. Giãn dòng 1.5 lines.
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
 \\setlength{\\parindent}{1cm}
 \\setlength{\\parskip}{4pt}
 
@@ -912,17 +916,19 @@ Trân trọng cảm ơn!
 
   {
     id: "ke-hoach-bai-day",
-    name: "📋 Kế hoạch bài dạy (Giáo án)",
-    description: "Mẫu giáo án chuẩn BGD&ĐT: thông tin tiết học, mục tiêu, hoạt động dạy-học, đánh giá",
+    name: "📋 Kế hoạch bài dạy (Giáo án — NĐ 30)",
+    description: "Mẫu giáo án chuẩn BGD&ĐT: thông tin tiết học, mục tiêu, hoạt động dạy-học, đánh giá. Định dạng theo Nghị định 30/2020/NĐ-CP (lề 2/2/3/2cm, giãn dòng 1.5).",
     body: `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[vietnamese]{babel}
 \\usepackage{geometry}
 \\usepackage{array}
 \\usepackage{enumitem}
-\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+% Nghị định 30/2020/NĐ-CP — lề chuẩn văn bản hành chính:
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
 \\setlength{\\parindent}{0pt}
-\\setlength{\\parskip}{4pt}
+\\setlength{\\parskip}{6pt}
 
 \\begin{document}
 
@@ -1016,8 +1022,8 @@ Học bài + làm bài tập 3, 4, 5 trang 46 SGK. Đọc trước bài "Định
 LATEX_TEMPLATES.push(
   {
     id: "lesson-plan-cv2345-4tiet",
-    name: "📋 Giáo án CV2345 — Tiếng Việt 4 tiết (LaTeX)",
-    description: "Khung kế hoạch bài dạy chuẩn Công văn 2345/BGDĐT — Tiếng Việt 4 tiết. Bảng 2 cột GV/HS qua tabularx, section I/II/III roman, danh sách enumitem.",
+    name: "📋 Giáo án CV2345 — Tiếng Việt 4 tiết (LaTeX, NĐ 30)",
+    description: "Khung CV2345/BGDĐT — Tiếng Việt 4 tiết. Định dạng NĐ 30/2020/NĐ-CP: lề 2/2/3/2cm, giãn dòng 1.5, justify. Bảng 2 cột GV/HS qua tabularx.",
     body: `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[vietnamese]{babel}
@@ -1027,9 +1033,13 @@ LATEX_TEMPLATES.push(
 \\usepackage{tabularx}
 \\usepackage{array}
 \\usepackage{titlesec}
-\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+% Định dạng theo Nghị định 30/2020/NĐ-CP — văn bản hành chính:
+% Khổ A4, lề trên/dưới 2cm, lề trái 3cm, lề phải 2cm
+% Giãn dòng 1.5 lines, khoảng cách đoạn 6pt, canh đều 2 lề (justify mặc định)
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
 \\setlength{\\parindent}{0pt}
-\\setlength{\\parskip}{4pt}
+\\setlength{\\parskip}{6pt}
 \\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
 \\titleformat{\\subsection}{\\normalsize\\bfseries}{\\thesubsection.}{0.5em}{}
 \\renewcommand{\\thesection}{\\Roman{section}}
@@ -1141,8 +1151,8 @@ Viết chữ viết hoa ........; viết câu ứng dụng .....................
   },
   {
     id: "lesson-plan-cv2345-6tiet",
-    name: "📖 Giáo án CV2345 — Tiếng Việt 6 tiết (LaTeX)",
-    description: "Khung CV2345 mở rộng cho bài Tiếng Việt 6 tiết: Đọc + Viết + Luyện tập từ/câu + Đoạn văn + Đọc mở rộng.",
+    name: "📖 Giáo án CV2345 — Tiếng Việt 6 tiết (LaTeX, NĐ 30)",
+    description: "Khung CV2345 mở rộng cho bài Tiếng Việt 6 tiết: Đọc + Viết + Luyện tập từ/câu + Đoạn văn + Đọc mở rộng. Định dạng NĐ 30/2020/NĐ-CP.",
     body: `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[vietnamese]{babel}
@@ -1152,9 +1162,11 @@ Viết chữ viết hoa ........; viết câu ứng dụng .....................
 \\usepackage{tabularx}
 \\usepackage{array}
 \\usepackage{titlesec}
-\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+% Nghị định 30/2020/NĐ-CP: lề 2/2/3/2cm, giãn dòng 1.5, paragraph 6pt
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
 \\setlength{\\parindent}{0pt}
-\\setlength{\\parskip}{4pt}
+\\setlength{\\parskip}{6pt}
 \\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
 \\titleformat{\\subsection}{\\normalsize\\bfseries}{\\thesubsection.}{0.5em}{}
 \\renewcommand{\\thesection}{\\Roman{section}}
@@ -1294,8 +1306,8 @@ Viết chữ viết hoa ........; viết câu ứng dụng .....................
   },
   {
     id: "lesson-plan-5hoatdong",
-    name: "🎯 Giáo án Khung 5 hoạt động (LaTeX, mọi môn)",
-    description: "Khung 5 hoạt động chuẩn BGD&ĐT phù hợp Toán/Lý/Hoá/Sinh/Sử/Địa/Anh: Khởi động → Hình thành KT → Luyện tập → Vận dụng → Hướng dẫn về nhà. Mỗi hoạt động có a/b/c/d (Mục tiêu/Nội dung/Sản phẩm/Tổ chức).",
+    name: "🎯 Giáo án Khung 5 hoạt động (LaTeX, mọi môn — NĐ 30)",
+    description: "Khung 5 hoạt động chuẩn BGD&ĐT phù hợp Toán/Lý/Hoá/Sinh/Sử/Địa/Anh: Khởi động → Hình thành KT → Luyện tập → Vận dụng → Hướng dẫn về nhà. Định dạng theo Nghị định 30/2020/NĐ-CP.",
     body: `\\documentclass[12pt,a4paper]{article}
 \\usepackage[utf8]{inputenc}
 \\usepackage[vietnamese]{babel}
@@ -1306,9 +1318,13 @@ Viết chữ viết hoa ........; viết câu ứng dụng .....................
 \\usepackage{array}
 \\usepackage{titlesec}
 \\usepackage{xcolor}
-\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+% Nghị định 30/2020/NĐ-CP: lề chuẩn văn bản hành chính
+% Khổ A4 dọc, lề trên/dưới 2cm, trái 3cm, phải 2cm
+% Giãn dòng 1.5, khoảng cách đoạn 6pt, canh đều 2 lề
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
 \\setlength{\\parindent}{0pt}
-\\setlength{\\parskip}{4pt}
+\\setlength{\\parskip}{6pt}
 \\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
 \\renewcommand{\\thesection}{\\Roman{section}}
 

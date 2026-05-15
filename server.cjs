@@ -6641,15 +6641,58 @@ if (USE_NODEJS_QUESTIONS) {
           .normalize('NFD').replace(/[̀-ͯ]/g, '')
           .replace(/đ/gi, 'd').replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
         const objectKey = `lesson-plans/${user.id}/${safeTitle}-${Date.now()}.html`;
-        // Wrap content in standalone HTML
+        // Wrap content trong standalone HTML — định dạng theo Nghị định
+        // 30/2020/NĐ-CP cho văn bản hành chính:
+        //   • Khổ A4, lề trên/dưới 2cm, lề trái 3cm, lề phải 2cm
+        //   • Times New Roman 13pt (chuẩn), giãn dòng 1.5 lines
+        //   • Canh đều 2 lề (justify), khoảng cách đoạn ≥6pt
+        // @page rule cho khi user In ra (Ctrl+P) hoặc save as PDF
         const html = `<!DOCTYPE html>
 <html lang="vi"><head><meta charset="UTF-8"><title>${plan.title || 'Giáo án'}</title>
-<style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6;}
-h1,h2,h3{color:#1e293b;} table{border-collapse:collapse;width:100%;}
-table td,table th{border:1px solid #ccc;padding:8px;}</style>
-</head><body><h1>${plan.title || 'Giáo án'}</h1>
+<style>
+@page {
+  size: A4;
+  margin: 2cm 2cm 2cm 3cm;  /* trên phải dưới TRÁI — NĐ 30: trái 3cm */
+}
+html { background: #f5f5f5; }
+body {
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 13pt;
+  line-height: 1.5;
+  text-align: justify;
+  color: #111;
+  background: #fff;
+  margin: 0 auto;
+  /* Trên màn hình: simulate khổ A4 (210mm × 297mm) */
+  max-width: 21cm;
+  min-height: 29.7cm;
+  padding: 2cm 2cm 2cm 3cm;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-sizing: border-box;
+}
+@media print {
+  html, body { background: white; box-shadow: none; max-width: none; padding: 0; }
+}
+h1, h2, h3, h4 { color: #1a1a1a; line-height: 1.3; margin-top: 1em; margin-bottom: 0.5em; }
+h1 { font-size: 16pt; text-align: center; }
+h2 { font-size: 14pt; }
+h3 { font-size: 13pt; }
+p { margin: 0 0 6pt 0; }
+ul, ol { margin: 0 0 6pt 0; padding-left: 1.5cm; }
+li { margin-bottom: 4pt; }
+table { border-collapse: collapse; width: 100%; margin: 8pt 0; page-break-inside: avoid; }
+table td, table th { border: 1px solid #333; padding: 6pt 8pt; vertical-align: top; }
+table th { background: #f0f0f0; font-weight: 700; text-align: center; }
+hr { border: none; border-top: 1px solid #999; margin: 12pt 0; }
+.metadata { font-size: 10pt; color: #666; text-align: center; margin-top: 24pt; }
+</style>
+</head><body>
+<h1>${plan.title || 'Giáo án'}</h1>
 ${plan.content || '<p>(Trống)</p>'}
-<hr/><p><small>Sao lưu từ AeroEduVision lúc ${new Date().toLocaleString('vi-VN')}</small></p>
+<hr/>
+<p class="metadata">
+  Định dạng theo Nghị định 30/2020/NĐ-CP · Sao lưu từ AeroEduVision lúc ${new Date().toLocaleString('vi-VN')}
+</p>
 </body></html>`;
         const file = bucket.file(objectKey);
         await file.save(html, { contentType: 'text/html; charset=utf-8' });

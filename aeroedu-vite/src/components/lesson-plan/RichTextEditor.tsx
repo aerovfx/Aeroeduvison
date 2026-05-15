@@ -416,7 +416,18 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
         }}
       >
         <style>{`
-          .ProseMirror { outline: none; min-height: 400px; }
+          /* Định dạng theo Nghị định 30/2020/NĐ-CP — preview giống file PDF khi
+             user In hoặc Lưu vào Drive. Justify, line-height 1.5, paragraph 6pt */
+          .ProseMirror {
+            outline: none;
+            min-height: 400px;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 13pt;
+            line-height: 1.5;
+            text-align: justify;
+            color: #111827;
+          }
+          .ProseMirror p { margin: 0 0 6pt 0; }
           .ProseMirror p.is-editor-empty:first-child::before {
             content: attr(data-placeholder);
             float: left;
@@ -427,7 +438,7 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
           .ProseMirror h1 { font-size: 1.875rem; font-weight: 700; margin: 1.5rem 0 0.75rem; }
           .ProseMirror h2 { font-size: 1.5rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
           .ProseMirror h3 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; }
-          .ProseMirror p { margin: 0.5rem 0; }
+          /* paragraph margin được set ở trên — NĐ 30: 6pt giữa các đoạn */
           .ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem; margin: 0.5rem 0; }
           .ProseMirror blockquote {
             border-left: 4px solid #d1d5db;
