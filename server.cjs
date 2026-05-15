@@ -2024,6 +2024,7 @@ const _TEACHER_LOCAL_PREFIXES = [
   '/api/teacher/students',       // line 9513  (stubs)
   '/api/teacher/gradebook',      // line 10076 (TT58 gradebook GET+POST)
   '/api/teacher/news',           // line 10426 (news compose)
+  '/api/teacher/analytics',      // teacher analytics aggregate (real student data)
 ];
 
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
@@ -5522,6 +5523,215 @@ if (USE_NODEJS_QUESTIONS) {
       `, [user.id]);
       return res.json({ students: rows });
     } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/analytics?period=week|month|semester ──
+  // Aggregate analytics theo dữ liệu THẬT từ:
+  //   1. ClassStudent của TeacherClass mà GV quản lý (HS đã import)
+  //   2. TeacherStudentLink approved (HS chủ động kết nối với GV)
+  //   3. GradedSheet (điểm GV đã chấm, là source of truth cho score)
+  //
+  // Trả về cùng shape với FE TeacherAnalyticsPage:
+  //   { totalStudents, averageScore, completionRate, engagementScore,
+  //     topPerformingStudents, strugglingStudents, subjectPerformance,
+  //     weeklyProgress }
+  app.get('/api/teacher/analytics', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const period = String(req.query.period || 'month');
+      // Khoảng thời gian
+      const sinceDays = period === 'week' ? 7 : period === 'semester' ? 180 : 30;
+      const sinceISO = new Date(Date.now() - sinceDays * 86400_000).toISOString();
+
+      // ── 1. Tập students = ClassStudent (in classes của GV) ∪ TSL approved ──
+      // Dedupe theo email (case-insensitive), giữ ưu tiên data từ TSL (có User.id)
+      const { rows: classStudents } = await pool.query(`
+        SELECT cs.id AS "csId", cs.name, cs.email, cs."classId", tc.name AS "className"
+          FROM "ClassStudent" cs
+          JOIN "TeacherClass" tc ON tc.id = cs."classId"
+         WHERE tc."teacherId" = $1
+      `, [user.id]).catch(e => {
+        console.warn('[analytics:classStudents]', e.message);
+        return { rows: [] };
+      });
+      const { rows: linkedStudents } = await pool.query(`
+        SELECT u.id AS "userId", u.name, u.email
+          FROM "TeacherStudentLink" tsl
+          JOIN "User" u ON u.id = tsl."studentId"
+         WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+      `, [user.id]).catch(e => {
+        console.warn('[analytics:linkedStudents]', e.message);
+        return { rows: [] };
+      });
+      // Merge dedupe theo email
+      const studentMap = {};   // email_lower → { name, email, classNames: Set, userId? }
+      for (const r of classStudents) {
+        const k = String(r.email || '').toLowerCase().trim();
+        if (!k) continue;
+        if (!studentMap[k]) studentMap[k] = { name: r.name, email: r.email, classNames: new Set(), userId: null };
+        if (r.className) studentMap[k].classNames.add(r.className);
+      }
+      for (const r of linkedStudents) {
+        const k = String(r.email || '').toLowerCase().trim();
+        if (!k) continue;
+        if (!studentMap[k]) studentMap[k] = { name: r.name, email: r.email, classNames: new Set(), userId: r.userId };
+        else { studentMap[k].userId = r.userId; if (!studentMap[k].name) studentMap[k].name = r.name; }
+      }
+      const allStudents = Object.values(studentMap);
+
+      // ── 2. GradedSheet của GV trong period ──
+      const { rows: graded } = await pool.query(`
+        SELECT "studentName", "examCode", "className", score, "maxScore", "createdAt"
+          FROM "GradedSheet"
+         WHERE "teacherId" = $1 AND "createdAt" >= $2
+         ORDER BY "createdAt" ASC
+      `, [user.id, sinceISO]).catch(e => {
+        console.warn('[analytics:graded]', e.message);
+        return { rows: [] };
+      });
+
+      // ── 3. Per-student aggregates ──
+      // Index graded theo studentName lowercase (vì GradedSheet ko ref tới User.id,
+      // chỉ có studentName text từ OCR)
+      const perStudent = {};   // nameKey → { name, scores: [], normalizedScores: [], firstScore, lastScore }
+      for (const g of graded) {
+        const nameKey = String(g.studentName || '').toLowerCase().trim();
+        if (!nameKey) continue;
+        const norm = g.maxScore > 0 ? (Number(g.score) / Number(g.maxScore)) * 100 : Number(g.score);
+        if (!perStudent[nameKey]) perStudent[nameKey] = { name: g.studentName, normalizedScores: [], rawScores: [], examCodes: new Set() };
+        perStudent[nameKey].normalizedScores.push(norm);
+        perStudent[nameKey].rawScores.push({ score: Number(g.score), max: Number(g.maxScore) });
+        if (g.examCode) perStudent[nameKey].examCodes.add(g.examCode);
+      }
+      // Match perStudent với allStudents — fuzzy by name lowercase
+      const enrichedStudents = allStudents.map(s => {
+        const nameKey = String(s.name || '').toLowerCase().trim();
+        const ps = perStudent[nameKey];
+        const scores = ps?.normalizedScores || [];
+        const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+        const improvement = scores.length >= 2
+          ? Math.round(scores[scores.length - 1] - scores[0])
+          : 0;
+        return {
+          name: s.name,
+          email: s.email,
+          className: Array.from(s.classNames).join(', ') || null,
+          isLinked: !!s.userId,
+          averageScore: avg != null ? Math.round(avg * 10) / 10 : null,
+          examCount: scores.length,
+          improvement,
+        };
+      });
+
+      // ── 4. Top-level aggregates ──
+      const studentsWithScore = enrichedStudents.filter(s => s.averageScore != null);
+      const totalStudents = enrichedStudents.length;
+      const averageScore = studentsWithScore.length > 0
+        ? Math.round((studentsWithScore.reduce((a, s) => a + (s.averageScore || 0), 0) / studentsWithScore.length) * 10) / 10
+        : 0;
+      // completionRate: % students có ≥1 exam đã chấm trong period
+      const completionRate = totalStudents > 0
+        ? Math.round((studentsWithScore.length / totalStudents) * 1000) / 10
+        : 0;
+      // engagementScore: % students có ≥3 examCount (engaged) — rough metric
+      const engagedCount = enrichedStudents.filter(s => s.examCount >= 3).length;
+      const engagementScore = totalStudents > 0
+        ? Math.round((engagedCount / totalStudents) * 1000) / 10
+        : 0;
+
+      // ── 5. Top performing (top 3 by avg, ≥1 exam) ──
+      const topPerformingStudents = [...studentsWithScore]
+        .sort((a, b) => (b.averageScore || 0) - (a.averageScore || 0))
+        .slice(0, 3)
+        .map(s => ({ name: s.name, score: s.averageScore || 0, improvement: s.improvement }));
+
+      // ── 6. Struggling (avg < 50 hoặc 0 exam, top 5) ──
+      const strugglingStudents = [
+        ...studentsWithScore.filter(s => (s.averageScore || 0) < 50)
+          .sort((a, b) => (a.averageScore || 0) - (b.averageScore || 0)),
+        ...enrichedStudents.filter(s => s.examCount === 0),
+      ].slice(0, 5).map(s => ({
+        name: s.name,
+        score: s.averageScore == null ? 0 : Math.round(s.averageScore),
+        issues: s.examCount === 0
+          ? ['Chưa làm bài kiểm tra nào trong kỳ', 'Cần liên hệ phụ huynh']
+          : [`Điểm dưới 5/10 (${(s.averageScore || 0).toFixed(1)})`, 'Cần ôn tập thêm'],
+      }));
+
+      // ── 7. Subject performance (group GradedSheet by examCode) ──
+      const bySubject = {};
+      for (const g of graded) {
+        const code = g.examCode || 'Khác';
+        if (!bySubject[code]) bySubject[code] = { scores: [], dates: [] };
+        const norm = g.maxScore > 0 ? (Number(g.score) / Number(g.maxScore)) * 100 : Number(g.score);
+        bySubject[code].scores.push(norm);
+        bySubject[code].dates.push(new Date(g.createdAt).getTime());
+      }
+      const subjectPerformance = Object.entries(bySubject)
+        .map(([subject, data]) => {
+          const avg = data.scores.reduce((a, b) => a + b, 0) / data.scores.length;
+          // Trend: so sánh nửa đầu vs nửa sau period
+          const half = Math.floor(data.scores.length / 2);
+          let trend = 'stable';
+          if (data.scores.length >= 4) {
+            const firstHalfAvg = data.scores.slice(0, half).reduce((a, b) => a + b, 0) / half;
+            const secondHalfAvg = data.scores.slice(half).reduce((a, b) => a + b, 0) / (data.scores.length - half);
+            if (secondHalfAvg > firstHalfAvg + 3) trend = 'up';
+            else if (secondHalfAvg < firstHalfAvg - 3) trend = 'down';
+          }
+          return { subject, averageScore: Math.round(avg * 10) / 10, trend, examCount: data.scores.length };
+        })
+        .sort((a, b) => b.examCount - a.examCount)
+        .slice(0, 6);
+
+      // ── 8. Weekly progress (last 4 weeks of period) ──
+      const weeks = [];
+      const now = Date.now();
+      for (let w = 3; w >= 0; w--) {
+        const wStart = now - (w + 1) * 7 * 86400_000;
+        const wEnd = now - w * 7 * 86400_000;
+        const inWeek = graded.filter(g => {
+          const t = new Date(g.createdAt).getTime();
+          return t >= wStart && t < wEnd;
+        });
+        const scores = inWeek.map(g => g.maxScore > 0 ? (Number(g.score) / Number(g.maxScore)) * 100 : Number(g.score));
+        const avgWeek = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+        // completion = % students có exam trong tuần đó
+        const studentsInWeek = new Set(inWeek.map(g => String(g.studentName || '').toLowerCase()));
+        const completion = totalStudents > 0
+          ? Math.round((studentsInWeek.size / totalStudents) * 100)
+          : 0;
+        weeks.push({
+          week: `Tuần ${4 - w}`,
+          completion,
+          averageScore: Math.round(avgWeek * 10) / 10,
+        });
+      }
+
+      return res.json({
+        period,
+        meta: {
+          fromClassStudent: classStudents.length,
+          fromTeacherStudentLink: linkedStudents.length,
+          uniqueStudents: totalStudents,
+          gradedSheets: graded.length,
+        },
+        totalStudents,
+        averageScore,
+        completionRate,
+        engagementScore,
+        topPerformingStudents,
+        strugglingStudents,
+        subjectPerformance,
+        weeklyProgress: weeks,
+      });
+    } catch (err) {
+      console.error('[teacher:analytics]', err.message);
       return res.status(500).json({ error: err.message });
     }
   });

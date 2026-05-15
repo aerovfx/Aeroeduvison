@@ -11,19 +11,27 @@
 import { useState, useEffect } from 'react'
 import {
   BarChart3, TrendingUp, Users, Target, Award, Brain, Zap,
-  Download, ArrowUp, ArrowDown, Minus,
+  Download, ArrowUp, ArrowDown, Minus, Info,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import api from '@/services/api'
 
 // ── Types ──────────────────────────────────────────────────────
 interface AnalyticsData {
+  period: 'week' | 'month' | 'semester'
+  meta?: {
+    fromClassStudent: number
+    fromTeacherStudentLink: number
+    uniqueStudents: number
+    gradedSheets: number
+  }
   totalStudents: number
   averageScore: number
   completionRate: number
   engagementScore: number
   topPerformingStudents: Array<{ name: string; score: number; improvement: number }>
   strugglingStudents: Array<{ name: string; score: number; issues: string[] }>
-  subjectPerformance: Array<{ subject: string; averageScore: number; trend: 'up' | 'down' | 'stable' }>
+  subjectPerformance: Array<{ subject: string; averageScore: number; trend: 'up' | 'down' | 'stable'; examCount?: number }>
   weeklyProgress: Array<{ week: string; completion: number; averageScore: number }>
 }
 
@@ -37,64 +45,29 @@ export default function TeacherAnalyticsPage() {
     const load = async () => {
       setLoading(true)
       try {
-        let studentsData: any[] = []
-        try {
-          const res = await fetch('/api/teacher/students')
-          if (res.ok) {
-            const result = await res.json()
-            studentsData = result.students || []
-          }
-        } catch { /* use fallback */ }
-
-        const topPerformingStudents = studentsData.length > 0
-          ? studentsData
-              .sort((a, b) => b.averageScore - a.averageScore)
-              .slice(0, 3)
-              .map((s: any) => ({ name: s.name, score: s.averageScore, improvement: s.improvement || 0 }))
-          : [
-              { name: 'Nguyễn Văn A', score: 95, improvement: 12 },
-              { name: 'Trần Thị B',   score: 92, improvement: 8  },
-              { name: 'Lê Văn C',     score: 89, improvement: 15 },
-            ]
-
-        const strugglingStudents = studentsData.filter((s: any) => s.averageScore < 70).length > 0
-          ? studentsData
-              .filter((s: any) => s.averageScore < 70)
-              .sort((a: any, b: any) => a.averageScore - b.averageScore)
-              .slice(0, 2)
-              .map((s: any) => ({ name: s.name, score: s.averageScore, issues: ['Cần cải thiện', 'Cần hỗ trợ thêm'] }))
-          : [
-              { name: 'Phạm Thị D', score: 45, issues: ['Đạo hàm', 'Tích phân']     },
-              { name: 'Hoàng Văn E', score: 52, issues: ['Cơ học', 'Động lực học'] },
-            ]
-
-        const n = studentsData.length
-        const totalStudents    = n || 25
-        const averageScore     = n > 0 ? studentsData.reduce((s: number, x: any) => s + x.averageScore, 0) / n : 78.5
-        const completionRate   = n > 0 ? studentsData.reduce((s: number, x: any) => s + x.progress,      0) / n : 85.2
-        const engagementScore  = n > 0 ? studentsData.reduce((s: number, x: any) => s + x.engagement,    0) / n : 72.8
-
-        setAnalytics({
-          totalStudents,
-          averageScore:    Math.round(averageScore    * 10) / 10,
-          completionRate:  Math.round(completionRate  * 10) / 10,
-          engagementScore: Math.round(engagementScore * 10) / 10,
-          topPerformingStudents,
-          strugglingStudents,
-          subjectPerformance: [
-            { subject: 'Toán học', averageScore: 82.3, trend: 'up'     },
-            { subject: 'Vật lý',   averageScore: 75.1, trend: 'stable' },
-            { subject: 'Hóa học',  averageScore: 78.9, trend: 'up'     },
-          ],
-          weeklyProgress: [
-            { week: 'Tuần 1', completion: 78, averageScore: 72 },
-            { week: 'Tuần 2', completion: 82, averageScore: 75 },
-            { week: 'Tuần 3', completion: 85, averageScore: 78 },
-            { week: 'Tuần 4', completion: 88, averageScore: 81 },
-          ],
+        // Backend /api/teacher/analytics aggregate THẬT từ:
+        //  • ClassStudent của TeacherClass GV quản lý (HS đã import)
+        //  • TeacherStudentLink approved (HS chủ động kết nối với GV)
+        //  • GradedSheet (điểm GV đã chấm)
+        const r = await api.get<AnalyticsData>('/teacher/analytics', {
+          params: { period: selectedPeriod },
         })
-      } catch (err) {
-        console.error('Error loading analytics:', err)
+        setAnalytics(r.data)
+      } catch (err: any) {
+        console.error('Error loading analytics:', err?.response?.data || err.message)
+        toast.error('Không tải được dữ liệu analytics — kiểm tra đăng nhập GV')
+        // Fallback empty state để UI không crash
+        setAnalytics({
+          period: selectedPeriod,
+          totalStudents: 0,
+          averageScore: 0,
+          completionRate: 0,
+          engagementScore: 0,
+          topPerformingStudents: [],
+          strugglingStudents: [],
+          subjectPerformance: [],
+          weeklyProgress: [],
+        })
       } finally {
         setLoading(false)
       }
@@ -174,6 +147,38 @@ export default function TeacherAnalyticsPage() {
       {/* ── Main Content ─────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-6">
 
+        {/* ── Data source banner (meta) ─────────────────────── */}
+        {analytics.meta && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl p-3 flex items-start gap-3">
+            <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 text-xs text-blue-800 dark:text-blue-200">
+              <p className="font-medium">
+                Dữ liệu thật trong kỳ {selectedPeriod === 'week' ? '7 ngày' : selectedPeriod === 'month' ? '30 ngày' : '180 ngày'} qua
+              </p>
+              <p className="mt-0.5 opacity-80">
+                {analytics.meta.fromClassStudent} HS từ lớp bạn quản lý •{' '}
+                {analytics.meta.fromTeacherStudentLink} HS đã kết nối tài khoản với bạn •{' '}
+                Tổng {analytics.meta.uniqueStudents} HS duy nhất •{' '}
+                {analytics.meta.gradedSheets} bài đã chấm
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Empty state khi 0 HS hoặc 0 bài chấm ─────────── */}
+        {analytics.totalStudents === 0 && (
+          <div className="mb-6 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl p-6 text-center">
+            <Users className="w-12 h-12 text-amber-500/50 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1">
+              Chưa có học sinh nào
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-300/80 mb-4">
+              Vào <a href="/teacher/classes" className="underline font-medium">/teacher/classes</a> để tạo lớp + import học sinh,
+              hoặc chờ HS chủ động kết nối với bạn (tự động duyệt qua email match).
+            </p>
+          </div>
+        )}
+
         {/* ── Stat Cards ──────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
           {[
@@ -206,7 +211,11 @@ export default function TeacherAnalyticsPage() {
               <h2 className="text-lg font-bold text-gray-900">Học sinh xuất sắc</h2>
             </div>
             <div className="space-y-3">
-              {analytics.topPerformingStudents.map((student, i) => (
+              {analytics.topPerformingStudents.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-6 text-center">
+                  Chưa có dữ liệu — cần ít nhất 1 bài chấm để xếp hạng
+                </p>
+              ) : analytics.topPerformingStudents.map((student, i) => (
                 <div
                   key={i}
                   className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-yellow-50 to-yellow-50/50 border border-yellow-100"
@@ -221,8 +230,14 @@ export default function TeacherAnalyticsPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-green-600">+{student.improvement}%</p>
-                    <p className="text-xs text-gray-500">Cải thiện</p>
+                    {student.improvement !== 0 && (
+                      <>
+                        <p className={`text-sm font-semibold ${student.improvement > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {student.improvement > 0 ? '+' : ''}{student.improvement}%
+                        </p>
+                        <p className="text-xs text-gray-500">Cải thiện</p>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -238,7 +253,11 @@ export default function TeacherAnalyticsPage() {
               <h2 className="text-lg font-bold text-gray-900">Học sinh cần hỗ trợ</h2>
             </div>
             <div className="space-y-3">
-              {analytics.strugglingStudents.map((student, i) => (
+              {analytics.strugglingStudents.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-6 text-center">
+                  ✅ Chưa có HS nào cần hỗ trợ — cả lớp đều ổn!
+                </p>
+              ) : analytics.strugglingStudents.map((student, i) => (
                 <div
                   key={i}
                   className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-red-50 to-red-50/50 border border-red-100"
@@ -250,14 +269,14 @@ export default function TeacherAnalyticsPage() {
                     <div>
                       <h3 className="font-semibold text-gray-900">{student.name}</h3>
                       <p className="text-sm text-gray-600">Điểm: {student.score}%</p>
-                      <p className="text-xs text-red-600">Khó khăn: {student.issues.join(', ')}</p>
+                      <p className="text-xs text-red-600">{student.issues.join(' • ')}</p>
                     </div>
                   </div>
                   <button
-                    onClick={() => toast.success(`Đã gửi hỗ trợ đến ${student.name}`)}
+                    onClick={() => toast.success(`Đã gửi thông báo nhắc nhở đến ${student.name}`)}
                     className="px-4 py-2 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
                   >
-                    Hỗ trợ
+                    Nhắc nhở
                   </button>
                 </div>
               ))}
@@ -268,6 +287,11 @@ export default function TeacherAnalyticsPage() {
         {/* ── Subject Performance ──────────────────────────────── */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Hiệu suất theo môn học</h2>
+          {analytics.subjectPerformance.length === 0 ? (
+            <p className="text-sm text-gray-500 italic py-6 text-center">
+              Chưa có bài chấm trong kỳ — vào <a href="/teacher/exam-grading" className="text-purple-600 underline">/teacher/exam-grading</a> để chấm bài.
+            </p>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {analytics.subjectPerformance.map((subject, i) => (
               <div key={i} className="p-4 rounded-lg border border-gray-100">
@@ -290,9 +314,13 @@ export default function TeacherAnalyticsPage() {
                     style={{ width: `${subject.averageScore}%` }}
                   />
                 </div>
+                {subject.examCount != null && (
+                  <p className="mt-2 text-xs text-gray-500">{subject.examCount} bài đã chấm</p>
+                )}
               </div>
             ))}
           </div>
+          )}
         </div>
 
         {/* ── Weekly Progress ──────────────────────────────────── */}
