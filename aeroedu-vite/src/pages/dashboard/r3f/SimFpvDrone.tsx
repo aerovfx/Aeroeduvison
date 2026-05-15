@@ -362,10 +362,19 @@ function FpvHUD({ telemetry, gamepadId }: { telemetry: DroneState | null; gamepa
 }
 
 // ─────────────────────────────────────────────────────────────
-// VR Button — dùng vanilla WebXR API (không cần @react-three/xr)
+// VR — Bridge captures `gl` từ inside Canvas, button render OUTSIDE Canvas
+// (HTML elements KHÔNG được nằm trong <Canvas> — R3F chỉ chấp nhận THREE)
 // ─────────────────────────────────────────────────────────────
-function VRButton() {
+
+/** Component nhỏ INSIDE Canvas — store gl reference vào ref ngoài */
+function GlCapture({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer | null> }) {
   const { gl } = useThree()
+  useEffect(() => { glRef.current = gl }, [gl, glRef])
+  return null
+}
+
+/** Button OUTSIDE Canvas — đọc gl từ ref shared */
+function VRButton({ glRef }: { glRef: React.MutableRefObject<THREE.WebGLRenderer | null> }) {
   const [supported, setSupported] = useState<boolean | null>(null)
   const [inXR, setInXR] = useState(false)
 
@@ -377,6 +386,7 @@ function VRButton() {
 
   const enter = useCallback(async () => {
     const xr = (navigator as Navigator & { xr?: any }).xr
+    const gl = glRef.current
     if (!xr || !gl) return
     try {
       const session = await xr.requestSession('immersive-vr', {
@@ -389,7 +399,7 @@ function VRButton() {
     } catch (e) {
       alert('Không khởi động được VR session: ' + (e as Error).message)
     }
-  }, [gl])
+  }, [glRef])
 
   if (supported === null) return null
   if (!supported) {
@@ -398,6 +408,7 @@ function VRButton() {
         position: 'absolute', bottom: 60, right: 16, padding: '8px 14px',
         background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)',
         color: '#fca5a5', fontSize: 11, borderRadius: 6, fontFamily: 'monospace', pointerEvents: 'none',
+        zIndex: 10,
       }}>
         🥽 VR không hỗ trợ trên trình duyệt/thiết bị này
       </div>
@@ -408,7 +419,7 @@ function VRButton() {
       position: 'absolute', bottom: 60, right: 16, padding: '10px 18px',
       background: inXR ? 'rgba(34, 197, 94, 0.3)' : 'linear-gradient(135deg, #7c3aed, #3b82f6)',
       border: 'none', color: '#fff', fontWeight: 'bold', borderRadius: 8, cursor: inXR ? 'default' : 'pointer',
-      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.4)', fontSize: 13,
+      boxShadow: '0 4px 12px rgba(124, 58, 237, 0.4)', fontSize: 13, zIndex: 10,
     }}>
       {inXR ? '✓ Đang ở VR' : '🥽 Vào VR'}
     </button>
@@ -420,6 +431,7 @@ function VRButton() {
 // ─────────────────────────────────────────────────────────────
 function FpvScene() {
   const inputsRef = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
+  const glRef = useRef<THREE.WebGLRenderer | null>(null)
   const [telemetry, setTelemetry] = useState<DroneState | null>(null)
   const gamepadId = useGamepadInput(inputsRef)
 
@@ -452,15 +464,18 @@ function FpvScene() {
           camera={{ fov: 90, near: 0.1, far: 1000, position: [0, 1.5, 0] }}
           style={{ background: '#0a0a0f', width: '100%', height: '100%' }}
         >
+          {/* CHỈ THREE elements ở đây — KHÔNG được có HTML <button>/<div> */}
           <Environment />
           <DroneRig inputs={inputsRef} onTelemetry={onTelemetry} />
           <KeyboardBridge inputsRef={inputsRef} />
           <Text position={[0, 12, -20]} fontSize={1.5} color="#22c55e" anchorX="center">
             AERO FPV SANDBOX
           </Text>
-          <VRButton />
+          <GlCapture glRef={glRef} />
         </Canvas>
+        {/* HTML overlays ở NGOÀI Canvas (sibling div) */}
         <FpvHUD telemetry={telemetry} gamepadId={gamepadId} />
+        <VRButton glRef={glRef} />
       </div>
     </KeyboardControls>
   )
