@@ -65,4 +65,20 @@ export const lessonPlanService = {
 
   backup: (id: string) =>
     api.post<{ ok: boolean; url: string; backedUpAt: string }>(`/teacher/lesson-plans/${id}/backup`).then(r => r.data),
+
+  // ── GCS snapshots — danh mục các giáo án đã sao lưu lên Drive ──
+  listGcsSnapshots: () =>
+    api.get<{ snapshots: GcsSnapshot[]; count: number; bucket: string; prefix: string }>('/teacher/lesson-plans-gcs').then(r => r.data),
+
+  deleteGcsSnapshot: (filename: string) =>
+    api.delete<{ ok: boolean; deleted: string }>(`/teacher/lesson-plans-gcs/${encodeURIComponent(filename)}`).then(r => r.data),
+}
+
+export interface GcsSnapshot {
+  name: string           // file basename (e.g., "giao-an-toan-1717024829.html")
+  fullPath: string       // full GCS path (lesson-plans/{teacherId}/{name})
+  url: string            // public URL
+  size: number           // bytes
+  updated: string | null // ISO timestamp
+  contentType: string
 }

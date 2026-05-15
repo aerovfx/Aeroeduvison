@@ -6681,6 +6681,65 @@ ${plan.content || '<p>(Trống)</p>'}
     return text.split(/\s+/).length;
   }
 
+  // ── GET /api/teacher/lesson-plans-gcs ──
+  // List tất cả file HTML của teacher đã backup lên GCS bucket
+  // (lesson-plans/{teacherId}/*.html). Dùng cho danh mục "Drive Snapshots".
+  app.get('/api/teacher/lesson-plans-gcs', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const { Storage } = require('@google-cloud/storage');
+      const bucketName = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+      const storage = new Storage();
+      const bucket = storage.bucket(bucketName);
+      const prefix = `lesson-plans/${user.id}/`;
+      const [files] = await bucket.getFiles({ prefix });
+      const items = files.map(f => {
+        const m = f.metadata || {};
+        const name = f.name.replace(prefix, '');
+        return {
+          name,
+          fullPath: f.name,
+          url: `https://storage.googleapis.com/${bucketName}/${encodeURIComponent(f.name).replace(/%2F/g, '/')}`,
+          size: Number(m.size) || 0,
+          updated: m.updated || null,
+          contentType: m.contentType || 'text/html',
+        };
+      });
+      // Sort by updated DESC
+      items.sort((a, b) => new Date(b.updated || 0).getTime() - new Date(a.updated || 0).getTime());
+      res.json({ snapshots: items, count: items.length, bucket: bucketName, prefix });
+    } catch (err) {
+      console.warn('[lesson-plan:gcs-list]', err.message);
+      // 503 nếu GCS không sẵn sàng — FE hiện empty state với hint
+      res.status(503).json({ error: 'GCS list không khả dụng', detail: err.message, snapshots: [] });
+    }
+  });
+
+  // ── DELETE /api/teacher/lesson-plans-gcs/:filename ──
+  // Xoá 1 snapshot khỏi GCS (verify ownership qua prefix lesson-plans/{userId}/)
+  app.delete('/api/teacher/lesson-plans-gcs/:filename(*)', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const filename = req.params.filename;
+      // Security: filename phải bắt đầu bằng tên teacher (hoặc đã có full path lesson-plans/{user.id}/)
+      const expectedPrefix = `lesson-plans/${user.id}/`;
+      const fullPath = filename.startsWith(expectedPrefix) ? filename : expectedPrefix + filename;
+      if (!fullPath.startsWith(expectedPrefix)) {
+        return res.status(403).json({ error: 'Forbidden — không phải snapshot của bạn' });
+      }
+      const { Storage } = require('@google-cloud/storage');
+      const bucketName = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+      const storage = new Storage();
+      await storage.bucket(bucketName).file(fullPath).delete().catch(() => null);
+      res.json({ ok: true, deleted: fullPath });
+    } catch (err) {
+      console.warn('[lesson-plan:gcs-delete]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── GET /api/student/my-teachers ── list GV approved của HS
   app.get('/api/student/my-teachers', async (req, res) => {
     try {
