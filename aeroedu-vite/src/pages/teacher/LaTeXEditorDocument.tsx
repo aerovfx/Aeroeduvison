@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Save, Loader2, FileCode2, Play, Download,
-  Printer, History, Share2, Trash2, Sparkles,
+  Printer, History, Share2, Trash2, Sparkles, BookOpen, Zap,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
-import { LatexEditor } from '@/components/latex-editor'
+import { LatexEditor, insertAtMonacoCursor } from '@/components/latex-editor'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
+import LatexSnippetsPanel from '@/components/latex-editor/LatexSnippetsPanel'
 import { LATEX_TEMPLATES, getTemplateById } from '@/lib/latex-templates'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
 
@@ -112,7 +113,26 @@ export default function LaTeXEditorDocument() {
   const [templateSel, setTemplateSel] = useState('')
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
 
+  // ── Realtime preview + Snippets panel ──
+  // autoCompile=true → auto biên dịch sau 2.5s im lặng (giúp GV thấy ngay
+  // PDF mỗi lần gõ, không cần bấm "Biên dịch")
+  const [autoCompile, setAutoCompile] = useState(() => {
+    try { return localStorage.getItem('latex-auto-compile') !== 'false' } catch { return true }
+  })
+  const [snippetsOpen, setSnippetsOpen] = useState(false)
+  // Monaco editor instance — dùng để insert snippet tại cursor
+  const monacoRef = useRef<any>(null)
+  const handleEditorMount = useCallback((editor: any) => {
+    monacoRef.current = editor
+  }, [])
+  const handleSnippetInsert = useCallback((code: string) => {
+    insertAtMonacoCursor(monacoRef.current, code)
+    toast.success('Đã chèn mẫu vào editor', { duration: 1500 })
+  }, [])
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Debounce riêng cho auto-compile (longer than auto-save, tránh spam compile)
+  const compileDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevPdfRef = useRef<string | null>(null)
   const compileInflight = useRef(false)
 
@@ -163,6 +183,30 @@ export default function LaTeXEditorDocument() {
     debounceRef.current = setTimeout(() => { debounceRef.current = null; saveContent(content) }, AUTO_SAVE_MS)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [content, id, loading, saveContent])
+
+  /* ── Auto-compile realtime (debounce 3s) ──
+   * GV gõ → 3s im lặng → tự gọi /latex-projects/compile → PDF cập nhật
+   * trong iframe bên phải mà không cần bấm nút.
+   * Persist preference vào localStorage.
+   */
+  useEffect(() => {
+    if (!id || loading || !autoCompile || !content || compileInflight.current) return
+    if (compileDebounceRef.current) clearTimeout(compileDebounceRef.current)
+    compileDebounceRef.current = setTimeout(() => {
+      compileDebounceRef.current = null
+      // Reuse handleCompile (declared below) — must be ref-stable
+      handleCompileRef.current?.()
+    }, 3000)
+    return () => { if (compileDebounceRef.current) clearTimeout(compileDebounceRef.current) }
+  }, [content, id, loading, autoCompile])
+
+  // Persist autoCompile to localStorage
+  useEffect(() => {
+    try { localStorage.setItem('latex-auto-compile', autoCompile ? 'true' : 'false') } catch {}
+  }, [autoCompile])
+
+  // Stable ref to handleCompile for use in auto-compile effect
+  const handleCompileRef = useRef<(() => Promise<void>) | null>(null)
 
   /* ── Load versions ── */
   const fetchVersions = useCallback(() => {
@@ -218,7 +262,7 @@ export default function LaTeXEditorDocument() {
     setAiDialogOpen(false)
   }
 
-  const handleCompile = async () => {
+  const handleCompile = useCallback(async () => {
     if (!id || compileInflight.current) return
     compileInflight.current = true
     setCompiling(true)
@@ -257,7 +301,10 @@ export default function LaTeXEditorDocument() {
       setCompiling(false)
       compileInflight.current = false
     }
-  }
+  }, [id, content])
+
+  // Sync ref để auto-compile useEffect gọi được
+  useEffect(() => { handleCompileRef.current = handleCompile }, [handleCompile])
 
   /** Tên file PDF tải xuống: <tiêu-đề> - dd-mm-yyyy.pdf (bỏ ký tự không hợp lệ) */
   const buildPdfFilename = useCallback(() => {
@@ -564,9 +611,38 @@ export default function LaTeXEditorDocument() {
           }}>
             <FileCode2 size={14} style={{ color: D.muted }} />
             <span style={{ color: D.muted, fontSize: 13, fontWeight: 600 }}>main.tex</span>
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={() => setSnippetsOpen(true)}
+              title="Mở bảng gợi ý LaTeX — click 1 mẫu để chèn ngay vào editor"
+              style={{
+                background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.4)',
+                borderRadius: 7, color: '#a78bfa', cursor: 'pointer',
+                padding: '5px 12px', fontSize: 12, fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              <BookOpen size={12} /> Mẫu nhanh
+            </button>
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer',
+              padding: '5px 10px', borderRadius: 7,
+              background: autoCompile ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.05)',
+              border: `1px solid ${autoCompile ? 'rgba(34,197,94,0.4)' : D.border2}`,
+              color: autoCompile ? '#4ade80' : D.muted, fontSize: 12, fontWeight: 700,
+            }}
+              title={autoCompile
+                ? 'Realtime: tự biên dịch sau 3 giây mỗi lần gõ — TẮT để tiết kiệm tài nguyên'
+                : 'TẮT realtime — phải bấm "Biên dịch" thủ công'}
+            >
+              <input type="checkbox" checked={autoCompile}
+                onChange={e => setAutoCompile(e.target.checked)}
+                style={{ accentColor: '#22c55e', cursor: 'pointer' }} />
+              <Zap size={11} /> Realtime
+            </label>
           </div>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <LatexEditor value={content} onChange={setContent} height="100%" />
+            <LatexEditor value={content} onChange={setContent} height="100%" onMount={handleEditorMount} />
           </div>
         </div>
 
@@ -784,6 +860,13 @@ export default function LaTeXEditorDocument() {
           onClick={() => setHistoryOpen(false)}
         />
       )}
+
+      {/* ── Snippets panel (mẫu LaTeX nhanh cho GV ko quen code) ── */}
+      <LatexSnippetsPanel
+        open={snippetsOpen}
+        onClose={() => setSnippetsOpen(false)}
+        onInsert={handleSnippetInsert}
+      />
 
       {/* ── AI exam generator modal ── */}
       <AiExamDialog
