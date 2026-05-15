@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `f5651d9` (deploy 239, 2026-05-15 — TranscriptRecording history page)
-- Commits since last deploy: `3/5` (c14e988 AI giáo án, 681f972 Scrumboard GV+Admin, this commit CreateModuleModal LPB)
+- Commits since last deploy: `4/5` (c14e988, 681f972, da269db, this commit Word+PDF export + Spreadsheet)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

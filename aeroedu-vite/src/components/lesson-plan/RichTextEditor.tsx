@@ -35,10 +35,11 @@ import {
   List, ListOrdered, Quote, Code,
   Heading1, Heading2, Heading3, Pilcrow,
   Link as LinkIcon, Table as TableIcon, Minus,
-  Undo2, Redo2, Highlighter, Palette, Sigma,
+  Undo2, Redo2, Highlighter, Palette, Sigma, Sheet,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { MathInline, MathBlock } from './MathExtension'
+import { Spreadsheet } from './SpreadsheetExtension'
 
 interface RichTextEditorProps {
   /** Initial HTML content */
@@ -92,6 +93,7 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
       TableCell,
       MathInline,
       MathBlock,
+      Spreadsheet,
       Placeholder.configure({ placeholder: placeholder || 'Bắt đầu soạn giáo án... (gõ $E=mc^2$ → tự render công thức)' }),
     ],
     content: value,
@@ -314,7 +316,25 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
           icon={<TableIcon size={15} />}
           active={false}
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-          title="Chèn bảng 3x3"
+          title="Chèn bảng 3x3 (table — không có công thức)"
+        />
+
+        {/* Spreadsheet (Excel-like với formula) */}
+        <ToolbarBtn
+          icon={<Sheet size={15} />}
+          active={editor.isActive('spreadsheet')}
+          onClick={() => {
+            const promptStr = window.prompt(
+              'Kích thước bảng tính (hàng x cột), max 200x50:',
+              '5x5',
+            )
+            if (!promptStr) return
+            const m = promptStr.trim().match(/^(\d+)\s*[x×*]\s*(\d+)$/i)
+            const rows = m ? Math.min(200, Math.max(1, parseInt(m[1], 10))) : 5
+            const cols = m ? Math.min(50, Math.max(1, parseInt(m[2], 10))) : 5
+            editor.chain().focus().insertSpreadsheet({ rows, cols }).run()
+          }}
+          title="Chèn BẢNG TÍNH như Excel — hỗ trợ công thức =SUM, =AVG, =A1+B1, =MIN, =MAX, =COUNT"
         />
 
         {/* Math (LaTeX inline + block) */}

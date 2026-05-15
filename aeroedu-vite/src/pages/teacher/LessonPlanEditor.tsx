@@ -11,11 +11,12 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Save, Loader2, Cloud, Check, AlertTriangle,
-  ExternalLink,
+  ExternalLink, FileText, Printer,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { lessonPlanService, type LessonPlan } from '@/services/lessonPlan.service'
 import RichTextEditor from '@/components/lesson-plan/RichTextEditor'
+import { exportLessonPlanToWord, exportLessonPlanToPdf } from '@/lib/lesson-plan-export'
 
 const SUBJECTS = ['Toán', 'Vật lý', 'Hoá học', 'Sinh học', 'Ngữ văn', 'Tiếng Anh', 'Lịch sử', 'Địa lý', 'GDCD', 'Tin học', 'Công nghệ', 'Thể dục']
 const GRADES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
@@ -109,6 +110,40 @@ export default function LessonPlanEditor() {
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Lỗi lưu')
     } finally { setSaving(false) }
+  }
+
+  const handleDownloadWord = () => {
+    if (!content || content.trim().length < 10) {
+      toast.error('Giáo án trống — chưa có gì để xuất')
+      return
+    }
+    try {
+      exportLessonPlanToWord(
+        content,
+        title || 'Giáo án',
+        { subject: subject || undefined, grade: grade ? `Khối ${grade}` : undefined },
+      )
+      toast.success('Đang tải file .doc — mở bằng Word/Google Docs/LibreOffice')
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi xuất Word')
+    }
+  }
+
+  const handleDownloadPdf = () => {
+    if (!content || content.trim().length < 10) {
+      toast.error('Giáo án trống — chưa có gì để xuất')
+      return
+    }
+    try {
+      exportLessonPlanToPdf(
+        content,
+        title || 'Giáo án',
+        { subject: subject || undefined, grade: grade ? `Khối ${grade}` : undefined },
+      )
+      toast.success('Mở dialog in — chọn "Save as PDF" để lưu')
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi xuất PDF')
+    }
   }
 
   const handleBackup = async () => {
@@ -216,6 +251,34 @@ export default function LessonPlanEditor() {
             </button>
           )}
         </div>
+
+        {/* Download Word */}
+        <button onClick={handleDownloadWord}
+          title="Tải file .doc — mở bằng Word, Google Docs, LibreOffice"
+          style={{
+            padding: '7px 12px',
+            background: 'rgba(37,99,235,0.12)', border: '1px solid rgba(37,99,235,0.4)',
+            borderRadius: 7, color: '#60a5fa',
+            cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+          }}>
+          <FileText size={12} />
+          Word
+        </button>
+
+        {/* Download PDF (qua print dialog) */}
+        <button onClick={handleDownloadPdf}
+          title="Mở dialog in — chọn 'Save as PDF' để lưu"
+          style={{
+            padding: '7px 12px',
+            background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.4)',
+            borderRadius: 7, color: '#f87171',
+            cursor: 'pointer', fontSize: 12, fontWeight: 700,
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+          }}>
+          <Printer size={12} />
+          PDF
+        </button>
 
         {/* Backup to Drive */}
         <button onClick={handleBackup} disabled={backupLoading}
