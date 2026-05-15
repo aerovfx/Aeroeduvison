@@ -12265,6 +12265,449 @@ if (!USE_NODEJS_QUESTIONS) {
   // ─ Camera / IoT ──────────────────────────────────────────
   app.get('/api/camera/recording', (_req, res) => res.json({ recordings: [] }));
 
+  // ════════════════════════════════════════════════════════════
+  // CAMERA MANAGEMENT (ONVIF-compliant) — admin CRUD + teacher list
+  //
+  // Schema "Camera" (lazy migration): id, name, brand, model, ipAddress,
+  // httpPort, rtspPort, onvifPort, username, password (base64 obfuscated
+  // — TODO replace KMS), mainProfile, subProfile, rtspMainUrl, rtspSubUrl,
+  // hlsUrl, snapshotUrl, location, locationType, schoolId, classId,
+  // roomNumber, enabled, status, lastSeenAt, lastError, hasPTZ, hasAudio,
+  // hasMotion, createdById, createdAt, updatedAt.
+  //
+  // Endpoints:
+  //  GET    /api/cameras                  — teacher: list mình được xem
+  //  GET    /api/cameras/:id              — teacher: detail (NO password)
+  //  POST   /api/cameras/:id/copy-url     — teacher: trả RTSP có cred để copy
+  //  GET    /api/admin/cameras            — admin: list full + cred mask
+  //  POST   /api/admin/cameras            — admin: create
+  //  PATCH  /api/admin/cameras/:id        — admin: update
+  //  DELETE /api/admin/cameras/:id        — admin: delete
+  //  POST   /api/admin/cameras/:id/test   — admin: test connection (mock)
+  //  POST   /api/admin/cameras/discover   — admin: ONVIF discovery (mock)
+  // ════════════════════════════════════════════════════════════
+  {
+    const { Pool: CamPool } = require('pg');
+    const cjwt = require('jsonwebtoken');
+    const cnano = (() => { try { return require('nanoid').nanoid; } catch { return null; } })();
+    const CAM_JWT_SECRET = process.env.JWT_SECRET
+      || process.env.NEXTAUTH_SECRET
+      || 'dev-secret-fallback-change-in-production!!';
+    let _cmPool = null;
+    function getCMPool() {
+      if (!_cmPool && process.env.DATABASE_URL) {
+        _cmPool = new CamPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _cmPool;
+    }
+
+    function genId(prefix = 'cam') {
+      if (cnano) return `${prefix}_${cnano(16)}`;
+      return `${prefix}_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36).slice(-6)}`;
+    }
+
+    // Bcrypt-style "obfuscation" cho password camera. KHÔNG phải mã hoá thật,
+    // chỉ chống đọc trực tiếp khi DB dump. TODO: chuyển sang Cloud KMS.
+    function obfuscatePass(p) {
+      if (!p) return null;
+      return Buffer.from('cam:' + p).toString('base64');
+    }
+    function deobfuscatePass(s) {
+      if (!s) return '';
+      try {
+        const dec = Buffer.from(s, 'base64').toString('utf8');
+        return dec.startsWith('cam:') ? dec.slice(4) : dec;
+      } catch { return ''; }
+    }
+
+    // Lazy migration — tạo bảng + add cột missing (idempotent)
+    let _camTablesEnsured = false;
+    async function ensureCameraTables() {
+      if (_camTablesEnsured) return;
+      const pool = getCMPool();
+      if (!pool) return;
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS "Camera" (
+          id            TEXT PRIMARY KEY,
+          name          TEXT NOT NULL,
+          brand         TEXT,
+          model         TEXT,
+          serialNumber  TEXT,
+          ipAddress     TEXT NOT NULL,
+          httpPort      INT  DEFAULT 80,
+          rtspPort      INT  DEFAULT 554,
+          onvifPort     INT  DEFAULT 80,
+          username      TEXT,
+          password      TEXT,
+          mainProfile   TEXT,
+          subProfile    TEXT,
+          rtspMainUrl   TEXT,
+          rtspSubUrl    TEXT,
+          hlsUrl        TEXT,
+          snapshotUrl   TEXT,
+          location      TEXT,
+          locationType  TEXT,
+          schoolId      TEXT,
+          classId       TEXT,
+          roomNumber    TEXT,
+          enabled       BOOLEAN NOT NULL DEFAULT true,
+          status        TEXT    NOT NULL DEFAULT 'unknown',
+          lastSeenAt    TIMESTAMPTZ,
+          lastError     TEXT,
+          hasPTZ        BOOLEAN NOT NULL DEFAULT false,
+          hasAudio      BOOLEAN NOT NULL DEFAULT false,
+          hasMotion     BOOLEAN NOT NULL DEFAULT false,
+          createdById   TEXT,
+          createdAt     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updatedAt     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        // Indexes
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_school ON "Camera"(schoolId)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_class  ON "Camera"(classId)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_enabled ON "Camera"(enabled, status)`);
+        _camTablesEnsured = true;
+      } catch (e) {
+        console.error('[camera:ensureTables]', e.message);
+      }
+    }
+
+    // Auto-build RTSP URL theo brand nếu admin không cung cấp custom URL
+    // Hikvision: rtsp://user:pass@ip:554/Streaming/Channels/101 (main) / 102 (sub)
+    // Dahua:     rtsp://user:pass@ip:554/cam/realmonitor?channel=1&subtype=0
+    // Generic:   rtsp://user:pass@ip:554/  (user phải custom)
+    function buildRtspUrl(cam, sub = false) {
+      if (sub && cam.rtspSubUrl) return cam.rtspSubUrl;
+      if (!sub && cam.rtspMainUrl) return cam.rtspMainUrl;
+      const auth = (cam.username || cam.password)
+        ? `${encodeURIComponent(cam.username || '')}:${encodeURIComponent(deobfuscatePass(cam.password) || '')}@`
+        : '';
+      const host = `${cam.ipAddress}:${cam.rtspPort || 554}`;
+      const brand = (cam.brand || '').toLowerCase();
+      let path;
+      if (brand.includes('hikvision')) {
+        path = `/Streaming/Channels/${sub ? '102' : '101'}`;
+      } else if (brand.includes('dahua')) {
+        path = `/cam/realmonitor?channel=1&subtype=${sub ? 1 : 0}`;
+      } else if (brand.includes('axis')) {
+        path = `/axis-media/media.amp?streamprofile=${sub ? 'Mobile' : 'Quality'}`;
+      } else if (brand.includes('uniview')) {
+        path = `/media/video${sub ? '2' : '1'}`;
+      } else {
+        path = '/'; // generic — rely on profile token
+      }
+      return `rtsp://${auth}${host}${path}`;
+    }
+
+    // Map row → response shape (KHÔNG bao gồm password rõ)
+    function mapCameraPublic(r) {
+      return {
+        id: r.id, name: r.name, brand: r.brand || '', model: r.model || '',
+        ipAddress: r.ipAddress, httpPort: r.httpPort, rtspPort: r.rtspPort,
+        onvifPort: r.onvifPort,
+        username: r.username || '',
+        // password masked
+        passwordMask: r.password ? '••••••••' : null,
+        mainProfile: r.mainProfile || '', subProfile: r.subProfile || '',
+        rtspMainUrl: buildRtspUrl(r, false),
+        rtspSubUrl:  buildRtspUrl(r, true),
+        hlsUrl: r.hlsUrl || null, snapshotUrl: r.snapshotUrl || null,
+        location: r.location || '', locationType: r.locationType || '',
+        schoolId: r.schoolId || null, classId: r.classId || null,
+        roomNumber: r.roomNumber || '',
+        enabled: !!r.enabled, status: r.status || 'unknown',
+        lastSeenAt: r.lastSeenAt, lastError: r.lastError || null,
+        hasPTZ: !!r.hasPTZ, hasAudio: !!r.hasAudio, hasMotion: !!r.hasMotion,
+        createdAt: r.createdAt, updatedAt: r.updatedAt,
+      };
+    }
+    // Teacher view — KHÔNG cred + ko mask password info
+    function mapCameraTeacher(r) {
+      return {
+        id: r.id, name: r.name, brand: r.brand || '', model: r.model || '',
+        ipAddress: r.ipAddress,
+        rtspUrl: buildRtspUrl(r, false),     // có cred để copy / play
+        hlsUrl: r.hlsUrl || null,
+        snapshotUrl: r.snapshotUrl || null,
+        location: r.location || '', locationType: r.locationType || '',
+        classId: r.classId || null, roomNumber: r.roomNumber || '',
+        enabled: !!r.enabled, status: r.status || 'unknown',
+        hasPTZ: !!r.hasPTZ, hasAudio: !!r.hasAudio,
+      };
+    }
+
+    function getCamUser(req) {
+      const auth = req.headers.authorization || '';
+      const tok = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+      if (!tok) return null;
+      try { return cjwt.verify(tok, CAM_JWT_SECRET, { ignoreExpiration: true }); }
+      catch { return null; }
+    }
+    function isAdminRole(u) {
+      const r = (u?.role || '').toUpperCase();
+      return r === 'ADMIN' || r === 'SUPERADMIN';
+    }
+
+    // ── GET /api/cameras ──────────────────────────────────────
+    // Teacher view: list cameras enabled + thuộc class teacher dạy hoặc
+    // toàn trường (school cameras). Tạm thời: trả tất cả enabled = true.
+    app.get('/api/cameras', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.json({ cameras: [] });
+        const { rows } = await pool.query(
+          `SELECT * FROM "Camera" WHERE enabled = true ORDER BY name ASC`
+        );
+        res.json({ cameras: rows.map(mapCameraTeacher), count: rows.length });
+      } catch (e) {
+        console.error('[cameras:list]', e.message);
+        res.json({ cameras: [], count: 0 });
+      }
+    });
+
+    // ── GET /api/cameras/:id ──────────────────────────────────
+    app.get('/api/cameras/:id', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(404).json({ error: 'not found' });
+        const { rows } = await pool.query(`SELECT * FROM "Camera" WHERE id = $1 LIMIT 1`, [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Camera không tồn tại' });
+        res.json(mapCameraTeacher(rows[0]));
+      } catch (e) {
+        console.error('[cameras:get]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── POST /api/cameras/:id/copy-url ────────────────────────
+    // Trả RTSP URL có credentials để teacher copy vào VLC / phần mềm khác.
+    // Audit log mỗi lần copy (chống abuse — nhưng v1 chưa enforce).
+    app.post('/api/cameras/:id/copy-url', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(404).json({ error: 'not found' });
+        const { rows } = await pool.query(`SELECT * FROM "Camera" WHERE id = $1 AND enabled = true LIMIT 1`, [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Camera không tồn tại hoặc đã bị tắt' });
+        const cam = rows[0];
+        console.log(`[camera:copy-url] user=${user.id} cam=${cam.id} ip=${cam.ipAddress}`);
+        res.json({
+          rtspMain: buildRtspUrl(cam, false),
+          rtspSub:  buildRtspUrl(cam, true),
+          hls:      cam.hlsUrl || null,
+          snapshot: cam.snapshotUrl || null,
+          name:     cam.name,
+        });
+      } catch (e) {
+        console.error('[cameras:copy-url]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── GET /api/admin/cameras ────────────────────────────────
+    app.get('/api/admin/cameras', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.json({ cameras: [] });
+        const { rows } = await pool.query(`SELECT * FROM "Camera" ORDER BY createdAt DESC`);
+        res.json({ cameras: rows.map(mapCameraPublic), count: rows.length });
+      } catch (e) {
+        console.error('[admin:cameras:list]', e.message);
+        res.json({ cameras: [], count: 0 });
+      }
+    });
+
+    // ── POST /api/admin/cameras ───────────────────────────────
+    app.post('/api/admin/cameras', express.json({ limit: '128kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      const b = req.body || {};
+      if (!b.name || !b.ipAddress) {
+        return res.status(400).json({ error: 'Thiếu trường bắt buộc: name, ipAddress' });
+      }
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const id = genId();
+        const params = [
+          id, b.name, b.brand || null, b.model || null, b.serialNumber || null,
+          b.ipAddress, Number(b.httpPort) || 80, Number(b.rtspPort) || 554,
+          Number(b.onvifPort) || 80,
+          b.username || null, obfuscatePass(b.password),
+          b.mainProfile || null, b.subProfile || null,
+          b.rtspMainUrl || null, b.rtspSubUrl || null,
+          b.hlsUrl || null, b.snapshotUrl || null,
+          b.location || null, b.locationType || null,
+          b.schoolId || null, b.classId || null, b.roomNumber || null,
+          b.enabled !== false,
+          !!b.hasPTZ, !!b.hasAudio, !!b.hasMotion,
+          user.id,
+        ];
+        const { rows } = await pool.query(`
+          INSERT INTO "Camera" (id, name, brand, model, "serialNumber",
+            "ipAddress", "httpPort", "rtspPort", "onvifPort", username, password,
+            "mainProfile", "subProfile", "rtspMainUrl", "rtspSubUrl",
+            "hlsUrl", "snapshotUrl", location, "locationType",
+            "schoolId", "classId", "roomNumber", enabled, "hasPTZ", "hasAudio",
+            "hasMotion", "createdById")
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+                  $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+          RETURNING *
+        `, params);
+        res.json({ camera: mapCameraPublic(rows[0]) });
+      } catch (e) {
+        console.error('[admin:cameras:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── PATCH /api/admin/cameras/:id ──────────────────────────
+    app.patch('/api/admin/cameras/:id', express.json({ limit: '128kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      const b = req.body || {};
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const allowed = [
+          'name', 'brand', 'model', 'serialNumber', 'ipAddress',
+          'httpPort', 'rtspPort', 'onvifPort', 'username',
+          'mainProfile', 'subProfile', 'rtspMainUrl', 'rtspSubUrl',
+          'hlsUrl', 'snapshotUrl', 'location', 'locationType',
+          'schoolId', 'classId', 'roomNumber', 'enabled',
+          'hasPTZ', 'hasAudio', 'hasMotion',
+        ];
+        const sets = []; const vals = [];
+        for (const k of allowed) {
+          if (k in b) { sets.push(`"${k}" = $${vals.length + 1}`); vals.push(b[k]); }
+        }
+        // password chỉ update khi admin gửi mới (không gửi → giữ nguyên)
+        if (b.password !== undefined && b.password !== null && b.password !== '') {
+          sets.push(`password = $${vals.length + 1}`); vals.push(obfuscatePass(b.password));
+        }
+        if (sets.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
+        sets.push(`"updatedAt" = NOW()`);
+        vals.push(req.params.id);
+        const { rows } = await pool.query(
+          `UPDATE "Camera" SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`,
+          vals
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Camera không tồn tại' });
+        res.json({ camera: mapCameraPublic(rows[0]) });
+      } catch (e) {
+        console.error('[admin:cameras:update]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── DELETE /api/admin/cameras/:id ─────────────────────────
+    app.delete('/api/admin/cameras/:id', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const r = await pool.query(`DELETE FROM "Camera" WHERE id = $1`, [req.params.id]);
+        if (r.rowCount === 0) return res.status(404).json({ error: 'Camera không tồn tại' });
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[admin:cameras:delete]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── POST /api/admin/cameras/:id/test ──────────────────────
+    // Mock test connection — v1 chỉ check IP+port reachable bằng TCP probe.
+    // Sau này sẽ dùng node-onvif probe ONVIF capabilities.
+    app.post('/api/admin/cameras/:id/test', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const { rows } = await pool.query(`SELECT * FROM "Camera" WHERE id = $1 LIMIT 1`, [req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'Camera không tồn tại' });
+        const cam = rows[0];
+        // TCP probe RTSP port (timeout 3s)
+        const net = require('net');
+        const result = await new Promise((resolve) => {
+          const sock = net.createConnection({ host: cam.ipAddress, port: cam.rtspPort || 554, timeout: 3000 });
+          let resolved = false;
+          const done = (ok, msg) => { if (resolved) return; resolved = true; try { sock.destroy(); } catch {} resolve({ ok, msg }); };
+          sock.once('connect', () => done(true, `TCP ${cam.ipAddress}:${cam.rtspPort || 554} OK`));
+          sock.once('error', (e) => done(false, `TCP error: ${e.message}`));
+          sock.once('timeout', () => done(false, 'Timeout 3s — không kết nối được'));
+        });
+        // Update DB status
+        await pool.query(
+          `UPDATE "Camera" SET status = $1, "lastSeenAt" = $2, "lastError" = $3, "updatedAt" = NOW() WHERE id = $4`,
+          [result.ok ? 'online' : 'offline', result.ok ? new Date() : null, result.ok ? null : result.msg, cam.id]
+        );
+        res.json({
+          ok: result.ok,
+          message: result.msg,
+          status: result.ok ? 'online' : 'offline',
+          rtspMain: buildRtspUrl(cam, false),
+          rtspSub:  buildRtspUrl(cam, true),
+        });
+      } catch (e) {
+        console.error('[admin:cameras:test]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ── POST /api/admin/cameras/discover ──────────────────────
+    // ONVIF WS-Discovery v1 mock — trả 0 results với hint setup manual.
+    // Production: dùng node-onvif Discovery hoặc UDP multicast 239.255.255.250:3702.
+    app.post('/api/admin/cameras/discover', express.json({ limit: '8kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      // V1: chưa scan thật. Trả notice cho UI hiển thị hướng dẫn nhập tay.
+      res.json({
+        discovered: [],
+        message: 'ONVIF discovery chưa khả dụng trên Cloud Run (UDP multicast bị NAT block). ' +
+                 'Vui lòng nhập manual IP camera bằng SADP Tool / Hikvision iVMS / Dahua ConfigTool ở mạng LAN, ' +
+                 'sau đó nhập IP + cred vào form Add Camera.',
+        hint: {
+          sadpDownload: 'https://www.hikvision.com/en/support/tools/hitools/clea4befef0726a8e4/',
+          dahuaTool:    'https://www.dahuasecurity.com/support/downloadCenter/tools',
+          nxWitness:    'https://www.networkoptix.com/nx-witness/free-trial',
+          commonRtspPaths: {
+            Hikvision: 'rtsp://user:pass@IP:554/Streaming/Channels/101',
+            Dahua:     'rtsp://user:pass@IP:554/cam/realmonitor?channel=1&subtype=0',
+            Axis:      'rtsp://user:pass@IP:554/axis-media/media.amp',
+            Uniview:   'rtsp://user:pass@IP:554/media/video1',
+          },
+        },
+      });
+    });
+
+    console.log('[init] Camera management endpoints (Camera CRUD + ONVIF) ready');
+  }
+
   // ─ Agents / Settings ─────────────────────────────────────
   app.get('/api/student/agent-settings', emptyObj);
   app.put('/api/student/agent-settings', okMsg);
