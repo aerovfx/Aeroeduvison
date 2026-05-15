@@ -123,6 +123,7 @@ const ActivatePage          = lazy(() => import('@/pages/payment/Activate'))
 const OnlineExamRoomPage    = lazy(() => import('@/pages/teacher/OnlineExamRoom'))
 const ExamGradingPage       = lazy(() => import('@/pages/teacher/ExamGrading'))
 const TranscriptPage        = lazy(() => import('@/pages/teacher/Transcript'))
+const TranscriptRecordingPage = lazy(() => import('@/pages/teacher/TranscriptRecording'))
 const CreateModulePage      = lazy(() => import('@/pages/teacher/CreateModule'))
 const LaTeXEditorPage       = lazy(() => import('@/pages/teacher/LaTeXEditor'))
 const TeacherMyCoursesPage  = lazy(() => import('@/pages/teacher/MyCourses'))
@@ -481,7 +482,7 @@ export function AppRouter() {
               <Route path="/teacher/student/:studentId"            element={<StudentInsightPage />} />
               <Route path="/teacher/system-flow"                   element={<PageFallback />} />
               <Route path="/teacher/transcript/library"            element={<PageFallback />} />
-              <Route path="/teacher/transcript/recording"          element={<PageFallback />} />
+              <Route path="/teacher/transcript/recording"          element={<TranscriptRecordingPage />} />
               <Route path="/teacher/transcript/upload"             element={<PageFallback />} />
               <Route path="/teacher/vision/object-detection"       element={<PageFallback />} />
             </Route>

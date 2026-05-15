@@ -194,9 +194,9 @@ export default function TranscriptPage() {
             </div>
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {([
-                { Icon: Mic,       color: '#a78bfa', label: 'Ghi âm',   desc: 'Transcribe trực tiếp', path: '/teacher/transcript/recording' },
+                { Icon: Mic,       color: '#a78bfa', label: 'Ghi âm',   desc: 'Transcribe trực tiếp', path: '/teacher/transcript' },
                 { Icon: Upload,    color: '#60a5fa', label: 'Upload',   desc: 'Từ file audio/video',  path: '/teacher/transcript/upload' },
-                { Icon: FileVideo, color: '#4ade80', label: 'Thư viện', desc: 'Quản lý transcript',   path: '/teacher/transcript/library' },
+                { Icon: FileVideo, color: '#4ade80', label: 'Thư viện', desc: 'Quản lý transcript',   path: '/teacher/transcript/recording' },
               ]).map(({ Icon, color, label, desc, path }) => (
                 <div
                   key={label}

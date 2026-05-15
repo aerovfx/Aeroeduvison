@@ -13976,8 +13976,247 @@ if (!USE_NODEJS_QUESTIONS) {
   app.post('/api/extract/youtube', notImpl('Trích xuất YouTube đang phát triển'));
 
   // ─ Transcript ─────────────────────────────────────────────
-  app.get('/api/transcript/history', (_req, res) => res.json({ history: [] }));
-  app.post('/api/transcript/save', okMsg);
+  // ── Transcript persistence (Postgres-backed) ────────────────────
+  // GET    /api/transcript/history       — list của user (sort updated DESC)
+  // POST   /api/transcript/save          — insert mới
+  // GET    /api/transcript/:id           — chi tiết (full text)
+  // DELETE /api/transcript/:id           — xoá
+  // PATCH  /api/transcript/:id           — update title/type/summary
+  {
+    const { Pool: TPool } = require('pg');
+    const tjwt = require('jsonwebtoken');
+    const T_JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+      || 'dev-secret-fallback-change-in-production!!';
+    let _tpool = null;
+    function getTPool() {
+      if (!_tpool && process.env.DATABASE_URL) {
+        _tpool = new TPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _tpool;
+    }
+    function getTUser(req) {
+      const auth = req.headers.authorization || '';
+      const tok = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+      if (!tok) return null;
+      try { return tjwt.verify(tok, T_JWT_SECRET, { ignoreExpiration: true }); }
+      catch { return null; }
+    }
+    function tGenId() {
+      return `tr_${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36).slice(-4)}`;
+    }
+    let _tReady = false;
+    async function ensureTranscriptTable() {
+      if (_tReady) return;
+      const pool = getTPool();
+      if (!pool) return;
+      try {
+        // CREATE skeleton + ALTER ADD COLUMN IF NOT EXISTS pattern (Prisma legacy safety)
+        await pool.query(`CREATE TABLE IF NOT EXISTS "Transcript" (id TEXT PRIMARY KEY)`);
+        const cols = [
+          ['"userId"',     'TEXT'],
+          ['title',        `TEXT DEFAULT 'Transcript'`],
+          ['transcript',   `TEXT DEFAULT ''`],          // full text (1 line per segment, \n-separated)
+          ['summary',      `TEXT DEFAULT ''`],
+          ['type',         `TEXT DEFAULT 'lecture'`],   // lecture | meeting | other
+          ['duration',     'INT DEFAULT 0'],            // seconds
+          ['"sourceLanguage"', `TEXT DEFAULT 'vi'`],
+          ['"targetLanguage"', `TEXT DEFAULT 'vi'`],
+          ['provider',     `TEXT DEFAULT 'fal.ai/whisper-large-v3'`],
+          ['"wordCount"',  'INT DEFAULT 0'],
+          ['"createdAt"',  'TIMESTAMPTZ DEFAULT NOW()'],
+          ['"updatedAt"',  'TIMESTAMPTZ DEFAULT NOW()'],
+        ];
+        for (const [c, t] of cols) {
+          try { await pool.query(`ALTER TABLE "Transcript" ADD COLUMN IF NOT EXISTS ${c} ${t}`); }
+          catch (_e) { /* ignore */ }
+        }
+        // Discover-and-DROP NOT NULL ngoài whitelist + DROP NOT NULL cho optional cols
+        try {
+          const known = new Set(['id', 'userId', 'title', 'transcript', 'summary', 'type',
+            'duration', 'sourceLanguage', 'targetLanguage', 'provider', 'wordCount',
+            'createdAt', 'updatedAt']);
+          const { rows } = await pool.query(
+            `SELECT column_name, is_nullable FROM information_schema.columns
+              WHERE table_name = 'Transcript' AND table_schema = 'public'`
+          );
+          for (const c of rows) {
+            if (!known.has(c.column_name) && c.is_nullable === 'NO') {
+              try { await pool.query(`ALTER TABLE "Transcript" ALTER COLUMN "${c.column_name}" DROP NOT NULL`); }
+              catch (_e) {}
+            }
+          }
+          // Drop FK constraints (Prisma legacy)
+          const { rows: fks } = await pool.query(
+            `SELECT con.conname FROM pg_constraint con
+               JOIN pg_class cls ON cls.oid = con.conrelid
+              WHERE cls.relname = 'Transcript' AND con.contype = 'f'`
+          );
+          for (const fk of fks) {
+            try { await pool.query(`ALTER TABLE "Transcript" DROP CONSTRAINT IF EXISTS "${fk.conname}"`); }
+            catch (_e) {}
+          }
+        } catch (_e) {}
+        // Backfill timestamps + userId
+        try {
+          await pool.query(`UPDATE "Transcript" SET "createdAt" = NOW() WHERE "createdAt" IS NULL`);
+          await pool.query(`UPDATE "Transcript" SET "updatedAt" = NOW() WHERE "updatedAt" IS NULL`);
+          await pool.query(`UPDATE "Transcript" SET "userId" = '__legacy__' WHERE "userId" IS NULL`);
+        } catch (_e) {}
+        try { await pool.query(`ALTER TABLE "Transcript" ALTER COLUMN "userId" SET NOT NULL`); } catch (_e) {}
+        await pool.query(`CREATE INDEX IF NOT EXISTS "Transcript_user_idx"
+          ON "Transcript"("userId", "createdAt" DESC)`);
+        _tReady = true;
+      } catch (e) {
+        console.error('[transcript:ensure]', e.message);
+      }
+    }
+
+    function mapTranscript(r, summary = false) {
+      const base = {
+        id: r.id,
+        title: r.title || 'Transcript',
+        summary: r.summary || '',
+        type: r.type || 'lecture',
+        duration: r.duration || 0,
+        sourceLanguage: r.sourceLanguage || 'vi',
+        targetLanguage: r.targetLanguage || 'vi',
+        provider: r.provider || 'fal.ai/whisper-large-v3',
+        wordCount: r.wordCount || 0,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+      if (summary) {
+        return { ...base, preview: String(r.transcript || '').slice(0, 200) };
+      }
+      return { ...base, transcript: r.transcript || '' };
+    }
+
+    function tWordCount(text) {
+      if (!text) return 0;
+      const t = String(text).trim();
+      if (!t) return 0;
+      return t.split(/\s+/).length;
+    }
+
+    // GET /api/transcript/history
+    app.get('/api/transcript/history', async (req, res) => {
+      const user = getTUser(req);
+      if (!user || !user.id) return res.json({ history: [] });
+      try {
+        await ensureTranscriptTable();
+        const pool = getTPool();
+        if (!pool) return res.json({ history: [] });
+        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+        const { rows } = await pool.query(
+          `SELECT * FROM "Transcript" WHERE "userId" = $1
+           ORDER BY "createdAt" DESC LIMIT $2`,
+          [user.id, limit]
+        );
+        res.json({ history: rows.map(r => mapTranscript(r, true)), count: rows.length });
+      } catch (e) {
+        console.warn('[transcript:history]', e.message);
+        res.json({ history: [], error: e.message });
+      }
+    });
+
+    // GET /api/transcript/:id
+    app.get('/api/transcript/:id', async (req, res) => {
+      const user = getTUser(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureTranscriptTable();
+        const pool = getTPool();
+        if (!pool) return res.status(404).json({ error: 'not found' });
+        const { rows } = await pool.query(
+          `SELECT * FROM "Transcript" WHERE id = $1 AND "userId" = $2 LIMIT 1`,
+          [req.params.id, user.id]
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Transcript không tồn tại' });
+        res.json(mapTranscript(rows[0], false));
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/transcript/save
+    app.post('/api/transcript/save', express.json({ limit: '4mb' }), async (req, res) => {
+      const user = getTUser(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      if (!b.transcript) return res.status(400).json({ error: 'Thiếu trường transcript' });
+      try {
+        await ensureTranscriptTable();
+        const pool = getTPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const id = tGenId();
+        const wc = tWordCount(b.transcript);
+        const { rows } = await pool.query(
+          `INSERT INTO "Transcript" (id, "userId", title, transcript, summary, type, duration,
+              "sourceLanguage", "targetLanguage", provider, "wordCount", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW(), NOW())
+           RETURNING *`,
+          [id, user.id, b.title || 'Transcript', b.transcript, b.summary || '',
+           b.type || 'lecture', Number(b.duration) || 0,
+           b.sourceLanguage || 'vi', b.targetLanguage || 'vi',
+           b.provider || 'fal.ai/whisper-large-v3', wc]
+        );
+        res.json({ ok: true, transcript: mapTranscript(rows[0], false) });
+      } catch (e) {
+        console.error('[transcript:save]', e.message, '| code:', e.code, '| detail:', e.detail);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // PATCH /api/transcript/:id (update title/type/summary)
+    app.patch('/api/transcript/:id', express.json({ limit: '4mb' }), async (req, res) => {
+      const user = getTUser(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      try {
+        await ensureTranscriptTable();
+        const pool = getTPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const sets = []; const vals = [];
+        for (const k of ['title', 'type', 'summary']) {
+          if (k in b) { sets.push(`"${k}" = $${vals.length + 1}`); vals.push(b[k]); }
+        }
+        if (sets.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
+        sets.push(`"updatedAt" = NOW()`);
+        vals.push(req.params.id, user.id);
+        const { rows } = await pool.query(
+          `UPDATE "Transcript" SET ${sets.join(', ')}
+           WHERE id = $${vals.length - 1} AND "userId" = $${vals.length}
+           RETURNING *`, vals
+        );
+        if (rows.length === 0) return res.status(404).json({ error: 'Transcript không tồn tại' });
+        res.json({ ok: true, transcript: mapTranscript(rows[0], false) });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/transcript/:id
+    app.delete('/api/transcript/:id', async (req, res) => {
+      const user = getTUser(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureTranscriptTable();
+        const pool = getTPool();
+        if (!pool) return res.status(503).json({ error: 'DB chưa sẵn sàng' });
+        const r = await pool.query(
+          `DELETE FROM "Transcript" WHERE id = $1 AND "userId" = $2`,
+          [req.params.id, user.id]
+        );
+        if (r.rowCount === 0) return res.status(404).json({ error: 'Transcript không tồn tại' });
+        res.json({ ok: true });
+      } catch (e) {
+        res.status(500).json({ error: e.message });
+      }
+    });
+  }
 
   // ── POST /api/transcript/local/transcribe ── fal.ai Whisper STT
   // FE gửi multipart/form-data: { audio: Blob, sourceLanguage, targetLanguage }
