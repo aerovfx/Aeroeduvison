@@ -153,6 +153,7 @@ const teacherSections: RouteSection[] = [
       { icon: Thermometer,  labelKey: 'routeEnvironment', href: '/teacher/environment-monitoring', badge: 'IoT' },
       { icon: FileEdit,     labelKey: 'routeAssignments', href: '/teacher/assignments' },
       { icon: Calendar,     labelKey: 'routeCalendar',    href: '/teacher/calendar' },
+      { icon: Kanban,       labelKey: 'routeScrum',       href: '/teacher/scrumboard' },
     ],
   },
   {
@@ -195,6 +196,7 @@ const adminSections: RouteSection[] = [
       { icon: Brain,       labelKey: 'routeModels',        href: '/admin/models' },
       { icon: Settings,    labelKey: 'routeAdminSettings', href: '/admin/settings' },
       { icon: CheckSquare, labelKey: 'routeNewsReview',    href: '/admin/news/review' },
+      { icon: Kanban,      labelKey: 'routeScrum',         href: '/admin/scrumboard' },
     ],
   },
   {

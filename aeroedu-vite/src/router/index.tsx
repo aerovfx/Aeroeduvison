@@ -61,6 +61,8 @@ const AuraPage         = lazy(() => import('@/pages/dashboard/Aura'))
 const StemPage         = lazy(() => import('@/pages/dashboard/Stem'))
 const NotesPage        = lazy(() => import('@/pages/dashboard/Notes'))
 const ScrumboardPage   = lazy(() => import('@/pages/dashboard/Scrumboard'))
+const TeacherScrumboardPage = lazy(() => import('@/pages/teacher/TeacherScrumboard'))
+const AdminScrumboardPage   = lazy(() => import('@/pages/admin/AdminScrumboard'))
 const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
 const ContactsPage     = lazy(() => import('@/pages/dashboard/Contacts'))
 
@@ -480,6 +482,7 @@ export function AppRouter() {
               <Route path="/teacher/question-bank/edit/:id"        element={<PageFallback />} />
               <Route path="/teacher/question-bank/list"            element={<PageFallback />} />
               <Route path="/teacher/student/:studentId"            element={<StudentInsightPage />} />
+              <Route path="/teacher/scrumboard"                    element={<TeacherScrumboardPage />} />
               <Route path="/teacher/system-flow"                   element={<PageFallback />} />
               <Route path="/teacher/transcript/library"            element={<PageFallback />} />
               <Route path="/teacher/transcript/recording"          element={<TranscriptRecordingPage />} />
@@ -513,6 +516,7 @@ export function AppRouter() {
               <Route path="/admin/categories"          element={<AdminCategoriesPage />} />
               <Route path="/admin/analytics"           element={<AdminAnalyticsPage />} />
               <Route path="/admin/insights"            element={<AdminInsightsPage />} />
+              <Route path="/admin/scrumboard"          element={<AdminScrumboardPage />} />
             </Route>
 
           </Route>{/* /DashboardLayout */}
