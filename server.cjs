@@ -6436,6 +6436,16 @@ if (USE_NODEJS_QUESTIONS) {
         await pool.query(`UPDATE "LessonPlan" SET "teacherId" = '__legacy__' WHERE "teacherId" IS NULL`);
       } catch (_e) { /* ignore */ }
       try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "teacherId" SET NOT NULL`); } catch (_e) {}
+
+      // ALWAYS DROP NOT NULL cho optional cols (subject, grade, gcsBackupUrl, gcsBackupAt)
+      // Code mới INSERT NULL cho các col này khi user không fill, nhưng Prisma
+      // legacy có thể đã SET NOT NULL → INSERT crash.
+      const optionalCols = ['subject', 'grade', 'gcsBackupUrl', 'gcsBackupAt'];
+      for (const col of optionalCols) {
+        try {
+          await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "${col}" DROP NOT NULL`);
+        } catch (_e) { /* ignore — col may not exist yet, ALTER ADD COLUMN sẽ thêm */ }
+      }
       // Index
       await pool.query(`CREATE INDEX IF NOT EXISTS "LessonPlan_teacher_idx"
         ON "LessonPlan"("teacherId", "updatedAt" DESC) WHERE "isArchived" = false`);
