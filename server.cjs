@@ -13380,9 +13380,76 @@ if (!USE_NODEJS_QUESTIONS) {
   // ─ Transcript ─────────────────────────────────────────────
   app.get('/api/transcript/history', (_req, res) => res.json({ history: [] }));
   app.post('/api/transcript/save', okMsg);
-  app.post('/api/transcript/local/transcribe', notImpl('Transcript đang phát triển'));
-  app.post('/api/transcript/local/transcribe-stream', notImpl('Transcript đang phát triển'));
-  app.post('/api/transcript/elevenlabs/transcribe', notImpl('Transcript đang phát triển'));
+
+  // ── POST /api/transcript/local/transcribe ── fal.ai Whisper STT
+  // FE gửi multipart/form-data: { audio: Blob, sourceLanguage, targetLanguage }
+  // Trả: { segments: [{ original, translated? }] } để FE map sang TranscriptSegment
+  try {
+    const multer = require('multer');
+    const falWhisper = require('./lib/fal-whisper.cjs');
+    // Upload memory storage, max 25MB (fal.ai whisper limit ~25MB cho data URL)
+    const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+    app.post('/api/transcript/local/transcribe', upload.single('audio'), async (req, res) => {
+      try {
+        if (!req.file || !req.file.buffer) {
+          return res.status(400).json({ error: 'Thiếu file audio' });
+        }
+        const sourceLanguage = req.body?.sourceLanguage || 'auto';
+        const targetLanguage = req.body?.targetLanguage || sourceLanguage;
+        const mimeType = req.file.mimetype || 'audio/webm';
+
+        console.log(`[transcript:local] file=${req.file.size}B mime=${mimeType} src=${sourceLanguage} tgt=${targetLanguage}`);
+
+        // STEP 1: Transcribe audio → text bằng fal.ai Whisper
+        const result = await falWhisper.transcribeBuffer(req.file.buffer, mimeType, {
+          language: sourceLanguage,
+          task: 'transcribe',
+        });
+
+        // STEP 2: Map chunks → segments format FE expect
+        // Nếu translate sang target language khác source → có thể chain qua any-llm
+        // (defer cho v2 — v1 chỉ transcribe)
+        const segments = (result.chunks || []).map(c => ({
+          original: c.text || '',
+          translated: targetLanguage !== sourceLanguage && targetLanguage !== 'auto' ? null : undefined,
+          startTime: c.timestamp?.[0] || 0,
+          endTime: c.timestamp?.[1] || 0,
+        }));
+
+        // Nếu chunks rỗng nhưng có text tổng → tạo 1 segment duy nhất
+        if (segments.length === 0 && result.text) {
+          segments.push({ original: result.text, translated: undefined, startTime: 0, endTime: 0 });
+        }
+
+        res.json({
+          segments,
+          fullText: result.text,
+          language: result.inferred_languages?.[0] || sourceLanguage,
+          provider: 'fal.ai/whisper-large-v3',
+        });
+      } catch (e) {
+        console.error('[transcript:local]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // Stream endpoint: V1 simply rejects (FE will fall back to non-stream
+    // submit at end of recording). True streaming whisper API chưa có ở fal.ai.
+    app.post('/api/transcript/local/transcribe-stream', (_req, res) => {
+      res.status(202).json({
+        ok: true,
+        note: 'Stream chưa hỗ trợ — chunks được gửi cùng /transcribe khi dừng ghi',
+      });
+    });
+    console.log('[init] Transcript fal.ai Whisper endpoint ready');
+  } catch (e) {
+    console.warn('[init] multer/fal-whisper require failed — transcript /local/* sẽ trả 501:', e.message);
+    app.post('/api/transcript/local/transcribe', notImpl('multer chưa cài — chạy npm install multer'));
+    app.post('/api/transcript/local/transcribe-stream', notImpl('multer chưa cài'));
+  }
+
+  app.post('/api/transcript/elevenlabs/transcribe', notImpl('ElevenLabs đang phát triển — dùng "fal.ai Whisper" mode mặc định'));
   app.post('/api/transcript/summarize', notImpl('Transcript summarize đang phát triển'));
 
   // ─ Camera / IoT ──────────────────────────────────────────

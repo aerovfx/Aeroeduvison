@@ -102,7 +102,9 @@ RUN npm config set fetch-timeout 600000 && \
       jsonwebtoken \
       hash-wasm \
       pdf-parse@1.1.4 \
-      nodemailer@6
+      nodemailer@6 \
+      multer@1 \
+      @google-cloud/storage@7
 
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist

@@ -485,7 +485,7 @@ export function AudioRecorder({
         segmentsRef.current = newSegments
         finalSegments = newSegments
         onSegmentsChange?.(newSegments)
-        toast.success(translationMode === 'elevenlabs' ? 'Transcribe xong (ElevenLabs)' : 'Transcribe xong (MLX Local)')
+        toast.success(translationMode === 'elevenlabs' ? 'Transcribe xong (ElevenLabs)' : 'Transcribe xong (fal.ai Whisper)')
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Lỗi transcribe')
       } finally {

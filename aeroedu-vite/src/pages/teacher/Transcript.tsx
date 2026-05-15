@@ -229,9 +229,9 @@ export default function TranscriptPage() {
               <div>
                 <span style={labelStyle}>Model</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {modeBtn('local', '🖥️ MLX Local')}
+                  {modeBtn('local', '⚡ fal.ai Whisper')}
                   {modeBtn('soniox', '☁️ Soniox')}
-                  {modeBtn('elevenlabs', '⚡ ElevenLabs')}
+                  {modeBtn('elevenlabs', '🎙️ ElevenLabs')}
                 </div>
                 {translationMode === 'soniox' && !apiKey && (
                   <p style={{ color: '#f59e0b', fontSize: 11, marginTop: 4 }}>⚠ Nhập API Key trong Cài đặt</p>
@@ -424,12 +424,12 @@ export default function TranscriptPage() {
                   onChange={e => setTranslationMode(e.target.value as RecorderTranslationMode)}
                   style={selectStyle}
                 >
-                  <option value="local">🖥️ MLX Local (mặc định — offline, miễn phí)</option>
+                  <option value="local">⚡ fal.ai Whisper large-v3 (mặc định — server-side, không cần key)</option>
                   <option value="soniox">☁️ Soniox (Real-time — cần API Key)</option>
-                  <option value="elevenlabs">⚡ ElevenLabs (API Key)</option>
+                  <option value="elevenlabs">🎙️ ElevenLabs (đang phát triển)</option>
                 </select>
                 <p style={{ color: D.muted, fontSize: 11, marginTop: 5 }}>
-                  Mặc định: MLX Local. Chọn Soniox hoặc ElevenLabs nếu cần cloud model.
+                  Mặc định: fal.ai Whisper qua server (Vietnamese OK). Chọn Soniox nếu cần real-time.
                 </p>
               </div>
 
