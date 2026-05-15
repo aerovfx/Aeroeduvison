@@ -183,19 +183,21 @@ export const MathInline = Node.create({
   },
 
   // Input rule: $...$ + space → tự convert thành math inline
+  // Regex đơn giản hoá: chỉ match \$...\$ + space ở cuối, KHÔNG dùng
+  // leading context (?:^|...) vì gây sai offset → leftover $.
+  // Non-greedy để chỉ ăn đoạn ngắn nhất giữa 2 dollars (multi-formula
+  // trong cùng dòng vẫn detect đúng từng formula).
   addInputRules() {
     return [
       new InputRule({
-        find: /(?:^|[\s,.;:!?])\$([^$\n]+)\$(?:\s)$/,
+        find: /\$([^$\n]+?)\$\s$/,
         handler: ({ state, range, match }) => {
           const latex = match[1].trim()
           if (!latex) return
-          // Tính lại range: bỏ leading whitespace + trailing space
-          const fullMatch = match[0]
-          const dollarStart = fullMatch.indexOf('$')
-          const startInDoc = range.from + dollarStart
-          // Replace từ '$' đầu tiên tới ' ' cuối (giữ lại trailing space)
-          state.tr.replaceWith(startInDoc, range.to - 1, this.type.create({ latex }))
+          // range.from = position của \$ đầu tiên
+          // range.to   = position sau khoảng trắng cuối
+          // Replace từ range.from đến range.to-1 (giữ trailing space)
+          state.tr.replaceWith(range.from, range.to - 1, this.type.create({ latex }))
         },
       }),
     ]
@@ -256,11 +258,12 @@ export const MathBlock = Node.create({
   addInputRules() {
     return [
       new InputRule({
-        find: /\$\$([^$\n]+)\$\$$/,
+        find: /\$\$([^$\n]+?)\$\$\s$/,
         handler: ({ state, range, match }) => {
           const latex = match[1].trim()
           if (!latex) return
-          state.tr.replaceWith(range.from, range.to, this.type.create({ latex }))
+          // Giữ trailing space (range.to - 1)
+          state.tr.replaceWith(range.from, range.to - 1, this.type.create({ latex }))
         },
       }),
     ]
