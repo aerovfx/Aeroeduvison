@@ -15,7 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: deploy 229 (2026-05-15 — Lesson Plans + Music playlist + 10 LaTeX templates)
+- Last deployed commit: `1b7a382` (deploy 232, 2026-05-15 — fal.ai Whisper STT cho Transcript page)
 - Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
