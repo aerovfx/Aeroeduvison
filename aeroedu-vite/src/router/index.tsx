@@ -88,6 +88,7 @@ const CircuitSimulator   = lazy(() => import('@/pages/labs/CircuitSimulator'))
 const DigitalLogicLab    = lazy(() => import('@/pages/labs/DigitalLogicLab'))
 const PixelOdyssey       = lazy(() => import('@/pages/labs/PixelOdyssey'))
 const GamesIndexPage     = lazy(() => import('@/pages/games/GamesIndex'))
+const ArduinoEmulator    = lazy(() => import('@/pages/labs/ArduinoEmulator'))
 const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
 const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
 const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
@@ -306,6 +307,7 @@ export function AppRouter() {
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
             <Route path="/dashboard/iot-lab"               element={<IoTLab />} />
+            <Route path="/dashboard/iot-lab/emulator"      element={<ArduinoEmulator />} />
             <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
             <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
             <Route path="/dashboard/learning"              element={<PageFallback />} />

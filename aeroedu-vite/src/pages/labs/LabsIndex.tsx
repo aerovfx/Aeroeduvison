@@ -248,6 +248,13 @@ const POPULAR_LABS: PopularLab[] = [
     accent: 'cyan',
   },
   {
+    name: 'Arduino Emulator',
+    emoji: '⚡',
+    path: '/dashboard/iot-lab/emulator',
+    desc: 'Viết code C++ → chạy real-time trong browser',
+    accent: 'emerald',
+  },
+  {
     name: 'MechaForce',
     emoji: '🤖',
     path: '/dashboard/labtwin/labs/mechaforce',

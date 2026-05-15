@@ -1393,12 +1393,22 @@ export default function IoTLab() {
     <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-slate-950 to-zinc-950 text-zinc-100">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100 mb-4"
-        >
-          <ChevronLeft className="w-4 h-4" /> Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100"
+          >
+            <ChevronLeft className="w-4 h-4" /> Dashboard
+          </Link>
+          <Link
+            to="/dashboard/iot-lab/emulator"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white inline-flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] transition-transform"
+            title="Viết code Arduino C++ → chạy real-time trong browser"
+          >
+            <Zap className="w-3.5 h-3.5" /> Arduino Emulator
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/15 ml-1">⚡ NEW</span>
+          </Link>
+        </div>
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
           <div>
