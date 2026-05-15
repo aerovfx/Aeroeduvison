@@ -70,7 +70,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeNotes:         'Ghi chú',
     routeScrum:         'Scrum Board',
     routeKnowledgeGraph: 'Đồ thị tri thức',
-    routeGames:         'Trò chơi học tập',
+    routeGames:         '🎮 Game Hub',
     routeContacts:      'Danh bạ',
     routeSchedule:      'Thời khoá biểu',
     routeWishlist:      'Yêu thích',
