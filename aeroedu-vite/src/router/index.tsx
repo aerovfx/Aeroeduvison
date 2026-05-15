@@ -148,6 +148,8 @@ const DocumentDigitizationPage = lazy(() => import('@/pages/teacher/DocumentDigi
 const DocumentDigitizationReviewPage = lazy(() => import('@/pages/teacher/DocumentDigitizationReview'))
 const LaTeXEditorDocumentPage = lazy(() => import('@/pages/teacher/LaTeXEditorDocument'))
 const LearningPathBuilderPage = lazy(() => import('@/pages/teacher/LearningPathBuilder'))
+const LessonPlansPage         = lazy(() => import('@/pages/teacher/LessonPlans'))
+const LessonPlanEditorPage    = lazy(() => import('@/pages/teacher/LessonPlanEditor'))
 const CameraManagementPage         = lazy(() => import('@/pages/teacher/CameraManagement'))
 const EnvironmentMonitoringPage    = lazy(() => import('@/pages/teacher/EnvironmentMonitoring'))
 
@@ -465,6 +467,8 @@ export function AppRouter() {
               <Route path="/teacher/interaction-center"            element={<InteractionCenterPage />} />
               <Route path="/teacher/latex-documents/:id"           element={<LaTeXEditorDocumentPage />} />
               <Route path="/teacher/learning-path-builder"         element={<LearningPathBuilderPage />} />
+              <Route path="/teacher/lesson-plans"                  element={<LessonPlansPage />} />
+              <Route path="/teacher/lesson-plans/:id"              element={<LessonPlanEditorPage />} />
               <Route path="/teacher/meeting-notes"                 element={<MeetingNotesPage />} />
               <Route path="/teacher/meeting-notes/history"         element={<PageFallback />} />
               <Route path="/teacher/multi-disciplinary-paths"      element={<PageFallback />} />

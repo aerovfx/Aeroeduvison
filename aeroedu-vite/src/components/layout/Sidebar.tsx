@@ -131,6 +131,7 @@ const teacherSections: RouteSection[] = [
       { icon: Sparkles, labelKey: 'routeAiContent',  href: '/teacher/create-module',             badge: 'AI' },
       { icon: Upload,   labelKey: 'routeDigitize',   href: '/teacher/document-digitization',     badge: 'AI' },
       { icon: FileEdit, labelKey: 'routeLatex',      href: '/teacher/latex-documents' },
+      { icon: FileText, labelKey: 'routeLessonPlans', href: '/teacher/lesson-plans',             badge: 'New' },
       { icon: Mic,      labelKey: 'routeTranscript', href: '/teacher/transcript',                badge: 'AI' },
       { icon: Map,      labelKey: 'routePathBuilder',href: '/teacher/learning-path-builder' },
     ],

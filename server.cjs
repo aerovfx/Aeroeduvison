@@ -2027,6 +2027,7 @@ const _TEACHER_LOCAL_PREFIXES = [
   '/api/teacher/analytics',      // teacher analytics aggregate (real student data)
   '/api/teacher/roster',         // teacher full roster (ClassStudent + TSL approved)
   '/api/teacher/learning-paths', // teacher learning path builder (per-student)
+  '/api/teacher/lesson-plans',   // teacher lesson plan editor (Google Docs-like + LaTeX)
 ];
 
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
@@ -6299,6 +6300,322 @@ if (USE_NODEJS_QUESTIONS) {
       return res.status(500).json({ error: err.message });
     }
   });
+
+  // ════════════════════════════════════════════════════════════
+  // LESSON PLANS — GV soạn giáo án WYSIWYG (Google Docs-like)
+  // Lưu HTML/JSON content → DB. Optional snapshot lên GCS bucket.
+  //
+  // Schema: id, teacherId, title, content (HTML), contentJson (TipTap doc),
+  //   subject, grade, tags[], wordCount, lastSavedAt, createdAt, updatedAt
+  //
+  // Auto-save pattern: FE debounce 3s → PATCH content. DB chỉ update,
+  // không tạo version mỗi lần (giảm I/O). Optional /backup endpoint
+  // để snapshot snapshot lên GCS khi user "Lưu vào Drive".
+  // ════════════════════════════════════════════════════════════
+  let _lpsReady = false;
+  async function ensureLessonPlanTables() {
+    if (_lpsReady) return;
+    const pool = getAsgnPool();
+    if (!pool) return;
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LessonPlan" (id TEXT PRIMARY KEY)`);
+      const cols = [
+        ['"teacherId"',    'TEXT'],
+        ['title',          `TEXT DEFAULT 'Giáo án mới'`],
+        ['content',        `TEXT DEFAULT ''`],         // HTML rendered
+        ['"contentJson"',  `JSONB DEFAULT '{}'::jsonb`], // TipTap doc JSON
+        ['subject',        'TEXT'],
+        ['grade',          'TEXT'],
+        ['tags',           `JSONB DEFAULT '[]'::jsonb`],
+        ['"wordCount"',    'INT DEFAULT 0'],
+        ['"isArchived"',   'BOOLEAN DEFAULT false'],
+        ['"gcsBackupUrl"', 'TEXT'],                     // URL snapshot GCS
+        ['"gcsBackupAt"',  'TIMESTAMPTZ'],
+        ['"lastSavedAt"',  'TIMESTAMPTZ DEFAULT NOW()'],
+        ['"createdAt"',    'TIMESTAMPTZ DEFAULT NOW()'],
+        ['"updatedAt"',    'TIMESTAMPTZ DEFAULT NOW()'],
+      ];
+      for (const [col, typeDef] of cols) {
+        try { await pool.query(`ALTER TABLE "LessonPlan" ADD COLUMN IF NOT EXISTS ${col} ${typeDef}`); }
+        catch (e) { console.warn('[lp:alter]', col, e.message); }
+      }
+      // Set DEFAULT for existing cols (in case they were created without)
+      const defaults = [
+        ['title', `'Giáo án mới'`], ['content', `''`], ['"contentJson"', `'{}'::jsonb`],
+        ['tags', `'[]'::jsonb`], ['"wordCount"', '0'], ['"isArchived"', 'false'],
+        ['"lastSavedAt"', 'NOW()'], ['"createdAt"', 'NOW()'], ['"updatedAt"', 'NOW()'],
+      ];
+      for (const [col, def] of defaults) {
+        try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN ${col} SET DEFAULT ${def}`); }
+        catch (_e) { /* ignore */ }
+      }
+      // Discover-and-DROP NOT NULL/FK pattern (Prisma legacy safety)
+      try {
+        const knownCols = new Set([
+          'id', 'teacherId', 'title', 'content', 'contentJson', 'subject', 'grade',
+          'tags', 'wordCount', 'isArchived', 'gcsBackupUrl', 'gcsBackupAt',
+          'lastSavedAt', 'createdAt', 'updatedAt',
+        ]);
+        const { rows: schemaCols } = await pool.query(
+          `SELECT column_name, is_nullable FROM information_schema.columns
+            WHERE table_name = 'LessonPlan' AND table_schema = 'public'`
+        );
+        for (const c of schemaCols) {
+          if (!knownCols.has(c.column_name) && c.is_nullable === 'NO') {
+            try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "${c.column_name}" DROP NOT NULL`); }
+            catch (_e) { /* ignore */ }
+          }
+        }
+        const { rows: fks } = await pool.query(
+          `SELECT con.conname FROM pg_constraint con
+             JOIN pg_class cls ON cls.oid = con.conrelid
+            WHERE cls.relname = 'LessonPlan' AND con.contype = 'f'`
+        );
+        for (const fk of fks) {
+          try { await pool.query(`ALTER TABLE "LessonPlan" DROP CONSTRAINT IF EXISTS "${fk.conname}"`); }
+          catch (_e) { /* ignore */ }
+        }
+      } catch (e) { console.warn('[lp:discover]', e.message); }
+      // Backfill NULL timestamps + teacherId
+      try {
+        await pool.query(`UPDATE "LessonPlan" SET "createdAt" = NOW() WHERE "createdAt" IS NULL`);
+        await pool.query(`UPDATE "LessonPlan" SET "updatedAt" = NOW() WHERE "updatedAt" IS NULL`);
+        await pool.query(`UPDATE "LessonPlan" SET "lastSavedAt" = NOW() WHERE "lastSavedAt" IS NULL`);
+        await pool.query(`UPDATE "LessonPlan" SET "teacherId" = '__legacy__' WHERE "teacherId" IS NULL`);
+      } catch (_e) { /* ignore */ }
+      try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "teacherId" SET NOT NULL`); } catch (_e) {}
+      // Index
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LessonPlan_teacher_idx"
+        ON "LessonPlan"("teacherId", "updatedAt" DESC) WHERE "isArchived" = false`);
+      _lpsReady = true;
+    } catch (e) {
+      console.error('[lesson-plan:ensure]', e.message);
+    }
+  }
+
+  function lpsGenId() {
+    return `lpn_${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36).slice(-4)}`;
+  }
+
+  function mapLessonPlan(r, summary = false) {
+    const base = {
+      id: r.id,
+      title: r.title || 'Giáo án mới',
+      subject: r.subject || null,
+      grade: r.grade || null,
+      tags: r.tags || [],
+      wordCount: r.wordCount || 0,
+      isArchived: !!r.isArchived,
+      gcsBackupUrl: r.gcsBackupUrl || null,
+      gcsBackupAt: r.gcsBackupAt || null,
+      lastSavedAt: r.lastSavedAt,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+    // List view: skip large content fields
+    if (summary) return { ...base, contentPreview: (r.content || '').replace(/<[^>]+>/g, '').slice(0, 160) };
+    return { ...base, content: r.content || '', contentJson: r.contentJson || {} };
+  }
+
+  // ── GET /api/teacher/lesson-plans ──
+  app.get('/api/teacher/lesson-plans', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const includeArchived = req.query.archived === '1' || req.query.archived === 'true';
+      const { rows } = await pool.query(
+        `SELECT id, "teacherId", title, content, "contentJson", subject, grade,
+                tags, "wordCount", "isArchived", "gcsBackupUrl", "gcsBackupAt",
+                "lastSavedAt", "createdAt", "updatedAt"
+           FROM "LessonPlan"
+          WHERE "teacherId" = $1 ${includeArchived ? '' : `AND "isArchived" = false`}
+          ORDER BY "updatedAt" DESC
+          LIMIT 200`,
+        [user.id]
+      );
+      res.json({ plans: rows.map(r => mapLessonPlan(r, true)), count: rows.length });
+    } catch (err) {
+      console.error('[lesson-plan:list]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/lesson-plans/:id ──
+  app.get('/api/teacher/lesson-plans/:id', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "LessonPlan" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Giáo án không tồn tại' });
+      res.json(mapLessonPlan(rows[0], false));
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/lesson-plans ──
+  app.post('/api/teacher/lesson-plans', express.json({ limit: '2mb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const id = lpsGenId();
+      const wordCount = computeWordCount(b.content || '');
+      const { rows } = await pool.query(
+        `INSERT INTO "LessonPlan" (id, "teacherId", title, content, "contentJson",
+            subject, grade, tags, "wordCount",
+            "lastSavedAt", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW(), NOW(), NOW())
+         RETURNING *`,
+        [id, user.id, b.title || 'Giáo án mới', b.content || '',
+         JSON.stringify(b.contentJson || {}),
+         b.subject || null, b.grade || null,
+         JSON.stringify(Array.isArray(b.tags) ? b.tags : []),
+         wordCount]
+      );
+      res.json({ plan: mapLessonPlan(rows[0], false) });
+    } catch (err) {
+      console.error('[lesson-plan:create]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/teacher/lesson-plans/:id (auto-save) ──
+  app.patch('/api/teacher/lesson-plans/:id', express.json({ limit: '2mb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const sets = []; const vals = [];
+      const allowed = ['title', 'content', 'subject', 'grade', 'isArchived'];
+      for (const k of allowed) {
+        if (k in b) { sets.push(`"${k}" = $${vals.length + 1}`); vals.push(b[k]); }
+      }
+      if (b.contentJson !== undefined) {
+        sets.push(`"contentJson" = $${vals.length + 1}`);
+        vals.push(JSON.stringify(b.contentJson || {}));
+      }
+      if (b.tags !== undefined && Array.isArray(b.tags)) {
+        sets.push(`tags = $${vals.length + 1}`);
+        vals.push(JSON.stringify(b.tags));
+      }
+      if ('content' in b) {
+        const wc = computeWordCount(b.content || '');
+        sets.push(`"wordCount" = $${vals.length + 1}`);
+        vals.push(wc);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
+      sets.push(`"lastSavedAt" = NOW()`);
+      sets.push(`"updatedAt" = NOW()`);
+      vals.push(req.params.id, user.id);
+      const { rows } = await pool.query(
+        `UPDATE "LessonPlan" SET ${sets.join(', ')}
+          WHERE id = $${vals.length - 1} AND "teacherId" = $${vals.length}
+          RETURNING *`,
+        vals
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Giáo án không tồn tại' });
+      res.json({ plan: mapLessonPlan(rows[0], false) });
+    } catch (err) {
+      console.error('[lesson-plan:update]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/lesson-plans/:id ──
+  app.delete('/api/teacher/lesson-plans/:id', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const r = await pool.query(
+        `DELETE FROM "LessonPlan" WHERE id = $1 AND "teacherId" = $2`,
+        [req.params.id, user.id]
+      );
+      if (r.rowCount === 0) return res.status(404).json({ error: 'Giáo án không tồn tại' });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/lesson-plans/:id/backup ──
+  // Snapshot HTML lên GCS bucket "aeroedu-media-..."
+  // Chỉ tạo backup khi user click "Lưu vào Drive" (KHÔNG auto, để
+  // tiết kiệm GCS write ops).
+  app.post('/api/teacher/lesson-plans/:id/backup', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLessonPlanTables();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "LessonPlan" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Giáo án không tồn tại' });
+      const plan = rows[0];
+      // Try GCS upload (graceful fallback nếu chưa setup)
+      try {
+        const { Storage } = require('@google-cloud/storage');
+        const bucketName = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+        const storage = new Storage();
+        const bucket = storage.bucket(bucketName);
+        const safeTitle = (plan.title || 'giao-an')
+          .normalize('NFD').replace(/[̀-ͯ]/g, '')
+          .replace(/đ/gi, 'd').replace(/[^a-z0-9-]+/gi, '-').toLowerCase();
+        const objectKey = `lesson-plans/${user.id}/${safeTitle}-${Date.now()}.html`;
+        // Wrap content in standalone HTML
+        const html = `<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><title>${plan.title || 'Giáo án'}</title>
+<style>body{font-family:'Times New Roman',serif;max-width:800px;margin:40px auto;padding:0 20px;line-height:1.6;}
+h1,h2,h3{color:#1e293b;} table{border-collapse:collapse;width:100%;}
+table td,table th{border:1px solid #ccc;padding:8px;}</style>
+</head><body><h1>${plan.title || 'Giáo án'}</h1>
+${plan.content || '<p>(Trống)</p>'}
+<hr/><p><small>Sao lưu từ AeroEduVision lúc ${new Date().toLocaleString('vi-VN')}</small></p>
+</body></html>`;
+        const file = bucket.file(objectKey);
+        await file.save(html, { contentType: 'text/html; charset=utf-8' });
+        await file.makePublic();
+        const url = `https://storage.googleapis.com/${bucketName}/${objectKey}`;
+        await pool.query(
+          `UPDATE "LessonPlan" SET "gcsBackupUrl" = $1, "gcsBackupAt" = NOW(), "updatedAt" = NOW()
+            WHERE id = $2`,
+          [url, req.params.id]
+        );
+        return res.json({ ok: true, url, backedUpAt: new Date().toISOString() });
+      } catch (gcsErr) {
+        console.warn('[lesson-plan:backup:gcs]', gcsErr.message);
+        return res.status(503).json({
+          error: 'GCS backup chưa khả dụng. Đã lưu vào DB. Liên hệ admin để cấu hình bucket.',
+        });
+      }
+    } catch (err) {
+      console.error('[lesson-plan:backup]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Helper: đếm từ trong HTML content (strip tags, trim, split whitespace)
+  function computeWordCount(html) {
+    if (!html) return 0;
+    const text = String(html).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').trim();
+    if (!text) return 0;
+    return text.split(/\s+/).length;
+  }
 
   // ── GET /api/student/my-teachers ── list GV approved của HS
   app.get('/api/student/my-teachers', async (req, res) => {
