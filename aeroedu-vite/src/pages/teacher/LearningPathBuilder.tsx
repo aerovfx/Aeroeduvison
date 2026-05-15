@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import {
   Plus, Brain, BookOpen, FolderKanban, Save,
   Settings, Zap, Clock, ChevronRight, Trash2,
@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
+
+const CreateModuleModal = lazy(() => import('@/components/learning-path/CreateModuleModal'))
 
 /* ── Dark palette ── */
 const D = {
@@ -21,21 +23,78 @@ const D = {
 } as const
 
 /* ── Types ── */
-type Difficulty = 'easy' | 'medium' | 'hard'
-type ModuleType = 'lesson' | 'quiz' | 'project' | 'assignment'
+export type Difficulty = 'easy' | 'medium' | 'hard'
+export type ModuleType =
+  | 'lesson'
+  | 'quiz'
+  | 'project'
+  | 'assignment'
+  | 'video'        // Bài video (YouTube / Vimeo / GCS mp4)
+  | 'survey'       // Bài khảo sát (rating/text/choice)
+  | 'final-exam'   // Bài kiểm tra cuối khoá (link tới Exam đã tạo)
+  | 'stem-skill'   // Hoàn thành 1 kĩ năng STEM
+  | 'challenge'    // Thách đấu với 1 HS khác
 
-interface Module {
+export interface QuizQuestion {
+  id: string
+  q: string
+  options: string[]            // 2-4 đáp án
+  correctIndex: number         // 0-based
+  explanation?: string
+}
+
+export interface SurveyQuestion {
+  id: string
+  q: string
+  type: 'rating' | 'text' | 'choice'
+  options?: string[]           // dùng cho 'choice'
+  scaleMax?: number            // dùng cho 'rating' (mặc định 5)
+}
+
+export type VideoEmbedKind = 'youtube' | 'vimeo' | 'mp4' | 'gcs'
+export type ChallengeFormat = 'speed-quiz' | 'best-of-3' | 'duel-3min'
+
+export interface Module {
   id: string
   type: ModuleType
   title: string
   subject: string
   difficulty: Difficulty
-  duration: number
+  duration: number             // phút
   xpTarget: number
   prerequisites?: string[]
+
+  // ── Rich content (optional, type-specific) ──
+  description?: string
+  tags?: string[]
+  passingScore?: number        // % đạt cho quiz/exam (0-100)
+  attempts?: number            // số lần làm tối đa (0 = unlimited)
+
+  // type=video
+  videoUrl?: string
+  videoEmbedKind?: VideoEmbedKind
+
+  // type=quiz
+  quizQuestions?: QuizQuestion[]
+
+  // type=survey
+  surveyQuestions?: SurveyQuestion[]
+
+  // type=final-exam
+  examId?: string              // link tới existing Exam trong /teacher/exams
+  examName?: string
+
+  // type=stem-skill
+  stemSkillId?: string
+  stemSkillName?: string
+
+  // type=challenge
+  challengeStudentId?: string
+  challengeStudentName?: string
+  challengeFormat?: ChallengeFormat
 }
 
-interface RosterStudent {
+export interface RosterStudent {
   id: string
   userId: string | null
   name: string
@@ -64,7 +123,27 @@ interface LearningPath {
 
 /* ── Helpers ── */
 const MODULE_ICONS: Record<ModuleType, string> = {
-  lesson: '📖', quiz: '📝', project: '🎯', assignment: '📋',
+  lesson:       '📖',
+  quiz:         '📝',
+  project:      '🎯',
+  assignment:   '📋',
+  video:        '🎬',
+  survey:       '📊',
+  'final-exam': '🏆',
+  'stem-skill': '⚙️',
+  challenge:    '⚔️',
+}
+
+export const MODULE_TYPE_LABELS: Record<ModuleType, string> = {
+  lesson:       'Bài giảng',
+  quiz:         'Trắc nghiệm',
+  project:      'Dự án',
+  assignment:   'Bài tập',
+  video:        'Video',
+  survey:       'Khảo sát',
+  'final-exam': 'Bài kiểm tra cuối khoá',
+  'stem-skill': 'Kĩ năng STEM',
+  challenge:    'Thách đấu HS khác',
 }
 
 const DIFF_COLORS: Record<Difficulty, { bg: string; border: string; text: string }> = {
@@ -145,6 +224,18 @@ export default function LearningPathBuilder() {
   const [pathsListOpen, setPathsListOpen] = useState(false)
   const [editingPathId, setEditingPathId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  // ── Tạo Module Mới modal ──
+  const [createModuleOpen, setCreateModuleOpen] = useState(false)
+  // Modules tự tạo bởi GV (lưu local state để hiển thị bên cột Modules có sẵn)
+  const [customModules, setCustomModules] = useState<Module[]>([])
+
+  const handleCreateModule = (m: Module) => {
+    // 1. Thêm vào danh sách "Modules có sẵn" (sticky để dùng lại)
+    setCustomModules(prev => [m, ...prev])
+    // 2. Auto-add ngay vào path đang soạn
+    setSelectedModules(prev => [...prev, m])
+  }
 
   // Load roster + existing paths on mount
   useEffect(() => {
@@ -514,6 +605,68 @@ export default function LearningPathBuilder() {
             </h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+              {customModules.length > 0 && (
+                <div style={{
+                  fontSize: 10, color: '#a78bfa', textTransform: 'uppercase',
+                  fontWeight: 800, letterSpacing: '0.05em',
+                  paddingTop: 4, paddingBottom: 2,
+                }}>
+                  ✨ Module bạn vừa tạo
+                </div>
+              )}
+              {customModules.map(module => (
+                <div
+                  key={module.id}
+                  onClick={() => addModule(module)}
+                  style={{
+                    background: 'rgba(124,58,237,0.08)',
+                    border: '1px solid rgba(124,58,237,0.4)', borderRadius: 10,
+                    padding: '10px 12px', cursor: 'pointer', transition: 'border-color 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(124,58,237,0.4)')}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                    <span style={{ fontSize: 20 }}>{MODULE_ICONS[module.type]}</span>
+                    <DiffBadge diff={module.difficulty} />
+                  </div>
+                  <p style={{ color: D.text, fontSize: 13, fontWeight: 700, margin: '0 0 6px' }}>{module.title}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: D.muted }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Clock size={10} /> {module.duration}m
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <Zap size={10} /> {module.xpTarget} XP
+                    </span>
+                  </div>
+                  {/* Rich content preview line */}
+                  {(module.quizQuestions || module.surveyQuestions || module.videoUrl ||
+                    module.examName || module.stemSkillName || module.challengeStudentName) && (
+                    <div style={{
+                      marginTop: 6, paddingTop: 6, borderTop: `1px dashed ${D.border2}`,
+                      fontSize: 10, color: '#c4b5fd', display: 'flex', flexWrap: 'wrap', gap: 6,
+                    }}>
+                      {module.quizQuestions && <span>· {module.quizQuestions.length} câu MCQ</span>}
+                      {module.surveyQuestions && <span>· {module.surveyQuestions.length} câu khảo sát</span>}
+                      {module.videoUrl && <span>· 🎬 {module.videoEmbedKind}</span>}
+                      {module.examName && <span>· 🏆 {module.examName.slice(0, 20)}</span>}
+                      {module.stemSkillName && <span>· ⚙️ {module.stemSkillName}</span>}
+                      {module.challengeStudentName && <span>· ⚔️ vs {module.challengeStudentName}</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {customModules.length > 0 && (
+                <div style={{
+                  fontSize: 10, color: D.muted, textTransform: 'uppercase',
+                  fontWeight: 800, letterSpacing: '0.05em',
+                  paddingTop: 8, paddingBottom: 2, borderTop: `1px solid ${D.border}`, marginTop: 2,
+                }}>
+                  Module mặc định (demo)
+                </div>
+              )}
+
               {AVAILABLE_MODULES.map(module => (
                 <div
                   key={module.id}
@@ -543,15 +696,17 @@ export default function LearningPathBuilder() {
             </div>
 
             <button
+              onClick={() => setCreateModuleOpen(true)}
               style={{
-                marginTop: 12, width: '100%', background: 'transparent',
-                border: `1px solid ${D.border2}`, borderRadius: 10,
-                color: D.muted, cursor: 'pointer', padding: '8px 0',
-                fontSize: 13, fontWeight: 600,
+                marginTop: 12, width: '100%',
+                background: 'linear-gradient(90deg, #7c3aed, #6d28d9)',
+                border: '1px solid rgba(124,58,237,0.5)', borderRadius: 10,
+                color: '#fff', cursor: 'pointer', padding: '10px 0',
+                fontSize: 13, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                boxShadow: '0 3px 10px rgba(124,58,237,0.25)',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#7c3aed'; e.currentTarget.style.color = '#a78bfa' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = D.border2; e.currentTarget.style.color = D.muted }}
+              title="Mở wizard tạo module với 9 loại: bài giảng, video, trắc nghiệm, khảo sát, kiểm tra cuối khoá, kĩ năng STEM, thách đấu HS..."
             >
               <Plus size={14} /> Tạo Module Mới
             </button>
@@ -892,6 +1047,16 @@ export default function LearningPathBuilder() {
           </div>
         </div>
       )}
+
+      {/* ── Tạo Module Mới Modal ── */}
+      <Suspense fallback={null}>
+        <CreateModuleModal
+          open={createModuleOpen}
+          onClose={() => setCreateModuleOpen(false)}
+          onCreate={handleCreateModule}
+          roster={roster}
+        />
+      </Suspense>
     </div>
   )
 }
