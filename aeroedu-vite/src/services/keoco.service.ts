@@ -122,6 +122,31 @@ export interface KcCreateSessionInput {
   questionCount?: number
   timePerQuestion?: number
   ropeMax?: number
+  /** Optional: nguồn câu hỏi từ 1 đề thi cụ thể trong game catalog */
+  examId?: string
+  examTitle?: string
+}
+
+// ── Game catalog (đề thi GV add vào danh mục thi đấu) ──────────────
+export interface KcCatalogItem {
+  id: string
+  examId: string
+  examTitle: string
+  subject: string | null
+  grade: string | null
+  questionCount: number
+  gameType: string
+  addedAt: string
+}
+
+// ── Leaderboard top players ────────────────────────────────────────
+export interface KcLeaderboardEntry {
+  rank: number
+  name: string
+  wins: number
+  totalPlayed: number
+  totalScore: number
+  winRate: number
 }
 
 // ── 1v1 Challenge types ────────────────────────────────────────────
@@ -404,6 +429,19 @@ export const keocoService = {
     api
       .post(`/keoco/public/lives/${token}/answer`, payload)
       .then(unwrap<KcLiveAnswerResult>),
+
+  // ── Game catalog (GV add đề vào danh mục thi đấu) ───────────────
+  listGameCatalog: (gameType: string = 'keo-co'): Promise<KcCatalogItem[]> =>
+    api.get(`/games/catalog?type=${encodeURIComponent(gameType)}`)
+      .then(r => Array.isArray(r.data?.items) ? r.data.items : []),
+
+  removeFromCatalog: (id: string): Promise<void> =>
+    api.delete(`/games/catalog/${id}`).then(() => undefined),
+
+  // ── Leaderboard top players (cross-session aggregate) ───────────
+  getLeaderboard: (): Promise<KcLeaderboardEntry[]> =>
+    api.get(`/keoco/leaderboard`)
+      .then(r => Array.isArray(r.data?.leaderboard) ? r.data.leaderboard : []),
 }
 
 export default keocoService

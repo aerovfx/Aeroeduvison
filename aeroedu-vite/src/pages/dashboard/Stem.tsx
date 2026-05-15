@@ -1,12 +1,13 @@
 /**
- * STEM Projects Dashboard v2 — Blueprint.am-inspired
+ * STEM Lab — Hub đa năng cho HS sáng tạo dự án + biến thành startup
  *
- * Trước: chỉ là list dự án của HS.
- * Giờ: 1 hub đa dạng với 4 mảng nội dung:
- *   🤖 AI Project Generator — mô tả ý tưởng → AI sinh kế hoạch + BOM + steps
- *   📂 Dự án của tôi        — list cũ giữ nguyên (tab 1)
+ * 5 mảng nội dung:
+ *   🤖 AI Generator         — mô tả ý tưởng → AI sinh kế hoạch + BOM + steps
+ *   📂 Dự án của tôi        — list dự án cá nhân (CRUD + public vote/feedback)
  *   📚 Thư viện linh kiện   — Arduino/ESP32/sensors với specs + giá tham khảo
  *   🎯 Mẫu khởi đầu         — 6 starter templates 1-click
+ *   🚀 Startup Blueprint    — AI sinh Lean Canvas 9 ô từ dự án STEM
+ *                              + 8 bài học khởi nghiệp 101 cho HS
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -1380,6 +1381,248 @@ const LEVEL_BADGE: Record<Lesson['level'], { label: string; cls: string }> = {
   advanced:     { label: 'NÂNG CAO',    cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
 }
 
+// ─────────────────────────────────────────────
+// STARTUP BLUEPRINT GENERATOR — Lean Canvas 9 ô + AI suggestion
+// (Phương pháp Lean Canvas — concept khởi nghiệp tinh gọn, dùng cho HS THPT)
+// ─────────────────────────────────────────────
+interface StartupBlueprint {
+  productIdea: string
+  problem: string
+  customerSegments: string[]
+  uniqueValueProposition: string
+  solution: string
+  channels: string[]
+  revenueStreams: string[]
+  costStructure: string[]
+  keyMetrics: string[]
+  unfairAdvantage: string
+  estimatedStartupCost: string
+  firstMilestone: string
+  risks: string[]
+  nextSteps: string[]
+}
+
+function StartupBlueprintGenerator() {
+  const [projects, setProjects] = useState<STEMProject[]>([])
+  const [selectedId, setSelectedId] = useState<string>('')
+  const [customTitle, setCustomTitle] = useState('')
+  const [customDesc, setCustomDesc] = useState('')
+  const [targetMarket, setTargetMarket] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [blueprint, setBlueprint] = useState<StartupBlueprint | null>(null)
+  const [tookMs, setTookMs] = useState(0)
+
+  useEffect(() => { setProjects(loadProjects()) }, [])
+
+  const project = projects.find(p => p.id === selectedId)
+  const title = project?.title || customTitle.trim()
+  const desc = project?.description || customDesc.trim()
+
+  const canGenerate = title.length >= 3 && !generating
+
+  const generate = async () => {
+    if (!canGenerate) return
+    setGenerating(true)
+    setBlueprint(null)
+    try {
+      const r = await api.post<{ success: boolean; blueprint: StartupBlueprint; tookMs: number }>(
+        '/stem/blueprint-suggest',
+        {
+          projectTitle: title,
+          projectDescription: desc || undefined,
+          targetMarket: targetMarket.trim() || undefined,
+        },
+        { timeout: 90_000 },
+      )
+      if (r.data?.blueprint) {
+        setBlueprint(r.data.blueprint)
+        setTookMs(r.data.tookMs || 0)
+        toast.success(`AI sinh blueprint xong (${((r.data.tookMs || 0) / 1000).toFixed(1)}s)`)
+      } else {
+        toast.error('AI không trả về blueprint hợp lệ')
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Lỗi gọi AI Blueprint Generator')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const exportJson = () => {
+    if (!blueprint) return
+    const blob = new Blob([JSON.stringify({ title, blueprint }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `blueprint-${title.replace(/[^a-z0-9]+/gi, '-').slice(0, 40).toLowerCase() || 'startup'}.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    toast.success('Đã tải blueprint .json')
+  }
+
+  // 9 ô Lean Canvas + 5 ô bổ sung — render grid responsive
+  const cards: Array<{ key: keyof StartupBlueprint; label: string; emoji: string; color: string; isList?: boolean }> = [
+    { key: 'problem',                 label: 'Vấn đề',              emoji: '❓', color: 'rose' },
+    { key: 'customerSegments',        label: 'Khách hàng mục tiêu',  emoji: '👥', color: 'cyan',   isList: true },
+    { key: 'uniqueValueProposition',  label: 'Giá trị độc đáo (UVP)', emoji: '✨', color: 'purple' },
+    { key: 'solution',                label: 'Giải pháp',            emoji: '🛠️', color: 'emerald' },
+    { key: 'channels',                label: 'Kênh tiếp cận',        emoji: '📢', color: 'blue',   isList: true },
+    { key: 'revenueStreams',          label: 'Nguồn doanh thu',      emoji: '💰', color: 'amber',  isList: true },
+    { key: 'costStructure',           label: 'Cấu trúc chi phí',     emoji: '💸', color: 'orange', isList: true },
+    { key: 'keyMetrics',              label: 'Chỉ số đo lường',      emoji: '📊', color: 'teal',   isList: true },
+    { key: 'unfairAdvantage',         label: 'Lợi thế cạnh tranh',   emoji: '🏆', color: 'pink' },
+  ]
+
+  return (
+    <div className="rounded-2xl bg-gradient-to-br from-orange-600/15 via-pink-600/10 to-purple-600/10 border border-orange-500/30 p-5 mb-5 relative overflow-hidden">
+      <div className="absolute -top-20 -right-20 w-60 h-60 bg-orange-500/15 blur-3xl rounded-full pointer-events-none" />
+      <div className="relative">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-pink-500 flex items-center justify-center shadow-lg shadow-orange-500/30 flex-shrink-0">
+            <Rocket className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-white mb-1">🚀 Blueprint sản phẩm khởi nghiệp</h2>
+            <p className="text-sm text-white/60">
+              Chọn 1 dự án STEM của bạn → AI sẽ phân tích và sinh <strong className="text-orange-300">Lean Canvas 9 ô</strong> + 5 mục bổ sung
+              (chi phí khởi nghiệp, mục tiêu 90 ngày, rủi ro, bước tiếp theo). Phương pháp dùng cho 100% startup tinh gọn.
+            </p>
+          </div>
+        </div>
+
+        {/* Project picker / custom input */}
+        <div className="space-y-3 mb-4">
+          {projects.length > 0 && (
+            <div>
+              <label className="text-xs text-white/50 uppercase font-bold tracking-wider mb-1.5 block">
+                Chọn dự án STEM của bạn
+              </label>
+              <select
+                value={selectedId}
+                onChange={e => { setSelectedId(e.target.value); setCustomTitle(''); setCustomDesc('') }}
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white text-sm focus:outline-none focus:border-orange-500/50"
+                disabled={generating}
+              >
+                <option value="">— Hoặc nhập tay bên dưới —</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.title} ({p.category})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {!selectedId && (
+            <>
+              <input
+                value={customTitle}
+                onChange={e => setCustomTitle(e.target.value)}
+                placeholder="Tên dự án STEM (VD: Hệ thống tưới cây tự động)"
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-orange-500/50"
+                disabled={generating}
+              />
+              <textarea
+                value={customDesc}
+                onChange={e => setCustomDesc(e.target.value)}
+                placeholder="Mô tả ngắn dự án (tuỳ chọn)"
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-orange-500/50 resize-none"
+                disabled={generating}
+              />
+            </>
+          )}
+          <input
+            value={targetMarket}
+            onChange={e => setTargetMarket(e.target.value)}
+            placeholder="Thị trường mục tiêu (tuỳ chọn — VD: nông dân ĐBSCL, HS THCS Hà Nội)"
+            className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/30 text-sm focus:outline-none focus:border-orange-500/50"
+            disabled={generating}
+          />
+        </div>
+
+        <button
+          onClick={generate}
+          disabled={!canGenerate}
+          className={`w-full py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+            canGenerate
+              ? 'bg-gradient-to-r from-orange-500 to-pink-500 text-white shadow-lg shadow-orange-500/30 hover:scale-[1.01]'
+              : 'bg-white/[0.05] text-white/30 cursor-not-allowed'
+          }`}
+        >
+          {generating ? (
+            <><Loader2 className="w-4 h-4 animate-spin" /> AI đang phân tích blueprint…</>
+          ) : (
+            <><Sparkles className="w-4 h-4" /> Sinh Blueprint khởi nghiệp bằng AI</>
+          )}
+        </button>
+
+        {/* Result */}
+        {blueprint && (
+          <div className="mt-5">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <div>
+                <h3 className="text-base font-bold text-white">💡 {blueprint.productIdea}</h3>
+                <p className="text-xs text-white/50">Sinh trong {(tookMs / 1000).toFixed(1)}s · Phương pháp Lean Canvas</p>
+              </div>
+              <button
+                onClick={exportJson}
+                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-white/80 font-semibold flex items-center gap-1.5"
+              >
+                <Download className="w-3 h-3" /> Tải JSON
+              </button>
+            </div>
+
+            {/* 9-card grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+              {cards.map(c => {
+                const val = blueprint[c.key]
+                return (
+                  <div key={c.key} className={`rounded-xl border p-3 bg-${c.color}-500/5 border-${c.color}-500/20`}>
+                    <div className="text-[10px] text-white/40 uppercase font-bold tracking-wider mb-1.5 flex items-center gap-1">
+                      <span>{c.emoji}</span> {c.label}
+                    </div>
+                    {c.isList && Array.isArray(val) ? (
+                      <ul className="space-y-1">
+                        {val.map((item, i) => (
+                          <li key={i} className="text-xs text-white/80 leading-snug">• {item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-white/85 leading-relaxed">{String(val)}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Bonus 5 boxes */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <div className="text-[10px] text-emerald-300 uppercase font-bold tracking-wider mb-1.5">💵 Chi phí khởi nghiệp ước tính</div>
+                <p className="text-sm text-white/90 font-bold">{blueprint.estimatedStartupCost}</p>
+              </div>
+              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-3">
+                <div className="text-[10px] text-blue-300 uppercase font-bold tracking-wider mb-1.5">🎯 Mục tiêu 90 ngày đầu</div>
+                <p className="text-xs text-white/85">{blueprint.firstMilestone}</p>
+              </div>
+              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-3">
+                <div className="text-[10px] text-rose-300 uppercase font-bold tracking-wider mb-1.5">⚠️ Rủi ro</div>
+                <ul className="space-y-1">
+                  {blueprint.risks.map((r, i) => <li key={i} className="text-xs text-white/80">• {r}</li>)}
+                </ul>
+              </div>
+              <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3">
+                <div className="text-[10px] text-purple-300 uppercase font-bold tracking-wider mb-1.5">🚀 Bước tiếp theo</div>
+                <ul className="space-y-1">
+                  {blueprint.nextSteps.map((s, i) => <li key={i} className="text-xs text-white/80">{i + 1}. {s}</li>)}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function StartupLessonsTab() {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState<'all' | Lesson['level']>('all')
@@ -1395,6 +1638,8 @@ function StartupLessonsTab() {
 
   return (
     <div>
+      {/* ── Blueprint Generator (đặt lên đầu — feature mới hấp dẫn nhất) ── */}
+      <StartupBlueprintGenerator />
       {/* Hero intro */}
       <div className="rounded-2xl bg-gradient-to-br from-orange-600/15 via-pink-600/10 to-purple-600/10 border border-orange-500/30 p-5 mb-5 relative overflow-hidden">
         <div className="absolute -top-20 -right-20 w-60 h-60 bg-orange-500/15 blur-3xl rounded-full pointer-events-none" />
@@ -1643,7 +1888,7 @@ export default function StemPage() {
             { key: 'projects'  as const, label: 'Dự án của tôi',     icon: Layers,     count: projects.length },
             { key: 'library'   as const, label: 'Thư viện linh kiện', icon: Cpu,        count: COMPONENT_LIB.length },
             { key: 'templates' as const, label: 'Mẫu khởi đầu',      icon: Sparkles,   count: TEMPLATES.length },
-            { key: 'startup'   as const, label: 'Học startup',       icon: Rocket,     count: STARTUP_LESSONS.length },
+            { key: 'startup'   as const, label: 'Startup Blueprint', icon: Rocket,     count: STARTUP_LESSONS.length + 1 },
           ]).map(({ key, label, icon: Icon, count }) => (
             <button
               key={key}

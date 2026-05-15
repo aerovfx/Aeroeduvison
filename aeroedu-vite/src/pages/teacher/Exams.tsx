@@ -3,7 +3,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Plus, FileText, Eye, Edit, Trash2, Copy,
-  Grid3x3, Search, BarChart3, Sparkles, Loader2,
+  Grid3x3, Search, BarChart3, Sparkles, Loader2, Swords,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
@@ -72,6 +72,7 @@ export default function ExamsPage() {
   const [exportingLatexId, setExportingLatexId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [addingToGameId, setAddingToGameId] = useState<string | null>(null)
 
   useEffect(() => { loadExams() }, [subjectFilter])
 
@@ -120,6 +121,25 @@ export default function ExamsPage() {
       toast.error('Không thể xóa đề thi')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleAddToGameCatalog = async (exam: Exam) => {
+    if (addingToGameId) return
+    setAddingToGameId(exam.id)
+    try {
+      await api.post('/games/catalog', {
+        examId: exam.id,
+        examTitle: exam.title,
+        subject: exam.subject,
+        questionCount: exam.totalQuestions,
+        gameType: 'keo-co',
+      })
+      toast.success(`Đã thêm "${exam.title}" vào danh mục trò chơi Kéo Co ⚔️`)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Không thể thêm vào danh mục trò chơi')
+    } finally {
+      setAddingToGameId(null)
     }
   }
 
@@ -391,6 +411,21 @@ export default function ExamsPage() {
                                 {exportingLatexId === exam.id
                                   ? <Loader2 className="w-4 h-4 animate-spin" />
                                   : <Sparkles className="w-4 h-4" />
+                                }
+                              </button>
+                              {/* Add to game catalog (Kéo Co) */}
+                              <button
+                                onClick={() => handleAddToGameCatalog(exam)}
+                                title="Thêm vào danh mục trò chơi thi đấu đối kháng (Kéo Co)"
+                                disabled={addingToGameId === exam.id}
+                                className="p-2 rounded-lg transition-colors disabled:opacity-50"
+                                style={{ color: '#f59e0b' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.15)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                              >
+                                {addingToGameId === exam.id
+                                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                                  : <Swords className="w-4 h-4" />
                                 }
                               </button>
                               {/* Delete */}

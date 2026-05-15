@@ -7556,6 +7556,369 @@ ${plan.content || '<p>(Trống)</p>'}
   });
 
   // ════════════════════════════════════════════════
+  // GAME CATALOG — đề thi được GV add vào danh mục trò chơi đối kháng
+  // (Keo-co, Speed-quiz...). KeoCoApp dropdown chọn đề từ catalog này.
+  // ════════════════════════════════════════════════
+  let gameCatalogReady = false;
+  async function ensureGameCatalogReady() {
+    if (gameCatalogReady) return;
+    const pool = getKcPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS game_catalog (
+        id TEXT PRIMARY KEY,
+        teacher_id TEXT NOT NULL,
+        exam_id TEXT NOT NULL,
+        exam_title TEXT NOT NULL,
+        subject TEXT,
+        grade TEXT,
+        question_count INT DEFAULT 0,
+        game_type TEXT NOT NULL DEFAULT 'keo-co',
+        added_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_catalog_type ON game_catalog(game_type, added_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_game_catalog_teacher ON game_catalog(teacher_id, added_at DESC)`);
+    gameCatalogReady = true;
+  }
+
+  // POST /api/games/catalog — GV add 1 đề vào danh mục trò chơi
+  app.post('/api/games/catalog', express.json({ limit: '256kb' }), async (req, res) => {
+    try {
+      const user = getUserKc(req);
+      if (!user) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const { examId, examTitle, subject, grade, questionCount, gameType } = req.body || {};
+      if (!examId || !examTitle) {
+        return res.status(400).json({ success: false, error: 'examId + examTitle required' });
+      }
+      const validTypes = ['keo-co', 'speed-quiz', 'best-of-3', 'duel-3min'];
+      const gt = validTypes.includes(gameType) ? gameType : 'keo-co';
+      await ensureGameCatalogReady();
+      const pool = getKcPool();
+      // Check duplicate: nếu đã add đề này cho game type rồi thì update added_at
+      const existing = await pool.query(
+        `SELECT id FROM game_catalog WHERE teacher_id=$1 AND exam_id=$2 AND game_type=$3`,
+        [user.id, String(examId), gt]
+      );
+      if (existing.rowCount > 0) {
+        await pool.query(`UPDATE game_catalog SET added_at=NOW() WHERE id=$1`, [existing.rows[0].id]);
+        return res.json({ success: true, id: existing.rows[0].id, deduped: true });
+      }
+      const id = 'gc_' + Math.random().toString(36).slice(2, 12);
+      await pool.query(
+        `INSERT INTO game_catalog (id, teacher_id, exam_id, exam_title, subject, grade, question_count, game_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [id, user.id, String(examId), String(examTitle).slice(0, 200),
+         subject ? String(subject).slice(0, 80) : null,
+         grade ? String(grade).slice(0, 20) : null,
+         Number(questionCount) || 0, gt]
+      );
+      console.log(`[games:catalog] ✅ added exam=${examId} type=${gt} teacher=${user.id}`);
+      return res.status(201).json({ success: true, id });
+    } catch (err) {
+      console.error('[games:catalog:add] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/games/catalog?type=keo-co — list đề trong catalog cho game type
+  app.get('/api/games/catalog', async (req, res) => {
+    try {
+      await ensureGameCatalogReady();
+      const pool = getKcPool();
+      const gameType = String(req.query.type || 'keo-co').slice(0, 30);
+      const r = await pool.query(
+        `SELECT id, exam_id, exam_title, subject, grade, question_count, game_type, added_at
+         FROM game_catalog WHERE game_type=$1 ORDER BY added_at DESC LIMIT 100`,
+        [gameType]
+      );
+      return res.json({
+        success: true,
+        items: r.rows.map(x => ({
+          id: x.id, examId: x.exam_id, examTitle: x.exam_title,
+          subject: x.subject, grade: x.grade, questionCount: x.question_count,
+          gameType: x.game_type, addedAt: x.added_at,
+        })),
+      });
+    } catch (err) {
+      console.error('[games:catalog:list] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // DELETE /api/games/catalog/:id — remove khỏi catalog (chỉ owner)
+  app.delete('/api/games/catalog/:id', async (req, res) => {
+    try {
+      const user = getUserKc(req);
+      if (!user) return res.status(401).json({ success: false, error: 'unauthorized' });
+      await ensureGameCatalogReady();
+      const pool = getKcPool();
+      const q = await pool.query(`SELECT teacher_id FROM game_catalog WHERE id=$1`, [req.params.id]);
+      if (q.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      if (q.rows[0].teacher_id !== user.id) return res.status(403).json({ success: false, error: 'forbidden' });
+      await pool.query(`DELETE FROM game_catalog WHERE id=$1`, [req.params.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[games:catalog:del] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // KEO-CO LEADERBOARD — top players/teams across sessions
+  // Aggregate từ keoco_sessions + keoco_participants (mỗi session 1 winner).
+  // ════════════════════════════════════════════════
+  app.get('/api/keoco/leaderboard', async (req, res) => {
+    try {
+      await ensureKcReady();
+      const pool = getKcPool();
+      // Top players by wins (group by name from participants table, count sessions
+      // where their team won). Limit 10.
+      // Fallback: nếu schema chưa có winner column hoặc bảng chưa create → return []
+      let rows = [];
+      try {
+        const r = await pool.query(`
+          SELECT
+            p.display_name AS name,
+            COUNT(DISTINCT s.id) FILTER (WHERE s.winner_team = p.team) AS wins,
+            COUNT(DISTINCT s.id) AS total_played,
+            COALESCE(SUM(p.score), 0) AS total_score
+          FROM keoco_participants p
+          JOIN keoco_sessions s ON s.id = p.session_id
+          WHERE p.display_name IS NOT NULL AND p.display_name <> ''
+          GROUP BY p.display_name
+          ORDER BY wins DESC, total_score DESC, total_played DESC
+          LIMIT 10
+        `);
+        rows = r.rows;
+      } catch (e) {
+        console.warn('[keoco:leaderboard] schema chưa đủ, return []:', e.message);
+        rows = [];
+      }
+      return res.json({
+        success: true,
+        leaderboard: rows.map((x, i) => ({
+          rank: i + 1,
+          name: x.name,
+          wins: parseInt(x.wins, 10) || 0,
+          totalPlayed: parseInt(x.total_played, 10) || 0,
+          totalScore: parseInt(x.total_score, 10) || 0,
+          winRate: x.total_played > 0 ? Math.round((x.wins / x.total_played) * 100) : 0,
+        })),
+      });
+    } catch (err) {
+      console.error('[keoco:leaderboard] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // STEM PROJECT VOTE + FEEDBACK (cho project public)
+  // Bảng stem_project_votes + stem_project_feedback (discover-and-patch)
+  // ════════════════════════════════════════════════
+  let stemSocialReady = false;
+  async function ensureStemSocialReady() {
+    if (stemSocialReady) return;
+    const pool = getKcPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stem_project_votes (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        voter_id TEXT NOT NULL,
+        vote_type TEXT NOT NULL CHECK (vote_type IN ('up','down')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (project_id, voter_id)
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS stem_project_feedback (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        author_id TEXT NOT NULL,
+        author_name TEXT,
+        comment TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stem_votes_proj ON stem_project_votes(project_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_stem_fb_proj ON stem_project_feedback(project_id, created_at DESC)`);
+    stemSocialReady = true;
+  }
+
+  // GET /api/stem/projects/:id/social — tổng vote + list feedback
+  app.get('/api/stem/projects/:id/social', async (req, res) => {
+    try {
+      await ensureStemSocialReady();
+      const pool = getKcPool();
+      const pid = req.params.id;
+      const user = getUserKc(req);
+      const [vq, fq, mq] = await Promise.all([
+        pool.query(
+          `SELECT
+             COUNT(*) FILTER (WHERE vote_type='up') AS ups,
+             COUNT(*) FILTER (WHERE vote_type='down') AS downs
+           FROM stem_project_votes WHERE project_id=$1`,
+          [pid]
+        ),
+        pool.query(
+          `SELECT id, author_id, author_name, comment, created_at
+           FROM stem_project_feedback WHERE project_id=$1 ORDER BY created_at DESC LIMIT 50`,
+          [pid]
+        ),
+        user
+          ? pool.query(
+              `SELECT vote_type FROM stem_project_votes WHERE project_id=$1 AND voter_id=$2`,
+              [pid, user.id]
+            )
+          : Promise.resolve({ rows: [] }),
+      ]);
+      return res.json({
+        success: true,
+        ups: parseInt(vq.rows[0]?.ups, 10) || 0,
+        downs: parseInt(vq.rows[0]?.downs, 10) || 0,
+        myVote: mq.rows[0]?.vote_type || null,
+        feedback: fq.rows.map(x => ({
+          id: x.id, authorId: x.author_id, authorName: x.author_name || 'Ẩn danh',
+          comment: x.comment, createdAt: x.created_at,
+        })),
+      });
+    } catch (err) {
+      console.error('[stem:social:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/stem/projects/:id/vote — vote up/down (toggle nếu đã vote)
+  app.post('/api/stem/projects/:id/vote', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      const user = getUserKc(req);
+      if (!user) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const { vote } = req.body || {};
+      if (vote !== 'up' && vote !== 'down' && vote !== null) {
+        return res.status(400).json({ success: false, error: 'vote must be up|down|null' });
+      }
+      await ensureStemSocialReady();
+      const pool = getKcPool();
+      const pid = req.params.id;
+      if (vote === null) {
+        await pool.query(
+          `DELETE FROM stem_project_votes WHERE project_id=$1 AND voter_id=$2`,
+          [pid, user.id]
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO stem_project_votes (id, project_id, voter_id, vote_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (project_id, voter_id) DO UPDATE SET vote_type = EXCLUDED.vote_type, created_at = NOW()`,
+          ['v_' + Math.random().toString(36).slice(2, 12), pid, user.id, vote]
+        );
+      }
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[stem:vote] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/stem/projects/:id/feedback — submit comment
+  app.post('/api/stem/projects/:id/feedback', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      const user = getUserKc(req);
+      if (!user) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const { comment, authorName } = req.body || {};
+      if (!comment || typeof comment !== 'string' || comment.trim().length < 2) {
+        return res.status(400).json({ success: false, error: 'comment ≥2 chars required' });
+      }
+      await ensureStemSocialReady();
+      const pool = getKcPool();
+      const id = 'fb_' + Math.random().toString(36).slice(2, 12);
+      await pool.query(
+        `INSERT INTO stem_project_feedback (id, project_id, author_id, author_name, comment)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, req.params.id, user.id, String(authorName || '').slice(0, 80) || null, comment.trim().slice(0, 1000)]
+      );
+      return res.status(201).json({ success: true, id });
+    } catch (err) {
+      console.error('[stem:feedback] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // STARTUP BLUEPRINT AI — generate Lean Canvas từ STEM project description
+  // ════════════════════════════════════════════════
+  app.post('/api/stem/blueprint-suggest', express.json({ limit: '32kb' }), async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const user = getUserKc(req);
+      if (!user) return res.status(401).json({ success: false, error: 'unauthorized' });
+      const { projectTitle, projectDescription, targetMarket } = req.body || {};
+      if (!projectTitle || projectTitle.trim().length < 3) {
+        return res.status(400).json({ success: false, error: 'projectTitle ≥3 chars required' });
+      }
+
+      const fal = require('./lib/fal-client.cjs');
+      const sysPrompt = [
+        'Bạn là cố vấn khởi nghiệp cho HS THPT Việt Nam. Người dùng có 1 dự án STEM và muốn biến nó thành sản phẩm khởi nghiệp.',
+        'Hãy phân tích theo phương pháp Lean Canvas (9 ô) — đơn giản, dễ hiểu cho HS, văn phong khích lệ.',
+        '',
+        'TRẢ VỀ duy nhất JSON object theo schema:',
+        '{',
+        '  "productIdea": "1 câu mô tả sản phẩm khởi nghiệp",',
+        '  "problem": "vấn đề thực tế mà sản phẩm giải quyết (2-3 câu)",',
+        '  "customerSegments": ["nhóm KH 1", "nhóm KH 2", "nhóm KH 3"],',
+        '  "uniqueValueProposition": "giá trị độc đáo (1-2 câu hấp dẫn)",',
+        '  "solution": "giải pháp cụ thể (cách thức hoạt động)",',
+        '  "channels": ["kênh tiếp cận KH 1", "kênh 2", "kênh 3"],',
+        '  "revenueStreams": ["nguồn doanh thu 1 (VD: bán sản phẩm)", "nguồn 2 (VD: subscription)"],',
+        '  "costStructure": ["chi phí 1 (linh kiện)", "chi phí 2 (marketing)", "chi phí 3"],',
+        '  "keyMetrics": ["chỉ số 1 (VD: số đơn/tháng)", "chỉ số 2 (VD: NPS)"],',
+        '  "unfairAdvantage": "lợi thế cạnh tranh khó copy",',
+        '  "estimatedStartupCost": "X triệu VND (range thực tế HS có thể tự bỏ vốn)",',
+        '  "firstMilestone": "mục tiêu 90 ngày đầu cụ thể, đo được",',
+        '  "risks": ["rủi ro 1", "rủi ro 2"],',
+        '  "nextSteps": ["bước 1 làm ngay", "bước 2", "bước 3"]',
+        '}',
+        '',
+        'KHÔNG markdown code fence. CHỈ JSON thuần. Tất cả text tiếng Việt.',
+      ].join('\n');
+
+      const userPrompt = [
+        `TÊN DỰ ÁN STEM: ${projectTitle.trim()}`,
+        projectDescription ? `\nMÔ TẢ: ${projectDescription.trim()}` : '',
+        targetMarket ? `\nTHỊ TRƯỜNG MỤC TIÊU GỢI Ý: ${targetMarket.trim()}` : '',
+        '',
+        'Hãy phân tích dự án này như 1 startup có tiềm năng và sinh blueprint chi tiết.',
+      ].filter(Boolean).join('\n');
+
+      const result = await fal.complete({
+        messages: [{ role: 'user', content: userPrompt }],
+        system: sysPrompt,
+      });
+
+      let raw = (result?.content || '').trim();
+      // Strip fence nếu có
+      const fenceMatch = raw.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+      if (fenceMatch) raw = fenceMatch[1].trim();
+
+      let blueprint;
+      try {
+        blueprint = JSON.parse(raw);
+      } catch (e) {
+        console.warn('[stem:blueprint] AI returned non-JSON, fallback to text:', raw.slice(0, 200));
+        return res.status(502).json({
+          success: false, error: 'AI trả về không phải JSON hợp lệ', rawPreview: raw.slice(0, 500),
+        });
+      }
+
+      console.log(`[stem:blueprint] ✅ user=${user.id} project="${projectTitle.slice(0, 40)}" took=${Date.now() - t0}ms`);
+      return res.json({ success: true, blueprint, tookMs: Date.now() - t0 });
+    } catch (err) {
+      console.error('[stem:blueprint] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
   // CLASSROOM MODE — public student routes (no auth, QR scan)
   // ════════════════════════════════════════════════
 
