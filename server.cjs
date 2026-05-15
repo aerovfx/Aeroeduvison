@@ -6319,6 +6319,19 @@ if (USE_NODEJS_QUESTIONS) {
     if (!pool) return;
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS "LessonPlan" (id TEXT PRIMARY KEY)`);
+
+      // ── NUCLEAR: drop legacy JSON cols (Prisma có thể tạo Json cols với
+      // DEFAULT '' không valid → fix-default không đủ vì DEFAULT cũ vẫn cached
+      // trong type catalog). DROP + ADD lại đảm bảo schema sạch.
+      // An toàn vì LessonPlan là feature MỚI ngày 15/5 — chưa có user data.
+      const legacyJsonCols = ['contentJson', 'tags', 'data', 'meta', 'metadata'];
+      for (const col of legacyJsonCols) {
+        try {
+          await pool.query(`ALTER TABLE "LessonPlan" DROP COLUMN IF EXISTS "${col}"`);
+        } catch (e) {
+          console.warn('[lp:drop-legacy-json]', col, e.message);
+        }
+      }
       const cols = [
         ['"teacherId"',    'TEXT'],
         ['title',          `TEXT DEFAULT 'Giáo án mới'`],
@@ -6501,8 +6514,10 @@ if (USE_NODEJS_QUESTIONS) {
       );
       res.json({ plan: mapLessonPlan(rows[0], false) });
     } catch (err) {
-      console.error('[lesson-plan:create]', err.message);
-      res.status(500).json({ error: err.message });
+      console.error('[lesson-plan:create]', err.message,
+        '| code:', err.code, '| detail:', err.detail,
+        '| column:', err.column, '| where:', err.where);
+      res.status(500).json({ error: err.message, detail: err.detail || null });
     }
   });
 
