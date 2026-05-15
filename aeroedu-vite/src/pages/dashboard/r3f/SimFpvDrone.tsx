@@ -21,10 +21,78 @@
  *   { unlockedLevel: 1-5, totalScore, perLevel: { 1: {stars, bestTime, completedAt} } }
  */
 
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
+import { useRef, useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Sky, Stars, Text, KeyboardControls, useKeyboardControls } from '@react-three/drei'
+import { Sky, Stars, Text, KeyboardControls, useKeyboardControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+
+// ═════════════════════════════════════════════════════════════
+// DRONE MODELS — 3 lựa chọn (procedural + 2 GLTF từ Sketchfab CC-BY-4.0)
+// ═════════════════════════════════════════════════════════════
+const GCS_BASE = 'https://storage.googleapis.com/aeroedu-media-extreme-lattice-491123-p2/models/drones'
+
+interface DroneModel {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  /** null = procedural mesh; URL = GLTF file (textures/scene.bin auto-load relative) */
+  gltfUrl: string | null
+  /** Model-specific transform (vì mỗi model export khác orientation/scale) */
+  scale: number
+  rotation: [number, number, number]
+  position: [number, number, number]
+  attribution?: string
+}
+
+const DRONE_MODELS: DroneModel[] = [
+  {
+    id: 'procedural', name: 'AeroEdu FPV', emoji: '🚁',
+    description: 'Mẫu mặc định procedural, light-weight, load tức thì',
+    gltfUrl: null,
+    scale: 1, rotation: [0, 0, 0], position: [0, 0, 0],
+  },
+  {
+    id: 'fpv_drone', name: 'FPV Drone Classic', emoji: '🛸',
+    description: 'Mẫu FPV racing 5-inch chuẩn (Sketchfab Jeyhun1985, 3.2MB)',
+    gltfUrl: `${GCS_BASE}/fpv_drone/scene.gltf`,
+    scale: 0.18, rotation: [0, Math.PI, 0], position: [0, -0.05, 0],
+    attribution: 'Jeyhun1985 (CC-BY-4.0)',
+  },
+  {
+    id: 'hornetfpv', name: 'Hornet FPV', emoji: '🦟',
+    description: 'Mẫu Hornet FPV chi tiết cao với texture (Sketchfab Mike1980, 32MB)',
+    gltfUrl: `${GCS_BASE}/hornetfpv/scene.gltf`,
+    scale: 0.25, rotation: [0, Math.PI, 0], position: [0, 0, 0],
+    attribution: 'Mike1980 (CC-BY-4.0)',
+  },
+]
+
+const DEFAULT_MODEL_KEY = 'fpv-selected-model'
+
+function loadSelectedModel(): string {
+  try { return localStorage.getItem(DEFAULT_MODEL_KEY) || 'fpv_drone' } catch { return 'fpv_drone' }
+}
+function saveSelectedModel(id: string) {
+  try { localStorage.setItem(DEFAULT_MODEL_KEY, id) } catch {}
+}
+
+/** Component load GLTF từ URL — wrapped Suspense ở caller */
+function GltfDrone({ url, scale, rotation, position }: {
+  url: string; scale: number; rotation: [number, number, number]; position: [number, number, number]
+}) {
+  const { scene } = useGLTF(url)
+  // Clone scene để mỗi instance có transform riêng (useGLTF cache scene shared)
+  const cloned = useMemo(() => scene.clone(), [scene])
+  return <primitive object={cloned} scale={scale} rotation={rotation} position={position} />
+}
+
+// Preload cả 2 GLTF khi user vào setup screen → khi pick level đã sẵn sàng
+function preloadDroneModels() {
+  DRONE_MODELS.forEach(m => {
+    if (m.gltfUrl) useGLTF.preload(m.gltfUrl)
+  })
+}
 
 // ═════════════════════════════════════════════════════════════
 // LEVEL DEFINITIONS
@@ -418,10 +486,11 @@ const PHYSICS = {
 }
 
 function DroneRig({
-  inputs, level, onTelemetry, onGatePass, onHoverProgress, onCrash,
+  inputs, level, model, onTelemetry, onGatePass, onHoverProgress, onCrash,
 }: {
   inputs: React.MutableRefObject<ControlInputs>
   level: Level
+  model: DroneModel
   onTelemetry: (s: DroneState) => void
   onGatePass: (idx: number) => void
   onHoverProgress: (secondsHeld: number) => void
@@ -493,9 +562,16 @@ function DroneRig({
     onTelemetry({ ...s, pos: s.pos.clone(), vel: s.vel.clone() })
   })
 
+  const propSpeed = Math.max(0.1, (inputs.current.throttle + 1) / 2)
   return (
     <group ref={groupRef}>
-      <Quadcopter propSpeed={Math.max(0.1, (inputs.current.throttle + 1) / 2)} />
+      {model.gltfUrl ? (
+        // GLTF model — Suspense fallback ở caller, primitive sẽ mount khi load xong
+        <GltfDrone url={model.gltfUrl} scale={model.scale}
+          rotation={model.rotation} position={model.position} />
+      ) : (
+        <Quadcopter propSpeed={propSpeed} />
+      )}
     </group>
   )
 }
@@ -806,8 +882,16 @@ function SetupScreen({ onStart }: { onStart: (mode: 'device' | 'keyboard') => vo
 // SCREEN: LEVEL SELECT
 // ═════════════════════════════════════════════════════════════
 function LevelSelectScreen({
-  progress, onPick, onBackToSetup,
-}: { progress: Progress; onPick: (l: Level) => void; onBackToSetup: () => void }) {
+  progress, selectedModelId, onSelectModel, onPick, onBackToSetup,
+}: {
+  progress: Progress
+  selectedModelId: string
+  onSelectModel: (id: string) => void
+  onPick: (l: Level) => void
+  onBackToSetup: () => void
+}) {
+  // Preload GLTF khi vào level select để khi pick level đã sẵn sàng
+  useEffect(() => { preloadDroneModels() }, [])
   return (
     <div style={{
       width: '100%', height: '100%', overflowY: 'auto',
@@ -827,6 +911,49 @@ function LevelSelectScreen({
             <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fbbf24' }}>
               ⭐ {progress.totalScore.toLocaleString('vi-VN')}
             </div>
+          </div>
+        </div>
+
+        {/* ── Model picker ── */}
+        <div style={{
+          padding: 16, borderRadius: 12, marginBottom: 24,
+          background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(71, 85, 105, 0.4)',
+        }}>
+          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 10, fontWeight: 'bold', letterSpacing: 1 }}>
+            🛸 CHỌN MẪU DRONE
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+            {DRONE_MODELS.map(m => {
+              const active = m.id === selectedModelId
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => { onSelectModel(m.id); saveSelectedModel(m.id) }}
+                  style={{
+                    padding: 12, borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                    background: active ? 'rgba(236, 72, 153, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    border: `1px solid ${active ? '#ec4899' : 'rgba(71, 85, 105, 0.4)'}`,
+                    color: '#e2e8f0', transition: 'all 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 24 }}>{m.emoji}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 'bold' }}>
+                        {m.name}
+                        {active && <span style={{ marginLeft: 6, fontSize: 11, color: '#ec4899' }}>● ĐANG DÙNG</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{m.description}</div>
+                      {m.attribution && (
+                        <div style={{ fontSize: 9, color: '#64748b', marginTop: 4 }}>
+                          📜 {m.attribution}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -905,8 +1032,13 @@ function LevelSelectScreen({
 // SCREEN: GAME (level đang chạy)
 // ═════════════════════════════════════════════════════════════
 function GameScreen({
-  level, onComplete, onAbort,
-}: { level: Level; onComplete: (success: boolean, elapsed: number) => void; onAbort: () => void }) {
+  level, model, onComplete, onAbort,
+}: {
+  level: Level
+  model: DroneModel
+  onComplete: (success: boolean, elapsed: number) => void
+  onAbort: () => void
+}) {
   const inputsRef = useRef<ControlInputs>({ throttle: 0, yaw: 0, pitch: 0, roll: 0 })
   const glRef = useRef<THREE.WebGLRenderer | null>(null)
   const [telemetry, setTelemetry] = useState<DroneState | null>(null)
@@ -978,8 +1110,10 @@ function GameScreen({
           style={{ background: '#0a0a0f', width: '100%', height: '100%' }}
         >
           <LevelEnvironment level={level} currentGate={gateProgress} />
-          <DroneRig inputs={inputsRef} level={level} onTelemetry={onTelemetry}
-            onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} />
+          <Suspense fallback={null}>
+            <DroneRig inputs={inputsRef} level={level} model={model} onTelemetry={onTelemetry}
+              onGatePass={onGatePass} onHoverProgress={onHoverProg} onCrash={onCrash} />
+          </Suspense>
           <KeyboardBridge inputsRef={inputsRef} />
           <Text position={[0, 14, -20]} fontSize={1.5} color="#22c55e" anchorX="center">
             {level.emoji} {level.name.toUpperCase()}
@@ -1088,6 +1222,11 @@ type Screen =
 function FpvAppRoot() {
   const [progress, setProgress] = useState<Progress>(() => loadProgress())
   const [screen, setScreen] = useState<Screen>({ kind: 'setup' })
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => loadSelectedModel())
+  const selectedModel = useMemo(
+    () => DRONE_MODELS.find(m => m.id === selectedModelId) || DRONE_MODELS[0],
+    [selectedModelId]
+  )
 
   const handleComplete = useCallback((level: Level, success: boolean, elapsed: number) => {
     let isNewBest = false, isNewUnlock = false
@@ -1128,6 +1267,8 @@ function FpvAppRoot() {
       return (
         <LevelSelectScreen
           progress={progress}
+          selectedModelId={selectedModelId}
+          onSelectModel={setSelectedModelId}
           onPick={(l) => setScreen({ kind: 'game', level: l })}
           onBackToSetup={() => setScreen({ kind: 'setup' })}
         />
@@ -1136,6 +1277,7 @@ function FpvAppRoot() {
       return (
         <GameScreen
           level={screen.level}
+          model={selectedModel}
           onComplete={(success, elapsed) => handleComplete(screen.level, success, elapsed)}
           onAbort={() => setScreen({ kind: 'levels' })}
         />
