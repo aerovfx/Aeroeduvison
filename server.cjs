@@ -9566,29 +9566,69 @@ if (!USE_NODEJS_QUESTIONS) {
         // ── Lazy schema migration cho prod table cũ ──
         // CREATE TABLE IF NOT EXISTS không update schema nếu table đã có sẵn
         // (vd Prisma migration cũ tạo trước với schema khác). Dùng ALTER TABLE
-        // ADD COLUMN IF NOT EXISTS (PG ≥9.6) để bổ sung column thiếu.
-        // Bug user gặp: prod table không có "mssv" → 44/44 import skip với
-        // 'column "mssv" does not exist'. Fix: ensure tất cả 9 column tồn tại.
+        // để: (1) ADD COLUMN IF NOT EXISTS thêm cột thiếu,
+        //      (2) DROP NOT NULL trên những cột Prisma cũ mà code không biết.
+        //
+        // Bug discovered chronologically:
+        //   - Deploy 203: 'column "mssv" does not exist'  → fix bằng ADD COLUMN
+        //   - Deploy 204: '"studentId" violates not-null' → fix bằng DROP NOT NULL
+        //
+        // Strategy: thay vì gọi từng ALTER, dùng information_schema để DISCOVER
+        // và DROP NOT NULL trên MỌI column không nằm trong whitelist của code.
+        // Idempotent + an toàn (dữ liệu cũ vẫn còn).
+
+        // (1) ADD COLUMN cho 7 cột code dùng
         const cols = [
-          ['stt',         'INT'],
-          ['mssv',        'TEXT'],
-          ['name',        'TEXT'],
-          ['dob',         'TEXT'],
-          ['gender',      'TEXT'],
-          ['email',       'TEXT'],
-          ['phone',       'TEXT'],
+          ['stt',    'INT'],
+          ['mssv',   'TEXT'],
+          ['name',   'TEXT'],
+          ['dob',    'TEXT'],
+          ['gender', 'TEXT'],
+          ['email',  'TEXT'],
+          ['phone',  'TEXT'],
         ];
         for (const [col, kind] of cols) {
           try {
             await pool.query(`ALTER TABLE "ClassStudent" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`);
           } catch (e) {
-            console.warn(`[classes] migrate col ${col}:`, e.message.slice(0, 100));
+            console.warn(`[classes] migrate ADD ${col}:`, e.message.slice(0, 100));
           }
         }
-        // createdAt thường đã có nhưng đảm bảo (idempotent)
         try {
           await pool.query(`ALTER TABLE "ClassStudent" ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP DEFAULT NOW()`);
         } catch {}
+
+        // (2) Discover & DROP NOT NULL trên cột ngoài whitelist
+        // Whitelist = cột code biết về (id, classId, name, createdAt là NOT NULL của code)
+        const knownCols = new Set([
+          'id',         // PK NOT NULL OK
+          'classId',    // FK NOT NULL OK
+          'name',       // NOT NULL OK (tên HS bắt buộc)
+          'createdAt',  // NOT NULL với DEFAULT OK
+          // các cột khác đều nullable trong code:
+          'stt', 'mssv', 'dob', 'gender', 'email', 'phone',
+        ]);
+        try {
+          const r = await pool.query(`
+            SELECT column_name
+              FROM information_schema.columns
+             WHERE table_name = 'ClassStudent'
+               AND is_nullable = 'NO'
+          `);
+          for (const row of r.rows) {
+            const col = row.column_name;
+            if (knownCols.has(col)) continue;
+            // Cột Prisma cũ NOT NULL mà code không biết → DROP NOT NULL
+            try {
+              await pool.query(`ALTER TABLE "ClassStudent" ALTER COLUMN "${col}" DROP NOT NULL`);
+              console.log(`[classes] migrate DROP NOT NULL ${col}`);
+            } catch (e) {
+              console.warn(`[classes] migrate DROP NOT NULL ${col}:`, e.message.slice(0, 100));
+            }
+          }
+        } catch (e) {
+          console.warn('[classes] migrate discover:', e.message.slice(0, 100));
+        }
         console.log('[classes] ✅ tables ready (lazy migration ran)');
       })().catch(e => { console.error('[classes] ❌ ensureTables', e.message); _clsReady = null; });
       return _clsReady;
