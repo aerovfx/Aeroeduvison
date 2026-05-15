@@ -10536,6 +10536,75 @@ if (!USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // POST /api/latex-projects/ai-fill-template
+  // Input:  { prompt: string, template: string }
+  // Output: { latex: string }
+  // AI fill nội dung vào template LaTeX có sẵn (placeholder "...." / "[TÊN BÀI]").
+  // Dùng cho "Tạo giáo án bằng AI" trên /teacher/lesson-plans.
+  app.post('/api/latex-projects/ai-fill-template', express.json({ limit: '512kb' }), async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { prompt, template } = req.body || {};
+      if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 5) {
+        return res.status(400).json({ error: 'Yêu cầu prompt mô tả nội dung giáo án (≥5 ký tự)' });
+      }
+      if (!template || typeof template !== 'string' || template.trim().length < 50) {
+        return res.status(400).json({ error: 'Cần template LaTeX (≥50 ký tự)' });
+      }
+      if (template.length > 80000) {
+        return res.status(400).json({ error: 'Template quá dài (max 80000 ký tự)' });
+      }
+
+      const fal = require('./lib/fal-client.cjs');
+      const sysPrompt = [
+        'Bạn là chuyên gia soạn giáo án theo Công văn 2345/BGDĐT (kế hoạch bài dạy) và Nghị định 30/2020/NĐ-CP (định dạng văn bản hành chính).',
+        'Người dùng cung cấp một template LaTeX có sẵn cấu trúc + định dạng. Bạn cần fill nội dung chi tiết vào các placeholder.',
+        '',
+        'QUY TẮC:',
+        '1. KHÔNG đổi cấu trúc, KHÔNG bỏ/thêm \\section / \\subsection / \\begin{...} / \\end{...} / macro / package.',
+        '2. KHÔNG đổi geometry, linespread, parskip, titleformat, các định dạng đã được thiết lập.',
+        '3. Thay thế các chuỗi placeholder ("..........", "[TÊN BÀI]", "...", "...../...../.....") bằng nội dung thực tế dựa trên yêu cầu của giáo viên.',
+        '4. Với các bảng tabularx ô trống, fill cột "Hoạt động của Giáo viên" và "Hoạt động của Học sinh" với mô tả chi tiết, cụ thể (ít nhất 2-3 câu mỗi ô).',
+        '5. Yêu cầu cần đạt: viết theo CV2345 — Năng lực đặc thù, Năng lực chung, Phẩm chất, mỗi mục có gạch đầu dòng cụ thể.',
+        '6. Mỗi tiết phải có hoạt động Mở đầu / Hình thành kiến thức / Luyện tập / Vận dụng đầy đủ, có thời lượng ước tính (5 phút / 15 phút...).',
+        '7. Nếu là bài Vật Lý / Toán / Hóa có công thức — DÙNG đúng MathJax LaTeX: $\\vec{p}=m\\vec{v}$, $\\Delta p$, $E = \\frac{1}{2}mv^2$...',
+        '8. Tên môn / lớp / tuần / ngày dạy — fill dựa trên prompt (nếu prompt không nói rõ thì suy luận hợp lý theo chủ đề bài học).',
+        '9. CHỈ trả về thuần LaTeX hoàn chỉnh (từ \\documentclass đến \\end{document}). KHÔNG markdown code fence, KHÔNG giải thích, KHÔNG mô tả thêm.',
+      ].join('\n');
+
+      const userPrompt = [
+        `YÊU CẦU CỦA GIÁO VIÊN:`,
+        prompt.trim(),
+        '',
+        `TEMPLATE LATEX (fill nội dung vào, giữ nguyên cấu trúc):`,
+        '```',
+        template.trim(),
+        '```',
+      ].join('\n');
+
+      const result = await fal.complete({
+        messages: [{ role: 'user', content: userPrompt }],
+        system: sysPrompt,
+      });
+      let latex = (result?.content || '').trim();
+      // Strip code fence nếu AI vẫn trả về dù đã dặn không
+      const fenceMatch = latex.match(/^```(?:latex|tex)?\s*([\s\S]*?)\s*```$/);
+      if (fenceMatch) latex = fenceMatch[1].trim();
+      // Sanity check: phải bắt đầu bằng \documentclass
+      if (!latex.includes('\\documentclass') || !latex.includes('\\end{document}')) {
+        console.warn(`[latex:ai-fill] ⚠ AI output không hợp lệ (missing documentclass/end), trả raw cho FE`);
+      }
+
+      console.log(`[latex:ai-fill-template] ✅ user=${userId} promptLen=${prompt.length} tplLen=${template.length} outLen=${latex.length} took=${Date.now() - t0}ms`);
+      return res.json({ latex });
+    } catch (err) {
+      console.error('[latex:ai-fill-template] ❌', err?.message || err);
+      return res.status(500).json({ error: err?.message || 'AI generate failed' });
+    }
+  });
+
   app.post('/api/latex-projects/export-from-exam', (_req, res) => {
     res.status(501).json({ error: 'Tính năng đang phát triển' });
   });

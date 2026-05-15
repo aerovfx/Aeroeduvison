@@ -8,11 +8,12 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText, Plus, Search, Trash2, Cloud, CloudOff, Edit3, Loader2,
-  Calendar, BookOpen, Hash, X, Sparkles, ExternalLink, Download,
+  Calendar, BookOpen, Hash, X, Sparkles, ExternalLink, Download, Wand2,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { lessonPlanService, type LessonPlanSummary, type GcsSnapshot } from '@/services/lessonPlan.service'
 import { LESSON_PLAN_TEMPLATES, type LessonPlanTemplate } from '@/lib/lesson-plan-templates'
+import AiGenerateLatexLessonPlanModal from '@/components/lesson-plan/AiGenerateLatexLessonPlanModal'
 
 type TabKey = 'plans' | 'gcs'
 
@@ -29,6 +30,7 @@ export default function LessonPlans() {
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [tplPickerOpen, setTplPickerOpen] = useState(false)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
 
   // ── Tabs: Plans (DB) vs GCS Snapshots ──
   const [tab, setTab] = useState<TabKey>('plans')
@@ -138,20 +140,41 @@ export default function LessonPlans() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setTplPickerOpen(true)}
-            disabled={creating}
-            style={{
-              padding: '10px 18px', background: '#7c3aed', color: '#fff',
-              border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
-              cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1,
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              boxShadow: '0 4px 12px rgba(124,58,237,0.3)',
-            }}
-          >
-            {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-            Tạo giáo án mới
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setAiModalOpen(true)}
+              disabled={creating}
+              style={{
+                padding: '10px 18px',
+                background: 'linear-gradient(90deg, #7c3aed, #ec4899)',
+                color: '#fff',
+                border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
+                cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 4px 14px rgba(124,58,237,0.4)',
+              }}
+              title="AI điền nội dung vào template LaTeX (giống Gemini Canvas)"
+            >
+              <Wand2 size={15} />
+              Tạo bằng AI
+            </button>
+            <button
+              onClick={() => setTplPickerOpen(true)}
+              disabled={creating}
+              style={{
+                padding: '10px 18px',
+                background: '#161728',
+                color: '#f1f5f9',
+                border: '1px solid #2a2b3d',
+                borderRadius: 10, fontSize: 14, fontWeight: 700,
+                cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              {creating ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
+              Tạo giáo án mới
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -577,6 +600,12 @@ export default function LessonPlans() {
           </div>
         </div>
       )}
+
+      {/* ── AI Generate LaTeX Lesson Plan Modal ── */}
+      <AiGenerateLatexLessonPlanModal
+        open={aiModalOpen}
+        onClose={() => setAiModalOpen(false)}
+      />
     </div>
   )
 }

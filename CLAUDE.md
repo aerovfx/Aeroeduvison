@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `c7f88b1` (deploy 238, 2026-05-15 — NĐ 30/2020 formatting cho lesson plans)
-- Commits since last deploy: `2/5` (e6bf6df Lưu Giáo án cross-link, this commit TranscriptRecording history page)
+- Last deployed commit: `f5651d9` (deploy 239, 2026-05-15 — TranscriptRecording history page)
+- Commits since last deploy: `1/5` (AI Tạo giáo án LaTeX kiểu Gemini Canvas)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
