@@ -6350,6 +6350,9 @@ if (USE_NODEJS_QUESTIONS) {
         catch (_e) { /* ignore */ }
       }
       // Discover-and-DROP NOT NULL/FK pattern (Prisma legacy safety)
+      // PLUS: detect JSON/JSONB columns với invalid default (empty string từ
+      // Prisma) → force default '{}' hoặc '[]' để INSERT không crash với
+      // "invalid input syntax for type json"
       try {
         const knownCols = new Set([
           'id', 'teacherId', 'title', 'content', 'contentJson', 'subject', 'grade',
@@ -6357,13 +6360,27 @@ if (USE_NODEJS_QUESTIONS) {
           'lastSavedAt', 'createdAt', 'updatedAt',
         ]);
         const { rows: schemaCols } = await pool.query(
-          `SELECT column_name, is_nullable FROM information_schema.columns
+          `SELECT column_name, is_nullable, data_type, udt_name, column_default
+             FROM information_schema.columns
             WHERE table_name = 'LessonPlan' AND table_schema = 'public'`
         );
         for (const c of schemaCols) {
+          // DROP NOT NULL cho cols ngoài whitelist
           if (!knownCols.has(c.column_name) && c.is_nullable === 'NO') {
             try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "${c.column_name}" DROP NOT NULL`); }
             catch (_e) { /* ignore */ }
+          }
+          // Fix invalid JSON defaults (Prisma may set '' or NULL → JSON parse error)
+          if ((c.data_type === 'json' || c.data_type === 'jsonb' || c.udt_name === 'json' || c.udt_name === 'jsonb')) {
+            const isArray = ['tags'].includes(c.column_name);
+            const goodDefault = isArray ? `'[]'::${c.udt_name}` : `'{}'::${c.udt_name}`;
+            try {
+              await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN "${c.column_name}" SET DEFAULT ${goodDefault}`);
+            } catch (_e) { /* ignore */ }
+            // Backfill NULL hoặc empty string thành valid JSON
+            try {
+              await pool.query(`UPDATE "LessonPlan" SET "${c.column_name}" = ${goodDefault} WHERE "${c.column_name}" IS NULL`);
+            } catch (_e) { /* ignore — may fail nếu col is text masquerading */ }
           }
         }
         const { rows: fks } = await pool.query(
@@ -6474,7 +6491,7 @@ if (USE_NODEJS_QUESTIONS) {
         `INSERT INTO "LessonPlan" (id, "teacherId", title, content, "contentJson",
             subject, grade, tags, "wordCount",
             "lastSavedAt", "createdAt", "updatedAt")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW(), NOW(), NOW())
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb,$9, NOW(), NOW(), NOW())
          RETURNING *`,
         [id, user.id, b.title || 'Giáo án mới', b.content || '',
          JSON.stringify(b.contentJson || {}),
@@ -6503,11 +6520,11 @@ if (USE_NODEJS_QUESTIONS) {
         if (k in b) { sets.push(`"${k}" = $${vals.length + 1}`); vals.push(b[k]); }
       }
       if (b.contentJson !== undefined) {
-        sets.push(`"contentJson" = $${vals.length + 1}`);
+        sets.push(`"contentJson" = $${vals.length + 1}::jsonb`);
         vals.push(JSON.stringify(b.contentJson || {}));
       }
       if (b.tags !== undefined && Array.isArray(b.tags)) {
-        sets.push(`tags = $${vals.length + 1}`);
+        sets.push(`tags = $${vals.length + 1}::jsonb`);
         vals.push(JSON.stringify(b.tags));
       }
       if ('content' in b) {
