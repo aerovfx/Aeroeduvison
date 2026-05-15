@@ -13047,6 +13047,380 @@ if (!USE_NODEJS_QUESTIONS) {
         return res.json({ activeNow: 0, recent: [] });
       }
     });
+
+    // ════════════════════════════════════════════════════════════
+    // ADMIN INSIGHTS — phân tích hành vi user + trending topics/exams
+    //
+    // 4 endpoints (admin only):
+    //   /behavior         — phân tích hành vi (peak hours, retention, ...)
+    //   /trending-topics  — top subjects (từ PageView path + Exam category)
+    //   /trending-exams   — top exams được làm (PracticeExam group by exam)
+    //   /recommendations  — auto-generated từ patterns trong data
+    // ════════════════════════════════════════════════════════════
+
+    // ── GET /api/admin/insights/behavior ──
+    app.get('/api/admin/insights/behavior', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({});
+      try {
+        // Hourly distribution last 7 days — find peak hours
+        const hourly = await pool.query(`
+          SELECT EXTRACT(HOUR FROM "createdAt")::int AS hour,
+                 COUNT(*)::int AS views,
+                 COUNT(DISTINCT "sessionId")::int AS unique_sessions
+            FROM "PageView"
+           WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+           GROUP BY hour ORDER BY hour ASC
+        `).catch(() => ({ rows: [] }));
+
+        // DAU/WAU/MAU (Daily/Weekly/Monthly Active Users)
+        const dau = await pool.query(`
+          SELECT
+            COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '1 day' AND "userId" IS NOT NULL)::int AS dau,
+            COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '7 days' AND "userId" IS NOT NULL)::int AS wau,
+            COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '30 days' AND "userId" IS NOT NULL)::int AS mau
+          FROM "PageView"
+        `).catch(() => ({ rows: [{ dau: 0, wau: 0, mau: 0 }] }));
+
+        // Retention: % WAU returning DAU
+        const dauVal = Number(dau.rows[0]?.dau) || 0;
+        const wauVal = Number(dau.rows[0]?.wau) || 0;
+        const mauVal = Number(dau.rows[0]?.mau) || 0;
+        const stickiness = wauVal > 0 ? (dauVal / wauVal * 100) : 0;
+
+        // Avg session duration (min) by role last 7d
+        const sessionDur = await pool.query(`
+          SELECT "userRole" AS role,
+                 ROUND(AVG("viewDurationMs") / 60000.0, 2)::float AS avg_min,
+                 COUNT(DISTINCT "sessionId")::int AS sessions
+            FROM "PageView"
+           WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+             AND "viewDurationMs" > 0
+           GROUP BY "userRole"
+        `).catch(() => ({ rows: [] }));
+
+        // Top entry pages (first page in session) — proxy for landing pattern
+        const topEntries = await pool.query(`
+          WITH first_views AS (
+            SELECT DISTINCT ON ("sessionId") "sessionId", path
+            FROM "PageView"
+            WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+            ORDER BY "sessionId", "createdAt" ASC
+          )
+          SELECT path, COUNT(*)::int AS sessions
+          FROM first_views
+          GROUP BY path ORDER BY sessions DESC LIMIT 10
+        `).catch(() => ({ rows: [] }));
+
+        // Bounce rate per role (sessions với only 1 PageView)
+        const bounce = await pool.query(`
+          WITH session_counts AS (
+            SELECT "sessionId", "userRole", COUNT(*)::int AS pv
+            FROM "PageView"
+            WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+            GROUP BY "sessionId", "userRole"
+          )
+          SELECT "userRole" AS role,
+                 COUNT(*) FILTER (WHERE pv = 1)::int AS bounced,
+                 COUNT(*)::int AS total,
+                 ROUND(COUNT(*) FILTER (WHERE pv = 1)::numeric / NULLIF(COUNT(*), 0) * 100, 1)::float AS bounce_rate_pct
+          FROM session_counts
+          GROUP BY "userRole"
+        `).catch(() => ({ rows: [] }));
+
+        return res.json({
+          hourly: hourly.rows,
+          dau: dauVal, wau: wauVal, mau: mauVal,
+          stickiness: Math.round(stickiness * 10) / 10,
+          sessionDurByRole: sessionDur.rows,
+          topEntries: topEntries.rows,
+          bounceByRole: bounce.rows,
+          period: 'last_7_days',
+        });
+      } catch (e) {
+        console.warn('[insights:behavior]', e.message);
+        return res.json({ error: e.message });
+      }
+    });
+
+    // ── GET /api/admin/insights/trending-topics ──
+    app.get('/api/admin/insights/trending-topics', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ topics: [] });
+      try {
+        // Topics derived from PracticeExam → Exam.title (split by spaces, top words)
+        // OR from Exam.subject if available. Use last 7 days.
+        const examAttempts = await pool.query(`
+          SELECT e.title, e."subject", COUNT(pe.id)::int AS attempts,
+                 COUNT(DISTINCT pe."studentId")::int AS unique_students
+            FROM "PracticeExam" pe
+            JOIN "Exam" e ON e.id = pe."sourceExamId"
+           WHERE pe."createdAt" >= NOW() - INTERVAL '7 days'
+           GROUP BY e.title, e."subject"
+           ORDER BY attempts DESC LIMIT 50
+        `).catch(() => ({ rows: [] }));
+
+        // Aggregate by subject
+        const subjectMap = {};
+        for (const row of examAttempts.rows) {
+          const s = row.subject || 'Khác';
+          if (!subjectMap[s]) subjectMap[s] = { subject: s, attempts: 0, students: new Set(), examCount: 0 };
+          subjectMap[s].attempts += Number(row.attempts);
+          subjectMap[s].examCount += 1;
+        }
+        // Get unique students per subject (separate query to avoid double counting)
+        const subjStudents = await pool.query(`
+          SELECT e."subject", COUNT(DISTINCT pe."studentId")::int AS unique_students
+            FROM "PracticeExam" pe
+            JOIN "Exam" e ON e.id = pe."sourceExamId"
+           WHERE pe."createdAt" >= NOW() - INTERVAL '7 days' AND pe."studentId" IS NOT NULL
+           GROUP BY e."subject"
+        `).catch(() => ({ rows: [] }));
+        for (const row of subjStudents.rows) {
+          const s = row.subject || 'Khác';
+          if (subjectMap[s]) subjectMap[s].uniqueStudents = Number(row.unique_students);
+        }
+
+        const topics = Object.values(subjectMap)
+          .map(t => ({
+            subject: t.subject,
+            attempts: t.attempts,
+            uniqueStudents: t.uniqueStudents || 0,
+            examCount: t.examCount,
+            avgAttemptsPerStudent: t.uniqueStudents ? Math.round(t.attempts / t.uniqueStudents * 10) / 10 : 0,
+          }))
+          .sort((a, b) => b.attempts - a.attempts)
+          .slice(0, 10);
+
+        // Trend comparison: last 7d vs prev 7d (growth %)
+        const trendComp = await pool.query(`
+          SELECT e."subject",
+                 COUNT(*) FILTER (WHERE pe."createdAt" >= NOW() - INTERVAL '7 days')::int AS recent,
+                 COUNT(*) FILTER (WHERE pe."createdAt" >= NOW() - INTERVAL '14 days'
+                              AND pe."createdAt" < NOW() - INTERVAL '7 days')::int AS previous
+            FROM "PracticeExam" pe
+            JOIN "Exam" e ON e.id = pe."sourceExamId"
+           WHERE pe."createdAt" >= NOW() - INTERVAL '14 days'
+           GROUP BY e."subject"
+        `).catch(() => ({ rows: [] }));
+        const growthMap = {};
+        for (const row of trendComp.rows) {
+          const recent = Number(row.recent);
+          const prev = Number(row.previous);
+          const growth = prev > 0 ? ((recent - prev) / prev * 100) : (recent > 0 ? 100 : 0);
+          growthMap[row.subject || 'Khác'] = Math.round(growth);
+        }
+        for (const t of topics) {
+          t.growthPct = growthMap[t.subject] ?? 0;
+          t.trend = t.growthPct > 20 ? 'up' : t.growthPct < -20 ? 'down' : 'stable';
+        }
+
+        return res.json({ topics, period: 'last_7_days' });
+      } catch (e) {
+        console.warn('[insights:trending-topics]', e.message);
+        return res.json({ topics: [], error: e.message });
+      }
+    });
+
+    // ── GET /api/admin/insights/trending-exams ──
+    app.get('/api/admin/insights/trending-exams', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ exams: [] });
+      try {
+        const { rows } = await pool.query(`
+          SELECT e.id, e.title, e."subject", e."totalQuestions",
+                 COUNT(pe.id)::int AS attempts,
+                 COUNT(DISTINCT pe."studentId")::int AS unique_students,
+                 ROUND(AVG(pe.percentage)::numeric, 1)::float AS avg_percentage,
+                 ROUND(AVG(pe.score)::numeric, 2)::float AS avg_score,
+                 COUNT(*) FILTER (WHERE pe.percentage >= 50)::int AS pass_count,
+                 ROUND(COUNT(*) FILTER (WHERE pe.percentage >= 50)::numeric
+                       / NULLIF(COUNT(pe.id), 0) * 100, 1)::float AS pass_rate
+            FROM "PracticeExam" pe
+            JOIN "Exam" e ON e.id = pe."sourceExamId"
+           WHERE pe."createdAt" >= NOW() - INTERVAL '30 days'
+             AND pe.completed = true
+           GROUP BY e.id, e.title, e."subject", e."totalQuestions"
+          HAVING COUNT(pe.id) >= 3
+           ORDER BY attempts DESC, avg_percentage DESC
+           LIMIT 15
+        `).catch(() => ({ rows: [] }));
+
+        return res.json({ exams: rows, period: 'last_30_days' });
+      } catch (e) {
+        console.warn('[insights:trending-exams]', e.message);
+        return res.json({ exams: [], error: e.message });
+      }
+    });
+
+    // ── GET /api/admin/insights/recommendations ──
+    app.get('/api/admin/insights/recommendations', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ recommendations: [] });
+      try {
+        const recs = [];
+
+        // Rec 1: Low DAU/WAU stickiness → engagement issue
+        try {
+          const stick = await pool.query(`
+            SELECT
+              COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '1 day' AND "userId" IS NOT NULL)::int AS dau,
+              COUNT(DISTINCT "userId") FILTER (WHERE "createdAt" >= NOW() - INTERVAL '7 days' AND "userId" IS NOT NULL)::int AS wau
+            FROM "PageView"
+          `);
+          const d = Number(stick.rows[0]?.dau) || 0;
+          const w = Number(stick.rows[0]?.wau) || 0;
+          const ratio = w > 0 ? d / w : 0;
+          if (w >= 10 && ratio < 0.2) {
+            recs.push({
+              priority: 'high',
+              category: 'engagement',
+              icon: '📉',
+              title: 'Stickiness DAU/WAU thấp',
+              insight: `Tỷ lệ DAU/WAU = ${(ratio * 100).toFixed(1)}% (DAU=${d}, WAU=${w}). User vào 1 lần/tuần thì rời.`,
+              action: 'Cân nhắc: gửi email/push reminder hằng ngày, gamify XP daily streak, weekly digest.',
+            });
+          } else if (w >= 10 && ratio > 0.5) {
+            recs.push({
+              priority: 'low',
+              category: 'engagement',
+              icon: '🌟',
+              title: 'Engagement tốt',
+              insight: `DAU/WAU = ${(ratio * 100).toFixed(1)}% — user quay lại đều đặn (>50%). Giữ vững.`,
+              action: 'Tận dụng momentum: launch features mới, mời user feedback.',
+            });
+          }
+        } catch {}
+
+        // Rec 2: Bounce rate cao trên 1 trang
+        try {
+          const bounce = await pool.query(`
+            WITH sc AS (
+              SELECT "sessionId", path, COUNT(*)::int AS pv
+              FROM "PageView" WHERE "createdAt" >= NOW() - INTERVAL '7 days' GROUP BY "sessionId", path
+            ),
+            entries AS (
+              SELECT DISTINCT ON ("sessionId") "sessionId", path FROM "PageView"
+              WHERE "createdAt" >= NOW() - INTERVAL '7 days' ORDER BY "sessionId", "createdAt"
+            )
+            SELECT e.path,
+                   COUNT(*) FILTER (WHERE sc.pv = 1)::int AS bounces,
+                   COUNT(*)::int AS sessions,
+                   ROUND(COUNT(*) FILTER (WHERE sc.pv = 1)::numeric / NULLIF(COUNT(*), 0) * 100, 1)::float AS rate
+            FROM entries e LEFT JOIN sc ON sc."sessionId" = e."sessionId" AND sc.path = e.path
+            GROUP BY e.path HAVING COUNT(*) >= 5 ORDER BY rate DESC LIMIT 3
+          `);
+          for (const r of bounce.rows) {
+            if (r.rate >= 70) {
+              recs.push({
+                priority: 'high',
+                category: 'ux',
+                icon: '🚪',
+                title: `Bounce cao trên ${r.path}`,
+                insight: `${r.rate}% session vào ${r.path} thoát ngay (${r.bounces}/${r.sessions} sessions).`,
+                action: `Audit UX của ${r.path}: load chậm? content không relevant? CTA khó thấy?`,
+              });
+            }
+          }
+        } catch {}
+
+        // Rec 3: Trending exam có pass rate thấp
+        try {
+          const lowPass = await pool.query(`
+            SELECT e.title, e."subject", COUNT(pe.id)::int AS attempts,
+                   ROUND(AVG(pe.percentage)::numeric, 1)::float AS avg_pct
+              FROM "PracticeExam" pe
+              JOIN "Exam" e ON e.id = pe."sourceExamId"
+             WHERE pe."createdAt" >= NOW() - INTERVAL '30 days' AND pe.completed = true
+             GROUP BY e.id, e.title, e."subject"
+            HAVING COUNT(pe.id) >= 10 AND AVG(pe.percentage) < 40
+             ORDER BY attempts DESC LIMIT 3
+          `);
+          for (const r of lowPass.rows) {
+            recs.push({
+              priority: 'high',
+              category: 'content',
+              icon: '🎯',
+              title: `Đề "${r.title}" quá khó`,
+              insight: `${r.attempts} lượt làm nhưng điểm TB chỉ ${r.avg_pct}%.`,
+              action: 'GV review lại độ khó. Thêm hướng dẫn/lời giải chi tiết cho HS tự học.',
+            });
+          }
+        } catch {}
+
+        // Rec 4: Subject growing fast → invest content
+        try {
+          const growing = await pool.query(`
+            SELECT e."subject",
+                   COUNT(*) FILTER (WHERE pe."createdAt" >= NOW() - INTERVAL '7 days')::int AS recent,
+                   COUNT(*) FILTER (WHERE pe."createdAt" >= NOW() - INTERVAL '14 days'
+                                AND pe."createdAt" < NOW() - INTERVAL '7 days')::int AS previous
+              FROM "PracticeExam" pe
+              JOIN "Exam" e ON e.id = pe."sourceExamId"
+             WHERE pe."createdAt" >= NOW() - INTERVAL '14 days' AND e."subject" IS NOT NULL
+             GROUP BY e."subject"
+            HAVING COUNT(*) FILTER (WHERE pe."createdAt" >= NOW() - INTERVAL '7 days') >= 5
+          `);
+          for (const r of growing.rows) {
+            const recent = Number(r.recent);
+            const prev = Number(r.previous);
+            const growth = prev > 0 ? ((recent - prev) / prev * 100) : 0;
+            if (growth >= 50) {
+              recs.push({
+                priority: 'medium',
+                category: 'content',
+                icon: '🚀',
+                title: `${r.subject} tăng trưởng nhanh`,
+                insight: `Lượt làm bài ${r.subject} tăng ${growth.toFixed(0)}% so với tuần trước (${recent} vs ${prev}).`,
+                action: `Đầu tư thêm content ${r.subject}: nhờ GV soạn thêm đề, mua bộ sưu tập, AI generate.`,
+              });
+            }
+          }
+        } catch {}
+
+        // Rec 5: Roles không hoạt động
+        try {
+          const roleAct = await pool.query(`
+            SELECT "userRole" AS role, COUNT(DISTINCT "sessionId")::int AS sessions
+              FROM "PageView" WHERE "createdAt" >= NOW() - INTERVAL '7 days' AND "userRole" IS NOT NULL
+              GROUP BY "userRole"
+          `);
+          const total = roleAct.rows.reduce((s, r) => s + Number(r.sessions), 0);
+          for (const r of roleAct.rows) {
+            const pct = total > 0 ? Number(r.sessions) / total * 100 : 0;
+            if (pct < 5 && r.role !== 'GUEST') {
+              recs.push({
+                priority: 'medium',
+                category: 'engagement',
+                icon: '👥',
+                title: `${r.role} tham gia thấp`,
+                insight: `${r.role} chỉ chiếm ${pct.toFixed(1)}% sessions tuần qua (${r.sessions} sessions).`,
+                action: `Khảo sát: ${r.role} có rào cản gì? Onboarding khó? UX phù hợp?`,
+              });
+            }
+          }
+        } catch {}
+
+        // Sort by priority
+        const order = { high: 0, medium: 1, low: 2 };
+        recs.sort((a, b) => (order[a.priority] || 9) - (order[b.priority] || 9));
+
+        return res.json({ recommendations: recs, generated_at: new Date().toISOString() });
+      } catch (e) {
+        console.warn('[insights:recommendations]', e.message);
+        return res.json({ recommendations: [], error: e.message });
+      }
+    });
+
+    console.log('[init] Admin Insights endpoints (behavior + trending + recommendations) ready');
   }
 
   // ─ STEM AI Project Generator ─────────────────────────────

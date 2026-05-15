@@ -171,6 +171,7 @@ const adminSections: RouteSection[] = [
     routes: [
       { icon: Layout,       labelKey: 'routeAdminOverview', href: '/admin/overview',    isHighlighted: true },
       { icon: BarChart,     labelKey: 'routeAnalytics',     href: '/admin/analytics',   badge: 'Live' },
+      { icon: Sparkles,     labelKey: 'routeInsights',      href: '/admin/insights',    badge: 'AI' },
       { icon: Users,        labelKey: 'routeStudents',      href: '/admin/students' },
       { icon: GraduationCap,labelKey: 'routeTeachers',      href: '/admin/teachers' },
       { icon: AlertTriangle,labelKey: 'routeAtRisk',        href: '/admin/at-risk' },

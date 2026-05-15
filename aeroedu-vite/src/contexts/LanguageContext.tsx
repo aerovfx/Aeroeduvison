@@ -53,6 +53,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // ── Sidebar — Student routes ──────────────────────────────
     routeDashboard:     'Dashboard',
     routeAnalytics:     'Phân tích',
+    routeInsights:      'Insights AI',
     routeAchievements:  'Thành tích',
     routeAiTutor:       'Gia Sư AI',
     routeLearningPath:  'Lộ trình học',
@@ -381,6 +382,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // ── Sidebar — Student routes ──────────────────────────────
     routeDashboard:     'Dashboard',
     routeAnalytics:     'Analytics',
+    routeInsights:      'AI Insights',
     routeAchievements:  'Achievements',
     routeAiTutor:       'AI Tutor',
     routeLearningPath:  'Learning Path',
