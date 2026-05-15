@@ -31,6 +31,16 @@ interface SimEntry {
 }
 
 const SIMULATIONS: SimEntry[] = [
+  // ── ⭐ FEATURED — FPV Drone Sandbox + WebXR (đặt đầu trang) ──
+  {
+    id: 'fpv-drone-vr',
+    title: '🚁 FPV Drone Sandbox + VR',
+    description: 'Bay quadcopter trong môi trường procedural với race gates, địa hình đồi núi, rừng cây, tòa nhà, hangar, water tower. Hỗ trợ tay cầm FPV/RC TX (USB joystick mode), gamepad chuẩn, joystick ảo trên điện thoại, hoặc bàn phím. Vào VR qua WebXR cho Meta Quest/Vision Pro.',
+    icon: Wind,
+    category: 'fpv',
+    color: '#ec4899',
+    difficulty: 'Advanced',
+  },
   {
     id: 'interactive-box',
     title: 'Interactive Shapes',
@@ -334,16 +344,7 @@ const SIMULATIONS: SimEntry[] = [
     color: '#818cf8',
     difficulty: 'Advanced',
   },
-  // ── FPV Drone Sandbox + WebXR (NEW) ──
-  {
-    id: 'fpv-drone-vr',
-    title: '🚁 FPV Drone Sandbox + VR',
-    description: 'Bay quadcopter trong môi trường procedural với race gates. Hỗ trợ tay cầm FPV/RC TX (USB joystick mode), gamepad chuẩn, hoặc bàn phím. Vào VR qua WebXR cho Meta Quest/Vision Pro.',
-    icon: Wind,
-    category: 'fpv',
-    color: '#ec4899',
-    difficulty: 'Advanced',
-  },
+  // (FPV entry moved to top of array — featured)
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -715,6 +716,75 @@ export default function AuraPage() {
         </div>
       </div>
 
+      {/* ── ⭐ FEATURED — FPV Drone Sandbox + VR (hero card) ── */}
+      <div className="px-6 pb-6">
+        <h2 className="text-sm font-semibold text-pink-400/80 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>★</span> Featured Sandbox
+        </h2>
+        <button
+          onClick={() => setActiveSim('fpv-drone-vr')}
+          className="group w-full text-left rounded-2xl overflow-hidden relative transition-all duration-300 hover:scale-[1.005]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 50%, rgba(6,182,212,0.18) 100%)',
+            border: '1px solid rgba(236,72,153,0.4)',
+            boxShadow: '0 8px 32px rgba(236,72,153,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
+          }}
+        >
+          {/* Animated glow lines */}
+          <div className="absolute inset-0 opacity-30 pointer-events-none" style={{
+            background: 'radial-gradient(ellipse at top right, rgba(236,72,153,0.3), transparent 60%), radial-gradient(ellipse at bottom left, rgba(6,182,212,0.25), transparent 60%)',
+          }} />
+          <div className="relative p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center">
+            {/* Left: Icon + giant emoji */}
+            <div className="flex-shrink-0 flex items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-5xl"
+                style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.3), rgba(139,92,246,0.3))', border: '1px solid rgba(236,72,153,0.5)' }}>
+                🚁
+              </div>
+              <div className="hidden md:block w-px h-16 bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+            </div>
+            {/* Middle: Title + description */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h3 className="text-xl md:text-2xl font-bold text-white">FPV Drone Sandbox + VR</h3>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)' }}>
+                  ⭐ Featured
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)' }}>
+                  WebXR VR
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#10b981', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)' }}>
+                  📱 Mobile
+                </span>
+              </div>
+              <p className="text-sm text-white/70 leading-relaxed mb-3">
+                Bay quadcopter trong môi trường procedural — đồi núi, rừng cây, tòa nhà, hangar, water tower,
+                billboards, scaffolds. 5 cấp độ tăng dần từ hover cơ bản đến full course pro.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap text-xs text-white/50">
+                <span>🎮 Tay cầm RC TX</span>
+                <span>•</span>
+                <span>📱 Joystick ảo</span>
+                <span>•</span>
+                <span>⌨️ Bàn phím</span>
+                <span>•</span>
+                <span>🥽 Meta Quest / Vision Pro</span>
+              </div>
+            </div>
+            {/* Right: CTA */}
+            <div className="flex-shrink-0">
+              <div className="px-5 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition-transform group-hover:translate-x-1"
+                style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', boxShadow: '0 4px 16px rgba(236,72,153,0.4)' }}>
+                Bắt đầu bay →
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+
       {/* ── Your Sandboxes ── */}
       <div className="px-6 pb-6">
         <div className="flex items-center justify-between mb-3">
@@ -779,7 +849,7 @@ export default function AuraPage() {
       <div className="px-6 pb-8">
         <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">Built-in Simulations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {SIMULATIONS.map(sim => {
+          {SIMULATIONS.filter(s => s.id !== 'fpv-drone-vr').map(sim => {
             const Icon = sim.icon
             return (
               <button

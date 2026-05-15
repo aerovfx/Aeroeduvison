@@ -396,37 +396,467 @@ function DjiFpvDrone({ propSpeed = 1 }: { propSpeed?: number }) {
 const Quadcopter = DjiFpvDrone
 
 // ═════════════════════════════════════════════════════════════
-// LEVEL ENVIRONMENT — gates change theo level
+// SCENERY COMPONENTS — terrain, trees, buildings, obstacles
+// ═════════════════════════════════════════════════════════════
+
+/** Hill — half-sphere mound, tô màu cỏ rừng */
+function Hill({ pos, r, color = '#15803d' }: { pos: [number, number, number]; r: number; color?: string }) {
+  return (
+    <mesh position={pos} castShadow receiveShadow>
+      <sphereGeometry args={[r, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+      <meshStandardMaterial color={color} roughness={0.95} />
+    </mesh>
+  )
+}
+
+/** Tree — trunk + 2 cone canopy */
+function Tree({ pos, scale = 1, dead = false }: { pos: [number, number, number]; scale?: number; dead?: boolean }) {
+  const leafColor = dead ? '#78350f' : '#166534'
+  const leafColor2 = dead ? '#92400e' : '#15803d'
+  return (
+    <group position={pos} scale={scale}>
+      <mesh position={[0, 1, 0]} castShadow>
+        <cylinderGeometry args={[0.18, 0.25, 2, 8]} />
+        <meshStandardMaterial color="#78350f" roughness={0.9} />
+      </mesh>
+      <mesh position={[0, 2.8, 0]} castShadow>
+        <coneGeometry args={[1.3, 2.4, 8]} />
+        <meshStandardMaterial color={leafColor} roughness={0.85} />
+      </mesh>
+      <mesh position={[0, 4, 0]} castShadow>
+        <coneGeometry args={[0.95, 2, 8]} />
+        <meshStandardMaterial color={leafColor2} roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Forest cluster — N cây quanh tâm */
+function ForestCluster({ center, count, spread, scaleVar = true }: {
+  center: [number, number, number]; count: number; spread: number; scaleVar?: boolean
+}) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => {
+        const a = (i / count) * Math.PI * 2 + (i * 0.7)
+        const r = spread * (0.3 + ((i * 13) % 7) / 10)
+        const x = center[0] + Math.cos(a) * r
+        const z = center[2] + Math.sin(a) * r
+        const sc = scaleVar ? (0.7 + ((i * 17) % 5) * 0.18) : 1
+        return <Tree key={i} pos={[x, center[1], z]} scale={sc} />
+      })}
+    </>
+  )
+}
+
+/** Building — block với cửa sổ phát sáng (city night look) */
+function Building({ pos, w, h, d, color = '#475569', litWindows = true }: {
+  pos: [number, number, number]; w: number; h: number; d: number; color?: string; litWindows?: boolean
+}) {
+  const floors = Math.max(1, Math.floor(h / 2.5))
+  return (
+    <group position={pos}>
+      <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[w, h, d]} />
+        <meshStandardMaterial color={color} metalness={0.2} roughness={0.7} />
+      </mesh>
+      {/* Roof slab */}
+      <mesh position={[0, h + 0.15, 0]}>
+        <boxGeometry args={[w + 0.4, 0.3, d + 0.4]} />
+        <meshStandardMaterial color="#1f2937" roughness={0.8} />
+      </mesh>
+      {/* Antenna */}
+      <mesh position={[0, h + 1.5, 0]}>
+        <cylinderGeometry args={[0.05, 0.05, 2.5, 6]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.4} />
+      </mesh>
+      {/* Front-face windows (yellow if lit) */}
+      {litWindows && Array.from({ length: floors }).map((_, fi) => (
+        <mesh key={`f${fi}`} position={[0, 1.5 + fi * 2.5, d / 2 + 0.02]}>
+          <planeGeometry args={[w * 0.78, 0.7]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.5} />
+        </mesh>
+      ))}
+      {/* Back-face windows */}
+      {litWindows && Array.from({ length: floors }).map((_, fi) => (
+        <mesh key={`b${fi}`} position={[0, 1.5 + fi * 2.5, -d / 2 - 0.02]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[w * 0.78, 0.7]} />
+          <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.4} />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/** Scaffold — open metal frame tower */
+function Scaffold({ pos, h }: { pos: [number, number, number]; h: number }) {
+  const w = 2
+  const corners: [number, number][] = [[w / 2, w / 2], [-w / 2, w / 2], [w / 2, -w / 2], [-w / 2, -w / 2]]
+  const levels = Math.max(2, Math.floor(h / 2))
+  return (
+    <group position={pos}>
+      {corners.map(([x, z], i) => (
+        <mesh key={`p${i}`} position={[x, h / 2, z]} castShadow>
+          <cylinderGeometry args={[0.1, 0.1, h, 6]} />
+          <meshStandardMaterial color="#f59e0b" metalness={0.5} roughness={0.4} />
+        </mesh>
+      ))}
+      {Array.from({ length: levels }).map((_, li) => (
+        <group key={`l${li}`} position={[0, li * 2 + 1, 0]}>
+          <mesh rotation={[0, 0, Math.PI / 2]} position={[0, 0, w / 2]}>
+            <cylinderGeometry args={[0.06, 0.06, w, 6]} />
+            <meshStandardMaterial color="#f59e0b" metalness={0.5} />
+          </mesh>
+          <mesh rotation={[0, 0, Math.PI / 2]} position={[0, 0, -w / 2]}>
+            <cylinderGeometry args={[0.06, 0.06, w, 6]} />
+            <meshStandardMaterial color="#f59e0b" metalness={0.5} />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]} position={[w / 2, 0, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, w, 6]} />
+            <meshStandardMaterial color="#f59e0b" metalness={0.5} />
+          </mesh>
+          <mesh rotation={[Math.PI / 2, 0, 0]} position={[-w / 2, 0, 0]}>
+            <cylinderGeometry args={[0.06, 0.06, w, 6]} />
+            <meshStandardMaterial color="#f59e0b" metalness={0.5} />
+          </mesh>
+        </group>
+      ))}
+      {/* Warning red light on top */}
+      <mesh position={[0, h + 0.2, 0]}>
+        <sphereGeometry args={[0.12, 8, 8]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={1.5} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Hangar — half-cylinder arch building */
+function Hangar({ pos, rotY = 0 }: { pos: [number, number, number]; rotY?: number }) {
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      {/* Arch roof */}
+      <mesh castShadow position={[0, 0, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[6, 6, 14, 20, 1, true, 0, Math.PI]} />
+        <meshStandardMaterial color="#64748b" metalness={0.4} roughness={0.6} side={THREE.DoubleSide} />
+      </mesh>
+      {/* End walls (semicircle) */}
+      <mesh position={[0, 3, 7]} castShadow>
+        <circleGeometry args={[6, 20, 0, Math.PI]} />
+        <meshStandardMaterial color="#475569" />
+      </mesh>
+      <mesh position={[0, 3, -7]} rotation={[0, Math.PI, 0]} castShadow>
+        <circleGeometry args={[6, 20, 0, Math.PI]} />
+        <meshStandardMaterial color="#475569" />
+      </mesh>
+      {/* Door front (lit) */}
+      <mesh position={[0, 2.5, 7.05]}>
+        <planeGeometry args={[7, 5]} />
+        <meshStandardMaterial color="#0f172a" emissive="#3b82f6" emissiveIntensity={0.3} />
+      </mesh>
+      {/* HANGAR text */}
+      <Text position={[0, 5.5, 7.1]} fontSize={0.6} color="#fbbf24" anchorX="center">HANGAR</Text>
+    </group>
+  )
+}
+
+/** Water tower — red cylindrical tank on legs */
+function WaterTower({ pos }: { pos: [number, number, number] }) {
+  const legs: [number, number][] = [[1.5, 1.5], [-1.5, 1.5], [1.5, -1.5], [-1.5, -1.5]]
+  return (
+    <group position={pos}>
+      {legs.map(([x, z], i) => (
+        <mesh key={i} position={[x, 5, z]} castShadow>
+          <cylinderGeometry args={[0.18, 0.22, 10, 6]} />
+          <meshStandardMaterial color="#94a3b8" metalness={0.6} roughness={0.4} />
+        </mesh>
+      ))}
+      {/* Cross braces */}
+      {[1, 3, 6].map((y, i) => (
+        <group key={`brace${i}`}>
+          <mesh position={[0, y, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <cylinderGeometry args={[0.07, 0.07, 4.2, 6]} />
+            <meshStandardMaterial color="#94a3b8" />
+          </mesh>
+          <mesh position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.07, 0.07, 4.2, 6]} />
+            <meshStandardMaterial color="#94a3b8" />
+          </mesh>
+        </group>
+      ))}
+      {/* Tank */}
+      <mesh position={[0, 12, 0]} castShadow>
+        <cylinderGeometry args={[2.8, 2.8, 4.5, 16]} />
+        <meshStandardMaterial color="#dc2626" metalness={0.4} roughness={0.6} />
+      </mesh>
+      {/* Top dome */}
+      <mesh position={[0, 14.5, 0]} castShadow>
+        <sphereGeometry args={[2.8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color="#dc2626" />
+      </mesh>
+      {/* H₂O text */}
+      <Text position={[0, 12.5, 2.85]} fontSize={1.2} color="#fbbf24" anchorX="center">H₂O</Text>
+    </group>
+  )
+}
+
+/** Billboard — large flat sign on 2 posts */
+function Billboard({ pos, text, rotY = 0, color = '#fbbf24' }: {
+  pos: [number, number, number]; text: string; rotY?: number; color?: string
+}) {
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      <mesh position={[-2.2, 4, 0]} castShadow>
+        <cylinderGeometry args={[0.18, 0.18, 8, 6]} />
+        <meshStandardMaterial color="#334155" metalness={0.5} />
+      </mesh>
+      <mesh position={[2.2, 4, 0]} castShadow>
+        <cylinderGeometry args={[0.18, 0.18, 8, 6]} />
+        <meshStandardMaterial color="#334155" metalness={0.5} />
+      </mesh>
+      {/* Board (double-sided) */}
+      <mesh position={[0, 7, 0]} castShadow>
+        <boxGeometry args={[6.5, 3.2, 0.25]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.3} roughness={0.7} />
+      </mesh>
+      <Text position={[0, 7, 0.13]} fontSize={0.7} color={color} anchorX="center" anchorY="middle"
+        maxWidth={6} textAlign="center">{text}</Text>
+      <Text position={[0, 7, -0.13]} rotation={[0, Math.PI, 0]} fontSize={0.7} color={color}
+        anchorX="center" anchorY="middle" maxWidth={6} textAlign="center">{text}</Text>
+    </group>
+  )
+}
+
+/** Bridge — flat platform on multiple posts (fly under hoặc above) */
+function Bridge({ pos, length, height, rotY = 0 }: {
+  pos: [number, number, number]; length: number; height: number; rotY?: number
+}) {
+  const postCount = Math.max(2, Math.floor(length / 6))
+  return (
+    <group position={pos} rotation={[0, rotY, 0]}>
+      {/* Deck */}
+      <mesh position={[0, height, 0]} castShadow receiveShadow>
+        <boxGeometry args={[length, 0.4, 4]} />
+        <meshStandardMaterial color="#475569" metalness={0.3} roughness={0.7} />
+      </mesh>
+      {/* Side rails */}
+      <mesh position={[0, height + 0.6, 1.95]}>
+        <boxGeometry args={[length, 1, 0.1]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.2} />
+      </mesh>
+      <mesh position={[0, height + 0.6, -1.95]}>
+        <boxGeometry args={[length, 1, 0.1]} />
+        <meshStandardMaterial color="#fbbf24" emissive="#fbbf24" emissiveIntensity={0.2} />
+      </mesh>
+      {/* Posts */}
+      {Array.from({ length: postCount }).map((_, i) => {
+        const x = -length / 2 + (i / (postCount - 1)) * length
+        return (
+          <group key={i}>
+            <mesh position={[x, height / 2, 1.8]} castShadow>
+              <cylinderGeometry args={[0.25, 0.3, height, 8]} />
+              <meshStandardMaterial color="#334155" metalness={0.4} />
+            </mesh>
+            <mesh position={[x, height / 2, -1.8]} castShadow>
+              <cylinderGeometry args={[0.25, 0.3, height, 8]} />
+              <meshStandardMaterial color="#334155" metalness={0.4} />
+            </mesh>
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+/** Procedural ground — heightmap with subtle rolling hills, vertex-displaced.
+ * Skip displacement trong vòng 8m từ origin để spawn pad luôn phẳng.
+ */
+function ProceduralGround({ size = 400, segments = 60, color = '#1a4f3a' }: {
+  size?: number; segments?: number; color?: string
+}) {
+  const geom = useMemo(() => {
+    const g = new THREE.PlaneGeometry(size, size, segments, segments)
+    const pos = g.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i)
+      const y = pos.getY(i)   // pre-rotation: local Y → world -Z
+      const distSq = x * x + y * y
+      if (distSq < 64) continue   // flat zone radius 8m
+      // Layered sin/cos cho low-freq rolling hills
+      const h =
+        Math.sin(x * 0.04) * Math.cos(y * 0.04) * 1.5 +
+        Math.sin(x * 0.09 + 1) * Math.cos(y * 0.07 + 2) * 0.6 +
+        Math.sin(x * 0.18 + 3) * 0.2
+      pos.setZ(i, h)
+    }
+    g.computeVertexNormals()
+    return g
+  }, [size, segments])
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <primitive object={geom} attach="geometry" />
+      <meshStandardMaterial color={color} roughness={0.95} />
+    </mesh>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════
+// PER-LEVEL SCENERY — placement hand-tuned per level, không
+// chặn flight path qua các gates
+// ═════════════════════════════════════════════════════════════
+function LevelScenery({ levelId }: { levelId: number }) {
+  switch (levelId) {
+    case 1:
+      // Sunset meadow — open, distant trees, 2 small hills
+      return (
+        <>
+          <Hill pos={[20, 0, 18]} r={5} />
+          <Hill pos={[-22, 0, -15]} r={6} color="#14532d" />
+          <Hill pos={[18, 0, -20]} r={4} />
+          <ForestCluster center={[28, 0, 0]} count={8} spread={6} />
+          <ForestCluster center={[-28, 0, 5]} count={7} spread={5} />
+          <ForestCluster center={[0, 0, 30]} count={10} spread={8} />
+          <ForestCluster center={[0, 0, -32]} count={9} spread={7} />
+          <Billboard pos={[0, 0, -25]} text="🌱 LEVEL 1: HOVER 5m" color="#22c55e" />
+        </>
+      )
+    case 2:
+      // Forest path — gate at z=-8, flanked by trees, hill behind
+      return (
+        <>
+          {/* Trees lining approach (avoid x ∈ [-3,3], z ∈ [-12,-4]) */}
+          <Tree pos={[-7, 0, -3]} scale={1.2} />
+          <Tree pos={[-8, 0, -7]} scale={1.0} />
+          <Tree pos={[-6, 0, -11]} scale={1.3} />
+          <Tree pos={[7, 0, -3]} scale={1.1} />
+          <Tree pos={[8, 0, -7]} scale={1.2} />
+          <Tree pos={[6, 0, -11]} scale={1.0} />
+          {/* Hill behind gate */}
+          <Hill pos={[0, 0, -20]} r={8} />
+          <ForestCluster center={[0, 0, -28]} count={12} spread={10} />
+          <ForestCluster center={[20, 0, -10]} count={6} spread={6} />
+          <ForestCluster center={[-20, 0, -10]} count={6} spread={6} />
+          <ForestCluster center={[15, 0, 12]} count={5} spread={5} />
+          <ForestCluster center={[-15, 0, 12]} count={5} spread={5} />
+          <Billboard pos={[-12, 0, -2]} text="🎯 GATE 1" color="#ec4899" rotY={0.4} />
+        </>
+      )
+    case 3:
+      // Hill country slalom — 3 zigzag gates ((5,4,-8), (-5,5,-16), (0,6,-24))
+      return (
+        <>
+          {/* Hills between/beside gates (avoid gate radius 2.2) */}
+          <Hill pos={[-6, 0, -8]} r={4} />
+          <Hill pos={[6, 0, -16]} r={4} />
+          <Hill pos={[-6, 0, -24]} r={4} color="#14532d" />
+          <Hill pos={[6, 0, -24]} r={3} />
+          {/* Forest patches */}
+          <ForestCluster center={[12, 0, -8]} count={5} spread={4} />
+          <ForestCluster center={[-12, 0, -16]} count={5} spread={4} />
+          <ForestCluster center={[12, 0, -24]} count={4} spread={3} />
+          <ForestCluster center={[-12, 0, -32]} count={6} spread={5} />
+          {/* Bridge across path at z=-30 (under or over) */}
+          <Bridge pos={[0, 0, -30]} length={20} height={2} rotY={Math.PI / 2} />
+          <ForestCluster center={[20, 0, 5]} count={8} spread={7} />
+          <ForestCluster center={[-20, 0, 5]} count={8} spread={7} />
+          <Hill pos={[0, 0, 25]} r={10} color="#14532d" />
+          <Billboard pos={[14, 0, -8]} text="🏁 ZIGZAG" color="#fbbf24" rotY={-0.4} />
+        </>
+      )
+    case 4:
+      // Race track — gates at (0,4,-10), (8,6,-20), (-8,8,-30), (5,10,-40), (0,12,-50)
+      return (
+        <>
+          {/* Billboards alongside */}
+          <Billboard pos={[12, 0, -10]} text="⚡ START" color="#22c55e" rotY={-0.3} />
+          <Billboard pos={[-12, 0, -10]} text="GO!" color="#fbbf24" rotY={0.3} />
+          <Billboard pos={[14, 0, -25]} text="CHECKPOINT" color="#06b6d4" rotY={-0.3} />
+          <Billboard pos={[-14, 0, -35]} text="HALFWAY" color="#a78bfa" rotY={0.3} />
+          <Billboard pos={[12, 0, -50]} text="🏆 FINISH" color="#ef4444" rotY={-0.4} />
+          {/* Scaffold time markers */}
+          <Scaffold pos={[15, 0, -20]} h={12} />
+          <Scaffold pos={[-15, 0, -30]} h={14} />
+          <Scaffold pos={[15, 0, -40]} h={16} />
+          <Scaffold pos={[-15, 0, -45]} h={18} />
+          {/* Bridge to fly under/over at z=-35 (at height 3, gates above) */}
+          <Bridge pos={[0, 0, -35]} length={26} height={3} rotY={Math.PI / 2} />
+          {/* Hills along edges */}
+          <Hill pos={[22, 0, -15]} r={5} />
+          <Hill pos={[-22, 0, -25]} r={5} />
+          <Hill pos={[22, 0, -45]} r={6} color="#14532d" />
+          {/* Forest perimeters */}
+          <ForestCluster center={[28, 0, -25]} count={10} spread={8} />
+          <ForestCluster center={[-28, 0, -40]} count={10} spread={8} />
+          <ForestCluster center={[0, 0, -65]} count={12} spread={10} />
+          <ForestCluster center={[0, 0, 15]} count={8} spread={7} />
+        </>
+      )
+    case 5:
+      // Urban warzone — gates spread (10,4,-8), (-15,8,20), (18,6,-25), (-10,12,-5), (0,4,-40)
+      return (
+        <>
+          {/* Building cluster — north (avoid gate at -10,12,-5 = need clearance) */}
+          <Building pos={[-22, 0, -10]} w={6} h={14} d={6} color="#475569" />
+          <Building pos={[-22, 0, 0]} w={6} h={18} d={6} color="#334155" />
+          <Building pos={[-15, 0, -18]} w={5} h={10} d={5} color="#64748b" />
+          {/* East tower row (avoid gate 10,4,-8 cylinder ±2.2) */}
+          <Building pos={[16, 0, -2]} w={6} h={20} d={6} color="#475569" />
+          <Building pos={[22, 0, -8]} w={5} h={16} d={5} color="#334155" />
+          <Building pos={[16, 0, -18]} w={6} h={12} d={6} color="#64748b" />
+          {/* Hangar (south near spawn-back) */}
+          <Hangar pos={[0, 0, 28]} rotY={Math.PI / 2} />
+          {/* Water tower */}
+          <WaterTower pos={[-25, 0, -30]} />
+          <WaterTower pos={[25, 0, 18]} />
+          {/* Scaffolds (between gates) */}
+          <Scaffold pos={[5, 0, -15]} h={10} />
+          <Scaffold pos={[-5, 0, -32]} h={14} />
+          <Scaffold pos={[8, 0, -45]} h={16} />
+          <Scaffold pos={[-20, 0, 12]} h={12} />
+          {/* Bridges (đặt ở perimeter, không chặn gate hay xuyên building) */}
+          <Bridge pos={[28, 0, -20]} length={18} height={3} rotY={Math.PI / 2} />
+          <Bridge pos={[-28, 0, 5]} length={20} height={3} rotY={Math.PI / 2} />
+          {/* Billboards */}
+          <Billboard pos={[10, 0, 5]} text="⚡ FPV PRO" color="#ec4899" rotY={-0.5} />
+          <Billboard pos={[-10, 0, -45]} text="DANGER ZONE" color="#ef4444" rotY={0.6} />
+          <Billboard pos={[20, 0, -35]} text="↑ GATE" color="#fbbf24" rotY={-0.7} />
+          {/* Trees around perimeter */}
+          <ForestCluster center={[30, 0, 0]} count={10} spread={6} />
+          <ForestCluster center={[-30, 0, 25]} count={9} spread={7} />
+          <ForestCluster center={[0, 0, -55]} count={12} spread={9} />
+          <ForestCluster center={[30, 0, -50]} count={8} spread={6} />
+          {/* Hills */}
+          <Hill pos={[35, 0, 30]} r={8} color="#14532d" />
+          <Hill pos={[-35, 0, -45]} r={9} />
+          {/* Misc dead trees for atmosphere */}
+          <Tree pos={[8, 0, 12]} scale={1.5} dead />
+          <Tree pos={[-8, 0, -22]} scale={1.4} dead />
+        </>
+      )
+    default:
+      return null
+  }
+}
+
+// ═════════════════════════════════════════════════════════════
+// LEVEL ENVIRONMENT — gates change theo level + scenery riêng
 // ═════════════════════════════════════════════════════════════
 function LevelEnvironment({ level, currentGate }: { level: Level; currentGate: number }) {
-  const towerCount = level.difficulty === 'pro' ? 25 : level.difficulty === 'hard' ? 12 : 6
   return (
     <>
       <Sky distance={4500} sunPosition={[100, 20, 100]} inclination={0.49} azimuth={0.25} />
       <Stars radius={200} depth={50} count={3000} factor={4} fade speed={0.5} />
-      <ambientLight intensity={0.4} />
+      <ambientLight intensity={0.45} />
       <directionalLight position={[50, 80, 30]} intensity={1.2} castShadow shadow-mapSize={[2048, 2048]} />
+      {/* Hemisphere fill — sky/ground bounce */}
+      <hemisphereLight args={['#87ceeb', '#1a4f3a', 0.4]} />
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[400, 400, 50, 50]} />
-        <meshStandardMaterial color="#1a4f3a" />
-      </mesh>
-      <gridHelper args={[400, 80, '#22c55e', '#14532d']} position={[0, 0.01, 0]} />
+      {/* Procedural undulating ground */}
+      <ProceduralGround size={400} segments={60} />
+      {/* Subtle grid for ground plane — visible chỉ trong vùng gần */}
+      <gridHelper args={[80, 40, '#22c55e44', '#14532d44']} position={[0, 0.02, 0]} />
 
-      {/* Towers */}
-      {Array.from({ length: towerCount }).map((_, i) => {
-        const angle = (i / towerCount) * Math.PI * 2
-        const r = 30 + (i % 5) * 12
-        const x = Math.cos(angle) * r
-        const z = Math.sin(angle) * r
-        const h = 8 + (i % 4) * 4
-        return (
-          <mesh key={i} position={[x, h / 2, z]} castShadow>
-            <boxGeometry args={[2, h, 2]} />
-            <meshStandardMaterial color={['#7c3aed', '#3b82f6', '#10b981', '#f59e0b'][i % 4]} />
-          </mesh>
-        )
-      })}
+      {/* Per-level scenery (terrain + obstacles) */}
+      <LevelScenery levelId={level.id} />
 
       {/* Gates — current gate sáng vàng glow, qua rồi xanh, chưa tới hồng */}
       {(level.gates || []).map((g, i) => {
