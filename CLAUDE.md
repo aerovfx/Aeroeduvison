@@ -15,7 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `77ee257` (deploy 224, 2026-05-15 — Camera ONVIF feature)
+- Last deployed commit: `2201d7c` (deploy 225, 2026-05-15 — Analytics + AI Dashboard + Learning Path Builder)
 - Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
