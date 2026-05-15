@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
 import {
   Plus, Brain, BookOpen, FolderKanban, Save,
   Settings, Zap, Clock, ChevronRight, Trash2,
-  GripVertical, TrendingUp,
+  GripVertical, TrendingUp, Users, X, FolderOpen, Check,
+  Loader2, AlertCircle,
 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
+import { api } from '@/services/api'
 
 /* ── Dark palette ── */
 const D = {
@@ -31,6 +33,33 @@ interface Module {
   duration: number
   xpTarget: number
   prerequisites?: string[]
+}
+
+interface RosterStudent {
+  id: string
+  userId: string | null
+  name: string
+  email: string
+  avatar: string | null
+  classNames: string[]
+  isLinked: boolean
+}
+
+interface LearningPath {
+  id: string
+  name: string
+  description: string
+  subject: string | null
+  difficulty: string
+  modules: Module[]
+  estimatedDays: number
+  totalXP: number
+  totalDuration: number
+  isTemplate: boolean
+  assignments: Array<{ id: string; studentId: string; studentName: string; studentEmail: string; status: string; progressPct: number }>
+  assignedCount: number
+  createdAt: string
+  updatedAt: string
 }
 
 /* ── Helpers ── */
@@ -96,14 +125,89 @@ const AI_SUGGESTIONS = [
 
 /* ── Main Component ── */
 export default function LearningPathBuilder() {
-  const navigate = useNavigate()
-
   const [pathName, setPathName] = useState('')
   const [pathDescription, setPathDescription] = useState('')
   const [selectedModules, setSelectedModules] = useState<Module[]>([])
   const [xpPerDay, setXpPerDay] = useState('150')
   const [diffMode, setDiffMode] = useState('auto')
   const [autoAdjust, setAutoAdjust] = useState(true)
+
+  // ── HS được gán path (multi-select) ──
+  const [roster, setRoster] = useState<RosterStudent[]>([])
+  const [rosterLoading, setRosterLoading] = useState(true)
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
+  const [studentPickerOpen, setStudentPickerOpen] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
+
+  // ── Existing paths (load để chỉnh sửa) ──
+  const [existingPaths, setExistingPaths] = useState<LearningPath[]>([])
+  const [pathsLoading, setPathsLoading] = useState(true)
+  const [pathsListOpen, setPathsListOpen] = useState(false)
+  const [editingPathId, setEditingPathId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  // Load roster + existing paths on mount
+  useEffect(() => {
+    (async () => {
+      setRosterLoading(true)
+      try {
+        const r = await api.get<{ students: RosterStudent[] }>('/teacher/roster')
+        setRoster(Array.isArray(r.data?.students) ? r.data.students : [])
+      } catch (e: any) {
+        console.warn('[lpb:roster]', e?.response?.data || e.message)
+      } finally { setRosterLoading(false) }
+    })()
+    ;(async () => {
+      setPathsLoading(true)
+      try {
+        const r = await api.get<{ paths: LearningPath[] }>('/teacher/learning-paths')
+        setExistingPaths(Array.isArray(r.data?.paths) ? r.data.paths : [])
+      } catch (e: any) {
+        console.warn('[lpb:paths]', e?.response?.data || e.message)
+      } finally { setPathsLoading(false) }
+    })()
+  }, [])
+
+  const filteredRoster = useMemo(() => {
+    const q = studentSearch.trim().toLowerCase()
+    if (!q) return roster
+    return roster.filter(s =>
+      s.name.toLowerCase().includes(q) ||
+      s.email.toLowerCase().includes(q) ||
+      s.classNames.some(c => c.toLowerCase().includes(q))
+    )
+  }, [roster, studentSearch])
+
+  const toggleStudent = (studentId: string) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+  const selectAllStudents = () => setSelectedStudentIds(new Set(filteredRoster.map(s => s.id)))
+  const clearAllStudents = () => setSelectedStudentIds(new Set())
+
+  // Load 1 path (chỉnh sửa)
+  const loadPath = (p: LearningPath) => {
+    setEditingPathId(p.id)
+    setPathName(p.name)
+    setPathDescription(p.description)
+    setSelectedModules(p.modules || [])
+    setSelectedStudentIds(new Set(p.assignments.map(a => a.studentId)))
+    setPathsListOpen(false)
+    toast.success(`Đã load path "${p.name}"`)
+  }
+
+  const newPath = () => {
+    setEditingPathId(null)
+    setPathName('')
+    setPathDescription('')
+    setSelectedModules([])
+    setSelectedStudentIds(new Set())
+    setPathsListOpen(false)
+  }
 
   const addModule = (module: Module) => setSelectedModules(prev => [...prev, module])
   const removeModule = (moduleId: string) => setSelectedModules(prev => prev.filter(m => m.id !== moduleId))
@@ -123,18 +227,64 @@ export default function LearningPathBuilder() {
 
   const canSave = selectedModules.length > 0 && pathName.trim().length > 0
 
-  const savePath = () => {
-    const pathData = {
-      id: `path-${Date.now()}`,
-      name: pathName,
-      description: pathDescription,
-      modules: selectedModules,
-      createdAt: new Date().toISOString(),
+  const savePath = async () => {
+    if (!canSave || saving) return
+    setSaving(true)
+    try {
+      // Build assignTo từ selected students (lookup roster để lấy name/email)
+      const assignTo = Array.from(selectedStudentIds).map(sid => {
+        const r = roster.find(x => x.id === sid)
+        return {
+          studentId: sid,
+          studentName: r?.name || '',
+          studentEmail: r?.email || '',
+        }
+      })
+      if (editingPathId) {
+        // Update existing path (modules + name + desc)
+        await api.patch(`/teacher/learning-paths/${editingPathId}`, {
+          name: pathName,
+          description: pathDescription,
+          modules: selectedModules,
+        })
+        // Sync assignments: assign newly added (skip if already)
+        if (assignTo.length > 0) {
+          await api.post(`/teacher/learning-paths/${editingPathId}/assign`, {
+            students: assignTo,
+          })
+        }
+        toast.success(`Đã cập nhật path "${pathName}" — gán cho ${assignTo.length} HS`)
+      } else {
+        // Create new
+        await api.post('/teacher/learning-paths', {
+          name: pathName,
+          description: pathDescription,
+          modules: selectedModules,
+          assignTo,
+        })
+        toast.success(`Đã tạo path "${pathName}" — gán cho ${assignTo.length} HS`)
+      }
+      // Reload list
+      const r = await api.get<{ paths: LearningPath[] }>('/teacher/learning-paths')
+      setExistingPaths(Array.isArray(r.data?.paths) ? r.data.paths : [])
+      // Reset form
+      newPath()
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e.message || 'Lỗi lưu path'
+      toast.error(msg)
+    } finally { setSaving(false) }
+  }
+
+  const deletePath = async (pathId: string, pathName: string) => {
+    if (!confirm(`Xoá path "${pathName}"?\nTất cả assignments cho HS sẽ bị xoá theo.`)) return
+    try {
+      await api.delete(`/teacher/learning-paths/${pathId}`)
+      toast.success(`Đã xoá path "${pathName}"`)
+      setExistingPaths(prev => prev.filter(p => p.id !== pathId))
+      if (editingPathId === pathId) newPath()
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e.message || 'Lỗi xoá path')
     }
-    const saved = JSON.parse(localStorage.getItem('teacher-learning-paths') || '[]')
-    saved.push(pathData)
-    localStorage.setItem('teacher-learning-paths', JSON.stringify(saved))
-    navigate('/teacher/dashboard')
   }
 
   return (
@@ -162,23 +312,174 @@ export default function LearningPathBuilder() {
                 <h1 style={{ color: D.text, fontSize: 24, fontWeight: 900, margin: '0 0 4px' }}>
                   🎓 Learning Path Builder
                 </h1>
-                <p style={{ color: D.muted, fontSize: 13, margin: 0 }}>Tạo lộ trình học tập cá nhân hóa với AI</p>
+                <p style={{ color: D.muted, fontSize: 13, margin: 0 }}>
+                  {editingPathId
+                    ? `Đang chỉnh sửa: "${pathName}" — sẽ ghi đè khi lưu`
+                    : 'Tạo lộ trình học tập cá nhân hoá cho từng học sinh bạn dạy'}
+                </p>
               </div>
             </div>
 
-            <button
-              onClick={savePath}
-              disabled={!canSave}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: canSave ? D.purple : '#2a2b3d',
-                border: 'none', borderRadius: 11, cursor: canSave ? 'pointer' : 'not-allowed',
-                color: canSave ? '#fff' : D.muted, fontWeight: 700, fontSize: 14,
-                padding: '10px 22px', transition: 'background 0.2s', flexShrink: 0,
-              }}
-            >
-              <Save size={16} /> Lưu Path
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+              {/* Open existing paths */}
+              <button
+                onClick={() => setPathsListOpen(true)}
+                title="Mở danh sách paths đã tạo (chỉnh sửa, xoá)"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(255,255,255,0.06)', border: `1px solid ${D.border2}`,
+                  borderRadius: 11, cursor: 'pointer',
+                  color: D.text, fontWeight: 600, fontSize: 13,
+                  padding: '10px 16px',
+                }}
+              >
+                <FolderOpen size={15} />
+                Paths ({existingPaths.length})
+              </button>
+              {editingPathId && (
+                <button
+                  onClick={newPath}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'rgba(255,255,255,0.04)', border: `1px solid ${D.border2}`,
+                    borderRadius: 11, cursor: 'pointer',
+                    color: D.muted, fontWeight: 600, fontSize: 13, padding: '10px 16px',
+                  }}
+                >
+                  <Plus size={14} /> Path mới
+                </button>
+              )}
+              <button
+                onClick={savePath}
+                disabled={!canSave || saving}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  background: canSave && !saving ? D.purple : '#2a2b3d',
+                  border: 'none', borderRadius: 11,
+                  cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+                  color: canSave && !saving ? '#fff' : D.muted, fontWeight: 700, fontSize: 14,
+                  padding: '10px 22px', transition: 'background 0.2s',
+                }}
+              >
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {editingPathId ? 'Cập nhật' : 'Lưu Path'}
+                {selectedStudentIds.size > 0 && ` (${selectedStudentIds.size} HS)`}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Student picker chip area (multi-select) ── */}
+          <div style={{ position: 'relative', marginBottom: 16, padding: '12px 14px',
+            background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(124,58,237,0.2)',
+            borderRadius: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#a78bfa', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Users size={13} /> Học sinh được gán path
+                {rosterLoading && <Loader2 size={11} className="animate-spin" />}
+              </label>
+              <button onClick={() => setStudentPickerOpen(o => !o)}
+                style={{ background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
+                  borderRadius: 8, color: '#a78bfa', fontSize: 12, fontWeight: 700,
+                  padding: '4px 12px', cursor: 'pointer' }}>
+                {studentPickerOpen ? 'Đóng danh sách' : `Chọn HS (${roster.length} có sẵn)`}
+              </button>
+            </div>
+            {selectedStudentIds.size === 0 ? (
+              <p style={{ color: D.muted, fontSize: 12, margin: 0 }}>
+                {roster.length === 0 ? '⚠ Chưa có HS nào trong lớp — vào /teacher/classes để import HS hoặc chờ HS kết nối.' : 'Chưa chọn HS nào — path sẽ được lưu dạng template (không gán cho ai).'}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {Array.from(selectedStudentIds).slice(0, 12).map(sid => {
+                  const s = roster.find(x => x.id === sid)
+                  if (!s) return null
+                  return (
+                    <span key={sid} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: 'rgba(124,58,237,0.18)', border: '1px solid rgba(124,58,237,0.4)',
+                      borderRadius: 999, padding: '3px 4px 3px 10px',
+                      color: D.text, fontSize: 12, fontWeight: 600,
+                    }}>
+                      {s.name}
+                      <button onClick={() => toggleStudent(sid)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer',
+                          color: '#a78bfa', display: 'flex', padding: 2 }}>
+                        <X size={11} />
+                      </button>
+                    </span>
+                  )
+                })}
+                {selectedStudentIds.size > 12 && (
+                  <span style={{ color: D.muted, fontSize: 12, padding: '3px 8px' }}>
+                    +{selectedStudentIds.size - 12} HS khác
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Picker dropdown */}
+            {studentPickerOpen && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
+                background: '#13141f', border: `1px solid ${D.border2}`, borderRadius: 12,
+                boxShadow: '0 10px 40px rgba(0,0,0,0.5)', zIndex: 20, maxHeight: 360, overflowY: 'auto',
+              }}>
+                <div style={{ position: 'sticky', top: 0, background: '#13141f', padding: 10, borderBottom: `1px solid ${D.border}` }}>
+                  <input value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
+                    placeholder="Tìm HS theo tên / email / lớp..."
+                    style={{ ...inputStyle, fontSize: 13 }} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                    <button onClick={selectAllStudents} style={{
+                      background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+                      borderRadius: 6, color: '#4ade80', padding: '4px 10px', fontSize: 11,
+                      fontWeight: 700, cursor: 'pointer',
+                    }}>Chọn tất cả ({filteredRoster.length})</button>
+                    <button onClick={clearAllStudents} style={{
+                      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
+                      borderRadius: 6, color: '#f87171', padding: '4px 10px', fontSize: 11,
+                      fontWeight: 700, cursor: 'pointer',
+                    }}>Bỏ chọn tất cả</button>
+                  </div>
+                </div>
+                <div>
+                  {filteredRoster.length === 0 ? (
+                    <p style={{ color: D.muted, fontSize: 12, padding: 16, textAlign: 'center', margin: 0 }}>
+                      Không tìm thấy HS phù hợp
+                    </p>
+                  ) : filteredRoster.map(s => {
+                    const checked = selectedStudentIds.has(s.id)
+                    return (
+                      <label key={s.id}
+                        onClick={() => toggleStudent(s.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+                          cursor: 'pointer', borderBottom: `1px solid ${D.border}`,
+                          background: checked ? 'rgba(124,58,237,0.08)' : 'transparent',
+                        }}>
+                        <div style={{
+                          width: 16, height: 16, borderRadius: 4,
+                          background: checked ? D.purple : 'transparent',
+                          border: `2px solid ${checked ? D.purple : D.border2}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        }}>
+                          {checked && <Check size={11} color="#fff" strokeWidth={3} />}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ color: D.text, fontSize: 13, fontWeight: 600, margin: 0 }}>{s.name}</p>
+                          <p style={{ color: D.muted, fontSize: 11, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {s.email}{s.classNames.length > 0 && ` • ${s.classNames.join(', ')}`}
+                          </p>
+                        </div>
+                        {!s.isLinked && (
+                          <span style={{ fontSize: 9, color: '#facc15', background: 'rgba(234,179,8,0.1)', padding: '2px 5px', borderRadius: 4, fontWeight: 700 }}>
+                            CHƯA LINK
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -508,6 +809,89 @@ export default function LearningPathBuilder() {
           </div>
         </div>
       </div>
+
+      {/* ── Modal: Danh sách paths đã tạo (load để chỉnh sửa hoặc xoá) ── */}
+      {pathsListOpen && (
+        <div onClick={() => setPathsListOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: D.card, border: `1px solid ${D.border2}`, borderRadius: 16,
+              maxWidth: 720, width: '100%', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${D.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ color: D.text, fontSize: 18, fontWeight: 800, margin: 0 }}>
+                  📚 Learning Paths đã tạo
+                </h3>
+                <p style={{ color: D.muted, fontSize: 12, margin: '4px 0 0' }}>
+                  {existingPaths.length} path · Click để load chỉnh sửa
+                </p>
+              </div>
+              <button onClick={() => setPathsListOpen(false)} style={{
+                background: 'transparent', border: 'none', cursor: 'pointer', color: D.muted, padding: 6,
+              }}><X size={20} /></button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+              {pathsLoading ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <Loader2 size={28} className="animate-spin" style={{ color: D.purple, margin: '0 auto' }} />
+                </div>
+              ) : existingPaths.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 40 }}>
+                  <AlertCircle size={32} style={{ color: D.muted, margin: '0 auto 12px' }} />
+                  <p style={{ color: D.muted, fontSize: 13, margin: 0 }}>
+                    Chưa có path nào — tạo path đầu tiên bằng form bên dưới
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {existingPaths.map(p => (
+                    <div key={p.id} style={{
+                      background: D.card2, border: `1px solid ${editingPathId === p.id ? D.purple : D.border}`,
+                      borderRadius: 12, padding: 12,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <button onClick={() => loadPath(p)} style={{
+                          flex: 1, textAlign: 'left', background: 'transparent', border: 'none',
+                          cursor: 'pointer', padding: 0,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <h4 style={{ color: D.text, fontSize: 14, fontWeight: 700, margin: 0 }}>
+                              {p.name}
+                            </h4>
+                            {p.isTemplate && (
+                              <span style={{ fontSize: 9, color: '#facc15', background: 'rgba(234,179,8,0.15)',
+                                padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                                TEMPLATE
+                              </span>
+                            )}
+                          </div>
+                          {p.description && (
+                            <p style={{ color: D.muted, fontSize: 12, margin: '0 0 6px' }}>{p.description}</p>
+                          )}
+                          <div style={{ display: 'flex', gap: 12, fontSize: 11, color: D.muted }}>
+                            <span>📦 {p.modules.length} modules</span>
+                            <span>⏱ {p.totalDuration}p</span>
+                            <span>⚡ {p.totalXP} XP</span>
+                            <span>👥 {p.assignedCount} HS</span>
+                          </div>
+                        </button>
+                        <button onClick={() => deletePath(p.id, p.name)} style={{
+                          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                          borderRadius: 8, color: '#f87171', cursor: 'pointer', padding: 6,
+                        }} title="Xoá path">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
