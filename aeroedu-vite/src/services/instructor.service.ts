@@ -23,8 +23,17 @@ export interface CreateCoursePayload {
 
 export interface UploadVideoPayload {
   title: string
-  videoUrl: string
-  position: number
+  /** URL video (YouTube/Vimeo/MP4 trực tiếp/GCS public URL). BE accept cả 'url' lẫn legacy 'videoUrl'. */
+  url?: string
+  videoUrl?: string             // legacy alias, vẫn support
+  type?: 'youtube' | 'vimeo' | 'mp4' | 'gcs' | 'unknown'  // BE auto-detect nếu thiếu
+  thumbUrl?: string
+  duration?: number             // giây
+  position?: number
+  isPreview?: boolean
+  groupName?: string
+  /** Khi upload qua signed URL — pass gcsPath để BE biết để cleanup khi delete */
+  gcsPath?: string
 }
 
 export interface UploadAssetPayload {
@@ -71,6 +80,50 @@ export const instructorService = {
   /** DELETE /api/instructor/courses/:courseId/videos/:videoId */
   deleteVideo: (courseId: string, videoId: string) =>
     api.delete(`/instructor/courses/${courseId}/videos/${videoId}`).then((r) => r.data),
+
+  /**
+   * Lấy GCS signed URL để upload trực tiếp (PUT) — KHÔNG qua Cloud Run.
+   * FE nhận uploadUrl, dùng axios PUT file → GCS, sau đó gọi uploadVideo()
+   * với publicUrl trả về.
+   */
+  getVideoUploadUrl: (courseId: string, filename: string, contentType: string) =>
+    api.post<{
+      uploadUrl: string
+      publicUrl: string
+      gcsPath: string
+      contentType: string
+      expiresAt: string
+    }>('/upload/video-signed-url', { courseId, filename, contentType }).then(r => r.data),
+
+  /**
+   * Helper: upload file → GCS via signed URL với progress callback.
+   * Trả về { publicUrl, gcsPath } để gọi tiếp uploadVideo() lưu metadata.
+   */
+  uploadVideoFile: async (
+    courseId: string,
+    file: File,
+    onProgress?: (pct: number) => void,
+  ): Promise<{ publicUrl: string; gcsPath: string }> => {
+    const ct = file.type || 'video/mp4'
+    const { uploadUrl, publicUrl, gcsPath } = await api.post<{
+      uploadUrl: string; publicUrl: string; gcsPath: string
+    }>('/upload/video-signed-url', { courseId, filename: file.name, contentType: ct }).then(r => r.data)
+    // PUT trực tiếp tới GCS với progress tracking
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', uploadUrl, true)
+      xhr.setRequestHeader('Content-Type', ct)
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`GCS upload fail: ${xhr.status} ${xhr.statusText}`))
+      xhr.onerror = () => reject(new Error('GCS upload network error'))
+      xhr.send(file)
+    })
+    return { publicUrl, gcsPath }
+  },
 
   // ── Assets ──────────────────────────────────────────────
   /** GET /api/instructor/courses/:courseId/assets */

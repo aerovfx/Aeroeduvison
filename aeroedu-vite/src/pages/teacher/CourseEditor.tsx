@@ -345,8 +345,9 @@ function ContentStep({
 function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () => void; onBack: () => void }) {
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
+  // Tab: paste URL hoặc upload file lên GCS bucket
+  const [mode, setMode] = useState<'url' | 'file'>('url')
 
-  // Form fields matching elearniv UploadVideoForm
   const [groupName, setGroupName] = useState('')
   const [title, setTitle] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
@@ -355,6 +356,12 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
   const [serialId, setSerialId] = useState('')
   const [isPreview, setIsPreview] = useState(false)
   const [thumbUploading, setThumbUploading] = useState(false)
+
+  // File upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [uploadedGcsPath, setUploadedGcsPath] = useState<string>('')
 
   const { data: videos = [], isLoading } = useQuery({
     queryKey: ['instructor-videos', courseId],
@@ -365,15 +372,22 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
     mutationFn: () =>
       instructorService.uploadVideo(courseId, {
         title: title.trim(),
-        videoUrl: videoUrl.trim(),
+        url: videoUrl.trim(),
         position: videos.length + 1,
+        thumbUrl: thumbUrl || undefined,
+        isPreview,
+        groupName: groupName.trim() || undefined,
+        gcsPath: uploadedGcsPath || undefined,   // chỉ có khi upload file
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
-      toast.success('Đã thêm video!')
+      toast.success(mode === 'file' ? 'Đã upload + thêm video!' : 'Đã thêm video!')
       resetForm()
     },
-    onError: () => toast.error('Lỗi, thử lại nhé.'),
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Lỗi, thử lại nhé.')
+    },
   })
 
   const del = useMutation({
@@ -384,7 +398,43 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
   const resetForm = () => {
     setGroupName(''); setTitle(''); setVideoUrl('')
     setThumbUrl(''); setThumbPreview(''); setSerialId(''); setIsPreview(false)
+    setUploadFile(null); setUploadProgress(0); setUploadedGcsPath('')
     setShowForm(false)
+  }
+
+  // Upload file → GCS qua signed URL với progress bar
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      toast.error('Chỉ chấp nhận file video (mp4, webm, mov)')
+      return
+    }
+    const sizeMB = file.size / 1024 / 1024
+    if (sizeMB > 500) {
+      toast.error(`File quá lớn (${sizeMB.toFixed(0)}MB). Tối đa 500MB.`)
+      return
+    }
+    setUploadFile(file)
+    setUploadingFile(true)
+    setUploadProgress(0)
+    try {
+      const { publicUrl, gcsPath } = await instructorService.uploadVideoFile(
+        courseId, file, (pct) => setUploadProgress(pct),
+      )
+      setVideoUrl(publicUrl)
+      setUploadedGcsPath(gcsPath)
+      // Auto-fill title từ filename nếu chưa nhập
+      if (!title.trim()) {
+        const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
+        setTitle(baseName)
+      }
+      toast.success(`Upload xong (${sizeMB.toFixed(1)}MB)`)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string }
+      toast.error(e.response?.data?.error || e.message || 'Upload thất bại')
+      setUploadFile(null)
+    } finally {
+      setUploadingFile(false)
+    }
   }
 
   const handleThumbFile = async (file: File) => {
@@ -466,21 +516,120 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
               />
             </div>
 
+            {/* ── Tab nav: URL paste vs File upload ── */}
             <div className="sm:col-span-2">
-              <label className="label">URL video (YouTube / Vimeo / MP4 trực tiếp) <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=... hoặc https://cdn.example.com/video.mp4"
-                  className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-                />
+              <div className="flex gap-1 mb-3 border-b border-white/10">
+                {([
+                  { key: 'url'  as const, label: 'Dán URL',     icon: LinkIcon },
+                  { key: 'file' as const, label: 'Upload file', icon: Upload   },
+                ]).map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => { setMode(key); setVideoUrl(''); setUploadFile(null); setUploadedGcsPath('') }}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 transition-colors -mb-px',
+                      mode === key
+                        ? 'border-purple-500 text-purple-300'
+                        : 'border-transparent text-white/50 hover:text-white/80'
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />{label}
+                  </button>
+                ))}
               </div>
-              {videoUrl && (
-                <p className={cn('text-xs mt-1', isYT(videoUrl) ? 'text-green-400' : isVimeo(videoUrl) ? 'text-blue-400' : 'text-gray-400')}>
-                  {isYT(videoUrl) ? '✓ YouTube' : isVimeo(videoUrl) ? '✓ Vimeo' : '✓ URL trực tiếp'}
-                </p>
+
+              {mode === 'url' ? (
+                <>
+                  <label className="label">URL video (YouTube / Vimeo / MP4 trực tiếp) <span className="text-red-400">*</span></label>
+                  <div className="relative">
+                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                      value={videoUrl}
+                      onChange={(e) => setVideoUrl(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=... hoặc https://cdn.example.com/video.mp4"
+                      className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
+                    />
+                  </div>
+                  {videoUrl && (
+                    <p className={cn('text-xs mt-1', isYT(videoUrl) ? 'text-green-400' : isVimeo(videoUrl) ? 'text-blue-400' : 'text-gray-400')}>
+                      {isYT(videoUrl) ? '✓ YouTube' : isVimeo(videoUrl) ? '✓ Vimeo' : '✓ URL trực tiếp (MP4/WebM)'}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    💡 YouTube/Vimeo: nhúng player tự động. MP4: phát native HTML5.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label className="label">Chọn file video từ máy <span className="text-red-400">*</span></label>
+                  {!uploadFile ? (
+                    <label className={cn(
+                      'flex flex-col items-center justify-center gap-2 h-32',
+                      'rounded-xl border-2 border-dashed border-white/20 hover:border-purple-500/40',
+                      'cursor-pointer transition-colors'
+                    )}>
+                      <Upload className="w-7 h-7 text-gray-500" />
+                      <span className="text-sm text-gray-400">Click để chọn hoặc kéo file vào đây</span>
+                      <span className="text-xs text-gray-600">MP4 / WebM / MOV — tối đa 500MB</span>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm,video/quicktime,video/*"
+                        className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
+                      />
+                    </label>
+                  ) : (
+                    <div className="rounded-xl bg-purple-500/10 border border-purple-500/30 p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <Play className="w-8 h-8 text-purple-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{uploadFile.name}</p>
+                          <p className="text-xs text-gray-400">
+                            {(uploadFile.size / 1024 / 1024).toFixed(1)} MB
+                            {uploadedGcsPath && ' • ✅ Đã upload lên GCS'}
+                          </p>
+                        </div>
+                        {!uploadingFile && (
+                          <button
+                            type="button"
+                            onClick={() => { setUploadFile(null); setVideoUrl(''); setUploadedGcsPath(''); setUploadProgress(0) }}
+                            className="text-gray-400 hover:text-red-400"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      {uploadingFile && (
+                        <div>
+                          <div className="flex items-center justify-between text-xs text-purple-300 mb-1">
+                            <span>Đang upload tới Google Cloud Storage...</span>
+                            <span className="font-mono">{uploadProgress}%</span>
+                          </div>
+                          <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {uploadedGcsPath && !uploadingFile && (
+                        <a
+                          href={videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 truncate block"
+                        >
+                          🔗 {videoUrl}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 File upload trực tiếp từ trình duyệt → GCS bucket asia-southeast1, không qua server (nhanh + tiết kiệm bandwidth).
+                  </p>
+                </>
               )}
             </div>
 
@@ -551,12 +700,18 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
             </button>
             <button
               type="button"
-              disabled={!title.trim() || !videoUrl.trim() || add.isPending || thumbUploading}
+              disabled={
+                !title.trim() ||
+                !videoUrl.trim() ||
+                add.isPending ||
+                thumbUploading ||
+                uploadingFile
+              }
               onClick={() => add.mutate()}
               className="flex items-center gap-2 px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
             >
               {add.isPending && <Spin />}
-              Thêm bài học
+              {uploadingFile ? 'Đang upload...' : 'Thêm bài học'}
             </button>
           </div>
         </div>

@@ -2439,12 +2439,231 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
   // ── Stubs cho videos + assets endpoints (chưa implement full) ──
   const _501 = (msg) => (_req, res) => res.status(501).json({ error: msg });
   const _ok  = (_req, res) => res.json({ ok: true });
-  app.get('/api/instructor/courses/:id/videos', (_req, res) => res.json([]));
-  app.post('/api/instructor/courses/:id/videos', _501('Upload video đang phát triển'));
-  app.delete('/api/instructor/courses/:id/videos/:videoId', _ok);
   app.get('/api/instructor/courses/:id/assets', (_req, res) => res.json([]));
   app.post('/api/instructor/courses/:id/assets', _501('Upload assets đang phát triển'));
   app.delete('/api/instructor/courses/:id/assets/:assetId', _ok);
+
+  // ════════════════════════════════════════════════════════════════
+  // VIDEO MANAGEMENT — URL paste (YouTube/Vimeo/MP4) + GCS upload
+  // ────────────────────────────────────────────────────────────────
+  // Backed by table "CourseVideo" + GCS bucket aeroedu-media-* (asia-southeast1).
+  // Public read bucket → URL trực tiếp playback không cần auth FE.
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: VPool } = require('pg');
+    const vJwt = require('jsonwebtoken');
+    let _vPool = null;
+    function getVPool() {
+      if (!_vPool && process.env.DATABASE_URL) {
+        _vPool = new VPool({ connectionString: process.env.DATABASE_URL, max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000 });
+      }
+      return _vPool;
+    }
+    const V_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getVTeacher(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = vJwt.verify(auth.slice(7), V_SECRET, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id };
+      } catch { return null; }
+    }
+    let _vReady = false;
+    async function ensureVideoTable() {
+      if (_vReady) return;
+      const pool = getVPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "CourseVideo" (
+          id          TEXT PRIMARY KEY,
+          "courseId"  TEXT NOT NULL,
+          "userId"    TEXT NOT NULL,
+          title       TEXT NOT NULL,
+          type        TEXT NOT NULL,
+          url         TEXT NOT NULL,
+          "thumbUrl"  TEXT,
+          duration    INTEGER,
+          position    INTEGER NOT NULL DEFAULT 1,
+          "isPreview" BOOLEAN NOT NULL DEFAULT false,
+          "groupName" TEXT,
+          "gcsPath"   TEXT,
+          "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CourseVideo_course_idx"
+        ON "CourseVideo"("courseId", position ASC)`);
+      _vReady = true;
+    }
+
+    // Detect video type từ URL
+    function detectVideoType(url) {
+      const u = String(url || '').trim();
+      if (/youtube\.com\/watch|youtu\.be\//i.test(u))       return 'youtube';
+      if (/vimeo\.com\//i.test(u))                          return 'vimeo';
+      if (/storage\.googleapis\.com.*aeroedu-media/i.test(u)) return 'gcs';
+      if (/\.(mp4|webm|mov|m4v)(\?|$)/i.test(u))             return 'mp4';
+      return 'unknown';
+    }
+
+    const GCS_BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+
+    // ── GET /api/instructor/courses/:id/videos ──
+    app.get('/api/instructor/courses/:id/videos', async (req, res) => {
+      try {
+        const tid = getVTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getVPool();
+        if (!pool) return res.json([]);
+        await ensureVideoTable();
+        // Verify course ownership
+        const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+          [req.params.id, tid]);
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        const { rows } = await pool.query(
+          `SELECT * FROM "CourseVideo" WHERE "courseId"=$1 ORDER BY position ASC, "createdAt" ASC`,
+          [req.params.id]
+        );
+        return res.json(rows);
+      } catch (err) {
+        console.error('[videos:list]', err.message);
+        return res.json([]);
+      }
+    });
+
+    // ── POST /api/instructor/courses/:id/videos ── add video bằng URL
+    // Body: { title, url, type?, thumbUrl?, duration?, isPreview?, groupName? }
+    app.post('/api/instructor/courses/:id/videos', express.json({ limit: '4kb' }), async (req, res) => {
+      try {
+        const tid = getVTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getVPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureVideoTable();
+        const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+          [req.params.id, tid]);
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+
+        const b = req.body || {};
+        const title = String(b.title || '').trim();
+        // Accept cả 'url' (mới) và 'videoUrl' (legacy FE) — backward compat
+        const url = String(b.url || b.videoUrl || '').trim();
+        if (!title) return res.status(400).json({ error: 'Thiếu title' });
+        if (!url)   return res.status(400).json({ error: 'Thiếu URL video' });
+        const type = b.type || detectVideoType(url);
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        // Auto-position cuối list
+        const pRes = await pool.query(`SELECT COALESCE(MAX(position),0)+1 AS p FROM "CourseVideo" WHERE "courseId"=$1`,
+          [req.params.id]);
+        const position = Number(pRes.rows[0]?.p) || 1;
+        await pool.query(
+          `INSERT INTO "CourseVideo"
+             (id, "courseId", "userId", title, type, url, "thumbUrl", duration, position, "isPreview", "groupName", "gcsPath")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          [id, req.params.id, tid,
+           title.slice(0, 300), type, url.slice(0, 1000),
+           b.thumbUrl ? String(b.thumbUrl).slice(0, 1000) : null,
+           b.duration != null ? Number(b.duration) : null,
+           position,
+           !!b.isPreview,
+           b.groupName ? String(b.groupName).slice(0, 200) : null,
+           b.gcsPath ? String(b.gcsPath).slice(0, 500) : null]
+        );
+        const { rows } = await pool.query(`SELECT * FROM "CourseVideo" WHERE id=$1`, [id]);
+        console.log(`[videos:create] ✅ ${id.slice(0,8)} "${title.slice(0,40)}" type=${type}`);
+        return res.status(201).json(rows[0]);
+      } catch (err) {
+        console.error('[videos:create]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── DELETE /api/instructor/courses/:id/videos/:videoId ──
+    app.delete('/api/instructor/courses/:id/videos/:videoId', async (req, res) => {
+      try {
+        const tid = getVTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getVPool();
+        await ensureVideoTable();
+        // Verify ownership + get gcsPath để cleanup
+        const own = await pool.query(
+          `SELECT v."gcsPath" FROM "CourseVideo" v
+             JOIN "Course" c ON c.id = v."courseId"
+            WHERE v.id=$1 AND v."courseId"=$2 AND c."userId"=$3 LIMIT 1`,
+          [req.params.videoId, req.params.id, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy video' });
+        const gcsPath = own.rows[0].gcsPath;
+        await pool.query(`DELETE FROM "CourseVideo" WHERE id=$1`, [req.params.videoId]);
+        // Best-effort GCS file cleanup (không block response)
+        if (gcsPath) {
+          (async () => {
+            try {
+              const { Storage } = require('@google-cloud/storage');
+              const storage = new Storage();
+              await storage.bucket(GCS_BUCKET).file(gcsPath).delete();
+              console.log(`[videos:delete] cleanup GCS ${gcsPath}`);
+            } catch (e) { console.warn('[videos:delete] GCS cleanup fail:', e.message.slice(0, 80)); }
+          })();
+        }
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[videos:delete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/upload/video-signed-url ──
+    // Cấp signed URL TTL 15p để FE upload trực tiếp tới GCS (PUT method).
+    // FE không phải gửi file qua Cloud Run → tiết kiệm bandwidth + nhanh.
+    // Body: { filename, contentType, courseId }
+    // Returns: { uploadUrl, publicUrl, gcsPath, expiresAt }
+    app.post('/api/upload/video-signed-url', express.json({ limit: '4kb' }), async (req, res) => {
+      try {
+        const tid = getVTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const b = req.body || {};
+        const filename    = String(b.filename || '').trim();
+        const contentType = String(b.contentType || 'video/mp4').trim();
+        const courseId    = String(b.courseId || '').trim();
+        if (!filename || !courseId) return res.status(400).json({ error: 'Thiếu filename hoặc courseId' });
+        if (!/^(video\/|application\/octet-stream)/.test(contentType)) {
+          return res.status(400).json({ error: 'contentType phải là video/* (mp4, webm, mov)' });
+        }
+        // Verify course ownership
+        const pool = getVPool();
+        if (pool) {
+          const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+            [courseId, tid]);
+          if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        }
+        // GCS path: courses/{courseId}/videos/{timestamp}-{safe-filename}
+        const safeFile = filename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+        const gcsPath = `courses/${courseId}/videos/${Date.now()}-${safeFile}`;
+        const { Storage } = require('@google-cloud/storage');
+        const storage = new Storage();
+        const file = storage.bucket(GCS_BUCKET).file(gcsPath);
+        const [uploadUrl] = await file.getSignedUrl({
+          version: 'v4',
+          action: 'write',
+          expires: Date.now() + 15 * 60 * 1000,
+          contentType,
+        });
+        const publicUrl = `https://storage.googleapis.com/${GCS_BUCKET}/${gcsPath}`;
+        console.log(`[upload:signed-url] ✅ course=${courseId.slice(0,8)} → ${safeFile}`);
+        return res.json({
+          uploadUrl,
+          publicUrl,
+          gcsPath,
+          contentType,
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        });
+      } catch (err) {
+        console.error('[upload:signed-url]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
 
   // ── Upload image endpoint (avatar / course thumbnail) ─────
   // POST /api/upload/image — DEPRECATED stub (FE đã chuyển sang client-side
