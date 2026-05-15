@@ -35,9 +35,10 @@ import {
   List, ListOrdered, Quote, Code,
   Heading1, Heading2, Heading3, Pilcrow,
   Link as LinkIcon, Table as TableIcon, Minus,
-  Undo2, Redo2, Highlighter, Palette,
+  Undo2, Redo2, Highlighter, Palette, Sigma,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { MathInline, MathBlock } from './MathExtension'
 
 interface RichTextEditorProps {
   /** Initial HTML content */
@@ -85,7 +86,9 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
       TableRow,
       TableHeader,
       TableCell,
-      Placeholder.configure({ placeholder: placeholder || 'Bắt đầu soạn giáo án...' }),
+      MathInline,
+      MathBlock,
+      Placeholder.configure({ placeholder: placeholder || 'Bắt đầu soạn giáo án... (gõ $E=mc^2$ → tự render công thức)' }),
     ],
     content: value,
     editable,
@@ -308,6 +311,22 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
           active={false}
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
           title="Chèn bảng 3x3"
+        />
+
+        {/* Math (LaTeX inline + block) */}
+        <ToolbarBtn
+          icon={<Sigma size={15} />}
+          active={editor.isActive('mathInline') || editor.isActive('mathBlock')}
+          onClick={() => {
+            const latex = window.prompt(
+              'Nhập công thức LaTeX (vd: x^2 + y^2 = z^2):\n\nMẹo: dùng $...$ inline trong text, hoặc bấm OK để chèn dạng inline ngay đây.',
+              ''
+            )
+            if (latex && latex.trim()) {
+              editor.chain().focus().insertMathInline(latex.trim()).run()
+            }
+          }}
+          title="Chèn công thức LaTeX (KaTeX) — hoặc gõ $...$ trong text để auto-render"
         />
 
         {/* Link */}
