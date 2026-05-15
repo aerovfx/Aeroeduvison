@@ -19,6 +19,7 @@ import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
 import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
+import MusicToggle from '@/components/common/MusicToggle'
 
 interface Question {
   id: string; questionType: string; content: string
@@ -141,6 +142,7 @@ export default function ExamMasteryPage() {
   return (
     <div className="min-h-screen flex flex-col"
       style={{ background: 'linear-gradient(180deg, #ecfeff 0%, #99f6e4 50%, #14b8a6 100%)' }}>
+      <MusicToggle />
 
       {/* Top bar */}
       <div className="px-4 py-3 flex items-center justify-between bg-white/40 backdrop-blur">

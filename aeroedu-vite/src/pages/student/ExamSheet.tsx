@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
 import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
+import MusicToggle from '@/components/common/MusicToggle'
 
 interface Question {
   id: string
@@ -275,6 +276,7 @@ export default function ExamSheetPage() {
   // ─── Exam taking view ────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50">
+      <MusicToggle />
       {/* Top header */}
       <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
         <button onClick={() => { if (confirm('Thoát bài thi?')) navigate(-1) }}

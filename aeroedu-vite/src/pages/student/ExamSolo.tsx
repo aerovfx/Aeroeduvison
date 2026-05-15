@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
 import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
+import MusicToggle from '@/components/common/MusicToggle'
 
 interface Question {
   id: string
@@ -197,6 +198,7 @@ export default function ExamSoloPage() {
   return (
     <div className="min-h-screen flex flex-col"
       style={{ background: 'radial-gradient(ellipse at center, #4a1366 0%, #1a0b2e 70%)' }}>
+      <MusicToggle />
 
       {/* Top bar */}
       <div className="px-4 py-3 flex items-center justify-between gap-3">
