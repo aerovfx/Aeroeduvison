@@ -5831,37 +5831,152 @@ if (USE_NODEJS_QUESTIONS) {
     const pool = getAsgnPool();
     if (!pool) return;
     try {
+      // CREATE IF NOT EXISTS — sẽ noop nếu Prisma đã tạo table với schema cũ
       await pool.query(`CREATE TABLE IF NOT EXISTS "LearningPath" (
-        id            TEXT PRIMARY KEY,
-        "teacherId"   TEXT NOT NULL,
-        name          TEXT NOT NULL,
-        description   TEXT,
-        subject       TEXT,
-        difficulty    TEXT DEFAULT 'medium',
-        modules       JSONB NOT NULL DEFAULT '[]'::jsonb,
-        "estimatedDays"  INT DEFAULT 7,
-        "totalXP"     INT DEFAULT 0,
-        "totalDuration" INT DEFAULT 0,
-        "isTemplate"  BOOLEAN NOT NULL DEFAULT false,
-        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        id TEXT PRIMARY KEY
       )`);
+      // ALTER TABLE ADD COLUMN IF NOT EXISTS — patch missing cols cho table cũ
+      // (idempotent, an toàn chạy lại nhiều lần)
+      const lpCols = [
+        ['"teacherId"',     'TEXT'],
+        ['name',            'TEXT'],
+        ['description',     'TEXT'],
+        ['subject',         'TEXT'],
+        ['difficulty',      `TEXT DEFAULT 'medium'`],
+        ['modules',         `JSONB DEFAULT '[]'::jsonb`],
+        ['"estimatedDays"', 'INT DEFAULT 7'],
+        ['"totalXP"',       'INT DEFAULT 0'],
+        ['"totalDuration"', 'INT DEFAULT 0'],
+        ['"isTemplate"',    'BOOLEAN DEFAULT false'],
+        ['"createdAt"',     'TIMESTAMPTZ DEFAULT NOW()'],
+        ['"updatedAt"',     'TIMESTAMPTZ DEFAULT NOW()'],
+      ];
+      for (const [col, typeDef] of lpCols) {
+        try {
+          await pool.query(`ALTER TABLE "LearningPath" ADD COLUMN IF NOT EXISTS ${col} ${typeDef}`);
+        } catch (e) {
+          console.warn('[lp:alter]', col, e.message);
+        }
+      }
+      // Discover-and-DROP NOT NULL cho columns ngoài whitelist (Prisma schema cũ
+      // có thể có FK columns mà code mới không biết)
+      try {
+        const knownCols = new Set([
+          'id', 'teacherId', 'name', 'description', 'subject', 'difficulty',
+          'modules', 'estimatedDays', 'totalXP', 'totalDuration', 'isTemplate',
+          'createdAt', 'updatedAt',
+        ]);
+        const { rows: schemaCols } = await pool.query(
+          `SELECT column_name, is_nullable
+             FROM information_schema.columns
+            WHERE table_name = 'LearningPath' AND table_schema = 'public'`
+        );
+        for (const c of schemaCols) {
+          if (!knownCols.has(c.column_name) && c.is_nullable === 'NO') {
+            try {
+              await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN "${c.column_name}" DROP NOT NULL`);
+            } catch (e) {
+              console.warn('[lp:drop-not-null]', c.column_name, e.message);
+            }
+          }
+        }
+        // Drop FK constraints (Prisma legacy có thể ref tới Class table mà code mới ko dùng)
+        const { rows: fks } = await pool.query(
+          `SELECT con.conname
+             FROM pg_constraint con
+             JOIN pg_class cls ON cls.oid = con.conrelid
+            WHERE cls.relname = 'LearningPath' AND con.contype = 'f'`
+        );
+        for (const fk of fks) {
+          try {
+            await pool.query(`ALTER TABLE "LearningPath" DROP CONSTRAINT IF EXISTS "${fk.conname}"`);
+          } catch (e) {
+            console.warn('[lp:drop-fk]', fk.conname, e.message);
+          }
+        }
+      } catch (e) {
+        console.warn('[lp:discover]', e.message);
+      }
+      // Backfill teacherId NULL cho rows cũ (nếu có) — set = '__legacy__' để tránh
+      // crash query với WHERE "teacherId" = $1
+      try {
+        await pool.query(`UPDATE "LearningPath" SET "teacherId" = '__legacy__' WHERE "teacherId" IS NULL`);
+      } catch (e) { /* ignore */ }
+      // Set NOT NULL cho teacherId + name sau khi backfill
+      try { await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN "teacherId" SET NOT NULL`); } catch (_e) { /* ignore */ }
+      try { await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN name SET NOT NULL`); } catch (_e) { /* ignore */ }
+
       await pool.query(`CREATE INDEX IF NOT EXISTS "LearningPath_teacher_idx"
         ON "LearningPath"("teacherId", "createdAt" DESC)`);
+
+      // ── LearningPathAssignment ── same pattern
       await pool.query(`CREATE TABLE IF NOT EXISTS "LearningPathAssignment" (
-        id            TEXT PRIMARY KEY,
-        "pathId"      TEXT NOT NULL,
-        "studentId"   TEXT NOT NULL,        -- User.id (TSL linked) hoặc ClassStudent.id (chưa link)
-        "studentName" TEXT,                  -- snapshot tên HS khi assign
-        "studentEmail" TEXT,                 -- snapshot email
-        status        TEXT NOT NULL DEFAULT 'assigned',  -- assigned|in_progress|completed|paused
-        "progressPct" INT DEFAULT 0,         -- 0-100 (số module hoàn thành / tổng)
-        "moduleStatus" JSONB DEFAULT '{}'::jsonb,  -- { moduleId: 'completed'|'in_progress'|'pending' }
-        "assignedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "completedAt" TIMESTAMPTZ,
-        "lastActivityAt" TIMESTAMPTZ,
-        UNIQUE("pathId", "studentId")
+        id TEXT PRIMARY KEY
       )`);
+      const lpaCols = [
+        ['"pathId"',         'TEXT'],
+        ['"studentId"',      'TEXT'],
+        ['"studentName"',    'TEXT'],
+        ['"studentEmail"',   'TEXT'],
+        ['status',           `TEXT DEFAULT 'assigned'`],
+        ['"progressPct"',    'INT DEFAULT 0'],
+        ['"moduleStatus"',   `JSONB DEFAULT '{}'::jsonb`],
+        ['"assignedAt"',     'TIMESTAMPTZ DEFAULT NOW()'],
+        ['"completedAt"',    'TIMESTAMPTZ'],
+        ['"lastActivityAt"', 'TIMESTAMPTZ'],
+      ];
+      for (const [col, typeDef] of lpaCols) {
+        try {
+          await pool.query(`ALTER TABLE "LearningPathAssignment" ADD COLUMN IF NOT EXISTS ${col} ${typeDef}`);
+        } catch (e) {
+          console.warn('[lpa:alter]', col, e.message);
+        }
+      }
+      // Discover-and-DROP NOT NULL + FK cho assignment table
+      try {
+        const knownLPA = new Set([
+          'id', 'pathId', 'studentId', 'studentName', 'studentEmail',
+          'status', 'progressPct', 'moduleStatus',
+          'assignedAt', 'completedAt', 'lastActivityAt',
+        ]);
+        const { rows: schemaCols } = await pool.query(
+          `SELECT column_name, is_nullable
+             FROM information_schema.columns
+            WHERE table_name = 'LearningPathAssignment' AND table_schema = 'public'`
+        );
+        for (const c of schemaCols) {
+          if (!knownLPA.has(c.column_name) && c.is_nullable === 'NO') {
+            try {
+              await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN "${c.column_name}" DROP NOT NULL`);
+            } catch (_e) { /* ignore */ }
+          }
+        }
+        const { rows: fks } = await pool.query(
+          `SELECT con.conname FROM pg_constraint con
+             JOIN pg_class cls ON cls.oid = con.conrelid
+            WHERE cls.relname = 'LearningPathAssignment' AND con.contype = 'f'`
+        );
+        for (const fk of fks) {
+          try {
+            await pool.query(`ALTER TABLE "LearningPathAssignment" DROP CONSTRAINT IF EXISTS "${fk.conname}"`);
+          } catch (_e) { /* ignore */ }
+        }
+      } catch (e) {
+        console.warn('[lpa:discover]', e.message);
+      }
+      try { await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN "pathId" SET NOT NULL`); } catch (_e) { /* ignore */ }
+      try { await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN "studentId" SET NOT NULL`); } catch (_e) { /* ignore */ }
+
+      // UNIQUE (pathId, studentId) — tạo nếu chưa có
+      try {
+        await pool.query(`ALTER TABLE "LearningPathAssignment"
+          ADD CONSTRAINT "LPA_path_student_unique" UNIQUE ("pathId", "studentId")`);
+      } catch (e) {
+        // ignore if already exists
+        if (!/already exists|duplicate/i.test(e.message)) {
+          console.warn('[lpa:unique]', e.message);
+        }
+      }
       await pool.query(`CREATE INDEX IF NOT EXISTS "LPA_path_idx"
         ON "LearningPathAssignment"("pathId", status)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS "LPA_student_idx"
