@@ -1008,6 +1008,413 @@ Học bài + làm bài tập 3, 4, 5 trang 46 SGK. Đọc trước bài "Định
   },
 ];
 
+// ═══════════════════════════════════════════════════════════════
+// 3 MẪU GIÁO ÁN LATEX (5/2026) — chuyển từ HTML lesson-plan-templates
+// User: "tôi muốn 1 kiểu soạn giáo án với latex như soạn đề"
+// ═══════════════════════════════════════════════════════════════
+
+LATEX_TEMPLATES.push(
+  {
+    id: "lesson-plan-cv2345-4tiet",
+    name: "📋 Giáo án CV2345 — Tiếng Việt 4 tiết (LaTeX)",
+    description: "Khung kế hoạch bài dạy chuẩn Công văn 2345/BGDĐT — Tiếng Việt 4 tiết. Bảng 2 cột GV/HS qua tabularx, section I/II/III roman, danh sách enumitem.",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{tabularx}
+\\usepackage{array}
+\\usepackage{titlesec}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
+\\titleformat{\\subsection}{\\normalsize\\bfseries}{\\thesubsection.}{0.5em}{}
+\\renewcommand{\\thesection}{\\Roman{section}}
+\\setlist[itemize]{topsep=2pt,itemsep=2pt,leftmargin=1.2cm}
+\\setlist[enumerate]{topsep=2pt,itemsep=2pt,leftmargin=1.2cm}
+
+\\begin{document}
+
+\\begin{center}
+{\\large\\bfseries BÀI ...: [TÊN BÀI]} \\\\[2pt]
+\\textbf{(4 TIẾT)} \\\\[4pt]
+\\textbf{Môn:} Tiếng Việt \\quad \\textbf{Lớp:} ... \\quad \\textbf{Tuần:} ... \\quad \\textbf{Ngày dạy:} .../.../...
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section{Yêu cầu cần đạt}
+
+\\subsection{Năng lực đặc thù}
+
+\\textbf{1.1. Đọc}
+\\begin{itemize}
+  \\item \\textbf{Đọc kĩ thuật:} .....................................
+  \\item \\textbf{Đọc hiểu:}
+  \\begin{itemize}
+    \\item Đọc hiểu \\textit{nội dung}: .....................................
+    \\item Đọc hiểu \\textit{hình thức}: .....................................
+    \\item Đọc \\textit{liên hệ, so sánh kết nối} (nếu có): .....................................
+  \\end{itemize}
+\\end{itemize}
+
+\\textbf{1.2. Viết}\\\\
+Viết chữ viết hoa ........; viết câu ứng dụng .....................................
+
+\\textbf{1.3. Nói và nghe}\\\\
+.....................................
+
+\\subsection{Năng lực chung}
+\\begin{itemize}
+  \\item Năng lực ........... (biểu hiện)
+  \\item Năng lực ........... (biểu hiện)
+\\end{itemize}
+
+\\subsection{Phẩm chất}
+.....................................
+
+\\textit{(Yêu nước / Nhân ái / Chăm chỉ / Trung thực / Trách nhiệm)}
+
+\\section{Đồ dùng dạy học}
+\\begin{itemize}
+  \\item \\textbf{GV:} .....................................
+  \\item \\textbf{HS:} .....................................
+\\end{itemize}
+
+\\section{Các hoạt động dạy học chủ yếu}
+
+\\subsection*{TIẾT 1 + 2 — ĐỌC: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hình thành kiến thức} & \\\\
+\\hspace{0.5cm}a. Luyện đọc & \\\\
+\\hspace{0.5cm}b. Trả lời câu hỏi & \\\\ \\hline
+\\textbf{3. Luyện tập, thực hành} & \\\\
+\\hspace{0.5cm}a. Luyện đọc lại & \\\\
+\\hspace{0.5cm}b. Luyện tập theo văn bản đọc & \\\\
+\\hspace{0.5cm}\\quad Bài tập 1 của Luyện tập theo văn bản đọc & \\\\ \\hline
+\\textbf{4. Vận dụng, trải nghiệm} & \\\\
+\\hspace{0.5cm}Bài tập 2 của Luyện tập theo văn bản đọc & \\\\
+\\hspace{0.5cm}Hoạt động vận dụng khác (nếu có) & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\subsection*{TIẾT 3 — VIẾT: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hoạt động hình thành kiến thức mới} & \\\\
+\\hspace{0.5cm}a. Hướng dẫn viết chữ hoa & \\\\
+\\hspace{0.5cm}b. Hướng dẫn viết câu ứng dụng & \\\\ \\hline
+\\textbf{3. Luyện tập, thực hành} & \\\\ \\hline
+\\textbf{4. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\subsection*{TIẾT 4 — NÓI VÀ NGHE: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hoạt động hình thành kiến thức mới} & \\\\ \\hline
+\\textbf{3. Luyện tập, thực hành} & \\\\ \\hline
+\\textbf{4. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\end{document}
+`,
+  },
+  {
+    id: "lesson-plan-cv2345-6tiet",
+    name: "📖 Giáo án CV2345 — Tiếng Việt 6 tiết (LaTeX)",
+    description: "Khung CV2345 mở rộng cho bài Tiếng Việt 6 tiết: Đọc + Viết + Luyện tập từ/câu + Đoạn văn + Đọc mở rộng.",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{tabularx}
+\\usepackage{array}
+\\usepackage{titlesec}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
+\\titleformat{\\subsection}{\\normalsize\\bfseries}{\\thesubsection.}{0.5em}{}
+\\renewcommand{\\thesection}{\\Roman{section}}
+
+\\begin{document}
+
+\\begin{center}
+{\\large\\bfseries BÀI ...: [TÊN BÀI]} \\\\[2pt]
+\\textbf{(6 TIẾT)} \\\\[4pt]
+\\textbf{Môn:} Tiếng Việt \\quad \\textbf{Lớp:} ... \\quad \\textbf{Tuần:} ... \\quad \\textbf{Ngày dạy:} .../.../...
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section{Yêu cầu cần đạt}
+
+\\subsection{Năng lực đặc thù}
+
+\\textbf{1.1. Đọc}
+\\begin{itemize}
+  \\item \\textbf{Đọc kĩ thuật:} .....................................
+  \\item \\textbf{Đọc hiểu:}
+  \\begin{itemize}
+    \\item Đọc hiểu \\textit{nội dung}: .....................................
+    \\item Đọc hiểu \\textit{hình thức}: .....................................
+    \\item Đọc \\textit{liên hệ, so sánh kết nối} (nếu có): .....................................
+    \\item Đọc \\textit{mở rộng}: .....................................
+  \\end{itemize}
+\\end{itemize}
+
+\\textbf{1.2. Viết}
+\\begin{itemize}
+  \\item Viết chính tả: .....................................
+  \\item Viết đoạn văn: .....................................
+\\end{itemize}
+
+\\textbf{1.3. Kiến thức Tiếng Việt}
+\\begin{itemize}
+  \\item Phát triển vốn từ: .....................................
+\\end{itemize}
+
+\\subsection{Năng lực chung}
+\\begin{itemize}
+  \\item Năng lực ........... (biểu hiện)
+  \\item Năng lực ........... (biểu hiện)
+\\end{itemize}
+
+\\subsection{Phẩm chất}
+.....................................\\\\
+\\textit{(Yêu nước / Nhân ái / Chăm chỉ / Trung thực / Trách nhiệm)}
+
+\\section{Đồ dùng dạy học}
+\\begin{itemize}
+  \\item \\textbf{GV:} .....................................
+  \\item \\textbf{HS:} .....................................
+\\end{itemize}
+
+\\section{Các hoạt động dạy học chủ yếu}
+
+\\subsection*{TIẾT 1 + 2 — ĐỌC: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hình thành kiến thức} & \\\\
+\\hspace{0.5cm}a. Luyện đọc & \\\\
+\\hspace{0.5cm}b. Trả lời câu hỏi & \\\\ \\hline
+\\textbf{3. Luyện tập, thực hành} & \\\\
+\\hspace{0.5cm}a. Luyện đọc lại & \\\\
+\\hspace{0.5cm}b. Luyện tập theo văn bản đọc & \\\\ \\hline
+\\textbf{4. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\subsection*{TIẾT 3 — VIẾT: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hình thành kiến thức} & \\\\ \\hline
+\\textbf{3. Luyện tập, thực hành} & \\\\ \\hline
+\\textbf{4. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\subsection*{TIẾT 4 — LUYỆN TẬP TIẾNG VIỆT (Luyện tập từ / câu / dấu câu)}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hoạt động Luyện tập, thực hành} & \\\\
+\\hspace{0.5cm}2.1. Bài 1: ........................... & \\\\
+\\hspace{0.5cm}2.2. Bài 2: ........................... & \\\\
+\\hspace{0.5cm}2.3. Bài 3: ........................... & \\\\ \\hline
+\\textbf{3. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\subsection*{TIẾT 5 — VIẾT ĐOẠN VĂN: ...........................}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Luyện tập, thực hành} & \\\\
+\\hspace{0.5cm}2.1. Bài 1: ........................... & \\\\
+\\hspace{0.5cm}2.2. Bài 2: ........................... & \\\\ \\hline
+\\textbf{3. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\subsection*{TIẾT 6 — ĐỌC MỞ RỘNG: ...........................}
+
+\\textit{(Tuỳ Kế hoạch dạy học môn học của từng trường)}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{1. Hoạt động mở đầu} & \\\\ \\hline
+\\textbf{2. Hoạt động Đọc mở rộng} & \\\\ \\hline
+\\textbf{3. Vận dụng, trải nghiệm} & \\\\ \\hline
+\\end{tabularx}
+
+\\textit{* Điều chỉnh sau bài dạy:} .....................................
+
+\\end{document}
+`,
+  },
+  {
+    id: "lesson-plan-5hoatdong",
+    name: "🎯 Giáo án Khung 5 hoạt động (LaTeX, mọi môn)",
+    description: "Khung 5 hoạt động chuẩn BGD&ĐT phù hợp Toán/Lý/Hoá/Sinh/Sử/Địa/Anh: Khởi động → Hình thành KT → Luyện tập → Vận dụng → Hướng dẫn về nhà. Mỗi hoạt động có a/b/c/d (Mục tiêu/Nội dung/Sản phẩm/Tổ chức).",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{tabularx}
+\\usepackage{array}
+\\usepackage{titlesec}
+\\usepackage{xcolor}
+\\geometry{top=2cm,bottom=2cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{\\thesection.}{0.5em}{}
+\\renewcommand{\\thesection}{\\Roman{section}}
+
+\\begin{document}
+
+\\begin{center}
+{\\Large\\bfseries KẾ HOẠCH BÀI DẠY} \\\\[4pt]
+\\textbf{Môn: ........... \\quad Lớp: ........... \\quad Tiết: ...........} \\\\[2pt]
+\\textit{Ngày dạy: .../.../...}
+\\end{center}
+\\rule{\\textwidth}{0.4pt}
+
+\\section{Yêu cầu cần đạt}
+
+\\subsection*{1. Về kiến thức}
+\\begin{itemize}
+  \\item .....................................
+  \\item .....................................
+\\end{itemize}
+
+\\subsection*{2. Về năng lực}
+\\begin{itemize}
+  \\item \\textbf{Năng lực chung:} giao tiếp và hợp tác, tự chủ và tự học, giải quyết vấn đề và sáng tạo
+  \\item \\textbf{Năng lực đặc thù môn học:} .....................................
+\\end{itemize}
+
+\\subsection*{3. Về phẩm chất}
+\\begin{itemize}
+  \\item .....................................
+\\end{itemize}
+
+\\section{Thiết bị dạy học và học liệu}
+\\begin{itemize}
+  \\item \\textbf{Giáo viên:} SGK, máy chiếu, phiếu học tập, .....................................
+  \\item \\textbf{Học sinh:} SGK, vở ghi, dụng cụ học tập, .....................................
+\\end{itemize}
+
+\\section{Tiến trình dạy học}
+
+\\subsection*{1. HOẠT ĐỘNG KHỞI ĐỘNG (5 phút)}
+\\textbf{a) Mục tiêu:} Tạo tâm thế, kích thích hứng thú học tập, kết nối kiến thức cũ với bài mới.\\\\
+\\textbf{b) Nội dung:} .....................................\\\\
+\\textbf{c) Sản phẩm:} .....................................\\\\
+\\textbf{d) Tổ chức thực hiện:}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{Bước 1.} Chuyển giao nhiệm vụ: ... & \\\\ \\hline
+\\textbf{Bước 2.} HS thực hiện nhiệm vụ & \\\\ \\hline
+\\textbf{Bước 3.} Báo cáo kết quả & \\\\ \\hline
+\\textbf{Bước 4.} Đánh giá / kết luận & \\\\ \\hline
+\\end{tabularx}
+
+\\subsection*{2. HOẠT ĐỘNG HÌNH THÀNH KIẾN THỨC (25 phút)}
+\\textbf{a) Mục tiêu:} .....................................\\\\
+\\textbf{b) Nội dung:} .....................................\\\\
+\\textbf{c) Sản phẩm:} .....................................\\\\
+\\textbf{d) Tổ chức thực hiện:}
+
+\\begin{tabularx}{\\textwidth}{|>{\\raggedright\\arraybackslash}X|>{\\raggedright\\arraybackslash}X|}
+\\hline
+\\textbf{Hoạt động của Giáo viên} & \\textbf{Hoạt động của Học sinh} \\\\
+\\hline
+\\textbf{Bước 1.} Chuyển giao nhiệm vụ: ... & \\\\ \\hline
+\\textbf{Bước 2.} HS thực hiện nhiệm vụ (cá nhân/nhóm) & \\\\ \\hline
+\\textbf{Bước 3.} Báo cáo, thảo luận & \\\\ \\hline
+\\textbf{Bước 4.} Đánh giá, kết luận, ghi bảng & \\\\ \\hline
+\\end{tabularx}
+
+\\subsection*{3. HOẠT ĐỘNG LUYỆN TẬP (10 phút)}
+\\textbf{a) Mục tiêu:} Củng cố, áp dụng kiến thức vừa học.\\\\
+\\textbf{b) Nội dung:} Bài tập / câu hỏi luyện tập\\\\
+\\textbf{c) Sản phẩm:} Lời giải bài tập\\\\
+\\textbf{d) Tổ chức thực hiện:}
+\\begin{enumerate}
+  \\item GV phát phiếu bài tập / chiếu câu hỏi
+  \\item HS làm cá nhân hoặc theo cặp đôi
+  \\item GV gọi 2-3 HS chữa bài, các HS khác nhận xét
+  \\item GV chốt đáp án + lưu ý lỗi sai phổ biến
+\\end{enumerate}
+
+\\subsection*{4. HOẠT ĐỘNG VẬN DỤNG (5 phút)}
+\\textbf{a) Mục tiêu:} Vận dụng kiến thức vào tình huống thực tế\\\\
+\\textbf{b) Nội dung:} .....................................\\\\
+\\textbf{c) Sản phẩm:} .....................................\\\\
+\\textbf{d) Tổ chức thực hiện:} .....................................
+
+\\subsection*{5. HƯỚNG DẪN VỀ NHÀ}
+\\begin{itemize}
+  \\item Học bài cũ: .....................................
+  \\item Làm bài tập: .....................................
+  \\item Chuẩn bị bài mới: .....................................
+\\end{itemize}
+
+\\rule{\\textwidth}{0.4pt}
+
+\\textbf{* IV. ĐIỀU CHỈNH SAU BÀI DẠY}\\\\
+.....................................
+
+\\end{document}
+`,
+  },
+);
+
 export function getTemplateById(id: string): LatexTemplateOption | undefined {
   return LATEX_TEMPLATES.find((t) => t.id === id);
 }
