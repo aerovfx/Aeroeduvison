@@ -2012,22 +2012,26 @@ function makeProxy(target, label, pathFilter) {
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [] }));
 app.get('/api/teacher/students/:id', (req, res) => res.json({ id: req.params.id, name: '—', email: '—' }));
 
-// ── BUG FIX deploy 200: routing collision với teacher-service proxy ──
-// Các endpoint TeacherStudentLink + my-students được đăng ký Ở DƯỚI line 2016
-// nên proxy chặn trước → 503. Forward 4 path này tới next() để Express tìm
-// handler thật ở dưới.
-function _passToExpress(req, res, next) { return next() }
-app.use('/api/teacher-student-link', _passToExpress);
-app.use('/api/teacher/my-students', _passToExpress);
+// ── BUG FIX deploy 200/207: routing collision với teacher-service proxy ──
+// Các endpoint /api/teacher/* được đăng ký Ở DƯỚI line 2016 sẽ bị proxy chặn
+// trước → 503 (vì pixiai-teacher backend không tồn tại trên prod).
+// Cập nhật mỗi khi thêm endpoint /api/teacher/* mới ở phần sau của file.
+//
+// Endpoints (xếp theo registration line) cần SKIP proxy → forward Express:
+const _TEACHER_LOCAL_PREFIXES = [
+  '/api/teacher-student-link/',  // line ~5005 (TSL feature)
+  '/api/teacher/my-students',    // line 5283  (TSL my-students)
+  '/api/teacher/students',       // line 9513  (stubs)
+  '/api/teacher/gradebook',      // line 10076 (TT58 gradebook GET+POST)
+  '/api/teacher/news',           // line 10426 (news compose)
+];
 
-// ── /api/teacher/* → teacher-service ───────────────────────
-// Skip proxy nếu path là /api/teacher-student-link/* hoặc /api/teacher/my-students
-// (pathFilter function dùng pathname dạng "/api/teacher-..." sau khi mount).
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
-  // Loại trừ TSL endpoints (do collision: '/api/teacher-...' string-prefix-match)
-  if (pathname.startsWith('/api/teacher-student-link/')) return false;
-  if (pathname.startsWith('/api/teacher/my-students'))   return false;
-  // Mọi /api/teacher/* khác (exams, leaderboard, gradebook, ...) → proxy bình thường
+  // Skip proxy cho các endpoint local đã liệt kê trên (Express tìm handler bên dưới)
+  for (const prefix of _TEACHER_LOCAL_PREFIXES) {
+    if (pathname.startsWith(prefix)) return false;
+  }
+  // Mọi /api/teacher/* khác (exams, leaderboard, ...) → proxy bình thường
   return pathname.startsWith('/api/teacher');
 }));
 
