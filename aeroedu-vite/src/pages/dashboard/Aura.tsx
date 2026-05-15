@@ -24,7 +24,7 @@ interface SimEntry {
   title: string
   description: string
   icon: React.FC<{ className?: string; style?: React.CSSProperties }>
-  category: 'basics' | 'chemistry' | 'physics' | 'astronomy' | 'interactive' | 'shaders' | 'biology' | 'procedural' | 'performance'
+  category: 'basics' | 'chemistry' | 'physics' | 'astronomy' | 'interactive' | 'shaders' | 'biology' | 'procedural' | 'performance' | 'fpv'
   color: string
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced'
   standalone?: boolean
@@ -334,6 +334,16 @@ const SIMULATIONS: SimEntry[] = [
     color: '#818cf8',
     difficulty: 'Advanced',
   },
+  // ── FPV Drone Sandbox + WebXR (NEW) ──
+  {
+    id: 'fpv-drone-vr',
+    title: '🚁 FPV Drone Sandbox + VR',
+    description: 'Bay quadcopter trong môi trường procedural với race gates. Hỗ trợ tay cầm FPV/RC TX (USB joystick mode), gamepad chuẩn, hoặc bàn phím. Vào VR qua WebXR cho Meta Quest/Vision Pro.',
+    icon: Wind,
+    category: 'fpv',
+    color: '#ec4899',
+    difficulty: 'Advanced',
+  },
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -346,6 +356,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   biology: '#ec4899',
   procedural: '#22c55e',
   performance: '#f97316',
+  fpv: '#ec4899',         // pink hồng cho FPV/VR sandbox
 }
 
 // ─────────────────────────────────────────────
