@@ -8,13 +8,16 @@ import {
   Play, Square, ChevronUp, ChevronDown, ChevronLeft,
   ChevronRight, Plus, Minus, Settings2, History,
   Sidebar as SidebarIcon,
-  MousePointer2, Gamepad2, Info, Database, Download, Sparkles, Brain, Scan
+  MousePointer2, Gamepad2, Info, Database, Download, Sparkles, Brain, Scan,
+  Copy as CopyIcon,
 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import { AIVisionOverlay, type AnalysisResult } from '@/components/camera/AIVisionOverlay'
 import {
   EMOTION_CONFIG,
   EmotionType
 } from '@/lib/advanced-emotion-recognition'
+import { cameraService } from '@/services/camera.service'
 
 // ── Dark colour palette ──
 const D = {
@@ -447,36 +450,65 @@ export default function CameraManagement() {
   async function fetchData() {
     try {
       setLoading(true)
+      // Class map để lookup className theo classId
       const classRes = await fetch('/api/classes')
       const classMap: Record<string, string> = {}
-      let classIdsStr = ''
       if (classRes.ok) {
         const cd = await classRes.json()
         const cls = cd.classes || []
-        classIdsStr = cls.map((c: any) => c.id).join(',')
         cls.forEach((c: any) => { classMap[c.id] = c.name })
       }
+      // Demo camera (AI analysis sample) — luôn có cho test
       const demoCamera: CameraItem = {
         id: 'cam_demo', name: 'AI Demo Analysis',
         rtspUrl: '/api/camera/file/20260316003128604.MP4',
         brand: 'AeroAI', location: 'Lab 101', locationType: 'lab',
         className: 'Lớp 11A2', status: 'online', studentCount: 40,
       }
-      const response = await fetch(`/api/camera/teacher?class_ids=${classIdsStr}`)
-      if (response.ok) {
-        const data = await response.json()
-        const fetched = (data.cameras || []).map((cam: any) => ({ ...cam, className: cam.classId ? classMap[cam.classId] : undefined }))
-        const combined = [demoCamera, ...fetched.filter((c: any) => c.id !== 'cam_demo')]
-        setCameras(combined)
-        const grid = new Array(16).fill(null)
-        combined.slice(0, 4).forEach((cam: any, i: number) => { grid[i] = cam })
-        setGridAssignments(grid)
-      } else {
-        setCameras([demoCamera])
-        const grid = new Array(16).fill(null); grid[0] = demoCamera; setGridAssignments(grid)
+      // Real cameras from /api/cameras (admin đã setup ONVIF)
+      const r = await cameraService.list()
+      const fetched: CameraItem[] = (r.cameras || []).map(c => ({
+        id: c.id, name: c.name, brand: c.brand,
+        rtspUrl: c.rtspUrl || '',
+        location: c.location, locationType: c.locationType,
+        classId: c.classId || undefined,
+        className: c.classId ? classMap[c.classId] : undefined,
+        status: c.status === 'online' ? 'online' : c.status === 'offline' ? 'offline' : 'online',
+        hlsUrl: c.hlsUrl || undefined,
+      }))
+      const combined = [demoCamera, ...fetched.filter(c => c.id !== 'cam_demo')]
+      setCameras(combined)
+      const grid = new Array(16).fill(null)
+      combined.slice(0, 4).forEach((cam, i) => { grid[i] = cam })
+      setGridAssignments(grid)
+    } catch (e) {
+      console.warn('[teacher:cameras] fallback mock', e)
+      loadMockData()
+    } finally { setLoading(false) }
+  }
+
+  /** Copy RTSP URL của camera vào clipboard — gọi backend để lấy URL có cred.
+   * Hiển thị toast với URL preview (để user verify đã copy đúng).
+   */
+  async function handleCopyRtspUrl(camera: CameraItem) {
+    try {
+      // Camera demo dùng URL local file, không qua backend
+      if (camera.id === 'cam_demo' || !camera.id.startsWith('cam_')) {
+        await navigator.clipboard.writeText(camera.rtspUrl)
+        toast.success(`Đã copy URL "${camera.name}"`)
+        return
       }
-    } catch { loadMockData() }
-    finally { setLoading(false) }
+      const r = await cameraService.copyUrl(camera.id)
+      await navigator.clipboard.writeText(r.rtspMain)
+      // Mask password trong toast preview
+      const masked = r.rtspMain.replace(/:([^:@]+)@/, ':***@')
+      toast.success(
+        `Đã copy URL "${camera.name}"\n${masked}\n\nMở VLC → Media → Open Network Stream → paste`,
+        { duration: 5000 }
+      )
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e.message || 'Không thể copy URL camera')
+    }
   }
 
   function loadMockData() {
@@ -591,8 +623,8 @@ export default function CameraManagement() {
             const active = gridAssignments.some(a => a?.id === cam.id)
             return (
               <div
-                key={cam.id} onClick={() => handleCameraSelect(cam)}
-                className="cam-slot-hover"
+                key={cam.id}
+                className="cam-slot-hover group"
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12, padding: 12,
                   borderRadius: 10, cursor: 'pointer', marginBottom: 4,
@@ -601,11 +633,24 @@ export default function CameraManagement() {
                 }}
               >
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: cam.status === 'online' ? '#22c55e' : '#64748b', flexShrink: 0 }} className={cam.status === 'online' ? 'animate-pulse' : ''} />
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div onClick={() => handleCameraSelect(cam)} style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{cam.name}</p>
-                  <p style={{ fontSize: 10, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{cam.className || cam.location}</p>
+                  <p style={{ fontSize: 10, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                    {cam.brand} • {cam.className || cam.location}
+                  </p>
                 </div>
-                <Plus style={{ width: 12, height: 12, opacity: 0, color: D.purple }} />
+                {/* Copy RTSP URL — hover to reveal */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCopyRtspUrl(cam) }}
+                  title={`Copy RTSP URL của ${cam.name} (paste vào VLC để xem live)`}
+                  style={{
+                    padding: 6, borderRadius: 6, background: 'transparent', border: 'none',
+                    cursor: 'pointer', color: D.muted, opacity: 0.6,
+                  }}
+                  className="hover:!opacity-100 hover:!bg-cyan-500/20 hover:!text-cyan-400"
+                >
+                  <CopyIcon style={{ width: 13, height: 13 }} />
+                </button>
               </div>
             )
           })}
