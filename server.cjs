@@ -5902,6 +5902,31 @@ if (USE_NODEJS_QUESTIONS) {
       try {
         await pool.query(`UPDATE "LearningPath" SET "teacherId" = '__legacy__' WHERE "teacherId" IS NULL`);
       } catch (e) { /* ignore */ }
+      // ALTER COLUMN SET DEFAULT — ADD COLUMN IF NOT EXISTS không update DEFAULT
+      // cho col đã tồn tại (Prisma có thể tạo timestamp NOT NULL không default).
+      // Set DEFAULT cho mọi col có default để INSERT không cần điền tay.
+      const lpDefaults = [
+        ['"createdAt"', 'NOW()'],
+        ['"updatedAt"', 'NOW()'],
+        ['difficulty', `'medium'`],
+        ['modules', `'[]'::jsonb`],
+        ['"estimatedDays"', '7'],
+        ['"totalXP"', '0'],
+        ['"totalDuration"', '0'],
+        ['"isTemplate"', 'false'],
+      ];
+      for (const [col, def] of lpDefaults) {
+        try {
+          await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN ${col} SET DEFAULT ${def}`);
+        } catch (e) {
+          console.warn('[lp:set-default]', col, e.message);
+        }
+      }
+      // Backfill NULL timestamps cho rows cũ
+      try {
+        await pool.query(`UPDATE "LearningPath" SET "createdAt" = NOW() WHERE "createdAt" IS NULL`);
+        await pool.query(`UPDATE "LearningPath" SET "updatedAt" = NOW() WHERE "updatedAt" IS NULL`);
+      } catch (_e) { /* ignore */ }
       // Set NOT NULL cho teacherId + name sau khi backfill
       try { await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN "teacherId" SET NOT NULL`); } catch (_e) { /* ignore */ }
       try { await pool.query(`ALTER TABLE "LearningPath" ALTER COLUMN name SET NOT NULL`); } catch (_e) { /* ignore */ }
@@ -5964,6 +5989,24 @@ if (USE_NODEJS_QUESTIONS) {
       } catch (e) {
         console.warn('[lpa:discover]', e.message);
       }
+      // SET DEFAULT cho LPA cols có default
+      const lpaDefaults = [
+        ['status', `'assigned'`],
+        ['"progressPct"', '0'],
+        ['"moduleStatus"', `'{}'::jsonb`],
+        ['"assignedAt"', 'NOW()'],
+      ];
+      for (const [col, def] of lpaDefaults) {
+        try {
+          await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN ${col} SET DEFAULT ${def}`);
+        } catch (e) {
+          console.warn('[lpa:set-default]', col, e.message);
+        }
+      }
+      // Backfill NULL assignedAt
+      try {
+        await pool.query(`UPDATE "LearningPathAssignment" SET "assignedAt" = NOW() WHERE "assignedAt" IS NULL`);
+      } catch (_e) { /* ignore */ }
       try { await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN "pathId" SET NOT NULL`); } catch (_e) { /* ignore */ }
       try { await pool.query(`ALTER TABLE "LearningPathAssignment" ALTER COLUMN "studentId" SET NOT NULL`); } catch (_e) { /* ignore */ }
 
@@ -6099,8 +6142,9 @@ if (USE_NODEJS_QUESTIONS) {
       const id = lpGenId();
       const { rows } = await pool.query(
         `INSERT INTO "LearningPath" (id, "teacherId", name, description, subject,
-            difficulty, modules, "estimatedDays", "totalXP", "totalDuration", "isTemplate")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            difficulty, modules, "estimatedDays", "totalXP", "totalDuration", "isTemplate",
+            "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW(), NOW())
          RETURNING *`,
         [id, user.id, String(b.name).trim(), b.description || '', b.subject || null,
          b.difficulty || 'medium', JSON.stringify(modules),
@@ -6114,8 +6158,9 @@ if (USE_NODEJS_QUESTIONS) {
           if (!sid) continue;
           try {
             const { rows: aRows } = await pool.query(
-              `INSERT INTO "LearningPathAssignment" (id, "pathId", "studentId", "studentName", "studentEmail")
-               VALUES ($1,$2,$3,$4,$5)
+              `INSERT INTO "LearningPathAssignment"
+                 (id, "pathId", "studentId", "studentName", "studentEmail", "assignedAt", status)
+               VALUES ($1,$2,$3,$4,$5, NOW(), 'assigned')
                ON CONFLICT ("pathId","studentId") DO NOTHING
                RETURNING *`,
               [lpGenId('lpa'), id, sid, s.studentName || s.name || '', s.studentEmail || s.email || '']
@@ -6214,8 +6259,9 @@ if (USE_NODEJS_QUESTIONS) {
         if (!sid) continue;
         try {
           const { rows } = await pool.query(
-            `INSERT INTO "LearningPathAssignment" (id, "pathId", "studentId", "studentName", "studentEmail")
-             VALUES ($1,$2,$3,$4,$5)
+            `INSERT INTO "LearningPathAssignment"
+               (id, "pathId", "studentId", "studentName", "studentEmail", "assignedAt", status)
+             VALUES ($1,$2,$3,$4,$5, NOW(), 'assigned')
              ON CONFLICT ("pathId","studentId") DO NOTHING
              RETURNING *`,
             [lpGenId('lpa'), req.params.id, sid, s.studentName || s.name || '', s.studentEmail || s.email || '']
