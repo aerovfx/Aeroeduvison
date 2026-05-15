@@ -72,7 +72,11 @@ export default function RichTextEditor({ value, onChange, placeholder, editable 
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
-      }),
+        // StarterKit 3.x đã include Underline + Link → disable để tránh
+        // "duplicate extension" warning khi register thêm.
+        underline: false,
+        link: false,
+      } as any),
       Underline,
       TextStyle,
       Color.configure({ types: ['textStyle'] }),
