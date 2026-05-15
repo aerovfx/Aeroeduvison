@@ -8,10 +8,11 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText, Plus, Search, Trash2, Cloud, CloudOff, Edit3, Loader2,
-  Calendar, BookOpen, Hash,
+  Calendar, BookOpen, Hash, X, Sparkles,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { lessonPlanService, type LessonPlanSummary } from '@/services/lessonPlan.service'
+import { LESSON_PLAN_TEMPLATES, type LessonPlanTemplate } from '@/lib/lesson-plan-templates'
 
 export default function LessonPlans() {
   const navigate = useNavigate()
@@ -19,6 +20,7 @@ export default function LessonPlans() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
+  const [tplPickerOpen, setTplPickerOpen] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -32,14 +34,15 @@ export default function LessonPlans() {
 
   useEffect(() => { load() }, [])
 
-  const handleCreate = async () => {
+  const handleCreate = async (tpl: LessonPlanTemplate = LESSON_PLAN_TEMPLATES[0]) => {
     setCreating(true)
+    setTplPickerOpen(false)
     try {
       const plan = await lessonPlanService.create({
-        title: `Giáo án mới - ${new Date().toLocaleDateString('vi-VN')}`,
-        content: '<p></p>',
+        title: `${tpl.defaultTitle} — ${new Date().toLocaleDateString('vi-VN')}`,
+        content: tpl.content,
       })
-      toast.success('Đã tạo giáo án mới')
+      toast.success(`Đã tạo giáo án từ mẫu "${tpl.name}"`)
       navigate(`/teacher/lesson-plans/${plan.id}`)
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Lỗi tạo giáo án')
@@ -93,7 +96,7 @@ export default function LessonPlans() {
             </div>
           </div>
           <button
-            onClick={handleCreate}
+            onClick={() => setTplPickerOpen(true)}
             disabled={creating}
             style={{
               padding: '10px 18px', background: '#7c3aed', color: '#fff',
@@ -142,14 +145,14 @@ export default function LessonPlans() {
               {search ? 'Thử từ khoá khác' : 'Bấm "Tạo giáo án mới" để bắt đầu soạn bài'}
             </p>
             {!search && (
-              <button onClick={handleCreate} disabled={creating}
+              <button onClick={() => setTplPickerOpen(true)} disabled={creating}
                 style={{
                   padding: '10px 20px', background: '#7c3aed', color: '#fff',
                   border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
                   cursor: 'pointer',
                 }}>
                 <Plus size={14} style={{ marginRight: 6, display: 'inline-block', verticalAlign: 'middle' }} />
-                Tạo giáo án đầu tiên
+                Chọn mẫu giáo án
               </button>
             )}
           </div>
@@ -245,6 +248,108 @@ export default function LessonPlans() {
           </div>
         )}
       </div>
+
+      {/* ── Template Picker Modal ── */}
+      {tplPickerOpen && (
+        <div onClick={() => setTplPickerOpen(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#10111e', border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>
+                  📋 Chọn mẫu giáo án
+                </h2>
+                <p style={{ color: '#94a3b8', fontSize: 12, margin: '4px 0 0' }}>
+                  Click 1 mẫu để tạo giáo án có sẵn cấu trúc, GV chỉ điền nội dung
+                </p>
+              </div>
+              <button onClick={() => setTplPickerOpen(false)} style={{
+                background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 6,
+              }}><X size={20} /></button>
+            </div>
+
+            {/* List of templates */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {LESSON_PLAN_TEMPLATES.map(tpl => (
+                  <button key={tpl.id} onClick={() => handleCreate(tpl)} disabled={creating}
+                    style={{
+                      width: '100%', textAlign: 'left', cursor: creating ? 'not-allowed' : 'pointer',
+                      background: '#161728', border: '1px solid #2a2b3d', borderRadius: 12,
+                      padding: 16, transition: 'all 0.15s',
+                      opacity: creating ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => { if (!creating) {
+                      e.currentTarget.style.borderColor = '#7c3aed'
+                      e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
+                    }}}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = '#2a2b3d'
+                      e.currentTarget.style.background = '#161728'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 10,
+                        background: tpl.id === 'blank' ? 'rgba(148,163,184,0.15)' : 'rgba(124,58,237,0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 22, flexShrink: 0,
+                      }}>
+                        {tpl.icon}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+                            {tpl.name}
+                          </h3>
+                          {tpl.id.startsWith('cv2345') && (
+                            <span style={{
+                              fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(34, 197, 94, 0.15)', color: '#4ade80',
+                              fontWeight: 700, letterSpacing: '0.05em',
+                            }}>BGD&ĐT</span>
+                          )}
+                          {tpl.id === 'generic-5hoatdong' && (
+                            <span style={{
+                              fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                              background: 'rgba(96, 165, 250, 0.15)', color: '#60a5fa',
+                              fontWeight: 700, letterSpacing: '0.05em',
+                            }}>MỌI MÔN</span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
+                          {tpl.description}
+                        </p>
+                      </div>
+                      <div style={{ flexShrink: 0, color: '#7c3aed', display: 'flex', alignItems: 'center' }}>
+                        <Sparkles size={14} />
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '12px 24px', borderTop: '1px solid rgba(255,255,255,0.06)',
+              fontSize: 11, color: '#64748b',
+            }}>
+              💡 Mẫu CV2345 theo Công văn 2345/BGDĐT-GDTH (2021) — chuẩn của Bộ GD&ĐT cho khung kế hoạch bài dạy.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
