@@ -2447,7 +2447,10 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
   app.delete('/api/instructor/courses/:id/assets/:assetId', _ok);
 
   // ── Upload image endpoint (avatar / course thumbnail) ─────
-  app.post('/api/upload/image', _501('Upload ảnh đang phát triển — hãy paste link URL ảnh có sẵn vào ô imageUrl'));
+  // POST /api/upload/image — DEPRECATED stub (FE đã chuyển sang client-side
+  // compress + data URL). Giữ stub để không vỡ extension cũ nào còn gọi.
+  // Nếu cần real upload sau này → setup GCS bucket + multer.
+  app.post('/api/upload/image', _501('Upload ảnh đã chuyển sang client-side data URL (xem instructor.service.ts:uploadImage). Endpoint này deprecated.'));
 }
 
 // ══════════════════════════════════════════════════════════════
