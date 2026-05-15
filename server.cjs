@@ -9618,7 +9618,6 @@ if (!USE_NODEJS_QUESTIONS) {
           for (const row of r.rows) {
             const col = row.column_name;
             if (knownCols.has(col)) continue;
-            // Cột Prisma cũ NOT NULL mà code không biết → DROP NOT NULL
             try {
               await pool.query(`ALTER TABLE "ClassStudent" ALTER COLUMN "${col}" DROP NOT NULL`);
               console.log(`[classes] migrate DROP NOT NULL ${col}`);
@@ -9627,8 +9626,34 @@ if (!USE_NODEJS_QUESTIONS) {
             }
           }
         } catch (e) {
-          console.warn('[classes] migrate discover:', e.message.slice(0, 100));
+          console.warn('[classes] migrate discover NOT NULL:', e.message.slice(0, 100));
         }
+
+        // (3) Discover & DROP MỌI Foreign Key constraint trên ClassStudent
+        // Bug deploy 204: 'classId violates FK ClassStudent_classId_fkey'
+        // Lý do: Prisma cũ tạo FK trỏ tới bảng "Class" (Prisma model), nhưng
+        // code mới INSERT classId trỏ tới "TeacherClass" → mismatch → fail.
+        // Code Node.js manage relationships qua app logic (verify ownership,
+        // ensure exists trước khi INSERT) → không cần DB FK.
+        try {
+          const fks = await pool.query(`
+            SELECT conname
+              FROM pg_constraint
+             WHERE conrelid = '"ClassStudent"'::regclass
+               AND contype = 'f'
+          `);
+          for (const row of fks.rows) {
+            try {
+              await pool.query(`ALTER TABLE "ClassStudent" DROP CONSTRAINT "${row.conname}"`);
+              console.log(`[classes] migrate DROP FK ${row.conname}`);
+            } catch (e) {
+              console.warn(`[classes] migrate DROP FK ${row.conname}:`, e.message.slice(0, 100));
+            }
+          }
+        } catch (e) {
+          console.warn('[classes] migrate discover FK:', e.message.slice(0, 100));
+        }
+
         console.log('[classes] ✅ tables ready (lazy migration ran)');
       })().catch(e => { console.error('[classes] ❌ ensureTables', e.message); _clsReady = null; });
       return _clsReady;
