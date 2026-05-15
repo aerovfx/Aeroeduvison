@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { RotateCcw, Play } from 'lucide-react'
+import MusicToggle from '@/components/common/MusicToggle'
 
 interface Props {
   /** Tự bật game khi mount. Mặc định false (bấm Play) */
@@ -270,6 +271,8 @@ export default function BuffaloRunner({ autoStart = false, onScoreUpdate }: Prop
       borderRadius: 12, padding: 12, position: 'relative',
       userSelect: 'none', touchAction: 'manipulation',
     }}>
+      {/* Music toggle absolute trong card (không fixed full-screen) */}
+      <MusicToggle position="absolute" top={8} right={8} zIndex={5} />
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 8, fontSize: 12, color: 'var(--ai-muted-text)',
