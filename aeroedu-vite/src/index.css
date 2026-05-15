@@ -408,6 +408,110 @@ main  { contain: layout; }
  * DARK MODE OVERRIDES — all as  .dark .selector {}
  * ============================================================ */
 
+/* ── Form inputs (text/email/password/number/date/.../select/textarea) ──
+ * Browser default cho input là white background — invisible trong dark mode.
+ * Override: dark surface + light text + viền mờ. Chỉ apply cho input nhập
+ * dữ liệu, KHÔNG cho checkbox/radio/range/file/color/submit/button/reset
+ * (những loại có UI riêng).
+ * ─────────────────────────────────────────────────────────────── */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]),
+.dark textarea,
+.dark select {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color-scheme: dark;
+}
+
+/* Placeholder dim hơn để dễ phân biệt với text user nhập */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(255, 255, 255, 0.32) !important;
+  opacity: 1;
+}
+
+/* Focus state — accent purple ring + bg sáng hơn nhẹ */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):focus,
+.dark textarea:focus,
+.dark select:focus {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: hsl(262 83% 58%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px hsl(262 83% 58% / 0.15) !important;
+}
+
+/* Disabled state — mờ */
+.dark input:disabled,
+.dark textarea:disabled,
+.dark select:disabled {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.30) !important;
+  cursor: not-allowed;
+}
+
+/* Select <option> — browser dùng system colors → ép dark cho dropdown list */
+.dark select option,
+.dark select optgroup {
+  background-color: #1e293b !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+/* Autofill background fix (Chrome/Safari override) */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  caret-color: rgba(255, 255, 255, 0.92) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Native date picker icon trắng cho dễ thấy */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.85);
+  cursor: pointer;
+}
+
+/* Search input clear button */
+.dark input[type="search"]::-webkit-search-cancel-button {
+  filter: invert(1) brightness(0.7);
+  cursor: pointer;
+}
+
+/* Number input spinner buttons */
+.dark input[type="number"]::-webkit-inner-spin-button,
+.dark input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1) brightness(0.7);
+}
+
+/* Override khi explicit class bg-white được đặt trên input
+ * (existing .dark .bg-white = 0.02 alpha quá mờ cho input cần contrast hơn) */
+.dark input.bg-white,
+.dark textarea.bg-white,
+.dark select.bg-white {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Override các text color phổ biến đặt trên input/textarea trong light theme
+ * (text-gray-700/800/900) — ép sang light cho dark mode */
+.dark input.text-gray-700,
+.dark input.text-gray-800,
+.dark input.text-gray-900,
+.dark textarea.text-gray-700,
+.dark textarea.text-gray-800,
+.dark textarea.text-gray-900,
+.dark select.text-gray-700,
+.dark select.text-gray-800,
+.dark select.text-gray-900 {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
 /* ── Backgrounds ──────────────────────────────────────────── */
 .dark .bg-white             { background: rgba(255,255,255,0.02) !important; }
 .dark .bg-gray-50           { background: rgba(255,255,255,0.015) !important; }
