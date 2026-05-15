@@ -133,41 +133,199 @@ function calculateStars(elapsed: number, timeLimit: number): number {
 }
 
 // ═════════════════════════════════════════════════════════════
-// QUADCOPTER MESH (giống cũ)
+// DJI-FPV STYLE QUADCOPTER MESH
+// Inspired by DJI FPV combat drone: shark-nose body, tri-blade props với
+// red tips, gimbal camera nổi phía trước, motor pods góc forward, landing
+// legs, top cooling intake.
 // ═════════════════════════════════════════════════════════════
-function Quadcopter({ propSpeed = 1 }: { propSpeed?: number }) {
-  const propRefs = useRef<(THREE.Mesh | null)[]>([])
-  useFrame((_state, dt) => {
-    propRefs.current.forEach((p, i) => {
-      if (p) p.rotation.y += dt * 30 * propSpeed * (i % 2 === 0 ? 1 : -1)
-    })
-  })
-  const arms: [number, number, number][] = [
-    [ 0.4, 0,  0.4], [-0.4, 0,  0.4], [ 0.4, 0, -0.4], [-0.4, 0, -0.4],
-  ]
+
+/** Motor pod (bell shape giống DJI 1804 motor) */
+function MotorPod() {
   return (
     <group>
-      <mesh castShadow><boxGeometry args={[0.5, 0.08, 0.35]} />
-        <meshStandardMaterial color="#1f2937" metalness={0.7} roughness={0.3} /></mesh>
-      <mesh position={[0, 0.07, 0.05]}><boxGeometry args={[0.15, 0.06, 0.15]} />
-        <meshStandardMaterial color="#dc2626" /></mesh>
-      <mesh position={[0, 0.05, 0.18]} rotation={[0.4, 0, 0]}>
-        <cylinderGeometry args={[0.035, 0.035, 0.03, 16]} />
-        <meshStandardMaterial color="#0f172a" /></mesh>
-      {arms.map((pos, i) => (
-        <group key={i} position={pos}>
-          <mesh><cylinderGeometry args={[0.015, 0.015, 0.55, 8]} />
-            <meshStandardMaterial color="#374151" /></mesh>
-          <mesh position={[0, 0.04, 0]}><cylinderGeometry args={[0.04, 0.04, 0.05, 12]} />
-            <meshStandardMaterial color="#6b7280" metalness={0.8} /></mesh>
-          <mesh ref={el => (propRefs.current[i] = el)} position={[0, 0.08, 0]}>
-            <boxGeometry args={[0.25, 0.005, 0.025]} />
-            <meshStandardMaterial color="#fbbf24" transparent opacity={0.5} /></mesh>
-        </group>
-      ))}
+      {/* Body motor (silver bell) */}
+      <mesh position={[0, 0.025, 0]}>
+        <cylinderGeometry args={[0.045, 0.04, 0.05, 16]} />
+        <meshStandardMaterial color="#9ca3af" metalness={0.9} roughness={0.2} />
+      </mesh>
+      {/* Top cap đen */}
+      <mesh position={[0, 0.052, 0]}>
+        <cylinderGeometry args={[0.045, 0.045, 0.005, 16]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.7} />
+      </mesh>
+      {/* Bell vòng đỏ accent ở chân motor */}
+      <mesh position={[0, 0.001, 0]}>
+        <torusGeometry args={[0.045, 0.005, 8, 16]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+      </mesh>
     </group>
   )
 }
+
+function DjiFpvDrone({ propSpeed = 1 }: { propSpeed?: number }) {
+  // 4 prop refs để spin
+  const propRefs = useRef<(THREE.Group | null)[]>([null, null, null, null])
+  useFrame((_state, dt) => {
+    const spin = dt * 40 * propSpeed
+    propRefs.current.forEach((p, i) => {
+      if (p) p.rotation.y += spin * (i % 2 === 0 ? 1 : -1)
+    })
+  })
+
+  // 4 motor positions — slightly góc forward (DJI X-config thiên về phía trước
+  // để cinematic forward flight ổn định hơn)
+  const motors: [number, number, number][] = [
+    [ 0.32,  0,  0.30],   // FR
+    [-0.32,  0,  0.30],   // FL
+    [ 0.32,  0, -0.28],   // BR
+    [-0.32,  0, -0.28],   // BL
+  ]
+
+  return (
+    <group>
+      {/* ── Body chính (shark-nose elongated) ── */}
+      <mesh castShadow position={[0, 0.02, 0.02]}>
+        <boxGeometry args={[0.32, 0.08, 0.42]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      {/* Front nose taper (sharp shark nose) */}
+      <mesh castShadow position={[0, 0.02, 0.27]} rotation={[0, 0, 0]}>
+        <coneGeometry args={[0.12, 0.18, 4]} />
+        <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.4} />
+      </mesh>
+      {/* Top cooling intake (grille đen với LED đỏ) */}
+      <mesh position={[0, 0.07, -0.02]}>
+        <boxGeometry args={[0.18, 0.03, 0.22]} />
+        <meshStandardMaterial color="#0a0a0f" roughness={0.9} />
+      </mesh>
+      {/* LED bar đỏ (signature DJI FPV night light) */}
+      <mesh position={[0, 0.085, 0.05]}>
+        <boxGeometry args={[0.08, 0.01, 0.015]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={1.5} />
+      </mesh>
+      {/* Battery pack phía sau (visible) */}
+      <mesh position={[0, 0.06, -0.18]}>
+        <boxGeometry args={[0.16, 0.05, 0.14]} />
+        <meshStandardMaterial color="#dc2626" metalness={0.3} roughness={0.5} />
+      </mesh>
+      {/* Battery LED indicator (4 chấm) */}
+      {[-0.045, -0.015, 0.015, 0.045].map((x, i) => (
+        <mesh key={`bat-led-${i}`} position={[x, 0.087, -0.18]}>
+          <boxGeometry args={[0.012, 0.005, 0.012]} />
+          <meshStandardMaterial color={i < 3 ? '#22c55e' : '#fbbf24'} emissive={i < 3 ? '#22c55e' : '#fbbf24'} emissiveIntensity={0.8} />
+        </mesh>
+      ))}
+
+      {/* ── Camera gimbal (DJI signature: bulbous head với big lens) ── */}
+      <group position={[0, -0.01, 0.32]}>
+        {/* Gimbal body */}
+        <mesh>
+          <sphereGeometry args={[0.07, 16, 12]} />
+          <meshStandardMaterial color="#0a0a0f" metalness={0.8} roughness={0.2} />
+        </mesh>
+        {/* Lens housing — rotation trên mesh, KHÔNG phải geometry */}
+        <mesh position={[0, 0, 0.05]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.045, 0.05, 0.04, 16]} />
+          <meshStandardMaterial color="#0a0a0f" metalness={0.9} />
+        </mesh>
+        {/* Glass lens (blue tint) */}
+        <mesh position={[0, 0, 0.072]}>
+          <circleGeometry args={[0.04, 24]} />
+          <meshStandardMaterial color="#1e293b" emissive="#1e40af" emissiveIntensity={0.4} metalness={0.95} roughness={0.05} />
+        </mesh>
+        {/* Lens reflection ring */}
+        <mesh position={[0, 0, 0.073]}>
+          <ringGeometry args={[0.038, 0.045, 24]} />
+          <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.6} />
+        </mesh>
+      </group>
+
+      {/* ── 4 motor arms + motors + props ── */}
+      {motors.map((pos, i) => {
+        const isFront = pos[2] > 0
+        // Arm tilt forward 5° để có cinematic forward bias
+        return (
+          <group key={i} position={pos}>
+            {/* Arm carbon tube từ body ra motor — cylinder dọc theo Y default,
+                cần rotate Z 90° để nằm ngang dọc theo X (hướng arm) */}
+            <mesh
+              position={[-pos[0] * 0.5, 0, -pos[2] * 0.5]}
+              rotation={[
+                Math.PI / 2,
+                0,
+                Math.atan2(-pos[0], -pos[2]) + Math.PI / 2,
+              ]}
+            >
+              <cylinderGeometry args={[0.02, 0.02, 0.42, 8]} />
+              <meshStandardMaterial color="#1c1917" roughness={0.7} />
+            </mesh>
+            {/* Motor pod (đặt thẳng đứng tại đầu arm) */}
+            <MotorPod />
+            {/* Tri-blade prop spinning (3 cánh + tip đỏ DJI signature) */}
+            <group position={[0, 0.07, 0]} ref={(el) => { propRefs.current[i] = el }}>
+              {[0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle, b) => (
+                <group key={b} rotation={[0, angle, 0]}>
+                  {/* Cánh chính carbon đen */}
+                  <mesh position={[0.13, 0, 0]} rotation={[0, 0, 0.06]}>
+                    <boxGeometry args={[0.26, 0.005, 0.022]} />
+                    <meshStandardMaterial color="#1c1917" roughness={0.6} />
+                  </mesh>
+                  {/* Tip đỏ */}
+                  <mesh position={[0.25, 0, 0]}>
+                    <boxGeometry args={[0.05, 0.007, 0.024]} />
+                    <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={0.3} />
+                  </mesh>
+                </group>
+              ))}
+              {/* Hub đỏ trung tâm */}
+              <mesh>
+                <cylinderGeometry args={[0.022, 0.022, 0.012, 12]} />
+                <meshStandardMaterial color="#dc2626" metalness={0.5} />
+              </mesh>
+            </group>
+            {/* LED arm tip (front = white, back = red — orientation indicator) */}
+            <mesh position={[0, -0.005, 0]}>
+              <sphereGeometry args={[0.012, 8, 6]} />
+              <meshStandardMaterial
+                color={isFront ? '#ffffff' : '#dc2626'}
+                emissive={isFront ? '#ffffff' : '#dc2626'}
+                emissiveIntensity={1.2}
+              />
+            </mesh>
+          </group>
+        )
+      })}
+
+      {/* ── Landing legs (2 chân kép) ── */}
+      {[-0.12, 0.12].map((x, i) => (
+        <group key={`leg-${i}`} position={[x, -0.02, 0]}>
+          <mesh position={[0, -0.04, 0]}>
+            <boxGeometry args={[0.015, 0.08, 0.015]} />
+            <meshStandardMaterial color="#1c1917" />
+          </mesh>
+          {/* Foot pad */}
+          <mesh position={[0, -0.085, 0]}>
+            <cylinderGeometry args={[0.025, 0.025, 0.005, 8]} />
+            <meshStandardMaterial color="#0a0a0f" />
+          </mesh>
+        </group>
+      ))}
+
+      {/* ── Tail antenna stub (telemetry/video TX) ── */}
+      <mesh position={[0, 0.13, -0.21]} rotation={[0.3, 0, 0]}>
+        <cylinderGeometry args={[0.003, 0.005, 0.12, 6]} />
+        <meshStandardMaterial color="#1c1917" />
+      </mesh>
+      <mesh position={[0, 0.19, -0.23]}>
+        <sphereGeometry args={[0.008, 6, 4]} />
+        <meshStandardMaterial color="#dc2626" emissive="#dc2626" emissiveIntensity={1.5} />
+      </mesh>
+    </group>
+  )
+}
+
+/** Backward-compat alias (component cũ tên Quadcopter) */
+const Quadcopter = DjiFpvDrone
 
 // ═════════════════════════════════════════════════════════════
 // LEVEL ENVIRONMENT — gates change theo level
