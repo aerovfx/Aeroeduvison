@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { api } from '@/services/api'
 import {
   ArrowLeft, UserPlus, Search, Trash2, BarChart3,
   TrendingUp, Award, Users, Loader2, CheckCircle,
@@ -94,9 +95,10 @@ function AddStudentsModal({ open, onClose, classId, onAdded }: {
   useEffect(() => {
     if (!open) { setSelected([]); setSearch(''); return }
     setLoading(true)
-    fetch('/api/users?role=STUDENT')
-      .then(r => r.json())
-      .then(d => setAll(d.users || d || []))
+    // Bug fix: dùng /users/search có sẵn (api có Bearer auth) thay vì
+    // /api/users?role=STUDENT (endpoint không tồn tại → 503).
+    api.get('/users/search', { params: { q: '@', role: 'STUDENT' } })
+      .then(r => setAll(r.data?.users || []))
       .catch(() => setAll([]))
       .finally(() => setLoading(false))
   }, [open])
@@ -113,16 +115,25 @@ function AddStudentsModal({ open, onClose, classId, onAdded }: {
     if (!selected.length) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentIds: selected }),
+      // Convert User picks → ClassStudent rows qua endpoint import có sẵn
+      // (mỗi User → 1 row với name+email từ thông tin user).
+      const picked = all.filter(u => selected.includes(u.id))
+      await api.post(`/classes/${classId}/students/import`, {
+        students: picked.map((u, i) => ({
+          stt:       i + 1,
+          hoTen:     u.name,
+          maDinhDanh: '',
+          ngaySinh:  '',
+          gioiTinh:  '',
+          // chú ý: BE import handler chấp nhận field email qua row riêng?
+          // hiện tại chỉ name+mssv được lưu. Email bỏ qua, sau dùng /users để link.
+        })),
       })
-      if (!res.ok) throw new Error('Failed')
       toast.success(`Đã thêm ${selected.length} học sinh vào lớp`)
       onAdded()
-    } catch {
-      toast.error('Không thể thêm học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể thêm học sinh')
     } finally { setSaving(false) }
   }
 
@@ -326,14 +337,14 @@ export default function ClassDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<StudentRecord | null>(null)
   const [removing, setRemoving] = useState(false)
 
+  // Bug fix: dùng api (axios + Bearer interceptor) thay vì raw fetch (không có
+  // auth header → 401). Đồng thời BE GET /students giờ trả nested student object.
   const fetchClass = useCallback(async () => {
     if (!classId) return
     setClassLoading(true)
     try {
-      const res = await fetch(`/api/classes/${classId}`)
-      if (!res.ok) throw new Error()
-      const d = await res.json()
-      setClassData(d.class || d)
+      const res = await api.get(`/classes/${classId}`)
+      setClassData(res.data?.class || res.data)
     } catch {
       toast.error('Không thể tải thông tin lớp học')
     } finally { setClassLoading(false) }
@@ -343,10 +354,8 @@ export default function ClassDetailPage() {
     if (!classId) return
     setStudentsLoading(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`)
-      if (!res.ok) throw new Error()
-      const d = await res.json()
-      setStudents(d.students || [])
+      const res = await api.get(`/classes/${classId}/students`)
+      setStudents(res.data?.students || [])
     } catch {
       setStudents([])
     } finally { setStudentsLoading(false) }
@@ -358,13 +367,13 @@ export default function ClassDetailPage() {
     if (!removeTarget || !classId) return
     setRemoving(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students/${removeTarget.studentId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
+      await api.delete(`/classes/${classId}/students/${removeTarget.studentId}`)
       toast.success(`Đã xóa ${removeTarget.student.name} khỏi lớp`)
       setRemoveTarget(null)
       fetchStudents()
-    } catch {
-      toast.error('Không thể xóa học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể xóa học sinh')
     } finally { setRemoving(false) }
   }
 

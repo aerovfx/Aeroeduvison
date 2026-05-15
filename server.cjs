@@ -9712,6 +9712,9 @@ if (!USE_NODEJS_QUESTIONS) {
     });
 
     // GET /api/classes/:id/students — list students của class
+    // Trả về shape FE expect (nested student object + stats placeholders).
+    // Bug deploy 205: trước trả flat ClassStudent rows → ClassDetail.tsx
+    // expect s.student.name → render trống. Fix: map sang nested shape.
     app.get('/api/classes/:id/students', async (req, res) => {
       try {
         const tid = getClsTeacherId(req);
@@ -9727,9 +9730,56 @@ if (!USE_NODEJS_QUESTIONS) {
           `SELECT * FROM "ClassStudent" WHERE "classId"=$1 ORDER BY stt ASC NULLS LAST, name ASC`,
           [req.params.id]
         );
-        return res.json({ students: rows });
+        // Map flat → nested (shape ClassDetail.tsx expect)
+        const students = rows.map(r => ({
+          id: r.id,
+          studentId: r.id,             // dùng id ClassStudent cho DELETE :studentId
+          student: {
+            id:          r.id,
+            name:        r.name || '',
+            email:       r.email || '',
+            idNumber:    r.mssv || '',
+            dateOfBirth: r.dob  || '',
+            gender:      r.gender || '',
+          },
+          studentNumber:  r.stt || null,
+          attendanceRate: 0,           // placeholder — chưa có data attendance
+          averageScore:   0,           // placeholder — sẽ tính từ StudentGrade sau
+          totalXP:        0,
+          completedExams: 0,
+          passedExams:    0,
+          status:         'active',
+          enrollmentDate: r.createdAt,
+        }));
+        return res.json({ students });
       } catch (err) {
         console.error('[classes:students:list] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // DELETE /api/classes/:id/students/:studentId — xoá HS khỏi lớp
+    // :studentId = ClassStudent.id (dùng id row, không phải User.id)
+    app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
+      try {
+        const tid = getClsTeacherId(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getClsPool();
+        if (!pool) return res.status(503).json({ error: 'DB not available' });
+        await ensureClsTables();
+        // Verify ownership của class
+        const own = await pool.query(`SELECT 1 FROM "TeacherClass" WHERE id=$1 AND "teacherId"=$2`,
+          [req.params.id, tid]);
+        if (own.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy lớp' });
+        const { rowCount } = await pool.query(
+          `DELETE FROM "ClassStudent" WHERE id=$1 AND "classId"=$2`,
+          [req.params.studentId, req.params.id]
+        );
+        if (!rowCount) return res.status(404).json({ error: 'HS không thuộc lớp này' });
+        console.log(`[classes:student:delete] ✅ class=${req.params.id.slice(0,8)} student=${req.params.studentId.slice(0,8)}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[classes:student:delete] ❌', err.message);
         return res.status(500).json({ error: err.message });
       }
     });
