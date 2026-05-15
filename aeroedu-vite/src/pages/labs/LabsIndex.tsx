@@ -248,6 +248,13 @@ const POPULAR_LABS: PopularLab[] = [
     accent: 'cyan',
   },
   {
+    name: 'Pixel Odyssey',
+    emoji: '🌟',
+    path: '/dashboard/labtwin/labs/pixel-odyssey',
+    desc: 'RPG pixel — Hành Trình Ánh Sao Lạc',
+    accent: 'fuchsia',
+  },
+  {
     name: 'MechaForce',
     emoji: '🤖',
     path: '/dashboard/labtwin/labs/mechaforce',

@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `f5651d9` (deploy 239, 2026-05-15 — TranscriptRecording history page)
-- Commits since last deploy: `6/5` ⚠️ OVERDUE (c14e988, 681f972, da269db, 2a6ea7f, e717ff8, this commit Digital Logic Lab)
+- Last deployed commit: `2f1c60c` (deploy 240, 2026-05-15 — batch 6 features: AI giáo án, Scrumboard GV+Admin, CreateModuleModal, Word/PDF/Spreadsheet, Stem Blueprint + KeoCo, Digital Logic Lab)
+- Commits since last deploy: `1/5` (this commit Pixel Odyssey RPG)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
