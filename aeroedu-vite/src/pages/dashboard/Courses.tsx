@@ -68,7 +68,90 @@ function formatDuration(minutes: number) {
   return h > 0 ? `${h}g` : `${minutes}p`
 }
 
-function CourseCard({ course }: { course: typeof DEMO_COURSES[0] }) {
+// ─────────────────────────────────────────────
+// Map API course (từ /api/courses của giáo viên) → shape card
+// API trả về: { id, name, title, description, categoryId, categoryName,
+//   imageUrl, price, level, duration, lessons, enrollCount, rating,
+//   instructor: {name}, createdAt, ... }
+// ─────────────────────────────────────────────
+const CATEGORY_GRADIENTS: Record<string, { gradient: string; icon: string; cat: Category }> = {
+  physics:     { gradient: 'from-blue-600 to-cyan-500',   icon: '⚡',  cat: 'physics' },
+  chemistry:   { gradient: 'from-purple-600 to-pink-500', icon: '🧪',  cat: 'chemistry' },
+  biology:     { gradient: 'from-teal-600 to-cyan-500',   icon: '🔬',  cat: 'biology' },
+  math:        { gradient: 'from-orange-600 to-yellow-500', icon: '📐',  cat: 'math' },
+  engineering: { gradient: 'from-green-600 to-emerald-500', icon: '💻',  cat: 'engineering' },
+  default:     { gradient: 'from-slate-600 to-slate-500', icon: '📚',  cat: 'engineering' },
+}
+
+/** Đoán category từ tên category (VN) hoặc title */
+function detectCategory(categoryName: string | null, title: string): Category {
+  const haystack = `${categoryName || ''} ${title}`.toLowerCase()
+  if (/vật lý|physics|cơ học|nhiệt|quang|điện|từ|sóng|dao động|hạt|lượng tử/.test(haystack)) return 'physics'
+  if (/hoá|hóa|chemistry|phản ứng|nguyên tố|axit|bazơ|polymer|hữu cơ/.test(haystack))     return 'chemistry'
+  if (/sinh|biology|tế bào|gen|di truyền|cơ thể|sinh thái|tiến hoá/.test(haystack))         return 'biology'
+  if (/toán|math|đại số|hình học|tích phân|đạo hàm|xác suất|thống kê/.test(haystack))       return 'math'
+  if (/lập trình|tin học|coding|python|javascript|engineering|kỹ thuật|điện tử|robot|cơ khí|drone/.test(haystack)) return 'engineering'
+  return 'engineering' // default fallback
+}
+
+/** Đoán level từ title hoặc level field */
+function detectLevel(levelStr: string | undefined, title: string): Level {
+  const s = `${levelStr || ''} ${title}`.toLowerCase()
+  if (/nâng cao|advanced|chuyên sâu|olympic|hsg|expert/.test(s)) return 'advanced'
+  if (/cơ bản|beginner|nhập môn|cơ sở|basic|đại cương/.test(s)) return 'beginner'
+  return 'intermediate'
+}
+
+interface ApiCourse {
+  id: string
+  name?: string
+  title?: string
+  description?: string
+  imageUrl?: string | null
+  image?: string | null
+  price?: number
+  level?: string
+  duration?: number
+  lessons?: number
+  enrollCount?: number
+  rating?: number
+  categoryId?: string | null
+  categoryName?: string | null
+  createdAt?: string
+  instructor?: { name?: string }
+}
+
+function mapApiCourse(c: ApiCourse): typeof DEMO_COURSES[0] & { teacherName?: string; isFromTeacher?: boolean } {
+  const title = c.name || c.title || 'Khoá học'
+  const cat = detectCategory(c.categoryName || null, title)
+  const styleEntry = CATEGORY_GRADIENTS[cat] || CATEGORY_GRADIENTS.default
+  const lvl = detectLevel(c.level, title)
+  const enroll = c.enrollCount || 0
+  const createdMs = c.createdAt ? new Date(c.createdAt).getTime() : 0
+  const ageMs = Date.now() - createdMs
+  const isNew = ageMs > 0 && ageMs < 30 * 24 * 3600 * 1000  // < 30 ngày
+  return {
+    id: c.id,
+    name: title,
+    description: c.description || 'Khoá học do giáo viên tạo',
+    category: cat,
+    level: lvl,
+    price: c.price || 0,
+    rating: c.rating || 4.7,
+    enrollCount: enroll,
+    chapterCount: c.lessons || 0,
+    duration: c.duration || 0,
+    imageGradient: styleEntry.gradient,
+    icon: styleEntry.icon,
+    isNew,
+    isPopular: enroll > 500,
+    progress: 0,
+    teacherName: c.instructor?.name || undefined,
+    isFromTeacher: true,
+  }
+}
+
+function CourseCard({ course }: { course: typeof DEMO_COURSES[0] & { teacherName?: string; isFromTeacher?: boolean } }) {
   return (
     <Link
       to={`/courses/${course.id}`}
@@ -100,6 +183,11 @@ function CourseCard({ course }: { course: typeof DEMO_COURSES[0] }) {
             {course.name}
           </h3>
         </div>
+        {course.teacherName && (
+          <p className="text-[0.65rem] text-primary/80 mb-1.5 flex items-center gap-1">
+            <GraduationCap className="w-3 h-3" /> {course.teacherName}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground mb-3 leading-relaxed line-clamp-2">{course.description}</p>
 
         <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
@@ -134,14 +222,22 @@ export default function CoursesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
-  const { data: apiData } = useQuery({
-    queryKey: ['courses', activeCategory],
-    queryFn: () => coursesService.getAll({ categoryId: activeCategory === 'all' ? undefined : activeCategory }),
-    retry: false,
+  const { data: apiData, isLoading: apiLoading } = useQuery({
+    queryKey: ['courses-public'],
+    queryFn: () => coursesService.getAll(),
+    retry: 1,
+    staleTime: 30_000,
   })
 
-  // Merge API data with demo
-  const allCourses = DEMO_COURSES
+  // Lấy courses từ API (giáo viên đã publish), map sang shape card
+  const apiCoursesRaw = (apiData as any)?.courses || (apiData as any)?.items || []
+  const apiCourses = apiCoursesRaw.map(mapApiCourse)
+
+  // Nếu giáo viên đã tạo courses → dùng API; nếu chưa có → fallback demo (placeholder)
+  // Cách này đảm bảo trang không trống khi mới khởi tạo, nhưng ưu tiên data thật từ giáo viên
+  const allCourses: Array<typeof DEMO_COURSES[0] & { teacherName?: string; isFromTeacher?: boolean }> =
+    apiCourses.length > 0 ? apiCourses : DEMO_COURSES.map(c => ({ ...c, isFromTeacher: false }))
+  const showingDemo = apiCourses.length === 0 && !apiLoading
 
   const filtered = allCourses.filter(c => {
     if (activeCategory !== 'all' && c.category !== activeCategory) return false
@@ -163,10 +259,44 @@ export default function CoursesPage() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-foreground">Khoá Học</h1>
-            <p className="text-sm text-muted-foreground">{allCourses.length} khoá học miễn phí</p>
+            <p className="text-sm text-muted-foreground">
+              {apiLoading
+                ? 'Đang tải khoá học...'
+                : showingDemo
+                  ? `${allCourses.length} khoá học mẫu (giáo viên chưa publish)`
+                  : `${allCourses.length} khoá học từ giáo viên`}
+            </p>
           </div>
         </div>
       </div>
+
+      {/* Banner cho biết data source */}
+      {!apiLoading && showingDemo && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3">
+          <span className="text-xl">📝</span>
+          <div className="flex-1 text-xs">
+            <p className="text-amber-700 dark:text-amber-400 font-medium">
+              Đang hiển thị khoá học mẫu
+            </p>
+            <p className="text-muted-foreground mt-0.5">
+              Giáo viên chưa publish khoá học nào — danh sách bên dưới chỉ để demo. Sẽ tự động cập nhật khi giáo viên publish.
+            </p>
+          </div>
+        </div>
+      )}
+      {!apiLoading && !showingDemo && (
+        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-3">
+          <span className="text-xl">✅</span>
+          <div className="flex-1 text-xs">
+            <p className="text-emerald-700 dark:text-emerald-400 font-medium">
+              Khoá học từ giáo viên
+            </p>
+            <p className="text-muted-foreground mt-0.5">
+              {apiCourses.length} khoá học do giáo viên tạo và publish trên hệ thống AeroEduVision.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* In progress strip */}
       {inProgress.length > 0 && (

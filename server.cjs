@@ -10440,6 +10440,7 @@ if (!USE_NODEJS_QUESTIONS) {
         regularPrice: Number(r.price || 0),
         beforePrice:  0,
         categoryId:   r.categoryId || null,
+        categoryName: r.category_name || null,   // tên hiển thị (Vật lý, Hoá học, ...)
         isPublished:  !!r.isPublished,
         level:        'Trung cấp',
         duration:     chapters.reduce((s, c) => s + (c.duration || 30), 0),
@@ -10469,23 +10470,48 @@ if (!USE_NODEJS_QUESTIONS) {
       };
     }
 
-    // GET /api/courses — list public (paginated)
+    // GET /api/courses — list public (paginated, only published courses từ teacher)
     app.get('/api/courses', async (req, res) => {
       const pool = getCPool();
       if (!pool) return res.json({ courses: [], total: 0 });
       try {
-        const limit  = Math.min(parseInt(req.query.limit) || 24, 100);
+        const limit  = Math.min(parseInt(req.query.limit) || 48, 100);
         const offset = parseInt(req.query.offset) || 0;
         const { rows } = await pool.query(
-          `SELECT c.*, u.name AS teacher_name
+          `SELECT c.*, u.name AS teacher_name, cat.name AS category_name
              FROM "Course" c
-             LEFT JOIN "User" u ON u.id = c."userId"
+             LEFT JOIN "User"     u   ON u.id   = c."userId"
+             LEFT JOIN "Category" cat ON cat.id = c."categoryId"
             WHERE c."isPublished" = true
             ORDER BY c."createdAt" DESC
             LIMIT $1 OFFSET $2`,
           [limit, offset]
         );
-        const items = rows.map(r => mapCourseRow(r, [], r.teacher_name || 'AeroEduVision'));
+        // Batch-load chapter counts to populate `lessons` correctly
+        const courseIds = rows.map(r => r.id);
+        const chapMap = {};
+        if (courseIds.length > 0) {
+          try {
+            const ch = await pool.query(
+              `SELECT "courseId", COUNT(*)::int AS cnt, COALESCE(SUM(duration), 0)::int AS dur
+                 FROM "Chapter"
+                WHERE "courseId" = ANY($1) AND "isPublished" = true
+                GROUP BY "courseId"`,
+              [courseIds]
+            );
+            for (const r of ch.rows) chapMap[r.courseId] = { count: r.cnt, dur: r.dur };
+          } catch (e) {
+            if (!/relation .* does not exist/i.test(e.message)) {
+              console.warn('[courses:list:chapters]', e.message);
+            }
+          }
+        }
+        const items = rows.map(r => {
+          const stats = chapMap[r.id] || { count: 0, dur: 0 };
+          // Pseudo-chapters array (chỉ count) để mapCourseRow tính được lessons + duration
+          const fakeChapters = Array.from({ length: stats.count }, () => ({ duration: stats.count > 0 ? stats.dur / stats.count : 0 }));
+          return mapCourseRow(r, fakeChapters, r.teacher_name || 'AeroEduVision');
+        });
         res.json({ courses: items, items, total: items.length });
       } catch (e) {
         if (/relation .* does not exist/i.test(e.message)) return res.json({ courses: [], total: 0 });
