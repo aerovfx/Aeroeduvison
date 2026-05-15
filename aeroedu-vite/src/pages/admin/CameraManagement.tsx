@@ -1,10 +1,14 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Camera, Menu, Maximize2, Minimize2, Play, Square, Video,
   Settings, Volume2, Mic, ChevronLeft, ChevronRight,
   ZoomIn, ZoomOut, Focus, Search, Wifi, WifiOff,
-  Shield, Users, X, Film, AlertTriangle
+  Shield, Users, X, Film, AlertTriangle, Plus, Trash2,
+  Edit2, Radar, Loader2, RefreshCw,
 } from 'lucide-react';
+import { toast } from 'react-hot-toast';
+import { cameraService, type CameraAdmin } from '@/services/camera.service';
+import CameraConfigModal from '@/components/camera/CameraConfigModal';
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface CameraEntry {
@@ -14,6 +18,8 @@ interface CameraEntry {
   status: 'online' | 'offline';
   brand: string;
   channel: string;
+  /** Reference đến CameraAdmin (full config) — để mở edit modal */
+  _admin?: CameraAdmin;
 }
 
 interface Recording {
@@ -29,12 +35,24 @@ interface Recording {
 type GridSize = 1 | 4 | 9 | 16;
 
 /* ─── Constants ─────────────────────────────────────────── */
-const CAMERAS: CameraEntry[] = [
-  { id: 'cam-1', name: 'Cổng chính',    location: 'Cổng trường',    status: 'online',  brand: 'Hikvision', channel: 'CH01' },
-  { id: 'cam-2', name: 'Sân trường A',  location: 'Khu A',          status: 'online',  brand: 'Dahua',     channel: 'CH02' },
-  { id: 'cam-3', name: 'Hành lang T1',  location: 'Tầng 1',         status: 'online',  brand: 'Hikvision', channel: 'CH03' },
-  { id: 'cam-4', name: 'Nhà xe',        location: 'Bãi đỗ xe',      status: 'offline', brand: 'Uniview',   channel: 'CH04' },
-];
+// Fallback list khi API rỗng (lần đầu setup, chưa có camera nào trong DB)
+const FALLBACK_CAMERAS: CameraEntry[] = [
+  { id: 'cam-demo-1', name: 'Demo: Cổng chính',    location: 'Cổng trường',    status: 'offline', brand: 'Hikvision', channel: 'CH01' },
+  { id: 'cam-demo-2', name: 'Demo: Sân trường A',  location: 'Khu A',          status: 'offline', brand: 'Dahua',     channel: 'CH02' },
+]
+
+/** Map CameraAdmin (từ API) → CameraEntry (cho UI hiện tại) */
+function mapAdminToEntry(c: CameraAdmin, idx: number): CameraEntry {
+  return {
+    id: c.id,
+    name: c.name,
+    location: c.location || c.roomNumber || '—',
+    status: c.status === 'online' ? 'online' : 'offline',
+    brand: c.brand || 'Generic',
+    channel: `CH${String(idx + 1).padStart(2, '0')}`,
+    _admin: c,
+  }
+}
 
 const DEMO_VIDEOS: { label: string; url: string; tag: string }[] = [
   { label: 'Lớp học',    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',       tag: 'CLASSROOM' },
@@ -215,9 +233,91 @@ function CameraSlot({ slotIndex, cameraId, cameras, onPlay, onFullscreen, onRemo
 export default function CameraManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [gridSize, setGridSize] = useState<GridSize>(4);
-  const [gridAssignments, setGridAssignments] = useState<(string | null)[]>(
-    Array.from({ length: 16 }, (_, i) => (i < CAMERAS.length ? CAMERAS[i].id : null))
-  );
+
+  // ── Cameras từ API (admin view) ──
+  const [cameras, setCameras] = useState<CameraEntry[]>(FALLBACK_CAMERAS);
+  const [camerasLoading, setCamerasLoading] = useState(true);
+
+  // ── Modal Add/Edit camera ──
+  const [configOpen, setConfigOpen] = useState(false);
+  const [editingCamera, setEditingCamera] = useState<CameraAdmin | null>(null);
+  const [discovering, setDiscovering] = useState(false);
+
+  const loadCameras = useCallback(async () => {
+    setCamerasLoading(true);
+    try {
+      const r = await cameraService.admin.list();
+      if (r.cameras && r.cameras.length > 0) {
+        setCameras(r.cameras.map((c, i) => mapAdminToEntry(c, i)));
+      } else {
+        setCameras(FALLBACK_CAMERAS); // demo placeholder khi DB rỗng
+      }
+    } catch (e: any) {
+      console.warn('[admin:cameras]', e.message);
+      setCameras(FALLBACK_CAMERAS);
+    } finally {
+      setCamerasLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCameras(); }, [loadCameras]);
+
+  const handleAddCamera = () => {
+    setEditingCamera(null);
+    setConfigOpen(true);
+  };
+  const handleEditCamera = (e: CameraEntry) => {
+    if (!e._admin) {
+      toast.error('Camera demo — không edit được. Nhấn "Thêm Camera" để tạo mới.');
+      return;
+    }
+    setEditingCamera(e._admin);
+    setConfigOpen(true);
+  };
+  const handleDeleteCamera = async (e: CameraEntry) => {
+    if (!e._admin) {
+      toast.error('Camera demo — không xoá được');
+      return;
+    }
+    if (!confirm(`Xoá camera "${e.name}"?\nHành động không thể hoàn tác.`)) return;
+    try {
+      await cameraService.admin.remove(e._admin.id);
+      toast.success(`Đã xoá ${e.name}`);
+      loadCameras();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err.message || 'Lỗi xoá camera');
+    }
+  };
+  const handleDiscover = async () => {
+    setDiscovering(true);
+    try {
+      const r = await cameraService.admin.discover();
+      if (r.discovered && r.discovered.length > 0) {
+        toast.success(`Tìm thấy ${r.discovered.length} camera trong mạng LAN`);
+      } else {
+        toast(r.message || 'Chưa tìm thấy camera. Xem hint trong console.', {
+          icon: '💡', duration: 6000,
+        });
+        if (r.hint) console.log('[discover hint]', r.hint);
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err.message || 'Lỗi discover');
+    } finally {
+      setDiscovering(false);
+    }
+  };
+
+  const [gridAssignments, setGridAssignments] = useState<(string | null)[]>(Array(16).fill(null));
+
+  // Auto-assign cameras vào grid khi list load xong
+  useEffect(() => {
+    setGridAssignments(prev => {
+      const next = [...prev];
+      cameras.slice(0, 16).forEach((c, i) => { if (!next[i]) next[i] = c.id; });
+      return next;
+    });
+  }, [cameras]);
+
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
 
   // Video player modal
@@ -239,7 +339,7 @@ export default function CameraManagement() {
   // Sidebar search
   const [sidebarSearch, setSidebarSearch] = useState('');
 
-  const filteredCameras = CAMERAS.filter(c =>
+  const filteredCameras = cameras.filter(c =>
     c.name.toLowerCase().includes(sidebarSearch.toLowerCase()) ||
     c.location.toLowerCase().includes(sidebarSearch.toLowerCase())
   );
@@ -357,23 +457,72 @@ export default function CameraManagement() {
               </div>
             </div>
 
-            {/* Camera list */}
+            {/* Camera list — Admin có thêm Add/Edit/Delete/Discover */}
             <div className="px-4 py-3 border-b border-white/[0.06] flex-1">
-              <p className="text-[10px] text-white/30 uppercase tracking-widest mb-2">Camera List</p>
-              <div className="flex flex-col gap-1">
-                {filteredCameras.map(cam => (
-                  <button
-                    key={cam.id}
-                    onClick={() => assignCameraToSlot(cam.id)}
-                    className="flex items-center gap-2.5 px-2.5 py-2 rounded hover:bg-white/5 border border-transparent hover:border-white/[0.06] transition-all text-left group"
-                  >
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cam.status === 'online' ? 'bg-green-400 shadow-[0_0_6px_#4ade80]' : 'bg-red-500'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-white/80 truncate group-hover:text-white">{cam.name}</p>
-                      <p className="text-[9px] text-white/30 truncate">{cam.location}</p>
-                    </div>
-                    <span className="text-[9px] text-white/30 flex-shrink-0">{cam.channel}</span>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] text-white/30 uppercase tracking-widest">
+                  Camera List ({cameras.length})
+                </p>
+                <div className="flex items-center gap-1">
+                  <button onClick={loadCameras} disabled={camerasLoading}
+                    title="Refresh list"
+                    className="p-1 rounded hover:bg-white/10 disabled:opacity-50">
+                    <RefreshCw className={`w-3 h-3 text-white/40 ${camerasLoading ? 'animate-spin' : ''}`} />
                   </button>
+                  <button onClick={handleDiscover} disabled={discovering}
+                    title="ONVIF Discovery (scan mạng LAN)"
+                    className="p-1 rounded hover:bg-cyan-500/20 disabled:opacity-50">
+                    {discovering
+                      ? <Loader2 className="w-3 h-3 text-cyan-400 animate-spin" />
+                      : <Radar className="w-3 h-3 text-cyan-400" />}
+                  </button>
+                  <button onClick={handleAddCamera}
+                    title="Thêm camera mới (ONVIF)"
+                    className="p-1 rounded hover:bg-violet-500/20">
+                    <Plus className="w-3 h-3 text-violet-400" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                {camerasLoading ? (
+                  <div className="text-[10px] text-white/30 text-center py-3">
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
+                    Đang tải...
+                  </div>
+                ) : filteredCameras.length === 0 ? (
+                  <div className="text-[10px] text-white/30 text-center py-3">
+                    Chưa có camera. Bấm <Plus className="w-3 h-3 inline mx-0.5" /> để thêm.
+                  </div>
+                ) : filteredCameras.map(cam => (
+                  <div key={cam.id}
+                    className="group flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 border border-transparent hover:border-white/[0.06] transition-all">
+                    <button
+                      onClick={() => assignCameraToSlot(cam.id)}
+                      className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                    >
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cam.status === 'online' ? 'bg-green-400 shadow-[0_0_6px_#4ade80]' : 'bg-red-500'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-white/80 truncate group-hover:text-white">{cam.name}</p>
+                        <p className="text-[9px] text-white/30 truncate">
+                          {cam.brand} • {cam.location}
+                        </p>
+                      </div>
+                    </button>
+                    {cam._admin && (
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleEditCamera(cam)}
+                          title="Cấu hình ONVIF"
+                          className="p-1 rounded hover:bg-cyan-500/30">
+                          <Edit2 className="w-3 h-3 text-cyan-400" />
+                        </button>
+                        <button onClick={() => handleDeleteCamera(cam)}
+                          title="Xoá camera"
+                          className="p-1 rounded hover:bg-red-500/30">
+                          <Trash2 className="w-3 h-3 text-red-400" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -441,7 +590,7 @@ export default function CameraManagement() {
             </div>
 
             <button
-              onClick={() => setFullscreenCamera(CAMERAS.find(c => gridAssignments[0] === c.id) ?? null)}
+              onClick={() => setFullscreenCamera(cameras.find(c => gridAssignments[0] === c.id) ?? null)}
               className="p-1.5 rounded hover:bg-white/10 transition-colors text-white/60 hover:text-white"
             >
               <Maximize2 className="w-4 h-4" />
@@ -460,9 +609,9 @@ export default function CameraManagement() {
                   <CameraSlot
                     slotIndex={i}
                     cameraId={gridAssignments[i] ?? null}
-                    cameras={CAMERAS}
+                    cameras={cameras}
                     onPlay={cam => openVideoPlayer(
-                      DEMO_VIDEOS[CAMERAS.indexOf(cam) % DEMO_VIDEOS.length]?.url ?? DEMO_VIDEOS[0].url,
+                      DEMO_VIDEOS[cameras.indexOf(cam) % DEMO_VIDEOS.length]?.url ?? DEMO_VIDEOS[0].url,
                       cam.name
                     )}
                     onFullscreen={openFullscreen}
@@ -728,6 +877,14 @@ export default function CameraManagement() {
           </div>
         </div>
       )}
+
+      {/* ── Camera Config Modal (ONVIF Add/Edit) ── */}
+      <CameraConfigModal
+        open={configOpen}
+        onClose={() => setConfigOpen(false)}
+        camera={editingCamera}
+        onSaved={() => loadCameras()}
+      />
     </>
   );
 }
