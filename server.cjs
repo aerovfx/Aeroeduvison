@@ -6320,16 +6320,38 @@ if (USE_NODEJS_QUESTIONS) {
     try {
       await pool.query(`CREATE TABLE IF NOT EXISTS "LessonPlan" (id TEXT PRIMARY KEY)`);
 
-      // ── NUCLEAR: drop legacy JSON cols (Prisma có thể tạo Json cols với
-      // DEFAULT '' không valid → fix-default không đủ vì DEFAULT cũ vẫn cached
-      // trong type catalog). DROP + ADD lại đảm bảo schema sạch.
+      // ── NUCLEAR: drop legacy cols có TYPE SAI (Prisma có thể tạo JSON
+      // cho 'content' column → INSERT '<p></p>' fails "Token < invalid").
+      // Discover-based: query information_schema, mọi col TYPE=json/jsonb
+      // mà code expect TEXT → DROP. Cộng thêm danh sách candidate.
       // An toàn vì LessonPlan là feature MỚI ngày 15/5 — chưa có user data.
-      const legacyJsonCols = ['contentJson', 'tags', 'data', 'meta', 'metadata'];
-      for (const col of legacyJsonCols) {
+      const dropCandidates = ['contentJson', 'tags', 'data', 'meta', 'metadata'];
+      try {
+        // Cộng thêm content nếu nó là JSON type (Prisma có thể đã tạo vậy)
+        const { rows: contentCol } = await pool.query(`
+          SELECT data_type, udt_name FROM information_schema.columns
+          WHERE table_name = 'LessonPlan' AND column_name = 'content' AND table_schema = 'public'
+        `);
+        if (contentCol.length > 0 && (contentCol[0].udt_name === 'json' || contentCol[0].udt_name === 'jsonb')) {
+          console.log(`[lp] content column is ${contentCol[0].udt_name} (legacy Prisma) — will DROP + recreate as TEXT`);
+          dropCandidates.push('content');
+        }
+        // Tương tự cho title — nếu Prisma tạo JSON
+        const { rows: titleCol } = await pool.query(`
+          SELECT udt_name FROM information_schema.columns
+          WHERE table_name = 'LessonPlan' AND column_name = 'title' AND table_schema = 'public'
+        `);
+        if (titleCol.length > 0 && (titleCol[0].udt_name === 'json' || titleCol[0].udt_name === 'jsonb')) {
+          dropCandidates.push('title');
+        }
+      } catch (e) {
+        console.warn('[lp:detect-content-type]', e.message);
+      }
+      for (const col of dropCandidates) {
         try {
           await pool.query(`ALTER TABLE "LessonPlan" DROP COLUMN IF EXISTS "${col}"`);
         } catch (e) {
-          console.warn('[lp:drop-legacy-json]', col, e.message);
+          console.warn('[lp:drop-legacy]', col, e.message);
         }
       }
       const cols = [
