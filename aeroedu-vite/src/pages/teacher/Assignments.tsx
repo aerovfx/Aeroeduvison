@@ -679,7 +679,8 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
                             style={{ width: 14, height: 14, accentColor: D.purple }}
                           />
                           <span>{s.name}</span>
-                          {s.mssv && <span style={{ color: D.muted, fontSize: 11, fontFamily: 'monospace' }}>{s.mssv}</span>}
+                          {/* mssv (mã định danh) đã ẨN khỏi UI để tránh lộ PII —
+                              vẫn được dùng để filter/match nội bộ nhưng không hiển thị */}
                         </label>
                       )
                     })}

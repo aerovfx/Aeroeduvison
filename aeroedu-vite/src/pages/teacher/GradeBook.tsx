@@ -19,10 +19,11 @@
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, Save, Plus, X, GraduationCap, BookOpen } from 'lucide-react'
+import { Loader2, Save, Plus, X, GraduationCap, BookOpen, Download } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
+import * as XLSX from 'xlsx'
 
 interface ClassInfo {
   id: string
@@ -89,6 +90,75 @@ export default function GradeBook() {
   const [newSubject, setNewSubject] = useState('')
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Export sổ điểm xlsx (CHỈ trong file export mới có cột Mã định danh) ──
+  const handleExportGradebook = useCallback(() => {
+    if (!classId || !subject || students.length === 0) {
+      toast.error('Chưa có dữ liệu để xuất')
+      return
+    }
+    const className = classes.find(c => c.id === classId)?.name || ''
+    const schoolYear = classes.find(c => c.id === classId)?.schoolYear || ''
+    // Header rows: title + meta + cảnh báo + spacer + col headers
+    const txCols = Array.from({ length: NUM_TX }, (_, i) => `ĐĐGtx${i + 1}`)
+    const colHeaders = [
+      'STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Ngày sinh', 'Giới tính',
+      ...txCols, 'ĐĐGgk', 'ĐĐGck',
+      `ĐTBm${semester === 'HK1' ? 'hk1' : 'hk2'}`, 'ĐTBmcn',
+      `Nhận xét sự tiến bộ (${semester})`, 'Nhận xét ghi học bạ',
+    ]
+    const dataRows = students.map((s, i) => {
+      const g = grades[s.id] || emptyGrade()
+      const dtb = computeDTBmhk(g)
+      return [
+        s.stt ?? i + 1,
+        s.mssv || '',
+        s.name || '',
+        s.dob || '',
+        s.gender || '',
+        ...g.ddgtx.map(v => (v == null ? '' : v)),
+        g.ddggk ?? '',
+        g.ddgck ?? '',
+        dtb != null ? Number(dtb.toFixed(2)) : '',
+        semester === 'HK2' && dtb != null ? Number(dtb.toFixed(2)) : '',
+        g.noteProgress || '',
+        g.noteRecord || '',
+      ]
+    })
+    const aoa = [
+      [`SỔ ĐIỂM — ${subject} — ${className} — ${schoolYear} — ${semester === 'HK1' ? 'Học kỳ 1' : 'Học kỳ 2'}`],
+      [`Xuất ngày: ${new Date().toLocaleString('vi-VN')}`],
+      [`⚠ File chứa MÃ ĐỊNH DANH CÁ NHÂN HS — bảo mật theo Luật ATTT 86/2015`],
+      [],
+      colHeaders,
+      ...dataRows,
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [
+      { wch: 5 },   // STT
+      { wch: 22 },  // Mã định danh
+      { wch: 28 },  // Họ tên
+      { wch: 12 },  // Ngày sinh
+      { wch: 8 },   // Giới tính
+      ...Array(NUM_TX).fill({ wch: 8 }),  // ĐĐGtx
+      { wch: 8 }, { wch: 8 },  // ĐĐGgk, ĐĐGck
+      { wch: 10 }, { wch: 10 }, // ĐTBmhk, ĐTBmcn
+      { wch: 35 }, { wch: 35 },  // Nhận xét
+    ]
+    const totalCols = colHeaders.length
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Sổ điểm')
+    const safeClass = (className || classId).replace(/[^\w\d-]+/g, '_')
+    const safeSubj = subject.replace(/[^\w\d-]+/g, '_')
+    const dateStr = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `SoDiem_${safeClass}_${safeSubj}_${semester}_${dateStr}.xlsx`)
+    toast.success(`Đã xuất sổ điểm ${students.length} HS`)
+  }, [classId, subject, semester, students, grades, classes])
 
   // ── Load lớp của teacher (chỉ 1 lần)
   useEffect(() => {
@@ -330,7 +400,7 @@ export default function GradeBook() {
             Nhảy dòng
           </label>
 
-          {/* Save status */}
+          {/* Save status + Export */}
           <div className="ml-auto flex items-center gap-2 text-sm">
             {saving ? (
               <span className="flex items-center gap-1.5 text-blue-600">
@@ -346,6 +416,14 @@ export default function GradeBook() {
             ) : (
               <span className="text-green-600 text-xs">✓ Đã lưu</span>
             )}
+            <button
+              onClick={handleExportGradebook}
+              disabled={!subject || students.length === 0}
+              title="Xuất sổ điểm Excel — file export sẽ kèm cột Mã định danh BộGD&ĐT"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-3.5 h-3.5" />Xuất Excel
+            </button>
           </div>
         </div>
 
@@ -388,7 +466,8 @@ export default function GradeBook() {
               <thead className="bg-blue-700 text-white sticky top-0">
                 <tr>
                   <Th rowSpan={2} className="w-12 text-center">STT</Th>
-                  <Th rowSpan={2} className="w-32">Mã định danh<br/>Bộ GD&ĐT</Th>
+                  {/* Cột "Mã định danh Bộ GD&ĐT" đã ẨN khỏi UI (PII).
+                      Chỉ xuất hiện khi teacher bấm "Xuất Excel" ở toolbar. */}
                   <Th rowSpan={2} className="min-w-[180px]">Họ tên</Th>
                   {showDob && (
                     <>
@@ -423,7 +502,7 @@ export default function GradeBook() {
                   return (
                     <tr key={s.id} className={`${rowBg} text-slate-900`}>
                       <td className={`${rowBg} px-2 py-1.5 text-center text-slate-500 border border-slate-300`}>{s.stt ?? r + 1}</td>
-                      <td className={`${rowBg} px-2 py-1.5 font-mono text-xs text-slate-700 border border-slate-300`}>{s.mssv || '—'}</td>
+                      {/* Cột mssv ẨN — chỉ trong file Excel export */}
                       <td className={`${rowBg} px-2 py-1.5 font-semibold text-slate-900 border border-slate-300`}>{s.name}</td>
                       {showDob && (
                         <>
