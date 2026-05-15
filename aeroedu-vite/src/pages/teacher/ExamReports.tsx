@@ -1,4 +1,9 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import {
+  BarChart as RBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  Cell, CartesianGrid, ReferenceLine, PieChart, Pie, Legend,
+  AreaChart, Area,
+} from 'recharts'
 import {
   BarChart, Users, Target, Award,
   Download, FileText, CheckCircle2, AlertCircle,
@@ -693,56 +698,7 @@ export default function ExamReports() {
 
                 {/* ── Tab: Phân bố điểm ── */}
                 {activeTab === "distribution" && (
-                  <div style={{ background: D.card2, borderRadius: 10, border: `1px solid ${D.border2}`, padding: 20 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                      {Object.entries(analytics.grade_distribution)
-                        .sort(([a], [b]) => parseFloat(b.split("-")[0]) - parseFloat(a.split("-")[0]))
-                        .map(([range, count]) => {
-                          const pct = analytics.overview.total_submissions > 0
-                            ? (count / analytics.overview.total_submissions) * 100
-                            : 0
-                          const rangeStart = parseFloat(range.split("-")[0])
-                          const barColor = rangeStart >= 9 ? "#34d399"
-                            : rangeStart >= 8 ? "#60a5fa"
-                            : rangeStart >= 7 ? "#a78bfa"
-                            : rangeStart >= 5 ? "#fbbf24"
-                            : "#f87171"
-                          return (
-                            <div key={range}>
-                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: barColor }}>{range} điểm</span>
-                                <span style={{ fontSize: 12, color: D.muted }}>
-                                  {count} học sinh{pct > 0 ? ` (${pct.toFixed(1)}%)` : ""}
-                                </span>
-                              </div>
-                              <div style={{ background: D.border, borderRadius: 6, height: 10, overflow: "hidden" }}>
-                                <div style={{
-                                  height: "100%", borderRadius: 6, transition: "width 0.5s",
-                                  background: barColor, width: `${pct}%`,
-                                  opacity: count === 0 ? 0.2 : 1,
-                                }} />
-                              </div>
-                            </div>
-                          )
-                        })}
-                    </div>
-                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px solid ${D.border}` }}>
-                      <div style={{ display: "flex", justifyContent: "center", gap: 20, flexWrap: "wrap" as const }}>
-                        {[
-                          { label: "Xuất sắc (9-10)", color: "#34d399" },
-                          { label: "Giỏi (8-8.9)",   color: "#60a5fa" },
-                          { label: "Khá (7-7.9)",    color: "#a78bfa" },
-                          { label: "Trung bình (5-6.9)", color: "#fbbf24" },
-                          { label: "Yếu (<5)",        color: "#f87171" },
-                        ].map(({ label, color }) => (
-                          <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: D.muted }}>
-                            <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
-                            {label}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <DistributionTab analytics={analytics} D={D} />
                 )}
 
                 {/* ── Tab: Thời gian ── */}
@@ -844,6 +800,312 @@ export default function ExamReports() {
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DistributionTab — phổ điểm + đánh giá khách quan
+// Recharts: BarChart histogram + AreaChart cumulative + PieChart tier
+// + algorithmic assessment (skewness, modality, pass-rate, reliability)
+// ═══════════════════════════════════════════════════════════════
+const TIER_COLORS = {
+  excellent: '#34d399',  // 9-10
+  good:      '#60a5fa',  // 8-8.9
+  fair:      '#a78bfa',  // 7-7.9
+  average:   '#fbbf24',  // 5-6.9
+  weak:      '#f87171',  // <5
+} as const
+
+function tierForScore(start: number) {
+  if (start >= 9) return 'excellent'
+  if (start >= 8) return 'good'
+  if (start >= 7) return 'fair'
+  if (start >= 5) return 'average'
+  return 'weak'
+}
+
+interface DistributionTabProps {
+  analytics: ExamAnalytics
+  D: typeof D
+}
+
+function DistributionTab({ analytics, D }: DistributionTabProps) {
+  // Build histogram data sorted ASC by score
+  const histData = useMemo(() => {
+    return Object.entries(analytics.grade_distribution)
+      .map(([range, count]) => {
+        const start = parseFloat(range.split('-')[0])
+        return {
+          range,
+          rangeStart: start,
+          count,
+          percentage: analytics.overview.total_submissions > 0
+            ? (count / analytics.overview.total_submissions) * 100
+            : 0,
+          tier: tierForScore(start),
+          color: TIER_COLORS[tierForScore(start) as keyof typeof TIER_COLORS],
+        }
+      })
+      .sort((a, b) => a.rangeStart - b.rangeStart)
+  }, [analytics])
+
+  // Cumulative distribution (% students at or below each tier)
+  const cumulativeData = useMemo(() => {
+    let acc = 0
+    return histData.map(h => {
+      acc += h.percentage
+      return { range: h.range, cumulative: Math.round(acc * 10) / 10, individual: h.percentage }
+    })
+  }, [histData])
+
+  // Pie data — tier breakdown
+  const pieData = useMemo(() => {
+    const tierCounts: Record<string, number> = { excellent: 0, good: 0, fair: 0, average: 0, weak: 0 }
+    for (const h of histData) {
+      tierCounts[h.tier] += h.count
+    }
+    return [
+      { name: 'Xuất sắc (9-10)',  value: tierCounts.excellent, color: TIER_COLORS.excellent },
+      { name: 'Giỏi (8-8.9)',     value: tierCounts.good,      color: TIER_COLORS.good },
+      { name: 'Khá (7-7.9)',      value: tierCounts.fair,      color: TIER_COLORS.fair },
+      { name: 'Trung bình (5-6.9)', value: tierCounts.average, color: TIER_COLORS.average },
+      { name: 'Yếu (<5)',         value: tierCounts.weak,      color: TIER_COLORS.weak },
+    ].filter(t => t.value > 0)
+  }, [histData])
+
+  // ── ALGORITHMIC ASSESSMENT ───────────────────────
+  const assessment = useMemo(() => {
+    const ov = analytics.overview
+    const items: Array<{ icon: string; title: string; verdict: 'good' | 'warn' | 'bad'; text: string }> = []
+
+    // 1. Pass rate
+    if (ov.pass_rate >= 80) {
+      items.push({ icon: '✅', title: 'Tỷ lệ đạt cao', verdict: 'good',
+        text: `${ov.pass_rate.toFixed(1)}% học sinh đạt ≥5đ — kết quả khả quan, có thể nâng độ khó cho lần kiểm tra tiếp.` })
+    } else if (ov.pass_rate >= 60) {
+      items.push({ icon: '⚠️', title: 'Tỷ lệ đạt trung bình', verdict: 'warn',
+        text: `${ov.pass_rate.toFixed(1)}% học sinh đạt ≥5đ — chấp nhận được nhưng nên rà soát các câu khó để hỗ trợ HS yếu.` })
+    } else {
+      items.push({ icon: '🚨', title: 'Tỷ lệ đạt thấp', verdict: 'bad',
+        text: `Chỉ ${ov.pass_rate.toFixed(1)}% học sinh đạt ≥5đ — đề có thể quá khó hoặc HS chưa nắm vững kiến thức. Cân nhắc dạy lại các chủ đề chính.` })
+    }
+
+    // 2. Mean vs median (skewness)
+    const skew = ov.average_score - ov.median_score
+    if (Math.abs(skew) < 0.3) {
+      items.push({ icon: '📊', title: 'Phân bố cân đối', verdict: 'good',
+        text: `Trung bình (${ov.average_score.toFixed(2)}) ≈ Trung vị (${ov.median_score.toFixed(2)}) → phân bố GẦN CHUẨN, đề công bằng cho mọi nhóm HS.` })
+    } else if (skew > 0.3) {
+      items.push({ icon: '📈', title: 'Lệch dương (right-skew)', verdict: 'warn',
+        text: `TB (${ov.average_score.toFixed(2)}) > TV (${ov.median_score.toFixed(2)}) → vài HS điểm rất cao "kéo" trung bình lên. Đa số HS thấp hơn TB.` })
+    } else {
+      items.push({ icon: '📉', title: 'Lệch âm (left-skew)', verdict: 'warn',
+        text: `TB (${ov.average_score.toFixed(2)}) < TV (${ov.median_score.toFixed(2)}) → vài HS điểm rất thấp kéo TB xuống. Đa số HS cao hơn TB — đề có thể dễ.` })
+    }
+
+    // 3. Standard deviation (spread)
+    if (ov.std_deviation < 1.0) {
+      items.push({ icon: '🎯', title: 'Độ phân tán thấp', verdict: 'warn',
+        text: `Σ = ${ov.std_deviation.toFixed(2)} — điểm tập trung quanh TB, đề khó phân biệt giỏi-yếu. Cân nhắc tăng câu khó/dễ chênh lệch hơn.` })
+    } else if (ov.std_deviation > 2.5) {
+      items.push({ icon: '⚠️', title: 'Độ phân tán cao', verdict: 'warn',
+        text: `Σ = ${ov.std_deviation.toFixed(2)} — điểm dao động lớn (chênh lệch giữa HS giỏi và yếu rất lớn). Cần phân hoá dạy theo nhóm.` })
+    } else {
+      items.push({ icon: '✨', title: 'Độ phân tán hợp lý', verdict: 'good',
+        text: `Σ = ${ov.std_deviation.toFixed(2)} — phân tán vừa phải, đề phân biệt được trình độ HS tốt.` })
+    }
+
+    // 4. Reliability (Cronbach's alpha)
+    const alpha = analytics.reliability?.cronbach_alpha ?? 0
+    if (alpha >= 0.8) {
+      items.push({ icon: '🏆', title: 'Độ tin cậy CAO', verdict: 'good',
+        text: `Cronbach's α = ${alpha.toFixed(2)} — đề thi nhất quán, các câu hỏi cùng đo 1 năng lực. Dùng được làm chuẩn đánh giá.` })
+    } else if (alpha >= 0.6) {
+      items.push({ icon: '🔶', title: 'Độ tin cậy chấp nhận được', verdict: 'warn',
+        text: `Cronbach's α = ${alpha.toFixed(2)} — đề tương đối ổn, nhưng có vài câu chất lượng thấp. Xem tab "Câu hỏi" để loại câu yếu.` })
+    } else if (alpha > 0) {
+      items.push({ icon: '❌', title: 'Độ tin cậy THẤP', verdict: 'bad',
+        text: `Cronbach's α = ${alpha.toFixed(2)} — đề thi không nhất quán, kết quả không đáng tin để xếp loại HS. Cần xem lại bộ câu hỏi.` })
+    }
+
+    // 5. Modality detection (single peak vs bimodal)
+    const sortedHist = [...histData].sort((a, b) => b.count - a.count)
+    const top1 = sortedHist[0]?.count || 0
+    const top2 = sortedHist[1]?.count || 0
+    if (top1 > 0 && top2 / top1 > 0.7 && Math.abs(sortedHist[0].rangeStart - sortedHist[1].rangeStart) >= 2) {
+      items.push({ icon: '🔀', title: 'Phân bố 2 đỉnh (bimodal)', verdict: 'warn',
+        text: `Có 2 nhóm HS chính với mức điểm rất khác nhau (${sortedHist[0].range} và ${sortedHist[1].range}). Có thể do: (a) HS chia 2 nhóm rõ rệt giỏi/yếu, (b) đề không phù hợp với phân hoá lớp.` })
+    }
+
+    // 6. Excellence rate (≥9đ)
+    const excellentPct = histData.filter(h => h.rangeStart >= 9).reduce((s, h) => s + h.percentage, 0)
+    if (excellentPct >= 30) {
+      items.push({ icon: '🌟', title: 'Tỷ lệ HS xuất sắc cao', verdict: 'good',
+        text: `${excellentPct.toFixed(1)}% HS đạt ≥9đ — chất lượng nhóm HS giỏi tốt. Đề có thể chưa đủ thử thách cho top HS.` })
+    }
+
+    return items
+  }, [analytics, histData])
+
+  const ov = analytics.overview
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+
+      {/* ── Histogram BarChart (full width) ── */}
+      <div style={{
+        gridColumn: '1 / -1', background: D.card2, borderRadius: 10,
+        border: `1px solid ${D.border2}`, padding: 20,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, margin: 0 }}>
+            📊 Phổ điểm (Histogram)
+          </h3>
+          <span style={{ fontSize: 11, color: D.muted }}>
+            n = {ov.total_submissions} bài · TB = {ov.average_score.toFixed(2)} · Σ = {ov.std_deviation.toFixed(2)}
+          </span>
+        </div>
+        <ResponsiveContainer width="100%" height={280}>
+          <RBarChart data={histData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={D.border} />
+            <XAxis dataKey="range" stroke={D.muted} fontSize={11} />
+            <YAxis stroke={D.muted} fontSize={11} label={{ value: 'Số HS', angle: -90, position: 'insideLeft', fill: D.muted, fontSize: 11 }} />
+            <Tooltip
+              contentStyle={{ background: D.card, border: `1px solid ${D.border2}`, borderRadius: 8 }}
+              labelStyle={{ color: D.text }}
+              itemStyle={{ color: D.text }}
+              formatter={(value: any, _name: any, props: any) => [
+                `${value} HS (${props.payload.percentage.toFixed(1)}%)`,
+                'Số lượng',
+              ]}
+            />
+            <ReferenceLine x={`${Math.floor(ov.average_score)}-${Math.floor(ov.average_score) + 0.9}`}
+              stroke="#a78bfa" strokeDasharray="3 3"
+              label={{ value: `TB: ${ov.average_score.toFixed(1)}`, fill: '#a78bfa', fontSize: 10, position: 'top' }} />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+              {histData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+            </Bar>
+          </RBarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── Pie tier breakdown ── */}
+      <div style={{
+        background: D.card2, borderRadius: 10, border: `1px solid ${D.border2}`, padding: 20,
+      }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, margin: '0 0 14px' }}>
+          🥧 Tỷ lệ xếp loại
+        </h3>
+        {pieData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={250}>
+            <PieChart>
+              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
+                label={(e: any) => `${((e.value / ov.total_submissions) * 100).toFixed(0)}%`}
+                labelLine={false}>
+                {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+              </Pie>
+              <Legend wrapperStyle={{ fontSize: 11, color: D.muted }} />
+              <Tooltip
+                contentStyle={{ background: D.card, border: `1px solid ${D.border2}`, borderRadius: 8 }}
+                formatter={(value: any) => [`${value} HS`, 'Số lượng']}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        ) : (
+          <p style={{ color: D.muted, textAlign: 'center', padding: 20 }}>Chưa có dữ liệu</p>
+        )}
+      </div>
+
+      {/* ── Cumulative distribution AreaChart ── */}
+      <div style={{
+        background: D.card2, borderRadius: 10, border: `1px solid ${D.border2}`, padding: 20,
+      }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, margin: '0 0 14px' }}>
+          📈 Phân bố tích luỹ (CDF)
+        </h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <AreaChart data={cumulativeData}>
+            <CartesianGrid strokeDasharray="3 3" stroke={D.border} />
+            <XAxis dataKey="range" stroke={D.muted} fontSize={11} />
+            <YAxis stroke={D.muted} fontSize={11} unit="%" domain={[0, 100]} />
+            <Tooltip
+              contentStyle={{ background: D.card, border: `1px solid ${D.border2}`, borderRadius: 8 }}
+              labelStyle={{ color: D.text }}
+              formatter={(value: any) => [`${value}%`, 'Tích luỹ']}
+            />
+            <Area type="monotone" dataKey="cumulative" stroke="#7c3aed" fill="#7c3aed" fillOpacity={0.3} />
+          </AreaChart>
+        </ResponsiveContainer>
+        <p style={{ fontSize: 11, color: D.muted, marginTop: 8 }}>
+          Y-axis: % HS có điểm ≤ giá trị X. Vd: tại "5-5.9", giá trị 60% nghĩa là 60% HS điểm ≤ 5.9.
+        </p>
+      </div>
+
+      {/* ── 5-tier legend ── */}
+      <div style={{
+        gridColumn: '1 / -1', background: D.card2, borderRadius: 10,
+        border: `1px solid ${D.border2}`, padding: 16,
+        display: 'flex', justifyContent: 'center', gap: 24, flexWrap: 'wrap' as const,
+      }}>
+        {[
+          { label: 'Xuất sắc (9-10)', color: TIER_COLORS.excellent },
+          { label: 'Giỏi (8-8.9)',    color: TIER_COLORS.good },
+          { label: 'Khá (7-7.9)',     color: TIER_COLORS.fair },
+          { label: 'Trung bình (5-6.9)', color: TIER_COLORS.average },
+          { label: 'Yếu (<5)',        color: TIER_COLORS.weak },
+        ].map(({ label, color }) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: D.muted }}>
+            <div style={{ width: 12, height: 12, borderRadius: 3, background: color }} />
+            {label}
+          </div>
+        ))}
+      </div>
+
+      {/* ── ĐÁNH GIÁ KHÁCH QUAN ── */}
+      <div style={{
+        gridColumn: '1 / -1', background: D.card2, borderRadius: 10,
+        border: `1px solid ${D.border2}`, padding: 20,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 18 }}>🤖</span>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: D.text, margin: 0 }}>
+            Đánh giá khách quan (auto từ thống kê)
+          </h3>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+          {assessment.map((item, i) => {
+            const bgColor = item.verdict === 'good' ? 'rgba(52, 211, 153, 0.08)'
+              : item.verdict === 'bad' ? 'rgba(248, 113, 113, 0.08)'
+              : 'rgba(251, 191, 36, 0.08)'
+            const borderColor = item.verdict === 'good' ? 'rgba(52, 211, 153, 0.3)'
+              : item.verdict === 'bad' ? 'rgba(248, 113, 113, 0.3)'
+              : 'rgba(251, 191, 36, 0.3)'
+            const titleColor = item.verdict === 'good' ? '#34d399'
+              : item.verdict === 'bad' ? '#f87171' : '#fbbf24'
+            return (
+              <div key={i} style={{
+                background: bgColor, border: `1px solid ${borderColor}`,
+                borderRadius: 10, padding: 14,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 16 }}>{item.icon}</span>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: titleColor, margin: 0 }}>
+                    {item.title}
+                  </p>
+                </div>
+                <p style={{ fontSize: 12, color: D.muted, lineHeight: 1.5, margin: 0 }}>
+                  {item.text}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 11, color: D.muted, marginTop: 14, fontStyle: 'italic' }}>
+          💡 Đánh giá tự động dựa trên: tỷ lệ đạt, độ lệch (mean vs median), độ phân tán (σ),
+          độ tin cậy (Cronbach's α), modality detection. Chỉ mang tính tham khảo, GV nên đối chiếu với hoàn cảnh thực tế lớp.
+        </p>
       </div>
     </div>
   )
