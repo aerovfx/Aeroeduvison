@@ -2026,6 +2026,7 @@ const _TEACHER_LOCAL_PREFIXES = [
   '/api/teacher/news',           // line 10426 (news compose)
   '/api/teacher/analytics',      // teacher analytics aggregate (real student data)
   '/api/teacher/roster',         // teacher full roster (ClassStudent + TSL approved)
+  '/api/teacher/learning-paths', // teacher learning path builder (per-student)
 ];
 
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
@@ -5815,6 +5816,326 @@ if (USE_NODEJS_QUESTIONS) {
     } catch (err) {
       console.error('[teacher:roster]', err.message);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // LEARNING PATHS — GV soạn lộ trình học tập riêng cho từng HS
+  // Tables (lazy migration):
+  //   "LearningPath"     — path metadata + modules JSONB
+  //   "LearningPathAssignment" — gán path cho HS (M:N)
+  // ════════════════════════════════════════════════════════════
+  let _lpReady = false;
+  async function ensureLPTables() {
+    if (_lpReady) return;
+    const pool = getAsgnPool();
+    if (!pool) return;
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LearningPath" (
+        id            TEXT PRIMARY KEY,
+        "teacherId"   TEXT NOT NULL,
+        name          TEXT NOT NULL,
+        description   TEXT,
+        subject       TEXT,
+        difficulty    TEXT DEFAULT 'medium',
+        modules       JSONB NOT NULL DEFAULT '[]'::jsonb,
+        "estimatedDays"  INT DEFAULT 7,
+        "totalXP"     INT DEFAULT 0,
+        "totalDuration" INT DEFAULT 0,
+        "isTemplate"  BOOLEAN NOT NULL DEFAULT false,
+        "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LearningPath_teacher_idx"
+        ON "LearningPath"("teacherId", "createdAt" DESC)`);
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LearningPathAssignment" (
+        id            TEXT PRIMARY KEY,
+        "pathId"      TEXT NOT NULL,
+        "studentId"   TEXT NOT NULL,        -- User.id (TSL linked) hoặc ClassStudent.id (chưa link)
+        "studentName" TEXT,                  -- snapshot tên HS khi assign
+        "studentEmail" TEXT,                 -- snapshot email
+        status        TEXT NOT NULL DEFAULT 'assigned',  -- assigned|in_progress|completed|paused
+        "progressPct" INT DEFAULT 0,         -- 0-100 (số module hoàn thành / tổng)
+        "moduleStatus" JSONB DEFAULT '{}'::jsonb,  -- { moduleId: 'completed'|'in_progress'|'pending' }
+        "assignedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "completedAt" TIMESTAMPTZ,
+        "lastActivityAt" TIMESTAMPTZ,
+        UNIQUE("pathId", "studentId")
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LPA_path_idx"
+        ON "LearningPathAssignment"("pathId", status)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LPA_student_idx"
+        ON "LearningPathAssignment"("studentId", status)`);
+      _lpReady = true;
+    } catch (e) {
+      console.error('[learning-path:ensure]', e.message);
+    }
+  }
+
+  function lpGenId(prefix = 'lp') {
+    return `${prefix}_${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36).slice(-4)}`;
+  }
+
+  function mapLPRow(r, assignments = []) {
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description || '',
+      subject: r.subject || null,
+      difficulty: r.difficulty || 'medium',
+      modules: r.modules || [],
+      estimatedDays: r.estimatedDays,
+      totalXP: r.totalXP,
+      totalDuration: r.totalDuration,
+      isTemplate: !!r.isTemplate,
+      assignments,
+      assignedCount: assignments.length,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+  }
+
+  function mapLPAssignment(a) {
+    return {
+      id: a.id,
+      pathId: a.pathId,
+      studentId: a.studentId,
+      studentName: a.studentName || '',
+      studentEmail: a.studentEmail || '',
+      status: a.status,
+      progressPct: a.progressPct || 0,
+      moduleStatus: a.moduleStatus || {},
+      assignedAt: a.assignedAt,
+      completedAt: a.completedAt,
+      lastActivityAt: a.lastActivityAt,
+    };
+  }
+
+  // ── GET /api/teacher/learning-paths ──
+  app.get('/api/teacher/learning-paths', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      const { rows: paths } = await pool.query(
+        `SELECT * FROM "LearningPath" WHERE "teacherId" = $1 ORDER BY "createdAt" DESC`,
+        [user.id]
+      );
+      if (paths.length === 0) return res.json({ paths: [], count: 0 });
+      // Batch-load assignments
+      const pathIds = paths.map(p => p.id);
+      const { rows: assignments } = await pool.query(
+        `SELECT * FROM "LearningPathAssignment" WHERE "pathId" = ANY($1)`,
+        [pathIds]
+      );
+      const byPath = {};
+      for (const a of assignments) {
+        if (!byPath[a.pathId]) byPath[a.pathId] = [];
+        byPath[a.pathId].push(mapLPAssignment(a));
+      }
+      return res.json({
+        paths: paths.map(p => mapLPRow(p, byPath[p.id] || [])),
+        count: paths.length,
+      });
+    } catch (err) {
+      console.error('[learning-path:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── GET /api/teacher/learning-paths/:id ──
+  app.get('/api/teacher/learning-paths/:id', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "LearningPath" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Path không tồn tại' });
+      const { rows: assignments } = await pool.query(
+        `SELECT * FROM "LearningPathAssignment" WHERE "pathId" = $1 ORDER BY "assignedAt" DESC`,
+        [req.params.id]
+      );
+      return res.json(mapLPRow(rows[0], assignments.map(mapLPAssignment)));
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/learning-paths ──
+  app.post('/api/teacher/learning-paths', express.json({ limit: '256kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      if (!b.name || !String(b.name).trim()) {
+        return res.status(400).json({ error: 'Thiếu tên path' });
+      }
+      const modules = Array.isArray(b.modules) ? b.modules : [];
+      const totalXP = modules.reduce((s, m) => s + (Number(m.xpTarget) || 0), 0);
+      const totalDuration = modules.reduce((s, m) => s + (Number(m.duration) || 0), 0);
+      const estimatedDays = Math.max(1, Math.ceil(totalDuration / 60));
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      const id = lpGenId();
+      const { rows } = await pool.query(
+        `INSERT INTO "LearningPath" (id, "teacherId", name, description, subject,
+            difficulty, modules, "estimatedDays", "totalXP", "totalDuration", "isTemplate")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING *`,
+        [id, user.id, String(b.name).trim(), b.description || '', b.subject || null,
+         b.difficulty || 'medium', JSON.stringify(modules),
+         estimatedDays, totalXP, totalDuration, !!b.isTemplate]
+      );
+      // Auto-assign tới studentIds nếu kèm
+      let assignments = [];
+      if (Array.isArray(b.assignTo) && b.assignTo.length > 0) {
+        for (const s of b.assignTo) {
+          const sid = s.studentId || s.id;
+          if (!sid) continue;
+          try {
+            const { rows: aRows } = await pool.query(
+              `INSERT INTO "LearningPathAssignment" (id, "pathId", "studentId", "studentName", "studentEmail")
+               VALUES ($1,$2,$3,$4,$5)
+               ON CONFLICT ("pathId","studentId") DO NOTHING
+               RETURNING *`,
+              [lpGenId('lpa'), id, sid, s.studentName || s.name || '', s.studentEmail || s.email || '']
+            );
+            if (aRows[0]) assignments.push(mapLPAssignment(aRows[0]));
+          } catch (e) {
+            console.warn('[learning-path:assign]', e.message);
+          }
+        }
+      }
+      return res.json({ path: mapLPRow(rows[0], assignments) });
+    } catch (err) {
+      console.error('[learning-path:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/teacher/learning-paths/:id ──
+  app.patch('/api/teacher/learning-paths/:id', express.json({ limit: '256kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const b = req.body || {};
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      const sets = []; const vals = [];
+      const allowed = ['name', 'description', 'subject', 'difficulty', 'isTemplate'];
+      for (const k of allowed) {
+        if (k in b) { sets.push(`"${k}" = $${vals.length + 1}`); vals.push(b[k]); }
+      }
+      if (Array.isArray(b.modules)) {
+        const totalXP = b.modules.reduce((s, m) => s + (Number(m.xpTarget) || 0), 0);
+        const totalDuration = b.modules.reduce((s, m) => s + (Number(m.duration) || 0), 0);
+        const estimatedDays = Math.max(1, Math.ceil(totalDuration / 60));
+        sets.push(`modules = $${vals.length + 1}`); vals.push(JSON.stringify(b.modules));
+        sets.push(`"totalXP" = $${vals.length + 1}`); vals.push(totalXP);
+        sets.push(`"totalDuration" = $${vals.length + 1}`); vals.push(totalDuration);
+        sets.push(`"estimatedDays" = $${vals.length + 1}`); vals.push(estimatedDays);
+      }
+      if (sets.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
+      sets.push(`"updatedAt" = NOW()`);
+      vals.push(req.params.id, user.id);
+      const { rows } = await pool.query(
+        `UPDATE "LearningPath" SET ${sets.join(', ')}
+          WHERE id = $${vals.length - 1} AND "teacherId" = $${vals.length}
+          RETURNING *`,
+        vals
+      );
+      if (rows.length === 0) return res.status(404).json({ error: 'Path không tồn tại' });
+      return res.json({ path: mapLPRow(rows[0], []) });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/learning-paths/:id ──
+  app.delete('/api/teacher/learning-paths/:id', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      const r = await pool.query(
+        `DELETE FROM "LearningPath" WHERE id = $1 AND "teacherId" = $2`,
+        [req.params.id, user.id]
+      );
+      if (r.rowCount === 0) return res.status(404).json({ error: 'Path không tồn tại' });
+      // Xoá assignments liên quan
+      await pool.query(`DELETE FROM "LearningPathAssignment" WHERE "pathId" = $1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── POST /api/teacher/learning-paths/:id/assign ──
+  // Body: { students: [{ studentId, studentName?, studentEmail? }] }
+  // Tạo assignment cho mỗi HS (skip nếu đã có)
+  app.post('/api/teacher/learning-paths/:id/assign', express.json({ limit: '64kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const list = Array.isArray(req.body?.students) ? req.body.students : [];
+      if (list.length === 0) return res.status(400).json({ error: 'Không có HS nào để gán' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      // Verify path ownership
+      const { rows: pathRows } = await pool.query(
+        `SELECT id FROM "LearningPath" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (pathRows.length === 0) return res.status(404).json({ error: 'Path không tồn tại' });
+      const created = [];
+      for (const s of list) {
+        const sid = s.studentId || s.id;
+        if (!sid) continue;
+        try {
+          const { rows } = await pool.query(
+            `INSERT INTO "LearningPathAssignment" (id, "pathId", "studentId", "studentName", "studentEmail")
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT ("pathId","studentId") DO NOTHING
+             RETURNING *`,
+            [lpGenId('lpa'), req.params.id, sid, s.studentName || s.name || '', s.studentEmail || s.email || '']
+          );
+          if (rows[0]) created.push(mapLPAssignment(rows[0]));
+        } catch (e) {
+          console.warn('[learning-path:assign:row]', e.message);
+        }
+      }
+      return res.json({ assigned: created.length, total: list.length, assignments: created });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── DELETE /api/teacher/learning-paths/:id/assign/:assignmentId ──
+  app.delete('/api/teacher/learning-paths/:id/assign/:assignmentId', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      // Verify path ownership
+      const { rows: pathRows } = await pool.query(
+        `SELECT id FROM "LearningPath" WHERE id = $1 AND "teacherId" = $2 LIMIT 1`,
+        [req.params.id, user.id]
+      );
+      if (pathRows.length === 0) return res.status(404).json({ error: 'Path không tồn tại' });
+      await pool.query(
+        `DELETE FROM "LearningPathAssignment" WHERE id = $1 AND "pathId" = $2`,
+        [req.params.assignmentId, req.params.id]
+      );
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
     }
   });
 
