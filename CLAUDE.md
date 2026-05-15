@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `2f1c60c` (deploy 240, 2026-05-15 — batch 6 features: AI giáo án, Scrumboard GV+Admin, CreateModuleModal, Word/PDF/Spreadsheet, Stem Blueprint + KeoCo, Digital Logic Lab)
-- Commits since last deploy: `1/5` (this commit Pixel Odyssey RPG)
+- Last deployed commit: `238b793` (deploy 241, 2026-05-15 — Pixel Odyssey RPG)
+- Commits since last deploy: `1/5` (this commit Knowledge Graph Explorer)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

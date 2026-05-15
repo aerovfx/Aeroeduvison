@@ -61,6 +61,7 @@ const AuraPage         = lazy(() => import('@/pages/dashboard/Aura'))
 const StemPage         = lazy(() => import('@/pages/dashboard/Stem'))
 const NotesPage        = lazy(() => import('@/pages/dashboard/Notes'))
 const ScrumboardPage   = lazy(() => import('@/pages/dashboard/Scrumboard'))
+const KnowledgeGraphPage = lazy(() => import('@/pages/dashboard/KnowledgeGraph'))
 const TeacherScrumboardPage = lazy(() => import('@/pages/teacher/TeacherScrumboard'))
 const AdminScrumboardPage   = lazy(() => import('@/pages/admin/AdminScrumboard'))
 const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
@@ -315,6 +316,7 @@ export function AppRouter() {
             <Route path="/dashboard/quiz/:quizId"          element={<PageFallback />} />
             <Route path="/dashboard/quizzes"               element={<PageFallback />} />
             <Route path="/dashboard/scrumboard"            element={<ScrumboardPage />} />
+            <Route path="/dashboard/knowledge-graph"        element={<KnowledgeGraphPage />} />
             <Route path="/dashboard/settings"              element={<SettingsPage />} />
             <Route path="/dashboard/stem"                  element={<StemPage />} />
             <Route path="/dashboard/stem/create"           element={<StemCreatePage />} />

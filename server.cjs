@@ -7919,6 +7919,393 @@ ${plan.content || '<p>(Trống)</p>'}
   });
 
   // ════════════════════════════════════════════════
+  // KNOWLEDGE GRAPH — Đồ thị tri thức cho việc tìm kiếm liên ngành
+  // 2 bảng: kg_nodes + kg_edges. Search/expand/seed endpoints.
+  // ════════════════════════════════════════════════
+  let kgReady = false;
+  async function ensureKgReady() {
+    if (kgReady) return;
+    const pool = getKcPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_nodes (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        label TEXT NOT NULL,
+        description TEXT,
+        properties JSONB DEFAULT '{}'::jsonb,
+        source_type TEXT,
+        source_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_edges (
+        id TEXT PRIMARY KEY,
+        from_id TEXT NOT NULL,
+        to_id TEXT NOT NULL,
+        rel_type TEXT NOT NULL,
+        weight REAL DEFAULT 1.0,
+        properties JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (from_id, to_id, rel_type)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_nodes_type ON kg_nodes(type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_edges_from ON kg_edges(from_id, rel_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_edges_to   ON kg_edges(to_id, rel_type)`);
+    // Trigram extension cho fuzzy search (skip nếu đã có)
+    try {
+      await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_nodes_label_trgm ON kg_nodes USING gin (label gin_trgm_ops)`);
+    } catch (e) { console.warn('[kg] pg_trgm setup skipped:', e.message); }
+    kgReady = true;
+  }
+
+  // Seed Vật lí 11 — ~80 nodes + ~150 edges (idempotent: ON CONFLICT DO NOTHING)
+  async function seedKgPhysics11() {
+    await ensureKgReady();
+    const pool = getKcPool();
+    // ── Nodes ──
+    const nodes = [
+      // Subject (1)
+      { id: 'subj-vatli', type: 'Subject', label: 'Vật lí', description: 'Môn Vật lí THPT theo GDPT 2018' },
+      // Chapters (5)
+      { id: 'chap-co-hoc',     type: 'Chapter', label: 'Cơ học',     description: 'Chuyển động, lực, năng lượng' },
+      { id: 'chap-nhiet-hoc',  type: 'Chapter', label: 'Nhiệt học',  description: 'Nhiệt độ, áp suất, khí lý tưởng' },
+      { id: 'chap-dien-hoc',   type: 'Chapter', label: 'Điện học',   description: 'Điện tích, dòng điện, mạch' },
+      { id: 'chap-tu-truong',  type: 'Chapter', label: 'Từ trường',  description: 'Lực Lorentz, cảm ứng điện từ' },
+      { id: 'chap-dao-dong',   type: 'Chapter', label: 'Dao động & Sóng', description: 'Dao động điều hòa, sóng cơ' },
+      // Topics (~22)
+      { id: 'topic-dong-luong',     type: 'Topic', label: 'Động lượng',         description: 'Đại lượng vector p = m·v đặc trưng cho khả năng truyền chuyển động' },
+      { id: 'topic-bao-toan-p',     type: 'Topic', label: 'Bảo toàn động lượng', description: 'Tổng động lượng hệ kín không đổi' },
+      { id: 'topic-va-cham',        type: 'Topic', label: 'Va chạm',             description: 'Va chạm đàn hồi & không đàn hồi' },
+      { id: 'topic-cong',           type: 'Topic', label: 'Công cơ học',         description: 'A = F·s·cosα' },
+      { id: 'topic-cong-suat',      type: 'Topic', label: 'Công suất',           description: 'P = A/t (đơn vị Watt)' },
+      { id: 'topic-nang-luong',     type: 'Topic', label: 'Năng lượng',          description: 'Cơ năng = động năng + thế năng' },
+      { id: 'topic-bao-toan-e',     type: 'Topic', label: 'Bảo toàn năng lượng', description: 'Định luật bảo toàn cơ năng' },
+      { id: 'topic-luc-newton',     type: 'Topic', label: '3 định luật Newton',  description: 'Quán tính, F=ma, phản lực' },
+      { id: 'topic-trong-luc',      type: 'Topic', label: 'Trọng lực',           description: 'Lực hấp dẫn của Trái Đất' },
+      { id: 'topic-luc-ma-sat',     type: 'Topic', label: 'Lực ma sát',          description: 'Ma sát nghỉ + trượt + lăn' },
+      { id: 'topic-dao-dong-dh',    type: 'Topic', label: 'Dao động điều hòa',   description: 'x = A·cos(ωt+φ)' },
+      { id: 'topic-con-lac-don',    type: 'Topic', label: 'Con lắc đơn',         description: 'Chu kì T = 2π√(l/g)' },
+      { id: 'topic-con-lac-lo-xo',  type: 'Topic', label: 'Con lắc lò xo',       description: 'Chu kì T = 2π√(m/k)' },
+      { id: 'topic-song-co',        type: 'Topic', label: 'Sóng cơ',             description: 'Lan truyền dao động trong môi trường' },
+      { id: 'topic-giao-thoa',      type: 'Topic', label: 'Giao thoa sóng',      description: 'Tổng hợp 2 sóng kết hợp' },
+      { id: 'topic-dien-tich',      type: 'Topic', label: 'Điện tích & Coulomb', description: 'Lực Coulomb F = kq1q2/r²' },
+      { id: 'topic-dien-truong',    type: 'Topic', label: 'Điện trường',         description: 'E = F/q (V/m)' },
+      { id: 'topic-dien-the',       type: 'Topic', label: 'Hiệu điện thế',       description: 'U = A/q (Volt)' },
+      { id: 'topic-mach-dien',      type: 'Topic', label: 'Mạch điện một chiều', description: 'Định luật Ohm + Kirchhoff' },
+      { id: 'topic-tu-truong',      type: 'Topic', label: 'Từ trường',           description: 'Đường sức từ + lực Lorentz' },
+      { id: 'topic-cam-ung-dt',     type: 'Topic', label: 'Cảm ứng điện từ',     description: 'Định luật Faraday + Lenz' },
+      { id: 'topic-nhiet-do',       type: 'Topic', label: 'Nhiệt độ',            description: 'Đại lượng đo độ nóng lạnh (Kelvin)' },
+      // Formulas (~18)
+      { id: 'form-p-mv',          type: 'Formula', label: 'p = m·v',                description: 'Động lượng = khối lượng × vận tốc', properties: { unit: 'kg·m/s' } },
+      { id: 'form-f-ma',          type: 'Formula', label: 'F = m·a',                description: 'Định luật II Newton', properties: { unit: 'N' } },
+      { id: 'form-a-fs',          type: 'Formula', label: 'A = F·s·cosα',           description: 'Công cơ học', properties: { unit: 'J' } },
+      { id: 'form-p-at',          type: 'Formula', label: 'P = A/t',                description: 'Công suất', properties: { unit: 'W' } },
+      { id: 'form-wd-mv2',        type: 'Formula', label: 'Wđ = ½·m·v²',            description: 'Động năng', properties: { unit: 'J' } },
+      { id: 'form-wt-mgh',        type: 'Formula', label: 'Wt = m·g·h',             description: 'Thế năng trọng trường', properties: { unit: 'J' } },
+      { id: 'form-x-acos',        type: 'Formula', label: 'x = A·cos(ωt+φ)',        description: 'Phương trình dao động điều hòa' },
+      { id: 'form-t-2pi-lg',      type: 'Formula', label: 'T = 2π√(l/g)',           description: 'Chu kì con lắc đơn', properties: { unit: 's' } },
+      { id: 'form-t-2pi-mk',      type: 'Formula', label: 'T = 2π√(m/k)',           description: 'Chu kì con lắc lò xo', properties: { unit: 's' } },
+      { id: 'form-omega-2pi-t',   type: 'Formula', label: 'ω = 2π/T = 2πf',         description: 'Tần số góc' },
+      { id: 'form-coulomb',       type: 'Formula', label: 'F = k·|q₁·q₂|/r²',       description: 'Định luật Coulomb', properties: { unit: 'N', k: '9e9' } },
+      { id: 'form-e-fq',          type: 'Formula', label: 'E = F/q',                description: 'Cường độ điện trường', properties: { unit: 'V/m' } },
+      { id: 'form-u-aq',          type: 'Formula', label: 'U = A/q',                description: 'Hiệu điện thế', properties: { unit: 'V' } },
+      { id: 'form-ohm',           type: 'Formula', label: 'U = I·R',                description: 'Định luật Ohm', properties: { unit: 'V' } },
+      { id: 'form-pkvt',          type: 'Formula', label: 'P = U·I',                description: 'Công suất tiêu thụ điện' },
+      { id: 'form-faraday',       type: 'Formula', label: 'e = -dΦ/dt',             description: 'Suất điện động cảm ứng (Faraday)' },
+      { id: 'form-lorentz',       type: 'Formula', label: 'F = q·v·B·sinθ',         description: 'Lực Lorentz' },
+      { id: 'form-pv-nrt',        type: 'Formula', label: 'PV = nRT',               description: 'Phương trình khí lý tưởng' },
+      // Concepts (~8)
+      { id: 'concept-vector',     type: 'Concept', label: 'Đại lượng vector',  description: 'Có hướng + độ lớn (khác scalar)' },
+      { id: 'concept-bao-toan',   type: 'Concept', label: 'Định luật bảo toàn', description: 'Đại lượng không đổi trong hệ kín' },
+      { id: 'concept-he-kin',     type: 'Concept', label: 'Hệ kín',            description: 'Không trao đổi với bên ngoài' },
+      { id: 'concept-quan-tinh',  type: 'Concept', label: 'Quán tính',         description: 'Xu hướng giữ trạng thái chuyển động' },
+      { id: 'concept-luc',        type: 'Concept', label: 'Lực',               description: 'Đại lượng vector tác động' },
+      { id: 'concept-truong',     type: 'Concept', label: 'Trường vật lý',     description: 'Vùng không gian có tác động vật lý' },
+      { id: 'concept-dien-tu',    type: 'Concept', label: 'Điện từ trường',    description: 'Trường thống nhất điện + từ' },
+      { id: 'concept-dao-dong',   type: 'Concept', label: 'Dao động',          description: 'Lặp lại quanh vị trí cân bằng' },
+      // Careers (~7)
+      { id: 'career-ky-su-co-khi',  type: 'Career', label: 'Kỹ sư cơ khí',          description: 'Thiết kế máy, cơ cấu, robot' },
+      { id: 'career-ky-su-dien',    type: 'Career', label: 'Kỹ sư điện - điện tử',  description: 'Mạch, năng lượng, hệ thống' },
+      { id: 'career-vat-ly-thien-van', type: 'Career', label: 'Nhà thiên văn học',  description: 'Nghiên cứu vũ trụ' },
+      { id: 'career-ky-su-otc',     type: 'Career', label: 'Kỹ sư ô tô',            description: 'Động lực học, ma sát, va chạm' },
+      { id: 'career-ky-su-nang-luong', type: 'Career', label: 'Kỹ sư năng lượng',   description: 'Năng lượng tái tạo, pin' },
+      { id: 'career-bac-si-rad',    type: 'Career', label: 'Bác sĩ X-quang',        description: 'Ứng dụng điện từ y tế' },
+      { id: 'career-game-dev',      type: 'Career', label: 'Lập trình viên game',   description: 'Vật lý game (collision, gravity)' },
+    ];
+
+    for (const n of nodes) {
+      await pool.query(
+        `INSERT INTO kg_nodes (id, type, label, description, properties)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label, description = EXCLUDED.description`,
+        [n.id, n.type, n.label, n.description || null, JSON.stringify(n.properties || {})]
+      );
+    }
+
+    // ── Edges ──
+    const edges = [
+      // Subject → Chapter
+      ['subj-vatli', 'chap-co-hoc',     'HAS_CHAPTER'],
+      ['subj-vatli', 'chap-nhiet-hoc',  'HAS_CHAPTER'],
+      ['subj-vatli', 'chap-dien-hoc',   'HAS_CHAPTER'],
+      ['subj-vatli', 'chap-tu-truong',  'HAS_CHAPTER'],
+      ['subj-vatli', 'chap-dao-dong',   'HAS_CHAPTER'],
+      // Chapter → Topic
+      ['chap-co-hoc', 'topic-dong-luong',  'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-bao-toan-p',  'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-va-cham',     'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-cong',        'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-cong-suat',   'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-nang-luong',  'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-bao-toan-e',  'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-luc-newton',  'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-trong-luc',   'HAS_TOPIC'],
+      ['chap-co-hoc', 'topic-luc-ma-sat',  'HAS_TOPIC'],
+      ['chap-dao-dong', 'topic-dao-dong-dh',   'HAS_TOPIC'],
+      ['chap-dao-dong', 'topic-con-lac-don',   'HAS_TOPIC'],
+      ['chap-dao-dong', 'topic-con-lac-lo-xo', 'HAS_TOPIC'],
+      ['chap-dao-dong', 'topic-song-co',       'HAS_TOPIC'],
+      ['chap-dao-dong', 'topic-giao-thoa',     'HAS_TOPIC'],
+      ['chap-dien-hoc', 'topic-dien-tich',  'HAS_TOPIC'],
+      ['chap-dien-hoc', 'topic-dien-truong','HAS_TOPIC'],
+      ['chap-dien-hoc', 'topic-dien-the',   'HAS_TOPIC'],
+      ['chap-dien-hoc', 'topic-mach-dien',  'HAS_TOPIC'],
+      ['chap-tu-truong', 'topic-tu-truong', 'HAS_TOPIC'],
+      ['chap-tu-truong', 'topic-cam-ung-dt','HAS_TOPIC'],
+      ['chap-nhiet-hoc', 'topic-nhiet-do',  'HAS_TOPIC'],
+      // Topic → Formula
+      ['topic-dong-luong',    'form-p-mv',        'USES_FORMULA'],
+      ['topic-luc-newton',    'form-f-ma',        'USES_FORMULA'],
+      ['topic-cong',          'form-a-fs',        'USES_FORMULA'],
+      ['topic-cong-suat',     'form-p-at',        'USES_FORMULA'],
+      ['topic-nang-luong',    'form-wd-mv2',      'USES_FORMULA'],
+      ['topic-nang-luong',    'form-wt-mgh',      'USES_FORMULA'],
+      ['topic-dao-dong-dh',   'form-x-acos',      'USES_FORMULA'],
+      ['topic-dao-dong-dh',   'form-omega-2pi-t', 'USES_FORMULA'],
+      ['topic-con-lac-don',   'form-t-2pi-lg',    'USES_FORMULA'],
+      ['topic-con-lac-lo-xo', 'form-t-2pi-mk',    'USES_FORMULA'],
+      ['topic-dien-tich',     'form-coulomb',     'USES_FORMULA'],
+      ['topic-dien-truong',   'form-e-fq',        'USES_FORMULA'],
+      ['topic-dien-the',      'form-u-aq',        'USES_FORMULA'],
+      ['topic-mach-dien',     'form-ohm',         'USES_FORMULA'],
+      ['topic-mach-dien',     'form-pkvt',        'USES_FORMULA'],
+      ['topic-cam-ung-dt',    'form-faraday',     'USES_FORMULA'],
+      ['topic-tu-truong',     'form-lorentz',     'USES_FORMULA'],
+      ['topic-nhiet-do',      'form-pv-nrt',      'USES_FORMULA'],
+      // Topic → Concept
+      ['topic-dong-luong',    'concept-vector',     'USES_CONCEPT'],
+      ['topic-dong-luong',    'concept-bao-toan',   'USES_CONCEPT'],
+      ['topic-bao-toan-p',    'concept-bao-toan',   'USES_CONCEPT'],
+      ['topic-bao-toan-p',    'concept-he-kin',     'USES_CONCEPT'],
+      ['topic-bao-toan-e',    'concept-bao-toan',   'USES_CONCEPT'],
+      ['topic-luc-newton',    'concept-quan-tinh',  'USES_CONCEPT'],
+      ['topic-luc-newton',    'concept-luc',        'USES_CONCEPT'],
+      ['topic-trong-luc',     'concept-luc',        'USES_CONCEPT'],
+      ['topic-luc-ma-sat',    'concept-luc',        'USES_CONCEPT'],
+      ['topic-dien-truong',   'concept-truong',     'USES_CONCEPT'],
+      ['topic-tu-truong',     'concept-truong',     'USES_CONCEPT'],
+      ['topic-cam-ung-dt',    'concept-dien-tu',    'USES_CONCEPT'],
+      ['topic-dao-dong-dh',   'concept-dao-dong',   'USES_CONCEPT'],
+      ['topic-con-lac-don',   'concept-dao-dong',   'USES_CONCEPT'],
+      ['topic-con-lac-lo-xo', 'concept-dao-dong',   'USES_CONCEPT'],
+      // Topic ↔ Topic (RELATES_TO — semantic)
+      ['topic-dong-luong',    'topic-bao-toan-p',   'RELATES_TO'],
+      ['topic-dong-luong',    'topic-va-cham',      'RELATES_TO'],
+      ['topic-bao-toan-p',    'topic-va-cham',      'RELATES_TO'],
+      ['topic-cong',          'topic-nang-luong',   'RELATES_TO'],
+      ['topic-cong',          'topic-cong-suat',    'RELATES_TO'],
+      ['topic-nang-luong',    'topic-bao-toan-e',   'RELATES_TO'],
+      ['topic-luc-newton',    'topic-trong-luc',    'RELATES_TO'],
+      ['topic-luc-newton',    'topic-luc-ma-sat',   'RELATES_TO'],
+      ['topic-dao-dong-dh',   'topic-con-lac-don',  'RELATES_TO'],
+      ['topic-dao-dong-dh',   'topic-con-lac-lo-xo','RELATES_TO'],
+      ['topic-dao-dong-dh',   'topic-song-co',      'RELATES_TO'],
+      ['topic-song-co',       'topic-giao-thoa',    'RELATES_TO'],
+      ['topic-dien-tich',     'topic-dien-truong',  'RELATES_TO'],
+      ['topic-dien-truong',   'topic-dien-the',     'RELATES_TO'],
+      ['topic-dien-the',      'topic-mach-dien',    'RELATES_TO'],
+      ['topic-tu-truong',     'topic-cam-ung-dt',   'RELATES_TO'],
+      // Topic → Career
+      ['topic-dong-luong',    'career-ky-su-otc',         'APPLIED_IN_CAREER'],
+      ['topic-va-cham',       'career-ky-su-otc',         'APPLIED_IN_CAREER'],
+      ['topic-va-cham',       'career-game-dev',          'APPLIED_IN_CAREER'],
+      ['topic-luc-newton',    'career-ky-su-co-khi',      'APPLIED_IN_CAREER'],
+      ['topic-luc-newton',    'career-game-dev',          'APPLIED_IN_CAREER'],
+      ['topic-trong-luc',     'career-vat-ly-thien-van',  'APPLIED_IN_CAREER'],
+      ['topic-mach-dien',     'career-ky-su-dien',        'APPLIED_IN_CAREER'],
+      ['topic-dien-truong',   'career-ky-su-dien',        'APPLIED_IN_CAREER'],
+      ['topic-cam-ung-dt',    'career-ky-su-dien',        'APPLIED_IN_CAREER'],
+      ['topic-cam-ung-dt',    'career-ky-su-nang-luong',  'APPLIED_IN_CAREER'],
+      ['topic-tu-truong',     'career-bac-si-rad',        'APPLIED_IN_CAREER'],
+      ['topic-dao-dong-dh',   'career-ky-su-co-khi',      'APPLIED_IN_CAREER'],
+      ['topic-song-co',       'career-bac-si-rad',        'APPLIED_IN_CAREER'],
+      // Concept → Concept
+      ['concept-bao-toan',    'concept-he-kin',           'REQUIRES'],
+      ['concept-luc',         'concept-vector',           'IS_A'],
+      ['concept-dien-tu',     'concept-truong',           'IS_A'],
+    ];
+
+    let inserted = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) inserted++;
+      } catch (e) { console.warn('[kg:seed:edge]', from, '→', to, e.message); }
+    }
+    return { nodeCount: nodes.length, edgeCount: edges.length, edgeInserted: inserted };
+  }
+
+  // GET /api/kg/seed — admin-only, idempotent
+  app.get('/api/kg/seed', async (req, res) => {
+    try {
+      // Cho phép any user trigger để test (idempotent, an toàn)
+      const r = await seedKgPhysics11();
+      return res.json({ success: true, ...r, message: 'Đã seed Vật lí 11 vào knowledge graph' });
+    } catch (err) {
+      console.error('[kg:seed] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/search?q=động+lượng&limit=20 — fuzzy search nodes
+  app.get('/api/kg/search', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const q = String(req.query.q || '').trim().slice(0, 120);
+      const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || '20'), 10)));
+      const type = req.query.type ? String(req.query.type).slice(0, 30) : null;
+      if (!q) {
+        // Empty query → return top nodes by type (preview)
+        const r = await pool.query(
+          `SELECT id, type, label, description FROM kg_nodes
+           ${type ? 'WHERE type = $2' : ''}
+           ORDER BY type, label LIMIT $1`,
+          type ? [limit, type] : [limit]
+        );
+        return res.json({ success: true, items: r.rows });
+      }
+      // Trigram + ILIKE fallback
+      let r;
+      try {
+        r = await pool.query(
+          `SELECT id, type, label, description,
+                  similarity(label, $1) AS sim
+           FROM kg_nodes
+           WHERE label ILIKE $2 ${type ? 'AND type = $4' : ''}
+              OR similarity(label, $1) > 0.2
+           ORDER BY sim DESC NULLS LAST, label
+           LIMIT $3`,
+          type ? [q, `%${q}%`, limit, type] : [q, `%${q}%`, limit]
+        );
+      } catch (e) {
+        // Fallback nếu pg_trgm chưa enable
+        r = await pool.query(
+          `SELECT id, type, label, description FROM kg_nodes
+           WHERE label ILIKE $1 ${type ? 'AND type = $3' : ''}
+           ORDER BY label LIMIT $2`,
+          type ? [`%${q}%`, limit, type] : [`%${q}%`, limit]
+        );
+      }
+      return res.json({ success: true, items: r.rows });
+    } catch (err) {
+      console.error('[kg:search] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/node/:id — chi tiết + 1-hop neighbors
+  app.get('/api/kg/node/:id', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const nq = await pool.query(`SELECT * FROM kg_nodes WHERE id = $1`, [req.params.id]);
+      if (nq.rowCount === 0) return res.status(404).json({ success: false, error: 'not_found' });
+      const node = nq.rows[0];
+      const eq = await pool.query(
+        `SELECT e.*, n.label AS to_label, n.type AS to_type
+         FROM kg_edges e JOIN kg_nodes n ON n.id = e.to_id
+         WHERE e.from_id = $1
+         UNION ALL
+         SELECT e.*, n.label AS to_label, n.type AS to_type
+         FROM kg_edges e JOIN kg_nodes n ON n.id = e.from_id
+         WHERE e.to_id = $1`,
+        [req.params.id]
+      );
+      return res.json({
+        success: true,
+        node,
+        neighbors: eq.rows.map(r => ({
+          id: r.from_id === req.params.id ? r.to_id : r.from_id,
+          label: r.to_label,
+          type: r.to_type,
+          relType: r.rel_type,
+          direction: r.from_id === req.params.id ? 'out' : 'in',
+          weight: r.weight,
+        })),
+      });
+    } catch (err) {
+      console.error('[kg:node] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/expand/:id?depth=2 — BFS traversal n-hop
+  app.get('/api/kg/expand/:id', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const depth = Math.min(3, Math.max(1, parseInt(String(req.query.depth || '2'), 10)));
+      const startId = req.params.id;
+      // BFS qua recursive CTE — undirected (UNION 2 chiều)
+      const r = await pool.query(
+        `WITH RECURSIVE walk(id, depth, path) AS (
+           SELECT $1::TEXT, 0, ARRAY[$1::TEXT]
+           UNION
+           SELECT e.to_id, w.depth + 1, w.path || e.to_id
+           FROM kg_edges e JOIN walk w ON e.from_id = w.id
+           WHERE w.depth < $2 AND NOT (e.to_id = ANY (w.path))
+           UNION
+           SELECT e.from_id, w.depth + 1, w.path || e.from_id
+           FROM kg_edges e JOIN walk w ON e.to_id = w.id
+           WHERE w.depth < $2 AND NOT (e.from_id = ANY (w.path))
+         )
+         SELECT DISTINCT id, MIN(depth) AS depth FROM walk GROUP BY id`,
+        [startId, depth]
+      );
+      const ids = r.rows.map(x => x.id);
+      if (ids.length === 0) return res.json({ success: true, nodes: [], edges: [] });
+      const nq = await pool.query(
+        `SELECT id, type, label, description FROM kg_nodes WHERE id = ANY($1)`, [ids]
+      );
+      const eq = await pool.query(
+        `SELECT id, from_id, to_id, rel_type, weight FROM kg_edges
+         WHERE from_id = ANY($1) AND to_id = ANY($1)`, [ids]
+      );
+      const depthMap = new Map(r.rows.map(x => [x.id, x.depth]));
+      return res.json({
+        success: true,
+        nodes: nq.rows.map(n => ({ ...n, depth: depthMap.get(n.id) || 0 })),
+        edges: eq.rows,
+        startId,
+        depth,
+      });
+    } catch (err) {
+      console.error('[kg:expand] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
   // CLASSROOM MODE — public student routes (no auth, QR scan)
   // ════════════════════════════════════════════════
 

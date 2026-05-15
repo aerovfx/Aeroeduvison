@@ -12,7 +12,7 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
-  ClipboardList,
+  ClipboardList, Network,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -80,6 +80,7 @@ const studentSections: RouteSection[] = [
       { icon: Zap,            labelKey: 'routeStem',    href: '/dashboard/stem' },
       { icon: StickyNote,     labelKey: 'routeNotes',   href: '/dashboard/notes' },
       { icon: Kanban,         labelKey: 'routeScrum',   href: '/dashboard/scrumboard' },
+      { icon: Network,        labelKey: 'routeKnowledgeGraph', href: '/dashboard/knowledge-graph', badge: 'AI' },
     ],
   },
   {
