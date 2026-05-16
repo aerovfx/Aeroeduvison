@@ -81,8 +81,15 @@ export default function LoginPage() {
         // sẽ kick về login lần đầu vì isAuthenticated vẫn false (user state null).
         await googleLogin(response.credential)
         navigate(from, { replace: true })
-      } catch {
-        setError(t('loginGoogleError'))
+      } catch (err: any) {
+        // Server có thể trả 503 + { retryable: true, error: "..." } khi DB
+        // quá tải — hiển thị thông điệp friendly thay vì generic.
+        const data = err?.response?.data
+        if (data?.retryable && data?.error) {
+          setError(data.error)
+        } else {
+          setError(t('loginGoogleError'))
+        }
       } finally {
         setGoogleLoading(false)
       }

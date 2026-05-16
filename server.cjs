@@ -203,10 +203,40 @@ if (USE_NODEJS_AUTH) {
         requiresTwoFactor: false,
       });
     } catch (err) {
-      console.error('[auth:login] ❌', err.message);
-      return res.status(500).json({ error: 'Lỗi máy chủ, vui lòng thử lại' });
+      const cls = classifyDbError(err);
+      console.error(`[auth:login] ❌ [${cls.kind}]`, err.message);
+      return res.status(cls.status).json({
+        error: cls.userMessage,
+        retryable: cls.status === 503,
+        kind: cls.kind,
+      });
     }
   });
+
+  // ── Helper: detect lỗi infra DB (Neon quota, connection pool, network) ──
+  // Trả về { status, message } cho frontend hiểu đây là vấn đề tạm thời.
+  function classifyDbError(err) {
+    const msg = (err?.message || '').toLowerCase();
+    if (msg.includes('compute time quota') || msg.includes('exceeded')) {
+      return {
+        status: 503,
+        userMessage: 'Hệ thống đang quá tải tạm thời. Vui lòng thử lại sau 5-10 phút.',
+        kind: 'quota_exceeded',
+      };
+    }
+    if (msg.includes('connection') || msg.includes('econnrefused') || msg.includes('etimedout')) {
+      return {
+        status: 503,
+        userMessage: 'Mất kết nối tới cơ sở dữ liệu. Đang khắc phục, vui lòng thử lại sau.',
+        kind: 'db_unreachable',
+      };
+    }
+    return {
+      status: 500,
+      userMessage: 'Lỗi máy chủ, vui lòng thử lại',
+      kind: 'unknown',
+    };
+  }
 
   // ── POST /api/auth/google ─────────────────────────────────
   app.post('/api/auth/google', async (req, res) => {
@@ -286,8 +316,18 @@ if (USE_NODEJS_AUTH) {
         tokens: { accessToken: token, refreshToken: '' },
       });
     } catch (err) {
-      console.error('[auth:google] ❌', err.message);
-      return res.status(500).json({ error: 'Lỗi xác thực Google, vui lòng thử lại' });
+      const cls = classifyDbError(err);
+      console.error(`[auth:google] ❌ [${cls.kind}]`, err.message);
+      if (cls.kind === 'unknown' && err.stack) {
+        console.error('[auth:google] stack:', err.stack.split('\n').slice(0, 5).join('\n'));
+      }
+      return res.status(cls.status).json({
+        error: cls.kind === 'quota_exceeded' || cls.kind === 'db_unreachable'
+          ? cls.userMessage
+          : 'Lỗi xác thực Google, vui lòng thử lại',
+        retryable: cls.status === 503,
+        kind: cls.kind,
+      });
     }
   });
 
@@ -579,8 +619,13 @@ if (USE_NODEJS_AUTH) {
         tokens: { accessToken: token, refreshToken: '' },
       });
     } catch (err) {
-      console.error('[auth:register] ❌', err.message);
-      return res.status(500).json({ error: 'Lỗi đăng ký, vui lòng thử lại' });
+      const cls = classifyDbError(err);
+      console.error(`[auth:register] ❌ [${cls.kind}]`, err.message);
+      return res.status(cls.status).json({
+        error: cls.kind === 'unknown' ? 'Lỗi đăng ký, vui lòng thử lại' : cls.userMessage,
+        retryable: cls.status === 503,
+        kind: cls.kind,
+      });
     }
   });
 }
