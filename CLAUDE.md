@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `e685109` (deploy 247, 2026-05-16 — HOTFIX: phân loại Neon DB quota error → 503 + message friendly cho /auth/google, /auth/login, /auth/register)
-- Commits since last deploy: `2/5`
+- Commits since last deploy: `3/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

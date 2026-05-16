@@ -20,6 +20,7 @@ import { DocRef } from "@/components/docs/DocRef"
 import { NameStartModal } from "@/components/exam/NameStartModal"
 import { GalaxyHero } from "@/components/common/GalaxyHero"
 import { LevelXPCard } from "@/components/common/LevelXPCard"
+import { RecoDebugBadge } from "@/components/reco/RecoDebugBadge"
 import { api } from "@/services/api"
 import type {
   PracticeExam,
@@ -1088,6 +1089,11 @@ export default function ExamPrepPage() {
                                   <span className="font-medium">{ex.duration} phút</span>
                                 </div>
                                 <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-white/55">
+                                  {/* Dev-only reco debug badge (?recoDebug=1) */}
+                                  <RecoDebugBadge
+                                    score={(ex as any).__score}
+                                    breakdown={(ex as any).__breakdown}
+                                  />
                                   <span className="inline-flex items-center gap-1">
                                     <FileText className="h-3.5 w-3.5" />
                                     {ex.totalQuestions}

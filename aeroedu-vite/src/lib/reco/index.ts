@@ -14,4 +14,4 @@ export { buildContext, readLocalHistory, pushHistory } from './context'
 export type { HistoryRecord } from './context'
 
 // Use-case mixers
-export { rankExams } from './examPrepMixer'
+export { rankExams, rankMatrices, reasonLabel } from './examPrepMixer'

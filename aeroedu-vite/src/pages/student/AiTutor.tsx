@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, Trash2, BookOpen, Settings, Loader2 } from 'lucide-react'
+import { Send, Bot, Sparkles, Trash2, BookOpen, Settings, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
 import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
-import { MathText } from '@/components/common/MathText'
 import { SrsReviewPanel } from '@/components/srs/SrsReviewPanel'
+import { MessageBubble, type Message } from '@/components/ai-tutor/MessageBubble'
 import type { ReviewRecord } from '@/lib/srs'
 
 const D = {
@@ -17,13 +17,6 @@ const D = {
   muted: '#94a3b8',
   purple: '#7c3aed',
   purpleL: '#a78bfa',
-}
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
 }
 
 interface Conversation {
@@ -44,40 +37,6 @@ const QUICK_PROMPTS = [
   'Kiểm tra kiến thức của tôi',
   'Tạo sơ đồ tư duy',
 ]
-
-function MessageBubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === 'user'
-  return (
-    <div style={{ display: 'flex', gap: 12, justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 16 }}>
-      {!isUser && (
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#9333ea)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(124,58,237,0.3)' }}>
-          <Bot style={{ width: 18, height: 18, color: '#fff' }} />
-        </div>
-      )}
-      <div style={{
-        maxWidth: '72%',
-        padding: '12px 16px',
-        borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-        background: isUser ? 'linear-gradient(135deg,#7c3aed,#9333ea)' : D.card2,
-        border: isUser ? 'none' : `1px solid ${D.border}`,
-        color: D.text,
-        fontSize: 14,
-        lineHeight: 1.6,
-        boxShadow: isUser ? '0 0 16px rgba(124,58,237,0.2)' : 'none',
-      }}>
-        <MathText as="span">{msg.content}</MathText>
-        <div style={{ fontSize: 10, color: isUser ? 'rgba(255,255,255,0.5)' : D.muted, marginTop: 4, textAlign: 'right' }}>
-          {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-      {isUser && (
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: D.card2, border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <User style={{ width: 18, height: 18, color: D.muted }} />
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function AiTutor() {
   return (

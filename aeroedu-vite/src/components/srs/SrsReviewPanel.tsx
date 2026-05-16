@@ -4,8 +4,12 @@
  * Dùng trong AI Tutor sidebar. Stats đọc từ localStorage (SM-2 store) mỗi
  * 30s. Khi user click "Ôn ngay" → callback onStartReview với danh sách
  * card due (sort by dueAt ASC).
+ *
+ * Animation:
+ *   - Badge số due có animate-pulse khi giá trị thay đổi (mới có card)
+ *   - Tween smooth khi số stat tăng/giảm — count-up effect 400ms
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Brain, Clock, TrendingUp } from 'lucide-react'
 import { getStats, getDueCards, type ReviewRecord } from '@/lib/srs'
 
@@ -25,11 +29,19 @@ export function SrsReviewPanel({
   const [dueCount, setDueCount] = useState(
     () => getDueCards(Date.now(), { subject }).length,
   )
+  /** Flash key — đổi mỗi khi dueCount tăng → trigger animation lại */
+  const [flashKey, setFlashKey] = useState(0)
+  const prevDueRef = useRef(dueCount)
 
   useEffect(() => {
     const tick = () => {
+      const newDue = getDueCards(Date.now(), { subject }).length
+      if (newDue > prevDueRef.current) {
+        setFlashKey(k => k + 1)   // trigger animation re-mount
+      }
+      prevDueRef.current = newDue
       setStats(getStats())
-      setDueCount(getDueCards(Date.now(), { subject }).length)
+      setDueCount(newDue)
     }
     tick()
     const i = setInterval(tick, 30_000)
@@ -63,8 +75,12 @@ export function SrsReviewPanel({
           <span className="text-xs font-medium text-white/80">Ôn tập thông minh</span>
         </div>
         {dueCount > 0 && (
-          <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30">
-            {dueCount}
+          <span
+            key={`flash-${flashKey}`}
+            className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] font-bold border border-rose-500/30 animate-srs-pop"
+            style={{ animation: 'srs-pop 0.6s ease-out' }}
+          >
+            <AnimatedNumber value={dueCount} />
           </span>
         )}
       </div>
@@ -74,6 +90,20 @@ export function SrsReviewPanel({
         <Stat icon={Brain} label="Đang học" value={stats.learning} color="amber" />
         <Stat icon={TrendingUp} label="Thuộc lâu" value={stats.mature} color="emerald" />
       </div>
+
+      {/* keyframes inline cho self-contained (không cần đổi global CSS) */}
+      <style>{`
+        @keyframes srs-pop {
+          0% { transform: scale(1); }
+          30% { transform: scale(1.35); }
+          60% { transform: scale(0.92); }
+          100% { transform: scale(1); }
+        }
+        @keyframes srs-flash-bg {
+          0% { background-color: rgba(244, 63, 94, 0.5); }
+          100% { background-color: rgba(244, 63, 94, 0.2); }
+        }
+      `}</style>
 
       <button
         onClick={handleStart}
@@ -106,8 +136,40 @@ function Stat({ icon: Icon, label, value, color }: {
   return (
     <div className="rounded-md bg-black/30 p-1.5 text-center">
       <Icon className={`w-3 h-3 mx-auto ${colorClass}`} />
-      <div className={`text-sm font-bold ${colorClass} mt-0.5`}>{value}</div>
+      <div className={`text-sm font-bold ${colorClass} mt-0.5`}>
+        <AnimatedNumber value={value} />
+      </div>
       <div className="text-[9px] text-white/45">{label}</div>
     </div>
   )
+}
+
+/** Count-up tween — 400ms ease-out interpolation giữa giá trị cũ → mới. */
+function AnimatedNumber({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value)
+  const fromRef = useRef(value)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const from = fromRef.current
+    const to = value
+    if (from === to) return
+    const start = performance.now()
+    const dur = 400
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / dur)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplay(Math.round(from + (to - from) * eased))
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick)
+      } else {
+        fromRef.current = to
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick)
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
+  }, [value])
+
+  return <>{display}</>
 }

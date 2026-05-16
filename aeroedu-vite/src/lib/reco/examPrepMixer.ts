@@ -9,12 +9,15 @@
  *
  * Trả TeacherExam[] đã sort theo score DESC, kèm __score + __reasons.
  */
-import type { TeacherExam } from '@/types'
+import type { TeacherExam, ExamMatrixItem } from '@/types'
 import { mix } from './mixer'
-import type { RecoContext, Scored } from './types'
+import type { RecoContext, Scored, Source, Filter } from './types'
 import { defaultSources } from './stages/sources'
 import { defaultFilters } from './stages/filters'
 import { defaultScorers } from './stages/scorers'
+import {
+  weakTopicScorer, recencyScorer, authorDiversityScorer,
+} from './stages/scorers'
 
 export interface RankExamsOptions {
   /** Số đề trả về (default 30) */
@@ -51,4 +54,56 @@ export function reasonLabel(scorerName: string): string {
     'author-diversity':  '',  // không show
   }
   return map[scorerName] || ''
+}
+
+/* ─────────────────────────────────────────────────────────
+ * ExamMatrix support — ma trận đề KHÔNG có taker data (chưa
+ * có HS làm trực tiếp, chỉ là blueprint câu hỏi). Dùng subset
+ * scorer thích hợp: weak-topic, recency, author-diversity.
+ */
+export interface MatrixRankOptions {
+  topK?: number
+  reasonThreshold?: number
+}
+
+/** Adapt ExamMatrixItem → TeacherExam-shape để dùng chung scorer chain.
+ *  Matrix dùng `name` thay vì `title`, không có duration/totalScore real.
+ */
+function matrixSource(items: ExamMatrixItem[]): Source<ExamMatrixItem> {
+  return { name: 'matrices-cached', fetch: async () => items }
+}
+
+const matrixHasQuestions: Filter<ExamMatrixItem> = {
+  name: 'has-questions',
+  predicate: (item) => (item.totalQuestions ?? 0) > 0,
+}
+
+/** rankMatrices — variant của rankExams cho ExamMatrixItem.
+ *  Cùng pattern, scorer subset (weak-topic 0.5, recency 0.3, diversity 0.2).
+ */
+export async function rankMatrices(
+  items: ExamMatrixItem[],
+  ctx: RecoContext,
+  opts: MatrixRankOptions = {},
+): Promise<Scored<ExamMatrixItem>[]> {
+  // Scorer cần "title" — matrix có `name` thay vì `title`. Map adapter:
+  const adapted = items.map(m => ({ ...m, title: m.name })) as unknown as Array<ExamMatrixItem & { title: string }>
+
+  // Scorer xài "title" qua chỉ field → cast back sau
+  const scored = await mix(
+    {
+      sources: [matrixSource(adapted as any)],
+      filters: [matrixHasQuestions as any],
+      scorers: [
+        { ...weakTopicScorer, weight: 0.5 } as any,
+        { ...recencyScorer, weight: 0.3 } as any,
+        { ...authorDiversityScorer, weight: 0.2 } as any,
+      ],
+      topK: opts.topK ?? 20,
+      reasonThreshold: opts.reasonThreshold ?? 0.6,
+      dedupeKey: (e: any) => e.id,
+    },
+    ctx,
+  )
+  return scored as unknown as Scored<ExamMatrixItem>[]
 }
