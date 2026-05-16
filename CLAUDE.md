@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `7439500` (deploy 248, 2026-05-16 — Reco system Phase 0-1f: framework + ExamPrepMixer + SRS + NewsMixer + RecoDebugLayer + 40 vitest)
-- Commits since last deploy: `4/5`
+- Last deployed commit: `2f3702d` (deploy 249, 2026-05-17 — fix LabTwin event handler + cross-origin QR download + My Courses hiển thị khoá miễn phí)
+- Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
