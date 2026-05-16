@@ -48,6 +48,14 @@ const DIFF_LABELS: Record<string, string> = {
   EASY: "Dễ", MEDIUM: "Trung bình", HARD: "Khó",
 }
 
+/** Vietnamese label cho lý do reco (chip nhỏ trên card đề) */
+const REASON_LABELS: Record<string, string> = {
+  'weak-topic':        '🎯 Phù hợp điểm yếu',
+  'peer-engagement':   '👥 Bạn cùng lớp đã làm',
+  'recency':           '🆕 Mới ra',
+  'difficulty-match':  '⚖ Vừa sức',
+}
+
 const selectClass = "w-full rounded-xl bg-black/25 backdrop-blur-sm border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 focus:outline-none focus:border-[hsl(245,85%,65%)]/40 focus:shadow-[0_0_15px_rgba(120,100,255,0.1)]"
 const inputClass = "w-full rounded-xl bg-black/25 border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 placeholder-white/30 focus:outline-none focus:border-[hsl(245,85%,65%)]/40"
 
@@ -143,8 +151,42 @@ export default function ExamPrepPage() {
     staleTime: 60_000,
     retry: false,
   })
-  const teacherExams = teacherExamsData?.exams ?? []
+  const teacherExamsRaw = teacherExamsData?.exams ?? []
   const examMatrices = teacherExamsData?.matrices ?? []
+
+  /* ─── Reco pipeline: rank đề theo personalization ───
+   * X For You-style mixer compose 4 source + 3 filter + 5 scorer.
+   * - WeakTopicSource ưu tiên đề thuộc topic HS yếu (từ stats.weakTopics)
+   * - PeerSource đề có ≥3 HS đã làm
+   * - HeuristicScorer kết hợp weak-topic·peer·recency·difficulty·diversity
+   * Reorder client-side mỗi khi stats hoặc exam list thay đổi.
+   * Trả về Scored<TeacherExam>[] với __reasons cho UI chip.
+   */
+  const [rankedExams, setRankedExams] = useState<Array<TeacherExam & { __score?: number; __reasons?: string[] }>>([])
+  useEffect(() => {
+    if (teacherExamsRaw.length === 0) { setRankedExams([]); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { rankExams, buildContext } = await import('@/lib/reco')
+        const ctx = buildContext({
+          userId: user?.id ?? null,
+          userName: user?.name ?? undefined,
+          grade: formData.grade,
+          weakTopics: stats?.weakTopics ?? [],
+        })
+        const ranked = await rankExams(teacherExamsRaw, ctx, { topK: 50 })
+        if (!cancelled) setRankedExams(ranked)
+      } catch (e) {
+        console.warn('[ExamPrep] reco failed, fallback to raw:', e)
+        if (!cancelled) setRankedExams(teacherExamsRaw)
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherExamsRaw.length, stats?.weakTopics?.join('|'), user?.id, formData.grade])
+
+  const teacherExams = rankedExams.length > 0 ? rankedExams : teacherExamsRaw
 
   /* ─── React Query: Community stats ────────────────── */
   const {
@@ -1046,6 +1088,25 @@ export default function ExamPrepPage() {
                               >
                                 {ex.title}
                               </h4>
+
+                              {/* Reason chips từ reco mixer — chỉ render khi có __reasons */}
+                              {(ex as any).__reasons && (ex as any).__reasons.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                                  {((ex as any).__reasons as string[]).slice(0, 3).map((r) => {
+                                    const label = REASON_LABELS[r]
+                                    if (!label) return null
+                                    return (
+                                      <span
+                                        key={r}
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-200 border border-amber-500/30"
+                                        title={`Gợi ý vì: ${label}`}
+                                      >
+                                        {label}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
 
                               {/* Bottom row: badges (left) · Start button (right) */}
                               <div className="flex items-center justify-between gap-2 flex-wrap">
