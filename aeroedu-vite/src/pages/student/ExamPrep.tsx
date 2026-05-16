@@ -1088,6 +1088,14 @@ export default function ExamPrepPage() {
                                   Bắt đầu
                                 </button>
                               </div>
+
+                              {/* Stack avatar học sinh đã làm */}
+                              {ex.takers && ex.takers.length > 0 && (
+                                <TakerAvatarStack
+                                  takers={ex.takers}
+                                  totalCount={ex.takerCount ?? ex.takers.length}
+                                />
+                              )}
                             </div>
                           )
                         })}
@@ -1536,4 +1544,93 @@ function DistributionCard({
       </div>
     </div>
   )
+}
+
+/* ─── TakerAvatarStack ────────────────────────────────
+ * Hiển thị danh sách học sinh đã hoàn thành đề dưới dạng avatar tròn xếp
+ * chồng lên nhau (Slack/Linear style). Mỗi avatar có:
+ *   - Initial 1-2 chữ từ tên
+ *   - Background gradient sinh từ hash tên (mỗi học sinh 1 màu nhất quán)
+ *   - Border viền đen mỏng để cách avatar liền kề
+ *   - Tooltip native: "Tên — điểm %"
+ * Nếu > 5 avatar → hiển thị "+N" ở cuối.
+ */
+function TakerAvatarStack({
+  takers, totalCount, maxShown = 5,
+}: {
+  takers: NonNullable<TeacherExam['takers']>
+  totalCount: number
+  maxShown?: number
+}) {
+  if (takers.length === 0) return null
+  const shown = takers.slice(0, maxShown)
+  const extra = Math.max(0, totalCount - shown.length)
+  return (
+    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
+      <div className="flex items-center -space-x-2.5">
+        {shown.map((t, i) => (
+          <TakerAvatar key={`${t.name}-${i}`} name={t.name} percentage={t.percentage} />
+        ))}
+        {extra > 0 && (
+          <div
+            className="relative w-7 h-7 rounded-full border-2 border-black/40 bg-white/[0.08] flex items-center justify-center text-[10px] font-bold text-white/70"
+            title={`+${extra} học sinh khác`}
+            style={{ zIndex: 0 }}
+          >
+            +{extra}
+          </div>
+        )}
+      </div>
+      <span className="text-[11px] text-white/45">
+        {totalCount === 1 ? '1 học sinh đã làm' : `${totalCount} học sinh đã làm`}
+      </span>
+    </div>
+  )
+}
+
+function TakerAvatar({ name, percentage }: { name: string; percentage: number }) {
+  const initials = getInitials(name)
+  const [c1, c2] = colorFromName(name)
+  const passed = percentage >= 50
+  return (
+    <div
+      className="relative w-7 h-7 rounded-full border-2 border-black/40 flex items-center justify-center text-[10px] font-bold text-white/95 shadow-sm"
+      title={`${name} — ${percentage}%${passed ? '' : ' (chưa đạt)'}`}
+      style={{
+        background: `linear-gradient(135deg, ${c1}, ${c2})`,
+        zIndex: 1,
+      }}
+    >
+      {initials}
+      {/* Small dot bottom-right: green ≥ 80, amber 50-79, red < 50 */}
+      <span
+        className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-black/40"
+        style={{
+          background:
+            percentage >= 80 ? '#22c55e' :
+            percentage >= 50 ? '#f59e0b' : '#ef4444',
+        }}
+      />
+    </div>
+  )
+}
+
+function getInitials(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return '?'
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  // Lấy chữ cái đầu của họ + chữ cái đầu của tên
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase()
+}
+
+/** Hash tên → 2 màu HSL cho gradient. Cùng tên = cùng màu (consistent). */
+function colorFromName(name: string): [string, string] {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0
+  }
+  const h1 = Math.abs(hash) % 360
+  const h2 = (h1 + 40) % 360
+  return [`hsl(${h1}, 65%, 55%)`, `hsl(${h2}, 70%, 45%)`]
 }

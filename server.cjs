@@ -3646,6 +3646,42 @@ if (USE_NODEJS_QUESTIONS) {
             ORDER BY e."createdAt" DESC
             LIMIT 100`
         );
+
+        // Lấy danh sách người làm cho mỗi đề từ ExamXpReward (giải xong + nhận XP).
+        // Mỗi user chỉ có 1 row per exam (UNIQUE constraint) nên đây là số user
+        // riêng biệt đã hoàn thành. Lấy 8 người gần nhất + tổng count.
+        // Try/catch để không vỡ flow chính nếu bảng chưa tồn tại.
+        const examIds = exams.rows.map((r) => r.id);
+        let takersMap = new Map(); // examId → { recent: [...], count: N }
+        if (examIds.length > 0) {
+          try {
+            // Dùng cùng pool (cùng DATABASE_URL) — ExamXpReward & Exam ở cùng DB.
+            const tRes = await pool.query(
+              `SELECT "examId", "playerName", percentage, "earnedAt",
+                      ROW_NUMBER() OVER (PARTITION BY "examId" ORDER BY "earnedAt" DESC) AS rn,
+                      COUNT(*) OVER (PARTITION BY "examId") AS total
+                 FROM "ExamXpReward"
+                WHERE "examId" = ANY($1::text[])`,
+              [examIds]
+            );
+            for (const row of tRes.rows) {
+              if (!takersMap.has(row.examId)) {
+                takersMap.set(row.examId, { recent: [], count: Number(row.total) || 0 });
+              }
+              if (Number(row.rn) <= 8) {
+                takersMap.get(row.examId).recent.push({
+                  name: row.playerName || 'Ẩn danh',
+                  percentage: Number(row.percentage) || 0,
+                  earnedAt: row.earnedAt,
+                });
+              }
+            }
+          } catch (e) {
+            // ExamXpReward chưa tồn tại (mới bật flow) → log silent, không vỡ trả về
+            console.warn('[exam-prep] takers query failed (non-fatal):', e.message);
+          }
+        }
+
         const matrices = await pool.query(
           `SELECT m."id", m."name", m."subject", m."grade", m."examType", m."duration",
                   m."totalQuestions", m."totalScore", m."status", m."createdAt",
@@ -3660,17 +3696,22 @@ if (USE_NODEJS_QUESTIONS) {
         return res.json({
           success: true,
           data: {
-            exams: exams.rows.map((e) => ({
-              id: e.id,
-              title: e.title,
-              description: e.description || undefined,
-              examType: e.examType,
-              duration: e.duration,
-              totalQuestions: e.totalQuestions,
-              totalScore: Number(e.totalScore) || 0,
-              createdAt: e.createdAt,
-              user: e.user_name ? { name: e.user_name } : undefined,
-            })),
+            exams: exams.rows.map((e) => {
+              const tk = takersMap.get(e.id) || { recent: [], count: 0 };
+              return {
+                id: e.id,
+                title: e.title,
+                description: e.description || undefined,
+                examType: e.examType,
+                duration: e.duration,
+                totalQuestions: e.totalQuestions,
+                totalScore: Number(e.totalScore) || 0,
+                createdAt: e.createdAt,
+                user: e.user_name ? { name: e.user_name } : undefined,
+                takers: tk.recent,
+                takerCount: tk.count,
+              };
+            }),
             matrices: matrices.rows.map((m) => ({
               id: m.id,
               name: m.name,

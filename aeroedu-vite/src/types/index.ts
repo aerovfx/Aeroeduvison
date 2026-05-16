@@ -435,6 +435,15 @@ export interface TeacherExam {
   totalScore: number
   createdAt: string
   user?: { name: string } | null
+  /** Học sinh đã hoàn thành đề này (recent 8, sort by earnedAt DESC).
+   *  Hiển thị stack avatar nhỏ ở dưới card cho học sinh xem ai đã làm. */
+  takers?: Array<{
+    name: string
+    percentage: number
+    earnedAt: string
+  }>
+  /** Tổng số học sinh riêng biệt đã hoàn thành đề này */
+  takerCount?: number
 }
 
 export interface ExamMatrixItem {
