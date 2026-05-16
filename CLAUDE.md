@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `f786ea8` (deploy 246, 2026-05-16 — KG expand 500 fix + Arduino Emulator C array literal support + Serial.println newline fix)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `2/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

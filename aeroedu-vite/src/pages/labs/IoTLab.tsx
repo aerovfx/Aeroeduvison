@@ -16,6 +16,7 @@ import {
   Wrench, Sigma, FileCode2, Plug, Upload, AlertTriangle,
 } from 'lucide-react'
 import CircuitBuilder from './CircuitBuilder'
+import CircuitPresets from './CircuitPresets'
 import SemiconductorLab from './SemiconductorLab'
 
 // ───────────────────────────────────────────────────────────────────
@@ -1284,6 +1285,7 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 
 export default function IoTLab() {
   const [mode, setMode] = useState<'arduino' | 'analog' | 'semi'>('arduino')
+  const [analogTab, setAnalogTab] = useState<'builder' | 'presets'>('presets')
   const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)
   const [running, setRunning] = useState(true)
   const [tMs, setTMs] = useState(0)
@@ -1487,7 +1489,35 @@ export default function IoTLab() {
           </button>
         </div>
 
-        {mode === 'analog' && <CircuitBuilder />}
+        {mode === 'analog' && (
+          <>
+            {/* Sub-tabs: Mạch mẫu (presets) vs Mô phỏng tự do (builder) */}
+            <div className="flex items-center gap-1 bg-zinc-900/60 border border-zinc-800 rounded-lg p-1 mb-4 w-fit">
+              <button
+                onClick={() => setAnalogTab('presets')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'presets'
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                📚 Mạch mẫu (8 topology)
+              </button>
+              <button
+                onClick={() => setAnalogTab('builder')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'builder'
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                ⚙ Mô phỏng tự do (ghép linh kiện)
+              </button>
+            </div>
+            {analogTab === 'presets'  && <CircuitPresets />}
+            {analogTab === 'builder'  && <CircuitBuilder />}
+          </>
+        )}
         {mode === 'semi' && <SemiconductorLab />}
 
         {/* Two-pane layout (Arduino mode) */}
