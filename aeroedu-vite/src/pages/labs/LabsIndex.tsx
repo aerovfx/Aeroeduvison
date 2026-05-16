@@ -265,6 +265,25 @@ function siteOrigin() {
   return 'https://inphysic.com'
 }
 
+/** Tải ảnh QR cross-origin: fetch → blob → object URL → click.
+ *  Fallback mở tab mới nếu CORS thất bại. */
+async function downloadQrImage(src: string, filename: string) {
+  try {
+    const resp = await fetch(src)
+    const blob = await resp.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500)
+  } catch {
+    window.open(src, '_blank', 'noopener')
+  }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function LabsIndexPage() {
@@ -352,11 +371,12 @@ export default function LabsIndexPage() {
                     {PYTHON_TOTAL} thí nghiệm được code bằng Python thật! Mỗi danh mục có nhiều labs cool! 🎨
                   </p>
                 </div>
-                <Link to="/dashboard/labtwin/labs">
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all">
-                    Xem tất cả
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
+                <Link
+                  to="/dashboard/labtwin/labs"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg transition-all"
+                >
+                  Xem tất cả
+                  <ArrowRight className="h-5 w-5" />
                 </Link>
               </div>
             </div>
@@ -370,9 +390,10 @@ export default function LabsIndexPage() {
                   const border = CATEGORY_BORDER[cat.category] ?? 'border-white/10'
 
                   return (
-                    <div
+                    <Link
                       key={cat.category}
-                      className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${gradient} border-2 ${border} overflow-hidden relative rounded-2xl`}
+                      to={`/dashboard/labtwin/labs?category=${encodeURIComponent(cat.category)}`}
+                      className={`group hover:shadow-xl transition-all duration-300 hover:-translate-y-2 bg-gradient-to-br ${gradient} border-2 ${border} overflow-hidden relative rounded-2xl block`}
                     >
                       {/* Decorative circles */}
                       <div className="absolute top-0 right-0 w-20 h-20 bg-white/[0.04] rounded-full -mr-10 -mt-10" />
@@ -420,14 +441,12 @@ export default function LabsIndexPage() {
                           )}
                         </div>
 
-                        <Link to={`/dashboard/labtwin/labs?category=${encodeURIComponent(cat.category)}`}>
-                          <button className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
-                            Khám phá {cat.category}
-                            <ArrowRight className="h-4 w-4" />
-                          </button>
-                        </Link>
+                        <div className="w-full py-2 px-3 bg-gradient-to-r from-indigo-600 to-purple-600 group-hover:from-indigo-500 group-hover:to-purple-500 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                          Khám phá {cat.category}
+                          <ArrowRight className="h-4 w-4" />
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   )
                 })}
               </div>
@@ -444,11 +463,12 @@ export default function LabsIndexPage() {
                       </p>
                     </div>
                   </div>
-                  <Link to="/dashboard/labtwin/labs">
-                    <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all">
-                      Xem tất cả
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
+                  <Link
+                    to="/dashboard/labtwin/labs"
+                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all"
+                  >
+                    Xem tất cả
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
               </div>
@@ -544,10 +564,10 @@ export default function LabsIndexPage() {
                       ))}
                     </div>
 
-                    <button className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-500 group-hover:from-cyan-400 group-hover:to-blue-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                       Mở Graph
                       <ArrowRight className="h-4 w-4" />
-                    </button>
+                    </div>
                   </div>
                 </Link>
 
@@ -610,10 +630,10 @@ export default function LabsIndexPage() {
                       ))}
                     </div>
 
-                    <button className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 hover:from-fuchsia-400 hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                    <div className="w-full py-2.5 px-3 bg-gradient-to-r from-fuchsia-500 to-cyan-500 group-hover:from-fuchsia-400 group-hover:to-cyan-400 text-white text-sm font-semibold rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                       Mở AirflowCFD
                       <ArrowRight className="h-4 w-4" />
-                    </button>
+                    </div>
                   </div>
                 </Link>
 
@@ -658,11 +678,12 @@ export default function LabsIndexPage() {
                     </p>
                   </div>
                 </div>
-                <Link to="/dashboard/labtwin/labs/graph-lab">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-cyan-300 hover:bg-cyan-500/20 border-2 border-cyan-500/20 rounded-xl font-semibold transition-all">
-                    Thử ngay
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
+                <Link
+                  to="/dashboard/labtwin/labs/graph-lab"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-cyan-300 hover:bg-cyan-500/20 border-2 border-cyan-500/20 rounded-xl font-semibold transition-all"
+                >
+                  Thử ngay
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -725,11 +746,12 @@ export default function LabsIndexPage() {
                   </div>
                 </div>
                 <div className="pt-3 border-t border-blue-500/15">
-                  <Link to="/dashboard/labtwin/labs">
-                    <button className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      Bắt đầu thí nghiệm ngay!
-                    </button>
+                  <Link
+                    to="/dashboard/labtwin/labs"
+                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Bắt đầu thí nghiệm ngay!
                   </Link>
                 </div>
               </div>
@@ -751,11 +773,12 @@ export default function LabsIndexPage() {
                     Dành cho giáo viên — nhấn "Tải PNG" rồi in ra dán lớp, học sinh quét là vào thẳng đúng thí nghiệm.
                   </p>
                 </div>
-                <Link to="/dashboard/labtwin/labs">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all text-sm">
-                    Xem tất cả labs
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
+                <Link
+                  to="/dashboard/labtwin/labs"
+                  className="flex items-center gap-2 px-4 py-2 bg-white/[0.06] text-indigo-300 hover:bg-indigo-500/20 border-2 border-indigo-500/20 rounded-xl font-semibold transition-all text-sm"
+                >
+                  Xem tất cả labs
+                  <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -786,14 +809,14 @@ export default function LabsIndexPage() {
                         >
                           Mở
                         </Link>
-                        <a
-                          href={qrHires}
-                          download={`qr-${lab.path.split('/').pop()}.png`}
+                        <button
+                          type="button"
+                          onClick={() => downloadQrImage(qrHires, `qr-${lab.path.split('/').pop()}.png`)}
                           className="text-[11px] font-medium px-2 py-1.5 rounded-lg bg-white/[0.05] border border-white/[0.1] text-white/70 hover:bg-white/[0.1] transition-all"
                           title="Tải QR độ phân giải cao"
                         >
                           Tải PNG
-                        </a>
+                        </button>
                       </div>
                     </div>
                   )
@@ -819,12 +842,13 @@ export default function LabsIndexPage() {
               <p className="text-xl mb-6 text-white/90">
                 Hơn {PYTHON_TOTAL} thí nghiệm đang chờ bạn! Mỗi thí nghiệm là một cuộc phiêu lưu mới! 🚀
               </p>
-              <Link to="/dashboard/labtwin/labs">
-                <button className="inline-flex items-center gap-3 px-8 py-4 bg-white text-purple-600 hover:bg-gray-100 font-bold text-lg rounded-xl shadow-xl transition-all hover:scale-105">
-                  <FlaskConical className="h-6 w-6" />
-                  Khám phá ngay!
-                  <ArrowRight className="h-6 w-6" />
-                </button>
+              <Link
+                to="/dashboard/labtwin/labs"
+                className="inline-flex items-center gap-3 px-8 py-4 bg-white text-purple-600 hover:bg-gray-100 font-bold text-lg rounded-xl shadow-xl transition-all hover:scale-105"
+              >
+                <FlaskConical className="h-6 w-6" />
+                Khám phá ngay!
+                <ArrowRight className="h-6 w-6" />
               </Link>
             </div>
           </div>

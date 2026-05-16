@@ -21,9 +21,9 @@ import { Link } from 'react-router-dom'
 import {
   BookOpen, Play, Trophy, Clock, History, ChevronDown,
   Receipt, BarChart3, Star, Send, Target, CheckCircle2,
-  TrendingUp, DollarSign, Calendar,
+  TrendingUp, DollarSign, Calendar, Gift, Sparkles,
 } from 'lucide-react'
-import { learningService } from '@/services/learning.service'
+import { learningService, type PublicCourse } from '@/services/learning.service'
 import { LearningNav } from '@/components/student/LearningNav'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
 import { formatRelativeTime, cn } from '@/lib/utils'
@@ -114,23 +114,7 @@ export default function MyCourses() {
   }
 
   if (enrollments.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center px-4">
-        <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
-          <BookOpen className="w-10 h-10 text-purple-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-white">Chưa có khoá học nào</h2>
-        <p className="text-gray-400 max-w-sm">
-          Khám phá hàng trăm khoá học STEM thú vị và bắt đầu hành trình học tập của bạn.
-        </p>
-        <Link
-          to="/dashboard/courses"
-          className="mt-2 px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
-        >
-          Khám phá khoá học
-        </Link>
-      </div>
-    )
+    return <EmptyWithFreeCourses />
   }
 
   return (
@@ -175,6 +159,136 @@ export default function MyCourses() {
 }
 
 // ────────────────────────────────────────────────────────────
+//  Shared: Free course card (used in EmptyWithFreeCourses + CoursesGridTab)
+// ────────────────────────────────────────────────────────────
+
+function FreeCourseCard({ course }: { course: PublicCourse }) {
+  const imgSrc = course.imageUrl ?? course.image ?? null
+  const path = `/learning/course/${course.slug ?? course.id}/${course.id}`
+  return (
+    <div className="group rounded-xl bg-white/5 border border-white/10 hover:border-emerald-500/40 transition-all overflow-hidden flex flex-col">
+      <div className="relative aspect-video overflow-hidden bg-gray-800">
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={course.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookOpen className="w-10 h-10 text-gray-600" />
+          </div>
+        )}
+        {/* FREE badge */}
+        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-wider shadow-md">
+          Miễn phí
+        </div>
+        <Link
+          to={path}
+          className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <div className="w-12 h-12 rounded-full bg-emerald-600 flex items-center justify-center shadow-lg">
+            <Play className="w-5 h-5 text-white ml-0.5" />
+          </div>
+        </Link>
+      </div>
+
+      <div className="p-4 flex-1 flex flex-col gap-2">
+        <Link
+          to={path}
+          className="block text-white font-semibold hover:text-emerald-300 transition-colors line-clamp-2 text-sm"
+        >
+          {course.title}
+        </Link>
+        <p className="text-gray-400 text-xs">
+          Giảng viên: {course.user?.name || 'AeroEduVision'}
+        </p>
+        {course.description && (
+          <p className="text-gray-500 text-xs line-clamp-2 flex-1">{course.description}</p>
+        )}
+        <div className="flex items-center gap-3 text-xs text-gray-500 mt-auto">
+          {(course.lessons ?? 0) > 0 && (
+            <span className="flex items-center gap-1">
+              <BookOpen className="w-3.5 h-3.5" />
+              {course.lessons} bài
+            </span>
+          )}
+          {course.duration && (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {course.duration}
+            </span>
+          )}
+        </div>
+        <Link
+          to={path}
+          className="mt-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium text-center transition-colors"
+        >
+          Học ngay — miễn phí
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
+//  Empty state: hiển thị khoá học miễn phí có sẵn
+// ────────────────────────────────────────────────────────────
+
+function EmptyWithFreeCourses() {
+  const { data: freeCourses = [], isLoading } = useQuery({
+    queryKey: ['free-courses'],
+    queryFn: learningService.getFreeCourses,
+    staleTime: 5 * 60_000,
+  })
+
+  return (
+    <div className="p-6 lg:p-8 space-y-8">
+      {/* Hero text */}
+      <div className="flex flex-col items-center justify-center gap-4 text-center py-6">
+        <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
+          <BookOpen className="w-10 h-10 text-purple-400" />
+        </div>
+        <h2 className="text-2xl font-bold text-white">Chưa có khoá học nào</h2>
+        <p className="text-gray-400 max-w-sm">
+          Khám phá hàng trăm khoá học STEM thú vị. Bắt đầu ngay với các khoá miễn phí bên dưới!
+        </p>
+        <Link
+          to="/dashboard/courses"
+          className="px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
+        >
+          Khám phá tất cả khoá học
+        </Link>
+      </div>
+
+      {/* Free courses section */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl bg-white/5 animate-pulse h-64" />
+          ))}
+        </div>
+      ) : freeCourses.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-lg font-bold text-white">Khoá học miễn phí</h3>
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+              {freeCourses.length} khoá
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {freeCourses.map((c) => (
+              <FreeCourseCard key={c.id} course={c} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────
 //  Tab 1: Courses grid — giữ nguyên chức năng cũ (bỏ drawer "Xem lịch sử" vì đã có tab Thống kê + Đánh giá riêng)
 // ────────────────────────────────────────────────────────────
 
@@ -185,15 +299,29 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
     staleTime: 30_000,
   })
 
+  const { data: freeCourses = [] } = useQuery({
+    queryKey: ['free-courses'],
+    queryFn: learningService.getFreeCourses,
+    staleTime: 5 * 60_000,
+  })
+
   const activityByCourseId = useMemo(() => {
     const map = new Map<string, CourseActivitySummary>()
     for (const item of activity) map.set(item.courseId, item)
     return map
   }, [activity])
 
+  // Khoá miễn phí chưa đăng ký
+  const enrolledIds = useMemo(() => new Set(enrollments.map((e) => e.courseId)), [enrollments])
+  const unenrolledFree = useMemo(
+    () => freeCourses.filter((c) => !enrolledIds.has(c.id)),
+    [freeCourses, enrolledIds],
+  )
+
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   return (
+    <div className="space-y-8">
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {enrollments.map(({ id, course }) => {
         const summary = activityByCourseId.get(course.id)
@@ -342,6 +470,25 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
           </div>
         )
       })}
+    </div>
+
+    {/* Khoá học miễn phí chưa đăng ký */}
+    {unenrolledFree.length > 0 && (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 pt-2 border-t border-white/10">
+          <Sparkles className="w-5 h-5 text-emerald-400" />
+          <h3 className="text-base font-bold text-white">Khoá học miễn phí có sẵn</h3>
+          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30">
+            {unenrolledFree.length} khoá
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {unenrolledFree.map((c) => (
+            <FreeCourseCard key={c.id} course={c} />
+          ))}
+        </div>
+      </div>
+    )}
     </div>
   )
 }

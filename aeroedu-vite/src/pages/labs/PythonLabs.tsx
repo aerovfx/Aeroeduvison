@@ -629,14 +629,14 @@ export default function PythonLabsPage() {
                   </div>
                 </div>
               </div>
-              <Link to="/dashboard/labtwin/labs">
-                <button
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-purple-400/30 text-purple-300 hover:bg-purple-400/15 transition-colors"
-                >
-                  <X className="h-4 w-4" />
-                  Xóa filter
-                </button>
-              </Link>
+              <button
+                type="button"
+                onClick={clearFilter}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-purple-400/30 text-purple-300 hover:bg-purple-400/15 transition-colors"
+              >
+                <X className="h-4 w-4" />
+                Xóa filter
+              </button>
             </div>
           </div>
         )}
