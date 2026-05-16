@@ -8424,48 +8424,95 @@ ${plan.content || '<p>(Trống)</p>'}
   });
 
   // GET /api/kg/expand/:id?depth=2 — BFS traversal n-hop
+  // Dùng JS BFS (đơn giản, ổn định) thay vì recursive CTE phức tạp.
+  // Với graph ≤500 nodes / ≤2000 edges (typical scale của KG giáo dục),
+  // load toàn bộ edges 1 lần rồi BFS trong memory nhanh hơn + tránh
+  // edge case của recursive CTE (cycle, UNION dedup, path overflow).
   app.get('/api/kg/expand/:id', async (req, res) => {
     try {
       await ensureKgReady();
       const pool = getKcPool();
       const depth = Math.min(3, Math.max(1, parseInt(String(req.query.depth || '2'), 10)));
       const startId = req.params.id;
-      // BFS qua recursive CTE — undirected (UNION 2 chiều)
-      const r = await pool.query(
-        `WITH RECURSIVE walk(id, depth, path) AS (
-           SELECT $1::TEXT, 0, ARRAY[$1::TEXT]
-           UNION
-           SELECT e.to_id, w.depth + 1, w.path || e.to_id
-           FROM kg_edges e JOIN walk w ON e.from_id = w.id
-           WHERE w.depth < $2 AND NOT (e.to_id = ANY (w.path))
-           UNION
-           SELECT e.from_id, w.depth + 1, w.path || e.from_id
-           FROM kg_edges e JOIN walk w ON e.to_id = w.id
-           WHERE w.depth < $2 AND NOT (e.from_id = ANY (w.path))
-         )
-         SELECT DISTINCT id, MIN(depth) AS depth FROM walk GROUP BY id`,
-        [startId, depth]
+      if (!startId) {
+        return res.status(400).json({ success: false, error: 'Missing node id' });
+      }
+
+      // 1) Verify startId exists. Nếu không → trả empty (200, không 500)
+      //    để FE handle gracefully.
+      const startCheck = await pool.query(
+        `SELECT id FROM kg_nodes WHERE id = $1 LIMIT 1`,
+        [startId]
       );
-      const ids = r.rows.map(x => x.id);
-      if (ids.length === 0) return res.json({ success: true, nodes: [], edges: [] });
+      if (startCheck.rowCount === 0) {
+        console.warn(`[kg:expand] node not found: ${startId}`);
+        return res.json({ success: true, nodes: [], edges: [], startId, depth, error: 'node_not_found' });
+      }
+
+      // 2) Load tất cả edges 1 lần (graph thường ≤2000 edges)
+      const edgeRows = await pool.query(
+        `SELECT id, from_id, to_id, rel_type, weight FROM kg_edges LIMIT 5000`
+      );
+      const allEdges = edgeRows.rows;
+
+      // 3) Build adjacency (undirected)
+      const adj = new Map(); // id → Set<neighbor_id>
+      for (const e of allEdges) {
+        if (!adj.has(e.from_id)) adj.set(e.from_id, new Set());
+        if (!adj.has(e.to_id))   adj.set(e.to_id, new Set());
+        adj.get(e.from_id).add(e.to_id);
+        adj.get(e.to_id).add(e.from_id);
+      }
+
+      // 4) BFS từ startId tới depth max
+      const visited = new Map(); // id → depth
+      visited.set(startId, 0);
+      let frontier = [startId];
+      for (let d = 0; d < depth; d++) {
+        const next = [];
+        for (const nodeId of frontier) {
+          const neighbors = adj.get(nodeId) || new Set();
+          for (const nb of neighbors) {
+            if (!visited.has(nb)) {
+              visited.set(nb, d + 1);
+              next.push(nb);
+            }
+          }
+        }
+        if (next.length === 0) break;
+        frontier = next;
+      }
+
+      const ids = Array.from(visited.keys());
+      if (ids.length === 0) {
+        return res.json({ success: true, nodes: [], edges: [], startId, depth });
+      }
+
+      // 5) Load node details + filter edges within subgraph
       const nq = await pool.query(
-        `SELECT id, type, label, description FROM kg_nodes WHERE id = ANY($1)`, [ids]
+        `SELECT id, type, label, description, properties FROM kg_nodes WHERE id = ANY($1)`,
+        [ids]
       );
-      const eq = await pool.query(
-        `SELECT id, from_id, to_id, rel_type, weight FROM kg_edges
-         WHERE from_id = ANY($1) AND to_id = ANY($1)`, [ids]
-      );
-      const depthMap = new Map(r.rows.map(x => [x.id, x.depth]));
+      const idSet = new Set(ids);
+      const subgraphEdges = allEdges.filter(e => idSet.has(e.from_id) && idSet.has(e.to_id));
+
       return res.json({
         success: true,
-        nodes: nq.rows.map(n => ({ ...n, depth: depthMap.get(n.id) || 0 })),
-        edges: eq.rows,
+        nodes: nq.rows.map(n => ({ ...n, depth: visited.get(n.id) || 0 })),
+        edges: subgraphEdges,
         startId,
         depth,
       });
     } catch (err) {
-      console.error('[kg:expand] ❌', err.message);
-      return res.status(500).json({ success: false, error: err.message });
+      console.error('[kg:expand] ❌', err?.message || err, err?.stack?.split('\n')[1]);
+      // Trả 200 với empty + error message để FE không crash
+      return res.json({
+        success: false,
+        nodes: [], edges: [],
+        startId: req.params.id,
+        depth: parseInt(String(req.query.depth || '2'), 10),
+        error: err?.message || 'expand_failed',
+      });
     }
   });
 
