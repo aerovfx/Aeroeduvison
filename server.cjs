@@ -341,13 +341,21 @@ if (USE_NODEJS_AUTH) {
       const token = auth.slice(7);
       const decoded = jwt.verify(token, JWT_SECRET);
 
-      const pool = getPool();
-      const { rows } = await pool.query(
-        'SELECT * FROM "User" WHERE id = $1 LIMIT 1',
-        [decoded.sub]
-      );
-      if (!rows[0]) return res.status(404).json({ error: 'User not found' });
-      return res.json(publicUser(rows[0]));
+      // Cache: 60s TTL, key per-user. Profile thay đổi qua /change-password,
+      // /update-profile sẽ invalidate (xem cache.del bên dưới các handler đó).
+      const cache = require('./lib/cache.cjs');
+      const cacheKey = `auth:me:${decoded.sub}`;
+      const result = await cache.getOrFetch(cacheKey, 60, async () => {
+        const pool = getPool();
+        const { rows } = await pool.query(
+          'SELECT * FROM "User" WHERE id = $1 LIMIT 1',
+          [decoded.sub]
+        );
+        if (!rows[0]) return { __notFound: true };
+        return publicUser(rows[0]);
+      });
+      if (result?.__notFound) return res.status(404).json({ error: 'User not found' });
+      return res.json(result);
     } catch {
       return res.status(401).json({ error: 'Token không hợp lệ hoặc đã hết hạn' });
     }
@@ -357,6 +365,35 @@ if (USE_NODEJS_AUTH) {
   app.post('/api/auth/logout', (_req, res) => {
     // JWT is stateless — client discards the token
     return res.json({ success: true });
+  });
+
+  // ── GET /api/health/cache ─────────────────────────────────
+  // Public endpoint hiển thị trạng thái Redis cache. Dùng debug khi
+  // Redis bị disconnect / quota cap → mức degrade từ "fast cached"
+  // sang "slow Postgres only".
+  app.get('/api/health/cache', async (_req, res) => {
+    try {
+      const cache = require('./lib/cache.cjs');
+      const enabled = cache.isEnabled();
+      let pingMs = null;
+      if (enabled) {
+        const t0 = Date.now();
+        await cache.set('__healthcheck__', Date.now(), 5);
+        const v = await cache.get('__healthcheck__');
+        pingMs = Date.now() - t0;
+        if (v === null) {
+          return res.json({ status: 'degraded', enabled: true, reason: 'set/get round-trip lost' });
+        }
+      }
+      return res.json({
+        status: enabled ? 'ok' : 'disabled',
+        enabled,
+        backend: process.env.REDIS_URL ? 'REDIS_URL' : (process.env.REDIS_HOST ? 'REDIS_HOST' : 'none'),
+        pingMs,
+      });
+    } catch (e) {
+      return res.json({ status: 'error', error: e.message });
+    }
   });
 
   // ── POST /api/auth/refresh ────────────────────────────────
@@ -500,6 +537,8 @@ if (USE_NODEJS_AUTH) {
         'UPDATE "User" SET password = $1, "updatedAt" = $2 WHERE id = $3',
         [hash, new Date(), user.id]
       );
+      // Invalidate /auth/me cache cho user này
+      try { require('./lib/cache.cjs').del(`auth:me:${user.id}`); } catch {}
       console.log(`[auth:change-password] ✅ user=${user.id}`);
       return res.json({ ok: true, message: 'Đổi mật khẩu thành công' });
     } catch (err) {
@@ -3592,9 +3631,15 @@ if (USE_NODEJS_QUESTIONS) {
       const action = String(req.query.action || '').toLowerCase();
       const pool = getExamPool();
       await ensurePracticeExamTable();
+      const cache = require('./lib/cache.cjs');
 
       // ── stats ─────────────────────────────────────────
+      // Cache 120s per-user; invalidate khi POST submit/grade (cache.del).
       if (action === 'stats') {
+        const cacheKey = `examPrep:stats:${user.id}`;
+        const cached = await cache.get(cacheKey);
+        if (cached) return res.json(cached);
+
         const [sumQ, trendQ, bankQ] = await Promise.all([
           pool.query(
             `SELECT
@@ -3646,7 +3691,7 @@ if (USE_NODEJS_QUESTIONS) {
           .map((r) => Math.round(Number(r.percentage) || 0));
 
         const s = sumQ.rows[0] || {};
-        return res.json({
+        const payload = {
           success: true,
           data: {
             stats: {
@@ -3658,29 +3703,40 @@ if (USE_NODEJS_QUESTIONS) {
               questionBankCount: Number(bankQ.rows[0]?.n) || 0,
             },
           },
-        });
+        };
+        cache.set(cacheKey, payload, 120).catch(() => {});
+        return res.json(payload);
       }
 
       // ── topics ────────────────────────────────────────
+      // Cache 600s shared (Question table thay đổi chậm, theo subject).
       if (action === 'topics') {
         const subject = String(req.query.subject || '').trim();
         if (!subject) return res.json({ success: true, data: { topics: [] } });
-        const { rows } = await pool.query(
-          `SELECT DISTINCT topic
-             FROM "Question"
-            WHERE subject = $1 AND status = 'Hoạt động' AND topic IS NOT NULL AND topic <> ''
-            ORDER BY topic ASC
-            LIMIT 200`,
-          [subject]
-        );
-        return res.json({
-          success: true,
-          data: { topics: rows.map((r) => r.topic) },
+        const cacheKey = `examPrep:topics:${subject}`;
+        const payload = await cache.getOrFetch(cacheKey, 600, async () => {
+          const { rows } = await pool.query(
+            `SELECT DISTINCT topic
+               FROM "Question"
+              WHERE subject = $1 AND status = 'Hoạt động' AND topic IS NOT NULL AND topic <> ''
+              ORDER BY topic ASC
+              LIMIT 200`,
+            [subject]
+          );
+          return { success: true, data: { topics: rows.map((r) => r.topic) } };
         });
+        return res.json(payload);
       }
 
       // ── teacher_exams ─────────────────────────────────
+      // Cache 120s shared (mọi HS nhìn cùng list). Invalidate khi GV publish
+      // đề mới (xem POST handler bên dưới) hoặc khi HS hoàn thành (ảnh hưởng
+      // takerCount + recent takers).
       if (action === 'teacher_exams') {
+        const teCacheKey = 'examPrep:teacherExams:v2';
+        const cachedTE = await cache.get(teCacheKey);
+        if (cachedTE) return res.json(cachedTE);
+
         const exams = await pool.query(
           `SELECT e."id", e."title", e."description", e."examType", e."duration",
                   e."totalQuestions", e."totalScore", e."status", e."createdAt",
@@ -3738,7 +3794,7 @@ if (USE_NODEJS_QUESTIONS) {
             ORDER BY m."createdAt" DESC
             LIMIT 100`
         );
-        return res.json({
+        const tePayload = {
           success: true,
           data: {
             exams: exams.rows.map((e) => {
@@ -3771,14 +3827,23 @@ if (USE_NODEJS_QUESTIONS) {
               _count: { selectedQuestions: Number(m.selected_count) || 0 },
             })),
           },
-        });
+        };
+        // Cache 120s shared — chấp nhận takerCount lag 2 phút
+        cache.set(teCacheKey, tePayload, 120).catch(() => {});
+        return res.json(tePayload);
       }
 
       // ── community-stats ───────────────────────────────
       // Shape khớp với type ExamCommunityStats trong aeroedu-vite/src/types
       // (totalAttempts/totalUsers/averagePercentage/leaderboard/bySubject/byExamType/recentActivity).
       // Đứng tên người dùng ẩn danh (User_xxx) — không expose email/full name.
+      // Cache 300s shared — leaderboard + bySubject + recent activity. User
+      // chấp nhận lag 5 phút cho rankings (đỡ tải DB Neon đáng kể).
       if (action === 'community-stats') {
+        const csCacheKey = 'examPrep:community:v2';
+        const cachedCS = await cache.get(csCacheKey);
+        if (cachedCS) return res.json(cachedCS);
+
         const [overallQ, leaderboardQ, bySubjQ, byTypeQ, recentQ] = await Promise.all([
           pool.query(
             `SELECT COUNT(*)::int                            AS total_attempts,
@@ -3822,7 +3887,7 @@ if (USE_NODEJS_QUESTIONS) {
         ]);
         const ovr = overallQ.rows[0] || {};
         const anonName = (sid) => `Học sinh ${String(sid || '').slice(0, 4) || '----'}`;
-        return res.json({
+        const csPayload = {
           success: true,
           data: {
             totalAttempts: ovr.total_attempts || 0,
@@ -3858,7 +3923,9 @@ if (USE_NODEJS_QUESTIONS) {
               completedAt: r.completedAt,
             })),
           },
-        });
+        };
+        cache.set(csCacheKey, csPayload, 300).catch(() => {});
+        return res.json(csPayload);
       }
 
       // ── history ───────────────────────────────────────
@@ -4393,6 +4460,17 @@ if (USE_NODEJS_QUESTIONS) {
             practiceId,
           ]
         );
+
+        // Invalidate cache: user stats (đã có data mới) + community stats
+        // (avg + leaderboard + recentActivity bị ảnh hưởng).
+        // teacher_exams cache cũng invalidate vì takerCount sẽ tăng sau khi
+        // /exam-xp/award chạy fire-and-forget từ FE.
+        try {
+          const cache = require('./lib/cache.cjs');
+          cache.del(`examPrep:stats:${user.id}`);
+          cache.del('examPrep:community:v2');
+          cache.del('examPrep:teacherExams:v2');
+        } catch {}
 
         // Write a LessonHistory QUIZ_ATTEMPT row so the attempt surfaces in
         // learning timelines. courseId/learningPathId are null because
@@ -13680,6 +13758,9 @@ if (!USE_NODEJS_QUESTIONS) {
             [pct, user.id, examId]
           );
         }
+
+        // Invalidate teacher_exams cache — takerCount + recent takers thay đổi
+        try { require('./lib/cache.cjs').del('examPrep:teacherExams:v2'); } catch {}
 
         // Trả tổng
         const total = await pool.query(

@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `e685109` (deploy 247, 2026-05-16 — HOTFIX: phân loại Neon DB quota error → 503 + message friendly cho /auth/google, /auth/login, /auth/register)
-- Commits since last deploy: `4/5`
+- Last deployed commit: `7439500` (deploy 248, 2026-05-16 — Reco system Phase 0-1f: framework + ExamPrepMixer + SRS + NewsMixer + RecoDebugLayer + 40 vitest)
+- Commits since last deploy: `1/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
