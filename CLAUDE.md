@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `238b793` (deploy 241, 2026-05-15 — Pixel Odyssey RPG)
-- Commits since last deploy: `3/5` (c02ff19 KG Explorer, 5751ac5 KG Phase 2, this commit Games Hub + Docs update)
+- Last deployed commit: `f786ea8` (deploy 246, 2026-05-16 — KG expand 500 fix + Arduino Emulator C array literal support + Serial.println newline fix)
+- Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
