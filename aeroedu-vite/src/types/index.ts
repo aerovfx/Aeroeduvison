@@ -310,6 +310,8 @@ export interface CareerTestResult {
   personalityName: string
   careers: string[]
   answers?: Record<number, number>
+  /** Tên các nghề mà HS đã mở xem chi tiết trong lần làm bài này */
+  viewedCareers?: string[]
   createdAt: string
 }
 

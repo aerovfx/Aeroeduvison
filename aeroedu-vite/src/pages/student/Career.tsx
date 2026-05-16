@@ -71,6 +71,13 @@ export default function CareerAdvisorPage() {
   const [selectedCareer, setSelectedCareer] = useState<CareerDetail | null>(null)
   const [history, setHistory] = useState<CareerTestResult[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  /** Nghề đã mở xem chi tiết trong lần làm bài hiện tại — auto append khi
+   *  openCareerDetail() chạy, save lại để khi xem lại lịch sử có cả info này. */
+  const [viewedCareers, setViewedCareers] = useState<string[]>([])
+  /** Khi true → đang xem lại bài đã làm cũ (read-only mode) thay vì làm mới */
+  const [reviewMode, setReviewMode] = useState(false)
+  /** Collapse trạng thái cho section "Xem lại 60 câu trả lời" */
+  const [showAnswersReview, setShowAnswersReview] = useState(false)
 
   // Cổng nhập thông tin người làm bài (tên + năm sinh) để hiển thị cho QR-scanner
   const [showTakerGate, setShowTakerGate] = useState(false)
@@ -158,7 +165,11 @@ export default function CareerAdvisorPage() {
     }, 300)
   }
 
-  const saveResult = async (res: PersonalityResult, allAnswers: Record<number, number>) => {
+  const saveResult = async (
+    res: PersonalityResult,
+    allAnswers: Record<number, number>,
+    viewed: string[] = viewedCareers,
+  ) => {
     const yobNum = parseInt(takerYob, 10)
     await careerService.saveTest({
       mbtiType: res.mbtiType,
@@ -168,6 +179,7 @@ export default function CareerAdvisorPage() {
       personalityName: res.personalityName,
       careers: res.careers,
       answers: allAnswers,
+      viewedCareers: viewed,
       userId: user?.id ?? null,
       // Ưu tiên thông tin người làm nhập thủ công (từ QR scan) — nếu không
       // có thì fallback về tài khoản đang đăng nhập.
@@ -190,6 +202,9 @@ export default function CareerAdvisorPage() {
     setAnswers({})
     setCurrentQ(0)
     setResult(null)
+    setViewedCareers([])
+    setReviewMode(false)
+    setShowAnswersReview(false)
   }
 
   const openCareerDetail = (careerName: string) => {
@@ -199,6 +214,19 @@ export default function CareerAdvisorPage() {
       const ext = getCareerExtended(career.id)
       setSelectedCareer({ ...career, ...ext })
       setView("career-detail")
+      // Track nghề đã xem — append unique. Khi review mode thì không save lại
+      // (vì là re-open bài cũ, không muốn modify lịch sử).
+      if (!reviewMode) {
+        setViewedCareers(prev => {
+          if (prev.includes(careerName)) return prev
+          const next = [...prev, careerName]
+          // Re-save với updated viewedCareers (fire-and-forget)
+          if (result && Object.keys(answers).length > 0) {
+            saveResult(result, answers, next).catch(() => {/* ignore */})
+          }
+          return next
+        })
+      }
     } else {
       toast.error("Chưa có dữ liệu chi tiết cho nghề này")
     }
@@ -215,6 +243,35 @@ export default function CareerAdvisorPage() {
     } finally {
       setLoadingHistory(false)
     }
+  }
+
+  /**
+   * Khôi phục bài đã làm cũ vào state hiện tại → chuyển sang view "result"
+   * ở read-only mode. HS có thể bấm vào từng nghề trong gợi ý để xem chi tiết,
+   * bấm vào "Xem lại 60 câu trả lời" để duyệt từng câu hỏi đã trả lời.
+   */
+  const restoreFromHistory = (item: CareerTestResult) => {
+    const restoredAnswers = (item.answers || {}) as Record<number, number>
+    const restoredViewed = item.viewedCareers || []
+    // Rebuild full PersonalityResult bằng calculateResults() từ answers gốc
+    // → có đủ personalityEmoji, description, strengths, weaknesses, learningStyle, famousPeople
+    const personality = Object.keys(restoredAnswers).length > 0
+      ? calculateResults(restoredAnswers)
+      : null
+    if (!personality) {
+      toast.error('Lần làm này thiếu dữ liệu câu trả lời — không thể mở lại')
+      return
+    }
+    setAnswers(restoredAnswers)
+    setViewedCareers(restoredViewed)
+    setResult(personality)
+    setReviewMode(true)
+    setShowAnswersReview(false)
+    setView("result")
+    const dateStr = new Date(item.createdAt).toLocaleString("vi-VN", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+    })
+    toast.success(`Đã mở lại bài làm lúc ${dateStr}`, { icon: "📂" })
   }
 
   const currentAnswer = answers[allQuestions?.[currentQ]?.id ?? -1]
@@ -540,18 +597,41 @@ export default function CareerAdvisorPage() {
     return (
       <div className="flex flex-col h-full">
         <PageHeader
-          title="Kết Quả Tư Vấn Hướng Nghiệp"
-          description="Khám phá bản thân và ngành nghề phù hợp"
+          title={reviewMode ? "Xem Lại Bài Đã Làm" : "Kết Quả Tư Vấn Hướng Nghiệp"}
+          description={reviewMode
+            ? "Bài làm cũ — xem kết quả, câu trả lời và các nghề đã khám phá"
+            : "Khám phá bản thân và ngành nghề phù hợp"}
           actions={
-            <button
-              onClick={resetTest}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Làm Lại
-            </button>
+            <div className="flex items-center gap-2">
+              {reviewMode && (
+                <button
+                  onClick={loadHistory}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Về Lịch Sử
+                </button>
+              )}
+              <button
+                onClick={resetTest}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {reviewMode ? "Làm Bài Mới" : "Làm Lại"}
+              </button>
+            </div>
           }
         />
+        {reviewMode && (
+          <div className="px-6 py-2 bg-[hsl(265,85%,18%)]/30 border-b border-[hsl(265,85%,40%)]/20">
+            <div className="max-w-5xl mx-auto flex items-center gap-2 text-xs text-[hsl(280,75%,75%)]">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>
+                Đang xem lại bài cũ ở chế độ read-only. Bấm vào nghề để xem chi tiết — KHÔNG cập nhật vào lịch sử.
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto space-y-6">
@@ -749,18 +829,133 @@ export default function CareerAdvisorPage() {
               </div>
             </div>
 
+            {/* ── NGHỀ ĐÃ XEM CHI TIẾT (chỉ hiện khi có ≥1 nghề đã click vào) ── */}
+            {viewedCareers.length > 0 && (
+              <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
+                <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
+                  <Building className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                  Nghề Đã Xem Chi Tiết
+                  <span className="ml-auto text-[0.7rem] text-white/35 font-normal">
+                    {viewedCareers.length} / {result.careers.length} nghề
+                  </span>
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {viewedCareers.map((name, i) => (
+                    <button
+                      key={i}
+                      onClick={() => openCareerDetail(name)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[hsl(35,90%,55%)]/10 border border-[hsl(35,90%,55%)]/20 text-[hsl(35,90%,70%)] hover:bg-[hsl(35,90%,55%)]/20 hover:border-[hsl(35,90%,55%)]/40 text-xs font-medium transition-all"
+                    >
+                      <Briefcase className="h-3 w-3" />
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[0.7rem] text-white/30 mt-3 italic">
+                  💡 Bấm vào tên nghề để xem lại trang chi tiết
+                </p>
+              </div>
+            )}
+
+            {/* ── XEM LẠI 60 CÂU TRẢ LỜI (collapsible) ── */}
+            {Object.keys(answers).length > 0 && allQuestions && (
+              <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] overflow-hidden">
+                <button
+                  onClick={() => setShowAnswersReview(prev => !prev)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
+                >
+                  <h3 className="font-semibold text-white/90 flex items-center gap-2 text-sm">
+                    <ListChecks className="h-4 w-4 text-[hsl(195,85%,60%)]" />
+                    Xem Lại {Object.keys(answers).length} Câu Trả Lời Đã Làm
+                  </h3>
+                  <ChevronLeft className={`h-4 w-4 text-white/40 transition-transform ${showAnswersReview ? '-rotate-90' : 'rotate-180'}`} />
+                </button>
+                {showAnswersReview && (
+                  <div className="px-6 pb-6 max-h-[600px] overflow-y-auto space-y-3">
+                    {allQuestions.map((q, idx) => {
+                      const ansValue = answers[q.id]
+                      const hasAnswer = ansValue !== undefined && ansValue !== null
+                      // Map value → label (Hoàn toàn không đồng ý → Hoàn toàn đồng ý)
+                      const SCALE_LABELS = [
+                        'Hoàn toàn không đồng ý',
+                        'Không đồng ý',
+                        'Bình thường',
+                        'Đồng ý',
+                        'Hoàn toàn đồng ý',
+                      ]
+                      const ansLabel = hasAnswer && ansValue >= 1 && ansValue <= 5
+                        ? SCALE_LABELS[ansValue - 1]
+                        : '(chưa trả lời)'
+                      const ansColor = ansValue === 5 ? 'text-emerald-300'
+                                    : ansValue === 4 ? 'text-cyan-300'
+                                    : ansValue === 3 ? 'text-white/60'
+                                    : ansValue === 2 ? 'text-orange-300'
+                                    : ansValue === 1 ? 'text-rose-300'
+                                    : 'text-white/30'
+                      return (
+                        <div
+                          key={q.id}
+                          className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3.5"
+                        >
+                          <div className="flex items-start gap-2.5 mb-2">
+                            <span className="text-[0.65rem] font-mono text-white/30 mt-0.5 flex-shrink-0">#{idx + 1}</span>
+                            <p className="text-sm text-white/80 leading-snug flex-1">{q.text}</p>
+                          </div>
+                          <div className="pl-7 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className={`h-3 w-3 ${hasAnswer ? ansColor : 'text-white/20'}`} />
+                              <span className={`text-xs font-medium ${ansColor}`}>{ansLabel}</span>
+                            </div>
+                            {hasAnswer && (
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <div
+                                    key={v}
+                                    className={`w-2 h-2 rounded-full ${
+                                      v === ansValue
+                                        ? 'bg-[hsl(195,85%,60%)] scale-150'
+                                        : 'bg-white/10'
+                                    } transition-all`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* CTA */}
             <div className="bg-gradient-to-r from-[hsl(265,85%,55%)]/10 to-[hsl(175,80%,50%)]/10 rounded-2xl border border-white/[0.08] p-6 text-center">
-              <h3 className="font-semibold text-white/80 mb-2 text-sm">Muốn tìm hiểu chi tiết hơn?</h3>
-              <p className="text-xs text-white/35 mb-4">AI sẽ phân tích kết hợp tính cách với kết quả học tập để đưa ra gợi ý chính xác hơn</p>
-              <div className="flex justify-center gap-3">
+              <h3 className="font-semibold text-white/80 mb-2 text-sm">
+                {reviewMode ? "Muốn làm bài mới?" : "Muốn tìm hiểu chi tiết hơn?"}
+              </h3>
+              <p className="text-xs text-white/35 mb-4">
+                {reviewMode
+                  ? "Tính cách có thể thay đổi theo thời gian — làm lại bài để so sánh kết quả"
+                  : "AI sẽ phân tích kết hợp tính cách với kết quả học tập để đưa ra gợi ý chính xác hơn"}
+              </p>
+              <div className="flex justify-center gap-3 flex-wrap">
                 <button
                   onClick={resetTest}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/60 hover:bg-white/[0.06] transition-all text-sm font-medium"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Làm Lại Bài Test
+                  {reviewMode ? "Làm Bài Mới" : "Làm Lại Bài Test"}
                 </button>
+                {reviewMode && (
+                  <button
+                    onClick={loadHistory}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/60 hover:bg-white/[0.06] transition-all text-sm font-medium"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Về Lịch Sử
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1217,27 +1412,45 @@ export default function CareerAdvisorPage() {
                   hour: "2-digit", minute: "2-digit"
                 })
 
+                const canReopen = Boolean(item.answers && Object.keys(item.answers).length > 0)
                 return (
                   <div
                     key={item.id ?? i}
                     className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all"
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center">
+                    <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center flex-shrink-0">
                           <span className="text-lg font-bold text-white/80">{item.mbtiType}</span>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-semibold text-white/85">{item.personalityName}</h4>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold text-white/85 truncate">{item.personalityName}</h4>
                           <div className="flex items-center gap-2 text-[0.65rem] text-white/35">
                             <Clock className="h-3 w-3" />
                             {dateStr}
                           </div>
                         </div>
                       </div>
-                      <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,50%)]/20">
-                        Holland: {item.hollandCode}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,50%)]/20">
+                          Holland: {item.hollandCode}
+                        </Badge>
+                        <button
+                          onClick={() => restoreFromHistory(item)}
+                          disabled={!canReopen}
+                          title={canReopen
+                            ? "Mở lại bài làm này — xem kết quả, câu trả lời và các nghề đã xem"
+                            : "Lần làm này không có dữ liệu câu trả lời để mở lại"}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            canReopen
+                              ? 'bg-gradient-to-r from-[hsl(265,85%,60%)]/20 to-[hsl(210,85%,55%)]/20 border-white/15 text-white/85 hover:from-[hsl(265,85%,60%)]/30 hover:to-[hsl(210,85%,55%)]/30 hover:border-white/25'
+                              : 'bg-white/[0.02] border-white/[0.05] text-white/25 cursor-not-allowed'
+                          }`}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Xem lại từ đầu
+                        </button>
+                      </div>
                     </div>
 
                     {/* Mini dimension bars */}
