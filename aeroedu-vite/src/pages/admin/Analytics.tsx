@@ -8,12 +8,14 @@
  *   4. Realtime active sessions panel (5 phút qua)
  *   5. Breakdown theo role: STUDENT/TEACHER/ADMIN/GUEST
  */
-import { useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   BarChart3, TrendingUp, Users, Clock, Eye, RefreshCw,
   Loader2, Activity, ArrowUpRight, Filter, Calendar,
 } from 'lucide-react'
 import { api } from '@/services/api'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 
 interface OverviewData {
   totals: { today: number; week: number; month: number; all_time: number }
@@ -176,6 +178,91 @@ export default function AdminAnalytics() {
     [overview?.byRole]
   )
 
+  /** Build sheets cho export — lazy, chỉ gọi khi user click "Tải xuống" */
+  const getExportSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+    if (overview) {
+      // Sheet 1: Tổng quan
+      sheets.push({
+        name: 'Tổng quan',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value',  label: 'Giá trị', type: 'number' },
+        ],
+        rows: [
+          { metric: 'Lượt xem hôm nay',     value: overview.totals.today },
+          { metric: 'Lượt xem 7 ngày',      value: overview.totals.week },
+          { metric: 'Lượt xem 30 ngày',     value: overview.totals.month },
+          { metric: 'Tổng lượt xem',        value: overview.totals.all_time },
+          { metric: 'Sessions hôm nay',     value: overview.uniques.sessions_today },
+          { metric: 'Users hôm nay',        value: overview.uniques.users_today },
+          { metric: 'Users 7 ngày',         value: overview.uniques.users_week },
+          { metric: 'TB thời gian xem (ms)', value: overview.avgViewMs },
+        ],
+      })
+      // Sheet 2: Theo ngày
+      if (overview.daily?.length) {
+        sheets.push({
+          name: 'Theo ngày',
+          columns: [
+            { key: 'day',   label: 'Ngày',     type: 'date' },
+            { key: 'views', label: 'Lượt xem', type: 'number' },
+          ],
+          rows: overview.daily,
+        })
+      }
+      // Sheet 3: Theo vai trò
+      if (overview.byRole?.length) {
+        sheets.push({
+          name: 'Theo vai trò',
+          columns: [
+            { key: 'role',  label: 'Vai trò' },
+            { key: 'views', label: 'Lượt xem', type: 'number' },
+            { key: 'pct',   label: 'Tỉ lệ',    type: 'percent' },
+          ],
+          rows: overview.byRole.map(r => ({
+            role: r.role,
+            views: r.views,
+            pct: totalRoleViews > 0 ? r.views / totalRoleViews : 0,
+          })),
+        })
+      }
+    }
+    // Sheet 4: Top routes
+    if (routes.length > 0) {
+      sheets.push({
+        name: 'Top đường dẫn',
+        columns: [
+          { key: 'path',           label: 'Đường dẫn' },
+          { key: 'views',          label: 'Lượt xem',     type: 'number' },
+          { key: 'uniqueSessions', label: 'Sessions',     type: 'number' },
+          { key: 'uniqueUsers',    label: 'Users',        type: 'number' },
+          { key: 'avgViewMs',      label: 'TB thời gian', type: 'duration_ms' },
+          { key: 'bounceRate',     label: 'Bounce',       type: 'percent' },
+          { key: 'lastView',       label: 'Xem gần nhất', type: 'date' },
+        ],
+        rows: routes,
+      })
+    }
+    // Sheet 5: Realtime recent
+    if (realtime.recent.length > 0) {
+      sheets.push({
+        name: 'Realtime 5 phút qua',
+        columns: [
+          { key: 'path',      label: 'Đường dẫn' },
+          { key: 'userRole',  label: 'Vai trò' },
+          { key: 'createdAt', label: 'Thời gian', type: 'date' },
+        ],
+        rows: realtime.recent.map(r => ({
+          path: r.path,
+          userRole: r.userRole || 'GUEST',
+          createdAt: r.createdAt,
+        })),
+      })
+    }
+    return sheets
+  }, [overview, routes, realtime, totalRoleViews])
+
   if (loading && !overview) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[hsl(260,30%,8%)] text-white">
@@ -209,7 +296,7 @@ export default function AdminAnalytics() {
             </h1>
             <p className="text-white/50 mt-1">Thống kê lượt truy cập + tiếp cận nội dung kiểu YouTube</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={period}
               onChange={e => setPeriod(Number(e.target.value) as 7 | 30 | 90)}
@@ -226,6 +313,15 @@ export default function AdminAnalytics() {
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               Làm mới
             </button>
+            <ExportMenu
+              filename={`analytics-${period}d-${new Date().toISOString().slice(0, 10)}`}
+              getSheets={getExportSheets}
+              meta={{
+                title: 'Báo cáo Page View Analytics',
+                subtitle: `Thống kê ${period} ngày qua — AeroEduVision (inphysic.com)`,
+                authorName: 'Admin Dashboard',
+              }}
+            />
           </div>
         </div>
 

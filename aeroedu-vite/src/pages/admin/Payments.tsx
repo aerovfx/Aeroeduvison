@@ -9,7 +9,7 @@
  *
  * Auto-refresh mỗi 30s để admin thấy đơn mới gần realtime.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CreditCard, CheckCircle2, XCircle, Search, RefreshCw,
   TrendingUp, DollarSign, Package, AlertCircle, Loader2,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 
 type OrderStatus = 'PENDING' | 'AWAITING_REVIEW' | 'PAID' | 'REJECTED'
 
@@ -165,6 +167,75 @@ export default function AdminPayments() {
 
   const tabCounts = stats?.countByStatus || { AWAITING_REVIEW: 0, PAID: 0, PENDING: 0, REJECTED: 0 }
 
+  /** Sheets cho export — bao gồm orders đang hiển thị + stats tổng */
+  const getPaymentsSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+
+    // Sheet 1: Orders đang hiển thị
+    if (orders.length > 0) {
+      sheets.push({
+        name: `Đơn hàng (${tab})`,
+        columns: [
+          { key: 'id',           label: 'Mã đơn' },
+          { key: 'transferCode', label: 'Mã CK' },
+          { key: 'userEmail',    label: 'Email' },
+          { key: 'userName',     label: 'Tên' },
+          { key: 'planName',     label: 'Gói' },
+          { key: 'amount',       label: 'Số tiền', type: 'currency_vnd' },
+          { key: 'status',       label: 'Trạng thái' },
+          { key: 'createdAt',    label: 'Tạo lúc',    type: 'date' },
+          { key: 'approvedAt',   label: 'Duyệt lúc',  type: 'date' },
+        ],
+        rows: orders,
+      })
+    }
+
+    // Sheet 2: Stats tổng (nếu có)
+    if (stats) {
+      sheets.push({
+        name: 'Tổng quan',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value',  label: 'Giá trị' },
+        ],
+        rows: [
+          { metric: 'Tổng doanh thu (đ)',    value: stats.totalRevenue },
+          { metric: 'Số đơn thành công',     value: stats.paidCount },
+          { metric: 'Tổng số đơn',           value: stats.totalOrders },
+          { metric: 'Chờ duyệt',             value: stats.countByStatus.AWAITING_REVIEW },
+          { metric: 'Mới tạo',               value: stats.countByStatus.PENDING },
+          { metric: 'Đã từ chối',            value: stats.countByStatus.REJECTED },
+        ],
+      })
+      // Sheet 3: Doanh thu theo gói
+      if (stats.byPlan?.length) {
+        sheets.push({
+          name: 'Theo gói',
+          columns: [
+            { key: 'planName',  label: 'Gói' },
+            { key: 'planId',    label: 'Mã gói' },
+            { key: 'paidCount', label: 'Số đơn', type: 'number' },
+            { key: 'revenue',   label: 'Doanh thu', type: 'currency_vnd' },
+          ],
+          rows: stats.byPlan,
+        })
+      }
+      // Sheet 4: 30 ngày qua
+      if (stats.last30Days?.length) {
+        sheets.push({
+          name: '30 ngày qua',
+          columns: [
+            { key: 'day',     label: 'Ngày',     type: 'date' },
+            { key: 'count',   label: 'Số đơn',   type: 'number' },
+            { key: 'revenue', label: 'Doanh thu', type: 'currency_vnd' },
+          ],
+          rows: stats.last30Days,
+        })
+      }
+    }
+    return sheets
+  }, [orders, stats, tab])
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -177,12 +248,23 @@ export default function AdminPayments() {
             Xác thực đơn chuyển khoản · sinh mã kích hoạt · theo dõi doanh thu
           </p>
         </div>
-        <button
-          onClick={() => { fetchOrders(); fetchStats() }}
-          className="px-3 py-2 rounded-lg bg-white/[0.06] text-white/70 hover:bg-white/[0.1] flex items-center gap-2 text-sm"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Tải lại
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => { fetchOrders(); fetchStats() }}
+            className="px-3 py-2 rounded-lg bg-white/[0.06] text-white/70 hover:bg-white/[0.1] flex items-center gap-2 text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Tải lại
+          </button>
+          <ExportMenu
+            filename={`payments-${tab.toLowerCase()}-${new Date().toISOString().slice(0, 10)}`}
+            getSheets={getPaymentsSheets}
+            meta={{
+              title: 'Báo cáo thanh toán',
+              subtitle: `Tab: ${tab} — AeroEduVision (inphysic.com)`,
+              authorName: 'Admin Dashboard',
+            }}
+          />
+        </div>
       </div>
 
       {/* Stats cards */}
