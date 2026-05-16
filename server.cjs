@@ -6894,6 +6894,170 @@ ${plan.content || '<p>(Trống)</p>'}
     }
   });
 
+  // ── GET /api/student/progress-overview ──
+  // Aggregate real data từ exam history + KG interactions + lesson plans HS xem.
+  // Trả về JSON đầy đủ cho trang /student/progress dashboard.
+  app.get('/api/student/progress-overview', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      const pool = getAsgnPool();
+
+      // 1. User profile + level/XP (nếu schema có)
+      let profile = { name: user.email, level: 1, totalXp: 0, mbtiType: null };
+      try {
+        const ur = await pool.query(
+          `SELECT email, name, image, "createdAt" FROM "User" WHERE id=$1 LIMIT 1`,
+          [user.id]
+        );
+        if (ur.rows[0]) profile = { ...profile, ...ur.rows[0] };
+      } catch {/* schema missing fields → ignore */}
+
+      // 2. Exam stats — count + avgScore từ ExamAttempt nếu tồn tại
+      let examStats = { count: 0, avgScore: 0, recent: [] };
+      try {
+        const er = await pool.query(`
+          SELECT COUNT(*) AS count, AVG(score)::float AS avg_score
+          FROM "ExamAttempt"
+          WHERE "studentId" = $1 OR "userId" = $1
+        `, [user.id]);
+        examStats.count = parseInt(er.rows[0]?.count, 10) || 0;
+        examStats.avgScore = Math.round((er.rows[0]?.avg_score || 0) * 100) / 100;
+        // 5 attempts gần nhất
+        const rec = await pool.query(`
+          SELECT id, "examTitle", score, "completedAt"
+          FROM "ExamAttempt"
+          WHERE "studentId" = $1 OR "userId" = $1
+          ORDER BY "completedAt" DESC NULLS LAST LIMIT 5
+        `, [user.id]);
+        examStats.recent = rec.rows.map(r => ({
+          id: r.id, title: r.examTitle, score: r.score, at: r.completedAt,
+        }));
+      } catch {/* table not exist → keep zeros */}
+
+      // 3. Streak — count consecutive days có ExamAttempt hoặc activity
+      let streak = { current: 0, longest: 0, lastActive: null };
+      try {
+        const sr = await pool.query(`
+          SELECT DISTINCT DATE("completedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh') AS day
+          FROM "ExamAttempt"
+          WHERE ("studentId" = $1 OR "userId" = $1) AND "completedAt" > NOW() - INTERVAL '90 days'
+          ORDER BY day DESC
+        `, [user.id]);
+        const days = sr.rows.map(r => r.day);
+        if (days.length > 0) {
+          streak.lastActive = days[0];
+          // Compute current streak (consecutive days từ hôm nay)
+          let cur = 0;
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          for (let i = 0; i < days.length; i++) {
+            const d = new Date(days[i]); d.setHours(0, 0, 0, 0);
+            const expected = new Date(today.getTime() - i * 86400000);
+            if (d.getTime() === expected.getTime()) cur++;
+            else break;
+          }
+          streak.current = cur;
+          // Longest (greedy max consecutive)
+          let longest = 1, run = 1;
+          for (let i = 1; i < days.length; i++) {
+            const d1 = new Date(days[i - 1]); const d2 = new Date(days[i]);
+            if ((d1.getTime() - d2.getTime()) === 86400000) { run++; longest = Math.max(longest, run); }
+            else run = 1;
+          }
+          streak.longest = Math.max(longest, cur);
+        }
+      } catch {/* ignore */}
+
+      // 4. Weekly XP heatmap — 7 ngày gần đây, group exam attempts → XP estimate
+      const weekly = [];
+      const today = new Date();
+      try {
+        const wr = await pool.query(`
+          SELECT DATE("completedAt" AT TIME ZONE 'Asia/Ho_Chi_Minh') AS day,
+                 COUNT(*) AS attempts, AVG(score)::float AS avg
+          FROM "ExamAttempt"
+          WHERE ("studentId" = $1 OR "userId" = $1) AND "completedAt" > NOW() - INTERVAL '7 days'
+          GROUP BY day ORDER BY day
+        `, [user.id]);
+        const map = new Map(wr.rows.map(r => [String(r.day).slice(0, 10), r]));
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today.getTime() - i * 86400000);
+          const key = d.toISOString().slice(0, 10);
+          const r = map.get(key);
+          // XP heuristic: 50 cho mỗi attempt + bonus theo score
+          const xp = r ? Math.round((parseInt(r.attempts, 10) || 0) * 50 + (parseFloat(r.avg) || 0) * 5) : 0;
+          weekly.push({
+            date: key,
+            label: ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()],
+            xp,
+            activities: r ? parseInt(r.attempts, 10) || 0 : 0,
+          });
+        }
+      } catch {
+        // Fallback: empty 7 days
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date(today.getTime() - i * 86400000);
+          weekly.push({
+            date: d.toISOString().slice(0, 10),
+            label: ['CN','T2','T3','T4','T5','T6','T7'][d.getDay()],
+            xp: 0, activities: 0,
+          });
+        }
+      }
+
+      // 5. Knowledge Graph — count node interactions (votes/feedback by user)
+      let kgStats = { topicsExplored: 0, votesGiven: 0, feedbackPosted: 0 };
+      try {
+        const kgPool = getKcPool();
+        const v = await kgPool.query(`SELECT COUNT(*)::int AS c FROM stem_project_votes WHERE voter_id=$1`, [user.id]);
+        const f = await kgPool.query(`SELECT COUNT(*)::int AS c FROM stem_project_feedback WHERE author_id=$1`, [user.id]);
+        kgStats.votesGiven = v.rows[0]?.c || 0;
+        kgStats.feedbackPosted = f.rows[0]?.c || 0;
+      } catch {/* tables not exist → keep zeros */}
+
+      // 6. KeoCo competitive — wins (count session where user team won)
+      let keocoStats = { wins: 0, totalPlayed: 0 };
+      try {
+        const kcPool = getKcPool();
+        const k = await kcPool.query(`
+          SELECT
+            COUNT(DISTINCT s.id) FILTER (WHERE s.winner_team = p.team) AS wins,
+            COUNT(DISTINCT s.id) AS total
+          FROM keoco_participants p
+          JOIN keoco_sessions s ON s.id = p.session_id
+          WHERE p.display_name = $1 OR p.display_name = $2
+        `, [profile.name, profile.email]);
+        keocoStats.wins = parseInt(k.rows[0]?.wins, 10) || 0;
+        keocoStats.totalPlayed = parseInt(k.rows[0]?.total, 10) || 0;
+      } catch {/* ignore */}
+
+      // 7. Lesson plans HS được giao (qua TeacherStudentLink)
+      let lessonsAssigned = 0;
+      try {
+        const lp = await pool.query(`
+          SELECT COUNT(*)::int AS c FROM "LearningPathAssignment"
+          WHERE "studentId" = $1
+        `, [user.id]);
+        lessonsAssigned = lp.rows[0]?.c || 0;
+      } catch {/* ignore */}
+
+      return res.json({
+        success: true,
+        profile,
+        examStats,
+        streak,
+        weekly,
+        kgStats,
+        keocoStats,
+        lessonsAssigned,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[student:progress-overview] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── DELETE /api/teacher-student-link/:id ── 1 trong 2 phía gỡ link
   // KHÔNG xoá data cũ (assignments + grades giữ nguyên), chỉ stop sync mới
   app.delete('/api/teacher-student-link/:id', async (req, res) => {
