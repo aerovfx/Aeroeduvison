@@ -826,11 +826,17 @@ function drawCharacter(
   style: SpriteStyle,
   dir: Dir,
   walkPhase: number,
+  /** Pha thở idle 0..1 → vertical bob ±0.5 pixel scale (mịn, không giật). */
+  breathPhase: number = 0,
+  /** Nháy mắt — khi true vẽ mắt nhắm (đường gạch ngang). */
+  blink: boolean = false,
 ) {
   const c = STYLE_COLORS[style]
   const s = TILE / 16    // pixel size scale (mỗi "pixel" = s screen px)
   const x0 = px - 8 * s
-  const y0 = py - 20 * s
+  // Idle breath: gentle vertical bob (max 0.5 pixel) — đứng yên thì vẫn "thở"
+  const breathOffset = Math.sin(breathPhase * Math.PI * 2) * 0.5
+  const y0 = py - 20 * s + breathOffset * s
 
   // Bóng dưới chân
   ctx.fillStyle = 'rgba(0,0,0,0.25)'
@@ -901,21 +907,29 @@ function drawCharacter(
   // Đầu (mặt)
   px_(5, 3, 6, 6, c.skin)
 
-  // Mắt + miệng (đổi theo hướng)
+  // Mắt + miệng (đổi theo hướng, nháy mắt khi blink=true)
+  const eyeY = 5
+  const drawEye = (ex: number) => {
+    if (blink) {
+      // Mắt nhắm → đường gạch ngang 2 pixel rộng
+      px_(ex - 0.5, eyeY + 0.5, 2, 0.5, '#1a1a1a')
+    } else {
+      px_(ex, eyeY, 1, 1, '#1a1a1a')
+    }
+  }
   if (dir === 'right') {
-    px_(8, 5, 1, 1, '#1a1a1a')
-    px_(10, 5, 1, 1, '#1a1a1a')
+    drawEye(8)
+    drawEye(10)
     px_(8, 7, 2, 1, '#5a3a2a')
   } else if (dir === 'left') {
-    px_(6, 5, 1, 1, '#1a1a1a')
-    px_(8, 5, 1, 1, '#1a1a1a')
+    drawEye(6)
+    drawEye(8)
     px_(6, 7, 2, 1, '#5a3a2a')
   } else if (dir === 'up') {
-    // quay lưng — hiện tóc gáy
-    // không vẽ mắt
+    // quay lưng — hiện tóc gáy, không vẽ mắt
   } else {
-    px_(6, 5, 1, 1, '#1a1a1a')
-    px_(9, 5, 1, 1, '#1a1a1a')
+    drawEye(6)
+    drawEye(9)
     px_(7, 7, 2, 1, '#5a3a2a')
   }
 
@@ -1014,6 +1028,8 @@ function drawTile(
   ctx: CanvasRenderingContext2D,
   ch: string, x: number, y: number,
   map: MapDef,
+  /** Animation time (ms) — dùng cho tile động: water ripple, grass sway. */
+  now: number = 0,
 ) {
   const px = x * TILE
   const py = y * TILE
@@ -1022,7 +1038,7 @@ function drawTile(
 
   switch (ch) {
     case 'g': {
-      // Cỏ với chấm sáng
+      // Cỏ — chấm sáng + lá cỏ sway theo time (per-tile offset từ x+y)
       ctx.fillStyle = '#7ec97e'
       ctx.fillRect(px, py, TILE, TILE)
       ctx.fillStyle = '#a8d98a'
@@ -1030,6 +1046,15 @@ function drawTile(
       ctx.fillRect(px + 18, py + 14, 2, 2)
       ctx.fillRect(px + 24, py + 22, 2, 2)
       ctx.fillRect(px + 10, py + 26, 2, 2)
+      // Lá cỏ sway: 3 cọng cỏ với phase khác nhau, biên độ 1.5px
+      const swayBase = (now / 600) + (x * 0.31 + y * 0.17)
+      ctx.fillStyle = '#5ca85c'
+      const sway1 = Math.sin(swayBase) * 1.5
+      const sway2 = Math.sin(swayBase + 1.2) * 1.5
+      const sway3 = Math.sin(swayBase + 2.4) * 1.5
+      ctx.fillRect(px + 6 + sway1, py + 12, 1, 5)
+      ctx.fillRect(px + 14 + sway2, py + 8, 1, 6)
+      ctx.fillRect(px + 22 + sway3, py + 18, 1, 5)
       break
     }
     case 'T': {
@@ -1061,12 +1086,21 @@ function drawTile(
       break
     }
     case 'W': {
-      // Đài phun nước / hồ
+      // Đài phun nước / hồ — gợn nước animate theo thời gian
       ctx.fillStyle = '#5ab0e0'
       ctx.fillRect(px, py, TILE, TILE)
+      // Highlight gợn nước — offset theo time + per-tile để mỗi ô khác nhau
+      const wavePhase = (now / 400) + (x * 0.7 + y * 0.5)
+      const wave1Y = Math.round(6 + Math.sin(wavePhase) * 2)
+      const wave2Y = Math.round(16 + Math.sin(wavePhase + 1.5) * 2)
       ctx.fillStyle = '#90d0f0'
-      ctx.fillRect(px + 4, py + 6, TILE - 8, 4)
-      ctx.fillRect(px + 8, py + 16, TILE - 16, 3)
+      ctx.fillRect(px + 4, py + wave1Y, TILE - 8, 4)
+      ctx.fillRect(px + 8, py + wave2Y, TILE - 16, 3)
+      // Foam trắng nhỏ — pulse khi sóng cao
+      const foamAlpha = 0.3 + 0.4 * (Math.sin(wavePhase * 1.7) * 0.5 + 0.5)
+      ctx.fillStyle = `rgba(220, 240, 255, ${foamAlpha})`
+      ctx.fillRect(px + 6, py + wave1Y + 1, 3, 1)
+      ctx.fillRect(px + TILE - 10, py + wave2Y, 3, 1)
       ctx.fillStyle = '#3a8ab8'
       ctx.fillRect(px, py + TILE - 4, TILE, 4)
       break
@@ -1497,9 +1531,21 @@ export default function PixelAgents() {
     const [dx, dy] = dxMap[s.dir]
     const tx = Math.round(s.pos.x) + dx
     const ty = Math.round(s.pos.y) + dy
-    // Check NPC tại tile trước mặt
-    const npc = s.npcs.find(n => Math.round(n.x) === tx && Math.round(n.y) === ty && !n.defeated)
-    if (npc) {
+    // Check NPC trong phạm vi 1 tile xung quanh (8 hướng + cùng tile) —
+    // ưu tiên NPC ở tile trước mặt, fallback NPC gần nhất theo Manhattan.
+    const px = Math.round(s.pos.x), py = Math.round(s.pos.y)
+    const nearby = s.npcs.filter(n => {
+      if (n.defeated) return false
+      const nx = Math.round(n.x), ny = Math.round(n.y)
+      return Math.abs(nx - px) <= 1 && Math.abs(ny - py) <= 1
+    })
+    if (nearby.length > 0) {
+      // Ưu tiên: NPC tại tile trước mặt, sau đó tới NPC gần player nhất
+      const front = nearby.find(n => Math.round(n.x) === tx && Math.round(n.y) === ty)
+      const npc = front || nearby.sort((a, b) =>
+        (Math.abs(a.x - s.pos.x) + Math.abs(a.y - s.pos.y)) -
+        (Math.abs(b.x - s.pos.x) + Math.abs(b.y - s.pos.y))
+      )[0]
       setDialog({ npc, phase: 'intro', questionIdx: 0, selected: null, typedChars: 0, lastTickAt: performance.now(), correctCount: 0 })
       return
     }
@@ -1629,7 +1675,7 @@ export default function PixelAgents() {
       const ey = Math.min(map.h, sy + VIEW_H_TILES + 2)
       for (let y = sy; y < ey; y++) {
         for (let x = sx; x < ex; x++) {
-          drawTile(ctx, map.layout[y]?.[x] || '.', x, y, map)
+          drawTile(ctx, map.layout[y]?.[x] || '.', x, y, map, now)
         }
       }
 
@@ -1638,9 +1684,31 @@ export default function PixelAgents() {
 
       // NPCs
       const pulse = 0.5 + 0.5 * Math.sin(now / 350)   // 0..1 animation
-      s.npcs.forEach(n => {
+      // Subject → emoji icon mapping (hiển thị phía trên NPC để nhận biết môn dạy)
+      const SUBJECT_ICON: Record<string, string> = {
+        'Toán': '📐', 'Vật lý': '🔭', 'Hoá': '🧪', 'Sinh': '🧬',
+        'AI': '🤖', 'Văn': '📜', 'Mỹ thuật': '🎨', 'Tin học': '💻',
+      }
+      s.npcs.forEach((n, idx) => {
         const px = n.x * TILE + TILE / 2
         const py = n.y * TILE + TILE
+
+        // Compute facing direction: nếu player ở gần (≤4 tiles) thì NPC quay
+        // mặt về phía player — tạo cảm giác sống động. Nếu xa thì 'down'.
+        const distPx = Math.abs(s.pos.x - n.x)
+        const distPy = Math.abs(s.pos.y - n.y)
+        let npcDir: Dir = 'down'
+        if (!n.defeated && Math.max(distPx, distPy) <= 4) {
+          if (distPx > distPy) npcDir = s.pos.x > n.x ? 'right' : 'left'
+          else if (s.pos.y < n.y) npcDir = 'up'
+          else npcDir = 'down'
+        }
+
+        // Breath phase + blink — mỗi NPC offset riêng để không đồng bộ giả
+        const breathPhase = ((now / 1800) + idx * 0.37) % 1
+        // Eye blink: mỗi NPC blink 100ms mỗi ~4s, offset random theo idx
+        const blinkCycle = (now / 1000 + idx * 1.3) % 4
+        const blink = blinkCycle < 0.1
 
         // 1) Halo phát sáng dưới chân — giúp teacher nổi bật trên sàn/đồ đạc
         const haloColor = n.defeated ? 'rgba(255, 215, 100, ' : 'rgba(110, 220, 255, '
@@ -1655,8 +1723,20 @@ export default function PixelAgents() {
         ctx.ellipse(px, py + 2, 12, 5, 0, 0, Math.PI * 2)
         ctx.fill()
 
-        // 2) Sprite nhân vật
-        drawCharacter(ctx, px, py, n.spriteStyle, 'down', 0)
+        // 2) Sprite nhân vật (face player + breath + blink)
+        drawCharacter(ctx, px, py, n.spriteStyle, npcDir, 0, breathPhase, blink)
+
+        // 2b) Subject icon floating above sprite (gentle bob) — chỉ khi chưa
+        //     defeated, giúp HS biết teacher dạy môn gì từ xa
+        if (!n.defeated && n.questions.length > 0) {
+          const subj = n.questions[0].subject
+          const icon = SUBJECT_ICON[subj] || '📚'
+          const iconY = py - TILE - 42 + Math.sin(now / 600 + idx) * 2
+          ctx.font = '14px serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(icon, px + 14, iconY)
+        }
 
         // 3) Huy hiệu "GIÁO VIÊN" hoặc "ĐÃ XONG" phía trên sprite
         const badgeText = n.defeated ? 'ĐÃ XONG' : 'GIÁO VIÊN'
@@ -1711,10 +1791,17 @@ export default function PixelAgents() {
         ctx.fillText(n.name, px, nameY + 7)
       })
 
-      // Player
+      // Player — idle breath khi đứng yên, eye blink ngẫu nhiên ~mỗi 4s
       const ppx = s.pos.x * TILE + TILE / 2
       const ppy = s.pos.y * TILE + TILE
-      drawCharacter(ctx, ppx, ppy, 'player', s.dir, s.moving ? s.walkPhase : 0)
+      const playerBreath = s.moving ? 0 : ((now / 1800) % 1)
+      const playerBlink = ((now / 1000) % 4.7) < 0.1
+      drawCharacter(
+        ctx, ppx, ppy, 'player',
+        s.dir,
+        s.moving ? s.walkPhase : 0,
+        playerBreath, playerBlink,
+      )
 
       ctx.restore()
 
@@ -1726,12 +1813,14 @@ export default function PixelAgents() {
       ctx.textAlign = 'left'
       ctx.fillText(`📍 ${map.name}`, 12, 18)
 
-      // Hint khi đứng cạnh NPC / cửa
+      // Hint khi đứng cạnh NPC (bất cứ hướng nào) / cửa trước mặt
       const fx = Math.round(s.pos.x), fy = Math.round(s.pos.y)
       const dxMap = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }
       const [dx, dy] = dxMap[s.dir]
       const ahead = map.layout[fy + dy]?.[fx + dx]
-      const aheadNpc = s.npcs.find(n => Math.round(n.x) === fx + dx && Math.round(n.y) === fy + dy && !n.defeated)
+      // Tìm NPC gần nhất trong phạm vi 1 tile (8 hướng) — khớp với tryInteract
+      const aheadNpc = s.npcs.find(n => !n.defeated &&
+        Math.abs(Math.round(n.x) - fx) <= 1 && Math.abs(Math.round(n.y) - fy) <= 1)
       if (aheadNpc || isDoor(ahead)) {
         ctx.fillStyle = 'rgba(255, 225, 74, 0.95)'
         ctx.fillRect(W / 2 - 110, H - 36, 220, 24)
