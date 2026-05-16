@@ -396,6 +396,30 @@ export default function ExamPrepPage() {
         toast.success(autoSubmit ? "Hết giờ! Đã tự động nộp bài." : "Đã nộp bài!")
         refetchStats()
         refetchCommunity()
+        // ── Ghi vào reco history + SRS ───────────────────────
+        // history: dùng để mixer score `already-mastered` filter + difficulty-match
+        // SRS: từng câu sai/đúng được track riêng cho spaced repetition trong AI Tutor
+        ;(async () => {
+          try {
+            const { pushHistory } = await import('@/lib/reco')
+            pushHistory({
+              examId: practice.id,
+              subject: practice.subject,
+              percentage: gradeResult.percentage ?? 0,
+              completedAt: new Date().toISOString(),
+            })
+            // SRS: rate từng câu hỏi theo correctness
+            const srs = await import('@/lib/srs')
+            const details = (gradeResult as any).details || []
+            for (const d of details) {
+              if (!d?.questionId) continue
+              const rating = d.isCorrect ? 5 : 1   // đúng = easy, sai = forget
+              srs.recordReview(d.questionId, rating, { subject: practice.subject })
+            }
+          } catch (e) {
+            if (import.meta.env.DEV) console.warn('[reco/srs] push failed:', e)
+          }
+        })()
         // Cộng XP — chạy fire-and-forget, không chặn UX
         ;(async () => {
           try {

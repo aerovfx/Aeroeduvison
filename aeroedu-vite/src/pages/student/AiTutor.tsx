@@ -5,6 +5,8 @@ import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
 import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
 import { MathText } from '@/components/common/MathText'
+import { SrsReviewPanel } from '@/components/srs/SrsReviewPanel'
+import type { ReviewRecord } from '@/lib/srs'
 
 const D = {
   bg: '#0d0e17',
@@ -216,6 +218,29 @@ function AiTutorInner() {
             >
               {SUBJECTS.map(s => <option key={s}>{s}</option>)}
             </select>
+          </div>
+
+          {/* SRS spaced-repetition panel — câu cần ôn (SM-2 từ localStorage) */}
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${D.border}` }}>
+            <SrsReviewPanel
+              subject={selectedSubject}
+              sessionLimit={20}
+              onStartReview={(cards: ReviewRecord[]) => {
+                if (cards.length === 0) return
+                // Gom topic của các card cần ôn → seed prompt cho AI
+                const topics = Array.from(new Set(
+                  cards.map(c => c.topic).filter(Boolean),
+                )).slice(0, 5)
+                const subjectsList = Array.from(new Set(
+                  cards.map(c => c.subject).filter(Boolean),
+                ))
+                const prompt = topics.length > 0
+                  ? `Hôm nay tôi cần ôn ${cards.length} câu thuộc các chủ đề: ${topics.join(', ')}. Hãy giúp tôi hệ thống lại kiến thức trọng tâm và đưa ra 3-5 câu hỏi mẫu để kiểm tra.`
+                  : `Hôm nay tôi cần ôn ${cards.length} câu thuộc môn ${subjectsList.join(', ') || selectedSubject}. Hãy gợi ý cách ôn hiệu quả + đặt 5 câu hỏi để kiểm tra kiến thức.`
+                setInput(prompt)
+                toast.success(`Đã nạp ${cards.length} câu vào hội thoại — nhấn gửi để bắt đầu ôn`)
+              }}
+            />
           </div>
 
           {/* Conversation history */}
