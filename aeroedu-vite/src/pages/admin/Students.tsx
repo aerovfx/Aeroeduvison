@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search, Users, TrendingUp, TrendingDown, Minus,
   AlertTriangle, CheckCircle, Brain, Heart, Zap,
   Eye, MessageSquare, ChevronRight, Activity, Award, Target, Clock,
 } from 'lucide-react'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 
 /* ────────────────────────────────────────────────
    Types
@@ -414,6 +416,66 @@ export default function Students() {
     })
   }, [students, searchTerm, selectedClass, selectedRisk])
 
+  /** Build export sheets — main list + breakdown by class + by risk + XP distribution */
+  const getStudentsSheets = useCallback((): SheetData[] => {
+    if (filtered.length === 0) return []
+    const sheets: SheetData[] = []
+    sheets.push({
+      name: `Danh sách HS (${filtered.length})`,
+      columns: [
+        { key: 'name',               label: 'Họ tên' },
+        { key: 'email',              label: 'Email' },
+        { key: 'class',              label: 'Lớp' },
+        { key: 'currentXP',          label: 'XP hiện tại',   type: 'number' },
+        { key: 'xpChange',           label: 'XP thay đổi',   type: 'number' },
+        { key: 'masteryPercentage',  label: 'Mastery %',     type: 'number' },
+        { key: 'emotionScore',       label: 'Cảm xúc (1-10)', type: 'number' },
+        { key: 'riskLevel',          label: 'Mức rủi ro' },
+        { key: 'lastActive',         label: 'Hoạt động gần đây' },
+      ],
+      rows: filtered,
+    })
+    // Breakdown by class
+    const byClass = new Map<string, { count: number; avgXP: number; avgMastery: number }>()
+    for (const s of filtered) {
+      const c = byClass.get(s.class) || { count: 0, avgXP: 0, avgMastery: 0 }
+      c.count++
+      c.avgXP += s.currentXP
+      c.avgMastery += s.masteryPercentage
+      byClass.set(s.class, c)
+    }
+    sheets.push({
+      name: 'Theo lớp',
+      columns: [
+        { key: 'class',      label: 'Lớp' },
+        { key: 'count',      label: 'Số HS',     type: 'number' },
+        { key: 'avgXP',      label: 'XP trung bình',   type: 'number' },
+        { key: 'avgMastery', label: 'Mastery TB %',    type: 'number' },
+      ],
+      rows: Array.from(byClass.entries()).map(([cls, v]) => ({
+        class: cls,
+        count: v.count,
+        avgXP: Math.round(v.avgXP / v.count),
+        avgMastery: Math.round(v.avgMastery / v.count),
+      })),
+    })
+    // Breakdown by risk level
+    const byRisk = new Map<string, number>()
+    for (const s of filtered) byRisk.set(s.riskLevel, (byRisk.get(s.riskLevel) || 0) + 1)
+    sheets.push({
+      name: 'Theo mức rủi ro',
+      columns: [
+        { key: 'level', label: 'Mức' },
+        { key: 'count', label: 'Số HS', type: 'number' },
+        { key: 'pct',   label: 'Tỉ lệ', type: 'percent' },
+      ],
+      rows: Array.from(byRisk.entries()).map(([level, count]) => ({
+        level, count, pct: count / filtered.length,
+      })),
+    })
+    return sheets
+  }, [filtered])
+
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student)
     setViewMode('detail')
@@ -434,17 +496,28 @@ export default function Students() {
     <div className="p-6 md:p-8 min-h-screen bg-[hsl(260,30%,8%)]">
 
       {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-          <Users className="w-10 h-10 text-violet-400" />
-          <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent"
-            style={{ letterSpacing: '-1px' }}>
-            Student Insights Hub
-          </span>
-        </h1>
-        <p className="text-white/50 font-medium">
-          Track student behavior, emotions, and progress in real-time
-        </p>
+      <div className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+            <Users className="w-10 h-10 text-violet-400" />
+            <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent"
+              style={{ letterSpacing: '-1px' }}>
+              Student Insights Hub
+            </span>
+          </h1>
+          <p className="text-white/50 font-medium">
+            Track student behavior, emotions, and progress in real-time
+          </p>
+        </div>
+        <ExportMenu
+          filename={`students-${new Date().toISOString().slice(0, 10)}`}
+          getSheets={getStudentsSheets}
+          meta={{
+            title: 'Danh sách Học sinh',
+            subtitle: `Xuất sau khi filter (${filtered.length} HS) — AeroEduVision`,
+            authorName: 'Admin Dashboard',
+          }}
+        />
       </div>
 
       {/* Filters */}

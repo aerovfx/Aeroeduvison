@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo } from "react"
+import { useCallback, useState, useEffect, useMemo } from "react"
+import { ExportMenu } from "@/components/common/ExportMenu"
+import type { SheetData } from "@/lib/exportReport"
 import {
   BarChart as RBarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Cell, CartesianGrid, ReferenceLine, PieChart, Pie, Legend,
@@ -221,6 +223,127 @@ export default function ExamReports() {
     return () => { cancelled = true }
   }, [selectedExamId])
 
+  /** Build sheets cho client-side export (CSV/Excel/Word/JSON) — KHÔNG cần BE.
+   *  Bao gồm overview + grade distribution + question analysis + individual
+   *  attempts + group rooms (mỗi loại 1 sheet riêng).
+   */
+  const getExamReportSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+    if (!analytics) return sheets
+
+    // Sheet 1: Tổng quan
+    const o = analytics.overview
+    sheets.push({
+      name: 'Tổng quan',
+      columns: [
+        { key: 'metric', label: 'Chỉ số' },
+        { key: 'value',  label: 'Giá trị' },
+      ],
+      rows: [
+        { metric: 'Tổng số bài nộp',  value: o.total_submissions },
+        { metric: 'Đã hoàn thành',    value: o.completed },
+        { metric: 'Đang làm',         value: o.in_progress },
+        { metric: 'Điểm trung bình',  value: o.average_score?.toFixed(2) },
+        { metric: 'Điểm trung vị',    value: o.median_score?.toFixed(2) },
+        { metric: 'Cao nhất',         value: o.highest_score?.toFixed(2) },
+        { metric: 'Thấp nhất',        value: o.lowest_score?.toFixed(2) },
+        { metric: 'Độ lệch chuẩn',    value: o.std_deviation?.toFixed(2) },
+        { metric: 'Tỉ lệ đậu (%)',    value: o.pass_rate?.toFixed(1) },
+        { metric: 'Cronbach α',       value: analytics.reliability?.cronbach_alpha?.toFixed(2) || '—' },
+      ],
+    })
+
+    // Sheet 2: Phân bố điểm
+    if (analytics.grade_distribution) {
+      sheets.push({
+        name: 'Phân bố điểm',
+        columns: [
+          { key: 'range', label: 'Khoảng điểm' },
+          { key: 'count', label: 'Số HS', type: 'number' },
+        ],
+        rows: Object.entries(analytics.grade_distribution).map(([range, count]) => ({
+          range, count,
+        })),
+      })
+    }
+
+    // Sheet 3: Phân tích câu hỏi
+    if (analytics.question_analysis?.length) {
+      sheets.push({
+        name: 'Phân tích câu hỏi',
+        columns: [
+          { key: 'question_number',     label: 'Câu' },
+          { key: 'average_score',       label: 'Điểm TB',           type: 'number' },
+          { key: 'difficulty_index',    label: 'Độ khó (0-1)',      type: 'number' },
+          { key: 'discrimination_index',label: 'Phân biệt',         type: 'number' },
+          { key: 'most_common_answer',  label: 'Đáp án nhiều nhất' },
+          { key: 'correct_percentage',  label: '% đúng',             type: 'percent' },
+        ],
+        rows: analytics.question_analysis.map(q => ({
+          ...q,
+          correct_percentage: q.correct_percentage / 100,  // 90 → 0.9 for percent format
+        })),
+      })
+    }
+
+    // Sheet 4: Cá nhân (individual attempts)
+    if (attempts?.individual?.length) {
+      sheets.push({
+        name: `Cá nhân (${attempts.individual.length})`,
+        columns: [
+          { key: 'studentName',     label: 'Họ tên' },
+          { key: 'studentEmail',    label: 'Email' },
+          { key: 'score',           label: 'Điểm',         type: 'number' },
+          { key: 'percentage',      label: '%',            type: 'number' },
+          { key: 'answeredCount',   label: 'Đã trả lời',   type: 'number' },
+          { key: 'totalQuestions',  label: 'Tổng câu',     type: 'number' },
+          { key: 'completed',       label: 'Hoàn thành' },
+          { key: 'startedAt',       label: 'Bắt đầu',      type: 'date' },
+          { key: 'completedAt',     label: 'Nộp bài',      type: 'date' },
+          { key: 'durationSec',     label: 'Thời gian (s)', type: 'number' },
+        ],
+        rows: attempts.individual.map(a => ({
+          ...a,
+          completed: a.completed ? 'Có' : 'Chưa',
+        })),
+      })
+    }
+
+    // Sheet 5: Nhóm (group rooms — flatten participants)
+    if (attempts?.group?.length) {
+      const groupRows: any[] = []
+      for (const room of attempts.group) {
+        for (const p of room.participants) {
+          groupRows.push({
+            roomCode: room.code,
+            roomStatus: room.status,
+            startedAt: room.startedAt,
+            studentName: p.studentName,
+            score: p.score,
+            correctCount: p.correctCount,
+            joinedAt: p.joinedAt,
+          })
+        }
+      }
+      if (groupRows.length > 0) {
+        sheets.push({
+          name: `Nhóm (${groupRows.length})`,
+          columns: [
+            { key: 'roomCode',     label: 'Mã phòng' },
+            { key: 'roomStatus',   label: 'Trạng thái' },
+            { key: 'studentName',  label: 'HS' },
+            { key: 'score',        label: 'Điểm',     type: 'number' },
+            { key: 'correctCount', label: 'Câu đúng', type: 'number' },
+            { key: 'joinedAt',     label: 'Tham gia', type: 'date' },
+            { key: 'startedAt',    label: 'Phòng bắt đầu', type: 'date' },
+          ],
+          rows: groupRows,
+        })
+      }
+    }
+    return sheets
+  }, [analytics, attempts])
+
   const handleExport = async (format: "csv" | "excel" | "pdf") => {
     if (!selectedExamId) { toast.error("Vui lòng chọn đề thi"); return }
     try {
@@ -286,24 +409,34 @@ export default function ExamReports() {
               </div>
             </div>
 
-            {/* Export buttons */}
-            {selectedExamId && (
-              <div style={{ display: "flex", gap: 8 }}>
-                {(["csv", "excel", "pdf"] as const).map(fmt => (
-                  <button
-                    key={fmt}
-                    onClick={() => handleExport(fmt)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "8px 14px", border: `1px solid ${D.border2}`,
-                      borderRadius: 8, background: D.card2, color: D.muted,
-                      fontSize: 12, fontWeight: 500, cursor: "pointer",
-                    }}
-                  >
-                    <Download style={{ width: 14, height: 14 }} />
-                    {fmt.toUpperCase()}
-                  </button>
-                ))}
+            {/* Export — client-side menu (CSV/Excel/Word/JSON) ưu tiên hơn
+                BE endpoint vì hoạt động ngay với data đã loaded, không phụ
+                thuộc /teacher/exams/:id/export (chưa stable). */}
+            {selectedExamId && analytics && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <ExportMenu
+                  variant="compact"
+                  filename={`exam-report-${selectedExamId.slice(0, 8)}-${new Date().toISOString().slice(0, 10)}`}
+                  getSheets={getExamReportSheets}
+                  meta={{
+                    title: 'Báo cáo thi chi tiết',
+                    subtitle: `Đề: ${exams.find(e => e.id === selectedExamId)?.title || selectedExamId}`,
+                    authorName: 'GV — ExamReports',
+                  }}
+                />
+                <button
+                  onClick={() => handleExport('pdf')}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "8px 14px", border: `1px solid ${D.border2}`,
+                    borderRadius: 8, background: D.card2, color: D.muted,
+                    fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  }}
+                  title="Xuất PDF qua BE (nếu khả dụng)"
+                >
+                  <Download style={{ width: 14, height: 14 }} />
+                  PDF
+                </button>
               </div>
             )}
           </div>

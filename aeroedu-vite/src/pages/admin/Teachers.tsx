@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 import {
   Users, Award, Calendar, TrendingUp, Sparkles, BarChart3,
   Bell, Search, Plus, Edit, Trash2, Eye, Mail, Phone,
@@ -568,6 +570,65 @@ export default function Teachers() {
     setTimeout(() => setLoading(false), 400)
   }, [])
 
+  /** Build export sheets — 3 dataset chính */
+  const getTeachersSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+    if (teachers.length > 0) {
+      sheets.push({
+        name: `Hồ sơ GV (${teachers.length})`,
+        columns: [
+          { key: 'name',            label: 'Họ tên' },
+          { key: 'email',           label: 'Email' },
+          { key: 'phone',           label: 'Số điện thoại' },
+          { key: 'department',      label: 'Bộ môn' },
+          { key: 'specialization',  label: 'Chuyên môn' },
+          { key: 'position',        label: 'Vị trí' },
+          { key: 'status',          label: 'Trạng thái' },
+          { key: 'hireDate',        label: 'Ngày vào',     type: 'date' },
+          { key: 'totalStudents',   label: 'Số HS phụ trách', type: 'number' },
+          { key: 'avgXPGain',       label: 'XP gain TB',   type: 'number' },
+          { key: 'feedbackScore',   label: 'Điểm phản hồi', type: 'number' },
+          { key: 'responseTime',    label: 'Time phản hồi (h)', type: 'number' },
+          { key: 'interventions',   label: 'Lượt can thiệp', type: 'number' },
+        ],
+        rows: teachers,
+      })
+    }
+    if (licenses.length > 0) {
+      sheets.push({
+        name: 'Chứng chỉ',
+        columns: [
+          { key: 'teacherName',      label: 'GV' },
+          { key: 'type',             label: 'Loại' },
+          { key: 'name',             label: 'Tên chứng chỉ' },
+          { key: 'issuingAuthority', label: 'Đơn vị cấp' },
+          { key: 'issueDate',        label: 'Ngày cấp',  type: 'date' },
+          { key: 'expiryDate',       label: 'Ngày hết hạn', type: 'date' },
+          { key: 'status',           label: 'Trạng thái' },
+        ],
+        rows: licenses,
+      })
+    }
+    if (schedules.length > 0) {
+      sheets.push({
+        name: 'Lịch dạy',
+        columns: [
+          { key: 'teacherName',  label: 'GV' },
+          { key: 'date',         label: 'Ngày',     type: 'date' },
+          { key: 'shift',        label: 'Ca' },
+          { key: 'classes',      label: 'Lớp dạy' },
+          { key: 'isOverloaded', label: 'Quá tải' },
+        ],
+        rows: schedules.map(s => ({
+          ...s,
+          classes: Array.isArray(s.classes) ? s.classes.join(', ') : s.classes,
+          isOverloaded: s.isOverloaded ? 'Có' : 'Không',
+        })),
+      })
+    }
+    return sheets
+  }, [teachers, licenses, schedules])
+
   const TABS: { id: TeacherTab; label: string; icon: React.ElementType; description: string }[] = [
     { id: 'profiles',          label: 'Hồ Sơ Giáo Viên',      icon: Users,     description: 'Quản lý thông tin, năng lực, lịch sử công tác' },
     { id: 'licensing',         label: 'Chứng Chỉ & Giấy Phép', icon: Award,     description: 'Theo dõi CCHN, CME, quyền chuyên môn' },
@@ -613,6 +674,15 @@ export default function Teachers() {
                 <span className="text-sm text-white/40">Cảnh báo</span>
               </div>
             </div>
+            <ExportMenu
+              filename={`teachers-${new Date().toISOString().slice(0, 10)}`}
+              getSheets={getTeachersSheets}
+              meta={{
+                title: 'Quản lý Nhân sự Giáo viên',
+                subtitle: `Profiles + Licenses + Schedules — AeroEduVision`,
+                authorName: 'Admin HRM',
+              }}
+            />
           </div>
         </div>
       </div>

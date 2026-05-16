@@ -4,6 +4,7 @@ import { Receipt, BookOpen, Clock, DollarSign } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
 import { LearningNav } from '@/components/student/LearningNav'
 import { DocRef } from '@/components/docs/DocRef'
+import { ExportMenu } from '@/components/common/ExportMenu'
 
 function fmt(date: string) {
   return new Date(date).toLocaleDateString('vi-VN', {
@@ -19,6 +20,40 @@ export default function PurchaseHistory() {
     queryFn: learningService.getPurchaseHistory,
   })
 
+  /** Export sheets — đơn mua + tổng kết chi phí */
+  const getPurchaseSheets = () => {
+    if (enrollments.length === 0) return []
+    const totalSpent = enrollments.reduce((s, e) => s + Number(e.price || 0), 0)
+    return [
+      {
+        name: `Lịch sử mua (${enrollments.length})`,
+        columns: [
+          { key: 'courseTitle', label: 'Khoá học' },
+          { key: 'teacher',     label: 'Giảng viên' },
+          { key: 'price',       label: 'Giá',       type: 'currency_vnd' as const },
+          { key: 'createdAt',   label: 'Ngày mua',  type: 'date' as const },
+        ],
+        rows: enrollments.map((e) => ({
+          courseTitle: e.course?.title || '—',
+          teacher:     e.course?.user?.name || '—',
+          price:       e.price,
+          createdAt:   e.createdAt,
+        })),
+      },
+      {
+        name: 'Tổng kết',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value',  label: 'Giá trị' },
+        ],
+        rows: [
+          { metric: 'Số khoá đã mua', value: enrollments.length },
+          { metric: 'Tổng chi (VND)', value: totalSpent.toLocaleString('vi-VN') + 'đ' },
+        ],
+      },
+    ]
+  }
+
   if (isLoading) {
     return (
       <div className="p-8 space-y-4">
@@ -32,6 +67,20 @@ export default function PurchaseHistory() {
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <LearningNav title="Học tập của tôi" count={enrollments.length} />
+
+      {enrollments.length > 0 && (
+        <div className="flex justify-end">
+          <ExportMenu
+            variant="compact"
+            filename={`lich-su-mua-${new Date().toISOString().slice(0, 10)}`}
+            getSheets={getPurchaseSheets}
+            meta={{
+              title: 'Lịch sử mua khoá học',
+              subtitle: 'AeroEduVision (inphysic.com)',
+            }}
+          />
+        </div>
+      )}
 
       {enrollments.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">

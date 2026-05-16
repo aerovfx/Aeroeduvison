@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 import {
   AlertTriangle, TrendingDown, TrendingUp, Minus,
   Brain, Play, CheckCircle, Clock, XCircle,
@@ -358,23 +360,74 @@ export default function AtRisk() {
     }).sort((a, b) => b.riskScore - a.riskScore)
   }, [filterLevel, filterStatus])
 
+  const getAtRiskSheets = useCallback((): SheetData[] => {
+    if (filtered.length === 0) return []
+    return [
+      {
+        name: `HS rủi ro (${filtered.length})`,
+        columns: [
+          { key: 'studentName', label: 'Họ tên' },
+          { key: 'class',       label: 'Lớp' },
+          { key: 'riskScore',   label: 'Điểm rủi ro', type: 'number' },
+          { key: 'riskLevel',   label: 'Mức rủi ro' },
+          { key: 'status',      label: 'Trạng thái' },
+          { key: 'assignedTo',  label: 'GV phụ trách' },
+          { key: 'emotionTag',  label: 'Cảm xúc' },
+          { key: 'lastActive',  label: 'Hoạt động cuối' },
+          { key: 'createdAt',   label: 'Phát hiện lúc', type: 'date' },
+          { key: 'topFactor',   label: 'Yếu tố chính' },
+          { key: 'topRecommendation', label: 'Khuyến nghị #1' },
+        ],
+        rows: filtered.map(s => ({
+          ...s,
+          topFactor: s.factors[0]?.factor || '',
+          topRecommendation: s.recommendations[0]?.title || '',
+        })),
+      },
+      {
+        name: 'Tổng kết',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value', label: 'Giá trị', type: 'number' },
+        ],
+        rows: [
+          { metric: 'Nghiêm trọng',  value: counts.critical },
+          { metric: 'Cao',           value: counts.high },
+          { metric: 'Trung bình',    value: counts.medium },
+          { metric: 'Đã giải quyết', value: counts.resolved },
+        ],
+      },
+    ]
+  }, [filtered, counts])
+
   return (
     <div className="min-h-screen bg-[hsl(260,30%,8%)] p-6 md:p-8">
 
       {/* ── Header ── */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/30">
-            <AlertTriangle className="w-7 h-7 text-red-400" />
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/30">
+              <AlertTriangle className="w-7 h-7 text-red-400" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-300 bg-clip-text text-transparent"
+              style={{ letterSpacing: '-1px' }}>
+              At-Risk &amp; Intervention Manager
+            </h1>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-300 bg-clip-text text-transparent"
-            style={{ letterSpacing: '-1px' }}>
-            At-Risk &amp; Intervention Manager
-          </h1>
+          <p className="text-white/45 font-medium ml-1">
+            Hệ thống can thiệp sớm tích hợp AI – phát hiện và hỗ trợ học sinh có nguy cơ
+          </p>
         </div>
-        <p className="text-white/45 font-medium ml-1">
-          Hệ thống can thiệp sớm tích hợp AI – phát hiện và hỗ trợ học sinh có nguy cơ
-        </p>
+        <ExportMenu
+          filename={`at-risk-students-${new Date().toISOString().slice(0, 10)}`}
+          getSheets={getAtRiskSheets}
+          meta={{
+            title: 'Báo cáo HS có nguy cơ (At-Risk)',
+            subtitle: `${filtered.length} HS — AeroEduVision`,
+            authorName: 'Admin Intervention',
+          }}
+        />
       </div>
 
       {/* ── Summary stat cards ── */}

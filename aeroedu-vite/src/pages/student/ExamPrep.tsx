@@ -22,6 +22,8 @@ import { GalaxyHero } from "@/components/common/GalaxyHero"
 import { LevelXPCard } from "@/components/common/LevelXPCard"
 import { RecoDebugBadge } from "@/components/reco/RecoDebugBadge"
 import { RecoDebugLayer } from "@/components/reco/RecoDebugLayer"
+import { ExportMenu } from "@/components/common/ExportMenu"
+import type { SheetData as ExportSheetData } from "@/lib/exportReport"
 import { api } from "@/services/api"
 import type {
   PracticeExam,
@@ -819,11 +821,64 @@ export default function ExamPrepPage() {
 
   /* ─── RENDER: History ─────────────────────────────── */
   if (view === "history") {
+    const historySheets = (): ExportSheetData[] => {
+      if (history.length === 0) return []
+      const avg = history.filter(h => h.percentage != null).reduce((s, h) => s + (h.percentage || 0), 0) /
+                  Math.max(1, history.filter(h => h.percentage != null).length)
+      return [
+        {
+          name: 'Lịch sử làm bài',
+          columns: [
+            { key: 'subject',       label: 'Môn' },
+            { key: 'grade',         label: 'Lớp' },
+            { key: 'examType',      label: 'Loại đề' },
+            { key: 'questionCount', label: 'Số câu',   type: 'number' },
+            { key: 'score',         label: 'Điểm',     type: 'number' },
+            { key: 'percentage',    label: '%',        type: 'number' },
+            { key: 'completed',     label: 'Hoàn thành' },
+            { key: 'createdAt',     label: 'Tạo lúc',     type: 'date' },
+            { key: 'completedAt',   label: 'Nộp bài lúc', type: 'date' },
+          ],
+          rows: history.map(h => ({
+            ...h,
+            completed: h.completed ? 'Có' : 'Chưa',
+          })),
+        },
+        {
+          name: 'Thống kê cá nhân',
+          columns: [
+            { key: 'metric', label: 'Chỉ số' },
+            { key: 'value',  label: 'Giá trị' },
+          ],
+          rows: [
+            { metric: 'Tổng bài đã làm',     value: history.length },
+            { metric: 'Đã hoàn thành',       value: history.filter(h => h.completed).length },
+            { metric: 'Điểm trung bình (%)', value: avg.toFixed(1) },
+            { metric: 'Cao nhất',            value: Math.max(...history.map(h => h.percentage || 0)) },
+          ],
+        },
+      ]
+    }
+
     return (
       <div className="flex flex-col h-full">
         <PageHeader title="Lịch Sử Làm Bài" description="Xem lại các lần luyện tập trước đây" />
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto space-y-3">
+            {history.length > 0 && (
+              <div className="flex justify-end">
+                <ExportMenu
+                  variant="compact"
+                  filename={`lich-su-on-thi-${new Date().toISOString().slice(0, 10)}`}
+                  getSheets={historySheets}
+                  meta={{
+                    title: 'Lịch sử ôn thi cá nhân',
+                    subtitle: `${user?.name || 'Học sinh'} — AeroEduVision`,
+                    authorName: user?.name || undefined,
+                  }}
+                />
+              </div>
+            )}
             {history.length === 0 ? (
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-12 text-center">
                 <History className="h-12 w-12 text-white/15 mx-auto mb-3" />

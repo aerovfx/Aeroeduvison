@@ -8,7 +8,7 @@
  *   3. Trending Exams — table top exams với pass rate
  *   4. Recommendations — auto-generated cards (high/medium/low priority)
  */
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Activity, TrendingUp, TrendingDown, Minus, BookOpen, FileText, Sparkles,
   RefreshCw, Loader2, ArrowUpRight, AlertTriangle, Lightbulb, BarChart3,
@@ -19,6 +19,8 @@ import {
 } from 'recharts'
 import { adminInsightsService, type BehaviorData, type TrendingTopic, type TrendingExam, type Recommendation } from '@/services/adminInsights.service'
 import { toast } from 'react-hot-toast'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
 
 const D = {
   bg: '#0d0e17', card: '#10111e', card2: '#161728',
@@ -65,6 +67,114 @@ export default function AdminInsights() {
 
   useEffect(() => { load() }, [])
 
+  /** Build sheets cho export — 4 sections của Insights */
+  const getExportSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+    if (behavior) {
+      sheets.push({
+        name: 'Hành vi người dùng',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value', label: 'Giá trị', type: 'number' },
+        ],
+        rows: [
+          { metric: 'DAU (Daily Active Users)', value: behavior.dau },
+          { metric: 'WAU (Weekly Active Users)', value: behavior.wau },
+          { metric: 'MAU (Monthly Active Users)', value: behavior.mau },
+          { metric: 'Stickiness (DAU/MAU %)', value: behavior.stickiness },
+        ],
+      })
+      if (Array.isArray(behavior.hourly)) {
+        sheets.push({
+          name: 'Phân bố theo giờ',
+          columns: [
+            { key: 'hour',           label: 'Giờ' },
+            { key: 'views',          label: 'Lượt xem',  type: 'number' },
+            { key: 'unique_sessions',label: 'Phiên unique', type: 'number' },
+          ],
+          rows: behavior.hourly.map(r => ({ ...r, hour: `${r.hour}h` })),
+        })
+      }
+      if (Array.isArray(behavior.topEntries)) {
+        sheets.push({
+          name: 'Trang vào (entry pages)',
+          columns: [
+            { key: 'path',     label: 'Đường dẫn' },
+            { key: 'sessions', label: 'Số phiên', type: 'number' },
+          ],
+          rows: behavior.topEntries,
+        })
+      }
+      if (Array.isArray(behavior.bounceByRole)) {
+        sheets.push({
+          name: 'Bounce rate theo vai trò',
+          columns: [
+            { key: 'role',             label: 'Vai trò' },
+            { key: 'bounce_rate_pct',  label: 'Bounce',     type: 'percent' },
+            { key: 'total',            label: 'Tổng phiên', type: 'number' },
+            { key: 'bounced',          label: 'Bounce',     type: 'number' },
+          ],
+          rows: behavior.bounceByRole.map(b => ({
+            ...b,
+            role: b.role || 'GUEST',
+            bounce_rate_pct: (b.bounce_rate_pct || 0) / 100,  // convert 42 → 0.42 for percent format
+          })),
+        })
+      }
+    }
+    if (topics.length > 0) {
+      sheets.push({
+        name: 'Trending topics',
+        columns: [
+          { key: 'subject',                label: 'Môn' },
+          { key: 'attempts',               label: 'Lượt làm',       type: 'number' },
+          { key: 'uniqueStudents',         label: 'HS unique',      type: 'number' },
+          { key: 'examCount',              label: 'Số đề',          type: 'number' },
+          { key: 'avgAttemptsPerStudent',  label: 'TB/HS',          type: 'number' },
+          { key: 'growthPct',              label: 'Tăng trưởng %',  type: 'percent' },
+          { key: 'trend',                  label: 'Xu hướng' },
+        ],
+        rows: topics.map(t => ({
+          ...t,
+          growthPct: (t.growthPct || 0) / 100,
+        })),
+      })
+    }
+    if (exams.length > 0) {
+      sheets.push({
+        name: 'Trending exams',
+        columns: [
+          { key: 'title',           label: 'Tên đề' },
+          { key: 'subject',         label: 'Môn' },
+          { key: 'totalQuestions',  label: 'Số câu',     type: 'number' },
+          { key: 'attempts',        label: 'Lượt làm',   type: 'number' },
+          { key: 'unique_students', label: 'HS unique',  type: 'number' },
+          { key: 'avg_percentage',  label: '% TB',       type: 'number' },
+          { key: 'avg_score',       label: 'Điểm TB',    type: 'number' },
+          { key: 'pass_rate',       label: 'Tỉ lệ đậu',  type: 'percent' },
+        ],
+        rows: exams.map(e => ({
+          ...e,
+          pass_rate: (e.pass_rate || 0) / 100,
+        })),
+      })
+    }
+    if (recommendations.length > 0) {
+      sheets.push({
+        name: 'Gợi ý điều chỉnh',
+        columns: [
+          { key: 'title',     label: 'Tiêu đề' },
+          { key: 'category',  label: 'Phân loại' },
+          { key: 'priority',  label: 'Mức ưu tiên' },
+          { key: 'insight',   label: 'Insight' },
+          { key: 'action',    label: 'Hành động' },
+        ],
+        rows: recommendations,
+      })
+    }
+    return sheets
+  }, [behavior, topics, exams, recommendations])
+
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text }}>
       <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 20px' }}>
@@ -89,16 +199,27 @@ export default function AdminInsights() {
               </p>
             </div>
           </div>
-          <button onClick={load} disabled={loading}
-            style={{
-              padding: '8px 14px', background: 'rgba(124,58,237,0.15)',
-              border: '1px solid rgba(124,58,237,0.4)', borderRadius: 8,
-              color: '#a78bfa', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-            }}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Refresh
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button onClick={load} disabled={loading}
+              style={{
+                padding: '8px 14px', background: 'rgba(124,58,237,0.15)',
+                border: '1px solid rgba(124,58,237,0.4)', borderRadius: 8,
+                color: '#a78bfa', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Refresh
+            </button>
+            <ExportMenu
+              filename={`admin-insights-${new Date().toISOString().slice(0, 10)}`}
+              getSheets={getExportSheets}
+              meta={{
+                title: 'Báo cáo Admin Insights',
+                subtitle: 'Hành vi · Trending · Recommendations — AeroEduVision',
+                authorName: 'Admin Dashboard',
+              }}
+            />
+          </div>
         </div>
 
         {loading ? (

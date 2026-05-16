@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { api } from "@/services/api"
+import { ExportMenu } from "@/components/common/ExportMenu"
+import type { SheetData } from "@/lib/exportReport"
 import {
   CheckCircle2, Clock, FileText, Sparkles,
   ScanLine, ListChecks, Camera, RotateCcw,
@@ -239,22 +241,79 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 
   const keysWithSheets = Array.from(new Set(rows.map(r => r.answerKeyId)))
 
+  /** Export sheets — bảng điểm + summary stats */
+  const getGradedSheets = (): SheetData[] => {
+    if (rows.length === 0) return []
+    const avg = rows.reduce((s, r) => s + r.percentage, 0) / rows.length
+    const max = Math.max(...rows.map(r => r.totalScore))
+    const min = Math.min(...rows.map(r => r.totalScore))
+    return [
+      {
+        name: `Bảng điểm (${rows.length})`,
+        columns: [
+          { key: 'studentName', label: 'Họ tên' },
+          { key: 'studentId',   label: 'SBD' },
+          { key: 'totalScore',  label: 'Điểm',     type: 'number' },
+          { key: 'maxScore',    label: 'Tối đa',   type: 'number' },
+          { key: 'percentage',  label: '%',        type: 'number' },
+          { key: 'gradeLabel',  label: 'Loại' },
+          { key: 'reviewed',    label: 'Đã review' },
+          { key: 'published',   label: 'Đã công bố' },
+          { key: 'createdAt',   label: 'Chấm lúc', type: 'date' },
+          { key: 'examName',    label: 'Đề thi' },
+        ],
+        rows: rows.map(r => ({
+          ...r,
+          reviewed: r.reviewed ? 'Có' : 'Chưa',
+          published: r.published ? 'Có' : 'Chưa',
+          examName: keyName(r.answerKeyId),
+        })),
+      },
+      {
+        name: 'Thống kê',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value',  label: 'Giá trị' },
+        ],
+        rows: [
+          { metric: 'Bài đã chấm',  value: rows.length },
+          { metric: 'TB điểm (%)',  value: avg.toFixed(1) },
+          { metric: 'Cao nhất',     value: max },
+          { metric: 'Thấp nhất',    value: min },
+          { metric: 'Số đề thi',    value: keysWithSheets.length },
+        ],
+      },
+    ]
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Filter */}
-      {keysWithSheets.length > 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>Lọc theo đề:</span>
-          <select
-            value={filterKeyId}
-            onChange={e => setFilterKeyId(e.target.value)}
-            style={{ fontSize: 13, border: `1px solid ${D.border2}`, borderRadius: 8, padding: "6px 12px", background: D.card2, color: D.text, outline: "none" }}
-          >
-            <option value="all">Tất cả ({rows.length})</option>
-            {keysWithSheets.map(kId => <option key={kId} value={kId}>{keyName(kId)}</option>)}
-          </select>
-        </div>
-      )}
+      {/* Filter + Export */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", flexWrap: "wrap" }}>
+        {keysWithSheets.length > 1 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>Lọc theo đề:</span>
+            <select
+              value={filterKeyId}
+              onChange={e => setFilterKeyId(e.target.value)}
+              style={{ fontSize: 13, border: `1px solid ${D.border2}`, borderRadius: 8, padding: "6px 12px", background: D.card2, color: D.text, outline: "none" }}
+            >
+              <option value="all">Tất cả ({rows.length})</option>
+              {keysWithSheets.map(kId => <option key={kId} value={kId}>{keyName(kId)}</option>)}
+            </select>
+          </div>
+        ) : <div />}
+        <ExportMenu
+          variant="compact"
+          filename={`bang-diem-${new Date().toISOString().slice(0, 10)}`}
+          getSheets={getGradedSheets}
+          meta={{
+            title: 'Bảng điểm — Đã chấm',
+            subtitle: `Tổng ${rows.length} bài · ${keysWithSheets.length} đề`,
+            authorName: 'GV',
+          }}
+        />
+      </div>
 
       {/* Summary stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
