@@ -6,22 +6,56 @@
  *   - Grid 2x3 các bài còn lại
  *   - Sidebar phải: tin xem nhiều
  */
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, Clock } from 'lucide-react'
+import { Eye, Clock, Sparkles } from 'lucide-react'
 import { NewsLayout } from './NewsLayout'
 import {
   NEWS,
   CATEGORY_LABELS,
   formatVietnameseDate,
   formatViewCount,
+  type NewsArticle,
 } from './articles'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function NewsIndex() {
-  const sorted = [...NEWS].sort(
+  const { user } = useAuth()
+
+  // Reco-ranked feed: dùng rankNews mixer khi có user (sẽ personalize theo
+  // weakTopics đọc từ localStorage history). Fallback sort theo date cho
+  // anonymous browsing.
+  const dateSorted = [...NEWS].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   )
-  const featured = sorted[0]
-  const rest = sorted.slice(1)
+  const [ranked, setRanked] = useState<NewsArticle[]>(dateSorted)
+  const [usingReco, setUsingReco] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { rankNews, buildContext } = await import('@/lib/reco')
+        // Weak topics đọc từ history — nếu user mới chưa làm bài, default rỗng
+        const ctx = buildContext({
+          userId: user?.id ?? null,
+          userName: user?.name ?? undefined,
+        })
+        const r = await rankNews(NEWS, ctx, { topK: NEWS.length })
+        if (!cancelled && r.length > 0) {
+          setRanked(r)
+          setUsingReco(true)
+        }
+      } catch (e) {
+        console.warn('[NewsIndex] reco failed, fallback:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user])
+
+  const featured = ranked[0]
+  const rest = ranked.slice(1)
   const mostViewed = [...NEWS].sort((a, b) => b.views - a.views).slice(0, 5)
 
   return (
@@ -29,6 +63,13 @@ export default function NewsIndex() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8">
         {/* Main feed */}
         <div>
+          {/* Personalization badge — chỉ hiện khi user đăng nhập + reco active */}
+          {usingReco && (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 mb-4 rounded-full text-[11px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/30">
+              <Sparkles className="w-3 h-3" />
+              Sắp xếp riêng cho bạn
+            </div>
+          )}
           {/* Featured article */}
           {featured && (
             <Link

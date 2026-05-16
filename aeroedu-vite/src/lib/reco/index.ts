@@ -15,3 +15,4 @@ export type { HistoryRecord } from './context'
 
 // Use-case mixers
 export { rankExams, rankMatrices, reasonLabel } from './examPrepMixer'
+export { rankNews, newsReasonLabel } from './newsMixer'

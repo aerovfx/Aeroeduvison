@@ -21,6 +21,7 @@ import { NameStartModal } from "@/components/exam/NameStartModal"
 import { GalaxyHero } from "@/components/common/GalaxyHero"
 import { LevelXPCard } from "@/components/common/LevelXPCard"
 import { RecoDebugBadge } from "@/components/reco/RecoDebugBadge"
+import { RecoDebugLayer } from "@/components/reco/RecoDebugLayer"
 import { api } from "@/services/api"
 import type {
   PracticeExam,
@@ -164,30 +165,45 @@ export default function ExamPrepPage() {
    * Trả về Scored<TeacherExam>[] với __reasons cho UI chip.
    */
   const [rankedExams, setRankedExams] = useState<Array<TeacherExam & { __score?: number; __reasons?: string[] }>>([])
+  const [rankedMatrices, setRankedMatrices] = useState<Array<ExamMatrixItem & { __score?: number; __reasons?: string[] }>>([])
   useEffect(() => {
-    if (teacherExamsRaw.length === 0) { setRankedExams([]); return }
+    if (teacherExamsRaw.length === 0 && examMatrices.length === 0) {
+      setRankedExams([])
+      setRankedMatrices([])
+      return
+    }
     let cancelled = false
     ;(async () => {
       try {
-        const { rankExams, buildContext } = await import('@/lib/reco')
+        const { rankExams, rankMatrices, buildContext } = await import('@/lib/reco')
         const ctx = buildContext({
           userId: user?.id ?? null,
           userName: user?.name ?? undefined,
           grade: formData.grade,
           weakTopics: stats?.weakTopics ?? [],
         })
-        const ranked = await rankExams(teacherExamsRaw, ctx, { topK: 50 })
-        if (!cancelled) setRankedExams(ranked)
+        const [ranked, rankedMx] = await Promise.all([
+          teacherExamsRaw.length > 0 ? rankExams(teacherExamsRaw, ctx, { topK: 50 }) : Promise.resolve([]),
+          examMatrices.length > 0 ? rankMatrices(examMatrices, ctx, { topK: 20 }) : Promise.resolve([]),
+        ])
+        if (!cancelled) {
+          setRankedExams(ranked)
+          setRankedMatrices(rankedMx)
+        }
       } catch (e) {
         console.warn('[ExamPrep] reco failed, fallback to raw:', e)
-        if (!cancelled) setRankedExams(teacherExamsRaw)
+        if (!cancelled) {
+          setRankedExams(teacherExamsRaw)
+          setRankedMatrices(examMatrices)
+        }
       }
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teacherExamsRaw.length, stats?.weakTopics?.join('|'), user?.id, formData.grade])
+  }, [teacherExamsRaw.length, examMatrices.length, stats?.weakTopics?.join('|'), user?.id, formData.grade])
 
   const teacherExams = rankedExams.length > 0 ? rankedExams : teacherExamsRaw
+  const matricesDisplay = rankedMatrices.length > 0 ? rankedMatrices : examMatrices
 
   /* ─── React Query: Community stats ────────────────── */
   const {
@@ -1194,7 +1210,7 @@ export default function ExamPrepPage() {
                     </>
                   )}
 
-                  {teacherExams.length === 0 && (
+                  {teacherExams.length === 0 && examMatrices.length === 0 && (
                     <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-10 sm:p-12 text-center">
                       <GraduationCap className="h-14 w-14 sm:h-16 sm:w-16 text-white/15 mx-auto mb-4" />
                       <h3 className="text-white/85 text-lg sm:text-xl font-bold mb-1">
@@ -1204,6 +1220,94 @@ export default function ExamPrepPage() {
                         Khi giáo viên công bố đề mới, bạn sẽ thấy tại đây. Trong lúc đợi, thử
                         {' '}<button onClick={() => setActiveTab("bank")} className="text-purple-300 underline font-medium">luyện tập từ ngân hàng câu hỏi</button>.
                       </p>
+                    </div>
+                  )}
+
+                  {/* Đề từ ma trận — rank bằng rankMatrices, hiển thị nếu có */}
+                  {matricesDisplay.length > 0 && (
+                    <div className="mt-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h3 className="text-white/85 text-base sm:text-lg font-bold flex items-center gap-2">
+                          📊 Đề từ ma trận ({matricesDisplay.length})
+                        </h3>
+                        <span className="text-[10px] text-white/40">— random theo cấu trúc GV chọn</span>
+                      </div>
+                      <div className="space-y-2.5 sm:space-y-3">
+                        {matricesDisplay.slice(0, 8).map((mx, idx) => {
+                          const t = inferExamTheme({ id: mx.id, title: mx.name, examType: mx.examType } as TeacherExam, idx)
+                          return (
+                            <div
+                              key={mx.id}
+                              className="group rounded-2xl bg-white/[0.025] border border-white/[0.08] hover:border-white/[0.18] hover:bg-white/[0.04] transition-all p-4 sm:p-5"
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/30 bg-purple-500/12 text-[11px] font-bold text-purple-300">
+                                  Ma trận
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-white/55">
+                                  <RecoDebugBadge
+                                    score={(mx as any).__score}
+                                    breakdown={(mx as any).__breakdown}
+                                  />
+                                  <span className="inline-flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {mx.duration} phút
+                                  </span>
+                                  <span className="inline-flex items-center gap-1">
+                                    <FileText className="h-3 w-3" />
+                                    {mx.totalQuestions}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {(mx as any).__reasons && (mx as any).__reasons.length > 0 && (
+                                <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                                  {((mx as any).__reasons as string[]).slice(0, 3).map(r => {
+                                    const label = REASON_LABELS[r]
+                                    if (!label) return null
+                                    return (
+                                      <span
+                                        key={r}
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-200 border border-amber-500/30"
+                                      >
+                                        {label}
+                                      </span>
+                                    )
+                                  })}
+                                </div>
+                              )}
+
+                              <h4 className="font-bold text-white text-base sm:text-lg leading-tight mb-2 line-clamp-2" title={mx.name}>
+                                {mx.name}
+                              </h4>
+
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-white/[0.12] bg-white/[0.03] text-[11px] text-white/70">
+                                    {mx.subject || 'Đa môn'}
+                                  </span>
+                                  {mx.user?.name && (
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-white/[0.1] bg-white/[0.03] text-[11px] text-white/55">
+                                      GV: {mx.user.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => startFromTeacherExam(mx.id, "matrix", mx.name)}
+                                  disabled={loading}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-semibold text-xs shadow hover:brightness-110 active:scale-[0.97] transition disabled:opacity-50"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${t.from}, ${t.to})`,
+                                  }}
+                                >
+                                  <Rocket className="h-3.5 w-3.5" />
+                                  Bắt đầu
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                 </>
@@ -1264,6 +1368,17 @@ export default function ExamPrepPage() {
           setPendingStart(null)
           if (fn) fn()
         }}
+      />
+
+      {/* Dev-only RecoDebugLayer — toggle bằng ?recoDebug=1 */}
+      <RecoDebugLayer
+        title="ExamPrep"
+        items={[
+          ...rankedExams.map(e => ({ ...e, _kind: 'exam' as const })),
+          ...rankedMatrices.map(m => ({ ...m, _kind: 'matrix' as const, title: m.name })),
+        ]}
+        getTitle={(it) => (it as any).title || (it as any).name || it.id}
+        getId={(it) => `${(it as any)._kind}:${it.id}`}
       />
     </div>
   )
