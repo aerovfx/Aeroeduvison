@@ -215,6 +215,7 @@ const AdminOperationsPage   = lazy(() => import('@/pages/admin/Operations'))
 const AdminCategoriesPage   = lazy(() => import('@/pages/admin/Categories'))
 const AdminAnalyticsPage    = lazy(() => import('@/pages/admin/Analytics'))
 const AdminInsightsPage     = lazy(() => import('@/pages/admin/Insights'))
+const AdminPaymentsPage     = lazy(() => import('@/pages/admin/Payments'))
 
 // ── Fallback (PageFallback) dùng trực tiếp không cần lazy ────
 // vì component rất nhẹ (chỉ là iframe)
@@ -528,6 +529,7 @@ export function AppRouter() {
               <Route path="/admin/iot-management"      element={<AdminIoTManagement />} />
               <Route path="/admin/models"              element={<AdminModels />} />
               <Route path="/admin/settings"            element={<AdminSettings />} />
+              <Route path="/admin/payments"            element={<AdminPaymentsPage />} />
 
               {/* Chưa port → PageFallback */}
               <Route path="/admin/agents"              element={<PageFallback />} />

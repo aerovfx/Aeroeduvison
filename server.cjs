@@ -1982,6 +1982,51 @@ function makeProxy(target, label, pathFilter) {
     } catch { return null; }
   }
 
+  /**
+   * Async helper: kiểm tra user có quyền dùng feature không.
+   *   Trả về { ok: true } nếu đã có entitlement
+   *   Hoặc { ok: false, status, body } nếu thiếu → caller dùng res.status(status).json(body)
+   *
+   * Bypass cho:
+   *   - role = ADMIN
+   *   - role = TEACHER với feature thuộc list teacher (cho phép GV test)
+   *   - DEV mode (NODE_ENV !== 'production')  ← chỉ khi env DISABLE_GATING=1
+   */
+  async function checkEntitlement(req, feature) {
+    const p = getJwtPayload(req);
+    if (!p) return { ok: false, status: 401, body: { error: 'Unauthorized — đăng nhập trước khi dùng AI' } };
+    // Admin bypass
+    if (p.role === 'ADMIN') return { ok: true, bypass: 'admin' };
+    // Dev bypass flag — bật bằng env nếu muốn test không cần subscribe
+    if (process.env.DISABLE_GATING === '1') return { ok: true, bypass: 'dev' };
+
+    const userKey = p.sub || p.email;
+    if (!userKey) return { ok: false, status: 401, body: { error: 'Unauthorized' } };
+
+    try {
+      const ok = await entitlements.hasFeature(userKey, feature);
+      if (ok) return { ok: true };
+      return {
+        ok: false,
+        status: 402,   // Payment Required
+        body: {
+          error: 'subscription_required',
+          message: `Tính năng "${entitlements.FEATURES[feature] || feature}" yêu cầu gói trả phí`,
+          feature,
+          upgradeUrl: '/payment',
+        },
+      };
+    } catch (e) {
+      console.warn('[checkEntitlement] DB error:', e.message);
+      // Fail-open chỉ khi NEON quota — không khoá user nếu hệ thống lỗi
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('quota') || msg.includes('connection')) {
+        return { ok: true, bypass: 'db-degraded' };
+      }
+      return { ok: false, status: 500, body: { error: 'check_failed', message: e.message } };
+    }
+  }
+
   // Long polling worker (chỉ cần khi không setWebhook)
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_USE_WEBHOOK !== 'true') {
     tg.startPolling({ onCallback: onAdminCallback });
@@ -2066,9 +2111,163 @@ function makeProxy(target, label, pathFilter) {
       if (!userKey) return res.status(401).json({ error: 'Đăng nhập trước khi kích hoạt' });
       const result = await entitlements.activateCode(String(code).trim().toUpperCase(), userKey);
       console.log(`[entitlements] user=${userKey} activated ${result.code} → ${result.features.join(',')}`);
+      // Invalidate auth/me cache + entitlements:me cache (nếu có)
+      try {
+        const cache = require('./lib/cache.cjs');
+        cache.del(`auth:me:${userKey}`);
+        cache.del(`entitlements:${userKey}`);
+      } catch {}
       res.json({ ok: true, ...result });
     } catch (err) {
       res.status(400).json({ error: err.message });
+    }
+  });
+
+  // ─── Admin Payment Dashboard ───────────────────────────────
+  // Tất cả endpoint dưới đây yêu cầu JWT role = ADMIN.
+  function getJwtPayload(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const jwt = require('jsonwebtoken');
+      return jwt.verify(auth.slice(7),
+        process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!');
+    } catch { return null; }
+  }
+
+  function requireAdmin(req, res) {
+    const p = getJwtPayload(req);
+    if (!p) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    if (p.role !== 'ADMIN') { res.status(403).json({ error: 'Cần quyền admin' }); return null; }
+    return p;
+  }
+
+  // GET /api/admin/payments/list?status=&search=&limit=&offset=
+  app.get('/api/admin/payments/list', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const list = await orders.listOrders({
+        status: req.query.status || null,
+        search: req.query.search || '',
+        limit: Number(req.query.limit) || 50,
+        offset: Number(req.query.offset) || 0,
+      });
+      res.json({ orders: list });
+    } catch (err) {
+      console.error('[admin:payments:list] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/admin/payments/stats — revenue + counts + breakdown by plan
+  app.get('/api/admin/payments/stats', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const cache = require('./lib/cache.cjs');
+      // Cache 60s — stats không cần realtime, giảm load cho admin polling
+      const result = await cache.getOrFetch('admin:payments:stats', 60, async () => {
+        return {
+          ...(await orders.getStats()),
+          countByStatus: await orders.countByStatus(),
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      console.error('[admin:payments:stats] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/admin/payments/:id/approve — admin xác nhận đã nhận tiền
+  // → status = PAID + sinh activation code + gửi email cho user
+  app.post('/api/admin/payments/:id/approve', async (req, res) => {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const order = await orders.getOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status === 'PAID') return res.json({ ok: true, order, note: 'already paid' });
+
+      const updated = await orders.setStatus(req.params.id, 'PAID');
+      const code = await entitlements.generateActivationCode(updated);
+
+      // Invalidate caches
+      try {
+        const cache = require('./lib/cache.cjs');
+        cache.del('admin:payments:stats');
+        cache.del('admin:notifications');
+        if (order.userId) cache.del(`auth:me:${order.userId}`);
+      } catch {}
+
+      // Gửi email activation cho user (cùng pattern Telegram approve)
+      try {
+        if (updated.userEmail) {
+          await emailSender.sendActivationEmail({
+            to: updated.userEmail,
+            code: code.code,
+            planName: updated.planName,
+            features: code.features.map(f => entitlements.FEATURES[f] || f),
+            durationDays: code.durationDays,
+            baseUrl: PUBLIC_URL,
+          });
+          console.log(`[admin:approve] activation email → ${updated.userEmail}`);
+        }
+      } catch (e) {
+        console.warn('[admin:approve] email send failed (non-fatal):', e.message);
+      }
+      console.log(`[admin:payments] approved by ${admin.email} → order=${req.params.id} code=${code.code}`);
+      res.json({ ok: true, order: updated, code: code.code });
+    } catch (err) {
+      console.error('[admin:payments:approve] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/admin/payments/:id/reject — admin từ chối, không sinh code
+  app.post('/api/admin/payments/:id/reject', async (req, res) => {
+    const admin = requireAdmin(req, res);
+    if (!admin) return;
+    try {
+      const order = await orders.getOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const updated = await orders.setStatus(req.params.id, 'REJECTED');
+      try {
+        const cache = require('./lib/cache.cjs');
+        cache.del('admin:payments:stats');
+        cache.del('admin:notifications');
+      } catch {}
+      console.log(`[admin:payments] rejected by ${admin.email} → order=${req.params.id}`);
+      res.json({ ok: true, order: updated });
+    } catch (err) {
+      console.error('[admin:payments:reject] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/admin/notifications — pending count + recent activity cho header badge
+  app.get('/api/admin/notifications', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const cache = require('./lib/cache.cjs');
+      // Cache 30s — admin sidebar poll mỗi 60s nên không bị stale
+      const result = await cache.getOrFetch('admin:notifications', 30, async () => {
+        const counts = await orders.countByStatus();
+        const pendingOrders = await orders.listOrders({
+          status: 'AWAITING_REVIEW', limit: 5,
+        });
+        return {
+          pendingPaymentCount: counts.AWAITING_REVIEW || 0,
+          counts,
+          pendingOrders,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      console.error('[admin:notifications] ❌', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -3135,6 +3334,10 @@ if (USE_NODEJS_QUESTIONS) {
   app.post('/api/ai-tutor/chat', async (req, res) => {
     const startedAt = Date.now();
     try {
+      // Gating: yêu cầu subscription ai_tutor (admin + dev bypass)
+      const gate = await checkEntitlement(req, 'ai_tutor');
+      if (!gate.ok) return res.status(gate.status).json(gate.body);
+
       const body = req.body || {};
       const message = typeof body.message === 'string' ? body.message.trim() : '';
       const subject = typeof body.subject === 'string' ? body.subject : '';
@@ -3981,6 +4184,10 @@ if (USE_NODEJS_QUESTIONS) {
 
       // ── create (from Question Bank) ───────────────────
       if (action === 'create') {
+        // Gating: AI ôn thi cá nhân hoá (sinh đề từ AI khi bank thiếu câu)
+        const gate = await checkEntitlement(req, 'ai_examprep');
+        if (!gate.ok) return res.status(gate.status).json(gate.body);
+
         const subject = String(body.subject || '').trim();
         const grade = String(body.grade || '').trim();
         const examType = String(body.examType || 'Kiểm tra 1 tiết').trim();
@@ -14466,6 +14673,11 @@ if (!USE_NODEJS_QUESTIONS) {
   // Phiếu chuẩn Bộ GD&ĐT có các ô: SBD (số báo danh), Mã đề, Họ tên, Lớp.
   app.post('/api/grading/ocr', express.json({ limit: '20mb' }), async (req, res) => {
     try {
+      // Gating: OCR phiếu trắc nghiệm cần feature ocr_pdf (gói teacher)
+      const gating = require('./lib/gating.cjs');
+      const gate = await gating.checkEntitlement(req, 'ocr_pdf');
+      if (!gate.ok) return res.status(gate.status).json(gate.body);
+
       const { image, mimeType = 'image/jpeg' } = req.body || {};
       if (!image || typeof image !== 'string') {
         return res.status(400).json({

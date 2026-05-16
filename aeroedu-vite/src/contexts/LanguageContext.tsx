@@ -117,6 +117,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeOperations:      'Vận hành',
     routeModels:        'AI Models',
     routeAdminSettings: 'Cài đặt',
+    routeAdminPayments: 'Thanh toán',
 
     // ── Sidebar — Collapse ────────────────────────────────────
     collapse:           'Thu gọn',
@@ -448,6 +449,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeOperations:      'Operations',
     routeModels:        'AI Models',
     routeAdminSettings: 'Settings',
+    routeAdminPayments: 'Payments',
 
     // ── Sidebar — Collapse ────────────────────────────────────
     collapse:           'Collapse',

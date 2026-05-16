@@ -12,9 +12,11 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
-  ClipboardList, Network, Gamepad2,
+  ClipboardList, Network, Gamepad2, CreditCard,
   type LucideIcon
 } from 'lucide-react'
+import { useEffect } from 'react'
+import { api } from '@/services/api'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { cn } from '@/lib/utils'
@@ -25,6 +27,8 @@ type Route = {
   href: string
   isHighlighted?: boolean
   badge?: string
+  /** Key trong adminNotifications object — render badge số đỏ nếu > 0 */
+  notifKey?: 'pendingPaymentCount'
 }
 
 type RouteSection = {
@@ -195,6 +199,7 @@ const adminSections: RouteSection[] = [
     titleKey: 'sectionOperations',
     routes: [
       { icon: Shield,      labelKey: 'routeOperations',    href: '/admin/operations' },
+      { icon: CreditCard,  labelKey: 'routeAdminPayments', href: '/admin/payments',  notifKey: 'pendingPaymentCount' },
       { icon: Brain,       labelKey: 'routeModels',        href: '/admin/models' },
       { icon: Settings,    labelKey: 'routeAdminSettings', href: '/admin/settings' },
       { icon: CheckSquare, labelKey: 'routeNewsReview',    href: '/admin/news/review' },
@@ -219,7 +224,8 @@ function SidebarItem({
   isHighlighted,
   badge,
   collapsed,
-}: Route & { label: string; collapsed: boolean }) {
+  notifCount,
+}: Route & { label: string; collapsed: boolean; notifCount?: number }) {
   const location = useLocation()
   const isActive = location.pathname === href || location.pathname.startsWith(href + '/')
 
@@ -227,7 +233,7 @@ function SidebarItem({
     <Link
       to={href}
       className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group',
+        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative',
         isActive
           ? 'bg-[hsl(262,83%,58%)]/10 text-[hsl(262,83%,58%)]'
           : isHighlighted
@@ -237,11 +243,22 @@ function SidebarItem({
       )}
       title={collapsed ? label : undefined}
     >
-      <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-[hsl(262,83%,58%)]')} />
+      <div className="relative shrink-0">
+        <Icon className={cn('w-4 h-4', isActive && 'text-[hsl(262,83%,58%)]')} />
+        {/* Red dot indicator khi collapsed + có notification */}
+        {collapsed && notifCount !== undefined && notifCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-1 ring-background" />
+        )}
+      </div>
       {!collapsed && (
         <>
           <span className="flex-1 truncate">{label}</span>
-          {badge && (
+          {notifCount !== undefined && notifCount > 0 && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 animate-pulse">
+              {notifCount > 99 ? '99+' : notifCount}
+            </span>
+          )}
+          {badge && !notifCount && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[hsl(262,83%,58%)]/15 text-[hsl(262,83%,58%)] font-semibold">
               {badge}
             </span>
@@ -252,6 +269,27 @@ function SidebarItem({
   )
 }
 
+/** Poll /api/admin/notifications mỗi 60s để hiện badge số đỏ trên menu Payments. */
+function useAdminNotifications(enabled: boolean) {
+  const [data, setData] = useState<{ pendingPaymentCount: number } | null>(null)
+  useEffect(() => {
+    if (!enabled) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const res = await api.get<{ pendingPaymentCount: number }>('/admin/notifications')
+        if (!cancelled) setData(res.data)
+      } catch {
+        // im lặng — nếu BE chưa support, badge sẽ không hiện
+      }
+    }
+    tick()
+    const i = setInterval(tick, 60_000)
+    return () => { cancelled = true; clearInterval(i) }
+  }, [enabled])
+  return data
+}
+
 // ── Sidebar ────────────────────────────────────────────────────────────────
 
 export const Sidebar = memo(function Sidebar() {
@@ -259,6 +297,9 @@ export const Sidebar = memo(function Sidebar() {
   const role = useCurrentRole()
   const location = useLocation()
   const { t } = useLanguage()
+
+  const isAdminContext = role === 'ADMIN' || location.pathname.startsWith('/admin')
+  const adminNotifs = useAdminNotifications(isAdminContext)
 
   const sections = useMemo(() => {
     const isTeacherPage = location.pathname.startsWith('/teacher')
@@ -304,6 +345,9 @@ export const Sidebar = memo(function Sidebar() {
                 {...route}
                 label={t(route.labelKey)}
                 collapsed={collapsed}
+                notifCount={route.notifKey && adminNotifs
+                  ? adminNotifs[route.notifKey]
+                  : undefined}
               />
             ))}
           </div>
