@@ -27,8 +27,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Heart, Zap, Star, Save, RotateCcw, Pause, Play,
-  Book, Sparkles, Shield, Smile,
+  Book, Sparkles, Shield, Smile, Volume2, VolumeX,
 } from 'lucide-react'
+import { pixelOdysseyAudio as audio } from '@/lib/pixel-odyssey-audio'
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -367,6 +368,11 @@ export default function PixelOdyssey() {
   const [storyLog, setStoryLog] = useState(stateRef.current.storyLog)
   const [showHelp, setShowHelp] = useState(true)
   const [gameOver, setGameOver] = useState(false)
+  const [muted, setMuted] = useState(() => audio.isMuted())
+  // Ref tránh fire setGameOver lặp lại + tránh dialogue re-trigger ngay sau khi đóng
+  const gameOverFiredRef = useRef(false)
+  const dialogueCooldownRef = useRef(0)
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Load saved game ──
   useEffect(() => {
@@ -434,6 +440,7 @@ export default function PixelOdyssey() {
       s.storyLog.push({ chapter: to, line: CHAPTER_TITLES[to] || `Chương ${to}` })
       setStoryLog([...s.storyLog])
       setHud(h => ({ ...h, chapter: to }))
+      audio.sfxChapter()
 
       // Chapter 2 trigger: spawn shadow enemies in Luneria
       if (to === 2 && enemiesRef.current.get('luneria')!.length === 0) {
@@ -470,7 +477,11 @@ export default function PixelOdyssey() {
     })
     // Advance chapter sau khi xong dialogue (delay 1 tick)
     if (npc.advanceChapter && npc.advanceChapter > chapter) {
-      setTimeout(() => advanceChapter(npc.advanceChapter!), 200)
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current)
+      advanceTimerRef.current = setTimeout(() => {
+        advanceChapter(npc.advanceChapter!)
+        advanceTimerRef.current = null
+      }, 200)
     }
     // Mira awakened flag
     if (npc.tag === 'mira' && stateRef.current.currentMap === 'crater') {
@@ -512,12 +523,51 @@ export default function PixelOdyssey() {
     return () => clearInterval(t)
   }, [saveGame])
 
+  // ── Audio: init lần đầu + cleanup khi unmount ──
+  useEffect(() => {
+    audio.init()
+    return () => {
+      audio.stopBgm()
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current)
+    }
+  }, [])
+
+  // ── Auto-switch BGM theo map + chapter ──
+  useEffect(() => {
+    if (gameOver) { audio.stopBgm(); return }
+    if (paused || showHelp) { audio.stopBgm(); return }
+    const map = stateRef.current.currentMap
+    const chapter = stateRef.current.chapter
+    // Chapter ≥2 + có shadow trên map → battle music
+    const shadows = enemiesRef.current.get(map) || []
+    if (chapter >= 2 && shadows.length > 0) {
+      audio.playBgm('battle')
+    } else if (map === 'crater') {
+      audio.playBgm('crater')
+    } else {
+      audio.playBgm('luneria')
+    }
+  }, [paused, gameOver, showHelp, hud.chapter, hud.mapName])
+
+  const toggleMute = useCallback(() => {
+    const next = audio.toggleMute()
+    setMuted(next)
+  }, [])
+
+  // ── Set cooldown 400ms khi dialogue đóng — tránh E key re-trigger ngay ──
+  useEffect(() => {
+    if (dialogue === null) dialogueCooldownRef.current = 400
+  }, [dialogue])
+
   // ── Game loop ──
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+    const canvasEl = canvasRef.current
+    if (!canvasEl) return
+    const ctxObj = canvasEl.getContext('2d')
+    if (!ctxObj) return
+    // Non-null aliases — preserve narrowing inside nested functions
+    const canvas: HTMLCanvasElement = canvasEl
+    const ctx: CanvasRenderingContext2D = ctxObj
     let raf = 0
     let last = performance.now()
 
@@ -563,6 +613,7 @@ export default function PixelOdyssey() {
       if (keys.has(' ') || keys.has('j')) {
         if (p.attackTimer <= 0) {
           p.attackTimer = 250
+          audio.sfxAttack()
           // Hit detection
           const enemies = enemiesRef.current.get(s.currentMap) || []
           let attackX = p.x, attackY = p.y
@@ -570,6 +621,7 @@ export default function PixelOdyssey() {
           if (p.facing === 'down') attackY += ATTACK_RANGE
           if (p.facing === 'left') attackX -= ATTACK_RANGE
           if (p.facing === 'right') attackX += ATTACK_RANGE
+          let didHit = false
           enemies.forEach(e => {
             const d = Math.hypot(e.x - attackX, e.y - attackY)
             if (d < ATTACK_RANGE) {
@@ -579,17 +631,20 @@ export default function PixelOdyssey() {
               e.hp -= dmg
               damageNumbersRef.current.push({ x: e.x, y: e.y - 16, value: dmg, life: 800, color: '#fbbf24' })
               p.emotion.determination = Math.min(100, p.emotion.determination + 1)
+              didHit = true
             }
           })
+          if (didHit) audio.sfxHit()
         }
       }
 
       // Decrement timers
       if (p.attackTimer > 0) p.attackTimer = Math.max(0, p.attackTimer - dt)
       if (p.invulnTimer > 0) p.invulnTimer = Math.max(0, p.invulnTimer - dt)
+      if (dialogueCooldownRef.current > 0) dialogueCooldownRef.current = Math.max(0, dialogueCooldownRef.current - dt)
 
-      // NPC interaction
-      if (keys.has('e')) {
+      // NPC interaction (block khi cooldown sau khi đóng dialogue tránh re-trigger ngay)
+      if (keys.has('e') && dialogueCooldownRef.current <= 0) {
         const visibleNpcs = map.npcs.filter(n => !n.appearAfterChapter || s.chapter >= n.appearAfterChapter)
         for (const npc of visibleNpcs) {
           const dx2 = npc.x * TILE_SIZE + TILE_SIZE / 2 - p.x
@@ -597,6 +652,7 @@ export default function PixelOdyssey() {
           if (Math.hypot(dx2, dy2) < TILE_SIZE * 1.2) {
             keys.delete('e')
             startDialogue(npc)
+            audio.sfxDialogue()
             break
           }
         }
@@ -610,6 +666,7 @@ export default function PixelOdyssey() {
         p.starCores += 1
         p.emotion.hope = Math.min(100, p.emotion.hope + 5)
         damageNumbersRef.current.push({ x: p.x, y: p.y - 16, value: 1, life: 1000, color: '#fde047' })
+        audio.sfxPickup()
         setHud(h => ({ ...h, starCores: p.starCores, emotion: { ...p.emotion } }))
       }
 
@@ -635,14 +692,21 @@ export default function PixelOdyssey() {
           const ny = e.y + (dyp / dist) * e.speed * (dt / 16.6)
           if (isWalkable(map, nx, ny)) { e.x = nx; e.y = ny }
         }
-        // Attack player
-        if (dist < 32 && e.cooldown <= 0 && p.invulnTimer <= 0) {
+        // Attack player (skip nếu đã game over để không trừ HP âm)
+        if (dist < 32 && e.cooldown <= 0 && p.invulnTimer <= 0 && p.hp > 0) {
           p.hp = Math.max(0, p.hp - e.damage)
           p.invulnTimer = 600
           p.emotion.fear = Math.min(100, p.emotion.fear + 2)
           e.cooldown = 1000
           damageNumbersRef.current.push({ x: p.x, y: p.y - 16, value: e.damage, life: 800, color: '#f87171' })
-          if (p.hp <= 0) setGameOver(true)
+          audio.sfxDamage()
+          // Force sync HUD ngay khi mất HP (không chờ random tick)
+          setHud(h => ({ ...h, hp: p.hp, emotion: { ...p.emotion } }))
+          if (p.hp <= 0 && !gameOverFiredRef.current) {
+            gameOverFiredRef.current = true
+            setGameOver(true)
+            audio.stopBgm()
+          }
         }
         if (e.cooldown > 0) e.cooldown -= dt
       })
@@ -667,6 +731,9 @@ export default function PixelOdyssey() {
             p.maxMp += 10
             p.mp = p.maxMp
             damageNumbersRef.current.push({ x: p.x, y: p.y - 32, value: p.level, life: 2000, color: '#22d3ee' })
+            audio.sfxLevelUp()
+            // Force HUD sync ngay khi level up (đổi nhiều giá trị)
+            setHud(h => ({ ...h, hp: p.hp, mp: p.mp, level: p.level, xp: p.xp }))
           }
         } else {
           remaining.push(e)
@@ -1068,6 +1135,17 @@ export default function PixelOdyssey() {
             className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 inline-flex items-center gap-1.5"
           >
             <Book className="w-3.5 h-3.5" /> Nhật ký cốt truyện
+          </button>
+          <button
+            onClick={toggleMute}
+            title={muted ? 'Bật nhạc nền' : 'Tắt nhạc nền'}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border inline-flex items-center gap-1.5 ${
+              muted
+                ? 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                : 'bg-purple-500/15 border-purple-500/30 text-purple-300 hover:bg-purple-500/25'
+            }`}
+          >
+            {muted ? <><VolumeX className="w-3.5 h-3.5" /> Tắt</> : <><Volume2 className="w-3.5 h-3.5" /> Nhạc</>}
           </button>
           <button
             onClick={() => setPaused(p => !p)}
