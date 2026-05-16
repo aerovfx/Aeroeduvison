@@ -90,6 +90,11 @@ export class ArduinoRuntime {
   /** Optional callback khi mọi state thay đổi (cho re-render) */
   private onUpdate?: () => void
   private listeners: Array<() => void> = []
+  /** Track whether the last Serial append ended with newline (println).
+   *  Khi true → lần append tiếp theo (print hay println) sẽ tạo dòng mới.
+   *  Start true để Serial.print đầu tiên cũng tạo dòng mới chứ không bị
+   *  merge vào dòng "Serial begin". */
+  private lastEndedWithNewline = true
   public error: string | null = null
 
   constructor(signal: StopSignal, opts: RuntimeOptions = {}) {
@@ -112,6 +117,7 @@ export class ArduinoRuntime {
   reset() {
     this.startedAt = performance.now()
     this.serialLines = []
+    this.lastEndedWithNewline = true
     this.error = null
     this.tones.clear()
     this.signal.stopped = false
@@ -229,13 +235,18 @@ export class ArduinoRuntime {
 
   private serialLog(text: string) { this.serialAppend(text, true) }
   private serialAppend(text: string, newline: boolean) {
-    const last = this.serialLines[this.serialLines.length - 1]
-    if (last && !text.endsWith('\n') && !newline) {
-      // Append vào dòng cuối
-      last.text += text
-    } else {
+    // Nếu dòng trước đã kết thúc bằng newline → tạo dòng mới.
+    // Nếu chưa → append vào dòng đang dở.
+    if (this.lastEndedWithNewline || this.serialLines.length === 0) {
       this.serialLines.push({ t: this.millis(), text })
+    } else {
+      const last = this.serialLines[this.serialLines.length - 1]
+      last.text += text
     }
+    // Cập nhật flag: dòng kết thúc bằng newline khi:
+    //   - println được gọi (newline=true), HOẶC
+    //   - text tự chứa '\n' ở cuối (vd Serial.print("hi\n"))
+    this.lastEndedWithNewline = newline || text.endsWith('\n')
     if (this.serialLines.length > this.opts.maxSerialLines) {
       this.serialLines = this.serialLines.slice(-this.opts.maxSerialLines)
     }

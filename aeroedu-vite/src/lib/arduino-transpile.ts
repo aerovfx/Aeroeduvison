@@ -147,8 +147,19 @@ function replaceTypes(src: string): string {
     })
   // const T x → const x
   r = r.replace(/\bconst\s+(int|long|byte|short|float|double|bool|char)\s+/g, 'const ')
-  // char arr[N] → let arr   (drop the [N] size)
-  r = r.replace(/(let\s+\w+)\s*\[\s*\d*\s*\]/g, '$1')
+  // C array initializer: `let X[N] = { 1, 2, 3 }` → `let X = [1, 2, 3]`
+  // Cũng cover `const X[N] = {...}` (sau khi const đã giữ nguyên ở trên)
+  r = r.replace(
+    /\b(let|const)\s+(\w+)\s*\[\s*\d*\s*\]\s*=\s*\{([\s\S]*?)\}/g,
+    (_m, kw, name, contents) => `${kw} ${name} = [${contents}]`,
+  )
+  // Array khai báo không init: `let X[N];` → `let X = new Array(N).fill(0)`
+  //   (giữ size để loop chạy đúng); `let X[];` → `let X = []`
+  r = r.replace(
+    /\b(let|const)\s+(\w+)\s*\[\s*(\d+)\s*\]/g,
+    (_m, kw, name, size) => `${kw} ${name} = new Array(${size}).fill(0)`,
+  )
+  r = r.replace(/\b(let|const)\s+(\w+)\s*\[\s*\]/g, '$1 $2 = []')
   // String type → let
   r = r.replace(/\bString\s+/g, 'let ')
   return r
@@ -389,8 +400,22 @@ export async function executeSketch(
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-implied-eval
   const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor
+  let fn: any
   try {
-    const fn = new AsyncFunction('runtime', 'signal', jsCode)
+    fn = new AsyncFunction('runtime', 'signal', jsCode)
+  } catch (e: any) {
+    // SyntaxError khi transpile output sai cú pháp JS — show snippet để debug
+    const msg = e?.message || 'SyntaxError'
+    // Trích đoạn 200 ký tự đầu của jsCode (skip UTIL_PREFIX ~600 chars)
+    const snippet = jsCode.slice(600, 900).replace(/\s+/g, ' ').trim()
+    const friendly = new Error(
+      `Lỗi cú pháp khi biên dịch sketch: ${msg}\n` +
+      `(Snippet JS đã sinh: ${snippet}...)`
+    )
+    ;(friendly as any).original = e
+    throw friendly
+  }
+  try {
     await fn(runtime, signal)
   } catch (e: any) {
     if (e?.message === '__STOPPED__') return
