@@ -364,72 +364,17 @@ const SIMULATIONS: Simulation[] = [
     tags: ['AI', 'emotion', 'face', 'sign-language'],
     internal_link: '/dashboard/vision-tracker',
   },
-  {
-    id: 'quiz-tug-of-war',
-    name: 'Quiz Kéo Co Hai Đội',
-    description: 'Trò chơi trắc nghiệm đối kháng giữa 2 đội. Trả lời đúng kéo dây về phía mình, trả lời sai bị trừ điểm.',
-    category: 'Học qua trò chơi', level: 'Dễ', difficulty: 'Dễ', xp: 120, duration: '15-25 phút',
-    icon: 'Trophy',
-    features: ['Thi đấu 2 đội theo lượt', 'Thanh kéo co thể hiện lợi thế', 'Trừ điểm khi trả lời sai', 'Có thể tùy chỉnh câu hỏi'],
-    learning_objectives: ['Ôn tập kiến thức qua game', 'Tăng tương tác và tinh thần đồng đội', 'Luyện phản xạ và thảo luận nhóm', 'Theo dõi tiến độ qua điểm số'],
-    tags: ['quiz', 'team', 'tug-of-war', 'game'],
-    internal_link: '/dashboard/labtwin/labs/quiz-tug-of-war',
-  },
-  {
-    id: 'assembly-sim',
-    name: 'Mô phỏng lắp ráp chi tiết',
-    description: 'Trò chơi mô phỏng lắp ráp cơ khí/dân dụng bằng cử chỉ tay. Kéo thả linh kiện vào vùng lắp ráp.',
-    category: 'Học qua trò chơi', level: 'Trung bình', difficulty: 'Trung bình', xp: 160, duration: '15-20 phút',
-    icon: 'Box',
-    features: ['Kịch bản lắp động cơ + xây nhà', 'Điều khiển bằng cử chỉ chụm ngón', 'Theo dõi tiến độ lắp ráp realtime', 'HUD hướng dẫn thao tác'],
-    learning_objectives: ['Tư duy quy trình lắp ráp', 'Phối hợp tay-mắt trong thao tác', 'Hiểu thứ tự lắp ráp cơ bản', 'Tăng tương tác qua mô phỏng'],
-    tags: ['assembly', 'game', 'hand-tracking', 'simulation'],
-    internal_link: '/dashboard/labtwin/labs/assembly-sim',
-  },
-  {
-    id: 'gesture-swarm',
-    name: 'Murmuration AI',
-    description: 'Bầy hạt 3D chuyển động theo cử chỉ tay: tản ra, tụ lại và bay theo hướng ngón trỏ.',
-    category: 'Học qua trò chơi', level: 'Trung bình', difficulty: 'Trung bình', xp: 180, duration: '10-15 phút',
-    icon: 'Wind',
-    features: ['Hand tracking với MediaPipe', '3D particles + swarm physics', 'Điều khiển bằng mở tay/nắm tay', 'Tùy chỉnh màu bầy đàn'],
-    learning_objectives: ['Hiểu khái niệm điều khiển theo cử chỉ', 'Quan sát hành vi bầy đàn trong mô phỏng', 'Tăng tương tác trực quan với 3D', 'Khám phá motion + vector'],
-    tags: ['gesture', 'swarm', 'mediapipe', '3d', 'game'],
-    internal_link: '/dashboard/labtwin/labs/gesture-swarm',
-  },
-  {
-    id: 'roll-call-wheel',
-    name: 'Vòng quay gọi tên',
-    description: 'Ứng dụng gọi tên học sinh tự động bằng vòng quay ngẫu nhiên từ danh sách lớp.',
-    category: 'Học qua trò chơi', level: 'Dễ', difficulty: 'Dễ', xp: 90, duration: '5-10 phút',
-    icon: 'Trophy',
-    features: ['Quay chọn học sinh ngẫu nhiên', 'Loại trừ học sinh đã gọi', 'Thêm/xóa học sinh nhanh', 'Pháo hoa khi chọn'],
-    learning_objectives: ['Tăng tương tác lớp học', 'Khuyến khích học sinh tham gia', 'Tổ chức hoạt động nhanh gọn', 'Gọi tên công bằng ngẫu nhiên'],
-    tags: ['roll-call', 'random', 'classroom', 'game'],
-    internal_link: '/dashboard/labtwin/labs/roll-call-wheel',
-  },
-  {
-    id: 'keo-co-app',
-    name: 'Kéo Co Kiến Thức',
-    description: 'Trò chơi đối kháng kiến thức theo format kéo co. Hai đội thi đấu trả lời câu hỏi để kéo dây về phía mình. Rèn luyện kiến thức và tinh thần đồng đội!',
-    category: 'Học qua trò chơi', level: 'Dễ', difficulty: 'Dễ', xp: 150, duration: '15-20 phút',
-    icon: 'Trophy',
-    features: ['Chơi 2 đội đối kháng trực tiếp', 'Hệ thống câu hỏi trắc nghiệm', 'Hình ảnh kéo co trực quan sinh động', 'Chỉnh sửa và thêm câu hỏi dễ dàng', 'Bấm giờ và tính điểm tự động'],
-    learning_objectives: ['Tăng cường kiến thức qua trò chơi', 'Phát triển tinh thần đồng đội', 'Rèn luyện phản xạ và tư duy nhanh', 'Tạo không khí lớp học sôi động'],
-    tags: ['quiz', 'tug-of-war', 'team-game', 'classroom', 'trắc nghiệm'],
-    internal_link: '/dashboard/labtwin/labs/keo-co-app',
-  },
-  {
-    id: 'pixel-agents',
-    name: 'Pixel Agents - AI RPG',
-    description: 'Game RPG pixel art với chủ đề AI agents. Khám phá bản đồ, điều khiển nhân vật, và tương tác với các agent thông qua chat. Trải nghiệm độc đáo kết hợp game và AI!',
-    category: 'Học qua trò chơi', level: 'Dễ', difficulty: 'Dễ', xp: 200, duration: '20-30 phút',
-    icon: 'Trophy',
-    features: ['Đồ họa pixel art retro đẹp mắt', 'Điều khiển nhân vật bằng WASD/Arrow keys', 'Hệ thống chat AI agent thông minh', 'Nhiều NPC agents với hành vi độc lập', 'Bản đồ tương tác với nhiều vật thể'],
-    learning_objectives: ['Hiểu khái niệm cơ bản về game development', 'Khám phá AI agents và subagents', 'Tương tác với hệ thống đa agent', 'Trải nghiệm learning qua gameplay'],
-    tags: ['rpg', 'pixel-art', 'ai-agents', 'game', 'chat', 'exploration'],
-    internal_link: '/dashboard/labtwin/labs/pixel-agents',
-  },
+  // ──────────────────────────────────────────────────────────────
+  // 📌 6 game labs đã chuyển sang Game Hub (/dashboard/games)
+  // - quiz-tug-of-war / keo-co-app    → /dashboard/games/keo-co
+  // - assembly-sim                     → /dashboard/games/assembly-sim
+  // - gesture-swarm                    → /dashboard/games/gesture-swarm
+  // - roll-call-wheel                  → /dashboard/games/roll-call-wheel
+  // - pixel-agents                     → /dashboard/games/pixel-agents
+  // Mục "Học qua trò chơi" đã bỏ khỏi LabTwin để tách bạch lab khoa học
+  // với trò chơi. Routes cũ /dashboard/labtwin/labs/<game> vẫn redirect
+  // sang /dashboard/games/* cho link cũ không bị broken.
+  // ──────────────────────────────────────────────────────────────
   {
     id: 'wokwi-sim',
     name: 'Electronics Simulator',

@@ -345,35 +345,34 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
             <Route path="/dashboard/labtwin/labs/circuit-simulator"       element={<CircuitSimulator />} />
             <Route path="/dashboard/labtwin/labs/digital-logic-lab"       element={<DigitalLogicLab />} />
-            {/* Pixel Odyssey moved to /dashboard/games — keep redirect cho link cũ */}
-            <Route path="/dashboard/labtwin/labs/pixel-odyssey"           element={<Navigate to="/dashboard/games/pixel-odyssey" replace />} />
-            {/* Games hub */}
+            {/* ── GAME HUB — mọi game mount trực tiếp dưới /dashboard/games/* ── */}
             <Route path="/dashboard/games"                                element={<GamesIndexPage />} />
             <Route path="/dashboard/games/pixel-odyssey"                  element={<PixelOdyssey />} />
             <Route path="/dashboard/games/pixel-agents"                   element={<PixelAgents />} />
             <Route path="/dashboard/games/keo-co"                         element={<KeoCoApp />} />
-            <Route path="/dashboard/games/wayground"                      element={<Navigate to="/dashboard/games/keo-co" replace />} />
             <Route path="/dashboard/games/buffalo-runner"                 element={<BuffaloRunnerPage />} />
-            {/* Aliases — Học qua trò chơi labs giờ accessible từ Game Hub */}
+            <Route path="/dashboard/games/roll-call-wheel"                element={<RollCallWheel />} />
+            <Route path="/dashboard/games/gesture-swarm"                  element={<GestureSwarm />} />
+            <Route path="/dashboard/games/assembly-sim"                   element={<AssemblySim />} />
+            <Route path="/dashboard/games/wayground"                      element={<Navigate to="/dashboard/games/keo-co" replace />} />
             <Route path="/dashboard/games/quiz-tug-of-war"                element={<Navigate to="/dashboard/games/keo-co" replace />} />
-            <Route path="/dashboard/games/roll-call-wheel"                element={<Navigate to="/dashboard/labtwin/labs/roll-call-wheel" replace />} />
-            <Route path="/dashboard/games/gesture-swarm"                  element={<Navigate to="/dashboard/labtwin/labs/gesture-swarm" replace />} />
-            <Route path="/dashboard/games/assembly-sim"                   element={<Navigate to="/dashboard/labtwin/labs/assembly-sim" replace />} />
+            {/* ── Backward compat — old labtwin/labs/* paths cho games → redirect ── */}
+            <Route path="/dashboard/labtwin/labs/pixel-odyssey"           element={<Navigate to="/dashboard/games/pixel-odyssey" replace />} />
+            <Route path="/dashboard/labtwin/labs/pixel-agents"            element={<Navigate to="/dashboard/games/pixel-agents" replace />} />
+            <Route path="/dashboard/labtwin/labs/keo-co-app"              element={<Navigate to="/dashboard/games/keo-co" replace />} />
             <Route path="/dashboard/labtwin/labs/quiz-tug-of-war"         element={<Navigate to="/dashboard/games/keo-co" replace />} />
+            <Route path="/dashboard/labtwin/labs/roll-call-wheel"         element={<Navigate to="/dashboard/games/roll-call-wheel" replace />} />
+            <Route path="/dashboard/labtwin/labs/gesture-swarm"           element={<Navigate to="/dashboard/games/gesture-swarm" replace />} />
+            <Route path="/dashboard/labtwin/labs/assembly-sim"            element={<Navigate to="/dashboard/games/assembly-sim" replace />} />
+            {/* ── Pure science labs (vẫn ở labtwin) ── */}
             <Route path="/dashboard/labtwin/labs/physics-motion"          element={<PhysicsMotion />} />
             <Route path="/dashboard/labtwin/labs/fluid-dynamics-2d"       element={<FluidDynamicsLab />} />
-            {/* ── New native simulation labs ───────────────── */}
             <Route path="/dashboard/labtwin/labs/spring-pendulum"         element={<SpringPendulum />} />
             <Route path="/dashboard/labtwin/labs/simple-pendulum"         element={<SimplePendulum />} />
             <Route path="/dashboard/labtwin/labs/optics-lab"              element={<OpticsLab />} />
             <Route path="/dashboard/labtwin/labs/wave-interference"       element={<WaveInterference />} />
             <Route path="/dashboard/labtwin/labs/mechaforce"              element={<MechaForce />} />
-            <Route path="/dashboard/labtwin/labs/pixel-agents"            element={<PixelAgents />} />
             <Route path="/dashboard/labtwin/labs/physics-dungeon"         element={<PhysicsDungeon />} />
-            <Route path="/dashboard/labtwin/labs/keo-co-app"              element={<KeoCoApp />} />
-            <Route path="/dashboard/labtwin/labs/roll-call-wheel"         element={<RollCallWheel />} />
-            <Route path="/dashboard/labtwin/labs/gesture-swarm"           element={<GestureSwarm />} />
-            <Route path="/dashboard/labtwin/labs/assembly-sim"            element={<AssemblySim />} />
             {/* Tất cả labs khác → LabNextJsFallback (info card, no iframe) */}
             <Route path="/dashboard/labtwin/labs/:labSlug"                element={<LabNextJsFallback />} />
             {/* Lab experiment pages */}

@@ -38,14 +38,8 @@ const PYTHON_CATEGORIES: CategorySummary[] = [
       { name: 'AeroFlow 3D Advanced',    duration: '60 phút', xp: 300 },
     ],
   },
-  {
-    category: 'Học qua trò chơi', count: 7, totalXP: 1100,
-    preview: [
-      { name: 'Hầm Khoa Học',               duration: '15-25 phút', xp: 200 },
-      { name: 'Quiz Kéo Co Hai Đội',        duration: '15-25 phút', xp: 120 },
-      { name: 'Mô phỏng lắp ráp chi tiết',  duration: '15-20 phút', xp: 160 },
-    ],
-  },
+  // 📌 Category "Học qua trò chơi" đã chuyển sang /dashboard/games (Game Hub)
+  // — tách bạch lab khoa học với trò chơi để dễ quản lí.
   {
     category: 'Machine Learning', count: 3, totalXP: 880,
     preview: [
