@@ -255,20 +255,8 @@ const POPULAR_LABS: PopularLab[] = [
     desc: 'Lực · động lực học',
     accent: 'rose',
   },
-  {
-    name: 'Pixel Agents',
-    emoji: '🧠',
-    path: '/dashboard/labtwin/labs/pixel-agents',
-    desc: 'AI multi-agent · game',
-    accent: 'fuchsia',
-  },
-  {
-    name: 'Gesture Swarm',
-    emoji: '👋',
-    path: '/dashboard/labtwin/labs/gesture-swarm',
-    desc: 'CV nhận diện cử chỉ',
-    accent: 'amber',
-  },
+  // 📌 Pixel Agents + Gesture Swarm đã chuyển sang Game Hub
+  //    /dashboard/games/pixel-agents · /dashboard/games/gesture-swarm
 ]
 
 // Lấy origin của site — fallback inphysic.com nếu chạy SSR/test

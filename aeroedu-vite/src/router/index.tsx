@@ -340,6 +340,7 @@ export function AppRouter() {
 
             {/* ── LABS ──────────────────────────────────────── */}
             <Route path="/dashboard/labtwin"                              element={<LabsIndexPage />} />
+            <Route path="/dashboard/labtwin/labs"                         element={<Navigate to="/dashboard/labtwin" replace />} />
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
