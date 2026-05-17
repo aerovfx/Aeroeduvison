@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `0069a96` (revision pixiai-00288-sar, 2026-05-17 — RS-Phase 10 enhanced Cold-start Onboarding: 3-step modal + Settings access LIVE)
-- Commits since last deploy: `1/5` (this docs)
+- Commits since last deploy: `5/5` → DEPLOYING (0f47358 docs · 3558056 fix localStorage userId · 6609659 Daily adaptive banner+badge · _next_ ForYou parity · then docs)
 - Prev: `298dfad` → pixiai-00287-cel (RS-Phase 9 A/B Testing Framework)
 - Prev: `6b9a8aa` → pixiai-00286-kad (Daily/Sprint UX polish: lastSentAt + progress footer + localStorage)
 - Prev: `d984880` → pixiai-00285-xan (RS-Phase 8 Ops: scheduler script + audience-aware digest)

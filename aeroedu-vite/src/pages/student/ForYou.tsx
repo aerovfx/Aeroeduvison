@@ -41,17 +41,20 @@ export default function ForYouPage() {
     refetchInterval: 5 * 60_000, // 5 phút
   })
 
-  // RS-Phase 10: trigger onboarding modal nếu cold-start + chưa onboarded
+  // RS-Phase 10: trigger onboarding modal nếu cold-start + chưa onboarded; cache prefs
+  const [onboardingPrefs, setOnboardingPrefs] = useState<{ subject?: string | null } | null>(null)
   useEffect(() => {
     if (!feed?.isColdStart) return
     rs.getOnboardingPrefs().then(r => {
       const p = r.prefs
+      setOnboardingPrefs(p)
       // Show modal nếu chưa có prefs HOẶC chưa skipped + chưa completed
       if (!p || (!p.skipped && !p.completedAt)) {
         setShowOnboarding(true)
       }
     }).catch(() => {})
   }, [feed?.isColdStart])
+  const hasOnboardedSubject = !!onboardingPrefs?.subject
 
   const { data: history } = useQuery({
     queryKey: ['reco-history-student'],
@@ -325,15 +328,23 @@ export default function ForYouPage() {
           </div>
         )}
 
-        {/* RS-Phase 10: Cold-start welcome banner cho user mới */}
+        {/* RS-Phase 10: Cold-start welcome banner cho user mới — adaptive theo onboarding */}
         {tab === 'feed' && !isLoading && feed?.isColdStart && visibleItems.length > 0 && (
           <div className="mb-3 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-rose-500/5 p-4">
             <div className="flex items-start gap-3">
-              <span className="text-2xl shrink-0">🌱</span>
+              <span className="text-2xl shrink-0">{hasOnboardedSubject ? '🎯' : '🌱'}</span>
               <div className="flex-1">
-                <h3 className="font-bold text-amber-200 text-sm mb-1">Chào mừng đến với AeroEduVision!</h3>
+                <h3 className="font-bold text-amber-200 text-sm mb-1">
+                  {hasOnboardedSubject
+                    ? `Gợi ý cá nhân hoá cho môn ${onboardingPrefs?.subject}`
+                    : 'Chào mừng đến với AeroEduVision!'}
+                </h3>
                 <p className="text-xs text-amber-100/80 leading-snug">
-                  Bạn mới đăng ký — đây là <strong>gợi ý khởi đầu</strong> từ content phổ biến + lộ trình GV. Càng tương tác nhiều (xem đề, làm bài, hỏi AI), feed càng cá nhân hoá hơn.
+                  {hasOnboardedSubject ? (
+                    <>AI đã lọc gợi ý theo sở thích bạn chọn. Tương tác thêm để feed thông minh hơn nữa. <button onClick={() => setShowOnboarding(true)} className="underline font-bold">Đổi sở thích</button></>
+                  ) : (
+                    <>Bạn mới đăng ký — đây là <strong>gợi ý khởi đầu</strong> từ content phổ biến + lộ trình GV. Càng tương tác nhiều, feed càng cá nhân hoá. <button onClick={() => setShowOnboarding(true)} className="underline font-bold">Cá nhân hoá ngay →</button></>
+                  )}
                 </p>
               </div>
             </div>
@@ -410,10 +421,16 @@ export default function ForYouPage() {
                         </div>
                       )}
 
-                      {/* RS-Phase 3: Reasons chips (transparency — vì sao gợi ý) */}
-                      {item.reasons && item.reasons.length > 0 && (
+                      {/* RS-Phase 3: Reasons chips (transparency — vì sao gợi ý)
+                          + RS-Phase 10: matchedPref badge cho cold-start items match subject */}
+                      {((item.reasons && item.reasons.length > 0) || item.meta?.matchedPref) && (
                         <div className="flex flex-wrap gap-1 mt-2">
-                          {item.reasons.slice(0, 3).map((r, ri) => (
+                          {item.meta?.matchedPref && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/40 font-bold">
+                              ⭐ Khớp sở thích
+                            </span>
+                          )}
+                          {item.reasons?.slice(0, 3).map((r, ri) => (
                             <span
                               key={ri}
                               className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-800/80 text-zinc-300 border border-zinc-700"
