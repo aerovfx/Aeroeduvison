@@ -15,10 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `3decf00` (revision TBD, 2026-05-17 — RS-Phase 3 Hydration richer signals + reasons)
-- Commits since last deploy: `0/5` (early deploy: RS Phase 3)
+- Last deployed commit: `6e43220` (revision TBD, 2026-05-17 — RS-Phase 4 Two-tower embedding retrieval)
+- Commits since last deploy: `0/5` (early deploy: RS Phase 4 ML-style retrieval)
+- Prev: `00fb87c` → pixiai-00276-don (RS-Phase 3 Hydration)
 - Prev: `94e69fe` → pixiai-00275-tuc (AiTutor+ExamRooms tracking + Activity tab)
-- Prev: `cc750cf` → pixiai-00274-gub (Auto-tracking 3 pages — RS data pipeline)
 - Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
 - Prev: `2401573` → pixiai-00270-kon (KG mobile UX cho iPhone 14 Pro Max)
 - Prev: `735ca63` → pixiai-00269-gum (KG teacher notification + tabbed sidebar)
