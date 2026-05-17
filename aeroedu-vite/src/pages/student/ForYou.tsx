@@ -114,16 +114,34 @@ export default function ForYouPage() {
             onClick={async () => {
               const r = await rs.sendDigestMe()
               if (r.sent) {
-                toast.success(`📧 Digest gửi đến notification bell (${r.itemsCount} mục)`)
+                // RS-Phase 8 multi-channel: liệt kê channels delivered ok
+                const ch = r.channels
+                const dv = r.deliveries
+                const okList: string[] = []
+                if (dv?.inApp?.ok)    okList.push('🔔 bell')
+                if (dv?.email?.ok)    okList.push('📧 email')
+                if (dv?.telegram?.ok) okList.push('💬 telegram')
+                if (okList.length > 0) {
+                  toast.success(`Digest gửi xong (${r.itemsCount} mục): ${okList.join(', ')}`, { duration: 4000 })
+                } else {
+                  toast.success(`Digest tạo xong (${r.itemsCount} mục) — bật kênh trong Cài đặt để nhận`, { duration: 4500 })
+                }
+                // Hint cho user nếu chưa bật multi-channel
+                if (ch && !ch.email && !ch.telegram) {
+                  setTimeout(() => toast(
+                    'Bật Email/Telegram trong Cài đặt → Thông báo → "Gợi ý AI hàng ngày" để nhận daily',
+                    { icon: '💡', duration: 5000 }
+                  ), 1500)
+                }
               } else if (r.reason === 'already_sent_today') {
-                toast('Đã gửi digest hôm nay rồi, kiểm tra 🔔', { icon: 'ℹ️' })
+                toast('Đã gửi digest hôm nay rồi, kiểm tra kênh đã bật 🔔', { icon: 'ℹ️' })
               } else {
                 toast.error('Chưa có data để tạo digest')
               }
             }}
             className="p-2 rounded-lg bg-cyan-500/15 active:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30"
             aria-label="Gửi digest"
-            title="Gửi tóm tắt 3 mục vào notification bell"
+            title="Gửi tóm tắt 3 mục qua các kênh đã bật (bell / email / telegram)"
           >
             <Send className="w-4 h-4" />
           </button>
