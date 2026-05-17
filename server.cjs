@@ -6718,6 +6718,68 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ────────────────────────────────────────────────────────────
+  // STUDENT-side: GET /api/student/learning-paths
+  // Trả về tất cả LearningPath mà student được phân công (qua
+  // LearningPathAssignment.studentId HOẶC studentEmail match user email)
+  // + thông tin teacher (name) để FE hiển thị "Lộ trình từ GV X".
+  // ────────────────────────────────────────────────────────────
+  app.get('/api/student/learning-paths', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user || !user.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureLPTables();
+      const pool = getAsgnPool();
+      // 2 nguồn match: theo studentId trực tiếp HOẶC theo email (GV import mailing list)
+      const { rows: assignments } = await pool.query(
+        `SELECT lpa.*, lp.name AS path_name, lp.description AS path_desc,
+                lp.subject AS path_subject, lp.difficulty AS path_difficulty,
+                lp.modules AS path_modules, lp."estimatedDays" AS path_estimated_days,
+                lp."totalXP" AS path_total_xp, lp."totalDuration" AS path_total_duration,
+                lp."teacherId" AS path_teacher_id, lp."createdAt" AS path_created_at,
+                u.name AS teacher_name, u.email AS teacher_email
+           FROM "LearningPathAssignment" lpa
+           JOIN "LearningPath" lp ON lp.id = lpa."pathId"
+           LEFT JOIN "User" u ON u.id = lp."teacherId"
+          WHERE lpa."studentId" = $1
+             OR (lpa."studentEmail" IS NOT NULL AND LOWER(lpa."studentEmail") = LOWER($2))
+          ORDER BY lpa."assignedAt" DESC NULLS LAST`,
+        [user.id, user.email || '']
+      );
+      const paths = assignments.map((a) => ({
+        // Assignment-level fields
+        assignmentId: a.id,
+        status: a.status,                  // 'assigned' | 'in_progress' | 'completed'
+        progressPct: a.progressPct || 0,
+        moduleStatus: a.moduleStatus || {},
+        assignedAt: a.assignedAt,
+        completedAt: a.completedAt,
+        lastActivityAt: a.lastActivityAt,
+        // Path-level fields
+        id: a.pathId,
+        name: a.path_name,
+        description: a.path_desc || '',
+        subject: a.path_subject || null,
+        difficulty: a.path_difficulty || 'medium',
+        modules: a.path_modules || [],
+        estimatedDays: a.path_estimated_days,
+        totalXP: a.path_total_xp,
+        totalDuration: a.path_total_duration,
+        createdAt: a.path_created_at,
+        // Teacher info
+        teacher: {
+          id: a.path_teacher_id,
+          name: a.teacher_name || null,
+          email: a.teacher_email || null,
+        },
+      }));
+      return res.json({ paths, count: paths.length });
+    } catch (err) {
+      console.error('[student:learning-paths]', err.message);
+      return res.status(500).json({ error: err.message, paths: [], count: 0 });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════
   // LESSON PLANS — GV soạn giáo án WYSIWYG (Google Docs-like)
   // Lưu HTML/JSON content → DB. Optional snapshot lên GCS bucket.
