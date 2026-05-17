@@ -238,14 +238,23 @@ function NotificationBell() {
     } catch { /* silent — bell không cần spam toast */ }
   }, [isAuthenticated])
 
-  // Initial + poll mỗi 30s khi tab visible
+  // Initial + poll mỗi 30s khi tab visible + refetch instant khi tab
+  // chuyển từ hidden → visible (user quay lại từ tab khác → thấy ngay
+  // notification mới, không phải đợi tới chu kỳ poll tiếp theo).
   useEffect(() => {
     fetchList()
     if (!isAuthenticated) return
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') fetchList()
     }, 30_000)
-    return () => clearInterval(id)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchList()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [fetchList, isAuthenticated])
 
   const handleClickItem = async (n: Notification) => {
