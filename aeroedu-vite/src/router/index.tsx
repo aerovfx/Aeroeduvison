@@ -341,7 +341,10 @@ export function AppRouter() {
 
             {/* ── LABS ──────────────────────────────────────── */}
             <Route path="/dashboard/labtwin"                              element={<LabsIndexPage />} />
-            <Route path="/dashboard/labtwin/labs"                         element={<Navigate to="/dashboard/labtwin" replace />} />
+            {/* /labs catalog page — phải register TRƯỚC :labSlug catch-all
+                để khớp đúng route. Trước đây bị Navigate redirect về /labtwin
+                khiến mọi card "Xem tất cả" / category filter loop vô tận. */}
+            <Route path="/dashboard/labtwin/labs"                         element={<PythonLabsPage />} />
             <Route path="/dashboard/labtwin/labs/aerodynamics"            element={<AerodynamicsLab />} />
             <Route path="/dashboard/labtwin/labs/airflow-cfd"             element={<AirflowCFDLab />} />
             <Route path="/dashboard/labtwin/labs/chemistry-lab"           element={<ChemistryLab />} />
@@ -379,7 +382,7 @@ export function AppRouter() {
             <Route path="/dashboard/labtwin/labs/:labSlug"                element={<LabNextJsFallback />} />
             {/* Lab experiment pages */}
             <Route path="/dashboard/labtwin/experiment/*"   element={<PageFallback />} />
-            <Route path="/dashboard/labtwin/labs"           element={<PythonLabsPage />} />
+            {/* /dashboard/labtwin/labs registered ở trên (line ~345) trước :labSlug */}
             <Route path="/dashboard/labtwin/labs-simple"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/ml-training"    element={<PageFallback />} />
             <Route path="/dashboard/labtwin/simulations-simple" element={<PageFallback />} />
