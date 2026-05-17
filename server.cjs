@@ -10528,21 +10528,151 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         filtered.push(c);
       }
 
-      // ── Filter: skip items user has "not_interested" or "skip" recently ──
+      // ─────────────────────────────────────────────────────────
+      // RS-PHASE 6: NEGATIVE FEEDBACK MODEL (time-decayed)
+      // Thay vì binary 14-day filter, dùng time-tiered logic:
+      //   ≤7 ngày  → HARD FILTER (loại hẳn)
+      //   7-30d    → Penalty -15 (giảm mạnh)
+      //   30-60d   → Penalty -5  (giảm nhẹ)
+      //   >60d     → bỏ qua
+      // PLUS: aggregate dislike vector → penalty pattern-based
+      // ─────────────────────────────────────────────────────────
       try {
-        const recentNeg = await pool.query(
-          `SELECT target_type, target_id FROM rs_action_log
-           WHERE user_id = $1 AND action IN ('not_interested', 'block', 'skip')
-             AND created_at > NOW() - INTERVAL '14 days'`,
+        const negActions = await pool.query(
+          `SELECT target_type, target_id, action, weight, metadata, created_at
+           FROM rs_action_log
+           WHERE user_id = $1
+             AND action IN ('not_interested', 'block', 'skip', 'fail_quiz', 'report')
+             AND created_at > NOW() - INTERVAL '60 days'
+           ORDER BY created_at DESC LIMIT 300`,
           [user.id]
         );
-        const negSet = new Set(recentNeg.rows.map(r => `${r.target_type}::${r.target_id}`));
+
+        // 1. HARD FILTER cho recent negatives (≤7 ngày)
+        const hardBlockSet = new Set();
+        // 2. SOFT PENALTY map per (type, id)
+        const softPenaltyById = {};
+        // 3. AGGREGATE dislike vector cho pattern detection
+        const dislike = {
+          types: {},
+          subjects: {},
+          topicHints: {},
+          teacherIds: {},
+          sources: {},
+        };
+
+        const TOPIC_KEYWORDS = ['dao động', 'điện', 'từ trường', 'cơ học', 'sóng',
+          'nhiệt', 'hóa', 'toán', 'lượng giác', 'đạo hàm', 'di truyền', 'sinh học'];
+
+        for (const row of negActions.rows) {
+          const ageDays = (Date.now() - new Date(row.created_at).getTime()) / 86400000;
+          const decay = Math.max(0.1, 1 - ageDays / 60); // 1.0 → 0.1 trong 60 ngày
+          const actionMagnitude = Math.abs(Number(row.weight) || 1);
+          const decayedW = actionMagnitude * decay;
+
+          const key = `${row.target_type}::${row.target_id}`;
+
+          // Tier 1: HARD FILTER ≤7 ngày
+          if (ageDays <= 7) {
+            hardBlockSet.add(key);
+          }
+          // Tier 2: SOFT PENALTY -15 cho 7-30 ngày
+          else if (ageDays <= 30) {
+            softPenaltyById[key] = (softPenaltyById[key] || 0) + 15;
+          }
+          // Tier 3: SOFT PENALTY -5 cho 30-60 ngày
+          else if (ageDays <= 60) {
+            softPenaltyById[key] = (softPenaltyById[key] || 0) + 5;
+          }
+
+          // PATTERN AGGREGATE — tất cả negatives 60 ngày đều contribute
+          dislike.types[row.target_type] =
+            (dislike.types[row.target_type] || 0) + decayedW;
+          const meta = row.metadata || {};
+          if (meta.subject) {
+            dislike.subjects[meta.subject] =
+              (dislike.subjects[meta.subject] || 0) + decayedW;
+          }
+          if (meta.teacherId) {
+            dislike.teacherIds[meta.teacherId] =
+              (dislike.teacherIds[meta.teacherId] || 0) + decayedW;
+          }
+          if (meta.source) {
+            dislike.sources[meta.source] =
+              (dislike.sources[meta.source] || 0) + decayedW;
+          }
+          // Topic hints từ title
+          const title = String(meta.title || meta.preview || '').toLowerCase();
+          for (const kw of TOPIC_KEYWORDS) {
+            if (title.includes(kw)) {
+              dislike.topicHints[kw] = (dislike.topicHints[kw] || 0) + decayedW;
+            }
+          }
+        }
+
+        // Apply HARD FILTER first
         for (let i = filtered.length - 1; i >= 0; i--) {
-          if (negSet.has(`${filtered[i].type}::${filtered[i].id}`)) {
+          const key = `${filtered[i].type}::${filtered[i].id}`;
+          if (hardBlockSet.has(key)) {
             filtered.splice(i, 1);
           }
         }
-      } catch (e) { console.warn('[rs:filter:neg]', e.message); }
+
+        // Apply SOFT PENALTIES (per-item exact + pattern-based)
+        for (const c of filtered) {
+          const key = `${c.type}::${c.id}`;
+          let penalty = 0;
+
+          // Exact-item penalty (Tier 2-3)
+          if (softPenaltyById[key]) {
+            penalty += softPenaltyById[key];
+          }
+
+          // Pattern-based penalties (dislike vector)
+          // Type-level (vd. user thường skip 'curious_topic')
+          if (dislike.types[c.type]) {
+            penalty += dislike.types[c.type] * 0.4;
+          }
+
+          // Subject-level (vd. user dislike Lý nhưng like Toán)
+          const subj = c.meta?.subject;
+          if (subj && dislike.subjects[subj]) {
+            penalty += dislike.subjects[subj] * 0.8;
+          }
+
+          // Teacher-level (mạnh — user phản đối content từ GV này)
+          const teacherId = c.meta?.teacherId;
+          if (teacherId && dislike.teacherIds[teacherId]) {
+            penalty += dislike.teacherIds[teacherId] * 1.5;
+          }
+
+          // Source-level (user dislike kind-source — vd. 'curious')
+          if (dislike.sources[c.source]) {
+            penalty += dislike.sources[c.source] * 0.3;
+          }
+
+          // Topic hints penalty (text match từ title/description)
+          const text = ((c.title || '') + ' ' + (c.description || '')).toLowerCase();
+          for (const [kw, w] of Object.entries(dislike.topicHints)) {
+            if (text.includes(kw)) {
+              penalty += w * 0.6;
+            }
+          }
+
+          // Cap penalty 40 — không để âm score xuống quá xa
+          penalty = Math.min(40, penalty);
+          c.score -= penalty;
+
+          if (penalty >= 5) {
+            c.reasons?.push?.(`🔻 -${Math.round(penalty)} (giảm rank: lịch sử ít quan tâm)`);
+          }
+
+          // Lưu negative signal vào predictions để frontend hiển thị
+          if (c.predictions && penalty > 0) {
+            c.predictions.negative_signal_penalty = Math.round(penalty);
+          }
+        }
+      } catch (e) { console.warn('[rs:filter:negative-model]', e.message); }
 
       // ─────────────────────────────────────────────────────────
       // RS-PHASE 3: HYDRATION — enrich candidates với rich signals
