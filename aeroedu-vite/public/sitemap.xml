@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemap-protocol.org/schemas/sitemap/0.9"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemap-protocol.org/schemas/sitemap/0.9
+                            http://www.sitemap-protocol.org/schemas/sitemap/0.9/sitemap.xsd">
+
+  <!-- ── Trang chủ ── -->
+  <url>
+    <loc>https://inphysic.com/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- ── Tài liệu hệ thống ── -->
+  <url>
+    <loc>https://inphysic.com/docs</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- 15 doc articles (slugs khớp ARTICLES export) -->
+  <url><loc>https://inphysic.com/docs/getting-started</loc><priority>0.8</priority></url>
+  <url><loc>https://inphysic.com/docs/student-guide</loc><priority>0.8</priority></url>
+  <url><loc>https://inphysic.com/docs/teacher-guide</loc><priority>0.8</priority></url>
+  <url><loc>https://inphysic.com/docs/exam-modes</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/online-exam-room</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/exam-matrix</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/question-bank</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/latex-editor</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/ai-tools</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/course-player</loc><priority>0.7</priority></url>
+  <url><loc>https://inphysic.com/docs/qr-exam</loc><priority>0.6</priority></url>
+  <url><loc>https://inphysic.com/docs/payment</loc><priority>0.6</priority></url>
+  <url><loc>https://inphysic.com/docs/cold-start</loc><priority>0.5</priority></url>
+  <url><loc>https://inphysic.com/docs/glossary</loc><priority>0.5</priority></url>
+  <url><loc>https://inphysic.com/docs/privacy-camera</loc><priority>0.5</priority></url>
+
+  <!-- ── Tin tức giáo dục ── -->
+  <url>
+    <loc>https://inphysic.com/news</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- ── Pricing ── -->
+  <url>
+    <loc>https://inphysic.com/pricing</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- ── Auth pages ── -->
+  <url>
+    <loc>https://inphysic.com/auth/login</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://inphysic.com/auth/register</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- ── Legal ── -->
+  <url>
+    <loc>https://inphysic.com/terms</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://inphysic.com/privacy</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://inphysic.com/cookies</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://inphysic.com/contact-sales</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+</urlset>
