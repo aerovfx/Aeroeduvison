@@ -323,6 +323,33 @@ export default function TeacherSprintPage() {
                 </section>
               )
             })}
+
+            {/* Progress footer — GV thấy đã xử lý bao nhiêu trong sprint */}
+            {resolvedCount > 0 && (
+              <div className="mt-4 mx-auto max-w-md rounded-xl bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-transparent border border-emerald-500/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-2xl">✅</div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-300">
+                        {resolvedCount}/{resolvedCount + totalItems} đã xử lý
+                      </p>
+                      <p className="text-[10px] text-zinc-500">
+                        {Math.round((resolvedCount / (resolvedCount + totalItems)) * 100)}% sprint tuần này
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-1 max-w-[140px]">
+                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-500"
+                        style={{ width: `${Math.round((resolvedCount / (resolvedCount + totalItems)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
