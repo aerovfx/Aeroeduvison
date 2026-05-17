@@ -154,7 +154,7 @@ export default function CareerGamesPage() {
             dailyLife={selected.dailyLife}
           />
 
-          {/* Daily life text list — pair với sim, đọc song song */}
+          {/* Daily life text list — pair với sim, time tách thành badge */}
           {selected.dailyLife && selected.dailyLife.length > 0 && (
             <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
               <div className="flex items-center gap-2 mb-2">
@@ -162,14 +162,27 @@ export default function CareerGamesPage() {
                 <h4 className="text-xs font-bold text-zinc-200">Chi tiết lịch trình 1 ngày</h4>
               </div>
               <ol className="space-y-1.5">
-                {selected.dailyLife.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
-                    <span className="shrink-0 w-4 h-4 rounded-full bg-cyan-500/15 text-cyan-300 text-[9px] font-bold inline-flex items-center justify-center mt-0.5">
-                      {i + 1}
-                    </span>
-                    <span className="leading-snug">{item}</span>
-                  </li>
-                ))}
+                {selected.dailyLife.map((item, i) => {
+                  // Parse "9:30 - Code feature" → { time, rest }
+                  const m = item.match(/^(\d{1,2}:\d{2})\s*[-–—]\s*(.+)$/)
+                  const time = m?.[1]
+                  const rest = m?.[2] || item
+                  return (
+                    <li key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
+                      <span className="shrink-0 w-4 h-4 rounded-full bg-cyan-500/15 text-cyan-300 text-[9px] font-bold inline-flex items-center justify-center mt-0.5">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-1.5">
+                        {time && (
+                          <span className="font-mono font-bold text-cyan-400 text-[10px] shrink-0">
+                            {time}
+                          </span>
+                        )}
+                        <span className="leading-snug">{rest}</span>
+                      </div>
+                    </li>
+                  )
+                })}
               </ol>
             </div>
           )}
