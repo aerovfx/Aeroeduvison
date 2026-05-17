@@ -637,13 +637,19 @@ export default function PixelOdyssey() {
 
       {/* Completion banner */}
       {completed && (
-        <div className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border-b border-amber-500/40 flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
-          <p className="text-xs font-bold text-amber-100 flex-1">
+        <div className="px-4 py-2.5 bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border-b border-amber-500/40 flex items-center gap-2 flex-wrap">
+          <Sparkles className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
+          <p className="text-xs font-bold text-amber-100 flex-1 min-w-[60%]">
             🎉 Hoàn thành Odyssey! Bạn đã khám phá đủ {totalNPCs} nghề.
           </p>
+          <a
+            href="/student/career"
+            className="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 underline whitespace-nowrap"
+          >
+            Khám phá 22 nghề khác →
+          </a>
           <button onClick={resetTokens}
-            className="text-[10px] text-zinc-400 hover:text-zinc-200 underline">
+            className="text-[10px] text-zinc-400 hover:text-zinc-200 underline whitespace-nowrap">
             Chơi lại
           </button>
         </div>
