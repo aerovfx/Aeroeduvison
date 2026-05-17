@@ -152,7 +152,35 @@ export default function TeacherSprintPage() {
           </div>
         )}
 
-        {!isLoading && totalItems === 0 && (
+        {!isLoading && totalItems === 0 && resolvedCount > 0 && (
+          /* Celebratory state: đã xử lý hết tuần này */
+          <div className="text-center py-12 px-4 rounded-2xl bg-gradient-to-br from-emerald-500/20 via-cyan-500/10 to-transparent border border-emerald-500/40">
+            <div className="text-5xl mb-3 animate-bounce">🎉</div>
+            <p className="text-base font-bold text-emerald-300 mb-1">
+              Đã xử lý hết Sprint tuần này!
+            </p>
+            <p className="text-xs text-zinc-400 mb-5">
+              GV vừa hoàn thành {resolvedCount} hành động cho lớp đang dạy.
+              Tốc độ tuyệt vời 🚀
+            </p>
+            <div className="flex gap-2 justify-center flex-wrap">
+              <button
+                onClick={() => refetch()}
+                className="px-4 py-2 rounded-lg bg-emerald-500/30 text-emerald-100 border border-emerald-400/50 text-sm font-bold"
+              >
+                <RefreshCw className="inline w-3.5 h-3.5 mr-1" /> Làm mới feed
+              </button>
+              <button
+                onClick={() => navigate('/teacher/dashboard')}
+                className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold"
+              >
+                Về Dashboard
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!isLoading && totalItems === 0 && resolvedCount === 0 && (
           <div className="text-center py-16 px-4">
             <Sparkles className="w-12 h-12 mx-auto text-zinc-600 mb-3" />
             <p className="text-sm font-semibold mb-1">Chưa có item nào</p>
