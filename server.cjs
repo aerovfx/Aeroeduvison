@@ -11521,9 +11521,24 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     if (!adminToken || adminToken !== (process.env.RS_DIGEST_ADMIN_TOKEN || 'dev-secret')) {
       return res.status(403).json({ success: false, error: 'Forbidden' });
     }
+    const startTime = Date.now();
     try {
       await ensureRsReady();
       const pool = getKcPool();
+      await _rsEnsureDigestSchema(pool);
+      // Lazy migration: bảng log run
+      await pool.query(`CREATE TABLE IF NOT EXISTS rs_digest_runs (
+        id          TEXT PRIMARY KEY,
+        ran_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+        duration_ms INTEGER NOT NULL,
+        total_users INTEGER NOT NULL,
+        sent        INTEGER NOT NULL,
+        skipped     INTEGER NOT NULL,
+        errors      INTEGER NOT NULL,
+        per_channel JSONB,
+        meta        JSONB
+      )`);
+
       // Get active users (đã track action 7 ngày qua)
       const r = await pool.query(
         `SELECT DISTINCT user_id FROM rs_action_log
@@ -11531,19 +11546,86 @@ CHỈ TRẢ JSON, không bọc markdown.`;
          LIMIT 5000`
       );
       let sent = 0, skipped = 0, errors = 0;
+      const channelStats = { inApp: 0, email: 0, telegram: 0 };
+      const channelErrors = { inApp: 0, email: 0, telegram: 0 };
+      const reasonsSkipped = {};
+
       for (const row of r.rows) {
         try {
           const x = await _sendDigestNotification(pool, row.user_id);
-          if (x.sent) sent++; else skipped++;
-        } catch (e) { errors++; }
+          if (x.sent) {
+            sent++;
+            if (x.deliveries) {
+              for (const [ch, dv] of Object.entries(x.deliveries)) {
+                if (!dv) continue;
+                if (dv.ok) channelStats[ch] = (channelStats[ch] || 0) + 1;
+                else channelErrors[ch] = (channelErrors[ch] || 0) + 1;
+              }
+            }
+          } else {
+            skipped++;
+            reasonsSkipped[x.reason] = (reasonsSkipped[x.reason] || 0) + 1;
+          }
+        } catch (e) {
+          errors++;
+        }
       }
+
+      const durationMs = Date.now() - startTime;
+      const runId = 'digrun_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      try {
+        await pool.query(
+          `INSERT INTO rs_digest_runs
+             (id, duration_ms, total_users, sent, skipped, errors, per_channel, meta)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+          [
+            runId, durationMs, r.rows.length, sent, skipped, errors,
+            JSON.stringify({ delivered: channelStats, errored: channelErrors }),
+            JSON.stringify({ reasonsSkipped, triggerSource: req.headers['user-agent']?.includes('Cloud-Scheduler') ? 'cron' : 'manual' }),
+          ]
+        );
+      } catch (e) {
+        console.error('[rs:digest:run-all] ⚠️ log insert failed:', e.message);
+      }
+
+      console.log(`[rs:digest:run-all] ✓ ${durationMs}ms — ${sent}/${r.rows.length} sent, ${skipped} skipped, ${errors} errors. Channels: ${JSON.stringify(channelStats)}`);
+
       return res.json({
         success: true,
+        runId,
+        durationMs,
         totalActiveUsers: r.rows.length,
         sent, skipped, errors,
+        perChannel: { delivered: channelStats, errored: channelErrors },
+        reasonsSkipped,
       });
     } catch (err) {
       console.error('[rs:digest:run-all] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/digest/runs — admin view recent cron runs (audit + debug)
+  app.get('/api/reco/digest/runs', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken || adminToken !== (process.env.RS_DIGEST_ADMIN_TOKEN || 'dev-secret')) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      await pool.query(`CREATE TABLE IF NOT EXISTS rs_digest_runs (
+        id TEXT PRIMARY KEY, ran_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        duration_ms INTEGER NOT NULL, total_users INTEGER NOT NULL,
+        sent INTEGER NOT NULL, skipped INTEGER NOT NULL, errors INTEGER NOT NULL,
+        per_channel JSONB, meta JSONB
+      )`);
+      const r = await pool.query(
+        `SELECT * FROM rs_digest_runs ORDER BY ran_at DESC LIMIT 30`
+      );
+      return res.json({ success: true, runs: r.rows });
+    } catch (err) {
+      console.error('[rs:digest:runs] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
