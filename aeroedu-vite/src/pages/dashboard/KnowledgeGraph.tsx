@@ -172,6 +172,26 @@ export default function KnowledgeGraph() {
   const [masteryLoading, setMasteryLoading] = useState(false)
   const [showMasteryPanel, setShowMasteryPanel] = useState(false)
 
+  // ── Phase 4: Auto Learning Path ───────────────────────────────
+  const [pathFinding, setPathFinding] = useState(false)
+  const [pathResult, setPathResult] = useState<{
+    found: boolean
+    fromId: string; toId: string; hops: number
+    path: Array<{
+      nodeId: string; order: number; label: string; type: string
+      description?: string | null; masteryScore: number | null
+      relFromPrev: string | null
+    }>
+    message?: string
+  } | null>(null)
+  const [showPathPanel, setShowPathPanel] = useState(false)
+
+  // Set các nodeId đang trong path → highlight gold trên graph
+  const pathNodeIds = useMemo(
+    () => new Set((pathResult?.path ?? []).map(p => p.nodeId)),
+    [pathResult]
+  )
+
   // Camera
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -241,6 +261,30 @@ export default function KnowledgeGraph() {
       }
     } finally {
       setMasteryLoading(false)
+    }
+  }, [])
+
+  /** Phase 4: Tìm path từ điểm yếu (auto) → node đích. */
+  const findPathToNode = useCallback(async (targetNodeId: string) => {
+    setPathFinding(true)
+    setPathResult(null)
+    try {
+      const r = await kgs.findPath({
+        toId: targetNodeId,
+        autoFromWeak: true,
+        maxLen: 8,
+      })
+      setPathResult(r)
+      setShowPathPanel(true)
+      if (!r.found) {
+        toast(`Không tìm thấy lộ trình ≤8 hops`, { icon: '⚠️' })
+      } else {
+        toast.success(`Tìm thấy path ${r.hops} hops`, { icon: '🛣' })
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Lỗi tìm path')
+    } finally {
+      setPathFinding(false)
     }
   }, [])
 
@@ -702,6 +746,103 @@ export default function KnowledgeGraph() {
         </div>
       )}
 
+      {/* Phase 4: Path result panel (floating bottom-right) */}
+      {showPathPanel && pathResult && (
+        <div className="absolute bottom-12 right-4 z-30 w-80 max-h-[calc(100vh-180px)] overflow-y-auto bg-zinc-900/95 backdrop-blur border border-amber-500/40 rounded-xl shadow-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-amber-300 inline-flex items-center gap-1.5">
+              🛣 Lộ trình học gợi ý
+            </h3>
+            <button
+              onClick={() => { setShowPathPanel(false); setPathResult(null) }}
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {!pathResult.found ? (
+            <div className="text-xs text-zinc-400 py-4 text-center">
+              <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
+              {pathResult.message || `Không tìm thấy path từ ${pathResult.fromId} → ${pathResult.toId}`}
+              <div className="text-[10px] text-zinc-500 mt-2">
+                Thử khái niệm khác hoặc thêm relations qua "Trích xuất AI".
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-2 text-xs text-amber-200">
+                <strong>{pathResult.hops} bước</strong> từ điểm yếu nhất của bạn →
+                <span className="font-mono mx-1 text-amber-100">
+                  {pathResult.path[pathResult.path.length - 1]?.label}
+                </span>
+              </div>
+
+              {/* Path steps list */}
+              <div className="space-y-1.5">
+                {pathResult.path.map((step, idx) => {
+                  const isFirst = idx === 0
+                  const isLast = idx === pathResult.path.length - 1
+                  const score = step.masteryScore
+                  const scoreColor =
+                    score === null ? '#475569'
+                    : score < 30 ? '#f43f5e'
+                    : score < 70 ? '#fbbf24'
+                    : '#10b981'
+                  return (
+                    <div key={step.nodeId} className="relative">
+                      {/* Connection line to next step */}
+                      {!isLast && (
+                        <div className="absolute left-4 top-9 bottom-0 w-px bg-amber-500/30" style={{ height: 'calc(100% - 1.5rem)' }} />
+                      )}
+                      <button
+                        onClick={() => onNodeClick(step.nodeId)}
+                        className="w-full text-left p-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/60 transition flex items-start gap-2.5"
+                      >
+                        {/* Order badge */}
+                        <div
+                          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2"
+                          style={{
+                            background: isFirst ? '#f43f5e' : isLast ? '#10b981' : '#fbbf24',
+                            color: '#0a0f1e',
+                            borderColor: '#0a0f1e',
+                          }}
+                        >
+                          {isFirst ? 'S' : isLast ? 'E' : step.order}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-xs font-semibold text-zinc-100 truncate">{step.label}</span>
+                            {score !== null && (
+                              <span className="text-[9px] px-1 py-0.5 rounded font-mono shrink-0" style={{ background: `${scoreColor}25`, color: scoreColor }}>
+                                {score}%
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-zinc-500">
+                            {NODE_TYPE_LABELS[step.type] || step.type}
+                            {step.relFromPrev && (
+                              <span> · <span className="text-amber-400">{REL_TYPE_LABELS[step.relFromPrev] || step.relFromPrev.toLowerCase().replace(/_/g, ' ')}</span></span>
+                            )}
+                          </div>
+                          {step.description && (
+                            <div className="text-[10px] text-zinc-400 mt-1 line-clamp-2">{step.description}</div>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="text-[10px] text-zinc-500 italic pt-2 border-t border-zinc-800">
+                💡 Click 1 step để xem chi tiết · S = điểm bắt đầu (yếu nhất) · E = đích
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Mastery legend overlay khi bật mastery mode */}
       {masteryOn && (
         <div className="absolute top-20 left-72 z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 text-[11px]">
@@ -853,6 +994,11 @@ export default function KnowledgeGraph() {
                 const mc = masteryOn ? getMasteryColor(m?.score) : null
                 const useMastery = masteryOn && mc !== null
 
+                // Phase 4: highlight nodes trong path
+                const isInPath = pathNodeIds.has(n.id)
+                const isPathStart = pathResult?.fromId === n.id
+                const isPathEnd = pathResult?.toId === n.id
+
                 return (
                   <g
                     key={n.id}
@@ -870,13 +1016,28 @@ export default function KnowledgeGraph() {
                           dur="2s" repeatCount="indefinite" />
                       </circle>
                     )}
+                    {/* Phase 4: Path highlight halo (gold animate) */}
+                    {isInPath && (
+                      <circle r={n.radius + 8} fill="none" stroke="#fbbf24" strokeWidth={2.5} opacity={0.8}>
+                        <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" repeatCount="indefinite" />
+                      </circle>
+                    )}
                     {/* Main circle — mastery overlay thay fill+stroke khi bật */}
                     <circle
                       r={n.radius}
                       fill={useMastery ? mc!.fill : c.fill}
-                      stroke={useMastery ? mc!.stroke : c.stroke}
-                      strokeWidth={isCenter ? 3 : isSelected ? 2.5 : 1.5}
+                      stroke={isInPath ? '#fbbf24' : useMastery ? mc!.stroke : c.stroke}
+                      strokeWidth={isInPath ? 3 : isCenter ? 3 : isSelected ? 2.5 : 1.5}
                     />
+                    {/* Path order badge */}
+                    {isInPath && pathResult && (
+                      <>
+                        <circle cx={n.radius - 4} cy={-n.radius + 4} r={9} fill="#fbbf24" stroke="#0a0f1e" strokeWidth={1.5} />
+                        <text x={n.radius - 4} y={-n.radius + 7} textAnchor="middle" fontSize="9" fontWeight="800" fill="#0a0f1e">
+                          {isPathStart ? 'S' : isPathEnd ? 'E' : (pathResult.path.find(p => p.nodeId === n.id)?.order ?? '?')}
+                        </text>
+                      </>
+                    )}
                     {/* Mastery score badge (small arc bottom) */}
                     {useMastery && m && (
                       <>
@@ -992,10 +1153,22 @@ export default function KnowledgeGraph() {
 
             <button
               onClick={expandFromSelected}
-              className="w-full py-2 mb-4 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 text-sm font-bold inline-flex items-center justify-center gap-2"
+              className="w-full py-2 mb-2 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/25 text-sm font-bold inline-flex items-center justify-center gap-2"
             >
               <Network className="w-4 h-4" />
               Lấy node này làm tâm
+            </button>
+
+            {/* Phase 4: Auto Learning Path button */}
+            <button
+              onClick={() => findPathToNode(selectedNode.node.id)}
+              disabled={pathFinding}
+              className="w-full py-2 mb-4 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 text-sm font-bold inline-flex items-center justify-center gap-2 disabled:opacity-50"
+              title="BFS shortest path từ điểm yếu nhất của bạn → node này"
+            >
+              {pathFinding ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>🛣</span>}
+              Lộ trình từ điểm yếu
+              <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/30 ml-1">NEW</span>
             </button>
 
             <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">

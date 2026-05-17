@@ -9322,6 +9322,149 @@ ${plan.content || '<p>(Trống)</p>'}
     }
   });
 
+  // ════════════════════════════════════════════════
+  // KG — PHASE 4: Auto Learning Path from Graph
+  // BFS shortest path từ 1 node (hoặc tự pick từ weak mastery) → target,
+  // dùng để tạo lộ trình học có thứ tự prerequisite.
+  // ════════════════════════════════════════════════
+
+  // POST /api/kg/path/find
+  // Body: { fromId?: string,
+  //         toId: string,
+  //         maxLen?: number (default 8, max 15),
+  //         autoFromWeak?: boolean (nếu fromId không có → pick từ weak mastery) }
+  app.post('/api/kg/path/find', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const body = req.body || {};
+      const toId = String(body.toId || '').trim();
+      if (!toId) return res.status(400).json({ success: false, error: 'toId required' });
+      const maxLen = Math.min(15, Math.max(2, parseInt(String(body.maxLen || 8), 10)));
+
+      // Auto-pick fromId từ weak mastery nếu không cung cấp + có user
+      let fromId = String(body.fromId || '').trim();
+      if (!fromId && body.autoFromWeak) {
+        const user = getKgUser(req);
+        if (user) {
+          const wr = await pool.query(
+            `SELECT m.node_id FROM kg_mastery m
+             WHERE m.user_id = $1 AND m.score < 50
+             ORDER BY m.score ASC LIMIT 1`,
+            [user.id]
+          );
+          if (wr.rows.length > 0) fromId = wr.rows[0].node_id;
+        }
+      }
+      // Fallback: subj-vatli (top-level subject)
+      if (!fromId) fromId = 'subj-vatli';
+
+      if (fromId === toId) {
+        return res.status(400).json({
+          success: false, error: 'from = to (đã đến đích)',
+        });
+      }
+
+      // Load tất cả edges trong subgraph có chứa fromId hoặc toId
+      // Bidirectional BFS với edges undirected để tìm path ngắn nhất.
+      const allEdges = await pool.query(
+        `SELECT from_id, to_id, rel_type, weight FROM kg_edges`
+      );
+      // Build adjacency (undirected)
+      const adj = new Map(); // nodeId → [{to, rel, weight}]
+      const addAdjEdge = (a, b, rel, weight) => {
+        if (!adj.has(a)) adj.set(a, []);
+        adj.get(a).push({ to: b, rel, weight: weight ?? 1 });
+      };
+      for (const e of allEdges.rows) {
+        addAdjEdge(e.from_id, e.to_id, e.rel_type, e.weight);
+        addAdjEdge(e.to_id, e.from_id, e.rel_type, e.weight);
+      }
+
+      // BFS với visited tracking
+      const parent = new Map();
+      const visited = new Set([fromId]);
+      const queue = [fromId];
+      let found = false;
+      let hops = 0;
+      while (queue.length > 0 && hops < maxLen) {
+        const sz = queue.length;
+        for (let i = 0; i < sz; i++) {
+          const cur = queue.shift();
+          if (cur === toId) { found = true; break; }
+          const neighbors = adj.get(cur) || [];
+          for (const n of neighbors) {
+            if (visited.has(n.to)) continue;
+            visited.add(n.to);
+            parent.set(n.to, { from: cur, rel: n.rel });
+            queue.push(n.to);
+            if (n.to === toId) { found = true; break; }
+          }
+          if (found) break;
+        }
+        if (found) break;
+        hops++;
+      }
+
+      if (!found) {
+        return res.json({
+          success: true, found: false, fromId, toId,
+          hops: hops, message: `Không tìm thấy path ≤${maxLen} hops từ ${fromId} → ${toId}`,
+        });
+      }
+
+      // Trace back path từ toId → fromId
+      const pathIds = [toId];
+      const pathRels = [];
+      let cur = toId;
+      while (cur !== fromId) {
+        const p = parent.get(cur);
+        if (!p) break;
+        pathIds.unshift(p.from);
+        pathRels.unshift(p.rel);
+        cur = p.from;
+      }
+
+      // Load chi tiết nodes
+      const nodeDetail = await pool.query(
+        `SELECT id, type, label, description FROM kg_nodes WHERE id = ANY($1::text[])`,
+        [pathIds]
+      );
+      const detailMap = Object.fromEntries(nodeDetail.rows.map(r => [r.id, r]));
+
+      // Lấy mastery cho user (để hiển thị score trên path)
+      const masteryMap = {};
+      const user = getKgUser(req);
+      if (user) {
+        const mr = await pool.query(
+          `SELECT node_id, score FROM kg_mastery
+           WHERE user_id = $1 AND node_id = ANY($2::text[])`,
+          [user.id, pathIds]
+        );
+        for (const m of mr.rows) masteryMap[m.node_id] = Math.round(m.score);
+      }
+
+      const path = pathIds.map((id, idx) => ({
+        nodeId: id,
+        order: idx + 1,
+        label: detailMap[id]?.label || id,
+        type: detailMap[id]?.type || 'Unknown',
+        description: detailMap[id]?.description || null,
+        masteryScore: masteryMap[id] ?? null,
+        relFromPrev: idx > 0 ? pathRels[idx - 1] : null,
+      }));
+
+      return res.json({
+        success: true, found: true, fromId, toId,
+        hops: pathIds.length - 1,
+        path,
+      });
+    } catch (err) {
+      console.error('[kg:path:find] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // GET /api/kg/sources/lesson-plans?limit=50 — list LP cho dropdown trong UI extract
   app.get('/api/kg/sources/lesson-plans', async (req, res) => {
     try {

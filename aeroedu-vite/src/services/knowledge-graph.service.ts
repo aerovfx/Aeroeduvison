@@ -127,6 +127,28 @@ export interface KgMasteryUpdate {
   source?: string
 }
 
+// ─── Phase 4 types: Auto Learning Path from Graph ────────────────
+export interface KgPathStep {
+  nodeId: string
+  order: number
+  label: string
+  type: string
+  description?: string | null
+  /** Mastery score 0-100 nếu user đã có data, null nếu chưa */
+  masteryScore: number | null
+  /** Tên relation từ step trước → step này (null cho step 1) */
+  relFromPrev: string | null
+}
+
+export interface KgPathResult {
+  found: boolean
+  fromId: string
+  toId: string
+  hops: number
+  path: KgPathStep[]
+  message?: string
+}
+
 export const knowledgeGraphService = {
   /** Seed dữ liệu Vật lí 11 vào graph (idempotent). */
   seed: () =>
@@ -204,6 +226,27 @@ export const knowledgeGraphService = {
       weakTopics: r.data.weakTopics || [],
       recent: r.data.recent || [],
     })),
+
+  // ── Phase 4: Auto Learning Path from Graph ───────────────────────
+
+  /** Tìm BFS shortest path từ fromId → toId (undirected graph).
+   *  Nếu fromId rỗng + autoFromWeak=true + có user: tự pick từ weak mastery.
+   *  Fallback: subj-vatli làm start. */
+  findPath: (params: {
+    toId: string
+    fromId?: string
+    maxLen?: number
+    autoFromWeak?: boolean
+  }) =>
+    api.post<{ success: boolean } & KgPathResult>('/kg/path/find', params)
+      .then(r => ({
+        found: r.data.found,
+        fromId: r.data.fromId,
+        toId: r.data.toId,
+        hops: r.data.hops,
+        path: r.data.path || [],
+        message: r.data.message,
+      })),
 }
 
 /** Trả màu mastery overlay theo score 0-100 */
