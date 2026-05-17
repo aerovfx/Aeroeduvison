@@ -8821,12 +8821,172 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, edgeInserted: inserted };
   }
 
+  // ── Phase 5: Cross-Subject Seed (Toán 11 + Hóa 11 + cross-edges) ──
+  async function seedKgMathChem11() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === TOÁN 11 (subject + chapters + topics + formulas) ===
+      { id: 'subj-toan', type: 'Subject', label: 'Toán', description: 'Môn Toán THPT theo GDPT 2018', properties: { color: '#a78bfa' } },
+      { id: 'chap-toan-luong-giac', type: 'Chapter', label: 'Lượng giác', description: 'Hàm sin/cos/tan, phương trình lượng giác' },
+      { id: 'chap-toan-dao-ham',    type: 'Chapter', label: 'Đạo hàm',    description: 'Đạo hàm, ứng dụng đạo hàm' },
+      { id: 'chap-toan-day-so',     type: 'Chapter', label: 'Dãy số & Cấp số', description: 'Dãy số, cấp số cộng/nhân' },
+      { id: 'chap-toan-to-hop',     type: 'Chapter', label: 'Tổ hợp - Xác suất', description: 'Hoán vị, chỉnh hợp, xác suất' },
+      // Topics Toán
+      { id: 'topic-ham-sin',      type: 'Topic', label: 'Hàm số sin/cos', description: 'Hàm số y = sin(x), y = cos(x) — chu kì 2π' },
+      { id: 'topic-pt-luong-giac',type: 'Topic', label: 'Phương trình lượng giác', description: 'sin(x) = a, cos(x) = b, tan(x) = c' },
+      { id: 'topic-dao-ham-cb',   type: 'Topic', label: 'Đạo hàm cơ bản', description: 'f\'(x) = lim (f(x+h)-f(x))/h' },
+      { id: 'topic-dao-ham-ham-so', type: 'Topic', label: 'Đạo hàm hàm số', description: '(x^n)\' = nx^(n-1), (sin x)\' = cos x' },
+      { id: 'topic-cap-so-cong',  type: 'Topic', label: 'Cấp số cộng',     description: 'a_n = a_1 + (n-1)d' },
+      { id: 'topic-cap-so-nhan',  type: 'Topic', label: 'Cấp số nhân',     description: 'a_n = a_1 · q^(n-1)' },
+      { id: 'topic-xac-suat',     type: 'Topic', label: 'Xác suất',        description: 'P(A) = số kết quả thuận lợi / tổng số kết quả' },
+      { id: 'topic-hoan-vi',      type: 'Topic', label: 'Hoán vị · Chỉnh hợp · Tổ hợp', description: 'P_n, A^k_n, C^k_n' },
+      // Formulas Toán
+      { id: 'form-sin-cos',       type: 'Formula', label: 'sin²x + cos²x = 1', description: 'Hệ thức cơ bản lượng giác' },
+      { id: 'form-derivative-sin',type: 'Formula', label: "(sin x)' = cos x",   description: 'Đạo hàm hàm sin' },
+      { id: 'form-cong-thuc-newton', type: 'Formula', label: '(a+b)^n = Σ C^k_n a^(n-k) b^k', description: 'Nhị thức Newton' },
+      // Careers liên ngành
+      { id: 'career-kts',         type: 'Career', label: 'Kiến trúc sư',     description: 'Dùng hình học, đạo hàm, lượng giác' },
+      { id: 'career-actuary',     type: 'Career', label: 'Chuyên viên thống kê (Actuary)', description: 'Xác suất, mô hình tài chính' },
+
+      // === HÓA 11 ===
+      { id: 'subj-hoa',           type: 'Subject', label: 'Hóa học', description: 'Môn Hóa THPT theo GDPT 2018', properties: { color: '#34d399' } },
+      { id: 'chap-hoa-can-bang',  type: 'Chapter', label: 'Cân bằng hóa học', description: 'Phản ứng thuận nghịch, hằng số cân bằng' },
+      { id: 'chap-hoa-nitrogen',  type: 'Chapter', label: 'Nitrogen - Sulfur', description: 'N₂, NH₃, HNO₃, S, SO₂, H₂SO₄' },
+      { id: 'chap-hoa-huu-co',    type: 'Chapter', label: 'Đại cương Hóa hữu cơ', description: 'Đồng phân, danh pháp, phản ứng cơ bản' },
+      { id: 'chap-hoa-hidrocarbon', type: 'Chapter', label: 'Hidrocarbon',   description: 'Ankan, anken, ankin, aren' },
+      // Topics Hóa
+      { id: 'topic-hang-so-kc',   type: 'Topic', label: 'Hằng số cân bằng Kc', description: 'Kc = [C]^c[D]^d / [A]^a[B]^b' },
+      { id: 'topic-axit-bazo',    type: 'Topic', label: 'Axit - Bazơ',     description: 'pH, pOH, Bronsted, Lewis' },
+      { id: 'topic-ankan',        type: 'Topic', label: 'Ankan',           description: 'CnH(2n+2), phản ứng thế halogen' },
+      { id: 'topic-anken',        type: 'Topic', label: 'Anken',           description: 'CnH(2n), phản ứng cộng, trùng hợp' },
+      { id: 'topic-ankin',        type: 'Topic', label: 'Ankin',           description: 'CnH(2n-2), liên kết 3' },
+      { id: 'topic-aren',         type: 'Topic', label: 'Aren (benzene)',  description: 'Vòng thơm, phản ứng thế electrophilic' },
+      { id: 'topic-amoniac',      type: 'Topic', label: 'Amoniac NH₃',     description: 'Tính bazơ yếu, sản xuất công nghiệp' },
+      { id: 'topic-axit-nitric',  type: 'Topic', label: 'Axit nitric HNO₃', description: 'Tính oxi hóa mạnh' },
+      // Formulas Hóa
+      { id: 'form-ph-log',        type: 'Formula', label: 'pH = -log[H⁺]', description: 'Định nghĩa pH' },
+      { id: 'form-kc-formula',    type: 'Formula', label: 'Kc = [C]^c[D]^d / [A]^a[B]^b', description: 'Hằng số cân bằng' },
+      { id: 'form-ankan-general', type: 'Formula', label: 'CnH(2n+2)',     description: 'Công thức chung ankan' },
+      // Careers
+      { id: 'career-duoc-si',     type: 'Career', label: 'Dược sĩ',         description: 'Hóa hữu cơ + sinh học' },
+      { id: 'career-ks-mt',       type: 'Career', label: 'Kỹ sư môi trường', description: 'Hóa phân tích, xử lý nước' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-mc:node]', n.id, e.message); }
+    }
+
+    // ── Edges trong môn + cross-subject ──
+    const edges = [
+      // Toán hierarchical
+      ['subj-toan',          'chap-toan-luong-giac', 'HAS_CHAPTER'],
+      ['subj-toan',          'chap-toan-dao-ham',    'HAS_CHAPTER'],
+      ['subj-toan',          'chap-toan-day-so',     'HAS_CHAPTER'],
+      ['subj-toan',          'chap-toan-to-hop',     'HAS_CHAPTER'],
+      ['chap-toan-luong-giac','topic-ham-sin',       'HAS_TOPIC'],
+      ['chap-toan-luong-giac','topic-pt-luong-giac', 'HAS_TOPIC'],
+      ['chap-toan-dao-ham',  'topic-dao-ham-cb',     'HAS_TOPIC'],
+      ['chap-toan-dao-ham',  'topic-dao-ham-ham-so', 'HAS_TOPIC'],
+      ['chap-toan-day-so',   'topic-cap-so-cong',    'HAS_TOPIC'],
+      ['chap-toan-day-so',   'topic-cap-so-nhan',    'HAS_TOPIC'],
+      ['chap-toan-to-hop',   'topic-hoan-vi',        'HAS_TOPIC'],
+      ['chap-toan-to-hop',   'topic-xac-suat',       'HAS_TOPIC'],
+      ['topic-ham-sin',      'form-sin-cos',         'USES_FORMULA'],
+      ['topic-dao-ham-ham-so','form-derivative-sin', 'USES_FORMULA'],
+      ['topic-hoan-vi',      'form-cong-thuc-newton','USES_FORMULA'],
+      ['topic-dao-ham-ham-so','topic-dao-ham-cb',    'REQUIRES'],
+      ['topic-pt-luong-giac','topic-ham-sin',        'REQUIRES'],
+      ['topic-dao-ham-cb',   'career-kts',           'APPLIED_IN_CAREER'],
+      ['topic-xac-suat',     'career-actuary',       'APPLIED_IN_CAREER'],
+
+      // Hóa hierarchical
+      ['subj-hoa',           'chap-hoa-can-bang',    'HAS_CHAPTER'],
+      ['subj-hoa',           'chap-hoa-nitrogen',    'HAS_CHAPTER'],
+      ['subj-hoa',           'chap-hoa-huu-co',      'HAS_CHAPTER'],
+      ['subj-hoa',           'chap-hoa-hidrocarbon', 'HAS_CHAPTER'],
+      ['chap-hoa-can-bang',  'topic-hang-so-kc',     'HAS_TOPIC'],
+      ['chap-hoa-can-bang',  'topic-axit-bazo',      'HAS_TOPIC'],
+      ['chap-hoa-nitrogen',  'topic-amoniac',        'HAS_TOPIC'],
+      ['chap-hoa-nitrogen',  'topic-axit-nitric',    'HAS_TOPIC'],
+      ['chap-hoa-hidrocarbon','topic-ankan',         'HAS_TOPIC'],
+      ['chap-hoa-hidrocarbon','topic-anken',         'HAS_TOPIC'],
+      ['chap-hoa-hidrocarbon','topic-ankin',         'HAS_TOPIC'],
+      ['chap-hoa-hidrocarbon','topic-aren',          'HAS_TOPIC'],
+      ['topic-axit-bazo',    'form-ph-log',          'USES_FORMULA'],
+      ['topic-hang-so-kc',   'form-kc-formula',      'USES_FORMULA'],
+      ['topic-ankan',        'form-ankan-general',   'USES_FORMULA'],
+      ['topic-anken',        'topic-ankan',          'REQUIRES'],
+      ['topic-aren',         'topic-anken',          'REQUIRES'],
+      ['topic-axit-nitric',  'topic-amoniac',        'RELATES_TO'],
+      ['topic-axit-bazo',    'career-duoc-si',       'APPLIED_IN_CAREER'],
+      ['topic-aren',         'career-ks-mt',         'APPLIED_IN_CAREER'],
+
+      // ─── CROSS-SUBJECT EDGES (highlight liên môn) ───
+      // Vật lí ↔ Toán
+      ['topic-dao-dong-dh',  'topic-ham-sin',        'USES_CONCEPT'],   // dao động dùng sin/cos
+      ['topic-dao-dong-dh',  'form-sin-cos',         'USES_FORMULA'],
+      ['topic-song-co',      'topic-ham-sin',        'USES_CONCEPT'],
+      ['topic-cam-ung-dt',   'topic-dao-ham-cb',     'REQUIRES'],       // Faraday cần đạo hàm
+      ['topic-mach-dien',    'topic-cap-so-cong',    'RELATES_TO'],     // mạch nối tiếp = tổng
+      ['topic-va-cham',      'topic-xac-suat',       'RELATES_TO'],     // va chạm thống kê
+
+      // Vật lí ↔ Hóa
+      ['topic-nhiet-do',     'topic-hang-so-kc',     'RELATES_TO'],     // Kc phụ thuộc T
+      ['topic-dien-tich',    'topic-axit-bazo',      'RELATES_TO'],     // ion H+/OH-
+      ['topic-mach-dien',    'topic-axit-bazo',      'RELATES_TO'],     // dung dịch điện ly
+
+      // Toán ↔ Hóa
+      ['topic-xac-suat',     'topic-hang-so-kc',     'RELATES_TO'],     // xác suất hạt va chạm
+      ['topic-cap-so-nhan',  'form-ph-log',          'RELATES_TO'],     // log = nghịch đảo nhân
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-mc:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
+  // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
   app.get('/api/kg/seed', async (req, res) => {
     try {
-      // Cho phép any user trigger để test (idempotent, an toàn)
-      const r = await seedKgPhysics11();
-      return res.json({ success: true, ...r, message: 'Đã seed Vật lí 11 vào knowledge graph' });
+      const all = req.query.subjects === 'all' || req.query.all === '1';
+      const r1 = await seedKgPhysics11();
+      let r2 = null;
+      if (all) r2 = await seedKgMathChem11();
+      return res.json({
+        success: true,
+        nodeCount: r1.nodeCount + (r2?.nodeCount || 0),
+        edgeCount: r1.edgeCount + (r2?.edgeCount || 0),
+        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0),
+        physics: r1,
+        mathChem: r2,
+        message: all
+          ? 'Đã seed Vật lí 11 + Toán 11 + Hóa 11 (3 subjects, cross-edges)'
+          : 'Đã seed Vật lí 11 (thêm ?subjects=all để seed cả Toán + Hóa)',
+      });
     } catch (err) {
       console.error('[kg:seed] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
@@ -9562,6 +9722,215 @@ ${plan.content || '<p>(Trống)</p>'}
       });
     } catch (err) {
       console.error('[kg:path:save-as-lp] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // KG — PHASE 6: AI Smart Search & Recommendation
+  // User gõ câu hỏi tự nhiên ("Tôi muốn học dao động"), AI parse
+  // intent → match best nodes → optionally đề xuất path.
+  // ════════════════════════════════════════════════
+
+  // POST /api/kg/smart-query
+  // Body: { query: "Tôi muốn học về dao động", limit?: 10 }
+  app.post('/api/kg/smart-query', express.json({ limit: '8kb' }), async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const query = String(req.body?.query || '').trim().slice(0, 500);
+      if (query.length < 3) {
+        return res.status(400).json({ success: false, error: 'Query quá ngắn (≥3 ký tự)' });
+      }
+      const limit = Math.min(20, Math.max(3, parseInt(String(req.body?.limit || 8), 10)));
+
+      // Bước 1: Lấy TẤT CẢ labels của nodes (≤500) để AI biết catalog
+      const allLabels = await pool.query(
+        `SELECT id, type, label FROM kg_nodes ORDER BY type, label LIMIT 500`
+      );
+      const catalog = allLabels.rows
+        .map(r => `${r.id} | ${r.type} | ${r.label}`)
+        .join('\n');
+
+      // Bước 2: Hỏi AI Claude — parse intent + match best nodes
+      let aiResult;
+      try {
+        const client = getAnthropic();
+        const sys = `Bạn là trợ lý điều hướng Knowledge Graph cho học sinh THPT VN.
+Người dùng hỏi 1 câu, bạn phải:
+1. Phân tích intent (muốn HỌC khái niệm gì? muốn ĐỊNH NGHĨA? muốn THỰC HÀNH? muốn LIÊN MÔN?)
+2. Match với CATALOG được cung cấp
+3. Trả về JSON CHẶT chẽ: {intent, suggestedNodeIds: [id1, id2, ...], explanation, suggestedPathTo?: nodeId}
+- suggestedNodeIds: ≤${limit} ids từ catalog, sắp xếp theo relevance giảm dần
+- suggestedPathTo: id node "đích" nếu user đang hỏi muốn học cái gì
+- explanation: 1-2 câu tiếng Việt giải thích lựa chọn
+CHỈ TRẢ JSON, không bọc markdown.`;
+
+        const msg = await client.messages.create({
+          model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-6',
+          max_tokens: 800,
+          system: sys,
+          messages: [{
+            role: 'user',
+            content: `CATALOG (id | type | label):\n${catalog}\n\nCÂU HỎI: ${query}\n\nTrả JSON:`,
+          }],
+        });
+        const text = msg.content?.[0]?.text || '{}';
+        // Strip markdown if present
+        const cleaned = text.replace(/```json|```/g, '').trim();
+        aiResult = JSON.parse(cleaned);
+      } catch (e) {
+        // Fallback: trigram search nếu AI fail
+        console.warn('[kg:smart-query] AI failed, fallback trigram:', e.message);
+        const fb = await pool.query(
+          `SELECT id FROM kg_nodes
+           WHERE label ILIKE $1 OR similarity(label, $2) > 0.3
+           ORDER BY similarity(label, $2) DESC LIMIT $3`,
+          [`%${query}%`, query, limit]
+        );
+        aiResult = {
+          intent: 'fallback-search',
+          suggestedNodeIds: fb.rows.map(r => r.id),
+          explanation: 'AI tạm không khả dụng, dùng tìm kiếm trigram thay thế.',
+        };
+      }
+
+      // Bước 3: Load chi tiết các nodes được suggest
+      const ids = Array.isArray(aiResult.suggestedNodeIds)
+        ? aiResult.suggestedNodeIds.slice(0, limit) : [];
+      let nodeDetails = [];
+      if (ids.length > 0) {
+        const nr = await pool.query(
+          `SELECT id, type, label, description FROM kg_nodes WHERE id = ANY($1::text[])`,
+          [ids]
+        );
+        // Preserve order from AI suggestion
+        const map = Object.fromEntries(nr.rows.map(r => [r.id, r]));
+        nodeDetails = ids.map(id => map[id]).filter(Boolean);
+      }
+
+      return res.json({
+        success: true,
+        query,
+        intent: aiResult.intent || 'unknown',
+        explanation: aiResult.explanation || '',
+        suggestedNodes: nodeDetails,
+        suggestedPathTo: aiResult.suggestedPathTo || null,
+      });
+    } catch (err) {
+      console.error('[kg:smart-query] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // KG — PHASE 7: Collaborative Editing (suggestions)
+  // GV/HS đề xuất khái niệm/relation mới → admin duyệt.
+  // ════════════════════════════════════════════════
+
+  // Helper migration: bảng kg_suggestions
+  let _kgSuggReady = false;
+  async function ensureKgSuggReady() {
+    if (_kgSuggReady) return;
+    await ensureKgReady();
+    const pool = getKcPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_suggestions (
+        id TEXT PRIMARY KEY,
+        author_id TEXT,
+        kind TEXT NOT NULL,                  -- 'add_node' | 'add_edge' | 'edit_node' | 'remove'
+        payload JSONB NOT NULL,              -- {type, label, description, ...} hoặc {from, to, rel}
+        status TEXT NOT NULL DEFAULT 'pending',  -- pending | approved | rejected
+        upvotes INTEGER NOT NULL DEFAULT 0,
+        reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        reviewed_at TIMESTAMPTZ
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_sugg_status ON kg_suggestions(status)`);
+    _kgSuggReady = true;
+  }
+
+  // POST /api/kg/suggestions — submit đề xuất
+  // Body: { kind: 'add_node'|'add_edge'|'edit_node', payload: object, reason?: string }
+  app.post('/api/kg/suggestions', express.json({ limit: '32kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgSuggReady();
+      const pool = getKcPool();
+      const body = req.body || {};
+      const kind = String(body.kind || '');
+      const validKinds = ['add_node', 'add_edge', 'edit_node', 'remove'];
+      if (!validKinds.includes(kind)) {
+        return res.status(400).json({ success: false, error: 'kind không hợp lệ' });
+      }
+      if (!body.payload || typeof body.payload !== 'object') {
+        return res.status(400).json({ success: false, error: 'payload required' });
+      }
+      const id = 'sugg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      await pool.query(
+        `INSERT INTO kg_suggestions (id, author_id, kind, payload, reason)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, user.id, kind, JSON.stringify(body.payload), String(body.reason || '').slice(0, 500)]
+      );
+      return res.status(201).json({
+        success: true, id,
+        message: 'Đã ghi nhận đề xuất, admin sẽ xem xét trong vài ngày tới.',
+      });
+    } catch (err) {
+      console.error('[kg:suggestions:create] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/suggestions?status=pending&limit=50 — list (cho admin review)
+  app.get('/api/kg/suggestions', async (req, res) => {
+    try {
+      await ensureKgSuggReady();
+      const pool = getKcPool();
+      const status = ['pending', 'approved', 'rejected'].includes(String(req.query.status || ''))
+        ? String(req.query.status) : 'pending';
+      const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || 50), 10)));
+      const r = await pool.query(
+        `SELECT id, author_id, kind, payload, status, upvotes, reason, created_at, reviewed_at
+         FROM kg_suggestions WHERE status = $1
+         ORDER BY upvotes DESC, created_at DESC LIMIT $2`,
+        [status, limit]
+      );
+      return res.json({
+        success: true,
+        items: r.rows.map(x => ({
+          id: x.id, authorId: x.author_id, kind: x.kind,
+          payload: x.payload, status: x.status, upvotes: x.upvotes,
+          reason: x.reason, createdAt: x.created_at, reviewedAt: x.reviewed_at,
+        })),
+        count: r.rows.length,
+      });
+    } catch (err) {
+      console.error('[kg:suggestions:list] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/kg/suggestions/:id/upvote — vote up
+  app.post('/api/kg/suggestions/:id/upvote', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgSuggReady();
+      const pool = getKcPool();
+      const r = await pool.query(
+        `UPDATE kg_suggestions SET upvotes = upvotes + 1
+         WHERE id = $1 AND status = 'pending' RETURNING upvotes`,
+        [req.params.id]
+      );
+      if (r.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Not found or already reviewed' });
+      }
+      return res.json({ success: true, upvotes: r.rows[0].upvotes });
+    } catch (err) {
+      console.error('[kg:suggestions:upvote] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
     }
   });

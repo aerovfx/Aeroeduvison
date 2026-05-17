@@ -172,6 +172,15 @@ export default function KnowledgeGraph() {
   const [masteryLoading, setMasteryLoading] = useState(false)
   const [showMasteryPanel, setShowMasteryPanel] = useState(false)
 
+  // ── Phase 6: AI Smart Search ─────────────────────────────────
+  const [smartOpen, setSmartOpen] = useState(false)
+  const [smartQuery, setSmartQuery] = useState('')
+  const [smartLoading, setSmartLoading] = useState(false)
+  const [smartResult, setSmartResult] = useState<{
+    intent: string; explanation: string
+    suggestedNodes: KgNode[]; suggestedPathTo: string | null
+  } | null>(null)
+
   // ── Phase 4: Auto Learning Path ───────────────────────────────
   const [pathFinding, setPathFinding] = useState(false)
   const [pathResult, setPathResult] = useState<{
@@ -243,7 +252,8 @@ export default function KnowledgeGraph() {
     if (seeding) return
     setSeeding(true)
     try {
-      const r = await kgs.seed()
+      // Phase 5: seed cả 3 môn (Lý + Toán + Hóa + cross-edges)
+      const r = await kgs.seedAllSubjects()
       toast.success(`Đã seed ${r.nodeCount} nodes + ${r.edgeInserted} edges mới`)
       await loadFromNode('subj-vatli', 2)
     } catch (e: any) {
@@ -275,6 +285,48 @@ export default function KnowledgeGraph() {
       }
     } finally {
       setMasteryLoading(false)
+    }
+  }, [])
+
+  /** Phase 6: Hỏi AI bằng câu NL → AI match nodes + auto-path nếu thích hợp. */
+  const handleSmartQuery = useCallback(async () => {
+    const q = smartQuery.trim()
+    if (q.length < 3) {
+      toast.error('Nhập ≥ 3 ký tự')
+      return
+    }
+    setSmartLoading(true)
+    setSmartResult(null)
+    try {
+      const r = await kgs.smartQuery(q, 8)
+      setSmartResult(r)
+      if (r.suggestedNodes.length === 0) {
+        toast('AI không tìm thấy node phù hợp', { icon: '🤔' })
+      } else {
+        toast.success(`AI tìm được ${r.suggestedNodes.length} node`, { icon: '🪄' })
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Lỗi AI smart query')
+    } finally {
+      setSmartLoading(false)
+    }
+  }, [smartQuery])
+
+  /** Phase 7: Đề xuất khái niệm mới (add_node suggestion). */
+  const handleSuggestNode = useCallback(async () => {
+    const label = window.prompt('Tên khái niệm muốn đề xuất:')
+    if (!label || label.trim().length < 2) return
+    const description = window.prompt('Mô tả ngắn (tùy chọn):') || ''
+    const typeChoice = window.prompt('Loại: Concept / Topic / Formula / Career (default Concept):', 'Concept') || 'Concept'
+    try {
+      const r = await kgs.submitSuggestion({
+        kind: 'add_node',
+        payload: { type: typeChoice.trim(), label: label.trim(), description: description.trim() },
+        reason: 'Đề xuất từ Knowledge Graph viewer',
+      })
+      toast.success(r.message, { duration: 5000 })
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Lỗi gửi đề xuất')
     }
   }, [])
 
@@ -631,6 +683,23 @@ export default function KnowledgeGraph() {
           >
             <TrendingUp className="w-4 h-4" />
           </button>
+          {/* Phase 6: Smart Search */}
+          <button
+            onClick={() => setSmartOpen(true)}
+            title="Hỏi AI bằng câu tự nhiên: 'Tôi muốn học X' → AI tìm node phù hợp"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-[1.02] inline-flex items-center gap-1.5 shadow-lg shadow-purple-500/25 transition-transform"
+          >
+            🪄 Hỏi AI
+            <span className="text-[9px] px-1 py-0.5 rounded bg-white/20 ml-0.5">NEW</span>
+          </button>
+          {/* Phase 7: Đề xuất khái niệm */}
+          <button
+            onClick={handleSuggestNode}
+            title="Đề xuất khái niệm/relation mới — admin sẽ duyệt"
+            className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/15 hover:bg-white/10 text-zinc-300 inline-flex items-center gap-1"
+          >
+            💡 Đề xuất
+          </button>
           <button
             onClick={() => setExtractOpen(true)}
             title="AI trích xuất tri thức từ văn bản hoặc giáo án"
@@ -649,6 +718,122 @@ export default function KnowledgeGraph() {
           </button>
         </div>
       </header>
+
+      {/* Phase 6: Smart Search Modal */}
+      {smartOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 pt-20"
+          onClick={() => setSmartOpen(false)}
+        >
+          <div
+            className="bg-zinc-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-2xl w-full p-5 space-y-4 max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-purple-300 inline-flex items-center gap-2">
+                🪄 Hỏi AI về tri thức
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-normal">Phase 6</span>
+              </h3>
+              <button onClick={() => setSmartOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              Gõ câu hỏi tự nhiên (vd. "Tôi muốn học về dao động điều hòa" hoặc "Liên hệ giữa lượng giác và sóng cơ"). AI sẽ phân tích intent + tìm các node phù hợp + có thể đề xuất lộ trình.
+            </p>
+
+            <div>
+              <textarea
+                value={smartQuery}
+                onChange={(e) => setSmartQuery(e.target.value)}
+                rows={2}
+                autoFocus
+                placeholder="Bạn muốn học/hỏi gì?"
+                className="w-full px-3 py-2 bg-zinc-950 border-2 border-zinc-700 focus:border-purple-500/60 rounded-md text-sm text-zinc-100 focus:outline-none resize-none"
+                onKeyDown={(e) => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSmartQuery()
+                }}
+              />
+              <div className="text-[10px] text-zinc-500 mt-1">⌘+Enter để gửi · AI có thể mất ~3-5 giây</div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => { setSmartQuery(''); setSmartResult(null) }}
+                className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
+              >
+                Xóa
+              </button>
+              <button
+                onClick={handleSmartQuery}
+                disabled={smartLoading || smartQuery.trim().length < 3}
+                className="text-xs px-4 py-2 rounded-md bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-bold disabled:opacity-50 inline-flex items-center gap-1.5"
+              >
+                {smartLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                Hỏi AI
+              </button>
+            </div>
+
+            {smartResult && (
+              <div className="space-y-3 pt-3 border-t border-zinc-800">
+                <div className="bg-purple-500/10 border border-purple-500/30 rounded-md p-2.5 text-xs">
+                  <div className="font-bold text-purple-300 mb-1">
+                    Ý định: <span className="font-mono">{smartResult.intent}</span>
+                  </div>
+                  <div className="text-zinc-200">{smartResult.explanation}</div>
+                </div>
+
+                {smartResult.suggestedNodes.length > 0 && (
+                  <div>
+                    <div className="text-[11px] uppercase font-bold text-zinc-500 mb-2">
+                      Gợi ý {smartResult.suggestedNodes.length} node:
+                    </div>
+                    <div className="space-y-1.5">
+                      {smartResult.suggestedNodes.map((n, idx) => {
+                        const c = getNodeColor(n.type)
+                        return (
+                          <button
+                            key={n.id}
+                            onClick={() => {
+                              loadFromNode(n.id, 2)
+                              setSmartOpen(false)
+                            }}
+                            className="w-full text-left p-2.5 rounded-md bg-zinc-950 border border-zinc-800 hover:border-purple-500/40 transition flex items-start gap-2.5"
+                          >
+                            <span className="shrink-0 w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: c.fill, color: c.stroke, border: `1px solid ${c.stroke}` }}>
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-zinc-100 truncate">{n.label}</div>
+                              <div className="text-[10px] text-zinc-500">
+                                {NODE_TYPE_LABELS[n.type] || n.type}
+                                {n.description && ` · ${n.description.slice(0, 80)}${n.description.length > 80 ? '…' : ''}`}
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {smartResult.suggestedPathTo && (
+                  <button
+                    onClick={() => {
+                      findPathToNode(smartResult.suggestedPathTo!)
+                      setSmartOpen(false)
+                    }}
+                    className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-zinc-950 font-bold text-xs inline-flex items-center justify-center gap-1.5"
+                  >
+                    🛣 Tạo lộ trình tới đích AI gợi ý
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* AI Extract Modal */}
       <AiExtractModal

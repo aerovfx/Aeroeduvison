@@ -276,6 +276,56 @@ export const knowledgeGraphService = {
     api.post<{ success: boolean } & KgSaveAsLearningPathResult>(
       '/kg/path/save-as-learning-path', input
     ).then(r => r.data),
+
+  // ── Phase 5: Cross-Subject seed ──────────────────────────────────
+  /** Seed cả 3 môn Lý + Toán + Hóa với cross-edges. */
+  seedAllSubjects: () =>
+    api.get<{ success: boolean; nodeCount: number; edgeInserted: number; message: string }>(
+      '/kg/seed?subjects=all'
+    ).then(r => r.data),
+
+  // ── Phase 6: AI Smart Search ─────────────────────────────────────
+  /** Hỏi AI bằng câu NL tự nhiên → AI match best nodes + có thể đề
+   *  xuất path. Timeout 90s vì AI có thể chậm. */
+  smartQuery: (query: string, limit: number = 8) =>
+    api.post<{
+      success: boolean
+      query: string; intent: string; explanation: string
+      suggestedNodes: KgNode[]
+      suggestedPathTo: string | null
+    }>('/kg/smart-query', { query, limit }, { timeout: 90_000 })
+      .then(r => ({
+        intent: r.data.intent,
+        explanation: r.data.explanation,
+        suggestedNodes: r.data.suggestedNodes || [],
+        suggestedPathTo: r.data.suggestedPathTo,
+      })),
+
+  // ── Phase 7: Collaborative suggestions ──────────────────────────
+  submitSuggestion: (input: {
+    kind: 'add_node' | 'add_edge' | 'edit_node' | 'remove'
+    payload: Record<string, any>
+    reason?: string
+  }) =>
+    api.post<{ success: boolean; id: string; message: string }>(
+      '/kg/suggestions', input
+    ).then(r => r.data),
+
+  listSuggestions: (status: 'pending' | 'approved' | 'rejected' = 'pending') =>
+    api.get<{
+      success: boolean
+      items: Array<{
+        id: string; authorId: string | null; kind: string
+        payload: any; status: string; upvotes: number
+        reason: string | null; createdAt: string; reviewedAt: string | null
+      }>
+      count: number
+    }>('/kg/suggestions', { params: { status, limit: 50 } })
+      .then(r => r.data.items || []),
+
+  upvoteSuggestion: (id: string) =>
+    api.post<{ success: boolean; upvotes: number }>(`/kg/suggestions/${id}/upvote`)
+      .then(r => r.data),
 }
 
 /** Trả màu mastery overlay theo score 0-100 */
