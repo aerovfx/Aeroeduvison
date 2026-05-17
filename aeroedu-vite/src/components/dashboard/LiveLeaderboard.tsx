@@ -62,10 +62,22 @@ export function LiveLeaderboard({
     }
   }
 
+  // Poll 15s khi tab visible. Pause khi hidden (tiết kiệm backend +
+  // pin laptop), refetch ngay khi user quay lại tab → bảng xếp hạng
+  // cập nhật tức thì thay vì delay tới chu kỳ poll kế tiếp.
   useEffect(() => {
     fetchData()
-    const t = setInterval(fetchData, 15000)
-    return () => clearInterval(t)
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') fetchData()
+    }, 15000)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchData()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(t)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   const visible = compact ? leaders.slice(0, 5) : leaders.slice(0, 10)
