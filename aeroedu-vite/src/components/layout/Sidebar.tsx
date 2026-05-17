@@ -51,6 +51,7 @@ const studentSections: RouteSection[] = [
     titleKey: 'sectionLearning',
     routes: [
       { icon: SparklesIcon, labelKey: 'routeForYou',       href: '/student/for-you',      badge: 'AI', isHighlighted: true },
+      { icon: Calendar,     labelKey: 'routeDaily',        href: '/student/daily',        badge: 'AI' },
       { icon: Brain,        labelKey: 'routeAiTutor',      href: '/ai-tutor',             isHighlighted: true },
       { icon: BookOpen,     labelKey: 'routeMyCourses',    href: '/student/my-courses',   badge: 'LMS' },
       { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },
