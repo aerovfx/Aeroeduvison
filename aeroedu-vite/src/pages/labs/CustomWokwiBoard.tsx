@@ -21,11 +21,11 @@
  *   board-esp32-devkit-c-v4 · breadboard / breadboard-half
  *   Mỗi part không nhận diện được sẽ vẽ placeholder grey box.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import {
   ChevronDown, Code2, Download, FileCode2, Layers, Loader2,
   Play, RotateCcw, Sparkles, Upload, AlertTriangle, BookOpen, Check,
-  Save, Trash2, X, Globe, User as UserIcon,
+  Save, Trash2, X, Globe, User as UserIcon, Pause, Terminal, Square,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -38,6 +38,8 @@ import {
   type CreateCustomCircuitInput,
 } from '@/services/customCircuit.service'
 import { useAuth } from '@/hooks/useAuth'
+import { ArduinoRuntime, type StopSignal, type RuntimeSnapshot } from '@/lib/arduino-runtime'
+import { transpileArduino, executeSketch } from '@/lib/arduino-transpile'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -643,7 +645,17 @@ void loop() {
 interface PartShape {
   width: number
   height: number
-  render: (part: WokwiPart) => JSX.Element
+  render: (part: WokwiPart, sim?: SimState) => JSX.Element
+}
+
+/** State live từ simulator — truyền xuống mỗi shape để render dynamic */
+interface SimState {
+  /** id LED → on? (HIGH=true). Nếu LED không có pin map → undefined → off */
+  ledOn: Map<string, boolean>
+  /** id button → pressed? */
+  btnPressed: Map<string, boolean>
+  /** id buzzer → on (đang phát tone)? */
+  buzzerOn: Map<string, boolean>
 }
 
 const LED_COLORS: Record<string, string> = {
@@ -651,28 +663,52 @@ const LED_COLORS: Record<string, string> = {
   amber: '#f59e0b', orange: '#f97316', white: '#e5e7eb', purple: '#a855f7',
 }
 
-function ledShape(part: WokwiPart): JSX.Element {
+function ledShape(part: WokwiPart, sim?: SimState): JSX.Element {
   const color = String(part.attrs?.color ?? 'red')
   const fill = LED_COLORS[color] ?? '#ef4444'
+  const isOn = sim?.ledOn.get(part.id) ?? false
   return (
     <g>
-      <circle cx={14} cy={14} r={11} fill={fill} stroke="#111" strokeWidth={1.5} />
-      <circle cx={11} cy={11} r={3} fill="white" opacity={0.6} />
+      {/* Glow halo khi ON */}
+      {isOn && (
+        <>
+          <circle cx={14} cy={14} r={22} fill={fill} opacity={0.25}>
+            <animate attributeName="r" values="18;24;18" dur="1.5s" repeatCount="indefinite" />
+          </circle>
+          <circle cx={14} cy={14} r={16} fill={fill} opacity={0.4} />
+        </>
+      )}
+      <circle
+        cx={14} cy={14} r={11}
+        fill={isOn ? fill : `${fill}55`}
+        stroke={isOn ? fill : '#111'}
+        strokeWidth={1.5}
+      />
+      <circle cx={11} cy={11} r={3} fill="white" opacity={isOn ? 0.85 : 0.3} />
       <text x={14} y={36} textAnchor="middle" fontSize={8} fill="#94a3b8">{part.id}</text>
     </g>
   )
 }
 
-function buttonShape(part: WokwiPart): JSX.Element {
+function buttonShape(part: WokwiPart, sim?: SimState): JSX.Element {
   const color = String(part.attrs?.color ?? 'red')
   const fill = LED_COLORS[color] ?? '#64748b'
   const label = String(part.attrs?.label ?? '')
+  const isPressed = sim?.btnPressed.get(part.id) ?? false
   return (
     <g>
       <rect x={0} y={0} width={36} height={36} rx={4} fill="#1f2937" stroke="#374151" strokeWidth={1} />
-      <circle cx={18} cy={18} r={11} fill={fill} stroke="#0f172a" strokeWidth={1.5} />
+      <circle
+        cx={18} cy={18}
+        r={isPressed ? 9 : 11}
+        fill={isPressed ? `${fill}aa` : fill}
+        stroke={isPressed ? '#fbbf24' : '#0f172a'}
+        strokeWidth={isPressed ? 2 : 1.5}
+      />
       {label && <text x={18} y={22} textAnchor="middle" fontSize={10} fontWeight={700} fill="white">{label}</text>}
-      <text x={18} y={48} textAnchor="middle" fontSize={7} fill="#94a3b8">{part.id}</text>
+      <text x={18} y={48} textAnchor="middle" fontSize={7} fill={isPressed ? '#fbbf24' : '#94a3b8'}>
+        {part.id}{isPressed ? ' ●' : ''}
+      </text>
     </g>
   )
 }
@@ -693,13 +729,29 @@ function resistorShape(part: WokwiPart): JSX.Element {
   )
 }
 
-function buzzerShape(part: WokwiPart): JSX.Element {
+function buzzerShape(part: WokwiPart, sim?: SimState): JSX.Element {
+  const isOn = sim?.buzzerOn.get(part.id) ?? false
   return (
     <g>
-      <circle cx={20} cy={20} r={18} fill="#0f172a" stroke="#475569" strokeWidth={1.2} />
-      <circle cx={20} cy={20} r={13} fill="#1e293b" stroke="#64748b" strokeWidth={0.8} />
-      <circle cx={20} cy={20} r={2} fill="#7c3aed" />
-      <text x={20} y={50} textAnchor="middle" fontSize={7} fill="#94a3b8">{part.id}</text>
+      {/* Sound waves khi đang phát */}
+      {isOn && (
+        <>
+          <circle cx={20} cy={20} r={26} fill="none" stroke="#fbbf24" strokeWidth={1.5} opacity={0.5}>
+            <animate attributeName="r" values="22;30;22" dur="0.8s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.6;0;0.6" dur="0.8s" repeatCount="indefinite" />
+          </circle>
+          <circle cx={20} cy={20} r={32} fill="none" stroke="#fbbf24" strokeWidth={1} opacity={0.3}>
+            <animate attributeName="r" values="28;38;28" dur="0.8s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.4;0;0.4" dur="0.8s" repeatCount="indefinite" />
+          </circle>
+        </>
+      )}
+      <circle cx={20} cy={20} r={18} fill={isOn ? '#451a03' : '#0f172a'} stroke={isOn ? '#fbbf24' : '#475569'} strokeWidth={1.2} />
+      <circle cx={20} cy={20} r={13} fill={isOn ? '#78350f' : '#1e293b'} stroke="#64748b" strokeWidth={0.8} />
+      <circle cx={20} cy={20} r={2} fill={isOn ? '#fbbf24' : '#7c3aed'} />
+      <text x={20} y={50} textAnchor="middle" fontSize={7} fill={isOn ? '#fbbf24' : '#94a3b8'}>
+        {part.id}{isOn ? ' ♪' : ''}
+      </text>
     </g>
   )
 }
@@ -974,11 +1026,13 @@ function connectionColor(c: string | undefined): string {
 }
 
 function DiagramSVG({
-  diagram, focusedPartId, onFocusPart,
+  diagram, focusedPartId, onFocusPart, sim, onPartClick,
 }: {
   diagram: WokwiDiagram
   focusedPartId: string | null
   onFocusPart: (id: string | null) => void
+  sim?: SimState
+  onPartClick?: (part: WokwiPart) => void
 }) {
   const [hoverId, setHoverId] = useState<string | null>(null)
   const activeId = hoverId ?? focusedPartId
@@ -1063,13 +1117,21 @@ function DiagramSVG({
         const isFocused = p.id === focusedPartId
         const isHover = p.id === hoverId
         const isDimmed = activeId !== null && p.id !== activeId
+        const isInteractive = p.type === 'wokwi-pushbutton' && !!sim && !!onPartClick
         return (
           <g
             key={p.id}
             transform={`translate(${p.left ?? 0}, ${p.top ?? 0}) rotate(${rot}, ${shape.width / 2}, ${shape.height / 2})`}
             onMouseEnter={() => setHoverId(p.id)}
             onMouseLeave={() => setHoverId(null)}
-            onClick={(e) => { e.stopPropagation(); onFocusPart(isFocused ? null : p.id) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (isInteractive) {
+                onPartClick?.(p)
+              } else {
+                onFocusPart(isFocused ? null : p.id)
+              }
+            }}
             style={{
               cursor: 'pointer',
               opacity: isDimmed ? 0.45 : 1,
@@ -1081,12 +1143,12 @@ function DiagramSVG({
               <rect
                 x={-4} y={-4} width={shape.width + 8} height={shape.height + 8} rx={6}
                 fill="none"
-                stroke={isFocused ? '#22d3ee' : '#94a3b8'}
+                stroke={isFocused ? '#22d3ee' : isInteractive ? '#fbbf24' : '#94a3b8'}
                 strokeWidth={isFocused ? 2 : 1.2}
                 strokeDasharray={isFocused ? undefined : '3 2'}
               />
             )}
-            {shape.render(p)}
+            {shape.render(p, sim)}
           </g>
         )
       })}
@@ -1114,6 +1176,119 @@ function parseDiagram(text: string): { ok: true; data: WokwiDiagram } | { ok: fa
   } catch (e: any) {
     return { ok: false, error: 'JSON không hợp lệ: ' + (e?.message ?? 'parse error') }
   }
+}
+
+/**
+ * Trích bản đồ pin → component từ diagram. Dùng cho live simulator:
+ * LED nào trên pin nào, button nào trên pin nào, buzzer pin, pot A0?
+ *
+ * Heuristic Wokwi wiring chuẩn:
+ *   - LED: anode → resistor → board pin (qua 2 connection chain)
+ *           HOẶC anode → board pin trực tiếp (không resistor)
+ *           cathode → GND
+ *   - Button: pin1/2 → board pin (cái nào không phải GND)
+ *   - Buzzer: pin 2 → board pin (pin 1 thường GND)
+ *   - Potentiometer: SIG → A0-A5
+ */
+interface PinMap {
+  /** LED id → { pin, color } */
+  leds: Map<string, { pin: number; color: string }>
+  /** Button id → pin */
+  buttons: Map<string, number>
+  /** Buzzer ids + pin */
+  buzzers: Map<string, number>
+  /** Potentiometer id → analog pin (14=A0…19=A5) */
+  pots: Map<string, number>
+}
+
+function extractPinMap(diagram: WokwiDiagram | null): PinMap {
+  const map: PinMap = {
+    leds: new Map(),
+    buttons: new Map(),
+    buzzers: new Map(),
+    pots: new Map(),
+  }
+  if (!diagram?.parts || !diagram.connections) return map
+
+  const boardId = diagram.parts.find(p =>
+    p.type?.startsWith('wokwi-arduino') || p.type?.startsWith('board-arduino')
+  )?.id
+
+  const analogPinIdx = (s: string): number | null => {
+    // A0..A5 → 14..19
+    const m = s.match(/^A([0-5])$/)
+    if (m) return 14 + parseInt(m[1], 10)
+    const n = parseInt(s, 10)
+    if (!Number.isNaN(n) && n >= 0 && n < 20) return n
+    return null
+  }
+
+  // Build adjacency: each pin-ref → list of pin-refs connected to it
+  const adj = new Map<string, string[]>()
+  for (const c of diagram.connections) {
+    const a = String(c[0]), b = String(c[1])
+    if (!adj.has(a)) adj.set(a, []); adj.get(a)!.push(b)
+    if (!adj.has(b)) adj.set(b, []); adj.get(b)!.push(a)
+  }
+
+  // BFS từ 1 component pin → tìm board pin nào kết nối (qua resistor cũng được)
+  const tracePinToBoard = (start: string, maxHops = 3): number | null => {
+    if (!boardId) return null
+    const visited = new Set<string>([start])
+    let frontier = [start]
+    for (let hop = 0; hop < maxHops; hop++) {
+      const next: string[] = []
+      for (const node of frontier) {
+        const neighbors = adj.get(node) ?? []
+        for (const nb of neighbors) {
+          if (visited.has(nb)) continue
+          visited.add(nb)
+          // Check if neighbor is on the board
+          if (nb.startsWith(boardId + ':')) {
+            const pinStr = nb.slice(boardId.length + 1)
+            // Strip suffix .1 .2 .3 (GND multi)
+            const cleanPin = pinStr.split('.')[0]
+            if (cleanPin === 'GND' || cleanPin === '5V' || cleanPin === '3V3' || cleanPin === 'VIN' || cleanPin === 'RST' || cleanPin === 'AREF') {
+              continue // Skip power/ground
+            }
+            const idx = analogPinIdx(cleanPin)
+            if (idx !== null) return idx
+            continue
+          }
+          // Continue through resistor (allow hop)
+          if (nb.startsWith('r')) next.push(nb)
+        }
+      }
+      frontier = next
+      if (frontier.length === 0) break
+    }
+    return null
+  }
+
+  for (const p of diagram.parts) {
+    if (p.type === 'wokwi-led') {
+      const pin = tracePinToBoard(`${p.id}:A`)
+      if (pin !== null) {
+        map.leds.set(p.id, { pin, color: String(p.attrs?.color ?? 'red') })
+      }
+    } else if (p.type === 'wokwi-pushbutton') {
+      // Try both terminals — pick the one that traces to a digital pin
+      const pin = tracePinToBoard(`${p.id}:1.l`) ??
+                  tracePinToBoard(`${p.id}:2.r`) ??
+                  tracePinToBoard(`${p.id}:1.r`) ??
+                  tracePinToBoard(`${p.id}:2.l`)
+      if (pin !== null) map.buttons.set(p.id, pin)
+    } else if (p.type === 'wokwi-buzzer') {
+      // pin 2 = signal (pin 1 thường GND)
+      const pin = tracePinToBoard(`${p.id}:2`) ?? tracePinToBoard(`${p.id}:1`)
+      if (pin !== null) map.buzzers.set(p.id, pin)
+    } else if (p.type === 'wokwi-potentiometer') {
+      const pin = tracePinToBoard(`${p.id}:SIG`)
+      if (pin !== null && pin >= 14) map.pots.set(p.id, pin)
+    }
+  }
+
+  return map
 }
 
 /**
@@ -1179,6 +1354,36 @@ export default function CustomWokwiBoard() {
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
   const [editingCircuit, setEditingCircuit] = useState<CustomCircuit | null>(null)
+
+  // ── Simulator state ────────────────────────────────────────────
+  const [simRunning, setSimRunning] = useState(false)
+  const [simSnapshot, setSimSnapshot] = useState<RuntimeSnapshot | null>(null)
+  const [simError, setSimError] = useState<string | null>(null)
+  const [showSerial, setShowSerial] = useState(false)
+  const simRuntimeRef = useRef<ArduinoRuntime | null>(null)
+  const simSignalRef = useRef<StopSignal>({ stopped: false })
+
+  // Pin map derived từ diagram (memo theo parsed)
+  const pinMap = useMemo(() => extractPinMap(parsed), [parsed])
+
+  /** Build SimState từ runtime snapshot + pinMap — re-compute mỗi snapshot */
+  const simState: SimState | undefined = useMemo(() => {
+    if (!simRunning || !simSnapshot) return undefined
+    const ledOn = new Map<string, boolean>()
+    for (const [id, info] of pinMap.leds) {
+      ledOn.set(id, !!simSnapshot.pins[info.pin]?.value)
+    }
+    const btnPressed = new Map<string, boolean>()
+    for (const [id, pin] of pinMap.buttons) {
+      // Button active LOW (pull-up default) → value=0 means pressed
+      btnPressed.set(id, simSnapshot.pins[pin]?.value === 0)
+    }
+    const buzzerOn = new Map<string, boolean>()
+    for (const [id, pin] of pinMap.buzzers) {
+      buzzerOn.set(id, !!simSnapshot.pins[pin]?.value)
+    }
+    return { ledOn, btnPressed, buzzerOn }
+  }, [simRunning, simSnapshot, pinMap])
 
   // Load mạch đã lưu của user (+ public)
   const { data: savedCircuits = [] } = useQuery({
@@ -1353,6 +1558,66 @@ export default function CustomWokwiBoard() {
     }
   }
 
+  /** Stop simulator (idempotent) */
+  const stopSim = useCallback(() => {
+    if (simSignalRef.current) simSignalRef.current.stopped = true
+    setSimRunning(false)
+  }, [])
+
+  /** Start simulator — transpile sketch + tạo runtime + executeSketch */
+  const startSim = useCallback(async () => {
+    if (simRunning) return
+    setSimError(null)
+    setShowSerial(true)
+    // 1. Transpile Arduino C++ → JS
+    const t = transpileArduino(sketchText)
+    if ('error' in t) {
+      setSimError(t.error)
+      toast.error(`Lỗi cú pháp: ${t.error}`)
+      return
+    }
+    // 2. Tạo runtime mới + signal
+    simSignalRef.current = { stopped: false }
+    const runtime = new ArduinoRuntime(simSignalRef.current, { speed: 1, maxDelayMs: 30_000 })
+    simRuntimeRef.current = runtime
+    runtime.start()
+    // 3. Subscribe để re-render UI khi pin state thay đổi
+    const unsub = runtime.subscribe(() => {
+      setSimSnapshot(runtime.snapshot())
+    })
+    setSimSnapshot(runtime.snapshot())
+    setSimRunning(true)
+    // 4. Execute sketch — chạy async, await
+    try {
+      await executeSketch(t.code, runtime, simSignalRef.current)
+    } catch (e: any) {
+      const msg = e?.message || String(e)
+      setSimError(msg)
+      if (!simSignalRef.current.stopped) toast.error(`Runtime: ${msg.slice(0, 100)}`)
+    } finally {
+      unsub()
+      setSimRunning(false)
+    }
+  }, [simRunning, sketchText])
+
+  /** Auto-stop simulator khi đổi template / diagram / sketch */
+  useEffect(() => {
+    return () => stopSim()
+  }, [stopSim])
+  useEffect(() => {
+    // Nếu user đổi sketch hoặc template → stop để tránh state stale
+    if (simRunning) stopSim()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTemplateId])
+
+  /** Toggle button (digital input) */
+  const toggleButtonPin = useCallback((pin: number) => {
+    const rt = simRuntimeRef.current
+    if (!rt || !simRunning) return
+    const cur = rt.snapshot().pins[pin]?.value
+    rt.setExternalDigitalIn(pin, cur ? 0 : 1)
+  }, [simRunning])
+
   /** Xoá mạch đang active (nếu là custom của user) */
   const handleDeleteCircuit = async () => {
     if (!activeCustom) return
@@ -1455,6 +1720,27 @@ export default function CustomWokwiBoard() {
           <Globe className="w-3.5 h-3.5" />
           Khám phá ({myCircuits.length + communityCircuits.length})
         </button>
+
+        {/* ▶ Chạy giả lập / ■ Dừng — NEW */}
+        {simRunning ? (
+          <button
+            onClick={stopSim}
+            className="text-xs px-3 py-1.5 rounded-md bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 inline-flex items-center gap-1.5 font-semibold"
+            title="Dừng simulator"
+          >
+            <Square className="w-3.5 h-3.5" fill="currentColor" /> Dừng
+            <span className="text-[9px] px-1 rounded bg-rose-500/30 ml-0.5 animate-pulse">LIVE</span>
+          </button>
+        ) : (
+          <button
+            onClick={startSim}
+            className="text-xs px-3 py-1.5 rounded-md bg-emerald-500 hover:bg-emerald-400 text-zinc-950 border border-emerald-500 inline-flex items-center gap-1.5 font-bold shadow-lg shadow-emerald-500/30"
+            title="Chạy sketch Arduino + animate LEDs/buttons trên schematic"
+          >
+            <Play className="w-3.5 h-3.5" fill="currentColor" /> Chạy giả lập
+            <span className="text-[9px] px-1 py-0.5 rounded-md bg-zinc-950/30 ml-0.5">NEW</span>
+          </button>
+        )}
 
         <div className="flex-1" />
 
@@ -1589,6 +1875,14 @@ export default function CustomWokwiBoard() {
                   diagram={parsed}
                   focusedPartId={focusedPartId}
                   onFocusPart={setFocusedPartId}
+                  sim={simState}
+                  onPartClick={(p) => {
+                    // Click button → toggle digital input pin
+                    if (p.type === 'wokwi-pushbutton') {
+                      const pin = pinMap.buttons.get(p.id)
+                      if (pin !== undefined) toggleButtonPin(pin)
+                    }
+                  }}
                 />
               ) : (
                 <div className="h-96 flex items-center justify-center text-xs text-zinc-500">
@@ -1657,6 +1951,73 @@ export default function CustomWokwiBoard() {
                 </div>
               )
             })()}
+
+            {/* Simulator info panel — chỉ hiện khi đang chạy */}
+            {simRunning && simSnapshot && (
+              <div className="border-t border-emerald-500/30 bg-emerald-500/5 p-2.5 space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      SIMULATOR
+                    </span>
+                    <span className="text-zinc-500">
+                      uptime {(simSnapshot.uptimeMs / 1000).toFixed(1)}s ·
+                      🔆 {Array.from(simState?.ledOn.values() ?? []).filter(Boolean).length}/{pinMap.leds.size} LED ·
+                      🔘 {pinMap.buttons.size} btn ·
+                      🔊 {pinMap.buzzers.size} buzzer
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowSerial(v => !v)}
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 inline-flex items-center gap-1"
+                  >
+                    <Terminal className="w-3 h-3" /> {showSerial ? 'Ẩn' : 'Hiện'} Serial
+                  </button>
+                </div>
+                {showSerial && (
+                  <div className="bg-black/80 rounded border border-zinc-800 font-mono text-[10px] text-emerald-300 p-2 max-h-32 overflow-y-auto leading-relaxed">
+                    {simSnapshot.serial.length === 0 ? (
+                      <div className="text-zinc-600 italic">Serial monitor — sketch chưa println dòng nào</div>
+                    ) : (
+                      simSnapshot.serial.slice(-30).map((l, i) => (
+                        <div key={i}>
+                          <span className="text-zinc-600">[{(l.t / 1000).toFixed(2)}]</span> {l.text}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                {simError && (
+                  <div className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded p-1.5">
+                    <AlertTriangle className="w-3 h-3 inline mr-1" /> {simError}
+                  </div>
+                )}
+                <div className="text-[9px] text-zinc-500 italic">
+                  💡 Click vào button trên schematic để nhấn (active LOW). LED tự sáng khi pin HIGH.
+                </div>
+              </div>
+            )}
+
+            {/* Pin map hint khi NOT running */}
+            {!simRunning && (pinMap.leds.size > 0 || pinMap.buttons.size > 0) && (
+              <div className="border-t border-zinc-800 bg-zinc-950/50 p-2 text-[10px] text-zinc-500 flex flex-wrap gap-1.5 items-center">
+                <span className="text-zinc-400">📍 Pin map:</span>
+                {Array.from(pinMap.leds.entries()).slice(0, 6).map(([id, info]) => (
+                  <span key={id} className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700">
+                    {id}=D{info.pin}
+                  </span>
+                ))}
+                {Array.from(pinMap.buttons.entries()).slice(0, 4).map(([id, pin]) => (
+                  <span key={id} className="px-1.5 py-0.5 rounded bg-zinc-900 border border-zinc-700">
+                    {id}=D{pin}
+                  </span>
+                ))}
+                <span className="ml-auto text-emerald-400 text-[9px]">
+                  💡 Bấm "Chạy giả lập" để xem LED chớp / nghe buzzer / nhấn button
+                </span>
+              </div>
+            )}
 
             {/* Part type legend */}
             {parsed && partTypes.size > 0 && (
