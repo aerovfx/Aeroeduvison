@@ -11297,6 +11297,141 @@ if (!USE_NODEJS_QUESTIONS) {
     res.status(501).json({ error: 'Đặt lịch thi nâng cao đang phát triển — dùng startTime/endTime trong tạo phòng' }));
   app.post('/api/online-exam-room/:id/schedule/activate', (_req, res) =>
     res.status(501).json({ error: 'Kích hoạt lịch thi đang phát triển' }));
+
+  // ────────────────────────────────────────────────────────────
+  // STUDENT-side endpoints cho exam rooms
+  // ────────────────────────────────────────────────────────────
+
+  // GET /api/student/exam-rooms — list phòng thi HS có thể vào
+  // Bao gồm:
+  //   - Public rooms (status: draft hoặc active) — ai cũng vào được
+  //   - Rooms HS đã từng tham gia (qua ExamRoomParticipant) — kể cả private
+  // Mỗi room kèm leaderboard top 10 (theo score DESC) + my participant info.
+  app.get('/api/student/exam-rooms', async (req, res) => {
+    const user = getERTeacher(req); // JWT decode — không phân biệt role
+    const pool = getERPool();
+    if (!pool) return res.json({ rooms: [], count: 0 });
+    try {
+      await ensureExamRoomTables();
+      const userId = user?.id || null;
+      // Lấy rooms theo 2 điều kiện: public-and-open HOẶC student đã join
+      const r = await pool.query(
+        `SELECT DISTINCT er.*,
+                e.title AS exam_title, e."examType",
+                u.name AS teacher_name,
+                (SELECT COUNT(*) FROM "ExamRoomParticipant" p WHERE p."roomId" = er.id) AS participants,
+                (SELECT COUNT(*) FROM "ExamQuestion" eq WHERE eq."examId" = er."examId") AS questions,
+                (SELECT row_to_json(mp) FROM (
+                   SELECT score, "joinedAt", "submittedAt"
+                     FROM "ExamRoomParticipant"
+                    WHERE "roomId" = er.id AND "userId" = $1
+                    LIMIT 1
+                 ) mp) AS my_participant
+           FROM "ExamRoom" er
+           LEFT JOIN "Exam" e ON e.id = er."examId"
+           LEFT JOIN "User" u ON u.id = er."teacherId"
+          WHERE (er."isPublic" = true AND er.status IN ('draft','active'))
+             OR EXISTS (
+               SELECT 1 FROM "ExamRoomParticipant" p
+                WHERE p."roomId" = er.id AND p."userId" = $1
+             )
+          ORDER BY
+            CASE er.status WHEN 'active' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END,
+            er."startTime" ASC NULLS LAST
+          LIMIT 50`,
+        [userId]
+      );
+      if (r.rows.length === 0) return res.json({ rooms: [], count: 0 });
+
+      // Batch-load leaderboard cho tất cả rooms (top 10 mỗi room).
+      const roomIds = r.rows.map(row => row.id);
+      const lbRes = await pool.query(
+        `SELECT "roomId", "userId", "studentName", score, "submittedAt", "joinedAt",
+                ROW_NUMBER() OVER (PARTITION BY "roomId" ORDER BY score DESC NULLS LAST, "submittedAt" ASC NULLS LAST) AS rn
+           FROM "ExamRoomParticipant"
+          WHERE "roomId" = ANY($1::text[])`,
+        [roomIds]
+      );
+      const byRoom = new Map();
+      for (const lb of lbRes.rows) {
+        if (Number(lb.rn) > 10) continue; // chỉ top 10
+        if (!byRoom.has(lb.roomId)) byRoom.set(lb.roomId, []);
+        byRoom.get(lb.roomId).push({
+          userId: lb.userId,
+          name: lb.studentName || 'Ẩn danh',
+          score: lb.score == null ? null : Number(lb.score),
+          rank: Number(lb.rn),
+          submittedAt: lb.submittedAt,
+          isMe: lb.userId === userId,
+        });
+      }
+
+      const rooms = r.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        description: row.description,
+        status: row.status,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        duration: row.duration,
+        isPublic: !!row.isPublic,
+        maxStudents: row.maxStudents,
+        // Hide accessCode từ student-side public list (chỉ teacher dùng mã)
+        Teacher: row.teacher_name ? { id: row.teacherId, name: row.teacher_name } : null,
+        Exam: row.exam_title ? { id: row.examId, title: row.exam_title, examType: row.examType } : null,
+        _count: {
+          participants: Number(row.participants) || 0,
+          questions: Number(row.questions) || 0,
+        },
+        // Student-specific fields
+        myParticipant: row.my_participant ? {
+          score: row.my_participant.score == null ? null : Number(row.my_participant.score),
+          joinedAt: row.my_participant.joinedAt,
+          submittedAt: row.my_participant.submittedAt,
+          completed: !!row.my_participant.submittedAt,
+        } : null,
+        leaderboard: byRoom.get(row.id) || [],
+      }));
+      res.json({ rooms, count: rooms.length });
+    } catch (err) {
+      console.error('[student:exam-rooms]', err.message);
+      res.json({ rooms: [], count: 0, error: err.message });
+    }
+  });
+
+  // GET /api/online-exam-room/:id/leaderboard — full leaderboard 1 phòng
+  // (top 50, public — ai cũng xem được). HS dùng để xem chi tiết khi click
+  // vào room card.
+  app.get('/api/online-exam-room/:id/leaderboard', async (req, res) => {
+    const pool = getERPool();
+    if (!pool) return res.json({ leaderboard: [], count: 0 });
+    try {
+      await ensureExamRoomTables();
+      const { rows } = await pool.query(
+        `SELECT "userId", "studentName", score, "submittedAt", "joinedAt",
+                ROW_NUMBER() OVER (ORDER BY score DESC NULLS LAST, "submittedAt" ASC NULLS LAST) AS rank
+           FROM "ExamRoomParticipant"
+          WHERE "roomId" = $1
+          ORDER BY rank ASC
+          LIMIT 50`,
+        [req.params.id]
+      );
+      const user = getERTeacher(req);
+      const userId = user?.id || null;
+      const leaderboard = rows.map(r => ({
+        userId: r.userId,
+        name: r.studentName || 'Ẩn danh',
+        score: r.score == null ? null : Number(r.score),
+        rank: Number(r.rank),
+        submittedAt: r.submittedAt,
+        isMe: r.userId === userId,
+      }));
+      res.json({ roomId: req.params.id, leaderboard, count: leaderboard.length });
+    } catch (err) {
+      console.error('[exam-room:leaderboard]', err.message);
+      res.json({ leaderboard: [], count: 0, error: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
