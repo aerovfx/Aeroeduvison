@@ -68,6 +68,7 @@ const ScrumboardPage   = lazy(() => import('@/pages/dashboard/Scrumboard'))
 const KnowledgeGraphPage = lazy(() => import('@/pages/dashboard/KnowledgeGraph'))
 const TeacherScrumboardPage = lazy(() => import('@/pages/teacher/TeacherScrumboard'))
 const AdminScrumboardPage   = lazy(() => import('@/pages/admin/AdminScrumboard'))
+const AdminRsExperimentsPage= lazy(() => import('@/pages/admin/RsExperiments'))
 const SettingsPage     = lazy(() => import('@/pages/dashboard/Settings'))
 const ContactsPage     = lazy(() => import('@/pages/dashboard/Contacts'))
 
@@ -556,6 +557,7 @@ export function AppRouter() {
               <Route path="/admin/analytics"           element={<AdminAnalyticsPage />} />
               <Route path="/admin/insights"            element={<AdminInsightsPage />} />
               <Route path="/admin/scrumboard"          element={<AdminScrumboardPage />} />
+              <Route path="/admin/rs-experiments"      element={<AdminRsExperimentsPage />} />
             </Route>
 
           </Route>{/* /DashboardLayout */}
