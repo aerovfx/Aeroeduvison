@@ -19,6 +19,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RoleGuard } from '@/components/auth/RoleGuard'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import PageFallback from '@/pages/common/PageFallback'
+const NotFoundPage = lazy(() => import('@/pages/common/NotFound'))
 import { RouteErrorBoundary } from '@/components/common/ErrorBoundary'
 import { usePageTracking } from '@/hooks/usePageTracking'
 
@@ -568,7 +569,7 @@ export function AppRouter() {
         <Route path="/competition"    element={<PageFallback />} />
 
         {/* ── 404 fallback ─────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
 
         </Routes>
       </Suspense>
