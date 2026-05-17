@@ -259,6 +259,12 @@ export default function PixelOdyssey() {
     try { return !localStorage.getItem(LS_TUTORIAL_KEY) }
     catch { return false }
   })
+
+  /** Khi bất kỳ modal mở: clear pressed keys để character không bị stuck đi tiếp */
+  const anyModalOpen = !!activeNPC || showCharPicker || showTutorial || showMap
+  useEffect(() => {
+    if (anyModalOpen) keysRef.current.clear()
+  }, [anyModalOpen])
   const [playerCharId, setPlayerCharId] = useState<string>(() => {
     try {
       return localStorage.getItem(LS_PLAYER_KEY) || PLAYER_CHOICES[0]
@@ -339,6 +345,7 @@ export default function PixelOdyssey() {
       if (isTypingTarget(e.target)) return
 
       const k = e.key.toLowerCase()
+      // Khi NPC dialog mở: chỉ Escape work để đóng
       if (activeNPC) {
         if (k === 'escape') {
           e.preventDefault()
@@ -346,7 +353,17 @@ export default function PixelOdyssey() {
           setQuizPhase('intro')
           setSelectedChoice(null)
         }
-        return // không di chuyển khi đang nói chuyện
+        return
+      }
+      // Khi modal khác (char picker / tutorial / map) mở: Escape đóng modal, ignore game keys
+      if (showCharPicker || showTutorial || showMap) {
+        if (k === 'escape') {
+          e.preventDefault()
+          setShowCharPicker(false)
+          setShowTutorial(false)
+          setShowMap(false)
+        }
+        return
       }
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' ', 'e', 'r', 'm', 'escape'].includes(k)) {
         e.preventDefault()
@@ -366,7 +383,7 @@ export default function PixelOdyssey() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [activeNPC, handleInteract, resetPosition])
+  }, [activeNPC, handleInteract, resetPosition, showCharPicker, showTutorial, showMap])
 
   // Render loop
   useEffect(() => {
