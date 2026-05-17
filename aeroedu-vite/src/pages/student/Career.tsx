@@ -29,6 +29,7 @@ import { careerService } from "@/services/career.service"
 import { useAuth } from "@/hooks/useAuth"
 import { formatRelativeTime } from "@/lib/utils"
 import type { CareerCommunityStats, CareerTestResult } from "@/types"
+import CareerDayPixelSim from "@/components/career/CareerDayPixelSim"
 
 /* ─── Inline replacements ─────────────────────────── */
 function PageHeader({
@@ -1286,6 +1287,15 @@ export default function CareerAdvisorPage() {
             {/* Job Tasks — Làm gì? Ở đâu? (nếu có dữ liệu mở rộng) */}
             {c.jobTasks && (
               <JobTasksSection data={c.jobTasks} />
+            )}
+
+            {/* Pixel sim 1 ngày — cảm hứng từ pixel-agents (github.com/pablodelucca) */}
+            {c.dailyLife && c.dailyLife.length > 0 && (
+              <CareerDayPixelSim
+                careerName={c.name}
+                category={c.category}
+                dailyLife={c.dailyLife}
+              />
             )}
 
             {/* Daily Life */}
