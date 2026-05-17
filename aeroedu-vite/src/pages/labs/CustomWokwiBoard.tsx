@@ -1515,17 +1515,31 @@ export default function CustomWokwiBoard() {
     toast.success(`Đã tải: ${c.name}`)
   }
 
-  /** Mở Save modal — nếu đang ở mạch của chính user thì gợi ý update,
-   *  ngược lại tạo mới (kể cả khi đang xem mạch public của người khác
-   *  → cho clone về thư viện cá nhân). */
-  const openSaveModal = () => {
-    // Parse trước để không cho lưu JSON lỗi
+  /** Mở Save modal ở chế độ TẠO MỚI — luôn yêu cầu nhập tên, KHÔNG ghi
+   *  đè mạch hiện tại. User phải đặt tên trước khi save. */
+  const openSaveAsNewModal = () => {
     const res = parseDiagram(diagramText)
     if (!res.ok) {
       toast.error('Sửa lỗi JSON trước khi lưu: ' + res.error)
       return
     }
-    setEditingCircuit(canEditActive ? activeCustom : null)
+    setEditingCircuit(null)  // ép tạo mới, không update
+    setShowSaveModal(true)
+  }
+
+  /** Mở Save modal ở chế độ CẬP NHẬT — chỉ khi user sở hữu mạch hiện tại.
+   *  Modal hiển thị tên mạch sẵn + cảnh báo sẽ ghi đè. */
+  const openUpdateModal = () => {
+    if (!canEditActive || !activeCustom) {
+      toast.error('Chỉ cập nhật được mạch của chính bạn')
+      return
+    }
+    const res = parseDiagram(diagramText)
+    if (!res.ok) {
+      toast.error('Sửa lỗi JSON trước khi lưu: ' + res.error)
+      return
+    }
+    setEditingCircuit(activeCustom)
     setShowSaveModal(true)
   }
 
@@ -1690,15 +1704,27 @@ export default function CustomWokwiBoard() {
           )}
         </select>
 
-        {/* Save button — primary action */}
+        {/* "Lưu mạch mới" — LUÔN tạo mới, force nhập tên (tránh ghi đè) */}
         <button
-          onClick={openSaveModal}
+          onClick={openSaveAsNewModal}
           className="text-xs px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 inline-flex items-center gap-1.5 font-semibold"
-          title={canEditActive ? 'Cập nhật mạch của bạn' : 'Lưu mạch này vào thư viện cá nhân'}
+          title="Lưu thành mạch MỚI trong thư viện cá nhân (yêu cầu đặt tên)"
         >
           <Save className="w-3.5 h-3.5" />
-          {canEditActive ? 'Cập nhật' : 'Lưu mạch'}
+          Lưu mạch mới
         </button>
+
+        {/* "Cập nhật" — riêng button, chỉ hiện khi user sở hữu mạch hiện tại */}
+        {canEditActive && (
+          <button
+            onClick={openUpdateModal}
+            className="text-xs px-3 py-1.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-500/40 inline-flex items-center gap-1.5 font-semibold"
+            title={`Ghi đè mạch "${activeCustom?.name}" (chỉ áp dụng cho mạch của bạn)`}
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Cập nhật
+          </button>
+        )}
 
         {/* Delete chỉ hiển thị cho mạch của chính user */}
         {activeCustom && canEditActive && (
@@ -2132,18 +2158,20 @@ export default function CustomWokwiBoard() {
       {showSaveModal && (
         <SaveCircuitModal
           initial={editingCircuit ?? {
-            // Khi tạo mới (clone từ builtin / public circuit) → suggest "(bản sao)"
-            name: activeTemplate.name + ' (bản sao)',
+            // CHẾ ĐỘ TẠO MỚI: tên TRỐNG để buộc user nhập rõ ràng
+            // (không pre-fill template name → tránh user click Save nhanh
+            //  rồi lưu nhầm với tên template gốc).
+            name: '',
             description: activeTemplate.description,
             board: activeTemplate.board,
             difficulty: activeTemplate.difficulty as any,
-            // Inherit category nếu đang clone public circuit, không thì
-            // auto-detect từ diagram parts. Fall back 'general' nếu không khớp.
+            // Auto-detect category từ parts → user có thể đổi
             category: activeCustom?.category ?? detectCategory(parsed),
             isPublic: false,
             objectives: activeTemplate.objectives,
           }}
           isUpdate={!!editingCircuit}
+          suggestedName={activeTemplate.name + ' (bản sao)'}
           onClose={() => setShowSaveModal(false)}
           onSubmit={handleSaveCircuit}
         />
@@ -2158,11 +2186,16 @@ export default function CustomWokwiBoard() {
 interface SaveModalProps {
   initial: Partial<CreateCustomCircuitInput>
   isUpdate: boolean
+  /** Gợi ý tên (hiển thị dưới input như placeholder click-to-fill, không
+   *  pre-fill để buộc user xác nhận tên mạch trước khi save). */
+  suggestedName?: string
   onClose: () => void
   onSubmit: (input: CreateCustomCircuitInput) => Promise<void>
 }
 
-function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalProps) {
+function SaveCircuitModal({
+  initial, isUpdate, suggestedName, onClose, onSubmit,
+}: SaveModalProps) {
   const [name, setName] = useState(initial.name ?? '')
   const [description, setDescription] = useState(initial.description ?? '')
   const [board, setBoard] = useState(initial.board ?? 'Arduino UNO')
@@ -2175,9 +2208,12 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
     (initial.objectives ?? []).join('\n')
   )
   const [submitting, setSubmitting] = useState(false)
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false)
 
   const trimmedName = name.trim()
-  const canSubmit = trimmedName.length > 0 && !submitting
+  const nameTooShort = trimmedName.length < 3
+  // CẬP NHẬT cần check confirm overwrite trước
+  const canSubmit = !nameTooShort && !submitting && (!isUpdate || confirmOverwrite)
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -2211,24 +2247,47 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
-            <Save className="w-4 h-4 text-emerald-400" />
-            {isUpdate ? 'Cập nhật mạch' : 'Lưu mạch vào thư viện'}
+          <h3 className={`text-base font-bold flex items-center gap-2 ${
+            isUpdate ? 'text-cyan-100' : 'text-emerald-100'
+          }`}>
+            {isUpdate ? (
+              <><RotateCcw className="w-4 h-4 text-cyan-400" /> Cập nhật mạch hiện tại</>
+            ) : (
+              <><Save className="w-4 h-4 text-emerald-400" /> Lưu thành mạch MỚI</>
+            )}
           </h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs text-zinc-400">
-          Mạch sẽ xuất hiện trong dropdown <strong>"📁 Mạch của tôi"</strong> bên cạnh
-          các template có sẵn. Bật chia sẻ công khai để mọi người dùng đều thấy được.
-        </p>
+        {/* Mode banner — phân biệt rõ TẠO MỚI vs CẬP NHẬT */}
+        {isUpdate ? (
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-md p-2.5 text-xs text-cyan-200">
+            <strong>Ghi đè:</strong> mạch
+            <span className="font-mono mx-1 px-1 bg-zinc-900 rounded text-cyan-300">
+              {initial.name}
+            </span>
+            sẽ được cập nhật với nội dung diagram + sketch hiện tại. Nội dung cũ
+            <strong className="text-amber-300"> KHÔNG khôi phục được</strong>.
+          </div>
+        ) : (
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-md p-2.5 text-xs text-emerald-200">
+            Mạch mới sẽ xuất hiện trong dropdown <strong>"📁 Mạch của tôi"</strong>.
+            Đặt tên rõ ràng để dễ tìm lại sau (vd. "Đèn giao thông v2", "Simon Says
+            6 LED"…).
+          </div>
+        )}
 
-        {/* Name */}
+        {/* Name — emphasis: viền dày hơn, lớn hơn, autofocus */}
         <div>
-          <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+          <label className="text-xs uppercase tracking-wider font-bold flex items-center gap-1.5"
+            style={{ color: isUpdate ? '#67e8f9' : '#6ee7b7' }}
+          >
             Tên mạch <span className="text-rose-400">*</span>
+            <span className="text-[10px] text-zinc-500 normal-case font-normal">
+              {nameTooShort ? '(tối thiểu 3 ký tự)' : `(${trimmedName.length}/200)`}
+            </span>
           </label>
           <input
             type="text"
@@ -2236,9 +2295,29 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
             onChange={(e) => setName(e.target.value)}
             maxLength={200}
             autoFocus
-            placeholder="vd. Đếm 0-99 trên 2 led 7-đoạn"
-            className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+            placeholder={isUpdate ? '' : 'vd. Đếm 0-99 trên 2 led 7-đoạn'}
+            className={`w-full mt-1.5 px-3 py-2.5 bg-zinc-950 border-2 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-2 transition-colors ${
+              nameTooShort
+                ? 'border-zinc-700 focus:border-amber-500/60 focus:ring-amber-500/20'
+                : 'border-emerald-500/40 focus:border-emerald-500/80 focus:ring-emerald-500/30'
+            }`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && canSubmit) { e.preventDefault(); handleSubmit() }
+            }}
           />
+          {!isUpdate && suggestedName && name === '' && (
+            <button
+              type="button"
+              onClick={() => setName(suggestedName)}
+              className="mt-1.5 text-[11px] text-zinc-400 hover:text-emerald-300 inline-flex items-center gap-1"
+              title="Click để dùng gợi ý"
+            >
+              💡 Gợi ý:
+              <span className="font-mono px-1.5 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                {suggestedName}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Description */}
@@ -2350,6 +2429,23 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
           </div>
         </label>
 
+        {/* Confirm overwrite — bắt buộc tick khi UPDATE */}
+        {isUpdate && (
+          <label className="flex items-start gap-2 p-2.5 rounded-md bg-amber-500/10 border border-amber-500/40 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={confirmOverwrite}
+              onChange={(e) => setConfirmOverwrite(e.target.checked)}
+              className="mt-0.5 accent-amber-500"
+            />
+            <div className="text-xs text-amber-200">
+              <strong>Tôi xác nhận muốn ghi đè</strong> mạch
+              <span className="font-mono mx-1 text-amber-100">{initial.name}</span>
+              — nội dung cũ không khôi phục được.
+            </div>
+          </label>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
           <button
@@ -2362,14 +2458,27 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="text-xs px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold disabled:opacity-50 inline-flex items-center gap-1.5"
+            className={`text-xs px-4 py-2 rounded-md font-bold disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5 transition-colors ${
+              isUpdate
+                ? 'bg-cyan-500 hover:bg-cyan-400 text-zinc-950'
+                : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
+            }`}
+            title={
+              nameTooShort
+                ? 'Nhập tên mạch ít nhất 3 ký tự'
+                : isUpdate && !confirmOverwrite
+                ? 'Tick xác nhận ghi đè trước'
+                : 'Save'
+            }
           >
             {submitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isUpdate ? (
+              <RotateCcw className="w-3.5 h-3.5" />
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            {isUpdate ? 'Lưu thay đổi' : 'Lưu mạch'}
+            {isUpdate ? 'Ghi đè mạch hiện tại' : 'Tạo mạch mới'}
           </button>
         </div>
       </div>
