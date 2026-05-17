@@ -558,7 +558,11 @@ function DigestPrefsSection() {
       title="Gợi ý AI hàng ngày"
     >
       <div className="text-xs text-white/50 mb-3 -mt-2">
-        Mỗi ngày AI tổng hợp 3 mục học cá nhân hoá nhất cho bạn — bạn chọn nhận qua đâu.
+        Mỗi ngày AI tổng hợp 3 mục cá nhân hoá nhất cho bạn — bạn chọn nhận qua đâu.
+        <br />
+        <span className="text-white/40">
+          HS nhận gợi ý học (điểm yếu / LP từ GV / hot). GV nhận việc cần xử lý (lớp đang yếu / HS cần hỗ trợ / LP HS vừa tạo).
+        </span>
       </div>
 
       {loading ? (
