@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `cda8aa0` (revision TBD, 2026-05-17 — Custom Wokwi board + Sidebar gap fix + student empty state)
-- Commits since last deploy: `0/5` (vừa deploy 5 commits)
+- Last deployed commit: `814bc8f` (revision pixiai-00254-zeg, 2026-05-17 — Custom Wokwi board + Sidebar gap fix + student empty state UX)
+- Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
