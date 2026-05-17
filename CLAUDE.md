@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `1ad2ff0` (revision pixiai-00255-laj, 2026-05-17 — realtime UX: auto-poll + LIVE badges + dashboard real data)
-- Commits since last deploy: `0/5`
+- Last deployed commit: `d07510c` (revision TBD, 2026-05-17 — Custom mạch nút Lưu + danh mục + thư viện cá nhân/công khai)
+- Commits since last deploy: `0/5` (early deploy: user yêu cầu BE+FE feature)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
