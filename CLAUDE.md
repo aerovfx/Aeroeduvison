@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `0069a96` (revision pixiai-00288-sar, 2026-05-17 — RS-Phase 10 enhanced Cold-start Onboarding: 3-step modal + Settings access LIVE)
-- Commits since last deploy: `5/5` → DEPLOYING (0f47358 docs · 3558056 fix localStorage userId · 6609659 Daily adaptive banner+badge · _next_ ForYou parity · then docs)
+- Last deployed commit: `6d5d3c5` (revision pixiai-00289-zom, 2026-05-17 — RS bug fix localStorage userId namespace + adaptive cold-start UX parity)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `0069a96` → pixiai-00288-sar (RS-Phase 10 enhanced Cold-start Onboarding)
 - Prev: `298dfad` → pixiai-00287-cel (RS-Phase 9 A/B Testing Framework)
 - Prev: `6b9a8aa` → pixiai-00286-kad (Daily/Sprint UX polish: lastSentAt + progress footer + localStorage)
 - Prev: `d984880` → pixiai-00285-xan (RS-Phase 8 Ops: scheduler script + audience-aware digest)
