@@ -12,7 +12,7 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
-  ClipboardList, Network, Gamepad2, CreditCard,
+  ClipboardList, Network, Gamepad2, CreditCard, Radio,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -55,6 +55,7 @@ const studentSections: RouteSection[] = [
       { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },
       { icon: Map,          labelKey: 'routeLearningPath',  href: '/learning-paths' },
       { icon: FileText,     labelKey: 'routeExamPrep',      href: '/student/exam-prep' },
+      { icon: Radio,        labelKey: 'routeExamRooms',     href: '/student/exams',        badge: 'Live' },
       { icon: GraduationCap,labelKey: 'routeCareer',        href: '/student/career' },
     ],
   },
