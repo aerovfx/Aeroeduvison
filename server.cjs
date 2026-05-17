@@ -8596,6 +8596,20 @@ ${plan.content || '<p>(Trống)</p>'}
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_nodes_type ON kg_nodes(type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_edges_from ON kg_edges(from_id, rel_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_edges_to   ON kg_edges(to_id, rel_type)`);
+    // ── Phase 3: personal mastery layer ──
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_mastery (
+        user_id    TEXT NOT NULL,
+        node_id    TEXT NOT NULL,
+        score      REAL NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 100),
+        attempts   INTEGER NOT NULL DEFAULT 0,
+        source     TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (user_id, node_id)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_mastery_user ON kg_mastery(user_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_mastery_node ON kg_mastery(node_id)`);
     // Trigram extension cho fuzzy search (skip nếu đã có)
     try {
       await pool.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
@@ -9330,6 +9344,164 @@ ${plan.content || '<p>(Trống)</p>'}
     } catch (err) {
       console.warn('[kg:sources:lesson-plans] ⚠', err.message);
       return res.json({ success: true, items: [] });
+    }
+  });
+
+  // ════════════════════════════════════════════════
+  // KG — PHASE 3: Personal Mastery Layer
+  // Mỗi user có mức độ thông thạo (score 0-100) cho từng node — render
+  // overlay màu trên graph để biết chỗ nào còn yếu, chỗ nào đã thông thạo.
+  // ════════════════════════════════════════════════
+
+  // Helper: lấy userId từ JWT (reuse cùng pattern với phần khác)
+  function getKgUser(req) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+      const d = jwt.verify(auth.slice(7), secret, { ignoreExpiration: true });
+      return { id: d.sub || d.userId || d.id };
+    } catch { return null; }
+  }
+
+  // GET /api/kg/mastery/me — Map<nodeId, { score, attempts, source, updatedAt }>
+  app.get('/api/kg/mastery/me', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const r = await pool.query(
+        `SELECT node_id, score, attempts, source, updated_at
+         FROM kg_mastery WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 5000`,
+        [user.id]
+      );
+      const mastery = {};
+      for (const row of r.rows) {
+        mastery[row.node_id] = {
+          score: Math.round(row.score),
+          attempts: row.attempts,
+          source: row.source,
+          updatedAt: row.updated_at,
+        };
+      }
+      return res.json({ success: true, mastery, count: r.rows.length });
+    } catch (err) {
+      console.error('[kg:mastery:me] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/kg/mastery/update — bulk upsert
+  // Body: { updates: [{ nodeId, score, source? }, ...], incrementAttempts?: true }
+  app.post('/api/kg/mastery/update', express.json({ limit: '128kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const body = req.body || {};
+      const updates = Array.isArray(body.updates) ? body.updates : [];
+      if (updates.length === 0) {
+        return res.status(400).json({ success: false, error: 'Empty updates array' });
+      }
+      if (updates.length > 200) {
+        return res.status(400).json({ success: false, error: 'Max 200 updates per request' });
+      }
+      const incrAttempts = body.incrementAttempts !== false;
+      let upserted = 0;
+      for (const u of updates) {
+        const nodeId = String(u.nodeId || '').slice(0, 200);
+        let score = Number(u.score);
+        if (!nodeId || Number.isNaN(score)) continue;
+        score = Math.max(0, Math.min(100, score));
+        const source = String(u.source || 'manual').slice(0, 30);
+        try {
+          await pool.query(
+            `INSERT INTO kg_mastery (user_id, node_id, score, attempts, source, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (user_id, node_id) DO UPDATE SET
+               score      = EXCLUDED.score,
+               attempts   = kg_mastery.attempts + $4,
+               source     = EXCLUDED.source,
+               updated_at = NOW()`,
+            [user.id, nodeId, score, incrAttempts ? 1 : 0, source]
+          );
+          upserted++;
+        } catch (e) { console.warn('[kg:mastery:upsert]', nodeId, e.message); }
+      }
+      return res.json({ success: true, upserted, total: updates.length });
+    } catch (err) {
+      console.error('[kg:mastery:update] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/mastery/stats/me — aggregate stats + top weak nodes
+  app.get('/api/kg/mastery/stats/me', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      // Tổng nodes user đã có data + phân bố
+      const dist = await pool.query(
+        `SELECT
+            COUNT(*) FILTER (WHERE score < 30)  AS weak,
+            COUNT(*) FILTER (WHERE score >= 30 AND score < 70) AS learning,
+            COUNT(*) FILTER (WHERE score >= 70) AS mastered,
+            COUNT(*) AS total,
+            COALESCE(AVG(score), 0) AS avg_score
+         FROM kg_mastery WHERE user_id = $1`,
+        [user.id]
+      );
+      // Top 10 weak nodes — JOIN với kg_nodes để có label
+      const weak = await pool.query(
+        `SELECT m.node_id, m.score, m.attempts, m.updated_at,
+                n.label, n.type, n.description
+         FROM kg_mastery m
+         LEFT JOIN kg_nodes n ON n.id = m.node_id
+         WHERE m.user_id = $1 AND m.score < 50
+         ORDER BY m.score ASC, m.updated_at DESC
+         LIMIT 10`,
+        [user.id]
+      );
+      // Recent activity
+      const recent = await pool.query(
+        `SELECT m.node_id, m.score, m.updated_at, n.label, n.type
+         FROM kg_mastery m
+         LEFT JOIN kg_nodes n ON n.id = m.node_id
+         WHERE m.user_id = $1
+         ORDER BY m.updated_at DESC LIMIT 5`,
+        [user.id]
+      );
+      const d = dist.rows[0] || {};
+      return res.json({
+        success: true,
+        stats: {
+          total:    Number(d.total) || 0,
+          weak:     Number(d.weak) || 0,
+          learning: Number(d.learning) || 0,
+          mastered: Number(d.mastered) || 0,
+          avgScore: Math.round(Number(d.avg_score) || 0),
+        },
+        weakTopics: weak.rows.map(r => ({
+          nodeId: r.node_id, label: r.label || '(deleted)',
+          type: r.type || 'Concept',
+          score: Math.round(r.score), attempts: r.attempts,
+          description: r.description,
+          updatedAt: r.updated_at,
+        })),
+        recent: recent.rows.map(r => ({
+          nodeId: r.node_id, label: r.label || '(deleted)',
+          type: r.type || 'Concept',
+          score: Math.round(r.score), updatedAt: r.updated_at,
+        })),
+      });
+    } catch (err) {
+      console.error('[kg:mastery:stats] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

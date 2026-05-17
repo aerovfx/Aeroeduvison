@@ -89,6 +89,44 @@ export interface KgLessonPlanSource {
   updatedAt?: string | null
 }
 
+// ─── Phase 3 types: Personal Mastery Layer ───────────────────────
+export interface KgMasteryEntry {
+  score: number       // 0-100
+  attempts: number
+  source?: string | null
+  updatedAt: string
+}
+
+export interface KgMasteryMap {
+  [nodeId: string]: KgMasteryEntry
+}
+
+export interface KgMasteryStats {
+  total: number
+  weak: number      // score < 30
+  learning: number  // 30 ≤ score < 70
+  mastered: number  // score ≥ 70
+  avgScore: number
+}
+
+export interface KgWeakTopic {
+  nodeId: string
+  label: string
+  type: string
+  score: number
+  attempts: number
+  description?: string | null
+  updatedAt: string
+}
+
+export interface KgMasteryUpdate {
+  nodeId: string
+  /** 0-100 */
+  score: number
+  /** 'exam' | 'manual' | 'ai-extract' | 'practice' */
+  source?: string
+}
+
 export const knowledgeGraphService = {
   /** Seed dữ liệu Vật lí 11 vào graph (idempotent). */
   seed: () =>
@@ -139,6 +177,43 @@ export const knowledgeGraphService = {
     api.get<{ success: boolean; items: KgLessonPlanSource[] }>('/kg/sources/lesson-plans', {
       params: { limit },
     }).then(r => r.data.items || []),
+
+  // ── Phase 3: Personal Mastery Layer ──────────────────────────────
+
+  /** GET mastery của user hiện tại: Map<nodeId, {score, attempts...}> */
+  getMyMastery: () =>
+    api.get<{ success: boolean; mastery: KgMasteryMap; count: number }>('/kg/mastery/me')
+      .then(r => r.data.mastery || {}),
+
+  /** Bulk update mastery (vd. sau khi nộp bài thi). */
+  updateMastery: (updates: KgMasteryUpdate[], incrementAttempts: boolean = true) =>
+    api.post<{ success: boolean; upserted: number; total: number }>(
+      '/kg/mastery/update',
+      { updates, incrementAttempts }
+    ).then(r => r.data),
+
+  /** GET aggregate stats + top 10 weak topics + recent activity. */
+  getMasteryStats: () =>
+    api.get<{
+      success: boolean
+      stats: KgMasteryStats
+      weakTopics: KgWeakTopic[]
+      recent: Array<{ nodeId: string; label: string; type: string; score: number; updatedAt: string }>
+    }>('/kg/mastery/stats/me').then(r => ({
+      stats: r.data.stats,
+      weakTopics: r.data.weakTopics || [],
+      recent: r.data.recent || [],
+    })),
+}
+
+/** Trả màu mastery overlay theo score 0-100 */
+export function getMasteryColor(score: number | undefined): {
+  fill: string; stroke: string; label: string
+} {
+  if (score === undefined) return { fill: 'rgba(148,163,184,0.1)', stroke: '#475569', label: 'chưa có dữ liệu' }
+  if (score < 30)  return { fill: 'rgba(244,63,94,0.25)',  stroke: '#f43f5e', label: 'còn yếu' }
+  if (score < 70)  return { fill: 'rgba(251,191,36,0.25)', stroke: '#fbbf24', label: 'đang học' }
+  return { fill: 'rgba(16,185,129,0.25)', stroke: '#10b981', label: 'đã thông thạo' }
 }
 
 // ─── Helpers cho UI ────────────────────────────────────────────────

@@ -20,11 +20,13 @@ import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Search, X, Sparkles, RefreshCw, Network, Loader2,
   ZoomIn, ZoomOut, Maximize2, ChevronRight, Info, BookOpen, Wand2,
+  Target, TrendingUp, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import {
   knowledgeGraphService as kgs,
   NODE_TYPE_COLORS, NODE_TYPE_LABELS, REL_TYPE_LABELS, getNodeColor,
+  getMasteryColor,
   type KgNode, type KgEdge, type KgNodeType, type KgNeighbor,
 } from '@/services/knowledge-graph.service'
 import AiExtractModal from '@/components/knowledge-graph/AiExtractModal'
@@ -160,6 +162,16 @@ export default function KnowledgeGraph() {
   )
   const [extractOpen, setExtractOpen] = useState(false)
 
+  // ── Phase 3: Personal Mastery overlay ─────────────────────────
+  const [masteryOn, setMasteryOn] = useState(false)
+  const [masteryMap, setMasteryMap] = useState<Record<string, { score: number; attempts: number }>>({})
+  const [masteryStats, setMasteryStats] = useState<{
+    stats: { total: number; weak: number; learning: number; mastered: number; avgScore: number }
+    weakTopics: Array<{ nodeId: string; label: string; type: string; score: number }>
+  } | null>(null)
+  const [masteryLoading, setMasteryLoading] = useState(false)
+  const [showMasteryPanel, setShowMasteryPanel] = useState(false)
+
   // Camera
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -206,6 +218,66 @@ export default function KnowledgeGraph() {
       setSeeding(false)
     }
   }, [seeding, loadFromNode])
+
+  /** Phase 3: Fetch mastery map + stats. Gọi khi user bật overlay
+   *  hoặc mở mastery panel. */
+  const fetchMastery = useCallback(async () => {
+    setMasteryLoading(true)
+    try {
+      const [m, s] = await Promise.all([
+        kgs.getMyMastery(),
+        kgs.getMasteryStats(),
+      ])
+      setMasteryMap(
+        Object.fromEntries(
+          Object.entries(m).map(([k, v]) => [k, { score: v.score, attempts: v.attempts }])
+        )
+      )
+      setMasteryStats({ stats: s.stats, weakTopics: s.weakTopics })
+    } catch (e: any) {
+      // Auth lỗi → toast gọn (không spam khi user chưa login)
+      if (e?.response?.status !== 401) {
+        toast.error('Không tải được mastery: ' + (e?.message || 'unknown'))
+      }
+    } finally {
+      setMasteryLoading(false)
+    }
+  }, [])
+
+  /** Demo seed: gán mastery ngẫu nhiên cho ~20 node hiện có để user thấy
+   *  overlay hoạt động (chỉ dùng nếu user chưa có data nào). */
+  const seedDemoMastery = useCallback(async () => {
+    const visibleNodeIds = simRef.current
+      .filter(n => ['Topic', 'Concept', 'Formula', 'Chapter'].includes(n.type))
+      .slice(0, 20)
+      .map(n => n.id)
+    if (visibleNodeIds.length === 0) {
+      toast.error('Chưa có nodes phù hợp để seed mastery demo')
+      return
+    }
+    const updates = visibleNodeIds.map(id => ({
+      nodeId: id,
+      // Random score nhưng skew theo type cho realistic:
+      // Chapter cao hơn (đã học khái quát), Formula thấp hơn (khó nhớ)
+      score: Math.round(Math.random() * 100),
+      source: 'demo-seed',
+    }))
+    try {
+      const r = await kgs.updateMastery(updates, false)
+      toast.success(`Đã seed mastery demo cho ${r.upserted} nodes`)
+      await fetchMastery()
+    } catch (e: any) {
+      toast.error(e?.message || 'Lỗi seed mastery')
+    }
+  }, [fetchMastery])
+
+  // Phase 3: Fetch mastery khi bật overlay hoặc mở panel
+  useEffect(() => {
+    if ((masteryOn || showMasteryPanel) && !masteryLoading && Object.keys(masteryMap).length === 0) {
+      fetchMastery()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [masteryOn, showMasteryPanel])
 
   // Initial mount
   useEffect(() => {
@@ -440,6 +512,33 @@ export default function KnowledgeGraph() {
           <button onClick={() => setZoom(z => Math.max(0.3, z / 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
             <ZoomOut className="w-4 h-4" />
           </button>
+          {/* Phase 3: Mastery overlay toggle */}
+          <button
+            onClick={() => setMasteryOn(v => !v)}
+            title={masteryOn ? 'Tắt overlay mastery' : 'Bật overlay mastery — nodes đổi màu theo % thông thạo'}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition ${
+              masteryOn
+                ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200 shadow-md shadow-emerald-500/20'
+                : 'bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10'
+            }`}
+          >
+            <Target className="w-3.5 h-3.5" />
+            Mastery
+            {masteryOn && masteryLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+            <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-900/60 ml-0.5">NEW</span>
+          </button>
+          {/* Mastery stats panel toggle */}
+          <button
+            onClick={() => setShowMasteryPanel(v => !v)}
+            title="Hiện/ẩn panel mastery (top weak topics + stats)"
+            className={`p-1.5 rounded-lg border transition ${
+              showMasteryPanel
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setExtractOpen(true)}
             title="AI trích xuất tri thức từ văn bản hoặc giáo án"
@@ -474,6 +573,159 @@ export default function KnowledgeGraph() {
           }
         }}
       />
+
+      {/* Phase 3: Mastery panel (floating right) */}
+      {showMasteryPanel && (
+        <div className="absolute top-20 right-4 z-30 w-80 max-h-[calc(100vh-120px)] overflow-y-auto bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-xl shadow-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-emerald-300 inline-flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4" /> Mastery của bạn
+            </h3>
+            <button
+              onClick={() => setShowMasteryPanel(false)}
+              className="text-zinc-400 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {masteryLoading && !masteryStats && (
+            <div className="text-center py-6">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-emerald-400" />
+              <p className="text-xs text-zinc-500 mt-2">Đang tải mastery…</p>
+            </div>
+          )}
+
+          {!masteryLoading && masteryStats && masteryStats.stats.total === 0 && (
+            <div className="space-y-3">
+              <div className="text-xs text-zinc-400 text-center py-4">
+                <Target className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
+                Bạn chưa có mastery data nào.
+                <br />
+                Làm bài thi để tự động cập nhật, hoặc:
+              </div>
+              <button
+                onClick={seedDemoMastery}
+                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 inline-flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Tạo mastery demo (~20 nodes)
+              </button>
+            </div>
+          )}
+
+          {!masteryLoading && masteryStats && masteryStats.stats.total > 0 && (
+            <>
+              {/* Stats overview */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="text-center p-2 rounded-md bg-rose-500/10 border border-rose-500/30">
+                  <div className="text-xl font-bold text-rose-300">{masteryStats.stats.weak}</div>
+                  <div className="text-[10px] text-zinc-400">Còn yếu</div>
+                </div>
+                <div className="text-center p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+                  <div className="text-xl font-bold text-amber-300">{masteryStats.stats.learning}</div>
+                  <div className="text-[10px] text-zinc-400">Đang học</div>
+                </div>
+                <div className="text-center p-2 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+                  <div className="text-xl font-bold text-emerald-300">{masteryStats.stats.mastered}</div>
+                  <div className="text-[10px] text-zinc-400">Thông thạo</div>
+                </div>
+              </div>
+
+              {/* Avg score progress */}
+              <div>
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="text-zinc-400">Điểm TB</span>
+                  <span className="text-zinc-100 font-mono">{masteryStats.stats.avgScore}/100</span>
+                </div>
+                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${masteryStats.stats.avgScore}%`,
+                      background: `linear-gradient(90deg, #f43f5e, #fbbf24, #10b981)`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Top weak topics */}
+              {masteryStats.weakTopics.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Top yếu nhất ({masteryStats.weakTopics.length})
+                  </div>
+                  {masteryStats.weakTopics.slice(0, 5).map(t => (
+                    <button
+                      key={t.nodeId}
+                      onClick={() => {
+                        loadFromNode(t.nodeId, 2)
+                        toast(`Focus: ${t.label}`, { icon: '🎯' })
+                      }}
+                      className="w-full text-left p-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-rose-500/40 transition group"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold text-zinc-100 truncate flex-1 group-hover:text-rose-200">
+                          {t.label}
+                        </div>
+                        <div className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 font-mono">
+                          {t.score}%
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-zinc-500 mt-0.5">
+                        {NODE_TYPE_LABELS[t.type] || t.type}
+                        {t.attempts > 0 && ` · ${t.attempts} lần thử`}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Refresh + Practice CTA */}
+              <div className="flex items-center gap-2 pt-2 border-t border-zinc-800">
+                <button
+                  onClick={fetchMastery}
+                  disabled={masteryLoading}
+                  className="flex-1 px-2 py-1.5 rounded-md text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 inline-flex items-center justify-center gap-1 disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${masteryLoading ? 'animate-spin' : ''}`} />
+                  Làm mới
+                </button>
+                <Link
+                  to="/student/exam-prep"
+                  className="flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 inline-flex items-center justify-center gap-1"
+                >
+                  <BookOpen className="w-3 h-3" /> Luyện đề
+                </Link>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Mastery legend overlay khi bật mastery mode */}
+      {masteryOn && (
+        <div className="absolute top-20 left-72 z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 text-[11px]">
+          <span className="text-emerald-300 font-bold inline-flex items-center gap-1">
+            <Target className="w-3.5 h-3.5" /> Mastery overlay
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(244,63,94,0.3)', border: '1px solid #f43f5e' }} />
+            <span className="text-zinc-300">&lt;30%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(251,191,36,0.3)', border: '1px solid #fbbf24' }} />
+            <span className="text-zinc-300">30-70%</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(16,185,129,0.3)', border: '1px solid #10b981' }} />
+            <span className="text-zinc-300">≥70%</span>
+          </div>
+          <div className="flex items-center gap-1.5 border-l border-zinc-700 pl-3 ml-1">
+            <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(148,163,184,0.15)', border: '1px solid #475569' }} />
+            <span className="text-zinc-500">chưa có data</span>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: legend + filter */}
@@ -595,6 +847,12 @@ export default function KnowledgeGraph() {
                 const isCenter = n.id === startIdRef.current
                 const isSelected = selectedNode?.node.id === n.id
                 const pinned = n.fx != null && !isCenter
+
+                // Phase 3: apply mastery overlay nếu bật
+                const m = masteryOn ? masteryMap[n.id] : undefined
+                const mc = masteryOn ? getMasteryColor(m?.score) : null
+                const useMastery = masteryOn && mc !== null
+
                 return (
                   <g
                     key={n.id}
@@ -612,13 +870,25 @@ export default function KnowledgeGraph() {
                           dur="2s" repeatCount="indefinite" />
                       </circle>
                     )}
-                    {/* Main circle */}
+                    {/* Main circle — mastery overlay thay fill+stroke khi bật */}
                     <circle
                       r={n.radius}
-                      fill={c.fill}
-                      stroke={c.stroke}
+                      fill={useMastery ? mc!.fill : c.fill}
+                      stroke={useMastery ? mc!.stroke : c.stroke}
                       strokeWidth={isCenter ? 3 : isSelected ? 2.5 : 1.5}
                     />
+                    {/* Mastery score badge (small arc bottom) */}
+                    {useMastery && m && (
+                      <>
+                        <text
+                          x={0} y={n.radius + 10}
+                          textAnchor="middle" fontSize="9" fontWeight="700"
+                          fill={mc!.stroke}
+                        >
+                          {m.score}%
+                        </text>
+                      </>
+                    )}
                     {/* Pin indicator */}
                     {pinned && (
                       <text x={n.radius - 4} y={-n.radius + 8} fontSize="11" fill="#fbbf24">📌</text>
