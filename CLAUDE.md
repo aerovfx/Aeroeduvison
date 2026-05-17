@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `6b9a8aa` (revision pixiai-00286-kad, 2026-05-17 — Daily/Sprint UX polish: lastSentAt + progress footer + localStorage persistence)
-- Commits since last deploy: `5/5` → DEPLOYING (2978171 docs · 6681343 Phase 9 backend · e615bc6 Phase 9 admin UI · _next_ sidebar + i18n · then docs)
+- Last deployed commit: `298dfad` (revision pixiai-00287-cel, 2026-05-17 — RS-Phase 9 A/B Testing Framework LIVE — roadmap 10/10 ✅)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `6b9a8aa` → pixiai-00286-kad (Daily/Sprint UX polish: lastSentAt + progress footer + localStorage)
 - Prev: `d984880` → pixiai-00285-xan (RS-Phase 8 Ops: scheduler script + audience-aware digest)
 - Prev: `93ddbf1` → pixiai-00284-xef (RS-Phase 8 Multi-channel digest: In-app + Email + Telegram)
 - Prev: `bd971e7` → pixiai-00283-xok (Student Daily Plan UI)
