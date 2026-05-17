@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `6d5d3c5` (revision pixiai-00289-zom, 2026-05-17 — RS bug fix localStorage userId namespace + adaptive cold-start UX parity)
-- Commits since last deploy: `1/5` (this docs)
+- Commits since last deploy: `5/5` → DEPLOYING (2ae39b7 docs · e7a3e6e A/B templates · 3fd50f6 Career Pixel Sim · _next_ docs)
 - Prev: `0069a96` → pixiai-00288-sar (RS-Phase 10 enhanced Cold-start Onboarding)
 - Prev: `298dfad` → pixiai-00287-cel (RS-Phase 9 A/B Testing Framework)
 - Prev: `6b9a8aa` → pixiai-00286-kad (Daily/Sprint UX polish: lastSentAt + progress footer + localStorage)
