@@ -367,6 +367,23 @@ function StudentRecoPreview() {
           )
         })}
       </div>
+      {/* CTA tới Daily Plan — RS Phase 7 mirror cho HS */}
+      <Link
+        to="/student/daily"
+        onClick={() => rs.track({
+          action: 'click',
+          targetType: 'daily_plan',
+          targetId: 'student-daily',
+          metadata: { source: 'student-dashboard-cta' },
+        })}
+        className="mt-3 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg
+                   bg-gradient-to-r from-cyan-500/15 via-purple-500/10 to-amber-500/15
+                   border border-dashed border-cyan-400/40
+                   text-cyan-700 dark:text-cyan-300 text-xs font-bold
+                   hover:from-cyan-500/25 hover:via-purple-500/15 hover:to-amber-500/25 transition"
+      >
+        📅 Mở Kế hoạch hôm nay (group theo việc cần làm) →
+      </Link>
     </div>
   )
 }
