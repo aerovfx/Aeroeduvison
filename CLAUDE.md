@@ -15,10 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `4267160` (revision TBD, 2026-05-17 — Auto-tracking trên 3 pages — feed RS với data thật)
-- Commits since last deploy: `0/5` (early deploy: RS data pipeline complete)
+- Last deployed commit: `cc750cf` (revision pixiai-00274-gub, 2026-05-17 — Auto-tracking 3 pages — RS data pipeline complete)
+- Commits since last deploy: `0/5`
 - Prev: `42c85af` → pixiai-00273-xon (Reco preview cards Student + Teacher dashboard)
-- Prev: `ae1e65e` → pixiai-00272-gap (ExamSheet mobile fix)
 - Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
 - Prev: `2401573` → pixiai-00270-kon (KG mobile UX cho iPhone 14 Pro Max)
 - Prev: `735ca63` → pixiai-00269-gum (KG teacher notification + tabbed sidebar)
