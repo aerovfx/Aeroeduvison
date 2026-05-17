@@ -18,8 +18,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Compass, RotateCcw, Trophy, X, Sparkles, MessageCircle, Map as MapIcon,
+  Compass, RotateCcw, Trophy, X, Sparkles, MessageCircle, Map as MapIcon, User,
 } from 'lucide-react'
+import {
+  METRO_CHARACTERS,
+  drawMetroCityCharacter,
+  drawCharacterPreview,
+  getCharacter,
+  type Facing as MetroFacing,
+} from '@/lib/pixel-characters'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -27,6 +34,10 @@ interface NPC {
   id: string
   name: string
   emoji: string
+  /** MetroCity character palette ID (lookup từ METRO_CHARACTERS) */
+  characterId: string
+  /** Facing direction khi đứng yên */
+  facing: MetroFacing
   job: string
   x: number
   y: number
@@ -69,7 +80,8 @@ const BUILDINGS: Building[] = [
 
 const NPCS: NPC[] = [
   {
-    id: 'it', name: 'Anh Long', emoji: '👨‍💻', job: 'Kỹ sư phần mềm',
+    id: 'it', name: 'Anh Long', emoji: '👨‍💻', characterId: 'liam', facing: 'down',
+    job: 'Kỹ sư phần mềm',
     x: 6, y: 5,
     intro: 'Mỗi sáng anh stand-up meeting 15 phút, sau đó code feature mới. AI là đồng đội — không phải đối thủ.',
     quiz: {
@@ -80,7 +92,8 @@ const NPCS: NPC[] = [
     },
   },
   {
-    id: 'med', name: 'Chị Hồng', emoji: '👩‍⚕️', job: 'Bác sĩ',
+    id: 'med', name: 'Chị Hồng', emoji: '👩‍⚕️', characterId: 'duc', facing: 'down',
+    job: 'Bác sĩ',
     x: 17, y: 5,
     intro: 'Chị khám 30-40 bệnh nhân/ngày. Quan trọng nhất: lắng nghe + chẩn đoán chính xác.',
     quiz: {
@@ -91,7 +104,8 @@ const NPCS: NPC[] = [
     },
   },
   {
-    id: 'edu', name: 'Cô Lan', emoji: '👩‍🏫', job: 'Giáo viên',
+    id: 'edu', name: 'Cô Lan', emoji: '👩‍🏫', characterId: 'nora', facing: 'down',
+    job: 'Giáo viên',
     x: 28, y: 5,
     intro: 'Cô dạy 20 tiết/tuần. Niềm vui lớn nhất là thấy HS hiểu bài và phát triển.',
     quiz: {
@@ -102,7 +116,8 @@ const NPCS: NPC[] = [
     },
   },
   {
-    id: 'finance', name: 'Chú Hùng', emoji: '👨‍💼', job: 'Nhân viên Ngân hàng',
+    id: 'finance', name: 'Chú Hùng', emoji: '👨‍💼', characterId: 'noah', facing: 'down',
+    job: 'Nhân viên Ngân hàng',
     x: 6, y: 18,
     intro: 'Mỗi ngày chú gặp 20-30 khách, xử lý giao dịch + tư vấn vay vốn. Tỉ mỉ là tất cả.',
     quiz: {
@@ -113,7 +128,8 @@ const NPCS: NPC[] = [
     },
   },
   {
-    id: 'creative', name: 'Bạn Mai', emoji: '🧑‍🎨', job: 'UX/UI Designer',
+    id: 'creative', name: 'Bạn Mai', emoji: '🧑‍🎨', characterId: 'iris', facing: 'down',
+    job: 'UX/UI Designer',
     x: 17, y: 18,
     intro: 'Mỗi sáng Mai brainstorm + sketch, chiều design Figma + present cho client. Empathy là siêu năng lực.',
     quiz: {
@@ -124,7 +140,8 @@ const NPCS: NPC[] = [
     },
   },
   {
-    id: 'science', name: 'Cô Trang', emoji: '👩‍🔬', job: 'Nhà khoa học dữ liệu',
+    id: 'science', name: 'Cô Trang', emoji: '👩‍🔬', characterId: 'maya', facing: 'down',
+    job: 'Nhà khoa học dữ liệu',
     x: 28, y: 18,
     intro: 'Cô spend 75% thời gian clean data, 25% còn lại train model. Insight quan trọng hơn accuracy.',
     quiz: {
@@ -135,6 +152,11 @@ const NPCS: NPC[] = [
     },
   },
 ]
+
+/** Player character — selectable from a subset of METRO_CHARACTERS (loại bỏ những char
+ *  đã assigned cho NPC để tránh confusion). */
+const PLAYER_CHOICES = ['andy', 'sara', 'kai', 'linh']
+const LS_PLAYER_KEY = 'rs.odyssey.playerChar'
 
 const LS_TOKENS_KEY = 'rs.odyssey.tokens'
 
@@ -202,6 +224,18 @@ export default function PixelOdyssey() {
   const [quizPhase, setQuizPhase] = useState<'intro' | 'quiz' | 'result'>('intro')
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [showCharPicker, setShowCharPicker] = useState(false)
+  const [playerCharId, setPlayerCharId] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LS_PLAYER_KEY) || PLAYER_CHOICES[0]
+    } catch { return PLAYER_CHOICES[0] }
+  })
+  const playerChar = useMemo(() => getCharacter(playerCharId), [playerCharId])
+
+  const handleCharChange = useCallback((id: string) => {
+    setPlayerCharId(id)
+    try { localStorage.setItem(LS_PLAYER_KEY, id) } catch {}
+  }, [])
 
   const persistTokens = useCallback((tokens: Set<string>) => {
     try { localStorage.setItem(LS_TOKENS_KEY, JSON.stringify([...tokens])) } catch {}
@@ -417,40 +451,41 @@ export default function PixelOdyssey() {
           (b.rect.y + b.rect.h) * TILE_SIZE + 5)
       }
 
-      // NPCs (always drawn inside their buildings)
+      // NPCs (always drawn inside their buildings — using MetroCity sprites)
       for (const npc of NPCS) {
         const hasToken = collectedTokens.has(npc.id)
         const cx = npc.x * TILE_SIZE
         const cy = npc.y * TILE_SIZE
-        // Shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.3)'
-        ctx.fillRect(cx + 2, cy + 4, 10, 2)
-        // NPC body emoji
-        ctx.font = '13px serif'
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(npc.emoji, cx + 7, cy + 7)
-        // Token indicator above NPC
+        const npcChar = getCharacter(npc.characterId)
+        // Render MetroCity character
+        drawMetroCityCharacter(ctx, cx, cy, npcChar, npc.facing, false, charRef.current.bobFrame)
+        // Token indicator above NPC head
         if (hasToken) {
-          ctx.fillText('✓', cx + 7, cy - 8)
+          ctx.fillStyle = '#10b981'
+          ctx.font = 'bold 9px sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText('✓', cx + 7, cy - 5)
         } else {
-          // Pulse "!"
+          // Pulse "!" red indicator
           const pulse = Math.sin(performance.now() / 200) > 0
           if (pulse) {
             ctx.fillStyle = '#ef4444'
-            ctx.fillRect(cx + 5, cy - 12, 4, 6)
+            ctx.fillRect(cx + 5, cy - 9, 4, 6)
             ctx.fillStyle = '#fff'
             ctx.font = 'bold 6px sans-serif'
-            ctx.fillText('!', cx + 7, cy - 9)
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText('!', cx + 7, cy - 6)
           }
         }
       }
 
-      // Character
+      // Player character
       const char = charRef.current
       const cx = char.drawX * TILE_SIZE
       const cy = char.drawY * TILE_SIZE
-      drawPlayerCharacter(ctx, cx, cy, char.facing, char.walking, char.bobFrame)
+      drawMetroCityCharacter(ctx, cx, cy, playerChar, char.facing, char.walking, char.bobFrame)
 
       // Interact prompt if near NPC
       const nearby = findNearbyNPC()
@@ -476,7 +511,7 @@ export default function PixelOdyssey() {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [activeNPC, collectedTokens, findNearbyNPC])
+  }, [activeNPC, collectedTokens, findNearbyNPC, playerChar])
 
   const tokenCount = collectedTokens.size
   const totalNPCs = NPCS.length
@@ -497,6 +532,11 @@ export default function PixelOdyssey() {
           <Trophy className="w-3.5 h-3.5 text-amber-300" />
           <span className="text-xs font-bold text-amber-200">{tokenCount}/{totalNPCs}</span>
         </div>
+        <button onClick={() => setShowCharPicker(true)}
+          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          title={`Đổi nhân vật (hiện tại: ${playerChar.displayName || playerChar.name})`}>
+          <User className="w-3.5 h-3.5" />
+        </button>
         <button onClick={() => setShowMap(s => !s)}
           className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
           title="Mở mini-map (phím M)">
@@ -545,6 +585,51 @@ export default function PixelOdyssey() {
             maxWidth: '720px',
           }}
         />
+
+        {/* Character picker overlay */}
+        {showCharPicker && (
+          <div
+            onClick={() => setShowCharPicker(false)}
+            className="absolute inset-2 bg-black/85 backdrop-blur flex items-center justify-center cursor-pointer"
+          >
+            <div className="bg-zinc-900 rounded-xl p-4 max-w-md w-full" onClick={e => e.stopPropagation()}>
+              <h4 className="font-bold text-amber-200 mb-1 flex items-center gap-2">
+                <User className="w-4 h-4" /> Chọn nhân vật
+              </h4>
+              <p className="text-[11px] text-zinc-500 mb-3">
+                Tham khảo MetroCity Free Top-Down Character Pack — jik-a-4.itch.io
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {PLAYER_CHOICES.map(id => {
+                  const ch = getCharacter(id)
+                  const isActive = id === playerCharId
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => { handleCharChange(id); setShowCharPicker(false) }}
+                      className={`flex items-center gap-2 p-2 rounded-lg border-2 transition ${
+                        isActive
+                          ? 'bg-amber-500/20 border-amber-400'
+                          : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                      }`}
+                    >
+                      <CharacterPreview character={ch} />
+                      <div className="text-left">
+                        <p className="text-xs font-bold text-zinc-100">{ch.displayName || ch.name}</p>
+                        <p className="text-[10px] text-zinc-500 capitalize">
+                          {ch.hairStyle} · {ch.accessory || 'no accessory'}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-zinc-500 mt-3 text-center">
+                Click ngoài hoặc chọn nhân vật để đóng
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Mini-map overlay */}
         {showMap && (
@@ -689,57 +774,27 @@ export default function PixelOdyssey() {
   )
 }
 
-/** Draw player character with 4-direction facing. */
-function drawPlayerCharacter(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  facing: Facing,
-  walking: boolean,
-  bobFrame: number,
-) {
-  const bobOffset = walking
-    ? (Math.sin(performance.now() / 80) > 0 ? 0 : -1)
-    : Math.sin(bobFrame / 20) * 0.5
+// drawPlayerCharacter() removed — using drawMetroCityCharacter from @/lib/pixel-characters
 
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'
-  ctx.fillRect(cx + 2, cy + TILE_SIZE - 2, TILE_SIZE - 4, 2)
-
-  // Body
-  ctx.fillStyle = '#10b981' // green shirt to distinguish from NPCs
-  ctx.fillRect(cx + 3, cy + 4 + bobOffset, TILE_SIZE - 6, 6)
-
-  // Pants
-  ctx.fillStyle = '#1e3a8a'
-  ctx.fillRect(cx + 3, cy + 10 + bobOffset, TILE_SIZE - 6, 3)
-
-  // Walking leg split
-  if (walking) {
-    ctx.fillStyle = '#000'
-    ctx.fillRect(cx + 6, cy + 10 + bobOffset, 2, 3)
-  }
-
-  // Head
-  ctx.fillStyle = '#fde68a'
-  ctx.fillRect(cx + 3, cy + bobOffset, TILE_SIZE - 6, 5)
-  // Hair
-  ctx.fillStyle = '#78350f'
-  ctx.fillRect(cx + 3, cy + bobOffset, TILE_SIZE - 6, 2)
-
-  // Eyes / facing indicator (move eyes based on facing)
-  ctx.fillStyle = '#0f172a'
-  if (facing === 'down') {
-    ctx.fillRect(cx + 5, cy + 2 + bobOffset, 1, 1)
-    ctx.fillRect(cx + 8, cy + 2 + bobOffset, 1, 1)
-  } else if (facing === 'up') {
-    // Show back of head — no eyes
-    ctx.fillStyle = '#78350f'
-    ctx.fillRect(cx + 3, cy + 2 + bobOffset, TILE_SIZE - 6, 2)
-  } else if (facing === 'left') {
-    ctx.fillRect(cx + 4, cy + 2 + bobOffset, 1, 1)
-  } else {
-    // right
-    ctx.fillRect(cx + 9, cy + 2 + bobOffset, 1, 1)
-  }
+/** Small canvas preview của 1 character (cho picker UI). */
+function CharacterPreview({ character }: { character: ReturnType<typeof getCharacter> }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const c = ref.current
+    if (!c) return
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+    ctx.imageSmoothingEnabled = false
+    ctx.clearRect(0, 0, c.width, c.height)
+    drawCharacterPreview(ctx, 0, 0, character, 2)
+  }, [character])
+  return (
+    <canvas
+      ref={ref}
+      width={28}
+      height={32}
+      style={{ imageRendering: 'pixelated' }}
+      className="shrink-0"
+    />
+  )
 }
