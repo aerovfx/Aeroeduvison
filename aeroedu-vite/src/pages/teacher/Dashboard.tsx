@@ -949,6 +949,25 @@ function TeacherRecoCard({ D }: { D: any }) {
             </Link>
           )
         })}
+        {/* CTA tới Sprint Dashboard — RS Phase 7 UI */}
+        <Link
+          to="/teacher/sprint"
+          onClick={() => rs.track({
+            action: 'click',
+            targetType: 'sprint_dashboard',
+            targetId: 'teacher-sprint',
+            metadata: { source: 'teacher-dashboard-cta' },
+          })}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '8px 10px', borderRadius: 8, marginTop: 4,
+            background: 'linear-gradient(135deg, rgba(34,211,238,0.12), rgba(168,85,247,0.12))',
+            border: `1px dashed ${D.purpleA(0.45)}`,
+            textDecoration: 'none', color: '#a5f3fc', fontSize: 11, fontWeight: 700,
+          }}
+        >
+          ⚡ Mở Sprint Dashboard đầy đủ →
+        </Link>
       </div>
     </div>
   )
