@@ -208,6 +208,7 @@ const adminSections: RouteSection[] = [
       { icon: Settings,    labelKey: 'routeAdminSettings', href: '/admin/settings' },
       { icon: CheckSquare, labelKey: 'routeNewsReview',    href: '/admin/news/review' },
       { icon: Kanban,      labelKey: 'routeScrum',         href: '/admin/scrumboard' },
+      { icon: FlaskConical,labelKey: 'routeRsExperiments', href: '/admin/rs-experiments', badge: 'AI' },
     ],
   },
   {
