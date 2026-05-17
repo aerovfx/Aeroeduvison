@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `04ea6e0` (revision pixiai-00294-not, 2026-05-18 — Odyssey polish: tutorial + modal key block + achievement toast LIVE)
-- Commits since last deploy: `5/5` → DEPLOYING (49427ac docs · cb73609 games hub · 3278c59 search · 3f20c6f scroll-to-top · this docs)
+- Last deployed commit: `ed01f05` (revision pixiai-00295-fif, 2026-05-18 — Games hub /student/games + career search + ScrollToTopButton LIVE)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `04ea6e0` → pixiai-00294-not (Odyssey polish: tutorial + modal key block + achievement toast)
 - Prev: `ab1eb69` → pixiai-00293-ced (Pixel games: mobile D-pad + perf off-screen + position save)
 - Prev: `0a42917` → pixiai-00292-yex (MetroCity character library + NPC/player picker)
 - Prev: `b2411ee` → pixiai-00291-cof (2 Pixel Games: Pixel Agent v2 keyboard + Pixel Odyssey)
