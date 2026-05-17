@@ -11174,9 +11174,26 @@ CHỈ TRẢ JSON, không bọc markdown.`;
   // Idempotent: 1/day per user (skip nếu đã có digest hôm nay).
   // ─────────────────────────────────────────────────────────
 
-  // Helper: fetch top 3 reco cho 1 user (reuse logic /api/reco/feed)
-  // Đơn giản hoá: chỉ dùng kg_weak_topic + teacher_learning_path sources
+  // Helper: detect audience từ user role (TEACHER vs STUDENT)
+  async function _getDigestAudience(pool, userId) {
+    try {
+      const u = await pool.query(`SELECT role FROM "User" WHERE id = $1 LIMIT 1`, [userId]);
+      const role = (u.rows[0]?.role || 'STUDENT').toUpperCase();
+      return role === 'TEACHER' ? 'teacher' : 'student';
+    } catch { return 'student'; }
+  }
+
+  // Helper: fetch top 3 reco cho 1 user, ROUTE theo audience.
+  // Student: kg_weak_topic + teacher LP + popular exam
+  // Teacher: class trending weak + content gap + student needing help
   async function _generateDigestPreview(pool, userId) {
+    const audience = await _getDigestAudience(pool, userId);
+    return audience === 'teacher'
+      ? _generateDigestForTeacher(pool, userId)
+      : _generateDigestForStudent(pool, userId);
+  }
+
+  async function _generateDigestForStudent(pool, userId) {
     const items = [];
 
     // Source 1: top weak topics
@@ -11247,6 +11264,96 @@ CHỈ TRẢ JSON, không bọc markdown.`;
   }
 
   /**
+   * Digest cho GV: rút từ Sprint Dashboard sources.
+   * Top 3 ưu tiên: lớp đang yếu > HS cần hỗ trợ > content gap.
+   */
+  async function _generateDigestForTeacher(pool, userId) {
+    const items = [];
+
+    // Source 1: Class trending weak (topic >=2 HS yếu mastery<50%)
+    try {
+      const cw = await pool.query(
+        `SELECT n.id AS node_id, n.label, COUNT(DISTINCT m.user_id) AS weak_count,
+                AVG(m.score) AS avg_score
+         FROM kg_mastery m
+         JOIN kg_nodes n ON n.id = m.node_id
+         JOIN "TeacherStudentLink" tsl
+              ON tsl."studentId" = m.user_id AND tsl."teacherId" = $1
+                 AND tsl.status = 'approved'
+         WHERE m.score < 50
+         GROUP BY n.id, n.label
+         HAVING COUNT(DISTINCT m.user_id) >= 2
+         ORDER BY weak_count DESC, avg_score ASC
+         LIMIT 2`,
+        [userId]
+      );
+      for (const x of cw.rows) {
+        items.push({
+          emoji: '📉',
+          title: x.label,
+          subtitle: `Lớp đang yếu — ${x.weak_count} HS, TB ${Math.round(x.avg_score)}%`,
+          link: `/teacher/sprint#class-weak`,
+        });
+      }
+    } catch (_) {}
+
+    // Source 2: Students needing help (HS có >=3 weak topics)
+    if (items.length < 3) {
+      try {
+        const sh = await pool.query(
+          `SELECT u.id, u.name, COUNT(*) AS weak_count
+           FROM "TeacherStudentLink" tsl
+           JOIN kg_mastery m ON m.user_id = tsl."studentId" AND m.score < 50
+           JOIN "User" u ON u.id = tsl."studentId"
+           WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+           GROUP BY u.id, u.name
+           HAVING COUNT(*) >= 3
+           ORDER BY weak_count DESC
+           LIMIT ${3 - items.length}`,
+          [userId]
+        );
+        for (const x of sh.rows) {
+          items.push({
+            emoji: '🆘',
+            title: `${x.name} cần hỗ trợ`,
+            subtitle: `${x.weak_count} chủ đề mastery thấp — cân nhắc trao đổi 1-1`,
+            link: `/teacher/sprint#students-help`,
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Source 3: Recent student paths (HS vừa tự khảo sát KG)
+    if (items.length < 3) {
+      try {
+        const sp = await pool.query(
+          `SELECT lp.id, lp.name, u.name AS student_name
+           FROM "LearningPath" lp
+           JOIN "User" u ON u.id = lp."userId"
+           JOIN "TeacherStudentLink" tsl
+                ON tsl."studentId" = lp."userId" AND tsl."teacherId" = $1
+                   AND tsl.status = 'approved'
+           WHERE lp."teacherId" IS NULL
+             AND lp."createdAt" > NOW() - INTERVAL '7 days'
+           ORDER BY lp."createdAt" DESC
+           LIMIT ${3 - items.length}`,
+          [userId]
+        );
+        for (const x of sp.rows) {
+          items.push({
+            emoji: '🛣',
+            title: `${x.student_name} vừa tạo lộ trình`,
+            subtitle: `"${x.name}" — xem qua để hỗ trợ`,
+            link: `/teacher/sprint#student-paths`,
+          });
+        }
+      } catch (_) {}
+    }
+
+    return items.slice(0, 3);
+  }
+
+  /**
    * Lazy migration: đảm bảo User có rsDigestChannels jsonb + telegramChatId text.
    * Idempotent, chỉ chạy 1 lần / process lifetime.
    */
@@ -11264,9 +11371,17 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     }
   }
 
-  /** HTML email template — tóm tắt 3 mục. */
-  function _renderDigestEmailHtml(items, recipientName, baseUrl) {
+  /** HTML email template — tóm tắt 3 mục. Audience-aware (HS vs GV). */
+  function _renderDigestEmailHtml(items, recipientName, baseUrl, opts = {}) {
+    const { isTeacher = false, digestLabel = 'Gợi ý học hôm nay', digestEmoji = '🎯' } = opts;
     const safe = (s) => String(s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const ctaLabel = isTeacher ? 'Mở Sprint →' : 'Học ngay →';
+    const fullLink = isTeacher ? '/teacher/sprint' : '/student/for-you';
+    const fullLinkLabel = isTeacher ? 'Mở Sprint Dashboard đầy đủ →' : 'Xem tất cả gợi ý →';
+    const headerSubtext = isTeacher
+      ? `Chào GV ${safe(recipientName || '')}, đây là ${items.length} việc cần xử lý tuần này cho lớp bạn dạy`
+      : `Chào ${safe(recipientName || 'bạn')}, đây là ${items.length} gợi ý cá nhân hoá từ inphysic.com`;
+
     const rows = items.map((it, i) => `
       <tr>
         <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
@@ -11276,37 +11391,46 @@ CHỈ TRẢ JSON, không bọc markdown.`;
           </div>
           <div style="font-size:13px;color:#64748b;line-height:1.5;">${safe(it.subtitle)}</div>
           <a href="${baseUrl}${safe(it.link)}" style="display:inline-block;margin-top:8px;padding:6px 12px;background:#22d3ee;color:#fff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">
-            Học ngay →
+            ${ctaLabel}
           </a>
         </td>
       </tr>`).join('');
     return `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:24px 12px;color:#0f172a;">
       <table cellpadding="0" cellspacing="0" border="0" style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
         <tr><td style="padding:24px;background:linear-gradient(135deg,#22d3ee,#a855f7);color:#fff;">
-          <div style="font-size:22px;font-weight:700;margin-bottom:4px;">🎯 Gợi ý học hôm nay</div>
-          <div style="font-size:14px;opacity:.95;">Chào ${safe(recipientName || 'bạn')}, đây là ${items.length} gợi ý cá nhân hoá từ inphysic.com</div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${digestEmoji} ${digestLabel}</div>
+          <div style="font-size:14px;opacity:.95;">${headerSubtext}</div>
         </td></tr>
         ${rows}
         <tr><td style="padding:16px 24px;background:#f8fafc;text-align:center;font-size:12px;color:#94a3b8;">
-          <a href="${baseUrl}/student/for-you" style="color:#0ea5e9;text-decoration:none;font-weight:600;">Xem tất cả gợi ý →</a>
+          <a href="${baseUrl}${fullLink}" style="color:#0ea5e9;text-decoration:none;font-weight:600;">${fullLinkLabel}</a>
           <div style="margin-top:6px;">Không muốn nhận email? <a href="${baseUrl}/dashboard/settings" style="color:#64748b;">Tắt trong Cài đặt</a></div>
         </td></tr>
       </table></body></html>`;
   }
 
-  /** Telegram MarkdownV2 — escape minimal, tóm tắt items. */
-  function _renderDigestTelegramText(items, baseUrl) {
+  /** Telegram MarkdownV2 — escape minimal, tóm tắt items. Audience-aware. */
+  function _renderDigestTelegramText(items, baseUrl, opts = {}) {
+    const { isTeacher = false, digestLabel = 'Gợi ý học hôm nay', digestEmoji = '🎯' } = opts;
     const esc = (s) => String(s || '').replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+    const ctaLabel = isTeacher ? 'Mở Sprint →' : 'Học ngay →';
+    const fullLink = isTeacher ? '/teacher/sprint' : '/student/for-you';
+    const fullLinkLabel = isTeacher ? 'Mở Sprint Dashboard →' : 'Xem tất cả gợi ý →';
+
     const lines = items.map((it, i) =>
-      `${i + 1}\\. ${esc(it.emoji)} *${esc(it.title)}*\n   _${esc(it.subtitle)}_\n   [Học ngay →](${baseUrl}${esc(it.link)})`
+      `${i + 1}\\. ${esc(it.emoji)} *${esc(it.title)}*\n   _${esc(it.subtitle)}_\n   [${esc(ctaLabel)}](${baseUrl}${esc(it.link)})`
     ).join('\n\n');
-    return `🎯 *Gợi ý học hôm nay*\n${items.length} mục cho bạn từ inphysic\\.com\n\n${lines}\n\n[Xem tất cả →](${baseUrl}/student/for-you)`;
+    return `${esc(digestEmoji)} *${esc(digestLabel)}*\n${items.length} mục cho bạn từ inphysic\\.com\n\n${lines}\n\n[${esc(fullLinkLabel)}](${baseUrl}${esc(fullLink)})`;
   }
 
   async function _sendDigestNotification(pool, userId, opts = {}) {
     const { skipIdempotency = false, channels = null } = opts;
 
     await _rsEnsureDigestSchema(pool);
+    const audience = await _getDigestAudience(pool, userId);
+    const isTeacher = audience === 'teacher';
+    const digestEmoji = isTeacher ? '👩‍🏫' : '🎯';
+    const digestLabel = isTeacher ? 'Việc cần làm tuần này' : 'Gợi ý học hôm nay';
 
     // Check: đã có digest hôm nay chưa? (idempotent — trừ khi test mode)
     if (!skipIdempotency) {
@@ -11354,9 +11478,10 @@ CHỈ TRẢ JSON, không bọc markdown.`;
            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
           [
             notifId, userId, 'rs_digest',
-            `🎯 Gợi ý học hôm nay — ${items.length} mục cho bạn`,
-            body, '/student/for-you',
-            JSON.stringify({ items, generatedAt: new Date().toISOString(), channels: prefs }),
+            `${digestEmoji} ${digestLabel} — ${items.length} mục cho bạn`,
+            body,
+            isTeacher ? '/teacher/sprint' : '/student/for-you',
+            JSON.stringify({ items, generatedAt: new Date().toISOString(), channels: prefs, audience }),
           ]
         );
         deliveries.inApp = { ok: true, id: notifId };
@@ -11371,8 +11496,8 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         const { sendEmail } = require('./lib/email-sender.cjs');
         const r = await sendEmail({
           to: user.email,
-          subject: `🎯 ${items.length} gợi ý học hôm nay — inphysic`,
-          html: _renderDigestEmailHtml(items, user.name, baseUrl),
+          subject: `${digestEmoji} ${items.length} ${digestLabel.toLowerCase()} — inphysic`,
+          html: _renderDigestEmailHtml(items, user.name, baseUrl, { isTeacher, digestLabel, digestEmoji }),
         });
         deliveries.email = { ok: true, provider: r.provider, id: r.id };
       } catch (e) {
@@ -11389,7 +11514,7 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         const tg = require('./lib/telegram-bot.cjs');
         await tg.tgCall('sendMessage', {
           chat_id: user.telegramChatId,
-          text: _renderDigestTelegramText(items, baseUrl),
+          text: _renderDigestTelegramText(items, baseUrl, { isTeacher, digestLabel, digestEmoji }),
           parse_mode: 'MarkdownV2',
           disable_web_page_preview: true,
         });
