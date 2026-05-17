@@ -1116,6 +1116,54 @@ function parseDiagram(text: string): { ok: true; data: WokwiDiagram } | { ok: fa
   }
 }
 
+/**
+ * Đoán danh mục từ các part trong diagram — giúp gợi ý category trong
+ * Save modal. Heuristic ưu tiên category cụ thể hơn (game/sound) trước
+ * generic (gpio).
+ */
+function detectCategory(diagram: WokwiDiagram | null): string {
+  if (!diagram?.parts) return 'general'
+  const types = new Set(diagram.parts.map(p => p.type))
+  const has = (t: string) => types.has(t)
+  const hasMultiple = (...keys: string[]) =>
+    keys.filter(k => types.has(k)).length >= 2
+
+  // Game = ≥3 button + ≥3 LED + buzzer (Simon Says pattern)
+  const ledCount = diagram.parts.filter(p => p.type === 'wokwi-led').length
+  const btnCount = diagram.parts.filter(p => p.type === 'wokwi-pushbutton').length
+  if (btnCount >= 3 && ledCount >= 3 && has('wokwi-buzzer')) return 'game'
+
+  // MCU nâng cao: shift register, decoder
+  if (has('wokwi-74hc595') || has('wokwi-74hc165') || has('wokwi-cd4017')) return 'mcu'
+
+  // Hiển thị
+  if (has('wokwi-lcd1602') || has('wokwi-7segment')
+    || has('wokwi-ssd1306') || has('board-ssd1306')) return 'display'
+
+  // Motor & Servo
+  if (has('wokwi-servo') || has('wokwi-dc-motor') || has('wokwi-stepper-motor')) return 'motor'
+
+  // Cảm biến
+  if (has('wokwi-dht22') || has('wokwi-hc-sr04') || has('wokwi-photoresistor')
+    || has('wokwi-mpu6050') || has('wokwi-ds18b20')) return 'sensor'
+
+  // IoT (ESP32 boards)
+  if (has('board-esp32-devkit-c-v4') || has('wokwi-esp32-devkit-v1')
+    || has('board-esp32-c3-devkitm-1')) return 'iot'
+
+  // Âm thanh
+  if (has('wokwi-buzzer')) return 'sound'
+
+  // Input — nhiều button + ít/không LED
+  if (btnCount >= 2 && ledCount === 0) return 'input'
+
+  // GPIO cơ bản: LED + resistor + Arduino
+  if (hasMultiple('wokwi-led', 'wokwi-resistor', 'wokwi-arduino-uno')) return 'gpio'
+  if (ledCount > 0) return 'gpio'
+
+  return 'general'
+}
+
 export default function CustomWokwiBoard() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
@@ -1728,8 +1776,9 @@ export default function CustomWokwiBoard() {
             description: activeTemplate.description,
             board: activeTemplate.board,
             difficulty: activeTemplate.difficulty as any,
-            // Inherit category nếu đang clone public circuit, không thì 'general'
-            category: activeCustom?.category ?? 'general',
+            // Inherit category nếu đang clone public circuit, không thì
+            // auto-detect từ diagram parts. Fall back 'general' nếu không khớp.
+            category: activeCustom?.category ?? detectCategory(parsed),
             isPublic: false,
             objectives: activeTemplate.objectives,
           }}
