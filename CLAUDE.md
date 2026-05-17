@@ -15,8 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `2401573` (revision TBD, 2026-05-17 — KG mobile UX cho iPhone 14 Pro Max)
-- Commits since last deploy: `0/5` (early deploy: review trên iPhone)
+- Last deployed commit: `bcfe161` (revision TBD, 2026-05-17 — ExamSheet mobile fix: tabs PDF/Phiếu + sticky bar)
+- Commits since last deploy: `0/5` (early deploy: user báo PDF không scroll trang 2 trên iPhone)
+- Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
+- Prev: `2401573` → pixiai-00270-kon (KG mobile UX cho iPhone 14 Pro Max)
 - Prev: `735ca63` → pixiai-00269-gum (KG teacher notification + tabbed sidebar)
 - Prev: `8a5b391` → pixiai-00268-nix (KG Phase 5+6+7 — Cross-Subject + Smart Search + Suggestions)
 - Prev: `bf50545` → pixiai-00264-zir (Sim 4 critical bug fixes — t.jsCode/extractPinMap/uint8_t/shiftOut)
