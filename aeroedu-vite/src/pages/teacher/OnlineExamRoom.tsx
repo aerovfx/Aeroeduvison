@@ -201,6 +201,28 @@ export default function OnlineExamRoomPage() {
   }, [])
 
   useEffect(() => { void loadRooms() }, [loadRooms])
+
+  // Auto-poll mỗi 30s để GV thấy ngay khi có HS tham gia phòng thi mà
+  // không phải bấm "làm mới". Pause khi tab off-focus để không tốn tài
+  // nguyên server. Tách khỏi load đầu tiên (đã chạy ở effect trên).
+  useEffect(() => {
+    const POLL_MS = 30_000
+    let timer: number | undefined
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadRooms()
+      timer = window.setTimeout(tick, POLL_MS)
+    }
+    timer = window.setTimeout(tick, POLL_MS)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void loadRooms()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [loadRooms])
+
   useEffect(() => { if (showCreate) void loadExams() }, [showCreate, loadExams])
   useEffect(() => {
     if (selectedId) {
@@ -404,8 +426,26 @@ export default function OnlineExamRoomPage() {
               <Timer className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold" style={{ color: D.text }}>Phòng Thi Online</h1>
-              <p className="text-xs" style={{ color: D.muted }}>Tổ chức thi trực tuyến · Công khai hoặc bí mật</p>
+              <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: D.text }}>
+                Phòng Thi Online
+                <span
+                  title="Danh sách phòng + số HS tự cập nhật mỗi 30 giây"
+                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: 'rgba(16,185,129,0.15)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16,185,129,0.35)',
+                  }}
+                >
+                  <style>{`@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: '#34d399', animation: 'pulseDot 1.5s ease-in-out infinite',
+                  }} />
+                  Live
+                </span>
+              </h1>
+              <p className="text-xs" style={{ color: D.muted }}>Tổ chức thi trực tuyến · Công khai hoặc bí mật · Cập nhật tự động</p>
             </div>
           </div>
           <button
