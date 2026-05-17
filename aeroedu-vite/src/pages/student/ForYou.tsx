@@ -11,11 +11,11 @@
  * stack, swipe-friendly, no horizontal scroll.
  */
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Sparkles, RefreshCw, Loader2, ChevronRight, ThumbsDown, ArrowRight,
-  Compass, Target, Clock, Users, X, Activity, Send,
+  Compass, Target, Clock, Users, X, Activity, Send, Calendar,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -96,6 +96,20 @@ export default function ForYouPage() {
               Cá nhân hoá từ điểm yếu, GV của bạn, và xu hướng
             </p>
           </div>
+          <Link
+            to="/student/daily"
+            onClick={() => rs.track({
+              action: 'click',
+              targetType: 'daily_plan',
+              targetId: 'student-daily',
+              metadata: { source: 'for-you-header' },
+            })}
+            className="p-2 rounded-lg bg-amber-500/15 active:bg-amber-500/25 text-amber-300 border border-amber-500/30"
+            aria-label="Mở Kế hoạch hôm nay"
+            title="Chế độ tập trung — group theo việc cần làm"
+          >
+            <Calendar className="w-4 h-4" />
+          </Link>
           <button
             onClick={async () => {
               const r = await rs.sendDigestMe()
