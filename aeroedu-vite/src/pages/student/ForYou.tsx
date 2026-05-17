@@ -22,6 +22,7 @@ import {
   recommendationService as rs,
   getRsTypeMeta,
   type RsFeedItem,
+  type RsPredictions,
 } from '@/services/recommendation.service'
 import usePageTitle from '@/hooks/usePageTitle'
 
@@ -340,6 +341,43 @@ export default function ForYouPage() {
                         <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
                           <span>⚠ Cần học {(item.hydration.prereqCount ?? 0) - (item.hydration.prereqMastered ?? 0)}/{item.hydration.prereqCount} prerequisite trước</span>
                         </div>
+                      )}
+
+                      {/* RS-Phase 5: AI Predictions bar (transparency Grok-style) */}
+                      {item.predictions && (
+                        <details className="mt-2 group">
+                          <summary className="cursor-pointer text-[10px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1">
+                            🤖 AI dự đoán
+                            <span className="text-[9px] text-cyan-400 font-mono">
+                              {item.predictions.mlSignal > 0 ? '+' : ''}{item.predictions.mlSignal}
+                            </span>
+                            <span className="text-zinc-600 group-open:hidden">▶</span>
+                            <span className="text-zinc-600 hidden group-open:inline">▼</span>
+                          </summary>
+                          <div className="mt-1.5 grid grid-cols-2 gap-1 text-[10px]">
+                            {[
+                              { key: 'complete',   label: '✅ Hoàn thành', color: '#10b981' },
+                              { key: 'pass_quiz',  label: '🏆 Đạt',       color: '#fbbf24' },
+                              { key: 'like',       label: '❤️ Thích',      color: '#ec4899' },
+                              { key: 'dwell_30s',  label: '⏱ Đọc kỹ',     color: '#a855f7' },
+                              { key: 'skip',       label: '🚫 Skip',       color: '#f87171' },
+                              { key: 'not_interested', label: '👎 Không q.tâm', color: '#f43f5e' },
+                            ].map(({ key, label, color }) => {
+                              const v = item.predictions![key as keyof RsPredictions] as number
+                              const isNeg = key === 'skip' || key === 'not_interested'
+                              return (
+                                <div key={key} className="flex items-center gap-1.5">
+                                  <span className="text-zinc-400 shrink-0" style={{ width: 70 }}>{label}</span>
+                                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full transition-all"
+                                      style={{ width: `${v}%`, background: color, opacity: isNeg && v < 30 ? 0.4 : 1 }} />
+                                  </div>
+                                  <span className="font-mono shrink-0 text-zinc-500" style={{ width: 24 }}>{v}%</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </details>
                       )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0 mt-1" />

@@ -33,6 +33,24 @@ export interface RsHydration {
   estimatedMinutes?: number
 }
 
+/** RS-Phase 5: per-action probabilities (%) từ multi-action ranker */
+export interface RsPredictions {
+  /** 0-100 probability HS sẽ hoàn thành */
+  complete: number
+  /** 0-100 probability HS đạt được (pass quiz) */
+  pass_quiz: number
+  /** 0-100 probability HS thích */
+  like: number
+  /** 0-100 probability HS đọc kỹ (dwell ≥30s) */
+  dwell_30s: number
+  /** 0-100 probability HS skip (negative — càng cao càng tệ) */
+  skip: number
+  /** 0-100 probability HS đánh dấu "không quan tâm" (negative) */
+  not_interested: number
+  /** Tổng weighted ML signal (Σ weight × P), có thể âm hoặc dương */
+  mlSignal: number
+}
+
 export interface RsFeedItem {
   type: string
   id: string
@@ -48,6 +66,8 @@ export interface RsFeedItem {
   hydration?: RsHydration | null
   /** Human-readable reasons array, vd. ["🎯 Bạn còn yếu", "🔥 5 HS đã tương tác"] */
   reasons?: string[]
+  /** RS-Phase 5: multi-action predictions */
+  predictions?: RsPredictions | null
 }
 
 export interface RsFeedResponse {

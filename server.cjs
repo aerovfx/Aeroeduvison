@@ -10661,7 +10661,122 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         }
       } catch (e) { console.warn('[rs:hydrate]', e.message); }
 
-      // ── Score: apply user's engagement history boost ──
+      // ─────────────────────────────────────────────────────────
+      // RS-PHASE 5: MULTI-ACTION RANKER (Grok-style)
+      // Thay vì gán 1 score duy nhất, predict probability cho 6 actions
+      // và weighted combine theo X Phoenix pattern:
+      //   final = Σ (weight × P(action))
+      // Negative actions có weight âm để push down content user khả năng
+      // sẽ skip/dismiss.
+      // ─────────────────────────────────────────────────────────
+      try {
+        // Fetch per-action history per type (1 query)
+        const actionHistory = await pool.query(
+          `SELECT target_type, action, COUNT(*) AS cnt
+           FROM rs_action_log
+           WHERE user_id = $1 AND created_at > NOW() - INTERVAL '60 days'
+           GROUP BY target_type, action`,
+          [user.id]
+        );
+        // Map: type → action → count
+        const actionByType = {};
+        for (const row of actionHistory.rows) {
+          if (!actionByType[row.target_type]) actionByType[row.target_type] = {};
+          actionByType[row.target_type][row.action] = Number(row.cnt);
+        }
+
+        // Total action counts (cho normalize)
+        const totalByType = {};
+        for (const [type, actions] of Object.entries(actionByType)) {
+          totalByType[type] = Object.values(actions).reduce((s, v) => s + v, 0);
+        }
+
+        // Predictor function: tính 6 action probabilities cho 1 candidate
+        function predictActions(c) {
+          const hist = actionByType[c.type] || {};
+          const total = totalByType[c.type] || 0;
+          const h = c.hydration || {};
+
+          // Sigmoid-ish smoothing — convert raw count → 0-1 probability
+          const rate = (n) => total > 0 ? n / total : 0;
+
+          // Base probabilities từ history
+          const histComplete = rate(hist['complete'] || 0);
+          const histPass = rate(hist['pass_quiz'] || 0);
+          const histSkip = rate(hist['skip'] || 0);
+          const histDismiss = rate(hist['not_interested'] || 0);
+          const histLike = rate(hist['like'] || 0);
+          const histDwell = rate(hist['dwell_30s'] || 0);
+
+          // Modifiers từ hydration signals
+          // Prereq match → tăng P(complete), giảm P(skip)
+          const prereqOk = (h.prereqStatus ?? 100) >= 50;
+          const masteryGap = h.currentMastery !== undefined && h.currentMastery < 70;
+
+          return {
+            // POSITIVE actions (weight + )
+            complete:   clamp01(histComplete * 0.7 + (prereqOk ? 0.3 : 0)
+                         + (masteryGap ? 0.15 : 0)),
+            pass_quiz:  clamp01(histPass * 0.6 + (prereqOk ? 0.25 : 0)
+                         + ((h.currentMastery ?? 50) >= 40 ? 0.15 : 0)),
+            like:       clamp01(histLike * 0.8 + (h.popularity > 3 ? 0.1 : 0) + 0.05),
+            dwell_30s:  clamp01(histDwell * 0.5 + (c.description ? 0.15 : 0) + 0.2),
+
+            // NEGATIVE actions (weight - ) — predict likelihood user dismisses
+            skip:       clamp01(histSkip * 0.8
+                         + (!prereqOk ? 0.25 : 0)
+                         + (h.currentMastery !== undefined && h.currentMastery >= 85 ? 0.2 : 0)),
+            not_interested: clamp01(histDismiss * 1.0
+                              + (!prereqOk && (h.prereqStatus ?? 0) < 20 ? 0.15 : 0)),
+          };
+        }
+        function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+
+        // Weights theo X pattern (positive boost / negative penalty)
+        const ACTION_WEIGHTS = {
+          complete:       8.0,
+          pass_quiz:      6.0,
+          like:           3.0,
+          dwell_30s:      2.0,
+          skip:          -4.0,
+          not_interested: -8.0,
+        };
+
+        for (const c of filtered) {
+          const preds = predictActions(c);
+          let mlSignal = 0;
+          for (const [action, p] of Object.entries(preds)) {
+            mlSignal += ACTION_WEIGHTS[action] * p;
+          }
+          c.score += mlSignal;
+          c.predictions = {
+            complete:       Math.round(preds.complete * 100),
+            pass_quiz:      Math.round(preds.pass_quiz * 100),
+            like:           Math.round(preds.like * 100),
+            dwell_30s:      Math.round(preds.dwell_30s * 100),
+            skip:           Math.round(preds.skip * 100),
+            not_interested: Math.round(preds.not_interested * 100),
+            mlSignal:       Math.round(mlSignal * 10) / 10,
+          };
+
+          // Top prediction → human-readable reason
+          const sortedPositive = Object.entries(preds)
+            .filter(([a]) => ['complete', 'pass_quiz', 'like', 'dwell_30s'].includes(a))
+            .sort((a, b) => b[1] - a[1]);
+          if (sortedPositive.length > 0 && sortedPositive[0][1] >= 0.5) {
+            const [action, p] = sortedPositive[0];
+            const label = {
+              complete:  'hoàn thành',
+              pass_quiz: 'đạt được',
+              like:      'thích',
+              dwell_30s: 'đọc kỹ',
+            }[action];
+            c.reasons?.push?.(`🤖 AI tin bạn sẽ ${label} (${Math.round(p * 100)}%)`);
+          }
+        }
+      } catch (e) { console.warn('[rs:score:ml-ranker]', e.message); }
+
+      // ── Score: apply user's engagement history boost (legacy affinity) ──
       try {
         const userHistory = await pool.query(
           `SELECT target_type, SUM(weight) AS total_weight
@@ -10704,6 +10819,8 @@ CHỈ TRẢ JSON, không bọc markdown.`;
           // RS-Phase 3: hydration signals + human-readable reasons
           hydration: c.hydration || null,
           reasons: c.reasons || [],
+          // RS-Phase 5: per-action predictions (% likelihood) + ML signal
+          predictions: c.predictions || null,
         })),
         sources: Array.from(new Set(top.map(c => c.source))),
       });
