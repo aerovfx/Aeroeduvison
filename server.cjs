@@ -10144,10 +10144,22 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       }
       const weight = Number.isFinite(body.weight) ? Number(body.weight) : (RS_WEIGHTS[action] ?? 1.0);
       const id = 'rs_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      // RS-Phase 9: auto-attach assigned variants for downstream analytics.
+      // Cache đảm bảo không spam DB per request.
+      let metadata = body.metadata || {};
+      try {
+        const userVariants = await _getActiveExperimentsForUser(pool, user.id);
+        if (userVariants.length > 0) {
+          metadata = {
+            ...metadata,
+            experiments: userVariants.map(v => ({ name: v.experimentName, variant: v.variantKey })),
+          };
+        }
+      } catch (_) {}
       await pool.query(
         `INSERT INTO rs_action_log (id, user_id, action, target_type, target_id, weight, metadata)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [id, user.id, action, targetType, targetId, weight, JSON.stringify(body.metadata || {})]
+        [id, user.id, action, targetType, targetId, weight, JSON.stringify(metadata)]
       );
       return res.status(201).json({ success: true, id });
     } catch (err) {
@@ -10185,8 +10197,103 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // RS-PHASE 9: A/B TESTING FRAMEWORK (Multi-variant feed testing)
+  // ═══════════════════════════════════════════════════════════════
+  // Tham khảo cách X/Twitter assign variants: deterministic hash
+  // (userId + experimentName) → bucket [0,99] → variant per allocation.
+  // Stable: user luôn vào cùng variant, không flip flop giữa sessions.
+  // ═══════════════════════════════════════════════════════════════
+
+  let _rsExpSchemaReady = false;
+  async function _rsEnsureExperimentSchema(pool) {
+    if (_rsExpSchemaReady) return;
+    try {
+      await pool.query(`CREATE TABLE IF NOT EXISTS rs_experiments (
+        id           TEXT PRIMARY KEY,
+        name         TEXT UNIQUE NOT NULL,
+        description  TEXT,
+        variants     JSONB NOT NULL,
+        allocation   JSONB NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'draft',
+        start_at     TIMESTAMP,
+        end_at       TIMESTAMP,
+        created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_rs_experiments_status
+        ON rs_experiments (status)`);
+      _rsExpSchemaReady = true;
+    } catch (e) {
+      console.error('[rs:exp:schema] ❌', e.message);
+    }
+  }
+
+  /**
+   * Deterministic variant bucket: SHA-256(userId:experimentName) → 4 bytes
+   * → uint32 → mod 100 → bucket [0,99]. Stable per (user, experiment) pair.
+   */
+  function _hashBucket(userId, experimentName) {
+    const cryptoNode = require('crypto');
+    const h = cryptoNode.createHash('sha256').update(`${userId}:${experimentName}`).digest();
+    return h.readUInt32BE(0) % 100;
+  }
+
+  /**
+   * Resolve variant cho 1 user theo allocation.
+   * allocation = { control: 50, treatment_a: 30, treatment_b: 20 } (sum 100)
+   * bucket 0-49 → control, 50-79 → treatment_a, 80-99 → treatment_b.
+   */
+  function _resolveVariant(bucket, allocation, variants) {
+    const keys = Object.keys(allocation);
+    let cumulative = 0;
+    for (const k of keys) {
+      cumulative += allocation[k] || 0;
+      if (bucket < cumulative) {
+        const v = variants.find(x => x.key === k);
+        return v ? { key: k, config: v.config || {} } : { key: k, config: {} };
+      }
+    }
+    // Fallback: control nếu không match (alloc < 100, edge case)
+    return { key: keys[0] || 'control', config: variants[0]?.config || {} };
+  }
+
+  /**
+   * Cho 1 user, fetch tất cả active experiments và assign variant.
+   * Returns array of { experimentName, variantKey, config }.
+   * Cache trong-process 60s để tránh hit DB mỗi request.
+   */
+  let _expCache = { ts: 0, rows: [] };
+  async function _getActiveExperimentsForUser(pool, userId) {
+    const now = Date.now();
+    if (now - _expCache.ts > 60_000) {
+      try {
+        const r = await pool.query(
+          `SELECT name, variants, allocation FROM rs_experiments
+           WHERE status = 'active'
+             AND (start_at IS NULL OR start_at <= NOW())
+             AND (end_at   IS NULL OR end_at   >  NOW())`
+        );
+        _expCache = { ts: now, rows: r.rows };
+      } catch (_) {
+        _expCache = { ts: now, rows: [] };
+      }
+    }
+    const assignments = [];
+    for (const exp of _expCache.rows) {
+      const bucket = _hashBucket(userId, exp.name);
+      const v = _resolveVariant(bucket, exp.allocation, exp.variants);
+      assignments.push({ experimentName: exp.name, variantKey: v.key, config: v.config });
+    }
+    return assignments;
+  }
+
+  /** Helper public-ish — expose qua endpoint cho debug. */
+  globalThis.__rsGetUserVariants = _getActiveExperimentsForUser;
+
   // GET /api/reco/feed?audience=student|teacher&limit=20
   // RS-Phase 2: rule-based pipeline (Sources → Hydrate → Filter → Score → Select)
+  // RS-Phase 9: variant assignment + config applied to ranker (boost_explore, etc.)
   //
   // Cho HS: mix 4 nguồn
   //   1. Weak topics từ KG mastery (40% weight) — học cái yếu nhất trước
@@ -10203,6 +10310,15 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       const pool = getKcPool();
       const audience = String(req.query.audience || 'student');
       const limit = Math.min(50, Math.max(5, parseInt(String(req.query.limit || 20), 10)));
+
+      // RS-Phase 9: A/B variant assignment cho user này (deterministic, stable)
+      let experiments = [];
+      try {
+        await _rsEnsureExperimentSchema(pool);
+        experiments = await _getActiveExperimentsForUser(pool, user.id);
+      } catch (_) {}
+      // Merged config từ tất cả active experiments (later experiments win on key conflict).
+      const expConfig = experiments.reduce((acc, e) => ({ ...acc, ...(e.config || {}) }), {});
 
       const candidates = []; // {type, id, title, score, source, meta}
 
@@ -11140,6 +11256,29 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         }
       }
 
+      // ── RS-Phase 9: variant config applied here (boost/penalty hooks) ──
+      // Variants có thể inject các adjustments vào candidates:
+      //   - boost_explore (0-1): tăng score cho source='curious' or 'embedding'
+      //   - boost_kg_weak (0-1): tăng score cho source='kg-mastery'
+      //   - dampen_popular (0-1): giảm score cho source='popular'
+      // Áp dụng SAU regular scoring nhưng TRƯỚC final sort, để A/B isolate.
+      if (Object.keys(expConfig).length > 0) {
+        for (const c of filtered) {
+          let mul = 1;
+          if (typeof expConfig.boost_explore === 'number'
+              && (c.source === 'curious' || c.source === 'embedding')) {
+            mul *= (1 + expConfig.boost_explore);
+          }
+          if (typeof expConfig.boost_kg_weak === 'number' && c.source === 'kg-mastery') {
+            mul *= (1 + expConfig.boost_kg_weak);
+          }
+          if (typeof expConfig.dampen_popular === 'number' && c.source === 'popular') {
+            mul *= Math.max(0, 1 - expConfig.dampen_popular);
+          }
+          if (mul !== 1) c.score *= mul;
+        }
+      }
+
       // ── Selector: sort + top-K ──
       filtered.sort((a, b) => b.score - a.score);
       const top = filtered.slice(0, limit);
@@ -11161,6 +11300,11 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         sources: Array.from(new Set(top.map(c => c.source))),
         // RS-Phase 10: signal cho frontend nếu là cold-start user
         isColdStart,
+        // RS-Phase 9: assigned variants (transparency + tracking)
+        experiments: experiments.map(e => ({
+          name: e.experimentName,
+          variant: e.variantKey,
+        })),
       });
     } catch (err) {
       console.error('[rs:feed] ❌', err.message);
@@ -11746,6 +11890,173 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       });
     } catch (err) {
       console.error('[rs:digest:run-all] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // RS-PHASE 9: A/B EXPERIMENTS — Admin CRUD + Metrics
+  // ═══════════════════════════════════════════════════════════════
+
+  function _isRsAdmin(req) {
+    const adminToken = req.headers['x-admin-token'];
+    return adminToken && adminToken === (process.env.RS_DIGEST_ADMIN_TOKEN || 'dev-secret');
+  }
+
+  // GET /api/reco/experiments — list tất cả experiments (admin)
+  app.get('/api/reco/experiments', async (req, res) => {
+    if (!_isRsAdmin(req)) return res.status(403).json({ success: false, error: 'Forbidden' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureExperimentSchema(pool);
+      const r = await pool.query(`SELECT * FROM rs_experiments ORDER BY created_at DESC LIMIT 100`);
+      return res.json({ success: true, experiments: r.rows });
+    } catch (err) {
+      console.error('[rs:exp:list] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/reco/experiments — create new experiment (admin)
+  // Body: { name, description, variants: [{key, name, config}], allocation: {key: pct}, status, end_at }
+  app.post('/api/reco/experiments', express.json({ limit: '20kb' }), async (req, res) => {
+    if (!_isRsAdmin(req)) return res.status(403).json({ success: false, error: 'Forbidden' });
+    try {
+      const { name, description, variants, allocation, status, start_at, end_at } = req.body || {};
+      if (!name || !Array.isArray(variants) || variants.length < 2) {
+        return res.status(400).json({ success: false, error: 'name + variants[≥2] required' });
+      }
+      if (!allocation || typeof allocation !== 'object') {
+        return res.status(400).json({ success: false, error: 'allocation object required' });
+      }
+      const sum = Object.values(allocation).reduce((a, b) => a + Number(b || 0), 0);
+      if (sum !== 100) {
+        return res.status(400).json({ success: false, error: `allocation sum must be 100, got ${sum}` });
+      }
+      const variantKeys = new Set(variants.map(v => v.key));
+      for (const k of Object.keys(allocation)) {
+        if (!variantKeys.has(k)) {
+          return res.status(400).json({ success: false, error: `allocation key '${k}' not in variants` });
+        }
+      }
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureExperimentSchema(pool);
+      const id = 'exp_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      await pool.query(
+        `INSERT INTO rs_experiments (id, name, description, variants, allocation, status, start_at, end_at)
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)`,
+        [
+          id, name, description || null,
+          JSON.stringify(variants), JSON.stringify(allocation),
+          status || 'draft',
+          start_at ? new Date(start_at) : null,
+          end_at   ? new Date(end_at)   : null,
+        ]
+      );
+      _expCache.ts = 0; // invalidate
+      return res.status(201).json({ success: true, id, name });
+    } catch (err) {
+      console.error('[rs:exp:create] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // PUT /api/reco/experiments/:name — update status, allocation, dates
+  app.put('/api/reco/experiments/:name', express.json({ limit: '20kb' }), async (req, res) => {
+    if (!_isRsAdmin(req)) return res.status(403).json({ success: false, error: 'Forbidden' });
+    try {
+      const { name } = req.params;
+      const { status, allocation, end_at, description } = req.body || {};
+      const updates = [];
+      const params = [name];
+      let i = 2;
+      if (status) { updates.push(`status = $${i++}`); params.push(status); }
+      if (allocation) {
+        const sum = Object.values(allocation).reduce((a, b) => a + Number(b || 0), 0);
+        if (sum !== 100) {
+          return res.status(400).json({ success: false, error: `allocation sum must be 100, got ${sum}` });
+        }
+        updates.push(`allocation = $${i++}::jsonb`); params.push(JSON.stringify(allocation));
+      }
+      if (end_at) { updates.push(`end_at = $${i++}`); params.push(new Date(end_at)); }
+      if (description !== undefined) { updates.push(`description = $${i++}`); params.push(description); }
+      if (updates.length === 0) {
+        return res.status(400).json({ success: false, error: 'no fields to update' });
+      }
+      updates.push(`updated_at = NOW()`);
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureExperimentSchema(pool);
+      const r = await pool.query(
+        `UPDATE rs_experiments SET ${updates.join(', ')} WHERE name = $1 RETURNING *`,
+        params
+      );
+      if (r.rows.length === 0) return res.status(404).json({ success: false, error: 'experiment not found' });
+      _expCache.ts = 0;
+      return res.json({ success: true, experiment: r.rows[0] });
+    } catch (err) {
+      console.error('[rs:exp:update] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/experiments/:name/metrics — aggregate by variant
+  // Returns: { variants: [{ key, exposures, clicks, ctr, completes, completion_rate }] }
+  app.get('/api/reco/experiments/:name/metrics', async (req, res) => {
+    if (!_isRsAdmin(req)) return res.status(403).json({ success: false, error: 'Forbidden' });
+    try {
+      const { name } = req.params;
+      await ensureRsReady();
+      const pool = getKcPool();
+      // Query rs_action_log where metadata.experiments contains this experiment.
+      // Postgres JSONB containment trên array of {name, variant} objects:
+      const r = await pool.query(
+        `SELECT
+           (e->>'variant') AS variant_key,
+           action,
+           COUNT(*) AS cnt
+         FROM rs_action_log,
+              jsonb_array_elements(COALESCE(metadata->'experiments', '[]'::jsonb)) e
+         WHERE e->>'name' = $1
+         GROUP BY variant_key, action
+         ORDER BY variant_key, action`,
+        [name]
+      );
+
+      // Aggregate per variant
+      const byVariant = {};
+      for (const row of r.rows) {
+        const k = row.variant_key;
+        if (!byVariant[k]) byVariant[k] = { key: k, totalActions: 0, byAction: {} };
+        const cnt = Number(row.cnt);
+        byVariant[k].byAction[row.action] = cnt;
+        byVariant[k].totalActions += cnt;
+      }
+
+      const variants = Object.values(byVariant).map(v => {
+        const views    = v.byAction['view']    || 0;
+        const clicks   = v.byAction['click']   || 0;
+        const completes= v.byAction['complete']|| 0;
+        const passes   = v.byAction['pass_quiz']|| 0;
+        const skips    = v.byAction['skip']    || 0;
+        const notInter = v.byAction['not_interested'] || 0;
+        return {
+          ...v,
+          metrics: {
+            views, clicks, completes, passes, skips, notInter,
+            ctr:         views > 0 ? Math.round(clicks / views * 10000) / 100 : 0,
+            completion:  clicks > 0 ? Math.round(completes / clicks * 10000) / 100 : 0,
+            pass_rate:   completes > 0 ? Math.round(passes / completes * 10000) / 100 : 0,
+            negative_rate: (views > 0) ? Math.round((skips + notInter) / views * 10000) / 100 : 0,
+          },
+        };
+      });
+
+      return res.json({ success: true, experimentName: name, variants });
+    } catch (err) {
+      console.error('[rs:exp:metrics] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
