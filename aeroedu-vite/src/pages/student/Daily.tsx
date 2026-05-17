@@ -34,6 +34,17 @@ interface Section {
   itemTypes: string[]
 }
 
+/** Chào theo giờ trong ngày — UX cá nhân hoá nhẹ. */
+function getGreeting(): { text: string; emoji: string } {
+  const h = new Date().getHours()
+  if (h < 5)  return { text: 'Khuya rồi, ráng học chút nữa nha', emoji: '🌙' }
+  if (h < 11) return { text: 'Chào buổi sáng — khởi đầu thật khoẻ', emoji: '🌅' }
+  if (h < 14) return { text: 'Chào buổi trưa, nghỉ một chút nhé', emoji: '☀️' }
+  if (h < 18) return { text: 'Chào buổi chiều, học tiếp nào', emoji: '🌤' }
+  if (h < 22) return { text: 'Chào buổi tối, cố hoàn thành kế hoạch', emoji: '🌆' }
+  return { text: 'Chào buổi tối, đừng thức quá khuya', emoji: '🌙' }
+}
+
 const SECTIONS: Section[] = [
   {
     id: 'must-learn',
@@ -74,6 +85,8 @@ export default function StudentDailyPage() {
   const navigate = useNavigate()
   /** Items đã đánh dấu hoàn thành trong session này */
   const [done, setDone] = useState<Set<string>>(new Set())
+  /** Greeting recompute mỗi mount (không cần realtime tick) */
+  const greeting = useMemo(() => getGreeting(), [])
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-student-daily'],
@@ -150,6 +163,14 @@ export default function StudentDailyPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-5">
+        {/* Greeting theo giờ — UX cá nhân hoá nhẹ */}
+        {!isLoading && totalItems > 0 && (
+          <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium px-1">
+            <span className="text-xl">{greeting.emoji}</span>
+            <span>{greeting.text}.</span>
+          </div>
+        )}
+
         {/* Cold-start banner */}
         {!isLoading && isColdStart && totalItems > 0 && (
           <div className="rounded-2xl bg-gradient-to-br from-amber-500/15 via-orange-500/8 to-transparent border border-amber-500/40 p-4">

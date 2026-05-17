@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `9533775` (revision pixiai-00282-loy, 2026-05-17 — RS-Phase 7 Sprint Dashboard UI LIVE)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `5/5` → DEPLOYING (cc418c3 docs · 8d855f0 Daily page · a0d97f1 Student Dashboard CTA · ac51736 ForYou Calendar link · _next_ time-of-day greeting)
 - Prev: `7073eb9` → pixiai-00281-moh (RS-Phase 7+10 backend — Cold-start + Teacher trending)
 - Prev: `48ea1c3` → pixiai-00280-hir (RS-Phase 6 Negative feedback)
 - Prev: `bd8cf00` → pixiai-00279-law (RS-Phase 8 Daily digest)
