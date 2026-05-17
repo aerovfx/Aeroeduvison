@@ -2027,9 +2027,44 @@ function makeProxy(target, label, pathFilter) {
     }
   }
 
+  /**
+   * RS Phase 8: bind Telegram chat_id từ deep-link `/start digest_<userId>`.
+   * Cập nhật User."telegramChatId" để có thể nhận daily digest qua Telegram.
+   */
+  async function onDigestBind({ chatId, userId, fromUser }) {
+    try {
+      // RS Phase 8: __rsGetPool published bởi block declared later in file.
+      const getPool = globalThis.__rsGetPool;
+      if (typeof getPool !== 'function') return { ok: false, error: 'pool_not_ready' };
+      const pool = getPool();
+      // Schema migration idempotent
+      await pool.query(`ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "telegramChatId" text`);
+      await pool.query(`ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "rsDigestChannels" jsonb DEFAULT '{"inApp":true,"email":false,"telegram":false}'::jsonb`);
+      // Validate user tồn tại
+      const u = await pool.query(`SELECT id, email, name FROM "User" WHERE id = $1 LIMIT 1`, [userId]);
+      if (u.rows.length === 0) return { ok: false, error: 'user_not_found' };
+      const row = u.rows[0];
+      // Bind chat_id + auto-enable telegram channel
+      await pool.query(
+        `UPDATE "User" SET
+           "telegramChatId" = $1,
+           "rsDigestChannels" = COALESCE("rsDigestChannels", '{}'::jsonb) || '{"telegram":true}'::jsonb
+         WHERE id = $2`,
+        [String(chatId), userId]
+      );
+      console.log(`[rs:digest:telegram] bound user=${userId} chat=${chatId} from=${fromUser?.username || fromUser?.id}`);
+      return { ok: true, userName: row.name, email: row.email };
+    } catch (e) {
+      console.error('[rs:digest:telegram:bind] ❌', e.message);
+      return { ok: false, error: e.message };
+    }
+  }
+
   // Long polling worker (chỉ cần khi không setWebhook)
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_USE_WEBHOOK !== 'true') {
-    tg.startPolling({ onCallback: onAdminCallback });
+    tg.startPolling({ onCallback: onAdminCallback, onDigestBind });
   }
 
   app.get('/api/payment/plans', (_req, res) => {
@@ -2281,7 +2316,7 @@ function makeProxy(target, label, pathFilter) {
         const got = req.headers['x-telegram-bot-api-secret-token'];
         if (got !== secret) return res.status(401).json({ error: 'bad secret' });
       }
-      await tg.handleUpdate(req.body, { onCallback: onAdminCallback });
+      await tg.handleUpdate(req.body, { onCallback: onAdminCallback, onDigestBind });
       res.json({ ok: true });
     } catch (err) {
       console.error('[telegram:webhook] ❌', err.message);
@@ -7703,6 +7738,9 @@ ${plan.content || '<p>(Trống)</p>'}
     });
     return _kcPool;
   }
+  // RS Phase 8: expose lazy pool getter cho cross-block usage (payment block ở
+  // trên cần pool để bind Telegram chat_id từ /start digest_<userId>).
+  globalThis.__rsGetPool = getKcPool;
 
   function newKcId(prefix) {
     return (prefix || 'kc_') + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -11208,17 +11246,80 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     return items.slice(0, 3);
   }
 
-  async function _sendDigestNotification(pool, userId) {
-    // Check: đã có digest hôm nay chưa? (idempotent)
-    const dup = await pool.query(
-      `SELECT id FROM "Notification"
-       WHERE "userId" = $1 AND type = 'rs_digest'
-         AND "createdAt" > NOW() - INTERVAL '20 hours'
-       LIMIT 1`,
-      [userId]
-    );
-    if (dup.rows.length > 0) {
-      return { sent: false, reason: 'already_sent_today', existingId: dup.rows[0].id };
+  /**
+   * Lazy migration: đảm bảo User có rsDigestChannels jsonb + telegramChatId text.
+   * Idempotent, chỉ chạy 1 lần / process lifetime.
+   */
+  let _rsDigestSchemaReady = false;
+  async function _rsEnsureDigestSchema(pool) {
+    if (_rsDigestSchemaReady) return;
+    try {
+      await pool.query(`ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "rsDigestChannels" jsonb DEFAULT '{"inApp":true,"email":false,"telegram":false}'::jsonb`);
+      await pool.query(`ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "telegramChatId" text`);
+      _rsDigestSchemaReady = true;
+    } catch (e) {
+      console.error('[rs:digest:schema] ❌', e.message);
+    }
+  }
+
+  /** HTML email template — tóm tắt 3 mục. */
+  function _renderDigestEmailHtml(items, recipientName, baseUrl) {
+    const safe = (s) => String(s || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const rows = items.map((it, i) => `
+      <tr>
+        <td style="padding:12px 16px;border-bottom:1px solid #f1f5f9;vertical-align:top;">
+          <div style="font-size:24px;line-height:1;margin-bottom:6px;">${safe(it.emoji)}</div>
+          <div style="font-size:15px;font-weight:600;color:#0f172a;margin-bottom:2px;">
+            ${i + 1}. ${safe(it.title)}
+          </div>
+          <div style="font-size:13px;color:#64748b;line-height:1.5;">${safe(it.subtitle)}</div>
+          <a href="${baseUrl}${safe(it.link)}" style="display:inline-block;margin-top:8px;padding:6px 12px;background:#22d3ee;color:#fff;text-decoration:none;border-radius:6px;font-size:12px;font-weight:600;">
+            Học ngay →
+          </a>
+        </td>
+      </tr>`).join('');
+    return `<!DOCTYPE html><html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;margin:0;padding:24px 12px;color:#0f172a;">
+      <table cellpadding="0" cellspacing="0" border="0" style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <tr><td style="padding:24px;background:linear-gradient(135deg,#22d3ee,#a855f7);color:#fff;">
+          <div style="font-size:22px;font-weight:700;margin-bottom:4px;">🎯 Gợi ý học hôm nay</div>
+          <div style="font-size:14px;opacity:.95;">Chào ${safe(recipientName || 'bạn')}, đây là ${items.length} gợi ý cá nhân hoá từ inphysic.com</div>
+        </td></tr>
+        ${rows}
+        <tr><td style="padding:16px 24px;background:#f8fafc;text-align:center;font-size:12px;color:#94a3b8;">
+          <a href="${baseUrl}/student/for-you" style="color:#0ea5e9;text-decoration:none;font-weight:600;">Xem tất cả gợi ý →</a>
+          <div style="margin-top:6px;">Không muốn nhận email? <a href="${baseUrl}/dashboard/settings" style="color:#64748b;">Tắt trong Cài đặt</a></div>
+        </td></tr>
+      </table></body></html>`;
+  }
+
+  /** Telegram MarkdownV2 — escape minimal, tóm tắt items. */
+  function _renderDigestTelegramText(items, baseUrl) {
+    const esc = (s) => String(s || '').replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+    const lines = items.map((it, i) =>
+      `${i + 1}\\. ${esc(it.emoji)} *${esc(it.title)}*\n   _${esc(it.subtitle)}_\n   [Học ngay →](${baseUrl}${esc(it.link)})`
+    ).join('\n\n');
+    return `🎯 *Gợi ý học hôm nay*\n${items.length} mục cho bạn từ inphysic\\.com\n\n${lines}\n\n[Xem tất cả →](${baseUrl}/student/for-you)`;
+  }
+
+  async function _sendDigestNotification(pool, userId, opts = {}) {
+    const { skipIdempotency = false, channels = null } = opts;
+
+    await _rsEnsureDigestSchema(pool);
+
+    // Check: đã có digest hôm nay chưa? (idempotent — trừ khi test mode)
+    if (!skipIdempotency) {
+      const dup = await pool.query(
+        `SELECT id FROM "Notification"
+         WHERE "userId" = $1 AND type = 'rs_digest'
+           AND "createdAt" > NOW() - INTERVAL '20 hours'
+         LIMIT 1`,
+        [userId]
+      );
+      if (dup.rows.length > 0) {
+        return { sent: false, reason: 'already_sent_today', existingId: dup.rows[0].id };
+      }
     }
 
     const items = await _generateDigestPreview(pool, userId);
@@ -11226,27 +11327,88 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       return { sent: false, reason: 'no_recommendations' };
     }
 
+    // Load user + preferences
+    const u = await pool.query(
+      `SELECT id, email, name, "rsDigestChannels", "telegramChatId" FROM "User" WHERE id = $1 LIMIT 1`,
+      [userId]
+    );
+    if (u.rows.length === 0) return { sent: false, reason: 'user_not_found' };
+    const user = u.rows[0];
+    const prefs = channels || user.rsDigestChannels || { inApp: true, email: false, telegram: false };
+
     const body = items
       .map((it, i) => `${i + 1}. ${it.emoji} ${it.title}\n   ${it.subtitle}`)
       .join('\n\n');
 
-    const notifId = 'notif_digest_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
-    await pool.query(
-      `INSERT INTO "Notification"
-         (id, "userId", type, title, body, link, metadata, "createdAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
-      [
-        notifId,
-        userId,
-        'rs_digest',
-        `🎯 Gợi ý học hôm nay — ${items.length} mục cho bạn`,
-        body,
-        '/student/for-you',
-        JSON.stringify({ items, generatedAt: new Date().toISOString() }),
-      ]
-    );
+    const baseUrl = process.env.PUBLIC_BASE_URL || 'https://inphysic.com';
+    const deliveries = { inApp: null, email: null, telegram: null };
 
-    return { sent: true, notificationId: notifId, itemsCount: items.length };
+    // Channel 1: In-app notification (always log if inApp prefs ON)
+    let notifId = null;
+    if (prefs.inApp !== false) {
+      notifId = 'notif_digest_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      try {
+        await pool.query(
+          `INSERT INTO "Notification"
+             (id, "userId", type, title, body, link, metadata, "createdAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+          [
+            notifId, userId, 'rs_digest',
+            `🎯 Gợi ý học hôm nay — ${items.length} mục cho bạn`,
+            body, '/student/for-you',
+            JSON.stringify({ items, generatedAt: new Date().toISOString(), channels: prefs }),
+          ]
+        );
+        deliveries.inApp = { ok: true, id: notifId };
+      } catch (e) {
+        deliveries.inApp = { ok: false, error: e.message };
+      }
+    }
+
+    // Channel 2: Email
+    if (prefs.email && user.email) {
+      try {
+        const { sendEmail } = require('./lib/email-sender.cjs');
+        const r = await sendEmail({
+          to: user.email,
+          subject: `🎯 ${items.length} gợi ý học hôm nay — inphysic`,
+          html: _renderDigestEmailHtml(items, user.name, baseUrl),
+        });
+        deliveries.email = { ok: true, provider: r.provider, id: r.id };
+      } catch (e) {
+        console.error('[rs:digest:email] ❌', e.message);
+        deliveries.email = { ok: false, error: e.message };
+      }
+    } else if (prefs.email && !user.email) {
+      deliveries.email = { ok: false, error: 'no_email_on_account' };
+    }
+
+    // Channel 3: Telegram
+    if (prefs.telegram && user.telegramChatId) {
+      try {
+        const tg = require('./lib/telegram-bot.cjs');
+        await tg.tgCall('sendMessage', {
+          chat_id: user.telegramChatId,
+          text: _renderDigestTelegramText(items, baseUrl),
+          parse_mode: 'MarkdownV2',
+          disable_web_page_preview: true,
+        });
+        deliveries.telegram = { ok: true };
+      } catch (e) {
+        console.error('[rs:digest:telegram] ❌', e.message);
+        deliveries.telegram = { ok: false, error: e.message };
+      }
+    } else if (prefs.telegram && !user.telegramChatId) {
+      deliveries.telegram = { ok: false, error: 'telegram_not_linked' };
+    }
+
+    return {
+      sent: true,
+      notificationId: notifId,
+      itemsCount: items.length,
+      channels: prefs,
+      deliveries,
+    };
   }
 
   // POST /api/reco/digest/me — generate digest cho user hiện tại
@@ -11260,6 +11422,93 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       return res.json({ success: true, ...result });
     } catch (err) {
       console.error('[rs:digest:me] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/digest/preferences — load channel prefs + telegram link state
+  app.get('/api/reco/digest/preferences', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureDigestSchema(pool);
+      const r = await pool.query(
+        `SELECT email, "rsDigestChannels", "telegramChatId" FROM "User" WHERE id = $1 LIMIT 1`,
+        [user.id]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+      const u = r.rows[0];
+      const channels = u.rsDigestChannels || { inApp: true, email: false, telegram: false };
+      const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Aeroedu_bot';
+      return res.json({
+        success: true,
+        channels,
+        emailOnAccount: u.email || null,
+        telegramLinked: !!u.telegramChatId,
+        telegramChatIdPreview: u.telegramChatId ? `…${String(u.telegramChatId).slice(-4)}` : null,
+        telegramDeepLink: `https://t.me/${botUsername}?start=digest_${user.id}`,
+      });
+    } catch (err) {
+      console.error('[rs:digest:prefs:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // PUT /api/reco/digest/preferences — update channel prefs (3 booleans)
+  app.put('/api/reco/digest/preferences', express.json({ limit: '50kb' }), async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      const { inApp, email, telegram } = req.body || {};
+      const channels = {
+        inApp: inApp !== false, // default true if absent
+        email: !!email,
+        telegram: !!telegram,
+      };
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureDigestSchema(pool);
+      await pool.query(
+        `UPDATE "User" SET "rsDigestChannels" = $1::jsonb WHERE id = $2`,
+        [JSON.stringify(channels), user.id]
+      );
+      return res.json({ success: true, channels });
+    } catch (err) {
+      console.error('[rs:digest:prefs:put] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/reco/digest/test — gửi test digest (bypass idempotency)
+  // Cho phép user verify từng kênh hoạt động trước khi enable cho cron.
+  app.post('/api/reco/digest/test', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      const result = await _sendDigestNotification(pool, user.id, { skipIdempotency: true });
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[rs:digest:test] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/reco/digest/telegram/unlink — gỡ liên kết Telegram
+  app.post('/api/reco/digest/telegram/unlink', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureDigestSchema(pool);
+      await pool.query(`UPDATE "User" SET "telegramChatId" = NULL WHERE id = $1`, [user.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[rs:digest:telegram:unlink] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
