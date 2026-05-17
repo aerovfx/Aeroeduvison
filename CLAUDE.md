@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `67bfef3` (revision TBD, 2026-05-17 — Landing #awards Ednovation 2025 Top 60 ươm tạo cert)
-- Commits since last deploy: `0/5` (early deploy: user yêu cầu Awards section live)
+- Last deployed commit: `3925ee7` (revision TBD, 2026-05-17 — Custom mạch "Chạy giả lập" với ArduinoRuntime real-time)
+- Commits since last deploy: `0/5` (early deploy: user yêu cầu simulator)
+- Prev: `31efef4` → pixiai-00261-wic (Awards Ednovation 2025)
 - Prev: `c23a4b7` → pixiai-00260-feg (SEO batch — sitemap + OG + 404 + fallback)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
