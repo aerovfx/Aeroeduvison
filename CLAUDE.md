@@ -15,10 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `7f66062` (revision pixiai-00251-tux, 2026-05-17 — TikZ snippet library + fix LatexProject 503 + thêm 14 endpoint stubs)
-- Commits since last deploy: `2/5`
-  - `46476a7` feat(exam-prep): card đề thi hiển thị avatar HS được phân công + đã làm
-  - `f2d6145` fix(router): LabTwin card click không mở được — sửa redirect loop /labs → /labtwin
+- Last deployed commit: `b9661e6` (revision pixiai-00252-zuk, 2026-05-17 — assigned-students avatar + LabTwin router fix)
+- Commits since last deploy: `1/5`
+  - `8832ec7` feat(learning-paths): tách "lộ trình từ GV" (free) vs "AI tạo" (paid + AiSubscriptionGate)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
