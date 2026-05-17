@@ -254,9 +254,20 @@ export default function PixelOdyssey() {
     }
   }, [])
 
-  // Keyboard
+  // Keyboard — skip nếu user đang focus vào input/textarea/contenteditable
   useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+      if (target.isContentEditable) return true
+      return false
+    }
+
     const onKeyDown = (e: KeyboardEvent) => {
+      // BUG FIX: don't hijack keys while user typing in forms
+      if (isTypingTarget(e.target)) return
+
       const k = e.key.toLowerCase()
       if (activeNPC) {
         if (k === 'escape') {
@@ -276,6 +287,7 @@ export default function PixelOdyssey() {
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
       keysRef.current.delete(e.key.toLowerCase())
     }
     window.addEventListener('keydown', onKeyDown)

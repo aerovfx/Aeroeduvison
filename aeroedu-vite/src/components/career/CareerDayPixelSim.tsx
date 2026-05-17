@@ -324,13 +324,21 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
   // Reset khi đổi career
   useEffect(() => { resetChar() }, [careerName, resetChar])
 
-  // Manual mode: capture keyboard
+  // Manual mode: capture keyboard (skip nếu user typing trong form)
   useEffect(() => {
     if (mode !== 'manual') {
       keysRef.current.clear()
       return
     }
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+      if (target.isContentEditable) return true
+      return false
+    }
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
       const k = e.key.toLowerCase()
       if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' ', 'e', 'r'].includes(k)) {
         e.preventDefault()
@@ -347,7 +355,6 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
           }
           if (closest && minDist <= 2) {
             setInteractedZone(closest.name)
-            // Find activity matching this zone
             const idx = activities.findIndex(a => a.zoneKey === closest!.name)
             if (idx !== -1) setCurrentIdx(idx)
           }
@@ -355,6 +362,7 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
       }
     }
     const onKeyUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return
       keysRef.current.delete(e.key.toLowerCase())
     }
     window.addEventListener('keydown', onKeyDown)
