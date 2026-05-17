@@ -25,8 +25,17 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ChevronDown, Code2, Download, FileCode2, Layers, Loader2,
   Play, RotateCcw, Sparkles, Upload, AlertTriangle, BookOpen, Check,
+  Save, Trash2, X, Globe, User as UserIcon,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  customCircuitService,
+  CIRCUIT_CATEGORIES,
+  categoryEmoji,
+  type CustomCircuit,
+  type CreateCustomCircuitInput,
+} from '@/services/customCircuit.service'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -1106,6 +1115,7 @@ function parseDiagram(text: string): { ok: true; data: WokwiDiagram } | { ok: fa
 }
 
 export default function CustomWokwiBoard() {
+  const queryClient = useQueryClient()
   const [activeTemplateId, setActiveTemplateId] = useState<string>(TEMPLATES[0].id)
   const [diagramText, setDiagramText] = useState<string>(safeStringify(TEMPLATES[0].diagram))
   const [sketchText, setSketchText] = useState<string>(TEMPLATES[0].sketch)
@@ -1114,11 +1124,47 @@ export default function CustomWokwiBoard() {
   const [autoParse, setAutoParse] = useState<boolean>(true)
   const [view, setView] = useState<'split' | 'preview' | 'json'>('split')
   const [focusedPartId, setFocusedPartId] = useState<string | null>(null)
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [editingCircuit, setEditingCircuit] = useState<CustomCircuit | null>(null)
 
-  const activeTemplate = useMemo(
-    () => TEMPLATES.find(t => t.id === activeTemplateId) ?? TEMPLATES[0],
-    [activeTemplateId]
+  // Load mạch đã lưu của user (+ public)
+  const { data: savedCircuits = [] } = useQuery({
+    queryKey: ['custom-circuits', 'mine'],
+    queryFn: () => customCircuitService.list(true),
+    staleTime: 30_000,
+  })
+
+  const builtInIds = useMemo(() => new Set(TEMPLATES.map(t => t.id)), [])
+  const isCustomActive = !builtInIds.has(activeTemplateId)
+  const activeCustom = useMemo(
+    () => savedCircuits.find(c => c.id === activeTemplateId) ?? null,
+    [savedCircuits, activeTemplateId]
   )
+
+  const activeTemplate = useMemo(() => {
+    // First check built-in templates
+    const bi = TEMPLATES.find(t => t.id === activeTemplateId)
+    if (bi) return bi
+    // Fall back to a saved custom circuit (adapted to Template shape)
+    if (activeCustom) {
+      return {
+        id: activeCustom.id,
+        name: activeCustom.name,
+        emoji: categoryEmoji(activeCustom.category),
+        description: activeCustom.description || 'Mạch tự lưu',
+        board: activeCustom.board,
+        difficulty: (['Dễ', 'Trung bình', 'Nâng cao'].includes(activeCustom.difficulty as string)
+          ? activeCustom.difficulty
+          : 'Dễ') as Template['difficulty'],
+        diagram: activeCustom.diagram as Template['diagram'],
+        sketch: activeCustom.sketch,
+        objectives: activeCustom.objectives.length > 0
+          ? activeCustom.objectives
+          : ['Mạch tự lưu — bổ sung mục tiêu khi cập nhật.'],
+      }
+    }
+    return TEMPLATES[0]
+  }, [activeTemplateId, activeCustom])
 
   // Auto-parse on edit (debounced via state batching)
   useEffect(() => {
@@ -1182,6 +1228,74 @@ export default function CustomWokwiBoard() {
     e.target.value = '' // reset so same file can be re-selected
   }
 
+  /** Load mạch đã lưu (custom) — chuyển sang dropdown của user */
+  const loadCustomCircuit = (c: CustomCircuit) => {
+    setActiveTemplateId(c.id)
+    setDiagramText(safeStringify(c.diagram))
+    setSketchText(c.sketch || '')
+    setParsed(c.diagram as WokwiDiagram)
+    setError(null)
+    setFocusedPartId(null)
+    toast.success(`Đã tải: ${c.name}`)
+  }
+
+  /** Mở Save modal — nếu đang ở custom của user thì gợi ý update,
+   *  ngược lại tạo mới. */
+  const openSaveModal = () => {
+    // Parse trước để không cho lưu JSON lỗi
+    const res = parseDiagram(diagramText)
+    if (!res.ok) {
+      toast.error('Sửa lỗi JSON trước khi lưu: ' + res.error)
+      return
+    }
+    setEditingCircuit(isCustomActive ? activeCustom : null)
+    setShowSaveModal(true)
+  }
+
+  /** Submit save / update lên backend */
+  const handleSaveCircuit = async (input: CreateCustomCircuitInput) => {
+    const res = parseDiagram(diagramText)
+    if (!res.ok) {
+      toast.error('JSON không hợp lệ')
+      return
+    }
+    const payload: CreateCustomCircuitInput = {
+      ...input,
+      diagram: res.data,
+      sketch: sketchText,
+    }
+    try {
+      let saved: CustomCircuit | null
+      if (editingCircuit?.id) {
+        saved = await customCircuitService.update(editingCircuit.id, payload)
+        toast.success('Đã cập nhật mạch')
+      } else {
+        saved = await customCircuitService.create(payload)
+        toast.success('Đã lưu mạch vào thư viện')
+      }
+      await queryClient.invalidateQueries({ queryKey: ['custom-circuits', 'mine'] })
+      if (saved) setActiveTemplateId(saved.id)
+      setShowSaveModal(false)
+    } catch (e: any) {
+      toast.error(e?.message || 'Lưu thất bại')
+    }
+  }
+
+  /** Xoá mạch đang active (nếu là custom của user) */
+  const handleDeleteCircuit = async () => {
+    if (!activeCustom) return
+    if (!window.confirm(`Xoá mạch "${activeCustom.name}"? Không thể hoàn tác.`)) return
+    try {
+      await customCircuitService.delete(activeCustom.id)
+      toast.success('Đã xoá mạch')
+      await queryClient.invalidateQueries({ queryKey: ['custom-circuits', 'mine'] })
+      // Quay về template đầu tiên
+      loadTemplate(TEMPLATES[0])
+    } catch (e: any) {
+      toast.error(e?.message || 'Xoá thất bại')
+    }
+  }
+
   const partsCount = parsed?.parts.length ?? 0
   const connCount = parsed?.connections.length ?? 0
   const partTypes = useMemo(() => {
@@ -1205,15 +1319,62 @@ export default function CustomWokwiBoard() {
         <select
           value={activeTemplateId}
           onChange={(e) => {
-            const t = TEMPLATES.find(x => x.id === e.target.value)
-            if (t) loadTemplate(t)
+            const id = e.target.value
+            const tpl = TEMPLATES.find(x => x.id === id)
+            if (tpl) { loadTemplate(tpl); return }
+            const cc = savedCircuits.find(x => x.id === id)
+            if (cc) loadCustomCircuit(cc)
           }}
-          className="text-xs bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-100"
+          className="text-xs bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-100 max-w-[280px]"
         >
-          {TEMPLATES.map(t => (
-            <option key={t.id} value={t.id}>{t.emoji} {t.name} · {t.difficulty}</option>
-          ))}
+          <optgroup label="📚 Template có sẵn">
+            {TEMPLATES.map(t => (
+              <option key={t.id} value={t.id}>{t.emoji} {t.name} · {t.difficulty}</option>
+            ))}
+          </optgroup>
+          {savedCircuits.filter(c => !c.isPublic || c.ownerId === (activeCustom?.ownerId)).length > 0 && (
+            <optgroup label="📁 Mạch của tôi">
+              {savedCircuits
+                .filter(c => !c.isPublic ||
+                  (savedCircuits.find(x => x.id === c.id)?.ownerId === activeCustom?.ownerId))
+                .map(c => (
+                  <option key={c.id} value={c.id}>
+                    {categoryEmoji(c.category)} {c.name} · {c.difficulty}
+                  </option>
+                ))}
+            </optgroup>
+          )}
+          {savedCircuits.filter(c => c.isPublic).length > 0 && (
+            <optgroup label="🌍 Công khai từ cộng đồng">
+              {savedCircuits.filter(c => c.isPublic).map(c => (
+                <option key={'pub-' + c.id} value={c.id}>
+                  {categoryEmoji(c.category)} {c.name} · {c.difficulty}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
+
+        {/* Save button — primary action */}
+        <button
+          onClick={openSaveModal}
+          className="text-xs px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 inline-flex items-center gap-1.5 font-semibold"
+          title={isCustomActive ? 'Cập nhật mạch của bạn' : 'Lưu mạch này vào thư viện cá nhân'}
+        >
+          <Save className="w-3.5 h-3.5" />
+          {isCustomActive ? 'Cập nhật' : 'Lưu mạch'}
+        </button>
+
+        {/* Delete chỉ hiển thị cho mạch của chính user */}
+        {activeCustom && (
+          <button
+            onClick={handleDeleteCircuit}
+            className="text-xs px-2 py-1.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/40 inline-flex items-center gap-1"
+            title="Xoá mạch này khỏi thư viện"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         <div className="flex-1" />
 
@@ -1495,7 +1656,251 @@ export default function CustomWokwiBoard() {
             <li>• Bộ part hỗ trợ renderer: <span className="text-cyan-300">arduino-uno, esp32, led, button, resistor, buzzer, 74hc595, 7segment</span></li>
             <li>• Part khác sẽ vẽ placeholder grey — vẫn xuất khẩu được .json/.ino chuẩn Wokwi</li>
             <li>• Đường nối vẽ kiểu Manhattan (đơn giản hoá) từ tâm part đến tâm part</li>
+            <li>• Nút <span className="text-emerald-300 font-semibold">Lưu mạch</span> → đưa vào thư viện cá nhân, chọn danh mục + có thể chia sẻ công khai</li>
           </ul>
+        </div>
+      </div>
+
+      {/* Save modal */}
+      {showSaveModal && (
+        <SaveCircuitModal
+          initial={editingCircuit ?? {
+            name: activeTemplate.name + (isCustomActive ? '' : ' (bản sao)'),
+            description: activeTemplate.description,
+            board: activeTemplate.board,
+            difficulty: activeTemplate.difficulty as any,
+            category: 'general',
+            isPublic: false,
+            objectives: activeTemplate.objectives,
+          }}
+          isUpdate={!!editingCircuit}
+          onClose={() => setShowSaveModal(false)}
+          onSubmit={handleSaveCircuit}
+        />
+      )}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────
+// SaveCircuitModal
+// ────────────────────────────────────────────────────────────────
+interface SaveModalProps {
+  initial: Partial<CreateCustomCircuitInput>
+  isUpdate: boolean
+  onClose: () => void
+  onSubmit: (input: CreateCustomCircuitInput) => Promise<void>
+}
+
+function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalProps) {
+  const [name, setName] = useState(initial.name ?? '')
+  const [description, setDescription] = useState(initial.description ?? '')
+  const [board, setBoard] = useState(initial.board ?? 'Arduino UNO')
+  const [difficulty, setDifficulty] = useState<'Dễ' | 'Trung bình' | 'Nâng cao'>(
+    (initial.difficulty as any) ?? 'Dễ'
+  )
+  const [category, setCategory] = useState(initial.category ?? 'general')
+  const [isPublic, setIsPublic] = useState(initial.isPublic ?? false)
+  const [objectives, setObjectives] = useState<string>(
+    (initial.objectives ?? []).join('\n')
+  )
+  const [submitting, setSubmitting] = useState(false)
+
+  const trimmedName = name.trim()
+  const canSubmit = trimmedName.length > 0 && !submitting
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return
+    setSubmitting(true)
+    try {
+      const objArr = objectives
+        .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 10)
+      await onSubmit({
+        name: trimmedName,
+        description: description.trim(),
+        board,
+        difficulty,
+        category,
+        isPublic,
+        objectives: objArr,
+        // diagram + sketch sẽ được parent gắn vào (đọc từ state hiện tại)
+        diagram: { parts: [] }, // placeholder, parent overrides
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl max-w-lg w-full p-5 space-y-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-bold text-zinc-100 flex items-center gap-2">
+            <Save className="w-4 h-4 text-emerald-400" />
+            {isUpdate ? 'Cập nhật mạch' : 'Lưu mạch vào thư viện'}
+          </h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-xs text-zinc-400">
+          Mạch sẽ xuất hiện trong dropdown <strong>"📁 Mạch của tôi"</strong> bên cạnh
+          các template có sẵn. Bật chia sẻ công khai để mọi người dùng đều thấy được.
+        </p>
+
+        {/* Name */}
+        <div>
+          <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Tên mạch <span className="text-rose-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={200}
+            autoFocus
+            placeholder="vd. Đếm 0-99 trên 2 led 7-đoạn"
+            className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100 focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Mô tả ngắn
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            rows={2}
+            placeholder="Giải thích ngắn về mạch — nguyên lý, ứng dụng…"
+            className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100 resize-y focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+          />
+        </div>
+
+        {/* Category — grid picker */}
+        <div>
+          <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Danh mục
+          </label>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+            {CIRCUIT_CATEGORIES.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategory(c.id)}
+                className={`text-left text-xs px-2.5 py-2 rounded-md border transition flex items-center gap-1.5 ${
+                  category === c.id
+                    ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-200'
+                    : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+                }`}
+              >
+                <span className="text-base">{c.emoji}</span>
+                <span className="truncate">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Board + Difficulty in same row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+              Board
+            </label>
+            <select
+              value={board}
+              onChange={(e) => setBoard(e.target.value)}
+              className="w-full mt-1 px-2.5 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100"
+            >
+              <option>Arduino UNO</option>
+              <option>Arduino Nano</option>
+              <option>Arduino Mega</option>
+              <option>ESP32</option>
+              <option>ESP32-C3</option>
+              <option>Raspberry Pi Pico</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+              Độ khó
+            </label>
+            <select
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as any)}
+              className="w-full mt-1 px-2.5 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100"
+            >
+              <option value="Dễ">Dễ</option>
+              <option value="Trung bình">Trung bình</option>
+              <option value="Nâng cao">Nâng cao</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Objectives — multiline, 1 dòng = 1 mục tiêu */}
+        <div>
+          <label className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold">
+            Mục tiêu học tập <span className="text-zinc-600 normal-case">(mỗi dòng = 1 mục tiêu, tối đa 10)</span>
+          </label>
+          <textarea
+            value={objectives}
+            onChange={(e) => setObjectives(e.target.value)}
+            rows={3}
+            placeholder={'vd:\nHiểu nguyên lý dịch bit của 74HC595\nDùng shiftOut() điều khiển 16 LED bằng 3 chân'}
+            className="w-full mt-1 px-3 py-2 bg-zinc-950 border border-zinc-700 rounded-md text-sm text-zinc-100 resize-y focus:outline-none focus:ring-1 focus:ring-emerald-500/60"
+          />
+        </div>
+
+        {/* Public toggle */}
+        <label className="flex items-start gap-2 p-2.5 rounded-md bg-zinc-950 border border-zinc-700 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="mt-0.5 accent-emerald-500"
+          />
+          <div className="text-xs">
+            <div className="text-zinc-200 font-semibold flex items-center gap-1.5">
+              {isPublic ? <Globe className="w-3.5 h-3.5 text-emerald-300" /> : <UserIcon className="w-3.5 h-3.5 text-zinc-400" />}
+              {isPublic ? 'Chia sẻ công khai' : 'Chỉ mình tôi xem được'}
+            </div>
+            <div className="text-zinc-500 mt-0.5">
+              {isPublic
+                ? 'Mọi user khác sẽ thấy mạch này trong mục "🌍 Công khai từ cộng đồng".'
+                : 'Bật để chia sẻ với cộng đồng — vẫn có thể tắt sau.'}
+            </div>
+          </div>
+        </label>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 disabled:opacity-50"
+          >
+            Huỷ
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="text-xs px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold disabled:opacity-50 inline-flex items-center gap-1.5"
+          >
+            {submitting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5" />
+            )}
+            {isUpdate ? 'Lưu thay đổi' : 'Lưu mạch'}
+          </button>
         </div>
       </div>
     </div>

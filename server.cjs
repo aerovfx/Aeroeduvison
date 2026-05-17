@@ -15003,6 +15003,224 @@ if (!USE_NODEJS_QUESTIONS) {
     });
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // CUSTOM CIRCUIT LIBRARY — lưu mạch Custom của user (Wokwi-style)
+  // Bảng "CustomCircuit": id, ownerId, name, description, board,
+  // difficulty, category, diagram (JSONB), sketch (TEXT), objectives
+  // (JSONB array of strings), isPublic (bool, default false), createdAt,
+  // updatedAt. Endpoint dùng cùng JWT pattern getGrTeacher (rename
+  // getCircuitUser vì áp dụng cho cả HS lẫn GV).
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    let _ccpool = null;
+    function getCcPool() {
+      if (!_ccpool) {
+        const { Pool } = require('pg');
+        const url = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+        if (!url) return null;
+        _ccpool = new Pool({
+          connectionString: url,
+          ssl: url.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+          max: 4,
+          idleTimeoutMillis: 30000,
+        });
+      }
+      return _ccpool;
+    }
+    const _ccjwt = require('jsonwebtoken');
+    const _ccSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getCircuitUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = _ccjwt.verify(auth.slice(7), _ccSecret, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id, role: d.role || 'student' };
+      } catch { return null; }
+    }
+    let _ccReady = false;
+    async function ensureCustomCircuitTable() {
+      if (_ccReady) return;
+      const pool = getCcPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "CustomCircuit" (
+          id            TEXT PRIMARY KEY,
+          "ownerId"     TEXT NOT NULL,
+          name          TEXT NOT NULL,
+          description   TEXT,
+          board         TEXT NOT NULL DEFAULT 'Arduino UNO',
+          difficulty    TEXT NOT NULL DEFAULT 'Dễ',
+          category      TEXT NOT NULL DEFAULT 'general',
+          diagram       JSONB NOT NULL DEFAULT '{}'::jsonb,
+          sketch        TEXT NOT NULL DEFAULT '',
+          objectives    JSONB NOT NULL DEFAULT '[]'::jsonb,
+          "isPublic"    BOOLEAN NOT NULL DEFAULT FALSE,
+          "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CustomCircuit_owner_idx" ON "CustomCircuit" ("ownerId", "createdAt" DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CustomCircuit_public_idx" ON "CustomCircuit" ("isPublic", "category") WHERE "isPublic" = TRUE`);
+      _ccReady = true;
+    }
+    function ccToClient(row) {
+      return {
+        id: row.id,
+        ownerId: row.ownerId,
+        name: row.name,
+        description: row.description || '',
+        board: row.board || 'Arduino UNO',
+        difficulty: row.difficulty || 'Dễ',
+        category: row.category || 'general',
+        diagram: row.diagram || { parts: [], connections: [] },
+        sketch: row.sketch || '',
+        objectives: Array.isArray(row.objectives) ? row.objectives : [],
+        isPublic: !!row.isPublic,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
+    }
+
+    // GET /api/iot/custom-circuits → list mạch của user + ?public=1 cho public
+    app.get('/api/iot/custom-circuits', async (req, res) => {
+      const user = getCircuitUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCcPool();
+      if (!pool) return res.json({ circuits: [] });
+      try {
+        await ensureCustomCircuitTable();
+        const includePublic = req.query.includePublic === '1' || req.query.includePublic === 'true';
+        const sql = includePublic
+          ? `SELECT * FROM "CustomCircuit" WHERE "ownerId" = $1 OR "isPublic" = TRUE ORDER BY "updatedAt" DESC LIMIT 200`
+          : `SELECT * FROM "CustomCircuit" WHERE "ownerId" = $1 ORDER BY "updatedAt" DESC LIMIT 200`;
+        const r = await pool.query(sql, [user.id]);
+        res.json({ circuits: r.rows.map(ccToClient), count: r.rows.length });
+      } catch (e) {
+        console.error('[custom-circuit:list]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/iot/custom-circuits → tạo mạch mới
+    // Body: { name, description?, board?, difficulty?, category?,
+    //         diagram, sketch?, objectives?, isPublic? }
+    app.post('/api/iot/custom-circuits', express.json({ limit: '2mb' }), async (req, res) => {
+      const user = getCircuitUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCcPool();
+      if (!pool) return res.status(503).json({ error: 'Database unavailable' });
+      try {
+        await ensureCustomCircuitTable();
+        const body = req.body || {};
+        const name = String(body.name || '').trim();
+        if (!name) return res.status(400).json({ error: 'Tên mạch không được trống' });
+        if (!body.diagram || typeof body.diagram !== 'object' || !Array.isArray(body.diagram.parts)) {
+          return res.status(400).json({ error: 'Diagram không hợp lệ (thiếu parts)' });
+        }
+        const id = 'cc_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        const objectives = Array.isArray(body.objectives)
+          ? body.objectives.filter(o => typeof o === 'string').slice(0, 10)
+          : [];
+        const r = await pool.query(
+          `INSERT INTO "CustomCircuit" (
+             id, "ownerId", name, description, board, difficulty,
+             category, diagram, sketch, objectives, "isPublic"
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+          [
+            id,
+            user.id,
+            name.slice(0, 200),
+            String(body.description || '').slice(0, 1000),
+            String(body.board || 'Arduino UNO').slice(0, 60),
+            ['Dễ', 'Trung bình', 'Nâng cao'].includes(body.difficulty) ? body.difficulty : 'Dễ',
+            String(body.category || 'general').slice(0, 60),
+            JSON.stringify(body.diagram),
+            String(body.sketch || '').slice(0, 50_000),
+            JSON.stringify(objectives),
+            !!body.isPublic,
+          ]
+        );
+        res.status(201).json({ ok: true, circuit: ccToClient(r.rows[0]) });
+      } catch (e) {
+        console.error('[custom-circuit:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // PUT /api/iot/custom-circuits/:id → cập nhật mạch (chỉ owner)
+    app.put('/api/iot/custom-circuits/:id', express.json({ limit: '2mb' }), async (req, res) => {
+      const user = getCircuitUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCcPool();
+      if (!pool) return res.status(503).json({ error: 'Database unavailable' });
+      try {
+        await ensureCustomCircuitTable();
+        const body = req.body || {};
+        const checked = await pool.query(
+          `SELECT "ownerId" FROM "CustomCircuit" WHERE id = $1`,
+          [req.params.id]
+        );
+        if (checked.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy' });
+        if (checked.rows[0].ownerId !== user.id) {
+          return res.status(403).json({ error: 'Không có quyền sửa mạch này' });
+        }
+        const objectives = Array.isArray(body.objectives)
+          ? body.objectives.filter(o => typeof o === 'string').slice(0, 10)
+          : null;
+        const r = await pool.query(
+          `UPDATE "CustomCircuit" SET
+             name        = COALESCE($2, name),
+             description = COALESCE($3, description),
+             board       = COALESCE($4, board),
+             difficulty  = COALESCE($5, difficulty),
+             category    = COALESCE($6, category),
+             diagram     = COALESCE($7::jsonb, diagram),
+             sketch      = COALESCE($8, sketch),
+             objectives  = COALESCE($9::jsonb, objectives),
+             "isPublic"  = COALESCE($10, "isPublic"),
+             "updatedAt" = NOW()
+           WHERE id = $1 RETURNING *`,
+          [
+            req.params.id,
+            body.name ? String(body.name).slice(0, 200) : null,
+            body.description !== undefined ? String(body.description).slice(0, 1000) : null,
+            body.board ? String(body.board).slice(0, 60) : null,
+            ['Dễ', 'Trung bình', 'Nâng cao'].includes(body.difficulty) ? body.difficulty : null,
+            body.category ? String(body.category).slice(0, 60) : null,
+            body.diagram ? JSON.stringify(body.diagram) : null,
+            body.sketch !== undefined ? String(body.sketch).slice(0, 50_000) : null,
+            objectives ? JSON.stringify(objectives) : null,
+            typeof body.isPublic === 'boolean' ? body.isPublic : null,
+          ]
+        );
+        res.json({ ok: true, circuit: ccToClient(r.rows[0]) });
+      } catch (e) {
+        console.error('[custom-circuit:update]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/iot/custom-circuits/:id → xoá (chỉ owner)
+    app.delete('/api/iot/custom-circuits/:id', async (req, res) => {
+      const user = getCircuitUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getCcPool();
+      if (!pool) return res.status(503).json({ error: 'Database unavailable' });
+      try {
+        await ensureCustomCircuitTable();
+        const r = await pool.query(
+          `DELETE FROM "CustomCircuit" WHERE id = $1 AND "ownerId" = $2 RETURNING id`,
+          [req.params.id, user.id]
+        );
+        if (r.rows.length === 0) return res.status(404).json({ error: 'Không tìm thấy hoặc không có quyền' });
+        res.json({ ok: true, id: r.rows[0].id });
+      } catch (e) {
+        console.error('[custom-circuit:delete]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+  }
+
   // POST /api/grading/ocr — Vision AI extract thông tin học sinh từ phiếu trả lời
   // Body JSON: { image: base64String, mimeType: 'image/jpeg', language?: 'vi' }
   // Trả về { success: true, exam_info: { student_name, student_id, exam_code, class_name } }
