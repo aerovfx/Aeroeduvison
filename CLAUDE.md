@@ -15,7 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `a33f900` (deploy 250, 2026-05-17 — TikZ snippet library + fix LatexProject 503 + thêm 14 endpoint stubs)
+- Last deployed commit: `7f66062` (revision pixiai-00251-tux, 2026-05-17 — TikZ snippet library + fix LatexProject 503 + thêm 14 endpoint stubs)
 - Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
