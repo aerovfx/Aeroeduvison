@@ -10291,6 +10291,167 @@ CHỈ TRẢ JSON, không bọc markdown.`;
             });
           }
         } catch (e) { console.warn('[rs:source:curious]', e.message); }
+
+        // ── Source 5 (Phase 4): Embedding-based two-tower retrieval ──
+        // Build user embedding từ engagement history → score pool items
+        // bằng dot product → top-K similarity matches.
+        // KHÔNG dùng neural net thật — dùng sparse tag vectors (subject /
+        // topic / type / difficulty) → đơn giản nhưng hiệu quả cho cold-start.
+        try {
+          // 1. USER TOWER: aggregate engagement history → sparse vector
+          const userActions = await pool.query(
+            `SELECT target_type, action, weight, metadata, created_at
+             FROM rs_action_log
+             WHERE user_id = $1
+               AND created_at > NOW() - INTERVAL '60 days'
+               AND weight > 0
+             ORDER BY created_at DESC LIMIT 500`,
+            [user.id]
+          );
+          const userEmb = {
+            subjects: {},   // 'Vật lí' → 12.5
+            types: {},      // 'exam' → 8.0
+            difficulties: {},
+            topicHints: {}, // từ title/preview
+          };
+          for (const row of userActions.rows) {
+            const w = Number(row.weight) || 1;
+            // Decay theo thời gian — actions cũ ít quan trọng
+            const ageDays = (Date.now() - new Date(row.created_at).getTime()) / 86400000;
+            const timeDecay = Math.max(0.2, 1 - ageDays / 60);
+            const wd = w * timeDecay;
+            userEmb.types[row.target_type] = (userEmb.types[row.target_type] || 0) + wd;
+            const meta = row.metadata || {};
+            if (meta.subject) {
+              userEmb.subjects[meta.subject] = (userEmb.subjects[meta.subject] || 0) + wd;
+            }
+            if (meta.difficulty) {
+              userEmb.difficulties[meta.difficulty] = (userEmb.difficulties[meta.difficulty] || 0) + wd;
+            }
+            // Topic hints từ title (rough text matching)
+            const title = String(meta.title || meta.preview || '').toLowerCase();
+            for (const kw of ['dao động', 'điện', 'từ trường', 'cơ học', 'sóng', 'nhiệt', 'hóa', 'toán', 'lượng giác', 'đạo hàm']) {
+              if (title.includes(kw)) {
+                userEmb.topicHints[kw] = (userEmb.topicHints[kw] || 0) + wd;
+              }
+            }
+          }
+
+          // 2. ITEM TOWER: query pool items + extract tags
+          // Pool: recent published LearningPaths + Exams + KG nodes
+          // chưa được suggest ở các sources trên
+          const existingIds = new Set(candidates.map(c => c.id));
+          const itemPool = [];
+
+          // Pool A: Learning paths
+          const lps = await pool.query(
+            `SELECT id, name, description, subject, difficulty,
+                    "totalDuration", "totalXP", "createdAt"
+             FROM "LearningPath"
+             WHERE "createdAt" > NOW() - INTERVAL '90 days'
+             ORDER BY "createdAt" DESC LIMIT 50`
+          );
+          for (const lp of lps.rows) {
+            if (existingIds.has(lp.id)) continue;
+            const title = (lp.name + ' ' + (lp.description || '')).toLowerCase();
+            const topicHits = ['dao động', 'điện', 'từ trường', 'cơ học', 'sóng', 'nhiệt', 'hóa', 'toán', 'lượng giác', 'đạo hàm']
+              .filter(kw => title.includes(kw));
+            itemPool.push({
+              candidateType: 'embedding_lp',
+              id: lp.id,
+              title: lp.name,
+              description: lp.description,
+              tags: {
+                type: 'learning_path',
+                subject: lp.subject,
+                difficulty: lp.difficulty,
+                topics: topicHits,
+              },
+              meta: { duration: lp.totalDuration, xp: lp.totalXP, subject: lp.subject },
+              link: '/learning-paths',
+              cta: 'Vào lộ trình',
+            });
+          }
+
+          // Pool B: Exams
+          const exs = await pool.query(
+            `SELECT e.id, e.title, e.description, e.subject, e."examType"
+             FROM "Exam" e
+             WHERE e.published = true
+               AND e."createdAt" > NOW() - INTERVAL '90 days'
+             ORDER BY e."createdAt" DESC LIMIT 50`
+          );
+          for (const ex of exs.rows) {
+            if (existingIds.has(ex.id)) continue;
+            // Skip nếu user đã làm
+            const taken = await pool.query(
+              `SELECT 1 FROM "PracticeExam" WHERE "studentId" = $1 AND "examId" = $2 LIMIT 1`,
+              [user.id, ex.id]
+            );
+            if (taken.rows.length > 0) continue;
+            const title = (ex.title + ' ' + (ex.description || '')).toLowerCase();
+            const topicHits = ['dao động', 'điện', 'từ trường', 'cơ học', 'sóng', 'nhiệt', 'hóa', 'toán', 'lượng giác', 'đạo hàm']
+              .filter(kw => title.includes(kw));
+            itemPool.push({
+              candidateType: 'embedding_exam',
+              id: ex.id,
+              title: ex.title,
+              description: ex.description,
+              tags: {
+                type: 'exam',
+                subject: ex.subject,
+                topics: topicHits,
+              },
+              meta: { subject: ex.subject, examType: ex.examType },
+              link: '/student/exams',
+              cta: 'Làm bài',
+            });
+          }
+
+          // 3. SIMILARITY: score each item vs user embedding (dot product)
+          for (const item of itemPool) {
+            let sim = 0;
+            // Subject match (strong signal)
+            if (item.tags.subject && userEmb.subjects[item.tags.subject]) {
+              sim += userEmb.subjects[item.tags.subject] * 2.0;
+            }
+            // Type affinity
+            const itemType = item.tags.type === 'learning_path' ? 'teacher_learning_path' :
+                             item.tags.type === 'exam' ? 'popular_exam' : item.tags.type;
+            if (userEmb.types[itemType]) {
+              sim += userEmb.types[itemType] * 0.8;
+            }
+            // Topic hint match (strong)
+            for (const t of item.tags.topics || []) {
+              if (userEmb.topicHints[t]) {
+                sim += userEmb.topicHints[t] * 1.5;
+              }
+            }
+            // Difficulty match
+            if (item.tags.difficulty && userEmb.difficulties[item.tags.difficulty]) {
+              sim += userEmb.difficulties[item.tags.difficulty] * 0.5;
+            }
+            item.similarity = sim;
+          }
+
+          // Top 4 best matches
+          itemPool.sort((a, b) => b.similarity - a.similarity);
+          const topMatches = itemPool.filter(i => i.similarity > 0).slice(0, 4);
+          for (const m of topMatches) {
+            candidates.push({
+              type: 'embedding_match',
+              id: m.id,
+              title: m.title,
+              subtitle: `Khớp ${Math.round(m.similarity)}/100 sở thích · ${m.tags.subject || 'liên môn'}`,
+              description: m.description,
+              score: 45 + Math.min(50, m.similarity * 0.8),
+              source: 'embedding',
+              link: m.link,
+              meta: { ...m.meta, similarity: m.similarity, itemKind: m.candidateType },
+              cta: m.cta,
+            });
+          }
+        } catch (e) { console.warn('[rs:source:embedding]', e.message); }
       }
 
       else if (audience === 'teacher') {

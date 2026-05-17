@@ -140,6 +140,7 @@ export default function ForYouPage() {
                   'teacher-network': '👩‍🏫 GV',
                   'popular':         '🔥 Nổi bật',
                   'curious':         '✨ Khám phá',
+                  'embedding':       '🧠 AI Two-Tower',
                 }[s] || s}
               </span>
             ))}

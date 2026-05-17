@@ -105,6 +105,7 @@ export function getRsTypeMeta(type: string): { emoji: string; accent: string; la
     'teacher_learning_path': { emoji: '👩‍🏫', accent: '#22d3ee', label: 'GV mới tạo' },
     'popular_exam':          { emoji: '🔥', accent: '#fb923c', label: 'Nổi bật' },
     'curious_topic':         { emoji: '✨', accent: '#a855f7', label: 'Khám phá' },
+    'embedding_match':       { emoji: '🧠', accent: '#3b82f6', label: 'AI khớp sở thích' },
     'student_needs_help':    { emoji: '🆘', accent: '#f43f5e', label: 'HS cần hỗ trợ' },
     'student_self_path':     { emoji: '🛣',  accent: '#fbbf24', label: 'HS tự khảo sát' },
   }
