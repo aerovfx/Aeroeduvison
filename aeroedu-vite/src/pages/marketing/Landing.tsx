@@ -1191,11 +1191,39 @@ export default function Landing() {
               ))}
             </div>
 
+            {/* Đội ngũ */}
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Đội ngũ</p>
+              <a href="#team" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Đặng Việt Chung — Founder
+              </a>
+              <a href="#team" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Trần Thị Hương — Co-Founder
+              </a>
+              <p style={{ fontSize: 12, color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
+                Sáng lập bởi 2 giáo viên THPT đang trực tiếp đứng lớp tại TP. Hồ Chí Minh.
+              </p>
+            </div>
+
             {/* Legal */}
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Pháp lý</p>
-              {['Chính sách bảo mật', 'Điều khoản sử dụng', 'Liên hệ hỗ trợ'].map(l => (
-                <p key={l} style={{ fontSize: 13, color: C.muted, marginBottom: 8, cursor: 'pointer' }}>{l}</p>
+              {[
+                { label: 'Chính sách bảo mật', path: '/cookies' },
+                { label: 'Điều khoản sử dụng', path: '/terms' },
+                { label: 'Liên hệ hỗ trợ',     path: '/contact-sales' },
+              ].map(l => (
+                <p key={l.label} style={{ marginBottom: 8 }}>
+                  <Link to={l.path} style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                    onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                    {l.label}
+                  </Link>
+                </p>
               ))}
             </div>
           </div>
