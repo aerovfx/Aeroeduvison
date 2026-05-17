@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `298dfad` (revision pixiai-00287-cel, 2026-05-17 — RS-Phase 9 A/B Testing Framework LIVE — roadmap 10/10 ✅)
-- Commits since last deploy: `5/5` → DEPLOYING (0d2ff13 docs · debf482 onboarding backend · 488e359 OnboardingModal · _next_ Settings prefs section · then docs)
+- Last deployed commit: `0069a96` (revision pixiai-00288-sar, 2026-05-17 — RS-Phase 10 enhanced Cold-start Onboarding: 3-step modal + Settings access LIVE)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `298dfad` → pixiai-00287-cel (RS-Phase 9 A/B Testing Framework)
 - Prev: `6b9a8aa` → pixiai-00286-kad (Daily/Sprint UX polish: lastSentAt + progress footer + localStorage)
 - Prev: `d984880` → pixiai-00285-xan (RS-Phase 8 Ops: scheduler script + audience-aware digest)
 - Prev: `93ddbf1` → pixiai-00284-xef (RS-Phase 8 Multi-channel digest: In-app + Email + Telegram)
