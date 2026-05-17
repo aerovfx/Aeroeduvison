@@ -156,15 +156,19 @@ export default function StudentDailyPage() {
   ).length
   const doneCount = done.size
   const isColdStart = feed?.isColdStart
+  const [onboardingPrefs, setOnboardingPrefs] = useState<{ subject?: string | null } | null>(null)
 
-  // RS-Phase 10: trigger onboarding nếu cold-start + chưa onboarded
+  // RS-Phase 10: trigger onboarding nếu cold-start + chưa onboarded; cache prefs cho banner
   useEffect(() => {
     if (!isColdStart) return
     rs.getOnboardingPrefs().then(r => {
       const p = r.prefs
+      setOnboardingPrefs(p)
       if (!p || (!p.skipped && !p.completedAt)) setShowOnboarding(true)
     }).catch(() => {})
   }, [isColdStart])
+
+  const hasOnboardedSubject = !!onboardingPrefs?.subject
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-12">
@@ -214,16 +218,21 @@ export default function StudentDailyPage() {
           </div>
         )}
 
-        {/* Cold-start banner */}
+        {/* Cold-start banner — copy thay đổi tuỳ vào onboarding state */}
         {!isLoading && isColdStart && totalItems > 0 && (
           <div className="rounded-2xl bg-gradient-to-br from-amber-500/15 via-orange-500/8 to-transparent border border-amber-500/40 p-4">
             <div className="flex items-start gap-3">
-              <div className="text-3xl">🌱</div>
+              <div className="text-3xl">{hasOnboardedSubject ? '🎯' : '🌱'}</div>
               <div className="flex-1">
-                <p className="text-sm font-bold text-amber-200 mb-1">Chào mừng bạn đến với inphysic!</p>
+                <p className="text-sm font-bold text-amber-200 mb-1">
+                  {hasOnboardedSubject
+                    ? `Gợi ý cá nhân hoá cho môn ${onboardingPrefs?.subject}`
+                    : 'Chào mừng bạn đến với inphysic!'}
+                </p>
                 <p className="text-xs text-zinc-400 leading-snug">
-                  Bạn còn mới — dưới đây là những gợi ý khởi đầu. Làm vài bài
-                  để hệ thống hiểu sở thích và đưa gợi ý chính xác hơn.
+                  {hasOnboardedSubject
+                    ? <>AI đã filter gợi ý theo sở thích bạn đã chọn. Làm vài bài để hệ thống học thêm về bạn. <button onClick={() => setShowOnboarding(true)} className="text-amber-300 underline">Đổi sở thích</button></>
+                    : <>Bạn còn mới — dưới đây là những gợi ý khởi đầu. Làm vài bài để hệ thống hiểu sở thích và đưa gợi ý chính xác hơn. <button onClick={() => setShowOnboarding(true)} className="text-amber-300 underline">Cá nhân hoá ngay →</button></>}
                 </p>
               </div>
             </div>
@@ -388,10 +397,15 @@ export default function StudentDailyPage() {
                                 )}
                               </div>
                             )}
-                            {/* Reasons (Phase 3) */}
-                            {item.reasons && item.reasons.length > 0 && (
+                            {/* Reasons (Phase 3) + matchedPref badge (Phase 10) */}
+                            {((item.reasons && item.reasons.length > 0) || item.meta?.matchedPref) && (
                               <div className="flex flex-wrap gap-1 mt-1.5">
-                                {item.reasons.slice(0, 2).map((r, i) => (
+                                {item.meta?.matchedPref && (
+                                  <span className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                                    ⭐ Khớp sở thích
+                                  </span>
+                                )}
+                                {item.reasons?.slice(0, 2).map((r, i) => (
                                   <span
                                     key={i}
                                     className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-400"
