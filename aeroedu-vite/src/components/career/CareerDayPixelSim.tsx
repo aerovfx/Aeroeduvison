@@ -19,6 +19,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Play, Pause, RotateCcw, FastForward, Sparkles, Bot, Gamepad2, Info,
 } from 'lucide-react'
+import {
+  drawMetroCityCharacter,
+  pickCharacterForCategory,
+  type Facing as MetroFacing,
+} from '@/lib/pixel-characters'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -281,7 +286,7 @@ function buildActivities(dailyLife: string[], scene: SceneConfig): Activity[] {
 /* ────────────────────────── Component ────────────────────────── */
 
 type Mode = 'auto' | 'manual'
-type Facing = 'left' | 'right'
+type Facing = 'left' | 'right' | 'up' | 'down'
 
 export default function CareerDayPixelSim({ careerName, category, dailyLife }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -294,6 +299,8 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
 
   const scene = useMemo(() => getSceneForCategory(category), [category])
   const activities = useMemo(() => buildActivities(dailyLife, scene), [dailyLife, scene])
+  /** MetroCity character matching career category */
+  const character = useMemo(() => pickCharacterForCategory(category), [category])
 
   // Character state — extended with facing + visual state
   const charRef = useRef<{
@@ -392,8 +399,8 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
         let dx = 0, dy = 0
         if (keys.has('arrowleft') || keys.has('a')) { dx -= moveSpeed; char.facing = 'left' }
         if (keys.has('arrowright') || keys.has('d')) { dx += moveSpeed; char.facing = 'right' }
-        if (keys.has('arrowup') || keys.has('w')) dy -= moveSpeed
-        if (keys.has('arrowdown') || keys.has('s')) dy += moveSpeed
+        if (keys.has('arrowup') || keys.has('w')) { dy -= moveSpeed; char.facing = 'up' }
+        if (keys.has('arrowdown') || keys.has('s')) { dy += moveSpeed; char.facing = 'down' }
 
         if (dx !== 0 || dy !== 0) {
           char.x = Math.max(0, Math.min(GRID_W - 1, char.x + dx))
@@ -521,7 +528,16 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
         ? (char.y + (char.targetY - char.y) * char.progress) * TILE_SIZE
         : char.y * TILE_SIZE
 
-      drawCharacter(ctx, cx, cy, char.facing, char.walking, char.idleBobFrame)
+      // Render MetroCity-style character (positioned so feet at cy + tile)
+      drawMetroCityCharacter(
+        ctx,
+        cx + 1,
+        cy - 1, // shift up so feet align with tile
+        character,
+        char.facing as MetroFacing,
+        char.walking,
+        char.idleBobFrame,
+      )
 
       // Speech bubble — BUG FIX: clamp Y so it stays visible
       if (!char.walking && cur && mode === 'auto') {
@@ -580,7 +596,7 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-zinc-100">Pixel Agent — Mô phỏng 1 ngày</h3>
           <p className="text-[10px] text-zinc-500 leading-tight">
-            Cảm hứng pixel-agents · {scene.name} · {careerName}
+            Cảm hứng pixel-agents + MetroCity · {scene.name} · {character.displayName || character.name} · {careerName}
           </p>
         </div>
         {/* Mode toggle */}
@@ -717,65 +733,4 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
   )
 }
 
-/** Draw pixel art character at (cx, cy) — top-left of foot tile. */
-function drawCharacter(
-  ctx: CanvasRenderingContext2D,
-  cx: number,
-  cy: number,
-  facing: Facing,
-  walking: boolean,
-  bobFrame: number,
-) {
-  // Idle bob (subtle)
-  const bobOffset = walking
-    ? (Math.sin(performance.now() / 80) > 0 ? 0 : -1)
-    : Math.sin(bobFrame / 20) * 0.5
-
-  ctx.save()
-  if (facing === 'left') {
-    ctx.translate(cx + 16, 0)
-    ctx.scale(-1, 1)
-    cx = 0
-  }
-
-  // Shadow
-  ctx.fillStyle = 'rgba(0,0,0,0.4)'
-  ctx.fillRect(cx + 3, cy + 4, 10, 2)
-
-  // Body outline
-  ctx.fillStyle = '#1e293b'
-  ctx.fillRect(cx + 3, cy - 14 + bobOffset, 10, 18)
-
-  // Shirt
-  ctx.fillStyle = '#06b6d4'
-  ctx.fillRect(cx + 4, cy - 8 + bobOffset, 8, 8)
-  // Shirt collar
-  ctx.fillStyle = '#0e7490'
-  ctx.fillRect(cx + 7, cy - 8 + bobOffset, 2, 2)
-
-  // Pants
-  ctx.fillStyle = '#1e3a8a'
-  ctx.fillRect(cx + 4, cy + bobOffset, 8, 4)
-  // Leg split (walking)
-  if (walking) {
-    ctx.fillStyle = '#1e293b'
-    ctx.fillRect(cx + 7, cy + bobOffset, 2, 4)
-  }
-
-  // Head (skin tone)
-  ctx.fillStyle = '#fde68a'
-  ctx.fillRect(cx + 4, cy - 14 + bobOffset, 8, 7)
-  // Hair top
-  ctx.fillStyle = '#78350f'
-  ctx.fillRect(cx + 4, cy - 14 + bobOffset, 8, 2)
-  // Eyes
-  ctx.fillStyle = '#0f172a'
-  ctx.fillRect(cx + 6, cy - 11 + bobOffset, 1, 1)
-  ctx.fillRect(cx + 9, cy - 11 + bobOffset, 1, 1)
-  // Smile
-  if (!walking) {
-    ctx.fillStyle = '#a16207'
-    ctx.fillRect(cx + 7, cy - 9 + bobOffset, 2, 1)
-  }
-  ctx.restore()
-}
+// drawCharacter() removed — using drawMetroCityCharacter from @/lib/pixel-characters
