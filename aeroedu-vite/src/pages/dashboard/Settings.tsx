@@ -550,12 +550,14 @@ function DigestPrefsSection() {
         .filter(([_, v]) => v && !v.ok)
         .map(([k, v]) => `✗ ${k}: ${(v as any).error}`)
       toast.success(`Test digest gửi xong (${r.itemsCount} mục)\n${[...lines, ...failed].join('\n')}`, { duration: 5000 })
+      // Refresh để cập nhật lastSentAt + cho user xác nhận trực quan
+      reload()
     } catch (e: any) {
       toast.error(`Lỗi test: ${e?.message || 'thử lại'}`)
     } finally {
       setTesting(false)
     }
-  }, [])
+  }, [reload])
 
   const handleUnlinkTelegram = useCallback(async () => {
     if (!confirm('Bạn chắc muốn huỷ liên kết Telegram?')) return
