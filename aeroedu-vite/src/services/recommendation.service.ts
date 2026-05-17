@@ -129,7 +129,56 @@ export const recommendationService = {
       notificationId?: string
       itemsCount?: number
       existingId?: string
+      channels?: RsDigestChannels
+      deliveries?: RsDigestDeliveries
     }>('/reco/digest/me').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: load user digest preferences. */
+  getDigestPrefs: () =>
+    api.get<{
+      success: boolean
+      channels: RsDigestChannels
+      emailOnAccount: string | null
+      telegramLinked: boolean
+      telegramChatIdPreview: string | null
+      telegramDeepLink: string
+    }>('/reco/digest/preferences').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: cập nhật preferences. */
+  updateDigestPrefs: (channels: Partial<RsDigestChannels>) =>
+    api.put<{ success: boolean; channels: RsDigestChannels }>(
+      '/reco/digest/preferences',
+      channels
+    ).then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: gửi test digest (bypass idempotency). */
+  sendDigestTest: () =>
+    api.post<{
+      success: boolean
+      sent: boolean
+      reason?: string
+      itemsCount?: number
+      channels?: RsDigestChannels
+      deliveries?: RsDigestDeliveries
+    }>('/reco/digest/test').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: huỷ liên kết Telegram. */
+  unlinkTelegram: () =>
+    api.post<{ success: boolean }>('/reco/digest/telegram/unlink').then(r => r.data),
+}
+
+/** RS-Phase 8 multi-channel digest preferences */
+export interface RsDigestChannels {
+  inApp: boolean
+  email: boolean
+  telegram: boolean
+}
+
+/** RS-Phase 8 per-channel delivery result */
+export interface RsDigestDeliveries {
+  inApp?: { ok: boolean; id?: string; error?: string } | null
+  email?: { ok: boolean; provider?: string; id?: string; error?: string } | null
+  telegram?: { ok: boolean; error?: string } | null
 }
 
 /** UI helper: mapping cho từng item type → icon + accent color */

@@ -18,8 +18,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   User, Lock, Bell, Palette, Shield, Check, AlertCircle, X,
   Eye, EyeOff, Save, ChevronRight, Moon, Sun, Monitor,
-  Volume2, Mail, Smartphone, Globe,
-  GraduationCap, Trophy, Zap, LogOut,
+  Volume2, Mail, Smartphone, Globe, Send,
+  GraduationCap, Trophy, Zap, LogOut, ExternalLink, Loader2, Sparkles,
   Crown, Ticket, CheckCircle2, Calendar, Copy,
 } from 'lucide-react'
 import { api } from '@/services/api'
@@ -29,6 +29,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { learningService } from '@/services/learning.service'
 import { authService } from '@/services/auth.service'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 // ─────────────────────────────────────────────────────────────────
 // Types & constants
@@ -433,6 +434,9 @@ interface NotifTabProps {
 function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
   return (
     <div className="space-y-6 max-w-xl">
+      {/* RS-Phase 8: Multi-channel digest preferences (server-side) */}
+      <DigestPrefsSection />
+
       <Section icon={<Mail className="w-4 h-4" />} title="Email">
         <Toggle checked={state.emailLessons}      onChange={() => onToggle('emailLessons')}      label="Bài học mới"        desc="Thông báo khi có bài học AI gợi ý" />
         <Toggle checked={state.emailAchievements} onChange={() => onToggle('emailAchievements')} label="Thành tích"          desc="Khi bạn mở khóa huy hiệu mới" />
@@ -456,6 +460,191 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
         <Save className="w-4 h-4" /> Lưu cài đặt
       </button>
     </div>
+  )
+}
+
+/**
+ * RS-Phase 8 multi-channel digest preferences panel.
+ * State persisted server-side qua /api/reco/digest/preferences.
+ * Channels: In-app (bell) · Email · Telegram (cần link bot).
+ */
+function DigestPrefsSection() {
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState<keyof { inApp:1; email:1; telegram:1 } | null>(null)
+  const [testing, setTesting]   = useState(false)
+  const [channels, setChannels] = useState({ inApp: true, email: false, telegram: false })
+  const [emailOnAccount, setEmailOnAccount] = useState<string | null>(null)
+  const [telegramLinked, setTelegramLinked] = useState(false)
+  const [telegramPreview, setTelegramPreview] = useState<string | null>(null)
+  const [telegramDeepLink, setTelegramDeepLink] = useState('')
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await rs.getDigestPrefs()
+      setChannels(r.channels)
+      setEmailOnAccount(r.emailOnAccount)
+      setTelegramLinked(r.telegramLinked)
+      setTelegramPreview(r.telegramChatIdPreview)
+      setTelegramDeepLink(r.telegramDeepLink)
+    } catch (e: any) {
+      toast.error(`Không tải được cài đặt: ${e?.message || 'lỗi'}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
+
+  const updateChannel = useCallback(async (k: 'inApp' | 'email' | 'telegram', value: boolean) => {
+    // Edge: bật telegram khi chưa link → guide user
+    if (k === 'telegram' && value && !telegramLinked) {
+      toast('Hãy liên kết Telegram trước đã 🔗', { icon: 'ℹ️' })
+      return
+    }
+    setSaving(k)
+    const prev = { ...channels }
+    const next = { ...channels, [k]: value }
+    setChannels(next)
+    try {
+      const r = await rs.updateDigestPrefs(next)
+      setChannels(r.channels)
+      toast.success('Đã lưu cài đặt')
+    } catch (e: any) {
+      setChannels(prev)
+      toast.error(`Lỗi lưu: ${e?.message || 'thử lại'}`)
+    } finally {
+      setSaving(null)
+    }
+  }, [channels, telegramLinked])
+
+  const handleTest = useCallback(async () => {
+    setTesting(true)
+    try {
+      const r = await rs.sendDigestTest()
+      if (!r.sent) {
+        toast.error(`Không gửi được: ${r.reason || 'unknown'}`)
+        return
+      }
+      const lines: string[] = []
+      if (r.deliveries?.inApp?.ok)    lines.push('✓ In-app bell')
+      if (r.deliveries?.email?.ok)    lines.push(`✓ Email (${r.deliveries.email.provider})`)
+      if (r.deliveries?.telegram?.ok) lines.push('✓ Telegram')
+      const failed = Object.entries(r.deliveries || {})
+        .filter(([_, v]) => v && !v.ok)
+        .map(([k, v]) => `✗ ${k}: ${(v as any).error}`)
+      toast.success(`Test digest gửi xong (${r.itemsCount} mục)\n${[...lines, ...failed].join('\n')}`, { duration: 5000 })
+    } catch (e: any) {
+      toast.error(`Lỗi test: ${e?.message || 'thử lại'}`)
+    } finally {
+      setTesting(false)
+    }
+  }, [])
+
+  const handleUnlinkTelegram = useCallback(async () => {
+    if (!confirm('Bạn chắc muốn huỷ liên kết Telegram?')) return
+    try {
+      await rs.unlinkTelegram()
+      toast.success('Đã huỷ liên kết Telegram')
+      await reload()
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || 'thử lại'}`)
+    }
+  }, [reload])
+
+  return (
+    <Section
+      icon={<Sparkles className="w-4 h-4 text-cyan-400" />}
+      title="Gợi ý AI hàng ngày"
+    >
+      <div className="text-xs text-white/50 mb-3 -mt-2">
+        Mỗi ngày AI tổng hợp 3 mục học cá nhân hoá nhất cho bạn — bạn chọn nhận qua đâu.
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-3 text-white/40 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải cài đặt…
+        </div>
+      ) : (
+        <>
+          {/* In-app */}
+          <Toggle
+            checked={channels.inApp}
+            onChange={() => updateChannel('inApp', !channels.inApp)}
+            label="🔔 Thông báo trong app"
+            desc={saving === 'inApp' ? 'Đang lưu…' : 'Xuất hiện trong notification bell'}
+          />
+
+          {/* Email */}
+          <Toggle
+            checked={channels.email}
+            onChange={() => updateChannel('email', !channels.email)}
+            label="📧 Email"
+            desc={
+              saving === 'email' ? 'Đang lưu…'
+                : emailOnAccount ? `Gửi đến ${emailOnAccount}`
+                : 'Tài khoản chưa có email — cập nhật trong tab Hồ sơ'
+            }
+          />
+
+          {/* Telegram */}
+          <div className="space-y-2">
+            <Toggle
+              checked={channels.telegram}
+              onChange={() => updateChannel('telegram', !channels.telegram)}
+              label="💬 Telegram"
+              desc={
+                saving === 'telegram' ? 'Đang lưu…'
+                  : telegramLinked ? `Đã liên kết (chat ${telegramPreview})`
+                  : 'Chưa liên kết — bấm nút bên dưới'
+              }
+            />
+            {telegramLinked ? (
+              <button
+                type="button"
+                onClick={handleUnlinkTelegram}
+                className="text-[11px] text-rose-300 hover:text-rose-200 underline ml-12"
+              >
+                Huỷ liên kết Telegram
+              </button>
+            ) : (
+              telegramDeepLink && (
+                <a
+                  href={telegramDeepLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 ml-12 px-3 py-1.5 rounded-lg
+                             bg-gradient-to-r from-cyan-500/15 to-blue-500/15
+                             border border-cyan-500/30 text-cyan-300 text-xs font-bold
+                             hover:from-cyan-500/25 hover:to-blue-500/25 transition"
+                >
+                  <ExternalLink className="w-3 h-3" /> Liên kết Telegram bot →
+                </a>
+              )
+            )}
+          </div>
+
+          {/* Test button */}
+          <div className="pt-3 mt-3 border-t border-white/[0.06]">
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg
+                         bg-cyan-500/15 hover:bg-cyan-500/25
+                         border border-cyan-500/30 text-cyan-300 text-xs font-bold
+                         disabled:opacity-50 transition"
+            >
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {testing ? 'Đang gửi test…' : 'Gửi digest test ngay'}
+            </button>
+            <p className="text-[10px] text-white/30 mt-1.5">
+              Verify từng kênh hoạt động (bypass giới hạn 1/ngày).
+            </p>
+          </div>
+        </>
+      )}
+    </Section>
   )
 }
 
