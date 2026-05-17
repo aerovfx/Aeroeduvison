@@ -10,12 +10,12 @@
  * Data từ /api/reco/feed?audience=teacher với grouping client-side.
  * Mobile-friendly cho GV review trên điện thoại.
  */
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   TrendingDown, Lightbulb, AlertCircle, Footprints, RefreshCw, Loader2,
-  ChevronRight, ArrowLeft, Sparkles, Users, Target,
+  ChevronRight, ArrowLeft, Sparkles, Users, Target, CheckCircle2,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { recommendationService as rs, getRsTypeMeta, type RsFeedItem } from '@/services/recommendation.service'
@@ -68,6 +68,8 @@ const SECTIONS: Section[] = [
 export default function TeacherSprintPage() {
   usePageTitle('Sprint dashboard GV')
   const navigate = useNavigate()
+  /** Items GV đã "Đã xử lý" trong session này (filter khỏi view + log signal) */
+  const [resolved, setResolved] = useState<Set<string>>(new Set())
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-teacher-sprint'],
@@ -76,11 +78,25 @@ export default function TeacherSprintPage() {
     refetchInterval: 5 * 60_000,
   })
 
+  const handleResolve = useCallback((item: RsFeedItem, e: React.MouseEvent) => {
+    e.stopPropagation()
+    rs.track({
+      action: 'not_interested',
+      targetType: item.type,
+      targetId: item.id,
+      metadata: { source: 'teacher-sprint', reason: 'resolved' },
+    })
+    setResolved(s => new Set([...s, `${item.type}::${item.id}`]))
+    toast.success('Đã đánh dấu xử lý xong', { duration: 1500 })
+  }, [])
+
   const grouped = useMemo(() => {
     const map: Record<string, RsFeedItem[]> = {}
     for (const sec of SECTIONS) map[sec.id] = []
     if (!feed) return map
     for (const item of feed.items) {
+      const key = `${item.type}::${item.id}`
+      if (resolved.has(key)) continue
       for (const sec of SECTIONS) {
         if (sec.itemTypes.includes(item.type)) {
           map[sec.id].push(item)
@@ -89,9 +105,12 @@ export default function TeacherSprintPage() {
       }
     }
     return map
-  }, [feed])
+  }, [feed, resolved])
 
-  const totalItems = feed?.items.length ?? 0
+  const totalItems = (feed?.items ?? []).filter(
+    it => !resolved.has(`${it.type}::${it.id}`)
+  ).length
+  const resolvedCount = resolved.size
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-12">
@@ -108,7 +127,11 @@ export default function TeacherSprintPage() {
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold leading-tight">Sprint Dashboard</h1>
             <p className="text-[10px] text-zinc-500 leading-tight">
-              {totalItems} item cần xử lý · cá nhân hoá theo lớp bạn dạy
+              {totalItems} item cần xử lý
+              {resolvedCount > 0 && (
+                <span className="text-emerald-400"> · ✓ {resolvedCount} đã xong</span>
+              )}
+              {' '}· cá nhân hoá theo lớp bạn dạy
             </p>
           </div>
           <button
@@ -193,7 +216,7 @@ export default function TeacherSprintPage() {
                     {items.map(item => {
                       const meta = getRsTypeMeta(item.type)
                       return (
-                        <button
+                        <div
                           key={`${item.type}-${item.id}`}
                           onClick={() => {
                             rs.track({
@@ -204,7 +227,9 @@ export default function TeacherSprintPage() {
                             })
                             navigate(item.link)
                           }}
-                          className="w-full text-left p-3 hover:bg-zinc-800/40 transition flex items-start gap-3"
+                          className="w-full text-left p-3 hover:bg-zinc-800/40 transition flex items-start gap-3 cursor-pointer"
+                          role="button"
+                          tabIndex={0}
                         >
                           <div
                             className="shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-lg"
@@ -252,8 +277,18 @@ export default function TeacherSprintPage() {
                               {item.cta || 'Xem chi tiết'} →
                             </span>
                           </div>
-                          <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0 mt-1" />
-                        </button>
+                          <div className="shrink-0 flex flex-col items-end gap-1.5">
+                            <button
+                              onClick={(e) => handleResolve(item, e)}
+                              title="Đã xử lý — ẩn item này"
+                              aria-label="Đánh dấu xử lý xong"
+                              className="p-1.5 rounded-md text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                            <ChevronRight className="w-4 h-4 text-zinc-600 mt-0.5" />
+                          </div>
+                        </div>
                       )
                     })}
                   </div>
