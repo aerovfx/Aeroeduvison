@@ -30,6 +30,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { formatRelativeTime } from "@/lib/utils"
 import type { CareerCommunityStats, CareerTestResult } from "@/types"
 import CareerDayPixelSim from "@/components/career/CareerDayPixelSim"
+import PixelOdyssey from "@/components/career/PixelOdyssey"
 
 /* ─── Inline replacements ─────────────────────────── */
 function PageHeader({
@@ -334,6 +335,9 @@ export default function CareerAdvisorPage() {
                 </div>
               </div>
             </div>
+
+            {/* Pixel Odyssey — game khám phá nghề tương tác */}
+            <PixelOdyssey />
 
             {/* What You'll Discover */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
