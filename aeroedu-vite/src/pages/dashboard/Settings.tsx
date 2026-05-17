@@ -452,6 +452,10 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
         <Toggle checked={state.sound}     onChange={() => onToggle('sound')}     label="Hiệu ứng âm thanh" />
         <Toggle checked={state.vibration} onChange={() => onToggle('vibration')} label="Rung khi thông báo" />
       </Section>
+
+      {/* RS-Phase 10: edit cold-start onboarding prefs */}
+      <OnboardingPrefsSection />
+
       <button
         type="button"
         onClick={onSave}
@@ -460,6 +464,88 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
         <Save className="w-4 h-4" /> Lưu cài đặt
       </button>
     </div>
+  )
+}
+
+/**
+ * RS-Phase 10: panel xem + chỉnh cold-start onboarding prefs anytime.
+ * Hiện current subject/grade/topics, có nút "Chỉnh sửa" mở modal lại.
+ */
+function OnboardingPrefsSection() {
+  const [prefs, setPrefs] = useState<import('@/services/recommendation.service').RsOnboardingPrefs | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await rs.getOnboardingPrefs()
+      setPrefs(r.prefs)
+    } catch {} finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
+
+  // Lazy import để giảm bundle khi modal không cần
+  const [OnboardingModal, setOnboardingModal] = useState<any>(null)
+  useEffect(() => {
+    if (editing && !OnboardingModal) {
+      import('@/components/reco/OnboardingModal').then(m => setOnboardingModal(() => m.default))
+    }
+  }, [editing, OnboardingModal])
+
+  return (
+    <Section icon={<GraduationCap className="w-4 h-4 text-emerald-400" />} title="Sở thích học">
+      <div className="text-xs text-white/50 mb-3 -mt-2">
+        AI dùng thông tin này để gợi ý chính xác hơn — môn / khối lớp / chủ đề quan tâm.
+      </div>
+      {loading ? (
+        <p className="text-xs text-white/40 inline-flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang tải…
+        </p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          {prefs?.subject ? (
+            <p><span className="text-white/40">Môn:</span> <span className="text-emerald-200 font-bold">{prefs.subject}</span></p>
+          ) : (
+            <p className="text-white/40">Chưa chọn môn học</p>
+          )}
+          {prefs?.grade && (
+            <p><span className="text-white/40">Khối/Giai đoạn:</span> <span className="text-purple-200 font-bold">{prefs.grade}</span></p>
+          )}
+          {prefs?.interestedTopics && prefs.interestedTopics.length > 0 && (
+            <div>
+              <span className="text-white/40 text-xs">Chủ đề quan tâm:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {prefs.interestedTopics.map((t, i) => (
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-500/30">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {prefs?.skipped && (
+            <p className="text-[11px] text-white/30">⊘ Bạn đã bỏ qua onboarding — bấm "Cá nhân hoá" để chọn lại</p>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                       bg-emerald-500/15 hover:bg-emerald-500/25
+                       border border-emerald-500/30 text-emerald-300 text-xs font-bold transition"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {prefs?.subject ? 'Chỉnh sửa sở thích' : 'Cá nhân hoá ngay'}
+          </button>
+        </div>
+      )}
+      {editing && OnboardingModal && (
+        <OnboardingModal
+          onComplete={() => { setEditing(false); reload() }}
+          onSkip={() => { setEditing(false); reload() }}
+        />
+      )}
+    </Section>
   )
 }
 
