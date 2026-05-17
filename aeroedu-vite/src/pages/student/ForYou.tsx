@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Sparkles, RefreshCw, Loader2, ChevronRight, ThumbsDown, ArrowRight,
-  Compass, Target, Clock, Users, X,
+  Compass, Target, Clock, Users, X, Activity,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -29,12 +29,20 @@ export default function ForYouPage() {
   usePageTitle('Gợi ý cho bạn')
   const navigate = useNavigate()
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [tab, setTab] = useState<'feed' | 'activity'>('feed')
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-student'],
     queryFn: () => rs.getFeed('student', 20),
     staleTime: 60_000,
     refetchInterval: 5 * 60_000, // 5 phút
+  })
+
+  const { data: history } = useQuery({
+    queryKey: ['reco-history-student'],
+    queryFn: () => rs.getHistory(80),
+    enabled: tab === 'activity',
+    staleTime: 30_000,
   })
 
   // Track view 1 lần khi feed load
@@ -96,9 +104,35 @@ export default function ForYouPage() {
           </button>
         </div>
 
-        {/* Source chips — horizontal scroll */}
-        {feed && feed.sources.length > 0 && (
-          <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+        {/* Tab nav: Feed | Activity */}
+        <div className="flex border-t border-zinc-800">
+          <button
+            onClick={() => setTab('feed')}
+            className={`flex-1 py-2.5 text-xs font-bold inline-flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+              tab === 'feed'
+                ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5'
+                : 'border-transparent text-zinc-500'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Gợi ý {feed && feed.count > 0 && <span className="text-[10px] opacity-70">({feed.count})</span>}
+          </button>
+          <button
+            onClick={() => setTab('activity')}
+            className={`flex-1 py-2.5 text-xs font-bold inline-flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
+              tab === 'activity'
+                ? 'border-purple-400 text-purple-300 bg-purple-500/5'
+                : 'border-transparent text-zinc-500'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            Hoạt động
+          </button>
+        </div>
+
+        {/* Source chips — horizontal scroll (chỉ trong tab feed) */}
+        {tab === 'feed' && feed && feed.sources.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto px-4 py-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
             {feed.sources.map(s => (
               <span key={s} className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
                 {{
@@ -115,14 +149,87 @@ export default function ForYouPage() {
 
       {/* Main feed */}
       <main className="px-4 pt-4 max-w-2xl mx-auto">
-        {isLoading && (
+        {/* ── ACTIVITY TAB ── */}
+        {tab === 'activity' && (
+          <div className="space-y-2 pb-8">
+            <p className="text-[11px] text-zinc-500 mb-3">
+              Lịch sử {history?.length ?? 0} hoạt động gần đây của bạn. AI dùng dữ liệu này để cá nhân hoá gợi ý — mỗi lần bạn click / hoàn thành / pass quiz, recsys ghi nhận và cải thiện feed.
+            </p>
+            {!history && (
+              <div className="text-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin mx-auto text-purple-400" />
+              </div>
+            )}
+            {history && history.length === 0 && (
+              <div className="text-center py-12 text-zinc-500 text-sm">
+                Chưa có hoạt động nào.<br />
+                Bắt đầu khám phá → AI sẽ học sở thích của bạn.
+              </div>
+            )}
+            {history && history.map((h) => {
+              const ago = (() => {
+                const ms = Date.now() - new Date(h.createdAt).getTime()
+                const m = Math.floor(ms / 60000)
+                if (m < 1) return 'vừa xong'
+                if (m < 60) return `${m}p trước`
+                const hr = Math.floor(m / 60)
+                if (hr < 24) return `${hr}h trước`
+                return `${Math.floor(hr / 24)}d trước`
+              })()
+              const actionMeta: Record<string, { emoji: string; color: string; label: string }> = {
+                'view':         { emoji: '👀', color: '#94a3b8', label: 'Xem' },
+                'click':        { emoji: '👆', color: '#22d3ee', label: 'Click' },
+                'complete':     { emoji: '✅', color: '#10b981', label: 'Hoàn thành' },
+                'pass_quiz':    { emoji: '🏆', color: '#fbbf24', label: 'Đạt' },
+                'fail_quiz':    { emoji: '😕', color: '#f43f5e', label: 'Chưa đạt' },
+                'not_interested':{ emoji: '🚫', color: '#94a3b8', label: 'Không quan tâm' },
+                'dwell_30s':    { emoji: '⏱', color: '#a855f7', label: 'Đọc lâu' },
+                'like':         { emoji: '❤️', color: '#ec4899', label: 'Thích' },
+                'save':         { emoji: '🔖', color: '#3b82f6', label: 'Lưu' },
+              }
+              const m = actionMeta[h.action] || { emoji: '📌', color: '#94a3b8', label: h.action }
+              const targetLabel = h.metadata?.title || h.metadata?.label
+                || h.metadata?.subject || h.targetId
+              return (
+                <div
+                  key={h.id}
+                  className="flex items-start gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800"
+                  style={{ borderLeftWidth: 3, borderLeftColor: m.color }}
+                >
+                  <span className="text-base shrink-0">{m.emoji}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: m.color }}>
+                        {m.label}
+                      </span>
+                      <span className="text-[10px] text-zinc-600">·</span>
+                      <span className="text-[10px] text-zinc-500">{h.targetType}</span>
+                      <span className="text-[10px] text-zinc-600">·</span>
+                      <span className="text-[10px] text-zinc-500">weight {h.weight > 0 ? '+' : ''}{h.weight}</span>
+                    </div>
+                    <p className="text-xs text-zinc-200 truncate mt-0.5">{String(targetLabel)}</p>
+                    {h.metadata?.percentage !== undefined && (
+                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                        Kết quả: <span className="font-mono">{h.metadata.percentage}%</span>
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-zinc-600 shrink-0">{ago}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── FEED TAB ── */}
+        {tab === 'feed' && isLoading && (
           <div className="text-center py-16">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-cyan-400 mb-3" />
             <p className="text-sm text-zinc-500">Đang tính gợi ý cá nhân hoá…</p>
           </div>
         )}
 
-        {!isLoading && visibleItems.length === 0 && (
+        {tab === 'feed' && !isLoading && visibleItems.length === 0 && (
           <div className="text-center py-16 px-4">
             <Compass className="w-12 h-12 mx-auto text-zinc-600 mb-3" />
             <p className="text-sm font-semibold text-zinc-300 mb-1">Chưa có gợi ý nào</p>
@@ -141,7 +248,7 @@ export default function ForYouPage() {
           </div>
         )}
 
-        {!isLoading && visibleItems.length > 0 && (
+        {tab === 'feed' && !isLoading && visibleItems.length > 0 && (
           <div className="space-y-3">
             {visibleItems.map((item, idx) => {
               const meta = getRsTypeMeta(item.type)

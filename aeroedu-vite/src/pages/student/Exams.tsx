@@ -26,6 +26,7 @@ import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { QuickScanQr } from '@/components/common/QuickScanQr'
 import usePageTitle from '@/hooks/usePageTitle'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 const D = {
   bg: '#0d0e17',
@@ -396,6 +397,13 @@ export default function StudentExamsPage() {
       const { data } = await api.post('/online-exam-room/join', { roomId })
       const res = data.data ?? data
       const id = res.room?.id || res.roomId || roomId
+      // RS: track join signal (mạnh hơn click — user thực sự commit làm bài)
+      rs.track({
+        action: 'click',
+        targetType: 'exam_room',
+        targetId: roomId,
+        metadata: { alreadyJoined: !!res.alreadyJoined },
+      })
       toast.success(res.alreadyJoined ? 'Tiếp tục bài thi' : 'Đã vào phòng thi!')
       navigate(`/student/exam/${id}`)
     } catch (e: any) {

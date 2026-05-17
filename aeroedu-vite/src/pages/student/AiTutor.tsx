@@ -7,6 +7,7 @@ import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
 import { SrsReviewPanel } from '@/components/srs/SrsReviewPanel'
 import { MessageBubble, type Message } from '@/components/ai-tutor/MessageBubble'
 import type { ReviewRecord } from '@/lib/srs'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 const D = {
   bg: '#0d0e17',
@@ -92,6 +93,19 @@ function AiTutorInner() {
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setSending(true)
+
+    // RS: track AI tutor message — signal mạnh về topic interest
+    // Dùng subject làm targetId để recsys hiểu user quan tâm môn nào
+    rs.track({
+      action: 'click',
+      targetType: 'ai_tutor',
+      targetId: `subject:${selectedSubject}`,
+      metadata: {
+        subject: selectedSubject,
+        questionLength: trimmed.length,
+        preview: trimmed.slice(0, 100),
+      },
+    })
 
     try {
       const headers: HeadersInit = {
