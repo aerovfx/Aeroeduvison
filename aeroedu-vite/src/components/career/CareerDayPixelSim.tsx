@@ -24,6 +24,7 @@ import {
   pickCharacterForCategory,
   type Facing as MetroFacing,
 } from '@/lib/pixel-characters'
+import PixelTouchPad from './PixelTouchPad'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -682,6 +683,9 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
           }}
         />
       </div>
+
+      {/* Mobile touch controls — only show in manual mode */}
+      {mode === 'manual' && <PixelTouchPad hasInteract hasReset />}
 
       {/* Timeline (auto mode only) */}
       {mode === 'auto' && (

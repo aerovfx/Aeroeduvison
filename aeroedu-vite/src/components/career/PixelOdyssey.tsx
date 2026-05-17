@@ -27,6 +27,7 @@ import {
   getCharacter,
   type Facing as MetroFacing,
 } from '@/lib/pixel-characters'
+import PixelTouchPad from './PixelTouchPad'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -739,6 +740,9 @@ export default function PixelOdyssey() {
           </div>
         )}
       </div>
+
+      {/* Mobile touch controls — only show on small screens (md:hidden inside) */}
+      <PixelTouchPad hasMap hasInteract hasReset />
 
       {/* Progress bar */}
       <div className="px-4 py-2 bg-zinc-900/30 border-t border-zinc-800">
