@@ -444,6 +444,11 @@ export interface TeacherExam {
   }>
   /** Tổng số học sinh riêng biệt đã hoàn thành đề này */
   takerCount?: number
+  /** Học sinh được giáo viên phân công làm đề này nhưng CHƯA hoàn thành.
+   *  Hiển thị avatar gray bên cạnh takers để biết ai sắp phải làm. */
+  assignedStudents?: string[]
+  /** Tổng học sinh được phân công (bao gồm cả đã làm + chưa làm) */
+  assignedCount?: number
 }
 
 export interface ExamMatrixItem {

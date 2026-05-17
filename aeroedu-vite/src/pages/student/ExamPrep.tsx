@@ -1251,11 +1251,14 @@ export default function ExamPrepPage() {
                                 </button>
                               </div>
 
-                              {/* Stack avatar học sinh đã làm */}
-                              {ex.takers && ex.takers.length > 0 && (
+                              {/* Stack avatar học sinh đã làm + đã được phân công */}
+                              {((ex.takers?.length ?? 0) > 0 ||
+                                (ex.assignedStudents?.length ?? 0) > 0) && (
                                 <TakerAvatarStack
-                                  takers={ex.takers}
-                                  totalCount={ex.takerCount ?? ex.takers.length}
+                                  takers={ex.takers ?? []}
+                                  totalCount={ex.takerCount ?? ex.takers?.length ?? 0}
+                                  assignedStudents={ex.assignedStudents ?? []}
+                                  assignedCount={ex.assignedCount ?? 0}
                                 />
                               )}
                             </div>
@@ -1808,29 +1811,53 @@ function DistributionCard({
 }
 
 /* ─── TakerAvatarStack ────────────────────────────────
- * Hiển thị danh sách học sinh đã hoàn thành đề dưới dạng avatar tròn xếp
- * chồng lên nhau (Slack/Linear style). Mỗi avatar có:
+ * Hiển thị 2 nhóm học sinh dưới card đề dạng avatar tròn (Slack/Linear style):
+ *   1. Takers — đã hoàn thành (avatar gradient màu + chấm score dot)
+ *   2. Assigned — được GV phân công nhưng CHƯA làm (avatar gray, no dot)
+ * Mỗi avatar có:
  *   - Initial 1-2 chữ từ tên
- *   - Background gradient sinh từ hash tên (mỗi học sinh 1 màu nhất quán)
  *   - Border viền đen mỏng để cách avatar liền kề
- *   - Tooltip native: "Tên — điểm %"
- * Nếu > 5 avatar → hiển thị "+N" ở cuối.
+ *   - Tooltip native: "Tên — điểm %" (taker) hoặc "Tên — chưa làm" (assigned)
+ * Hiển thị tối đa 5 avatar tổng; còn lại gộp thành "+N".
+ * Caption dưới hiển thị "X đã làm · Y được phân công".
  */
 function TakerAvatarStack({
-  takers, totalCount, maxShown = 5,
+  takers, totalCount,
+  assignedStudents = [], assignedCount = 0,
+  maxShown = 5,
 }: {
   takers: NonNullable<TeacherExam['takers']>
   totalCount: number
+  assignedStudents?: string[]
+  assignedCount?: number
   maxShown?: number
 }) {
-  if (takers.length === 0) return null
-  const shown = takers.slice(0, maxShown)
-  const extra = Math.max(0, totalCount - shown.length)
+  if (takers.length === 0 && assignedStudents.length === 0) return null
+  // Ưu tiên hiển thị takers trước, rồi đến assigned
+  const takerSlots = takers.slice(0, maxShown)
+  const remainingSlots = Math.max(0, maxShown - takerSlots.length)
+  const assignedSlots = assignedStudents.slice(0, remainingSlots)
+  const shownTotal = takerSlots.length + assignedSlots.length
+  // Tổng cộng cả 2 nhóm chưa hiển thị
+  const totalAll = totalCount + assignedCount
+  const extra = Math.max(0, totalAll - shownTotal)
+  // Caption: gộp 2 con số nếu cả 2 đều > 0
+  let caption = ''
+  if (totalCount > 0 && assignedCount > 0) {
+    caption = `${totalCount} đã làm · ${assignedCount} được phân công`
+  } else if (totalCount > 0) {
+    caption = totalCount === 1 ? '1 học sinh đã làm' : `${totalCount} học sinh đã làm`
+  } else if (assignedCount > 0) {
+    caption = assignedCount === 1 ? '1 học sinh được phân công' : `${assignedCount} học sinh được phân công`
+  }
   return (
     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
       <div className="flex items-center -space-x-2.5">
-        {shown.map((t, i) => (
-          <TakerAvatar key={`${t.name}-${i}`} name={t.name} percentage={t.percentage} />
+        {takerSlots.map((t, i) => (
+          <TakerAvatar key={`t-${t.name}-${i}`} name={t.name} percentage={t.percentage} />
+        ))}
+        {assignedSlots.map((name, i) => (
+          <AssignedAvatar key={`a-${name}-${i}`} name={name} />
         ))}
         {extra > 0 && (
           <div
@@ -1842,9 +1869,9 @@ function TakerAvatarStack({
           </div>
         )}
       </div>
-      <span className="text-[11px] text-white/45">
-        {totalCount === 1 ? '1 học sinh đã làm' : `${totalCount} học sinh đã làm`}
-      </span>
+      {caption && (
+        <span className="text-[11px] text-white/45">{caption}</span>
+      )}
     </div>
   )
 }
@@ -1871,6 +1898,31 @@ function TakerAvatar({ name, percentage }: { name: string; percentage: number })
             percentage >= 80 ? '#22c55e' :
             percentage >= 50 ? '#f59e0b' : '#ef4444',
         }}
+      />
+    </div>
+  )
+}
+
+/** Avatar cho học sinh ĐƯỢC PHÂN CÔNG nhưng CHƯA làm.
+ *  Visual: gradient mờ (40% opacity của color hash), không có score dot,
+ *  thay vào đó là dấu chấm gray nhỏ ở góc → biểu thị "đang chờ làm". */
+function AssignedAvatar({ name }: { name: string }) {
+  const initials = getInitials(name)
+  const [c1, c2] = colorFromName(name)
+  return (
+    <div
+      className="relative w-7 h-7 rounded-full border-2 border-black/40 flex items-center justify-center text-[10px] font-bold text-white/85 shadow-sm"
+      title={`${name} — được phân công (chưa làm)`}
+      style={{
+        // 50% opacity của gradient để phân biệt với takers (sáng full)
+        background: `linear-gradient(135deg, ${c1}80, ${c2}80)`,
+        zIndex: 1,
+      }}
+    >
+      {initials}
+      {/* Gray dot bottom-right để báo "chưa làm" */}
+      <span
+        className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-black/40 bg-white/40"
       />
     </div>
   )

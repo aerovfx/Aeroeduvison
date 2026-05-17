@@ -3986,6 +3986,43 @@ if (USE_NODEJS_QUESTIONS) {
           }
         }
 
+        // ── Học sinh được phân công làm đề (assigned but not necessarily done) ──
+        // Một Assignment được tạo từ Exam có content JSON chứa { examId: "..." }.
+        // AssignmentTarget liên kết assignment → student/class.
+        // Với class target: expand sang tất cả ClassStudent.
+        // Trả về list { name, examId } để FE hiển thị avatar phụ.
+        // Try/catch: assignments/AssignmentTarget có thể chưa tồn tại trên DB cũ.
+        let assignedMap = new Map(); // examId → Set<string> names
+        if (examIds.length > 0) {
+          try {
+            const aRes = await pool.query(
+              `WITH exam_asgn AS (
+                 SELECT a.id AS asgn_id,
+                        regexp_replace(a.content, '.*"examId"\\s*:\\s*"([^"]+)".*', '\\1') AS exam_id
+                   FROM assignments a
+                  WHERE a.content IS NOT NULL
+                    AND a.content LIKE '%"examId"%'
+               )
+               SELECT ea.exam_id, cs.name
+                 FROM exam_asgn ea
+                 JOIN "AssignmentTarget" at ON at."assignmentId" = ea.asgn_id
+                 LEFT JOIN "ClassStudent" cs ON (
+                   (at."targetType" = 'student' AND cs.id = at."targetId") OR
+                   (at."targetType" = 'class'   AND cs."classId" = at."targetId")
+                 )
+                WHERE ea.exam_id = ANY($1::text[]) AND cs.name IS NOT NULL`,
+              [examIds]
+            );
+            for (const row of aRes.rows) {
+              if (!assignedMap.has(row.exam_id)) assignedMap.set(row.exam_id, new Set());
+              assignedMap.get(row.exam_id).add(row.name);
+            }
+          } catch (e) {
+            // Bảng assignments/AssignmentTarget có thể chưa tồn tại — log silent
+            console.warn('[exam-prep] assigned-students query failed (non-fatal):', e.message);
+          }
+        }
+
         const matrices = await pool.query(
           `SELECT m."id", m."name", m."subject", m."grade", m."examType", m."duration",
                   m."totalQuestions", m."totalScore", m."status", m."createdAt",
@@ -4002,6 +4039,13 @@ if (USE_NODEJS_QUESTIONS) {
           data: {
             exams: exams.rows.map((e) => {
               const tk = takersMap.get(e.id) || { recent: [], count: 0 };
+              // Loại bỏ những học sinh đã hoàn thành khỏi danh sách assigned
+              // (avatar tô màu sẽ là takers, avatar gray là assigned-chưa-làm)
+              const takerNames = new Set(tk.recent.map((t) => (t.name || '').toLowerCase()));
+              const assignedSet = assignedMap.get(e.id) || new Set();
+              const assignedStudents = Array.from(assignedSet).filter(
+                (name) => !takerNames.has(String(name).toLowerCase())
+              );
               return {
                 id: e.id,
                 title: e.title,
@@ -4014,6 +4058,8 @@ if (USE_NODEJS_QUESTIONS) {
                 user: e.user_name ? { name: e.user_name } : undefined,
                 takers: tk.recent,
                 takerCount: tk.count,
+                assignedStudents,            // học sinh được phân công chưa làm
+                assignedCount: assignedSet.size, // tổng được phân công (bao gồm đã làm)
               };
             }),
             matrices: matrices.rows.map((m) => ({
