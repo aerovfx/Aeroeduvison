@@ -385,6 +385,244 @@ void loop() {
       'Tính toán timing chu kỳ giao thông thực tế',
     ],
   },
+
+  // Servo + potentiometer
+  {
+    id: 'servo-pot',
+    name: 'Servo điều khiển bằng biến trở',
+    emoji: '🎛',
+    description: 'Xoay biến trở (POT) → analogRead trả 0-1023 → map sang 0-180° → quay servo SG90. Demo cách analog input điều khiển actuator.',
+    board: 'Arduino UNO',
+    difficulty: 'Trung bình',
+    diagram: {
+      version: 1,
+      parts: [
+        { type: 'wokwi-arduino-uno', id: 'uno', top: 200, left: 30, attrs: {} },
+        { type: 'wokwi-potentiometer', id: 'pot1', top: 30, left: 80, attrs: {} },
+        { type: 'wokwi-servo', id: 'servo1', top: 30, left: 220, attrs: {} },
+      ],
+      connections: [
+        ['uno:A0', 'pot1:SIG', 'blue'],
+        ['uno:5V', 'pot1:VCC', 'red'],
+        ['uno:GND.1', 'pot1:GND', 'black'],
+        ['uno:9', 'servo1:PWM', 'gold'],
+        ['uno:5V', 'servo1:V+', 'red'],
+        ['uno:GND.1', 'servo1:GND', 'black'],
+      ],
+    },
+    sketch: `// Servo điều khiển bằng biến trở
+#include <Servo.h>
+
+Servo myServo;
+const int POT = A0;
+
+void setup() {
+  myServo.attach(9);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int raw = analogRead(POT);          // 0-1023
+  int angle = map(raw, 0, 1023, 0, 180);
+  myServo.write(angle);
+  Serial.print("POT="); Serial.print(raw);
+  Serial.print(" → "); Serial.print(angle); Serial.println("°");
+  delay(15);  // wait for servo to settle
+}`,
+    objectives: [
+      'analogRead trả 10-bit (0-1023) từ chân analog',
+      'Hàm map() chuyển đổi tuyến tính giữa 2 dải',
+      'Thư viện Servo.h sinh PWM 50Hz chuẩn hobby servo',
+    ],
+  },
+
+  // DHT22 + LCD1602 thermometer
+  {
+    id: 'dht-lcd-thermo',
+    name: 'Nhiệt kế DHT22 + LCD 16×2',
+    emoji: '🌡',
+    description: 'Đọc nhiệt độ + độ ẩm từ DHT22 mỗi 2 giây, hiển thị lên LCD 1602 I²C. Học giao tiếp 1-Wire (DHT) và I²C (LCD).',
+    board: 'Arduino UNO',
+    difficulty: 'Nâng cao',
+    diagram: {
+      version: 1,
+      parts: [
+        { type: 'wokwi-arduino-uno', id: 'uno', top: 220, left: 20, attrs: {} },
+        { type: 'wokwi-dht22', id: 'dht1', top: 30, left: 60, attrs: {} },
+        { type: 'wokwi-lcd1602', id: 'lcd1', top: 80, left: 170, attrs: { pins: 'i2c' } },
+      ],
+      connections: [
+        ['uno:2', 'dht1:SDA', 'green'],
+        ['uno:5V', 'dht1:VCC', 'red'],
+        ['uno:GND.1', 'dht1:GND', 'black'],
+        ['uno:A4', 'lcd1:SDA', 'green'],
+        ['uno:A5', 'lcd1:SCL', 'yellow'],
+        ['uno:5V', 'lcd1:VCC', 'red'],
+        ['uno:GND.1', 'lcd1:GND', 'black'],
+      ],
+    },
+    sketch: `// Nhiệt kế DHT22 + LCD 1602 I²C
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+#define DHT_PIN 2
+#define DHT_TYPE DHT22
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+DHT dht(DHT_PIN, DHT_TYPE);
+
+void setup() {
+  Serial.begin(9600);
+  lcd.init();
+  lcd.backlight();
+  dht.begin();
+  lcd.setCursor(0, 0);
+  lcd.print("DHT22 Thermo");
+  delay(1500);
+  lcd.clear();
+}
+
+void loop() {
+  float t = dht.readTemperature();
+  float h = dht.readHumidity();
+  if (isnan(t) || isnan(h)) {
+    lcd.setCursor(0, 0); lcd.print("Sensor error    ");
+    delay(2000); return;
+  }
+  lcd.setCursor(0, 0); lcd.print("Temp: "); lcd.print(t, 1); lcd.print((char)223); lcd.print("C  ");
+  lcd.setCursor(0, 1); lcd.print("Hum:  "); lcd.print(h, 1); lcd.print("%    ");
+  Serial.print("T="); Serial.print(t); Serial.print("  H="); Serial.println(h);
+  delay(2000);
+}`,
+    objectives: [
+      'Giao tiếp 1-Wire với DHT22 (Wire + DHT lib)',
+      'I²C bus (chân A4=SDA, A5=SCL) cho LCD',
+      'Định dạng số thực + ký tự đặc biệt 0xDF = °',
+    ],
+  },
+
+  // HC-SR04 ultrasonic distance
+  {
+    id: 'ultrasonic-distance',
+    name: 'Đo khoảng cách HC-SR04',
+    emoji: '📏',
+    description: 'Bắn xung siêu âm 40kHz → đo thời gian phản hồi → tính khoảng cách (cm). Cảnh báo bằng LED + buzzer khi vật < 10cm.',
+    board: 'Arduino UNO',
+    difficulty: 'Trung bình',
+    diagram: {
+      version: 1,
+      parts: [
+        { type: 'wokwi-arduino-uno', id: 'uno', top: 200, left: 30, attrs: {} },
+        { type: 'wokwi-hc-sr04', id: 'sonar1', top: 30, left: 100, attrs: {} },
+        { type: 'wokwi-led', id: 'led-warn', top: 40, left: 240, attrs: { color: 'red' } },
+        { type: 'wokwi-buzzer', id: 'buzz1', top: 100, left: 240, attrs: { volume: '0.1' } },
+        { type: 'wokwi-resistor', id: 'r1', top: 30, left: 220, attrs: { value: '220' } },
+      ],
+      connections: [
+        ['uno:9', 'sonar1:TRIG', 'gold'],
+        ['uno:10', 'sonar1:ECHO', 'blue'],
+        ['uno:5V', 'sonar1:VCC', 'red'],
+        ['uno:GND.1', 'sonar1:GND', 'black'],
+        ['uno:13', 'r1:1', 'red'],
+        ['r1:2', 'led-warn:A', 'red'],
+        ['led-warn:C', 'uno:GND.1', 'black'],
+        ['uno:8', 'buzz1:1', 'purple'],
+        ['uno:GND.1', 'buzz1:2', 'black'],
+      ],
+    },
+    sketch: `// HC-SR04 đo khoảng cách + cảnh báo
+const int TRIG = 9, ECHO = 10, LED = 13, BUZZER = 8;
+
+long readDistanceCm() {
+  digitalWrite(TRIG, LOW);  delayMicroseconds(2);
+  digitalWrite(TRIG, HIGH); delayMicroseconds(10);
+  digitalWrite(TRIG, LOW);
+  long duration = pulseIn(ECHO, HIGH, 30000UL);   // 30ms timeout
+  return duration / 58;  // µs / 58 ≈ cm (tốc độ âm 343 m/s)
+}
+
+void setup() {
+  pinMode(TRIG, OUTPUT);
+  pinMode(ECHO, INPUT);
+  pinMode(LED, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  long d = readDistanceCm();
+  Serial.print("Distance: "); Serial.print(d); Serial.println(" cm");
+  if (d > 0 && d < 10) {
+    digitalWrite(LED, HIGH);
+    tone(BUZZER, 2000, 100);
+  } else {
+    digitalWrite(LED, LOW);
+    noTone(BUZZER);
+  }
+  delay(150);
+}`,
+    objectives: [
+      'pulseIn() đo thời gian xung HIGH',
+      'Vật lý sóng âm: d = v·t / 2 (echo về cả 2 chiều)',
+      'Threshold logic — cảnh báo khi gần',
+    ],
+  },
+
+  // LDR auto-light
+  {
+    id: 'ldr-auto-light',
+    name: 'Đèn tự động (LDR)',
+    emoji: '🌒',
+    description: 'Quang trở (LDR) đo cường độ ánh sáng → khi tối → bật LED. Áp dụng cho đèn đường, đèn ngủ tự động.',
+    board: 'Arduino UNO',
+    difficulty: 'Dễ',
+    diagram: {
+      version: 1,
+      parts: [
+        { type: 'wokwi-arduino-uno', id: 'uno', top: 160, left: 40, attrs: {} },
+        { type: 'wokwi-photoresistor', id: 'ldr1', top: 30, left: 80, attrs: {} },
+        { type: 'wokwi-resistor', id: 'r-divider', top: 90, left: 80, attrs: { value: '10000' } },
+        { type: 'wokwi-led', id: 'led1', top: 30, left: 200, attrs: { color: 'amber' } },
+        { type: 'wokwi-resistor', id: 'r-led', top: 90, left: 200, attrs: { value: '220' } },
+      ],
+      connections: [
+        ['uno:5V', 'ldr1:1', 'red'],
+        ['ldr1:2', 'r-divider:1', 'orange'],
+        ['ldr1:2', 'uno:A0', 'blue'],
+        ['r-divider:2', 'uno:GND.1', 'black'],
+        ['uno:9', 'r-led:1', 'gold'],
+        ['r-led:2', 'led1:A', 'gold'],
+        ['led1:C', 'uno:GND.1', 'black'],
+      ],
+    },
+    sketch: `// Đèn tự động sáng khi tối — LDR + LED
+const int LDR = A0;
+const int LED = 9;
+const int DARK_THRESHOLD = 500;  // tinh chỉnh theo môi trường
+
+void setup() {
+  pinMode(LED, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  int light = analogRead(LDR);
+  Serial.print("Light: "); Serial.println(light);
+  if (light < DARK_THRESHOLD) {
+    int brightness = map(light, 0, DARK_THRESHOLD, 255, 50);
+    analogWrite(LED, brightness);
+  } else {
+    analogWrite(LED, 0);
+  }
+  delay(200);
+}`,
+    objectives: [
+      'Cầu chia điện áp (voltage divider) với LDR + 10kΩ',
+      'analogWrite() tạo PWM điều chỉnh độ sáng',
+      'Adaptive lighting: càng tối càng sáng',
+    ],
+  },
 ]
 
 // ────────────────────────────────────────────────────────────────
@@ -527,6 +765,143 @@ function sevenSegShape(part: WokwiPart): JSX.Element {
   )
 }
 
+function potentiometerShape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      <rect x={0} y={20} width={60} height={36} rx={4} fill="#1e3a8a" stroke="#0f172a" strokeWidth={1.2} />
+      <circle cx={30} cy={20} r={18} fill="#172554" stroke="#0f172a" strokeWidth={1.2} />
+      <circle cx={30} cy={20} r={13} fill="#1e40af" />
+      {/* Knob ridges */}
+      {[0, 60, 120, 180, 240, 300].map(a => (
+        <line key={a}
+          x1={30 + Math.cos((a * Math.PI) / 180) * 8}
+          y1={20 + Math.sin((a * Math.PI) / 180) * 8}
+          x2={30 + Math.cos((a * Math.PI) / 180) * 13}
+          y2={20 + Math.sin((a * Math.PI) / 180) * 13}
+          stroke="#1e3a8a" strokeWidth={1} />
+      ))}
+      <line x1={30} y1={20} x2={30} y2={9} stroke="#fef3c7" strokeWidth={1.6} strokeLinecap="round" />
+      <text x={30} y={50} textAnchor="middle" fontSize={7} fill="#bfdbfe">POT</text>
+      <text x={30} y={66} textAnchor="middle" fontSize={6} fill="#94a3b8">{part.id}</text>
+    </g>
+  )
+}
+
+function servoShape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      {/* SG90 body — light blue plastic */}
+      <rect x={0} y={20} width={50} height={36} rx={2} fill="#3b82f6" stroke="#1e40af" strokeWidth={1.2} />
+      <rect x={50} y={28} width={8} height={20} fill="#3b82f6" stroke="#1e40af" strokeWidth={1.2} />
+      {/* Output disc */}
+      <circle cx={15} cy={38} r={11} fill="#1e293b" stroke="#0f172a" strokeWidth={1.2} />
+      <circle cx={15} cy={38} r={4} fill="#94a3b8" />
+      {/* Horn */}
+      <rect x={5} y={37} width={20} height={2} fill="#e2e8f0" rx={1} />
+      {/* Cable */}
+      <line x1={0} y1={36} x2={-6} y2={36} stroke="#dc2626" strokeWidth={1.2} />
+      <line x1={0} y1={40} x2={-6} y2={40} stroke="#1f2937" strokeWidth={1.2} />
+      <line x1={0} y1={44} x2={-6} y2={44} stroke="#facc15" strokeWidth={1.2} />
+      <text x={28} y={50} textAnchor="middle" fontSize={6} fill="#dbeafe">SG90</text>
+      <text x={28} y={66} textAnchor="middle" fontSize={6} fill="#94a3b8">{part.id}</text>
+    </g>
+  )
+}
+
+function photoresistorShape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      <circle cx={20} cy={20} r={16} fill="#fef3c7" stroke="#92400e" strokeWidth={1.2} />
+      {/* Zigzag CdS pattern */}
+      <path d="M 8 20 L 14 14 L 14 26 L 20 14 L 20 26 L 26 14 L 26 26 L 32 20"
+        fill="none" stroke="#92400e" strokeWidth={1.4} strokeLinejoin="round" />
+      <line x1={4} y1={20} x2={0} y2={20} stroke="#9ca3af" strokeWidth={1.2} />
+      <line x1={36} y1={20} x2={40} y2={20} stroke="#9ca3af" strokeWidth={1.2} />
+      <text x={20} y={48} textAnchor="middle" fontSize={6} fill="#94a3b8">LDR · {part.id}</text>
+    </g>
+  )
+}
+
+function dht22Shape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      <rect x={0} y={0} width={50} height={66} rx={3} fill="#f8fafc" stroke="#475569" strokeWidth={1.2} />
+      {/* Grille slits */}
+      {[12, 18, 24, 30, 36, 42].map(y => (
+        <line key={y} x1={6} y1={y} x2={44} y2={y} stroke="#94a3b8" strokeWidth={0.8} />
+      ))}
+      <text x={25} y={58} textAnchor="middle" fontSize={7} fontWeight={700} fill="#475569">DHT22</text>
+      <text x={25} y={80} textAnchor="middle" fontSize={6} fill="#94a3b8">{part.id}</text>
+    </g>
+  )
+}
+
+function hcsr04Shape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      {/* PCB */}
+      <rect x={0} y={0} width={80} height={36} rx={2} fill="#0b6e4f" stroke="#064e3b" strokeWidth={1.2} />
+      {/* Two ultrasonic transducers */}
+      <circle cx={20} cy={18} r={14} fill="#52525b" stroke="#1f2937" strokeWidth={1.2} />
+      <circle cx={20} cy={18} r={11} fill="#3f3f46" />
+      <text x={20} y={21} textAnchor="middle" fontSize={6} fontWeight={700} fill="#e5e7eb">T</text>
+      <circle cx={60} cy={18} r={14} fill="#52525b" stroke="#1f2937" strokeWidth={1.2} />
+      <circle cx={60} cy={18} r={11} fill="#3f3f46" />
+      <text x={60} y={21} textAnchor="middle" fontSize={6} fontWeight={700} fill="#e5e7eb">R</text>
+      <text x={40} y={48} textAnchor="middle" fontSize={7} fill="#34d399">HC-SR04 · {part.id}</text>
+    </g>
+  )
+}
+
+function lcd1602Shape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      {/* PCB green */}
+      <rect x={0} y={0} width={150} height={60} rx={3} fill="#0b6e4f" stroke="#064e3b" strokeWidth={1.2} />
+      {/* Display blue */}
+      <rect x={10} y={8} width={130} height={36} rx={1} fill="#1d4ed8" stroke="#1e3a8a" strokeWidth={0.8} />
+      {/* Char grid hint — 16x2 dots */}
+      {Array.from({ length: 16 }).map((_, i) => (
+        <g key={i}>
+          <rect x={14 + i * 8} y={12} width={6} height={12} fill="#1e40af" stroke="#172554" strokeWidth={0.3} />
+          <rect x={14 + i * 8} y={26} width={6} height={12} fill="#1e40af" stroke="#172554" strokeWidth={0.3} />
+        </g>
+      ))}
+      <text x={75} y={56} textAnchor="middle" fontSize={6} fill="#34d399">LCD1602 · {part.id}</text>
+    </g>
+  )
+}
+
+function ds1307Shape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      <rect x={0} y={0} width={80} height={50} rx={3} fill="#0b6e4f" stroke="#064e3b" strokeWidth={1.2} />
+      {/* IC */}
+      <rect x={10} y={10} width={32} height={18} rx={1} fill="#0f172a" stroke="#475569" />
+      <text x={26} y={22} textAnchor="middle" fontSize={6} fontWeight={700} fill="#cbd5e1">DS1307</text>
+      {/* Coin battery */}
+      <circle cx={60} cy={22} r={14} fill="#94a3b8" stroke="#475569" strokeWidth={1.2} />
+      <text x={60} y={25} textAnchor="middle" fontSize={5} fill="#1f2937">CR2032</text>
+      <text x={40} y={45} textAnchor="middle" fontSize={6} fill="#34d399">RTC · {part.id}</text>
+    </g>
+  )
+}
+
+function ssd1306Shape(part: WokwiPart): JSX.Element {
+  return (
+    <g>
+      {/* PCB */}
+      <rect x={0} y={0} width={90} height={70} rx={2} fill="#0f172a" stroke="#1e293b" strokeWidth={1.2} />
+      {/* Display */}
+      <rect x={6} y={6} width={78} height={48} fill="#020617" stroke="#475569" strokeWidth={0.8} />
+      {/* Sample text */}
+      <text x={45} y={28} textAnchor="middle" fontSize={7} fontWeight={700} fill="#06b6d4">OLED</text>
+      <text x={45} y={42} textAnchor="middle" fontSize={6} fill="#22d3ee">128×64</text>
+      <text x={45} y={66} textAnchor="middle" fontSize={6} fill="#94a3b8">{part.id}</text>
+    </g>
+  )
+}
+
 function genericShape(part: WokwiPart): JSX.Element {
   return (
     <g>
@@ -550,6 +925,15 @@ const PART_REGISTRY: Record<string, PartShape> = {
   'wokwi-buzzer':        { width: 40, height: 55, render: buzzerShape },
   'wokwi-74hc595':       { width: 72, height: 90, render: shiftRegister595Shape },
   'wokwi-7segment':      { width: 48, height: 85, render: sevenSegShape },
+  'wokwi-potentiometer': { width: 60, height: 70, render: potentiometerShape },
+  'wokwi-servo':         { width: 58, height: 70, render: servoShape },
+  'wokwi-photoresistor': { width: 40, height: 52, render: photoresistorShape },
+  'wokwi-dht22':         { width: 50, height: 84, render: dht22Shape },
+  'wokwi-hc-sr04':       { width: 80, height: 52, render: hcsr04Shape },
+  'wokwi-lcd1602':       { width: 150, height: 64, render: lcd1602Shape },
+  'wokwi-ds1307':        { width: 80, height: 50, render: ds1307Shape },
+  'board-ssd1306':       { width: 90, height: 74, render: ssd1306Shape },
+  'wokwi-ssd1306':       { width: 90, height: 74, render: ssd1306Shape },
 }
 
 function shapeFor(part: WokwiPart): PartShape {
