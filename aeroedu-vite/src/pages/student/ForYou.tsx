@@ -25,12 +25,14 @@ import {
   type RsPredictions,
 } from '@/services/recommendation.service'
 import usePageTitle from '@/hooks/usePageTitle'
+import OnboardingModal from '@/components/reco/OnboardingModal'
 
 export default function ForYouPage() {
   usePageTitle('Gợi ý cho bạn')
   const navigate = useNavigate()
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'feed' | 'activity'>('feed')
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-student'],
@@ -38,6 +40,18 @@ export default function ForYouPage() {
     staleTime: 60_000,
     refetchInterval: 5 * 60_000, // 5 phút
   })
+
+  // RS-Phase 10: trigger onboarding modal nếu cold-start + chưa onboarded
+  useEffect(() => {
+    if (!feed?.isColdStart) return
+    rs.getOnboardingPrefs().then(r => {
+      const p = r.prefs
+      // Show modal nếu chưa có prefs HOẶC chưa skipped + chưa completed
+      if (!p || (!p.skipped && !p.completedAt)) {
+        setShowOnboarding(true)
+      }
+    }).catch(() => {})
+  }, [feed?.isColdStart])
 
   const { data: history } = useQuery({
     queryKey: ['reco-history-student'],
@@ -83,6 +97,13 @@ export default function ForYouPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
+      {/* RS-Phase 10: cold-start onboarding modal */}
+      {showOnboarding && (
+        <OnboardingModal
+          onComplete={() => { setShowOnboarding(false); refetch() }}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
       {/* Header — iOS safe-area aware (notch + dynamic island) */}
       <header
         className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"

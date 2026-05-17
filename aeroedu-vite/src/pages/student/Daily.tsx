@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast'
 import { recommendationService as rs, getRsTypeMeta, type RsFeedItem } from '@/services/recommendation.service'
 import usePageTitle from '@/hooks/usePageTitle'
+import OnboardingModal from '@/components/reco/OnboardingModal'
 
 interface Section {
   id: string
@@ -107,6 +108,8 @@ export default function StudentDailyPage() {
   useEffect(() => { saveDoneToday(done) }, [done])
   /** Greeting recompute mỗi mount (không cần realtime tick) */
   const greeting = useMemo(() => getGreeting(), [])
+  /** RS-Phase 10: cold-start onboarding modal trigger */
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-student-daily'],
@@ -150,8 +153,24 @@ export default function StudentDailyPage() {
   const doneCount = done.size
   const isColdStart = feed?.isColdStart
 
+  // RS-Phase 10: trigger onboarding nếu cold-start + chưa onboarded
+  useEffect(() => {
+    if (!isColdStart) return
+    rs.getOnboardingPrefs().then(r => {
+      const p = r.prefs
+      if (!p || (!p.skipped && !p.completedAt)) setShowOnboarding(true)
+    }).catch(() => {})
+  }, [isColdStart])
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-12">
+      {/* RS-Phase 10: cold-start onboarding modal */}
+      {showOnboarding && (
+        <OnboardingModal
+          onComplete={() => { setShowOnboarding(false); refetch() }}
+          onSkip={() => setShowOnboarding(false)}
+        />
+      )}
       {/* Header */}
       <header
         className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"

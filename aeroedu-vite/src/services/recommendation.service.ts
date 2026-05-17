@@ -167,6 +167,30 @@ export const recommendationService = {
   /** RS-Phase 8 multi-channel: huỷ liên kết Telegram. */
   unlinkTelegram: () =>
     api.post<{ success: boolean }>('/reco/digest/telegram/unlink').then(r => r.data),
+
+  /** RS-Phase 10 onboarding: load current cold-start prefs */
+  getOnboardingPrefs: () =>
+    api.get<{ success: boolean; prefs: RsOnboardingPrefs | null }>('/reco/onboarding/prefs')
+      .then(r => r.data),
+
+  /** RS-Phase 10 onboarding: save prefs (subject + grade + topics) */
+  updateOnboardingPrefs: (prefs: Partial<RsOnboardingPrefs>) =>
+    api.put<{ success: boolean; prefs: RsOnboardingPrefs }>('/reco/onboarding/prefs', prefs)
+      .then(r => r.data),
+
+  /** RS-Phase 10 onboarding: get available subjects + grades */
+  getOnboardingOptions: () =>
+    api.get<{ success: boolean; subjects: string[]; grades: string[] }>('/reco/onboarding/subjects')
+      .then(r => r.data),
+}
+
+/** RS-Phase 10 enhancement: cold-start user prefs */
+export interface RsOnboardingPrefs {
+  subject?: string | null
+  grade?: string | null
+  interestedTopics?: string[]
+  skipped?: boolean
+  completedAt?: string
 }
 
 /** RS-Phase 8 multi-channel digest preferences */
