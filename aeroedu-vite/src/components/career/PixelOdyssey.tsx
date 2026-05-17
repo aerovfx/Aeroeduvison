@@ -162,6 +162,7 @@ const LS_PLAYER_KEY = 'rs.odyssey.playerChar'
 
 const LS_TOKENS_KEY = 'rs.odyssey.tokens'
 const LS_POSITION_KEY = 'rs.odyssey.pos'
+const LS_TUTORIAL_KEY = 'rs.odyssey.tutorialSeen'
 
 /** Lưu/load position để user return về nơi cũ */
 interface SavedPosition { x: number; y: number; facing: Facing }
@@ -254,6 +255,10 @@ export default function PixelOdyssey() {
   const [selectedChoice, setSelectedChoice] = useState<number | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [showCharPicker, setShowCharPicker] = useState(false)
+  const [showTutorial, setShowTutorial] = useState<boolean>(() => {
+    try { return !localStorage.getItem(LS_TUTORIAL_KEY) }
+    catch { return false }
+  })
   const [playerCharId, setPlayerCharId] = useState<string>(() => {
     try {
       return localStorage.getItem(LS_PLAYER_KEY) || PLAYER_CHOICES[0]
@@ -569,6 +574,11 @@ export default function PixelOdyssey() {
           <Trophy className="w-3.5 h-3.5 text-amber-300" />
           <span className="text-xs font-bold text-amber-200">{tokenCount}/{totalNPCs}</span>
         </div>
+        <button onClick={() => setShowTutorial(true)}
+          className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+          title="Xem hướng dẫn chơi">
+          <span className="text-xs font-bold leading-none w-3.5 h-3.5 inline-flex items-center justify-center">?</span>
+        </button>
         <button onClick={() => setShowCharPicker(true)}
           className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
           title={`Đổi nhân vật (hiện tại: ${playerChar.displayName || playerChar.name})`}>
@@ -622,6 +632,14 @@ export default function PixelOdyssey() {
             maxWidth: '720px',
           }}
         />
+
+        {/* First-visit tutorial overlay */}
+        {showTutorial && (
+          <TutorialOverlay onClose={() => {
+            setShowTutorial(false)
+            try { localStorage.setItem(LS_TUTORIAL_KEY, '1') } catch {}
+          }} />
+        )}
 
         {/* Character picker overlay */}
         {showCharPicker && (
@@ -815,6 +833,94 @@ export default function PixelOdyssey() {
 }
 
 // drawPlayerCharacter() removed — using drawMetroCityCharacter from @/lib/pixel-characters
+
+/** Tutorial overlay 3 slides cho first-visit users. */
+function TutorialOverlay({ onClose }: { onClose: () => void }) {
+  const [slide, setSlide] = useState(0)
+  const slides = [
+    {
+      title: 'Chào mừng tới Khu phố Nghề!',
+      emoji: '🎮',
+      body: (
+        <>
+          Bạn sẽ điều khiển nhân vật khám phá <b>6 building</b> tượng trưng cho 6 nghề.
+          Mỗi building có 1 chuyên gia chia sẻ về nghề đó.
+        </>
+      ),
+    },
+    {
+      title: 'Cách di chuyển',
+      emoji: '⌨️',
+      body: (
+        <>
+          <p className="mb-2">Bấm phím:</p>
+          <ul className="space-y-1">
+            <li><kbd className="kbd-ody">↑↓←→</kbd> hoặc <kbd className="kbd-ody">WASD</kbd> — đi 4 hướng</li>
+            <li><kbd className="kbd-ody">E</kbd> hoặc <kbd className="kbd-ody">SPACE</kbd> — nói chuyện với NPC gần đó</li>
+            <li><kbd className="kbd-ody">M</kbd> — mở bản đồ</li>
+            <li><kbd className="kbd-ody">R</kbd> — reset vị trí</li>
+          </ul>
+          <p className="text-[11px] text-zinc-400 mt-3">Trên điện thoại: dùng D-pad bên dưới canvas.</p>
+        </>
+      ),
+    },
+    {
+      title: 'Thu thập 🧭 Compass Tokens',
+      emoji: '🧭',
+      body: (
+        <>
+          Vào mỗi building, bấm <kbd className="kbd-ody">E</kbd> để nói chuyện chuyên gia.
+          Trả lời đúng câu hỏi → nhận <b>1 🧭 token</b>. Mục tiêu: thu đủ <b>6/6 tokens</b> để hoàn thành Odyssey.
+          <p className="text-[11px] text-zinc-500 mt-3">Tiến độ tự lưu — bạn có thể rời và quay lại bất kỳ lúc nào.</p>
+        </>
+      ),
+    },
+  ]
+  const cur = slides[slide]
+  const isLast = slide === slides.length - 1
+
+  return (
+    <div className="absolute inset-2 bg-black/85 backdrop-blur flex items-center justify-center z-10">
+      <div className="bg-zinc-900 rounded-2xl border-2 border-amber-500/50 p-5 max-w-sm w-full mx-2">
+        <div className="text-center mb-4">
+          <div className="text-5xl mb-2">{cur.emoji}</div>
+          <h3 className="font-bold text-amber-200 text-base">{cur.title}</h3>
+        </div>
+        <div className="text-sm text-zinc-200 leading-relaxed">{cur.body}</div>
+        {/* Slide indicators */}
+        <div className="flex gap-1.5 justify-center mt-4">
+          {slides.map((_, i) => (
+            <div
+              key={i}
+              className={`w-2 h-2 rounded-full ${i === slide ? 'bg-amber-400' : 'bg-zinc-700'}`}
+            />
+          ))}
+        </div>
+        {/* Controls */}
+        <div className="flex gap-2 mt-4 justify-between">
+          <button onClick={onClose}
+            className="text-xs text-zinc-500 hover:text-zinc-300 underline">
+            Bỏ qua
+          </button>
+          <div className="flex gap-2">
+            {slide > 0 && (
+              <button onClick={() => setSlide(s => s - 1)}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold">
+                ← Lùi
+              </button>
+            )}
+            <button
+              onClick={() => isLast ? onClose() : setSlide(s => s + 1)}
+              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
+            >
+              {isLast ? '🎮 Bắt đầu chơi!' : 'Tiếp →'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 /** Small canvas preview của 1 character (cho picker UI). */
 function CharacterPreview({ character }: { character: ReturnType<typeof getCharacter> }) {
