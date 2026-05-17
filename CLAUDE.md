@@ -15,11 +15,11 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `7122a66` (revision TBD, 2026-05-17 — Save UX redesign: tách Lưu mạch mới vs Cập nhật + confirm overwrite)
-- Commits since last deploy: `0/5` (early deploy: user feedback về ghi đè)
-- Prev: `a1f9ea8` → pixiai-00262-bop (Custom mạch simulator "Chạy giả lập" real-time)
+- Last deployed commit: `64bbfc4` (revision TBD, 2026-05-17 — Sim 4 critical bugs: t.jsCode/extractPinMap/uint8_t/shiftOut)
+- Commits since last deploy: `0/5` (early deploy: critical bug — sim không chạy)
+- Prev: `b100ff7` → pixiai-00263-lip (Save UX redesign: Lưu mới vs Cập nhật)
+- Prev: `a1f9ea8` → pixiai-00262-bop (Custom mạch simulator "Chạy giả lập")
 - Prev: `31efef4` → pixiai-00261-wic (Awards Ednovation 2025)
-- Prev: `c23a4b7` → pixiai-00260-feg (SEO batch — sitemap + OG + 404 + fallback)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
