@@ -170,7 +170,18 @@ export default function KnowledgeGraph() {
     weakTopics: Array<{ nodeId: string; label: string; type: string; score: number }>
   } | null>(null)
   const [masteryLoading, setMasteryLoading] = useState(false)
-  const [showMasteryPanel, setShowMasteryPanel] = useState(false)
+
+  // ── UX redesign: Unified left sidebar with tabs ──
+  // Thay cho 2 floating panels (mastery + path), consolidate vào left sidebar
+  // có tabs để dễ navigate, ít clutter.
+  type SidebarTab = 'filter' | 'mastery' | 'path' | 'help'
+  const [activeTab, setActiveTab] = useState<SidebarTab>('filter')
+
+  // Compatibility: showMasteryPanel = activeTab === 'mastery'
+  const showMasteryPanel = activeTab === 'mastery'
+  const setShowMasteryPanel = (v: boolean) => {
+    setActiveTab(v ? 'mastery' : 'filter')
+  }
 
   // ── Phase 6: AI Smart Search ─────────────────────────────────
   const [smartOpen, setSmartOpen] = useState(false)
@@ -195,7 +206,11 @@ export default function KnowledgeGraph() {
     totalMinutes?: number
     message?: string
   } | null>(null)
-  const [showPathPanel, setShowPathPanel] = useState(false)
+  // showPathPanel = activeTab === 'path' (consolidated into tabs)
+  const showPathPanel = activeTab === 'path'
+  const setShowPathPanel = (v: boolean) => {
+    setActiveTab(v ? 'path' : 'filter')
+  }
   const [savingAsLP, setSavingAsLP] = useState(false)
 
   // Set các nodeId đang trong path → highlight gold trên graph
@@ -851,255 +866,6 @@ export default function KnowledgeGraph() {
         }}
       />
 
-      {/* Phase 3: Mastery panel (floating right) */}
-      {showMasteryPanel && (
-        <div className="absolute top-20 right-4 z-30 w-80 max-h-[calc(100vh-120px)] overflow-y-auto bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-xl shadow-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-emerald-300 inline-flex items-center gap-1.5">
-              <TrendingUp className="w-4 h-4" /> Mastery của bạn
-            </h3>
-            <button
-              onClick={() => setShowMasteryPanel(false)}
-              className="text-zinc-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {masteryLoading && !masteryStats && (
-            <div className="text-center py-6">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto text-emerald-400" />
-              <p className="text-xs text-zinc-500 mt-2">Đang tải mastery…</p>
-            </div>
-          )}
-
-          {!masteryLoading && masteryStats && masteryStats.stats.total === 0 && (
-            <div className="space-y-3">
-              <div className="text-xs text-zinc-400 text-center py-4">
-                <Target className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
-                Bạn chưa có mastery data nào.
-                <br />
-                Làm bài thi để tự động cập nhật, hoặc:
-              </div>
-              <button
-                onClick={seedDemoMastery}
-                className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 inline-flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" /> Tạo mastery demo (~20 nodes)
-              </button>
-            </div>
-          )}
-
-          {!masteryLoading && masteryStats && masteryStats.stats.total > 0 && (
-            <>
-              {/* Stats overview */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center p-2 rounded-md bg-rose-500/10 border border-rose-500/30">
-                  <div className="text-xl font-bold text-rose-300">{masteryStats.stats.weak}</div>
-                  <div className="text-[10px] text-zinc-400">Còn yếu</div>
-                </div>
-                <div className="text-center p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
-                  <div className="text-xl font-bold text-amber-300">{masteryStats.stats.learning}</div>
-                  <div className="text-[10px] text-zinc-400">Đang học</div>
-                </div>
-                <div className="text-center p-2 rounded-md bg-emerald-500/10 border border-emerald-500/30">
-                  <div className="text-xl font-bold text-emerald-300">{masteryStats.stats.mastered}</div>
-                  <div className="text-[10px] text-zinc-400">Thông thạo</div>
-                </div>
-              </div>
-
-              {/* Avg score progress */}
-              <div>
-                <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-zinc-400">Điểm TB</span>
-                  <span className="text-zinc-100 font-mono">{masteryStats.stats.avgScore}/100</span>
-                </div>
-                <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${masteryStats.stats.avgScore}%`,
-                      background: `linear-gradient(90deg, #f43f5e, #fbbf24, #10b981)`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Top weak topics */}
-              {masteryStats.weakTopics.length > 0 && (
-                <div className="space-y-1.5">
-                  <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> Top yếu nhất ({masteryStats.weakTopics.length})
-                  </div>
-                  {masteryStats.weakTopics.slice(0, 5).map(t => (
-                    <button
-                      key={t.nodeId}
-                      onClick={() => {
-                        loadFromNode(t.nodeId, 2)
-                        toast(`Focus: ${t.label}`, { icon: '🎯' })
-                      }}
-                      className="w-full text-left p-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-rose-500/40 transition group"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold text-zinc-100 truncate flex-1 group-hover:text-rose-200">
-                          {t.label}
-                        </div>
-                        <div className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-300 font-mono">
-                          {t.score}%
-                        </div>
-                      </div>
-                      <div className="text-[10px] text-zinc-500 mt-0.5">
-                        {NODE_TYPE_LABELS[t.type] || t.type}
-                        {t.attempts > 0 && ` · ${t.attempts} lần thử`}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Refresh + Practice CTA */}
-              <div className="flex items-center gap-2 pt-2 border-t border-zinc-800">
-                <button
-                  onClick={fetchMastery}
-                  disabled={masteryLoading}
-                  className="flex-1 px-2 py-1.5 rounded-md text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 inline-flex items-center justify-center gap-1 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3 h-3 ${masteryLoading ? 'animate-spin' : ''}`} />
-                  Làm mới
-                </button>
-                <Link
-                  to="/student/exam-prep"
-                  className="flex-1 px-2 py-1.5 rounded-md text-[11px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 inline-flex items-center justify-center gap-1"
-                >
-                  <BookOpen className="w-3 h-3" /> Luyện đề
-                </Link>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Phase 4: Path result panel (floating bottom-right) */}
-      {showPathPanel && pathResult && (
-        <div className="absolute bottom-12 right-4 z-30 w-80 max-h-[calc(100vh-180px)] overflow-y-auto bg-zinc-900/95 backdrop-blur border border-amber-500/40 rounded-xl shadow-2xl p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-amber-300 inline-flex items-center gap-1.5">
-              🛣 Lộ trình học gợi ý
-            </h3>
-            <button
-              onClick={() => { setShowPathPanel(false); setPathResult(null) }}
-              className="text-zinc-400 hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {!pathResult.found ? (
-            <div className="text-xs text-zinc-400 py-4 text-center">
-              <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
-              {pathResult.message || `Không tìm thấy path từ ${pathResult.fromId} → ${pathResult.toId}`}
-              <div className="text-[10px] text-zinc-500 mt-2">
-                Thử khái niệm khác hoặc thêm relations qua "Trích xuất AI".
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-2 text-xs text-amber-200">
-                <strong>{pathResult.hops} bước</strong> từ điểm yếu nhất của bạn →
-                <span className="font-mono mx-1 text-amber-100">
-                  {pathResult.path[pathResult.path.length - 1]?.label}
-                </span>
-                {pathResult.totalMinutes !== undefined && (
-                  <div className="mt-1 text-[10px] text-amber-300 inline-flex items-center gap-1">
-                    ⏱ Tổng ~<strong>{pathResult.totalMinutes}</strong> phút
-                    · ~{Math.ceil(pathResult.totalMinutes / 30)} ngày (30p/ngày)
-                  </div>
-                )}
-              </div>
-
-              {/* Save as Learning Path — primary CTA */}
-              <button
-                onClick={savePathAsLP}
-                disabled={savingAsLP}
-                className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-bold text-xs inline-flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 disabled:opacity-50"
-              >
-                {savingAsLP ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <>💾</>
-                )}
-                Lưu thành lộ trình học của tôi
-                <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-950/30">NEW</span>
-              </button>
-
-              {/* Path steps list */}
-              <div className="space-y-1.5">
-                {pathResult.path.map((step, idx) => {
-                  const isFirst = idx === 0
-                  const isLast = idx === pathResult.path.length - 1
-                  const score = step.masteryScore
-                  const scoreColor =
-                    score === null ? '#475569'
-                    : score < 30 ? '#f43f5e'
-                    : score < 70 ? '#fbbf24'
-                    : '#10b981'
-                  return (
-                    <div key={step.nodeId} className="relative">
-                      {/* Connection line to next step */}
-                      {!isLast && (
-                        <div className="absolute left-4 top-9 bottom-0 w-px bg-amber-500/30" style={{ height: 'calc(100% - 1.5rem)' }} />
-                      )}
-                      <button
-                        onClick={() => onNodeClick(step.nodeId)}
-                        className="w-full text-left p-2 rounded-md bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/60 transition flex items-start gap-2.5"
-                      >
-                        {/* Order badge */}
-                        <div
-                          className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2"
-                          style={{
-                            background: isFirst ? '#f43f5e' : isLast ? '#10b981' : '#fbbf24',
-                            color: '#0a0f1e',
-                            borderColor: '#0a0f1e',
-                          }}
-                        >
-                          {isFirst ? 'S' : isLast ? 'E' : step.order}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-xs font-semibold text-zinc-100 truncate">{step.label}</span>
-                            {score !== null && (
-                              <span className="text-[9px] px-1 py-0.5 rounded font-mono shrink-0" style={{ background: `${scoreColor}25`, color: scoreColor }}>
-                                {score}%
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10px] text-zinc-500">
-                            {NODE_TYPE_LABELS[step.type] || step.type}
-                            {step.estimatedMinutes !== undefined && step.estimatedMinutes > 0 && (
-                              <span> · <span className="text-amber-400">⏱ {step.estimatedMinutes}p</span></span>
-                            )}
-                            {step.relFromPrev && (
-                              <span> · <span className="text-amber-400">{REL_TYPE_LABELS[step.relFromPrev] || step.relFromPrev.toLowerCase().replace(/_/g, ' ')}</span></span>
-                            )}
-                          </div>
-                          {step.description && (
-                            <div className="text-[10px] text-zinc-400 mt-1 line-clamp-2">{step.description}</div>
-                          )}
-                        </div>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="text-[10px] text-zinc-500 italic pt-2 border-t border-zinc-800">
-                💡 Click 1 step để xem chi tiết · S = điểm bắt đầu (yếu nhất) · E = đích
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       {/* Mastery legend overlay khi bật mastery mode */}
       {masteryOn && (
         <div className="absolute top-20 left-72 z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 text-[11px]">
@@ -1126,53 +892,261 @@ export default function KnowledgeGraph() {
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: legend + filter */}
-        <aside className="w-64 border-r border-white/10 bg-black/30 p-3 overflow-y-auto flex-shrink-0 hidden md:block">
-          <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Loại node</h3>
-          <div className="space-y-1 mb-4">
-            {Object.entries(NODE_TYPE_LABELS).map(([type, label]) => {
-              const c = NODE_TYPE_COLORS[type]
-              const active = enabledTypes.has(type)
-              return (
-                <button
-                  key={type}
-                  onClick={() => {
-                    setEnabledTypes(s => {
-                      const next = new Set(s)
-                      if (next.has(type)) next.delete(type); else next.add(type)
-                      return next
-                    })
-                  }}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                    active ? 'bg-white/[0.06]' : 'opacity-40 hover:opacity-70'
-                  }`}
-                >
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.stroke }} />
-                  <span className="text-xs text-white/80">{label}</span>
-                </button>
-              )
-            })}
+        {/* ═════ LEFT SIDEBAR — UX REDESIGN: TABBED PANEL ═════
+            Consolidate 4 chức năng (filter/mastery/path/help) vào 1 sidebar
+            có tabs, giảm số floating panels từ 3 → 0. */}
+        <aside className="w-72 border-r border-white/10 bg-black/30 flex-shrink-0 hidden md:flex flex-col">
+          {/* Tab nav */}
+          <div className="flex border-b border-white/10 bg-black/50">
+            {([
+              { id: 'filter',  icon: '🎨', label: 'Lọc',     badge: enabledTypes.size },
+              { id: 'mastery', icon: '🎯', label: 'Mastery', badge: masteryStats?.stats.total ?? null },
+              { id: 'path',    icon: '🛣',  label: 'Lộ trình', badge: pathResult?.path.length ?? null },
+              { id: 'help',    icon: 'ℹ',  label: 'Hướng dẫn' },
+            ] as const).map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id as SidebarTab)}
+                className={`flex-1 flex flex-col items-center justify-center py-2 px-1 text-[10px] font-bold transition-colors relative ${
+                  activeTab === t.id
+                    ? 'text-cyan-300 bg-cyan-500/10 border-b-2 border-cyan-400'
+                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border-b-2 border-transparent'
+                }`}
+              >
+                <span className="text-base mb-0.5">{t.icon}</span>
+                <span className="leading-none">{t.label}</span>
+                {t.badge !== null && t.badge !== undefined && t.badge > 0 && (
+                  <span className="absolute top-1 right-1 text-[8px] px-1 rounded bg-cyan-500/30 text-cyan-200">
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
 
-          {/* Stats */}
-          <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Thống kê</h3>
-          <div className="text-xs space-y-1 text-white/70">
-            <div>Nodes: <strong className="text-white">{visibleNodes.length}</strong></div>
-            <div>Edges: <strong className="text-white">{visibleEdges.length}</strong></div>
-            <div>Zoom: <strong className="text-white">{(zoom * 100).toFixed(0)}%</strong></div>
-          </div>
+          {/* Tab content */}
+          <div className="flex-1 overflow-y-auto p-3">
+            {/* ── FILTER tab ── */}
+            {activeTab === 'filter' && (
+              <>
+                <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Loại node</h3>
+                <div className="space-y-1 mb-4">
+                  {Object.entries(NODE_TYPE_LABELS).map(([type, label]) => {
+                    const c = NODE_TYPE_COLORS[type]
+                    const active = enabledTypes.has(type)
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setEnabledTypes(s => {
+                            const next = new Set(s)
+                            if (next.has(type)) next.delete(type); else next.add(type)
+                            return next
+                          })
+                        }}
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
+                          active ? 'bg-white/[0.06]' : 'opacity-40 hover:opacity-70'
+                        }`}
+                      >
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.stroke }} />
+                        <span className="text-xs text-white/80">{label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Thống kê</h3>
+                <div className="text-xs space-y-1 text-white/70">
+                  <div>Nodes: <strong className="text-white">{visibleNodes.length}</strong></div>
+                  <div>Edges: <strong className="text-white">{visibleEdges.length}</strong></div>
+                  <div>Zoom: <strong className="text-white">{(zoom * 100).toFixed(0)}%</strong></div>
+                </div>
+              </>
+            )}
 
-          {/* Hint */}
-          <div className="mt-4 p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/20 text-[11px] text-white/70 space-y-1.5">
-            <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
-              <Info className="w-3.5 h-3.5" /> Cách dùng
-            </div>
-            <div>• <strong>Kéo node</strong> để di chuyển</div>
-            <div>• <strong>Double-click</strong> node để ghim</div>
-            <div>• <strong>Click node</strong> để mở chi tiết</div>
-            <div>• <strong>Scroll</strong> để zoom</div>
-            <div>• <strong>Kéo nền</strong> để pan</div>
-            <div>• <strong>Tìm kiếm</strong> → click kết quả → graph tự xoay quanh node đó</div>
+            {/* ── MASTERY tab ── */}
+            {activeTab === 'mastery' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-emerald-300 inline-flex items-center gap-1.5">
+                    <TrendingUp className="w-4 h-4" /> Mastery của bạn
+                  </h3>
+                  <label className="text-[10px] text-zinc-400 inline-flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" checked={masteryOn} onChange={e => setMasteryOn(e.target.checked)} className="accent-emerald-500" />
+                    Overlay
+                  </label>
+                </div>
+
+                {masteryLoading && !masteryStats && (
+                  <div className="text-center py-6">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-emerald-400" />
+                    <p className="text-xs text-zinc-500 mt-2">Đang tải mastery…</p>
+                  </div>
+                )}
+
+                {!masteryLoading && masteryStats && masteryStats.stats.total === 0 && (
+                  <div className="space-y-3">
+                    <div className="text-xs text-zinc-400 text-center py-2">
+                      <Target className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
+                      Chưa có mastery data. Làm bài thi để cập nhật, hoặc:
+                    </div>
+                    <button onClick={seedDemoMastery} className="w-full px-3 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 inline-flex items-center justify-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" /> Tạo demo (~20 nodes)
+                    </button>
+                  </div>
+                )}
+
+                {!masteryLoading && masteryStats && masteryStats.stats.total > 0 && (
+                  <>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <div className="text-center p-2 rounded-md bg-rose-500/10 border border-rose-500/30">
+                        <div className="text-lg font-bold text-rose-300">{masteryStats.stats.weak}</div>
+                        <div className="text-[9px] text-zinc-400">Yếu</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-amber-500/10 border border-amber-500/30">
+                        <div className="text-lg font-bold text-amber-300">{masteryStats.stats.learning}</div>
+                        <div className="text-[9px] text-zinc-400">Học</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+                        <div className="text-lg font-bold text-emerald-300">{masteryStats.stats.mastered}</div>
+                        <div className="text-[9px] text-zinc-400">Thông thạo</div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] mb-1">
+                        <span className="text-zinc-400">Điểm TB</span>
+                        <span className="font-mono text-zinc-100">{masteryStats.stats.avgScore}/100</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                        <div className="h-full rounded-full transition-all" style={{ width: `${masteryStats.stats.avgScore}%`, background: 'linear-gradient(90deg,#f43f5e,#fbbf24,#10b981)' }} />
+                      </div>
+                    </div>
+                    {masteryStats.weakTopics.length > 0 && (
+                      <div className="space-y-1.5">
+                        <div className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Top yếu nhất
+                        </div>
+                        {masteryStats.weakTopics.slice(0, 5).map(t => (
+                          <button key={t.nodeId} onClick={() => { loadFromNode(t.nodeId, 2); toast(`Focus: ${t.label}`, { icon: '🎯' }) }} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-zinc-800 hover:border-rose-500/40 group">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[11px] font-semibold text-zinc-100 truncate group-hover:text-rose-200">{t.label}</span>
+                              <span className="shrink-0 text-[9px] px-1 rounded bg-rose-500/15 text-rose-300 font-mono">{t.score}%</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-800">
+                      <button onClick={fetchMastery} disabled={masteryLoading} className="flex-1 px-2 py-1 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 inline-flex items-center justify-center gap-1 disabled:opacity-50">
+                        <RefreshCw className={`w-3 h-3 ${masteryLoading ? 'animate-spin' : ''}`} /> Làm mới
+                      </button>
+                      <Link to="/student/exam-prep" className="flex-1 px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 inline-flex items-center justify-center gap-1">
+                        <BookOpen className="w-3 h-3" /> Luyện đề
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── PATH tab ── */}
+            {activeTab === 'path' && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-bold text-amber-300 inline-flex items-center gap-1.5">
+                  🛣 Lộ trình học gợi ý
+                </h3>
+                {!pathResult && (
+                  <div className="text-xs text-zinc-400 text-center py-6">
+                    <div className="text-3xl mb-2">🛣</div>
+                    Chưa có lộ trình.
+                    <div className="text-[10px] text-zinc-500 mt-1">
+                      Click 1 khái niệm → nút "🛣 Lộ trình từ điểm yếu" trong drawer bên phải.
+                    </div>
+                  </div>
+                )}
+                {pathResult && !pathResult.found && (
+                  <div className="text-xs text-zinc-400 py-4 text-center">
+                    <AlertTriangle className="w-6 h-6 mx-auto mb-2 text-amber-400" />
+                    {pathResult.message || `Không tìm thấy path từ ${pathResult.fromId} → ${pathResult.toId}`}
+                  </div>
+                )}
+                {pathResult && pathResult.found && (
+                  <>
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-md p-2 text-[11px] text-amber-200">
+                      <strong>{pathResult.hops} bước</strong> từ điểm yếu → <span className="text-amber-100">{pathResult.path[pathResult.path.length - 1]?.label}</span>
+                      {pathResult.totalMinutes !== undefined && (
+                        <div className="mt-1 text-[10px] text-amber-300">
+                          ⏱ ~<strong>{pathResult.totalMinutes}</strong>p · ~{Math.ceil(pathResult.totalMinutes / 30)} ngày
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={savePathAsLP} disabled={savingAsLP} className="w-full py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-bold text-[11px] inline-flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 disabled:opacity-50">
+                      {savingAsLP ? <Loader2 className="w-3 h-3 animate-spin" /> : '💾'}
+                      Lưu thành lộ trình + gửi GV
+                    </button>
+                    <div className="space-y-1">
+                      {pathResult.path.map((step, idx) => {
+                        const isFirst = idx === 0
+                        const isLast = idx === pathResult.path.length - 1
+                        const score = step.masteryScore
+                        const scoreColor = score === null ? '#475569' : score < 30 ? '#f43f5e' : score < 70 ? '#fbbf24' : '#10b981'
+                        return (
+                          <div key={step.nodeId} className="relative">
+                            {!isLast && <div className="absolute left-3 top-7 bottom-0 w-px bg-amber-500/30" style={{ height: 'calc(100% - 1rem)' }} />}
+                            <button onClick={() => onNodeClick(step.nodeId)} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/60 flex items-start gap-2">
+                              <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2" style={{ background: isFirst ? '#f43f5e' : isLast ? '#10b981' : '#fbbf24', color: '#0a0f1e', borderColor: '#0a0f1e' }}>
+                                {isFirst ? 'S' : isLast ? 'E' : step.order}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[11px] font-semibold text-zinc-100 truncate">{step.label}</span>
+                                  {score !== null && <span className="text-[9px] px-1 rounded font-mono shrink-0" style={{ background: `${scoreColor}25`, color: scoreColor }}>{score}%</span>}
+                                </div>
+                                <div className="text-[9px] text-zinc-500 truncate">
+                                  {NODE_TYPE_LABELS[step.type] || step.type}
+                                  {step.estimatedMinutes !== undefined && step.estimatedMinutes > 0 && <span> · <span className="text-amber-400">⏱{step.estimatedMinutes}p</span></span>}
+                                </div>
+                              </div>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* ── HELP tab ── */}
+            {activeTab === 'help' && (
+              <div className="space-y-3 text-[11px] text-white/80">
+                <div className="p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-cyan-300 font-bold">
+                    <Info className="w-3.5 h-3.5" /> Tương tác graph
+                  </div>
+                  <div>• <strong>Kéo node</strong> để di chuyển</div>
+                  <div>• <strong>Double-click</strong> để ghim/bỏ ghim</div>
+                  <div>• <strong>Click</strong> để mở chi tiết bên phải</div>
+                  <div>• <strong>Scroll</strong> để zoom in/out</div>
+                  <div>• <strong>Kéo nền</strong> để pan canvas</div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+                    🪄 AI Tools
+                  </div>
+                  <div>• <strong>Hỏi AI</strong>: NL query "Tôi muốn học X"</div>
+                  <div>• <strong>Trích xuất AI</strong>: paste văn bản → AI lấy entities</div>
+                  <div>• <strong>Đề xuất</strong>: thêm khái niệm mới (admin duyệt)</div>
+                </div>
+                <div className="p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/20 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                    🛣 Lộ trình học
+                  </div>
+                  <div>• Click khái niệm → "Lộ trình từ điểm yếu"</div>
+                  <div>• AI tính BFS từ điểm yếu nhất → đích</div>
+                  <div>• Lưu thành Learning Path → GV nhận thông báo</div>
+                </div>
+              </div>
+            )}
           </div>
         </aside>
 

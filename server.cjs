@@ -9713,12 +9713,78 @@ ${plan.content || '<p>(Trống)</p>'}
         [lpaId, pathId, user.id, '', '']
       );
 
+      // ── NOTIFY TEACHERS ──
+      // Tìm GV phụ trách (linked teacher của HS qua TeacherStudentLink approved).
+      // Gửi notification kèm preview path để GV biết HS đang tự khảo sát.
+      let notifiedTeachers = 0;
+      try {
+        // Pull student name từ User table cho nội dung notification
+        const userRow = await pool.query(
+          `SELECT name, email FROM "User" WHERE id = $1 LIMIT 1`,
+          [user.id]
+        );
+        const studentName = userRow.rows[0]?.name || userRow.rows[0]?.email || 'Học sinh';
+
+        // Tìm tất cả GV đã approved kết nối với HS
+        const teacherRows = await pool.query(
+          `SELECT "teacherId" FROM "TeacherStudentLink"
+           WHERE "studentId" = $1 AND status = 'approved'`,
+          [user.id]
+        );
+
+        // Build path preview (compact list of node labels)
+        const stepsPreview = pathSteps
+          .map((s, i) => `${i + 1}. ${s.label || s.nodeId}`)
+          .join('\n');
+
+        for (const tr of teacherRows.rows) {
+          const notifId = 'notif_kg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+          await pool.query(
+            `INSERT INTO "Notification"
+               (id, "userId", "fromUserId", type, title, body, link, metadata, "createdAt")
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW())`,
+            [
+              notifId,
+              tr.teacherId,
+              user.id,
+              'kg_path_saved',
+              `${studentName} vừa tự tạo lộ trình "${name}"`,
+              `${modules.length} bước, ~${totalDuration} phút, môn ${subject}.\n\nLộ trình:\n${stepsPreview}`,
+              `/learning-paths`, // GV có thể vào xem (cùng route HS)
+              JSON.stringify({
+                pathId,
+                assignmentId: lpaId,
+                studentId: user.id,
+                studentName,
+                subject,
+                modulesCount: modules.length,
+                totalDuration,
+                pathPreview: pathSteps.slice(0, 12).map(s => ({
+                  nodeId: s.nodeId,
+                  label: s.label,
+                  type: s.type,
+                  masteryScore: s.masteryScore,
+                  estimatedMinutes: s.estimatedMinutes,
+                })),
+              }),
+            ]
+          );
+          notifiedTeachers++;
+        }
+      } catch (notifErr) {
+        console.warn('[kg:path:save-as-lp:notify]', notifErr.message);
+        // Không fail toàn bộ request nếu notification lỗi
+      }
+
       return res.status(201).json({
         success: true,
         pathId, assignmentId: lpaId,
         modulesCount: modules.length,
         totalDuration, totalXP,
-        message: `Đã tạo lộ trình ${modules.length} module + tự gán cho bạn`,
+        notifiedTeachers,
+        message: notifiedTeachers > 0
+          ? `Đã tạo lộ trình ${modules.length} module + gửi cho ${notifiedTeachers} giáo viên`
+          : `Đã tạo lộ trình ${modules.length} module (chưa có GV được liên kết để báo)`,
       });
     } catch (err) {
       console.error('[kg:path:save-as-lp] ❌', err.message);
