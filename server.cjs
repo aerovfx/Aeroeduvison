@@ -11112,10 +11112,12 @@ if (!USE_NODEJS_QUESTIONS) {
         row.teacher_name ? { id: row.teacherId, name: row.teacher_name } : null,
         row,
       ));
-      res.json({ rooms, publicRooms });
+      // Return both `rooms` (student page) AND `examRooms` (teacher page) —
+      // historic naming inconsistency, không break consumer cũ.
+      res.json({ rooms, examRooms: rooms, publicRooms });
     } catch (err) {
       console.error('[exam-room:list]', err.message);
-      res.json({ rooms: [], publicRooms: [] });
+      res.json({ rooms: [], examRooms: [], publicRooms: [] });
     }
   });
 

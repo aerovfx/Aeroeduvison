@@ -156,8 +156,12 @@ export default function OnlineExamRoomPage() {
     try {
       setLoading(true)
       const { data } = await api.get('/online-exam-room')
-      setRooms(data.examRooms || data.data?.examRooms || [])
-      setPublicRooms(data.publicRooms || data.data?.publicRooms || [])
+      // Backend trả về cả `rooms` (naming cũ) lẫn `examRooms` (naming mới) —
+      // FE check cả 2 + cả wrapper {success, data: {...}} từ Rust microservice.
+      const myRooms = data.examRooms || data.rooms || data.data?.examRooms || data.data?.rooms || []
+      const publicArr = data.publicRooms || data.data?.publicRooms || []
+      setRooms(myRooms)
+      setPublicRooms(publicArr)
     } catch (e: any) {
       const status = e?.response?.status
       if (status !== 503 && status !== 502) {
