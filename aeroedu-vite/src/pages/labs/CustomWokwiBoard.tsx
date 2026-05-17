@@ -33,9 +33,11 @@ import {
   customCircuitService,
   CIRCUIT_CATEGORIES,
   categoryEmoji,
+  categoryLabel,
   type CustomCircuit,
   type CreateCustomCircuitInput,
 } from '@/services/customCircuit.service'
+import { useAuth } from '@/hooks/useAuth'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -1116,6 +1118,8 @@ function parseDiagram(text: string): { ok: true; data: WokwiDiagram } | { ok: fa
 
 export default function CustomWokwiBoard() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const myUserId = user?.id ?? null
   const [activeTemplateId, setActiveTemplateId] = useState<string>(TEMPLATES[0].id)
   const [diagramText, setDiagramText] = useState<string>(safeStringify(TEMPLATES[0].diagram))
   const [sketchText, setSketchText] = useState<string>(TEMPLATES[0].sketch)
@@ -1135,10 +1139,28 @@ export default function CustomWokwiBoard() {
   })
 
   const builtInIds = useMemo(() => new Set(TEMPLATES.map(t => t.id)), [])
-  const isCustomActive = !builtInIds.has(activeTemplateId)
+  // isCustomActive removed — replaced by canEditActive (sees ownerId, not just builtin-ness)
+  void builtInIds // kept for potential future use; suppress unused warning
   const activeCustom = useMemo(
     () => savedCircuits.find(c => c.id === activeTemplateId) ?? null,
     [savedCircuits, activeTemplateId]
+  )
+
+  // Phân chia theo ownership: của tôi vs công khai của người khác
+  const myCircuits = useMemo(
+    () => myUserId ? savedCircuits.filter(c => c.ownerId === myUserId) : [],
+    [savedCircuits, myUserId]
+  )
+  const communityCircuits = useMemo(
+    () => myUserId
+      ? savedCircuits.filter(c => c.ownerId !== myUserId && c.isPublic)
+      : savedCircuits.filter(c => c.isPublic),
+    [savedCircuits, myUserId]
+  )
+
+  // Owner check cho nút Cập nhật / Xoá — chỉ active khi user sở hữu
+  const canEditActive = activeCustom !== null && (
+    !myUserId ? true : activeCustom.ownerId === myUserId
   )
 
   const activeTemplate = useMemo(() => {
@@ -1239,8 +1261,9 @@ export default function CustomWokwiBoard() {
     toast.success(`Đã tải: ${c.name}`)
   }
 
-  /** Mở Save modal — nếu đang ở custom của user thì gợi ý update,
-   *  ngược lại tạo mới. */
+  /** Mở Save modal — nếu đang ở mạch của chính user thì gợi ý update,
+   *  ngược lại tạo mới (kể cả khi đang xem mạch public của người khác
+   *  → cho clone về thư viện cá nhân). */
   const openSaveModal = () => {
     // Parse trước để không cho lưu JSON lỗi
     const res = parseDiagram(diagramText)
@@ -1248,7 +1271,7 @@ export default function CustomWokwiBoard() {
       toast.error('Sửa lỗi JSON trước khi lưu: ' + res.error)
       return
     }
-    setEditingCircuit(isCustomActive ? activeCustom : null)
+    setEditingCircuit(canEditActive ? activeCustom : null)
     setShowSaveModal(true)
   }
 
@@ -1332,22 +1355,20 @@ export default function CustomWokwiBoard() {
               <option key={t.id} value={t.id}>{t.emoji} {t.name} · {t.difficulty}</option>
             ))}
           </optgroup>
-          {savedCircuits.filter(c => !c.isPublic || c.ownerId === (activeCustom?.ownerId)).length > 0 && (
-            <optgroup label="📁 Mạch của tôi">
-              {savedCircuits
-                .filter(c => !c.isPublic ||
-                  (savedCircuits.find(x => x.id === c.id)?.ownerId === activeCustom?.ownerId))
-                .map(c => (
-                  <option key={c.id} value={c.id}>
-                    {categoryEmoji(c.category)} {c.name} · {c.difficulty}
-                  </option>
-                ))}
+          {myCircuits.length > 0 && (
+            <optgroup label={`📁 Mạch của tôi (${myCircuits.length})`}>
+              {myCircuits.map(c => (
+                <option key={c.id} value={c.id}>
+                  {categoryEmoji(c.category)} {c.name} · {c.difficulty}
+                  {c.isPublic ? ' · 🌍' : ''}
+                </option>
+              ))}
             </optgroup>
           )}
-          {savedCircuits.filter(c => c.isPublic).length > 0 && (
-            <optgroup label="🌍 Công khai từ cộng đồng">
-              {savedCircuits.filter(c => c.isPublic).map(c => (
-                <option key={'pub-' + c.id} value={c.id}>
+          {communityCircuits.length > 0 && (
+            <optgroup label={`🌍 Công khai từ cộng đồng (${communityCircuits.length})`}>
+              {communityCircuits.map(c => (
+                <option key={c.id} value={c.id}>
                   {categoryEmoji(c.category)} {c.name} · {c.difficulty}
                 </option>
               ))}
@@ -1359,14 +1380,14 @@ export default function CustomWokwiBoard() {
         <button
           onClick={openSaveModal}
           className="text-xs px-3 py-1.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 inline-flex items-center gap-1.5 font-semibold"
-          title={isCustomActive ? 'Cập nhật mạch của bạn' : 'Lưu mạch này vào thư viện cá nhân'}
+          title={canEditActive ? 'Cập nhật mạch của bạn' : 'Lưu mạch này vào thư viện cá nhân'}
         >
           <Save className="w-3.5 h-3.5" />
-          {isCustomActive ? 'Cập nhật' : 'Lưu mạch'}
+          {canEditActive ? 'Cập nhật' : 'Lưu mạch'}
         </button>
 
         {/* Delete chỉ hiển thị cho mạch của chính user */}
-        {activeCustom && (
+        {activeCustom && canEditActive && (
           <button
             onClick={handleDeleteCircuit}
             className="text-xs px-2 py-1.5 rounded-md bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/40 inline-flex items-center gap-1"
@@ -1459,6 +1480,21 @@ export default function CustomWokwiBoard() {
             }`}>
               {activeTemplate.difficulty}
             </span>
+            {activeCustom && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border border-cyan-500/40 bg-cyan-500/10 text-cyan-200">
+                {categoryEmoji(activeCustom.category)} {categoryLabel(activeCustom.category)}
+              </span>
+            )}
+            {activeCustom?.isPublic && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 inline-flex items-center gap-1">
+                <Globe className="w-2.5 h-2.5" /> Công khai
+              </span>
+            )}
+            {activeCustom && !canEditActive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 text-amber-200">
+                🔒 Chỉ xem (không phải của bạn)
+              </span>
+            )}
             <span className="text-[10px] text-zinc-500">· {partsCount} parts · {connCount} dây nối</span>
           </div>
           <p className="text-xs text-zinc-400 mt-1">{activeTemplate.description}</p>
@@ -1665,11 +1701,13 @@ export default function CustomWokwiBoard() {
       {showSaveModal && (
         <SaveCircuitModal
           initial={editingCircuit ?? {
-            name: activeTemplate.name + (isCustomActive ? '' : ' (bản sao)'),
+            // Khi tạo mới (clone từ builtin / public circuit) → suggest "(bản sao)"
+            name: activeTemplate.name + ' (bản sao)',
             description: activeTemplate.description,
             board: activeTemplate.board,
             difficulty: activeTemplate.difficulty as any,
-            category: 'general',
+            // Inherit category nếu đang clone public circuit, không thì 'general'
+            category: activeCustom?.category ?? 'general',
             isPublic: false,
             objectives: activeTemplate.objectives,
           }}
