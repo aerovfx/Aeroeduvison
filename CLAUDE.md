@@ -16,8 +16,11 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `814bc8f` (revision pixiai-00254-zeg, 2026-05-17 — Custom Wokwi board + Sidebar gap fix + student empty state UX)
-- Commits since last deploy: `1/5`
+- Commits since last deploy: `4/5`
   - `6531572` feat(student/exams): auto-poll 45s + indicator "LIVE" với pulse dot
+  - `9ada0fa` feat(teacher/online-exam-room): auto-poll 30s + LIVE badge cho GV
+  - `73c60cd` feat(navbar/bell): refetch tức thì khi tab regains focus
+  - `28a9693` feat(student/dashboard): thay TOÀN BỘ demo data bằng dữ liệu thật
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
