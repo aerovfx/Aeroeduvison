@@ -161,6 +161,24 @@ const PLAYER_CHOICES = ['andy', 'sara', 'kai', 'linh']
 const LS_PLAYER_KEY = 'rs.odyssey.playerChar'
 
 const LS_TOKENS_KEY = 'rs.odyssey.tokens'
+const LS_POSITION_KEY = 'rs.odyssey.pos'
+
+/** Lưu/load position để user return về nơi cũ */
+interface SavedPosition { x: number; y: number; facing: Facing }
+function loadSavedPosition(): SavedPosition | null {
+  try {
+    const raw = localStorage.getItem(LS_POSITION_KEY)
+    if (!raw) return null
+    const p = JSON.parse(raw)
+    if (typeof p.x === 'number' && typeof p.y === 'number') {
+      return { x: p.x, y: p.y, facing: p.facing || 'down' }
+    }
+  } catch {}
+  return null
+}
+function saveCurrentPosition(p: SavedPosition) {
+  try { localStorage.setItem(LS_POSITION_KEY, JSON.stringify(p)) } catch {}
+}
 
 /* ────────────────────────── Collision ────────────────────────── */
 
@@ -213,10 +231,17 @@ export default function PixelOdyssey() {
   const rafRef = useRef<number | null>(null)
   const keysRef = useRef<Set<string>>(new Set())
   const moveTimerRef = useRef(0)
-  const charRef = useRef<CharState>({
-    x: 12, y: 11, facing: 'down', walking: false, bobFrame: 0,
-    drawX: 12, drawY: 11,
-  })
+  // Initial position: load saved hoặc default center (12, 11)
+  const charRef = useRef<CharState>((() => {
+    const saved = loadSavedPosition()
+    if (saved && isWalkable(saved.x, saved.y)) {
+      return {
+        x: saved.x, y: saved.y, facing: saved.facing, walking: false, bobFrame: 0,
+        drawX: saved.x, drawY: saved.y,
+      }
+    }
+    return { x: 12, y: 11, facing: 'down' as Facing, walking: false, bobFrame: 0, drawX: 12, drawY: 11 }
+  })())
 
   const [collectedTokens, setCollectedTokens] = useState<Set<string>>(() => {
     try {
@@ -290,6 +315,8 @@ export default function PixelOdyssey() {
       x: 12, y: 11, facing: 'down', walking: false, bobFrame: 0,
       drawX: 12, drawY: 11,
     }
+    // Clear saved position để bắt đầu lại sạch
+    try { localStorage.removeItem(LS_POSITION_KEY) } catch {}
   }, [])
 
   // Keyboard — skip nếu user đang focus vào input/textarea/contenteditable
@@ -378,6 +405,8 @@ export default function PixelOdyssey() {
         if (isWalkable(nx, ny)) {
           char.x = nx
           char.y = ny
+          // Save position (throttled — chỉ lưu khi tile thay đổi)
+          saveCurrentPosition({ x: nx, y: ny, facing: char.facing })
         }
         moveTimerRef.current = 0
       }
