@@ -31,6 +31,7 @@ import { formatRelativeTime } from "@/lib/utils"
 import type { CareerCommunityStats, CareerTestResult } from "@/types"
 import CareerDayPixelSim from "@/components/career/CareerDayPixelSim"
 import PixelOdyssey from "@/components/career/PixelOdyssey"
+import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 
 /* ─── Inline replacements ─────────────────────────── */
 function PageHeader({
@@ -283,8 +284,9 @@ export default function CareerAdvisorPage() {
     return (
       <div className="flex flex-col h-full">
         <PageHeader title="Tư Vấn Hướng Nghiệp" description="Khám phá tính cách và ngành nghề phù hợp với bạn" />
+        <ScrollToTopButton containerSelector="#career-intro-scroll" />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div id="career-intro-scroll" className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Hero */}
             <div className="relative bg-gradient-to-br from-[hsl(265,85%,18%)] via-[hsl(245,80%,22%)] to-[hsl(210,85%,18%)] rounded-3xl border border-white/[0.08] p-10 text-center overflow-hidden">
@@ -637,8 +639,9 @@ export default function CareerAdvisorPage() {
             </div>
           </div>
         )}
+        <ScrollToTopButton containerSelector="#career-results-scroll" />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div id="career-results-scroll" className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto space-y-6">
 
             {/* PERSONALITY TYPE HERO */}
