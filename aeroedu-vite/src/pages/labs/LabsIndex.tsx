@@ -249,6 +249,13 @@ const POPULAR_LABS: PopularLab[] = [
     accent: 'emerald',
   },
   {
+    name: 'Mạch Custom (Wokwi)',
+    emoji: '🔌',
+    path: '/dashboard/iot-lab',
+    desc: 'Thiết kế mạch · 8 template · 💾 Lưu thư viện · Chia sẻ cộng đồng',
+    accent: 'pink',
+  },
+  {
     name: 'MechaForce',
     emoji: '🤖',
     path: '/dashboard/labtwin/labs/mechaforce',
