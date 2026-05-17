@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Compass, RotateCcw, Trophy, X, Sparkles, MessageCircle, Map as MapIcon, User,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import {
   METRO_CHARACTERS,
   drawMetroCityCharacter,
@@ -304,11 +305,32 @@ export default function PixelOdyssey() {
     if (!activeNPC) return
     setSelectedChoice(idx)
     if (idx === activeNPC.quiz.correctIdx) {
-      // Token!
+      // Token! Show achievement toast với animated bounce
       setCollectedTokens(prev => {
+        if (prev.has(activeNPC.id)) {
+          // Already collected — không spam toast
+          return prev
+        }
         const next = new Set(prev)
         next.add(activeNPC.id)
         persistTokens(next)
+        // Toast bottom-right với emoji + tên NPC + count
+        const totalAfter = next.size
+        toast.success(
+          totalAfter >= NPCS.length
+            ? `🏆 HOÀN THÀNH ODYSSEY! ${totalAfter}/${NPCS.length} 🎉`
+            : `🧭 +1 Token từ ${activeNPC.name}! (${totalAfter}/${NPCS.length})`,
+          {
+            duration: 3500,
+            style: {
+              background: '#1c1917',
+              color: '#fcd34d',
+              border: '2px solid #fbbf24',
+              fontSize: '13px',
+              fontWeight: 'bold',
+            },
+          }
+        )
         return next
       })
     }
