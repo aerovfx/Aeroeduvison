@@ -177,6 +177,10 @@ export default function KnowledgeGraph() {
   type SidebarTab = 'filter' | 'mastery' | 'path' | 'help'
   const [activeTab, setActiveTab] = useState<SidebarTab>('filter')
 
+  // Mobile UI state
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false)
+
   // Compatibility: showMasteryPanel = activeTab === 'mastery'
   const showMasteryPanel = activeTab === 'mastery'
   const setShowMasteryPanel = (v: boolean) => {
@@ -608,30 +612,33 @@ export default function KnowledgeGraph() {
     <div className="min-h-screen bg-[#0a0612] text-white flex flex-col">
       {/* Top bar */}
       <header className="border-b border-white/10 bg-black/40 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-[1600px] mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
-          <Link to="/dashboard" className="text-slate-400 hover:text-white inline-flex items-center gap-1 text-sm">
-            <ArrowLeft className="w-4 h-4" /> Dashboard
+        {/* ── ROW 1: Back · Title · Search · Reset (responsive) ── */}
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
+          <Link to="/dashboard" className="text-slate-400 hover:text-white shrink-0 p-1.5 -ml-1.5 rounded hover:bg-white/5">
+            <ArrowLeft className="w-5 h-5" />
           </Link>
-          <div className="h-6 w-px bg-white/10" />
-          <Network className="w-5 h-5 text-cyan-400" />
-          <h1 className="font-bold">Knowledge Graph Explorer</h1>
-          <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
-            Đồ thị tri thức · MVP Vật lí 11
-          </span>
-          <div className="flex-1" />
+          <Network className="w-5 h-5 text-cyan-400 shrink-0 hidden sm:block" />
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <h1 className="font-bold text-sm sm:text-base truncate">Knowledge Graph</h1>
+            <p className="text-[10px] text-cyan-300/80 truncate hidden sm:block">
+              Đồ thị tri thức · 3 môn THPT
+            </p>
+          </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="flex-1 hidden sm:block" />
+
+          {/* Search — full width on mobile, fixed width on desktop */}
+          <div className="relative flex-1 sm:flex-none max-w-md sm:max-w-none">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               value={searchQ}
               onChange={e => { setSearchQ(e.target.value); setSearchOpen(true) }}
               onFocus={() => setSearchOpen(true)}
-              placeholder="Tìm: động lượng, công thức Newton…"
-              className="pl-9 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm w-64 focus:outline-none focus:border-cyan-400/50"
+              placeholder="Tìm khái niệm…"
+              className="w-full sm:w-64 pl-9 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-cyan-400/50"
             />
             {searchOpen && (searchResults.length > 0 || searching) && (
-              <div className="absolute top-full mt-1 right-0 w-80 bg-[#0d0e17] border border-white/15 rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
+              <div className="absolute top-full mt-1 right-0 left-0 sm:left-auto sm:w-80 bg-[#0d0e17] border border-white/15 rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
                 {searching && (
                   <div className="px-3 py-2 text-xs text-slate-400 flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> Đang tìm…
@@ -662,86 +669,131 @@ export default function KnowledgeGraph() {
             )}
           </div>
 
-          <button onClick={resetView} title="Reset zoom/pan" className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
-            <Maximize2 className="w-4 h-4" />
+          {/* Mobile menu toggle (⋯) — hidden on desktop */}
+          <button
+            onClick={() => setMobileMenuOpen(v => !v)}
+            className="lg:hidden p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 shrink-0"
+            aria-label="Menu"
+          >
+            <span className="text-base leading-none">⋯</span>
           </button>
-          <button onClick={() => setZoom(z => Math.min(3, z * 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
-            <ZoomIn className="w-4 h-4" />
-          </button>
-          <button onClick={() => setZoom(z => Math.max(0.3, z / 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          {/* Phase 3: Mastery overlay toggle */}
+        </div>
+
+        {/* ── ROW 2: Action buttons — horizontal scroll on mobile, wrap on desktop ── */}
+        <div className="max-w-[1600px] mx-auto px-3 sm:px-4 pb-2 sm:pb-3 flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          {/* Zoom controls (desktop only — mobile uses pinch) */}
+          <div className="hidden lg:flex items-center gap-1 shrink-0">
+            <button onClick={resetView} title="Reset zoom/pan" className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button onClick={() => setZoom(z => Math.min(3, z * 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button onClick={() => setZoom(z => Math.max(0.3, z / 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <div className="h-6 w-px bg-white/10 mx-1" />
+          </div>
+
+          {/* Mastery toggle — always visible (key feature) */}
           <button
             onClick={() => setMasteryOn(v => !v)}
-            title={masteryOn ? 'Tắt overlay mastery' : 'Bật overlay mastery — nodes đổi màu theo % thông thạo'}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 transition ${
+            title={masteryOn ? 'Tắt overlay mastery' : 'Bật overlay mastery'}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition whitespace-nowrap ${
               masteryOn
-                ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200 shadow-md shadow-emerald-500/20'
+                ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
                 : 'bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10'
             }`}
           >
             <Target className="w-3.5 h-3.5" />
             Mastery
             {masteryOn && masteryLoading && <Loader2 className="w-3 h-3 animate-spin" />}
-            <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-900/60 ml-0.5">NEW</span>
           </button>
-          {/* Mastery stats panel toggle */}
-          <button
-            onClick={() => setShowMasteryPanel(v => !v)}
-            title="Hiện/ẩn panel mastery (top weak topics + stats)"
-            className={`p-1.5 rounded-lg border transition ${
-              showMasteryPanel
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10'
-            }`}
-          >
-            <TrendingUp className="w-4 h-4" />
-          </button>
-          {/* Phase 6: Smart Search */}
+
+          {/* AI tools group — hide on mobile (in ⋯ menu) */}
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setSmartOpen(true)}
+              title="Hỏi AI bằng câu tự nhiên"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-[1.02] inline-flex items-center gap-1 shadow-md transition-transform"
+            >
+              🪄 Hỏi AI
+            </button>
+            <button
+              onClick={() => setExtractOpen(true)}
+              title="AI trích xuất tri thức"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-[1.02] inline-flex items-center gap-1 shadow-md transition-transform"
+            >
+              <Wand2 className="w-3.5 h-3.5" /> Trích xuất
+            </button>
+            <button
+              onClick={handleSuggestNode}
+              title="Đề xuất khái niệm/relation mới"
+              className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/15 hover:bg-white/10 text-zinc-300 inline-flex items-center gap-1"
+            >
+              💡 Đề xuất
+            </button>
+            <button
+              onClick={seed}
+              disabled={seeding}
+              title="Seed lại data (idempotent)"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 inline-flex items-center gap-1"
+            >
+              {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Seed
+            </button>
+          </div>
+
+          {/* Mobile: AI button gradient (most-used) */}
           <button
             onClick={() => setSmartOpen(true)}
-            title="Hỏi AI bằng câu tự nhiên: 'Tôi muốn học X' → AI tìm node phù hợp"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:scale-[1.02] inline-flex items-center gap-1.5 shadow-lg shadow-purple-500/25 transition-transform"
+            className="lg:hidden shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white inline-flex items-center gap-1 shadow-md whitespace-nowrap"
           >
             🪄 Hỏi AI
-            <span className="text-[9px] px-1 py-0.5 rounded bg-white/20 ml-0.5">NEW</span>
-          </button>
-          {/* Phase 7: Đề xuất khái niệm */}
-          <button
-            onClick={handleSuggestNode}
-            title="Đề xuất khái niệm/relation mới — admin sẽ duyệt"
-            className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/15 hover:bg-white/10 text-zinc-300 inline-flex items-center gap-1"
-          >
-            💡 Đề xuất
-          </button>
-          <button
-            onClick={() => setExtractOpen(true)}
-            title="AI trích xuất tri thức từ văn bản hoặc giáo án"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:scale-[1.02] inline-flex items-center gap-1.5 shadow-lg shadow-cyan-500/25 transition-transform"
-          >
-            <Wand2 className="w-3.5 h-3.5" /> Trích xuất AI
-          </button>
-          <button
-            onClick={seed}
-            disabled={seeding}
-            title="Seed lại data Vật lí 11 (idempotent)"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 inline-flex items-center gap-1.5"
-          >
-            {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Seed
           </button>
         </div>
+
+        {/* Mobile actions menu (⋯ dropdown) */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-white/10 bg-zinc-950/95 backdrop-blur p-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => { setExtractOpen(true); setMobileMenuOpen(false) }}
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white inline-flex items-center justify-center gap-1.5"
+            >
+              <Wand2 className="w-3.5 h-3.5" /> Trích xuất AI
+            </button>
+            <button
+              onClick={() => { handleSuggestNode(); setMobileMenuOpen(false) }}
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-zinc-200 inline-flex items-center justify-center gap-1.5"
+            >
+              💡 Đề xuất
+            </button>
+            <button
+              onClick={() => { seed(); setMobileMenuOpen(false) }}
+              disabled={seeding}
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 inline-flex items-center justify-center gap-1.5"
+            >
+              {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Seed
+            </button>
+            <button
+              onClick={() => { resetView(); setMobileMenuOpen(false) }}
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-zinc-200 inline-flex items-center justify-center gap-1.5"
+            >
+              <Maximize2 className="w-3.5 h-3.5" /> Reset zoom
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Phase 6: Smart Search Modal */}
       {smartOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-4 pt-20"
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center p-3 pt-8 sm:p-4 sm:pt-20"
           onClick={() => setSmartOpen(false)}
         >
           <div
-            className="bg-zinc-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-2xl w-full p-5 space-y-4 max-h-[80vh] overflow-y-auto"
+            className="bg-zinc-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-2xl w-full p-4 sm:p-5 space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -868,8 +920,8 @@ export default function KnowledgeGraph() {
 
       {/* Mastery legend overlay khi bật mastery mode */}
       {masteryOn && (
-        <div className="absolute top-20 left-72 z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-3 py-2 flex items-center gap-3 text-[11px]">
-          <span className="text-emerald-300 font-bold inline-flex items-center gap-1">
+        <div className="absolute top-20 left-3 md:left-72 right-3 md:right-auto z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-2.5 py-1.5 md:px-3 md:py-2 flex items-center gap-2 md:gap-3 text-[10px] md:text-[11px] overflow-x-auto scrollbar-hide">
+          <span className="text-emerald-300 font-bold inline-flex items-center gap-1 shrink-0">
             <Target className="w-3.5 h-3.5" /> Mastery overlay
           </span>
           <div className="flex items-center gap-1.5">
@@ -892,10 +944,25 @@ export default function KnowledgeGraph() {
       )}
 
       <div className="flex-1 flex overflow-hidden">
-        {/* ═════ LEFT SIDEBAR — UX REDESIGN: TABBED PANEL ═════
-            Consolidate 4 chức năng (filter/mastery/path/help) vào 1 sidebar
-            có tabs, giảm số floating panels từ 3 → 0. */}
-        <aside className="w-72 border-r border-white/10 bg-black/30 flex-shrink-0 hidden md:flex flex-col">
+        {/* ═════ LEFT SIDEBAR / MOBILE BOTTOM SHEET ═════
+            Desktop ≥ md: aside left fixed-width w-72
+            Mobile: bottom sheet that slides up khi user tap bottom tab bar
+            Cùng tab content cho cả 2 layout — chỉ thay đổi positioning. */}
+        {/* Mobile backdrop khi sheet open */}
+        {mobileSheetOpen && (
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-30"
+            onClick={() => setMobileSheetOpen(false)}
+          />
+        )}
+        <aside className={`
+          bg-black/95 backdrop-blur md:bg-black/30 md:backdrop-blur-none
+          md:relative md:flex md:flex-col md:w-72 md:border-r md:border-white/10 md:flex-shrink-0
+          ${mobileSheetOpen
+            ? 'fixed bottom-0 left-0 right-0 z-40 max-h-[70vh] flex flex-col rounded-t-2xl border-t border-white/15 shadow-2xl'
+            : 'hidden md:flex'
+          }
+        `}>
           {/* Tab nav */}
           <div className="flex border-b border-white/10 bg-black/50">
             {([
@@ -1151,7 +1218,7 @@ export default function KnowledgeGraph() {
         </aside>
 
         {/* Canvas */}
-        <main className="flex-1 relative overflow-hidden bg-[#06030f]">
+        <main className="flex-1 relative overflow-hidden bg-[#06030f] pb-14 md:pb-0">
           {/* Background grid pattern */}
           <svg
             ref={svgRef}
@@ -1349,9 +1416,24 @@ export default function KnowledgeGraph() {
           )}
         </main>
 
-        {/* Right: detail drawer */}
+        {/* Right: detail drawer
+            Desktop: aside right 320px, full height
+            Mobile: bottom sheet (above the bottom tab bar) with backdrop */}
         {selectedNode && (
-          <aside className="w-80 border-l border-white/10 bg-black/30 p-4 overflow-y-auto flex-shrink-0">
+          <>
+            {/* Mobile backdrop */}
+            <div
+              className="md:hidden fixed inset-0 bg-black/60 z-30"
+              onClick={() => setSelectedNode(null)}
+            />
+            <aside
+              className="
+                bg-zinc-950 border-white/10 overflow-y-auto
+                md:relative md:w-80 md:border-l md:flex-shrink-0 md:p-4 md:max-h-none
+                fixed bottom-14 left-0 right-0 z-40 max-h-[80vh] p-4 rounded-t-2xl border-t shadow-2xl md:rounded-none md:shadow-none
+              "
+              style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0) + 1rem)' }}
+            >
             <div className="flex items-start justify-between mb-3">
               <div>
                 <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-1">
@@ -1436,14 +1518,63 @@ export default function KnowledgeGraph() {
                 )
               })}
             </div>
-          </aside>
+            </aside>
+          </>
         )}
       </div>
 
-      {/* Bottom hint bar */}
+      {/* Bottom hint bar — desktop only */}
       <div className="border-t border-white/10 bg-black/40 px-4 py-2 text-[11px] text-white/40 text-center hidden md:block">
-        💡 Mẹo: gõ "động lượng" hoặc "Newton" trên thanh tìm kiếm → click kết quả để xem mạng tri thức xung quanh khái niệm đó
+        💡 Mẹo: gõ "động lượng" hoặc "Newton" → click kết quả để xem mạng tri thức xung quanh khái niệm đó
       </div>
+
+      {/* ═════ MOBILE BOTTOM TAB BAR (iPhone 14 Pro Max optimized) ═════
+          Hiển thị 4 tab + Reset zoom. Tap tab → mở bottom sheet với content tương ứng.
+          Position: fixed bottom với safe-area padding cho iPhone notch. */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/95 backdrop-blur border-t border-white/10"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
+      >
+        <div className="flex items-stretch h-14">
+          {([
+            { id: 'filter',  icon: '🎨', label: 'Lọc' },
+            { id: 'mastery', icon: '🎯', label: 'Mastery', badge: masteryStats?.stats.total },
+            { id: 'path',    icon: '🛣',  label: 'Lộ trình', badge: pathResult?.path.length },
+            { id: 'help',    icon: 'ℹ',  label: 'Trợ giúp' },
+          ] as const).map(t => {
+            const isActive = activeTab === t.id && mobileSheetOpen
+            return (
+              <button
+                key={t.id}
+                onClick={() => {
+                  if (activeTab === t.id && mobileSheetOpen) {
+                    setMobileSheetOpen(false)
+                  } else {
+                    setActiveTab(t.id as SidebarTab)
+                    setMobileSheetOpen(true)
+                  }
+                }}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
+                  isActive
+                    ? 'text-cyan-300 bg-cyan-500/10'
+                    : 'text-zinc-400 active:bg-white/5'
+                }`}
+              >
+                <span className="text-lg leading-none">{t.icon}</span>
+                <span className="text-[10px] font-bold leading-none">{t.label}</span>
+                {t.badge !== undefined && t.badge !== null && t.badge > 0 && (
+                  <span className="absolute top-1 right-1/4 text-[8px] px-1 rounded-full bg-cyan-500 text-zinc-950 font-bold min-w-[14px] text-center">
+                    {t.badge > 99 ? '99+' : t.badge}
+                  </span>
+                )}
+                {isActive && (
+                  <div className="absolute top-0 left-1/4 right-1/4 h-0.5 bg-cyan-400 rounded-full" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }

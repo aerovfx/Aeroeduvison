@@ -1253,3 +1253,13 @@ html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
 .tiptap-display li { margin-bottom: 0.2rem; }
 .tiptap-display strong { font-weight: 700; }
 .tiptap-display hr { border-top: 1px solid rgba(255,255,255,0.15); margin: 0.75rem 0; }
+
+
+/* Hide scrollbar utility — for horizontal-scrolling toolbars on mobile */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
