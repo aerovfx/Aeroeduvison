@@ -19,6 +19,7 @@ import CircuitBuilder from './CircuitBuilder'
 import CircuitPresets from './CircuitPresets'
 import SemiconductorLab from './SemiconductorLab'
 import CustomWokwiBoard from './CustomWokwiBoard'
+import usePageTitle from '@/hooks/usePageTitle'
 
 // ───────────────────────────────────────────────────────────────────
 // Types
@@ -1285,6 +1286,7 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 }
 
 export default function IoTLab() {
+  usePageTitle('IoT Lab — Mạch điện & Arduino')
   const [mode, setMode] = useState<'arduino' | 'analog' | 'semi' | 'custom'>('arduino')
   const [analogTab, setAnalogTab] = useState<'builder' | 'presets'>('presets')
   const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)

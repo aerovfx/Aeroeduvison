@@ -24,6 +24,7 @@ import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
 import studentLearningPathService, {
   type StudentLearningPath, type StudentLearningPathModule,
 } from '@/services/studentLearningPath.service'
+import usePageTitle from '@/hooks/usePageTitle'
 
 // ── Types cho AI form (giữ nguyên flow cũ) ─────────────────────
 interface LearningPathFormData {
@@ -95,6 +96,7 @@ const selectClass =
 // Component chính
 // ────────────────────────────────────────────────────────────────
 export default function LearningPathPage() {
+  usePageTitle('Lộ trình học')
   // ── 1. Lộ trình từ GV (free, primary content) ────────────────
   const {
     data: teacherPaths = [],

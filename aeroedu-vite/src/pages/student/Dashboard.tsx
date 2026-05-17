@@ -20,6 +20,7 @@ import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
 import { ConnectTeacherBanner } from '@/pages/student/MyTeachers'
 import { studentLearningPathService, type StudentLearningPath } from '@/services/studentLearningPath.service'
 import { api } from '@/services/api'
+import usePageTitle from '@/hooks/usePageTitle'
 
 // ─── Types ────────────────────────────────────────────────────────
 interface StudentExamRoomLite {
@@ -54,6 +55,7 @@ function progressOf(path: StudentLearningPath): number {
 
 // ─── Main component ───────────────────────────────────────────────
 export default function StudentDashboard() {
+  usePageTitle('Tổng quan học tập')
   const { user } = useAuth()
 
   // Real learning paths from teachers

@@ -25,6 +25,7 @@ import { useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { QuickScanQr } from '@/components/common/QuickScanQr'
+import usePageTitle from '@/hooks/usePageTitle'
 
 const D = {
   bg: '#0d0e17',
@@ -356,6 +357,7 @@ function ExamRoomCard({
 // Main page
 // ────────────────────────────────────────────────────────────────
 export default function StudentExamsPage() {
+  usePageTitle('Phòng thi Live')
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('active')
 
