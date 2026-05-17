@@ -15,12 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `bd971e7` (revision pixiai-00283-xok, 2026-05-17 — RS Student Daily Plan UI LIVE)
-- Commits since last deploy: `5/5` → DEPLOYING (2aba073 docs · 08b7e9e backend digest multi-channel · 219005c Settings panel · _next_ ForYou Send polish · then docs)
+- Last deployed commit: `93ddbf1` (revision pixiai-00284-xef, 2026-05-17 — RS-Phase 8 Multi-channel Digest LIVE: In-app + Email + Telegram)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `bd971e7` → pixiai-00283-xok (Student Daily Plan UI)
 - Prev: `9533775` → pixiai-00282-loy (RS-Phase 7 Sprint Dashboard UI)
 - Prev: `7073eb9` → pixiai-00281-moh (RS-Phase 7+10 backend — Cold-start + Teacher trending)
 - Prev: `48ea1c3` → pixiai-00280-hir (RS-Phase 6 Negative feedback)
-- Prev: `bd8cf00` → pixiai-00279-law (RS-Phase 8 Daily digest)
+- Prev: `bd8cf00` → pixiai-00279-law (RS-Phase 8 Daily digest base — in-app only)
 - Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
 - Prev: `2401573` → pixiai-00270-kon (KG mobile UX cho iPhone 14 Pro Max)
 - Prev: `735ca63` → pixiai-00269-gum (KG teacher notification + tabbed sidebar)
