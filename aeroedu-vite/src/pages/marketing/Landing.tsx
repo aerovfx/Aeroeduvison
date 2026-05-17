@@ -229,6 +229,7 @@ export default function Landing() {
             <Link to="/news" className="land-nav-link">Tin tức</Link>
             <a href="#testimonials" className="land-nav-link">Phản hồi</a>
             <a href="#team" className="land-nav-link">Đội ngũ</a>
+            <a href="#awards" className="land-nav-link">Giải thưởng</a>
           </div>
 
           {/* Desktop CTA */}
@@ -256,9 +257,9 @@ export default function Landing() {
         {/* Mobile menu */}
         {menuOpen && (
           <div style={{ background: 'rgba(2,4,18,0.98)', borderTop: `1px solid ${C.border}`, padding: '16px 24px 24px' }}>
-            {['features', 'platform', 'ai', 'testimonials', 'team'].map(s => (
+            {['features', 'platform', 'ai', 'testimonials', 'team', 'awards'].map(s => (
               <a key={s} href={`#${s}`} onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
-                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Phản hồi', team: 'Đội ngũ' }[s]}
+                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Phản hồi', team: 'Đội ngũ', awards: 'Giải thưởng' }[s]}
               </a>
             ))}
             <Link to="/docs" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
@@ -1101,6 +1102,148 @@ export default function Landing() {
           }}>
             Chúng tôi tin rằng công nghệ giáo dục tốt nhất phải được tạo bởi chính người
             đang dạy học — không phải kỹ sư xa lạ.
+          </p>
+        </div>
+      </section>
+
+      {/* ══ AWARDS / RECOGNITION SECTION ══ */}
+      <section id="awards" style={{
+        background: `linear-gradient(180deg, ${C.bg0}, ${C.bg2})`,
+        borderTop: `1px solid ${C.border}`,
+        padding: '96px 0',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+          {/* Heading */}
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '5px 16px', borderRadius: 99,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)',
+              fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 20,
+            }}>
+              🏆 Giải thưởng & Công nhận
+            </div>
+            <h2 style={{
+              fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, marginBottom: 16,
+              background: `linear-gradient(135deg, #fff, #fbbf24)`,
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              Được công nhận bởi Sở KH&CN TP.HCM
+            </h2>
+            <p style={{ fontSize: 16, color: C.muted, maxWidth: 720, margin: '0 auto', lineHeight: 1.65 }}>
+              AeroEduVision là <strong style={{ color: '#fbbf24' }}>1 trong 60 dự án</strong> được tuyển chọn vào
+              vòng ươm tạo của Chương trình <strong>Ednovation 2025</strong> — chương trình quốc gia
+              tuyển chọn dự án đổi mới sáng tạo trong lĩnh vực Công nghệ Giáo dục.
+            </p>
+          </div>
+
+          {/* Award card — 2 cột: ảnh + thông tin */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: 32, alignItems: 'center',
+            maxWidth: 1024, margin: '0 auto',
+          }}>
+            {/* Certificate image */}
+            <a
+              href="/awards/ednovation-2025-cert.jpg"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', position: 'relative',
+                borderRadius: 16, overflow: 'hidden',
+                border: `1px solid ${C.border}`,
+                background: C.bg2,
+                aspectRatio: '4 / 3',
+                boxShadow: `0 12px 48px rgba(251,191,36,0.15)`,
+                transition: 'transform .25s, box-shadow .25s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.02)'
+                e.currentTarget.style.boxShadow = '0 16px 64px rgba(251,191,36,0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = '0 12px 48px rgba(251,191,36,0.15)'
+              }}
+              title="Click để xem ảnh full size"
+            >
+              <img
+                src="/awards/ednovation-2025-cert.jpg"
+                alt="Chứng nhận Ednovation 2025 — Sở KH&CN TP.HCM"
+                loading="lazy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              {/* Subtle overlay */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4))',
+                pointerEvents: 'none',
+              }} />
+              <div style={{
+                position: 'absolute', bottom: 12, left: 12,
+                fontSize: 11, color: 'rgba(255,255,255,0.9)',
+                background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 99,
+                fontWeight: 600,
+              }}>
+                🔍 Click để phóng to
+              </div>
+            </a>
+
+            {/* Award info */}
+            <div>
+              <h3 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 8 }}>
+                Ednovation 2025 — Vòng ươm tạo
+              </h3>
+              <p style={{ fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 1.65 }}>
+                Trao bởi <strong style={{ color: C.text }}>Trung tâm Khởi nghiệp Sáng tạo TP.HCM</strong>,
+                thuộc Sở Khoa học và Công nghệ TP. Hồ Chí Minh.
+              </p>
+
+              {/* Stats inline */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
+                {[
+                  { v: 'Top 60', l: 'dự án ươm tạo 2025' },
+                  { v: '2026', l: 'tiếp tục vòng tăng tốc' },
+                  { v: '25/11/2025', l: 'ngày công nhận' },
+                ].map((s) => (
+                  <div key={s.v} style={{
+                    flex: '1 1 100px',
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(251,191,36,0.08)',
+                    border: '1px solid rgba(251,191,36,0.3)',
+                  }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24', marginBottom: 2 }}>{s.v}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Decision details */}
+              <div style={{
+                padding: 14, borderRadius: 12,
+                background: C.white(0.03), border: `1px solid ${C.border}`,
+                fontSize: 12, color: C.muted, lineHeight: 1.7,
+              }}>
+                <div><strong style={{ color: C.text }}>Quyết định:</strong> 233/QĐ-KNST</div>
+                <div><strong style={{ color: C.text }}>Người ký:</strong> Q. Giám đốc Đặng Thị Luận</div>
+                <div><strong style={{ color: C.text }}>Nhóm tác giả:</strong> Đặng Việt Chung · Trần Thị Hương</div>
+                <div style={{ marginTop: 8, fontStyle: 'italic', color: 'rgba(148,163,184,0.7)' }}>
+                  Sau vòng ươm tạo 2025, dự án tiếp tục được lựa chọn vào vòng thi
+                  <strong style={{ color: '#fbbf24' }}> Tăng tốc 2026 </strong>để phát triển sản phẩm thương mại.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust note */}
+          <p style={{
+            textAlign: 'center', marginTop: 40,
+            fontSize: 13, color: C.muted,
+          }}>
+            Sự công nhận từ cơ quan nhà nước là động lực để chúng tôi tiếp tục phát triển,
+            phục vụ ngày càng nhiều giáo viên và học sinh Việt Nam.
           </p>
         </div>
       </section>
