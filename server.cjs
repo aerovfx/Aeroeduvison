@@ -11567,6 +11567,24 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       const u = r.rows[0];
       const channels = u.rsDigestChannels || { inApp: true, email: false, telegram: false };
       const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'Aeroedu_bot';
+
+      // RS-Phase 8: last digest sent (cho UI hiển thị "đã gửi gần nhất X giờ trước")
+      let lastSentAt = null;
+      let lastSentItemsCount = null;
+      try {
+        const lastRow = await pool.query(
+          `SELECT "createdAt", metadata FROM "Notification"
+           WHERE "userId" = $1 AND type = 'rs_digest'
+           ORDER BY "createdAt" DESC LIMIT 1`,
+          [user.id]
+        );
+        if (lastRow.rows.length > 0) {
+          lastSentAt = lastRow.rows[0].createdAt;
+          const md = lastRow.rows[0].metadata;
+          lastSentItemsCount = Array.isArray(md?.items) ? md.items.length : null;
+        }
+      } catch (_) {}
+
       return res.json({
         success: true,
         channels,
@@ -11574,6 +11592,8 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         telegramLinked: !!u.telegramChatId,
         telegramChatIdPreview: u.telegramChatId ? `…${String(u.telegramChatId).slice(-4)}` : null,
         telegramDeepLink: `https://t.me/${botUsername}?start=digest_${user.id}`,
+        lastSentAt,
+        lastSentItemsCount,
       });
     } catch (err) {
       console.error('[rs:digest:prefs:get] ❌', err.message);

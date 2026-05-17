@@ -142,6 +142,8 @@ export const recommendationService = {
       telegramLinked: boolean
       telegramChatIdPreview: string | null
       telegramDeepLink: string
+      lastSentAt: string | null
+      lastSentItemsCount: number | null
     }>('/reco/digest/preferences').then(r => r.data),
 
   /** RS-Phase 8 multi-channel: cập nhật preferences. */

@@ -463,6 +463,18 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
   )
 }
 
+/** Format ISO timestamp → "5 phút trước" / "2 giờ trước" / "hôm qua" / dd/MM HH:mm */
+function formatRelativeVi(iso: string): string {
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return 'vừa xong'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} phút trước`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} giờ trước`
+  if (diff < 2 * 86_400_000) return 'hôm qua'
+  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} ngày trước`
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 /**
  * RS-Phase 8 multi-channel digest preferences panel.
  * State persisted server-side qua /api/reco/digest/preferences.
@@ -477,6 +489,8 @@ function DigestPrefsSection() {
   const [telegramLinked, setTelegramLinked] = useState(false)
   const [telegramPreview, setTelegramPreview] = useState<string | null>(null)
   const [telegramDeepLink, setTelegramDeepLink] = useState('')
+  const [lastSentAt, setLastSentAt] = useState<string | null>(null)
+  const [lastSentItemsCount, setLastSentItemsCount] = useState<number | null>(null)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -487,6 +501,8 @@ function DigestPrefsSection() {
       setTelegramLinked(r.telegramLinked)
       setTelegramPreview(r.telegramChatIdPreview)
       setTelegramDeepLink(r.telegramDeepLink)
+      setLastSentAt(r.lastSentAt)
+      setLastSentItemsCount(r.lastSentItemsCount)
     } catch (e: any) {
       toast.error(`Không tải được cài đặt: ${e?.message || 'lỗi'}`)
     } finally {
@@ -628,8 +644,8 @@ function DigestPrefsSection() {
             )}
           </div>
 
-          {/* Test button */}
-          <div className="pt-3 mt-3 border-t border-white/[0.06]">
+          {/* Test button + last sent stamp */}
+          <div className="pt-3 mt-3 border-t border-white/[0.06] space-y-2">
             <button
               type="button"
               onClick={handleTest}
@@ -642,9 +658,18 @@ function DigestPrefsSection() {
               {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               {testing ? 'Đang gửi test…' : 'Gửi digest test ngay'}
             </button>
-            <p className="text-[10px] text-white/30 mt-1.5">
+            <p className="text-[10px] text-white/30">
               Verify từng kênh hoạt động (bypass giới hạn 1/ngày).
             </p>
+            {lastSentAt && (
+              <p className="text-[11px] text-emerald-300/80 inline-flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Digest cuối: {formatRelativeVi(lastSentAt)}
+                {lastSentItemsCount !== null && (
+                  <span className="text-white/40"> ({lastSentItemsCount} mục)</span>
+                )}
+              </p>
+            )}
           </div>
         </>
       )}
