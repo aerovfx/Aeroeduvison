@@ -59,6 +59,7 @@ const studentSections: RouteSection[] = [
       { icon: FileText,     labelKey: 'routeExamPrep',      href: '/student/exam-prep' },
       { icon: Radio,        labelKey: 'routeExamRooms',     href: '/student/exams',        badge: 'Live' },
       { icon: GraduationCap,labelKey: 'routeCareer',        href: '/student/career' },
+      { icon: Gamepad2,     labelKey: 'routePixelGames',    href: '/student/games',        badge: 'Game' },
     ],
   },
   {
