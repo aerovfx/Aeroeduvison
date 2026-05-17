@@ -18,6 +18,21 @@ export type RsTargetType =
   | 'kg_node' | 'learning_path' | 'exam' | 'lesson' | 'course'
   | 'video' | 'article' | 'teacher' | 'student_paths' | string
 
+export interface RsHydration {
+  /** 0-100 mastery hiện tại của user với node này (nếu là KG node) */
+  currentMastery?: number
+  /** 0-100 % prerequisites đã thông thạo ≥70% */
+  prereqStatus?: number
+  /** Tổng số prerequisites */
+  prereqCount?: number
+  /** Số prerequisites đã thông thạo */
+  prereqMastered?: number
+  /** Unique users đã tương tác trong 30 ngày */
+  popularity?: number
+  /** Phút estimate */
+  estimatedMinutes?: number
+}
+
 export interface RsFeedItem {
   type: string
   id: string
@@ -29,6 +44,10 @@ export interface RsFeedItem {
   link: string
   meta?: Record<string, any>
   cta?: string
+  /** RS-Phase 3: hydration signals (transparency) */
+  hydration?: RsHydration | null
+  /** Human-readable reasons array, vd. ["🎯 Bạn còn yếu", "🔥 5 HS đã tương tác"] */
+  reasons?: string[]
 }
 
 export interface RsFeedResponse {

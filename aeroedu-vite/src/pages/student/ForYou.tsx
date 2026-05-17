@@ -317,6 +317,29 @@ export default function ForYouPage() {
                           )}
                         </div>
                       )}
+
+                      {/* RS-Phase 3: Reasons chips (transparency — vì sao gợi ý) */}
+                      {item.reasons && item.reasons.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {item.reasons.slice(0, 3).map((r, ri) => (
+                            <span
+                              key={ri}
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-800/80 text-zinc-300 border border-zinc-700"
+                            >
+                              {r}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Prereq warning bar nếu thiếu prerequisites */}
+                      {item.hydration?.prereqStatus !== undefined &&
+                       item.hydration.prereqStatus < 50 &&
+                       item.hydration.prereqCount && item.hydration.prereqCount > 0 && (
+                        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-1">
+                          <span>⚠ Cần học {(item.hydration.prereqCount ?? 0) - (item.hydration.prereqMastered ?? 0)}/{item.hydration.prereqCount} prerequisite trước</span>
+                        </div>
+                      )}
                     </div>
                     <ChevronRight className="w-4 h-4 text-zinc-600 shrink-0 mt-1" />
                   </button>

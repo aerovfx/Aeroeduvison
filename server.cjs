@@ -10383,6 +10383,123 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         }
       } catch (e) { console.warn('[rs:filter:neg]', e.message); }
 
+      // ─────────────────────────────────────────────────────────
+      // RS-PHASE 3: HYDRATION — enrich candidates với rich signals
+      // (mastery của user, prerequisites status, popularity từ action log)
+      // ─────────────────────────────────────────────────────────
+      try {
+        // 1. Collect KG node IDs để batch fetch mastery
+        const kgNodeIds = filtered
+          .filter(c => c.type === 'kg_weak_topic' || c.type === 'curious_topic')
+          .map(c => c.id);
+
+        // 2. Batch fetch mastery scores (1 query thay vì N)
+        const masteryById = {};
+        if (kgNodeIds.length > 0) {
+          const mr = await pool.query(
+            `SELECT node_id, score FROM kg_mastery
+             WHERE user_id = $1 AND node_id = ANY($2::text[])`,
+            [user.id, kgNodeIds]
+          );
+          for (const row of mr.rows) masteryById[row.node_id] = Math.round(row.score);
+        }
+
+        // 3. Batch fetch prerequisites (REQUIRES edges) cho KG nodes
+        const prereqsByNode = {};
+        if (kgNodeIds.length > 0) {
+          const pr = await pool.query(
+            `SELECT from_id, to_id FROM kg_edges
+             WHERE rel_type = 'REQUIRES' AND from_id = ANY($1::text[])`,
+            [kgNodeIds]
+          );
+          for (const row of pr.rows) {
+            if (!prereqsByNode[row.from_id]) prereqsByNode[row.from_id] = [];
+            prereqsByNode[row.from_id].push(row.to_id);
+          }
+          // Fetch mastery cho prereq nodes (cùng query)
+          const allPrereqIds = Array.from(new Set(Object.values(prereqsByNode).flat()));
+          if (allPrereqIds.length > 0) {
+            const pm = await pool.query(
+              `SELECT node_id, score FROM kg_mastery
+               WHERE user_id = $1 AND node_id = ANY($2::text[])`,
+              [user.id, allPrereqIds]
+            );
+            for (const row of pm.rows) masteryById[row.node_id] = Math.round(row.score);
+          }
+        }
+
+        // 4. Popularity per target — view count từ action log 30 ngày
+        const popularityKeys = filtered.map(c => `${c.type}::${c.id}`);
+        const popularityByKey = {};
+        if (popularityKeys.length > 0) {
+          const pop = await pool.query(
+            `SELECT target_type, target_id, COUNT(DISTINCT user_id) AS unique_users
+             FROM rs_action_log
+             WHERE created_at > NOW() - INTERVAL '30 days'
+               AND action IN ('view', 'click', 'complete', 'pass_quiz')
+             GROUP BY target_type, target_id`
+          );
+          for (const r of pop.rows) {
+            popularityByKey[`${r.target_type}::${r.target_id}`] = Number(r.unique_users);
+          }
+        }
+
+        // 5. Apply hydration signals + compute reasons
+        for (const c of filtered) {
+          c.hydration = {};
+          c.reasons = [];
+
+          // Mastery boost: nodes user weak → tăng score
+          const myMastery = masteryById[c.id];
+          if (myMastery !== undefined) {
+            c.hydration.currentMastery = myMastery;
+            const masteryGapBoost = (100 - myMastery) * 0.5;
+            c.score += masteryGapBoost;
+            if (myMastery < 30) {
+              c.reasons.push('🎯 Bạn còn yếu chủ đề này');
+            } else if (myMastery < 70) {
+              c.reasons.push('📈 Đang học — cải thiện thêm');
+            }
+          }
+
+          // Prerequisites check — nếu user thiếu prereq → giảm score + warning
+          const prereqs = prereqsByNode[c.id] || [];
+          if (prereqs.length > 0) {
+            const prereqScores = prereqs.map(pid => masteryById[pid] ?? 0);
+            const masteredCount = prereqScores.filter(s => s >= 70).length;
+            const prereqRatio = masteredCount / prereqs.length;
+            c.hydration.prereqStatus = Math.round(prereqRatio * 100);
+            c.hydration.prereqCount = prereqs.length;
+            c.hydration.prereqMastered = masteredCount;
+            // Penalty: missing prereqs lower score
+            const penalty = (1 - prereqRatio) * 25;
+            c.score -= penalty;
+            if (prereqRatio < 0.5 && prereqs.length > 0) {
+              c.reasons.push(`⚠ Cần học ${prereqs.length - masteredCount}/${prereqs.length} prerequisite trước`);
+            } else if (prereqRatio >= 0.8) {
+              c.reasons.push('✓ Bạn đã có nền tảng');
+            }
+          }
+
+          // Popularity boost (giới hạn ±10 để không dominate)
+          const popularity = popularityByKey[`${c.type}::${c.id}`] || 0;
+          c.hydration.popularity = popularity;
+          if (popularity > 0) {
+            const popBoost = Math.min(15, popularity * 1.5);
+            c.score += popBoost;
+            if (popularity >= 5) {
+              c.reasons.push(`🔥 ${popularity} HS đã tương tác`);
+            }
+          }
+
+          // Recency boost (đã tính trong source baseline cho 1 số types,
+          // ở đây chỉ là metadata để hiển thị)
+          if (c.meta?.duration) {
+            c.hydration.estimatedMinutes = c.meta.duration;
+          }
+        }
+      } catch (e) { console.warn('[rs:hydrate]', e.message); }
+
       // ── Score: apply user's engagement history boost ──
       try {
         const userHistory = await pool.query(
@@ -10398,6 +10515,7 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         for (const c of filtered) {
           const affinity = affinityByType[c.type] || 0;
           c.score += affinity * 3; // boost up to ±15
+          if (affinity > 2) c.reasons?.push?.(`💜 Bạn hay tương tác với ${c.type.replace(/_/g, ' ')}`);
         }
       } catch (e) { console.warn('[rs:score:affinity]', e.message); }
 
@@ -10422,6 +10540,9 @@ CHỈ TRẢ JSON, không bọc markdown.`;
           type: c.type, id: c.id, title: c.title, subtitle: c.subtitle,
           description: c.description, score: Math.round(c.score * 10) / 10,
           source: c.source, link: c.link, meta: c.meta, cta: c.cta,
+          // RS-Phase 3: hydration signals + human-readable reasons
+          hydration: c.hydration || null,
+          reasons: c.reasons || [],
         })),
         sources: Array.from(new Set(top.map(c => c.source))),
       });
