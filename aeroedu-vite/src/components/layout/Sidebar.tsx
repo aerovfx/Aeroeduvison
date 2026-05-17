@@ -12,7 +12,7 @@ import {
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
   CircuitBoard, FunctionSquare, Wand2, ShoppingBag, Bookmark, Newspaper,
-  ClipboardList, Network, Gamepad2, CreditCard, Radio,
+  ClipboardList, Network, Gamepad2, CreditCard, Radio, Sparkles as SparklesIcon,
   type LucideIcon
 } from 'lucide-react'
 import { useEffect } from 'react'
@@ -50,6 +50,7 @@ const studentSections: RouteSection[] = [
   {
     titleKey: 'sectionLearning',
     routes: [
+      { icon: SparklesIcon, labelKey: 'routeForYou',       href: '/student/for-you',      badge: 'AI', isHighlighted: true },
       { icon: Brain,        labelKey: 'routeAiTutor',      href: '/ai-tutor',             isHighlighted: true },
       { icon: BookOpen,     labelKey: 'routeMyCourses',    href: '/student/my-courses',   badge: 'LMS' },
       { icon: GraduationCap,labelKey: 'routeMyTeachers',   href: '/student/teachers' },

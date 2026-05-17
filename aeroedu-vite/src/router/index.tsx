@@ -180,6 +180,7 @@ const StudentAiTutorPage              = lazy(() => import('@/pages/student/AiTut
 const StudentCareerPage               = lazy(() => import('@/pages/student/Career'))
 const StudentExamPrepPage             = lazy(() => import('@/pages/student/ExamPrep'))
 const StudentExamsPage                = lazy(() => import('@/pages/student/Exams'))
+const ForYouPage                      = lazy(() => import('@/pages/student/ForYou'))
 const StudentVideoTranscriptPage      = lazy(() => import('@/pages/student/VideoTranscript'))
 const StudentVideoTranscriptHistoryPage = lazy(() => import('@/pages/student/VideoTranscriptHistory'))
 
@@ -441,6 +442,7 @@ export function AppRouter() {
               <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
               <Route path="/student/exam/:id"                 element={<PageFallback />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
+              <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/video-transcript/history" element={<StudentVideoTranscriptHistoryPage />} />
               <Route path="/student/video-transcript"         element={<StudentVideoTranscriptPage />} />
             </Route>

@@ -10026,6 +10026,411 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════
+  // RECOMMENDATION SYSTEM (RS) — "For You" feed cho HS/GV
+  // Lấy cảm hứng từ X/Twitter algorithm (Home Mixer + Phoenix + Thunder):
+  //   - Sources: in-network (GV linked) + out-of-network (popular) + KG-driven
+  //   - Hydrators: enrich với metadata (title, mastery, duration, ...)
+  //   - Filters: dedup, đã làm rồi, blocked, expired
+  //   - Scorers: weighted multi-signal (recency, mastery gap, popularity)
+  //   - Selector: top-K diverse
+  //
+  // RS-Phase 1: action logging
+  // RS-Phase 2: rule-based pipeline (no ML yet)
+  // RS-Phase 3+: ML embeddings (defer)
+  // ═══════════════════════════════════════════════════════════════════
+  let _rsReady = false;
+  async function ensureRsReady() {
+    if (_rsReady) return;
+    const pool = getKcPool();
+    if (!pool) return;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rs_action_log (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id TEXT NOT NULL,
+        weight REAL NOT NULL DEFAULT 1.0,
+        metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rs_user_recent ON rs_action_log(user_id, created_at DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_rs_target ON rs_action_log(target_type, target_id, created_at DESC)`);
+    _rsReady = true;
+  }
+
+  function getRsUser(req) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+      const d = jwt.verify(auth.slice(7), secret, { ignoreExpiration: true });
+      return { id: d.sub || d.userId || d.id, role: d.role || 'student' };
+    } catch { return null; }
+  }
+
+  // Weight mặc định cho từng loại action (Twitter pattern: positive vs negative)
+  const RS_WEIGHTS = {
+    'view':        0.5,
+    'click':       1.0,
+    'dwell_30s':   1.5,
+    'complete':    3.0,
+    'like':        2.0,
+    'save':        2.5,
+    'share':       3.0,
+    'pass_quiz':   4.0,
+    'fail_quiz':  -1.0,
+    'skip':       -0.5,
+    'not_interested': -2.0,
+    'block':      -3.0,
+    'report':     -5.0,
+  };
+
+  // POST /api/reco/track — log 1 action của user
+  // Body: { action, targetType, targetId, metadata? }
+  app.post('/api/reco/track', express.json({ limit: '4kb' }), async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      const body = req.body || {};
+      const action = String(body.action || '').toLowerCase();
+      const targetType = String(body.targetType || '').slice(0, 30);
+      const targetId = String(body.targetId || '').slice(0, 200);
+      if (!action || !targetType || !targetId) {
+        return res.status(400).json({ success: false, error: 'action/targetType/targetId required' });
+      }
+      const weight = Number.isFinite(body.weight) ? Number(body.weight) : (RS_WEIGHTS[action] ?? 1.0);
+      const id = 'rs_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      await pool.query(
+        `INSERT INTO rs_action_log (id, user_id, action, target_type, target_id, weight, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [id, user.id, action, targetType, targetId, weight, JSON.stringify(body.metadata || {})]
+      );
+      return res.status(201).json({ success: true, id });
+    } catch (err) {
+      console.error('[rs:track] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/history?limit=50 — user's recent actions (debug + UI)
+  app.get('/api/reco/history', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit || 50), 10)));
+      const r = await pool.query(
+        `SELECT id, action, target_type, target_id, weight, metadata, created_at
+         FROM rs_action_log WHERE user_id = $1
+         ORDER BY created_at DESC LIMIT $2`,
+        [user.id, limit]
+      );
+      return res.json({
+        success: true,
+        items: r.rows.map(x => ({
+          id: x.id, action: x.action,
+          targetType: x.target_type, targetId: x.target_id,
+          weight: x.weight, metadata: x.metadata,
+          createdAt: x.created_at,
+        })),
+      });
+    } catch (err) {
+      console.error('[rs:history] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/feed?audience=student|teacher&limit=20
+  // RS-Phase 2: rule-based pipeline (Sources → Hydrate → Filter → Score → Select)
+  //
+  // Cho HS: mix 4 nguồn
+  //   1. Weak topics từ KG mastery (40% weight) — học cái yếu nhất trước
+  //   2. From linked teachers (30%) — đề/path GV mới tạo
+  //   3. Popular (20%) — exams/paths được nhiều bạn làm
+  //   4. Curious (10%) — out-of-network: lĩnh vực user chưa engage
+  // Cho GV: students cần hỗ trợ + content gap suggestions
+  app.get('/api/reco/feed', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      await ensureKgReady();
+      const pool = getKcPool();
+      const audience = String(req.query.audience || 'student');
+      const limit = Math.min(50, Math.max(5, parseInt(String(req.query.limit || 20), 10)));
+
+      const candidates = []; // {type, id, title, score, source, meta}
+
+      if (audience === 'student') {
+        // ── Source 1: Weak topics từ KG mastery ──
+        try {
+          const weakRows = await pool.query(
+            `SELECT m.node_id, m.score, n.label, n.type, n.description
+             FROM kg_mastery m JOIN kg_nodes n ON n.id = m.node_id
+             WHERE m.user_id = $1 AND m.score < 50
+             ORDER BY m.score ASC LIMIT 8`,
+            [user.id]
+          );
+          for (const w of weakRows.rows) {
+            const recencyBoost = (50 - w.score) * 2; // 0-100 range
+            candidates.push({
+              type: 'kg_weak_topic',
+              id: w.node_id,
+              title: w.label,
+              subtitle: `Bạn còn yếu (${Math.round(w.score)}%) — học lại ngay`,
+              description: w.description,
+              score: 60 + recencyBoost, // ~60-160
+              source: 'kg-mastery',
+              link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(w.node_id)}`,
+              meta: { masteryScore: w.score, nodeType: w.type },
+              cta: 'Học lại',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:kg-weak]', e.message); }
+
+        // ── Source 2: From linked teachers ──
+        try {
+          const teacherContent = await pool.query(
+            `SELECT lp.id, lp.name, lp.description, lp.subject, lp."estimatedDays",
+                    lp."totalDuration", lp."totalXP", lp."createdAt", u.name AS teacher_name
+             FROM "LearningPath" lp
+             LEFT JOIN "User" u ON u.id = lp."teacherId"
+             JOIN "TeacherStudentLink" tsl ON tsl."teacherId" = lp."teacherId"
+             WHERE tsl."studentId" = $1 AND tsl.status = 'approved'
+               AND lp."createdAt" > NOW() - INTERVAL '30 days'
+             ORDER BY lp."createdAt" DESC LIMIT 6`,
+            [user.id]
+          );
+          for (const lp of teacherContent.rows) {
+            const ageDays = (Date.now() - new Date(lp.createdAt).getTime()) / 86400000;
+            const recencyDecay = Math.max(0, 30 - ageDays);
+            candidates.push({
+              type: 'teacher_learning_path',
+              id: lp.id,
+              title: lp.name,
+              subtitle: `GV: ${lp.teacher_name || 'Giáo viên'} · ${lp.subject || 'Tổng hợp'}`,
+              description: lp.description,
+              score: 50 + recencyDecay, // ~50-80
+              source: 'teacher-network',
+              link: `/learning-paths`,
+              meta: {
+                duration: lp.totalDuration,
+                xp: lp.totalXP, days: lp.estimatedDays,
+                teacherId: lp.teacherId, teacherName: lp.teacher_name,
+              },
+              cta: 'Vào lộ trình',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:teacher]', e.message); }
+
+        // ── Source 3: Popular exams ──
+        try {
+          const popularExams = await pool.query(
+            `SELECT e.id, e.title, e.description, e.subject, e."examType",
+                    COUNT(DISTINCT pe."studentId") AS taker_count,
+                    AVG(pe."percentage") AS avg_pct
+             FROM "Exam" e
+             LEFT JOIN "PracticeExam" pe ON pe."examId" = e.id
+             WHERE e.published = true AND e."createdAt" > NOW() - INTERVAL '60 days'
+             GROUP BY e.id, e.title, e.description, e.subject, e."examType"
+             HAVING COUNT(DISTINCT pe."studentId") > 0
+             ORDER BY taker_count DESC LIMIT 6`
+          );
+          for (const ex of popularExams.rows) {
+            // Skip nếu user đã làm
+            const taken = await pool.query(
+              `SELECT 1 FROM "PracticeExam" WHERE "studentId" = $1 AND "examId" = $2 LIMIT 1`,
+              [user.id, ex.id]
+            );
+            if (taken.rows.length > 0) continue;
+            candidates.push({
+              type: 'popular_exam',
+              id: ex.id,
+              title: ex.title,
+              subtitle: `${ex.subject || 'Đề thi'} · ${ex.taker_count} HS đã làm`,
+              description: ex.description,
+              score: 40 + Math.min(40, Number(ex.taker_count)),
+              source: 'popular',
+              link: `/student/exams`,
+              meta: { takerCount: Number(ex.taker_count), avgPct: Number(ex.avg_pct) || 0 },
+              cta: 'Làm thử',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:popular-exam]', e.message); }
+
+        // ── Source 4: Curious — random KG topics chưa engage ──
+        try {
+          const curious = await pool.query(
+            `SELECT n.id, n.label, n.type, n.description
+             FROM kg_nodes n
+             LEFT JOIN kg_mastery m ON m.node_id = n.id AND m.user_id = $1
+             WHERE m.node_id IS NULL
+               AND n.type IN ('Topic', 'Concept', 'Career')
+             ORDER BY RANDOM() LIMIT 4`,
+            [user.id]
+          );
+          for (const c of curious.rows) {
+            candidates.push({
+              type: 'curious_topic',
+              id: c.id,
+              title: c.label,
+              subtitle: c.type === 'Career' ? 'Khám phá nghề nghiệp' : 'Khái niệm chưa khám phá',
+              description: c.description,
+              score: 30 + Math.random() * 15,
+              source: 'curious',
+              link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(c.id)}`,
+              meta: { nodeType: c.type },
+              cta: 'Khám phá',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:curious]', e.message); }
+      }
+
+      else if (audience === 'teacher') {
+        // ── Teacher: HS cần hỗ trợ ──
+        try {
+          const struggling = await pool.query(
+            `SELECT u.id, u.name, u.email,
+                    AVG(m.score) AS avg_score,
+                    COUNT(m.node_id) FILTER (WHERE m.score < 30) AS weak_count
+             FROM "TeacherStudentLink" tsl
+             JOIN "User" u ON u.id = tsl."studentId"
+             LEFT JOIN kg_mastery m ON m.user_id = u.id
+             WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+             GROUP BY u.id, u.name, u.email
+             HAVING COUNT(m.node_id) FILTER (WHERE m.score < 30) > 0
+             ORDER BY weak_count DESC, avg_score ASC LIMIT 10`,
+            [user.id]
+          );
+          for (const s of struggling.rows) {
+            const avgScore = Math.round(Number(s.avg_score) || 0);
+            candidates.push({
+              type: 'student_needs_help',
+              id: s.id,
+              title: s.name || s.email,
+              subtitle: `${s.weak_count} chủ đề yếu · TB ${avgScore}%`,
+              description: `HS có nhiều điểm yếu cần GV giúp tạo lộ trình`,
+              score: 100 + Number(s.weak_count) * 5,
+              source: 'student-need',
+              link: `/teacher/dashboard`,
+              meta: { studentId: s.id, weakCount: Number(s.weak_count), avgScore },
+              cta: 'Xem chi tiết',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:struggling]', e.message); }
+
+        // ── Recent student-self-saved paths (KG-derived) ──
+        try {
+          const studentPaths = await pool.query(
+            `SELECT lp.id, lp.name, lp.description, lp."createdAt",
+                    u.name AS student_name, u.id AS student_id
+             FROM "LearningPath" lp
+             JOIN "User" u ON u.id = lp."teacherId"
+             JOIN "TeacherStudentLink" tsl ON tsl."studentId" = lp."teacherId"
+             WHERE tsl."teacherId" = $1 AND tsl.status = 'approved'
+               AND lp.id LIKE 'lp_kg_%'
+               AND lp."createdAt" > NOW() - INTERVAL '14 days'
+             ORDER BY lp."createdAt" DESC LIMIT 6`,
+            [user.id]
+          );
+          for (const sp of studentPaths.rows) {
+            candidates.push({
+              type: 'student_self_path',
+              id: sp.id,
+              title: `${sp.student_name} vừa tự tạo lộ trình`,
+              subtitle: sp.name,
+              description: sp.description,
+              score: 80,
+              source: 'student-activity',
+              link: `/learning-paths`,
+              meta: { studentId: sp.student_id, studentName: sp.student_name },
+              cta: 'Xem lộ trình',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:student-paths]', e.message); }
+      }
+
+      // ── Filter: deduplicate by (type, id) ──
+      const seen = new Set();
+      const filtered = [];
+      for (const c of candidates) {
+        const key = `${c.type}::${c.id}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        filtered.push(c);
+      }
+
+      // ── Filter: skip items user has "not_interested" or "skip" recently ──
+      try {
+        const recentNeg = await pool.query(
+          `SELECT target_type, target_id FROM rs_action_log
+           WHERE user_id = $1 AND action IN ('not_interested', 'block', 'skip')
+             AND created_at > NOW() - INTERVAL '14 days'`,
+          [user.id]
+        );
+        const negSet = new Set(recentNeg.rows.map(r => `${r.target_type}::${r.target_id}`));
+        for (let i = filtered.length - 1; i >= 0; i--) {
+          if (negSet.has(`${filtered[i].type}::${filtered[i].id}`)) {
+            filtered.splice(i, 1);
+          }
+        }
+      } catch (e) { console.warn('[rs:filter:neg]', e.message); }
+
+      // ── Score: apply user's engagement history boost ──
+      try {
+        const userHistory = await pool.query(
+          `SELECT target_type, SUM(weight) AS total_weight
+           FROM rs_action_log
+           WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+           GROUP BY target_type`,
+          [user.id]
+        );
+        const affinityByType = Object.fromEntries(
+          userHistory.rows.map(r => [r.target_type, Math.max(-5, Math.min(5, Number(r.total_weight))) ])
+        );
+        for (const c of filtered) {
+          const affinity = affinityByType[c.type] || 0;
+          c.score += affinity * 3; // boost up to ±15
+        }
+      } catch (e) { console.warn('[rs:score:affinity]', e.message); }
+
+      // ── Diversity: penalize repeated source ──
+      const sourceCount = {};
+      for (const c of filtered) {
+        sourceCount[c.source] = (sourceCount[c.source] || 0) + 1;
+        if (sourceCount[c.source] > 2) {
+          c.score *= 0.7; // penalize after 2nd from same source
+        }
+      }
+
+      // ── Selector: sort + top-K ──
+      filtered.sort((a, b) => b.score - a.score);
+      const top = filtered.slice(0, limit);
+
+      return res.json({
+        success: true,
+        audience,
+        count: top.length,
+        items: top.map(c => ({
+          type: c.type, id: c.id, title: c.title, subtitle: c.subtitle,
+          description: c.description, score: Math.round(c.score * 10) / 10,
+          source: c.source, link: c.link, meta: c.meta, cta: c.cta,
+        })),
+        sources: Array.from(new Set(top.map(c => c.source))),
+      });
+    } catch (err) {
+      console.error('[rs:feed] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════
   // KG — PHASE 3: Personal Mastery Layer
   // Mỗi user có mức độ thông thạo (score 0-100) cho từng node — render
