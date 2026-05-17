@@ -15,8 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `f4a591b` (revision TBD, 2026-05-17 — RS-Phase 5 Multi-action Transformer ranker)
-- Commits since last deploy: `0/5` (early deploy: RS Phase 5)
+- Last deployed commit: `9619604` (revision pixiai-00278-don, 2026-05-17 — RS-Phase 5 Multi-action ranker LIVE)
+- Commits since last deploy: `0/5`
 - Prev: `dbdc0a8` → pixiai-00277-dih (RS-Phase 4 Two-tower embedding)
 - Prev: `00fb87c` → pixiai-00276-don (RS-Phase 3 Hydration)
 - Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
