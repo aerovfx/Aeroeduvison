@@ -16,8 +16,9 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `56886e9` (revision pixiai-00252-zuk, 2026-05-17 — student exam-rooms + leaderboard + learning paths redesign)
-- Commits since last deploy: `1/5`
+- Commits since last deploy: `2/5`
   - `cfe7463` feat(iot-lab/custom): tab "Mạch Custom" với Wokwi JSON editor + 4 template (Simon Says)
+  - `a84318e` feat(iot-lab/custom): +7 component renderer + 4 template mới (servo, DHT, HC-SR04, LDR)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
