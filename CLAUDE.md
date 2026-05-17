@@ -15,10 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `158a2b7` (revision TBD, 2026-05-17 — RS-Phase 8 Daily digest notification)
-- Commits since last deploy: `0/5` (early deploy: RS Phase 8 push engagement)
+- Last deployed commit: `acb4a33` (revision TBD, 2026-05-17 — RS-Phase 6 Negative feedback model time-decay)
+- Commits since last deploy: `0/5` (early deploy: RS Phase 6)
+- Prev: `bd8cf00` → pixiai-00279-law (RS-Phase 8 Daily digest)
 - Prev: `9619604` → pixiai-00278-don (RS-Phase 5 Multi-action ranker)
-- Prev: `dbdc0a8` → pixiai-00277-dih (RS-Phase 4 Two-tower embedding)
 - Prev: `22bdb35` → pixiai-00271-qeh (RS-Phase 1+2 For You feed)
 - Prev: `2401573` → pixiai-00270-kon (KG mobile UX cho iPhone 14 Pro Max)
 - Prev: `735ca63` → pixiai-00269-gum (KG teacher notification + tabbed sidebar)
