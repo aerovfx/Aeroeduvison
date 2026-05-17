@@ -14,7 +14,7 @@
  * Data từ /api/reco/feed?audience=student (existing endpoint, không
  * cần backend mới).
  */
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -80,11 +80,31 @@ const SECTIONS: Section[] = [
   },
 ]
 
+/** LocalStorage key — track done items theo ngày để reset tự nhiên mỗi sáng */
+const DONE_LS_KEY = 'rs.daily.done'
+function loadDoneToday(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DONE_LS_KEY)
+    if (!raw) return new Set()
+    const { date, ids } = JSON.parse(raw)
+    const today = new Date().toISOString().slice(0, 10)
+    if (date !== today) return new Set() // ngày khác → reset
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch { return new Set() }
+}
+function saveDoneToday(ids: Set<string>) {
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    localStorage.setItem(DONE_LS_KEY, JSON.stringify({ date: today, ids: [...ids] }))
+  } catch {}
+}
+
 export default function StudentDailyPage() {
   usePageTitle('Kế hoạch hôm nay')
   const navigate = useNavigate()
-  /** Items đã đánh dấu hoàn thành trong session này */
-  const [done, setDone] = useState<Set<string>>(new Set())
+  /** Items đã đánh dấu hoàn thành — persist localStorage theo ngày */
+  const [done, setDone] = useState<Set<string>>(() => loadDoneToday())
+  useEffect(() => { saveDoneToday(done) }, [done])
   /** Greeting recompute mỗi mount (không cần realtime tick) */
   const greeting = useMemo(() => getGreeting(), [])
 

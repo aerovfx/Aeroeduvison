@@ -10,7 +10,7 @@
  * Data từ /api/reco/feed?audience=teacher với grouping client-side.
  * Mobile-friendly cho GV review trên điện thoại.
  */
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -65,11 +65,36 @@ const SECTIONS: Section[] = [
   },
 ]
 
+/** LocalStorage key — track resolved items theo tuần (Sprint cycle 7 ngày) */
+const RESOLVED_LS_KEY = 'rs.sprint.resolved'
+function getWeekKey(d = new Date()): string {
+  // ISO week-ish: year + week-of-year, không cần chuẩn ISO 8601 vì chỉ rotate
+  const startOfYear = new Date(d.getFullYear(), 0, 1)
+  const days = Math.floor((d.getTime() - startOfYear.getTime()) / 86_400_000)
+  const week = Math.floor((days + startOfYear.getDay()) / 7)
+  return `${d.getFullYear()}-W${week}`
+}
+function loadResolvedThisWeek(): Set<string> {
+  try {
+    const raw = localStorage.getItem(RESOLVED_LS_KEY)
+    if (!raw) return new Set()
+    const { week, ids } = JSON.parse(raw)
+    if (week !== getWeekKey()) return new Set() // tuần khác → reset
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch { return new Set() }
+}
+function saveResolvedThisWeek(ids: Set<string>) {
+  try {
+    localStorage.setItem(RESOLVED_LS_KEY, JSON.stringify({ week: getWeekKey(), ids: [...ids] }))
+  } catch {}
+}
+
 export default function TeacherSprintPage() {
   usePageTitle('Sprint dashboard GV')
   const navigate = useNavigate()
-  /** Items GV đã "Đã xử lý" trong session này (filter khỏi view + log signal) */
-  const [resolved, setResolved] = useState<Set<string>>(new Set())
+  /** Items GV đã "Đã xử lý" — persist localStorage theo tuần */
+  const [resolved, setResolved] = useState<Set<string>>(() => loadResolvedThisWeek())
+  useEffect(() => { saveResolvedThisWeek(resolved) }, [resolved])
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-teacher-sprint'],
