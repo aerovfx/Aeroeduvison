@@ -10168,6 +10168,100 @@ CHỈ TRẢ JSON, không bọc markdown.`;
 
       const candidates = []; // {type, id, title, score, source, meta}
 
+      // ─────────────────────────────────────────────────────────
+      // RS-PHASE 10: COLD-START DETECTION
+      // User mới (< 5 actions) → bypass regular sources và dùng
+      // smart defaults (popular content + linked teacher LP).
+      // Vẫn chạy regular sources sau để mix in nếu có data.
+      // ─────────────────────────────────────────────────────────
+      let isColdStart = false;
+      try {
+        const histCount = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM rs_action_log WHERE user_id = $1`,
+          [user.id]
+        );
+        const actionCount = Number(histCount.rows[0]?.cnt || 0);
+        isColdStart = actionCount < 5;
+      } catch (_) {}
+
+      if (isColdStart && audience === 'student') {
+        // Cold-start: smart defaults với high score để priority
+        try {
+          // 1. Popular published exams (cross all students, sort by takers)
+          const popular = await pool.query(
+            `SELECT e.id, e.title, e.description, e.subject,
+                    COUNT(DISTINCT pe."studentId") AS takers
+             FROM "Exam" e
+             LEFT JOIN "PracticeExam" pe ON pe."examId" = e.id
+             WHERE e.published = true
+             GROUP BY e.id, e.title, e.description, e.subject
+             HAVING COUNT(DISTINCT pe."studentId") >= 2
+             ORDER BY takers DESC LIMIT 4`
+          );
+          for (const ex of popular.rows) {
+            candidates.push({
+              type: 'cold_start_popular',
+              id: ex.id,
+              title: ex.title,
+              subtitle: `${ex.subject || 'Đề thi'} · ${ex.takers} HS đã làm`,
+              description: ex.description,
+              score: 90, // cold-start ưu tiên cao
+              source: 'cold-start',
+              link: '/student/exams',
+              meta: { takerCount: Number(ex.takers), subject: ex.subject },
+              cta: 'Làm thử',
+            });
+          }
+
+          // 2. KG entry-level topics (Subject + Chapter)
+          const intro = await pool.query(
+            `SELECT id, type, label, description
+             FROM kg_nodes
+             WHERE type IN ('Subject', 'Chapter')
+             ORDER BY type, label LIMIT 4`
+          );
+          for (const n of intro.rows) {
+            candidates.push({
+              type: 'cold_start_intro',
+              id: n.id,
+              title: n.label,
+              subtitle: `${n.type === 'Subject' ? 'Môn học' : 'Chương'} — bắt đầu khám phá`,
+              description: n.description,
+              score: 75,
+              source: 'cold-start',
+              link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(n.id)}`,
+              meta: { nodeType: n.type },
+              cta: 'Khám phá',
+            });
+          }
+
+          // 3. Teacher LP nếu có
+          const tps = await pool.query(
+            `SELECT lp.id, lp.name, lp.subject, u.name AS teacher_name
+             FROM "LearningPath" lp
+             JOIN "TeacherStudentLink" tsl ON tsl."teacherId" = lp."teacherId"
+             LEFT JOIN "User" u ON u.id = lp."teacherId"
+             WHERE tsl."studentId" = $1 AND tsl.status = 'approved'
+             ORDER BY lp."createdAt" DESC LIMIT 3`,
+            [user.id]
+          );
+          for (const lp of tps.rows) {
+            candidates.push({
+              type: 'cold_start_teacher_lp',
+              id: lp.id,
+              title: lp.name,
+              subtitle: `Lộ trình từ GV ${lp.teacher_name || 'phụ trách'}`,
+              description: 'Bắt đầu với lộ trình GV đã giao',
+              score: 100, // ưu tiên cao nhất nếu có GV
+              source: 'cold-start',
+              link: '/learning-paths',
+              meta: { teacherName: lp.teacher_name, subject: lp.subject },
+              cta: 'Bắt đầu',
+            });
+          }
+        } catch (e) { console.warn('[rs:cold-start]', e.message); }
+      }
+
       if (audience === 'student') {
         // ── Source 1: Weak topics từ KG mastery ──
         try {
@@ -10516,6 +10610,80 @@ CHỈ TRẢ JSON, không bọc markdown.`;
             });
           }
         } catch (e) { console.warn('[rs:source:student-paths]', e.message); }
+
+        // ─────────────────────────────────────────────────────────
+        // RS-PHASE 7: TEACHER — Class trending topics
+        // Aggregate weak topics ACROSS all linked students → highlight
+        // chủ đề mà NHIỀU HS đang gặp khó khăn (GV nên dạy lại / luyện)
+        // ─────────────────────────────────────────────────────────
+        try {
+          const trending = await pool.query(
+            `SELECT m.node_id, n.label, n.type,
+                    COUNT(DISTINCT m.user_id) AS weak_student_count,
+                    AVG(m.score) AS avg_score
+             FROM kg_mastery m
+             JOIN kg_nodes n ON n.id = m.node_id
+             JOIN "TeacherStudentLink" tsl ON tsl."studentId" = m.user_id
+             WHERE tsl."teacherId" = $1
+               AND tsl.status = 'approved'
+               AND m.score < 50
+               AND n.type IN ('Topic', 'Concept', 'Formula')
+             GROUP BY m.node_id, n.label, n.type
+             HAVING COUNT(DISTINCT m.user_id) >= 2
+             ORDER BY weak_student_count DESC, avg_score ASC LIMIT 5`,
+            [user.id]
+          );
+          for (const t of trending.rows) {
+            candidates.push({
+              type: 'class_trending_weak',
+              id: t.node_id,
+              title: `Lớp đang yếu: ${t.label}`,
+              subtitle: `${t.weak_student_count} HS · TB ${Math.round(t.avg_score)}% · cần dạy lại`,
+              description: `${t.weak_student_count} học sinh trong nhóm bạn dạy có mastery <50% cho chủ đề này. Cân nhắc tạo lộ trình ôn tập hoặc thêm đề luyện.`,
+              score: 110 + Number(t.weak_student_count) * 3, // ưu tiên cực cao
+              source: 'class-trending',
+              link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(t.node_id)}`,
+              meta: {
+                studentCount: Number(t.weak_student_count),
+                avgScore: Math.round(Number(t.avg_score) || 0),
+                nodeType: t.type,
+              },
+              cta: 'Xem chi tiết',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:class-trending]', e.message); }
+
+        // Content gap suggestion: topics quan trọng (Chapter level) mà
+        // GV chưa có LP nào — gợi ý tạo bài
+        try {
+          const gaps = await pool.query(
+            `SELECT n.id, n.label, n.type, n.description
+             FROM kg_nodes n
+             WHERE n.type = 'Chapter'
+               AND NOT EXISTS (
+                 SELECT 1 FROM "LearningPath" lp
+                 WHERE lp."teacherId" = $1
+                   AND (lp.name ILIKE '%' || n.label || '%'
+                        OR lp.description ILIKE '%' || n.label || '%')
+               )
+             ORDER BY RANDOM() LIMIT 3`,
+            [user.id]
+          );
+          for (const g of gaps.rows) {
+            candidates.push({
+              type: 'content_gap',
+              id: g.id,
+              title: `Gợi ý tạo bài: ${g.label}`,
+              subtitle: `Chưa có LP nào về chương này — HS có thể cần`,
+              description: g.description,
+              score: 70,
+              source: 'content-gap',
+              link: '/teacher/learning-path-builder',
+              meta: { chapterNodeId: g.id },
+              cta: 'Tạo lộ trình',
+            });
+          }
+        } catch (e) { console.warn('[rs:source:content-gap]', e.message); }
       }
 
       // ── Filter: deduplicate by (type, id) ──
@@ -10953,6 +11121,8 @@ CHỈ TRẢ JSON, không bọc markdown.`;
           predictions: c.predictions || null,
         })),
         sources: Array.from(new Set(top.map(c => c.source))),
+        // RS-Phase 10: signal cho frontend nếu là cold-start user
+        isColdStart,
       });
     } catch (err) {
       console.error('[rs:feed] ❌', err.message);

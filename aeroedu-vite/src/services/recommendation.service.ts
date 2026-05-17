@@ -75,6 +75,8 @@ export interface RsFeedResponse {
   count: number
   items: RsFeedItem[]
   sources: string[]
+  /** RS-Phase 10: true nếu user mới (<5 actions) — show welcome banner */
+  isColdStart?: boolean
 }
 
 export interface RsHistoryEntry {
@@ -109,6 +111,7 @@ export const recommendationService = {
       count: r.data.count,
       items: r.data.items || [],
       sources: r.data.sources || [],
+      isColdStart: !!r.data.isColdStart,
     })),
 
   /** Get user's engagement history (debug/transparency). */
@@ -137,8 +140,16 @@ export function getRsTypeMeta(type: string): { emoji: string; accent: string; la
     'popular_exam':          { emoji: '🔥', accent: '#fb923c', label: 'Nổi bật' },
     'curious_topic':         { emoji: '✨', accent: '#a855f7', label: 'Khám phá' },
     'embedding_match':       { emoji: '🧠', accent: '#3b82f6', label: 'AI khớp sở thích' },
+    // RS-Phase 10: cold-start types
+    'cold_start_popular':    { emoji: '🌟', accent: '#fbbf24', label: 'Khởi đầu' },
+    'cold_start_intro':      { emoji: '🌱', accent: '#10b981', label: 'Bắt đầu khám phá' },
+    'cold_start_teacher_lp': { emoji: '🚀', accent: '#a855f7', label: 'GV của bạn' },
+    // Teacher
     'student_needs_help':    { emoji: '🆘', accent: '#f43f5e', label: 'HS cần hỗ trợ' },
     'student_self_path':     { emoji: '🛣',  accent: '#fbbf24', label: 'HS tự khảo sát' },
+    // RS-Phase 7: teacher trending
+    'class_trending_weak':   { emoji: '📉', accent: '#f43f5e', label: 'Lớp đang yếu' },
+    'content_gap':           { emoji: '💡', accent: '#fbbf24', label: 'Cần tạo bài' },
   }
   return map[type] || { emoji: '📌', accent: '#94a3b8', label: 'Khác' }
 }

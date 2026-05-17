@@ -159,6 +159,11 @@ export default function ForYouPage() {
                   'popular':         '🔥 Nổi bật',
                   'curious':         '✨ Khám phá',
                   'embedding':       '🧠 AI Two-Tower',
+                  'cold-start':      '🌱 Khởi đầu',
+                  'class-trending':  '📉 Lớp đang yếu',
+                  'content-gap':     '💡 Cần tạo bài',
+                  'student-need':    '🆘 HS cần hỗ trợ',
+                  'student-activity':'🛣 HS tự khảo sát',
                 }[s] || s}
               </span>
             ))}
@@ -263,6 +268,21 @@ export default function ForYouPage() {
               <button onClick={() => navigate('/dashboard/knowledge-graph')} className="w-full py-2.5 rounded-lg bg-zinc-800 text-zinc-300 border border-zinc-700 text-sm font-bold">
                 Vào Knowledge Graph
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* RS-Phase 10: Cold-start welcome banner cho user mới */}
+        {tab === 'feed' && !isLoading && feed?.isColdStart && visibleItems.length > 0 && (
+          <div className="mb-3 rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-500/15 via-orange-500/10 to-rose-500/5 p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🌱</span>
+              <div className="flex-1">
+                <h3 className="font-bold text-amber-200 text-sm mb-1">Chào mừng đến với AeroEduVision!</h3>
+                <p className="text-xs text-amber-100/80 leading-snug">
+                  Bạn mới đăng ký — đây là <strong>gợi ý khởi đầu</strong> từ content phổ biến + lộ trình GV. Càng tương tác nhiều (xem đề, làm bài, hỏi AI), feed càng cá nhân hoá hơn.
+                </p>
+              </div>
             </div>
           </div>
         )}
