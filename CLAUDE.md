@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `93ddbf1` (revision pixiai-00284-xef, 2026-05-17 — RS-Phase 8 Multi-channel Digest LIVE: In-app + Email + Telegram)
-- Commits since last deploy: `5/5` → DEPLOYING (650453f docs · aa541c6 scheduler + per-channel stats · 35e25f3 teacher-aware digest · 04b6c60 Settings note · then docs)
+- Last deployed commit: `d984880` (revision pixiai-00285-xan, 2026-05-17 — RS-Phase 8 Ops: scheduler script + audience-aware digest LIVE)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `93ddbf1` → pixiai-00284-xef (RS-Phase 8 Multi-channel digest: In-app + Email + Telegram)
 - Prev: `bd971e7` → pixiai-00283-xok (Student Daily Plan UI)
 - Prev: `9533775` → pixiai-00282-loy (RS-Phase 7 Sprint Dashboard UI)
 - Prev: `7073eb9` → pixiai-00281-moh (RS-Phase 7+10 backend — Cold-start + Teacher trending)
