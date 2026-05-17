@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Clock, Send, Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle } from 'lucide-react'
+import { Clock, Send, Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle, FileText, ClipboardList, ExternalLink, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
@@ -61,6 +61,8 @@ export default function ExamSheetPage() {
     phanIVEarned?: number
   } | null>(null)
   const [timeLeft, setTimeLeft] = useState(0)
+  // Mobile-only: tab toggle giữa Đề bài (PDF) và Phiếu trả lời
+  const [mobileTab, setMobileTab] = useState<'pdf' | 'sheet'>('pdf')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -297,23 +299,91 @@ export default function ExamSheetPage() {
         </div>
       </div>
 
+      {/* MOBILE-ONLY: Tab toggle PDF ↔ Phiếu trả lời (hiển thị khi pdf-only) */}
+      {exam.examMode === 'pdf-only' && (
+        <div className="lg:hidden sticky top-[60px] z-10 bg-white border-b border-slate-200 flex">
+          <button
+            onClick={() => setMobileTab('pdf')}
+            className={`flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-1.5 border-b-2 transition ${
+              mobileTab === 'pdf' ? 'border-blue-600 text-blue-700 bg-blue-50' : 'border-transparent text-slate-500'
+            }`}
+          >
+            <FileText className="w-4 h-4" /> Đề bài
+          </button>
+          <button
+            onClick={() => setMobileTab('sheet')}
+            className={`flex-1 py-2.5 text-sm font-bold flex items-center justify-center gap-1.5 border-b-2 transition relative ${
+              mobileTab === 'sheet' ? 'border-pink-600 text-pink-700 bg-pink-50' : 'border-transparent text-slate-500'
+            }`}
+          >
+            <ClipboardList className="w-4 h-4" /> Phiếu trả lời
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-pink-500 text-white font-bold">
+              {Object.keys(answers).length}/{questions.length}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* Main split-pane layout */}
-      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-6">
+      <div className={`max-w-7xl mx-auto py-4 lg:py-6 grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4 lg:gap-6 ${
+        exam.examMode === 'pdf-only' ? 'px-0 lg:px-4' : 'px-4'
+      }`}>
 
         {/* ═══ LEFT: Question content (hoặc PDF nếu pdf-only) ═══ */}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${exam.examMode === 'pdf-only' && mobileTab !== 'pdf' ? 'hidden lg:block' : ''}`}>
           {exam.examMode === 'pdf-only' ? (
-            // PDF-only mode: nhúng PDF iframe, HS xem PDF làm hình đề
+            // PDF-only mode: nhúng PDF nhưng tối ưu cho mobile (iOS Safari có lỗi
+            // scroll iframe PDF — dùng object + fallback button "Mở PDF" để xem
+            // ở tab mới với native Safari PDF viewer)
             <>
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden" style={{ minHeight: '85vh' }}>
-                <iframe
-                  src={`/api/exams/${exam.id}/pdf#toolbar=1&navpanes=0`}
-                  title={exam.title}
-                  className="w-full"
-                  style={{ height: '85vh', border: 0, display: 'block' }}
-                />
+              <div
+                className="bg-white lg:rounded-xl lg:border border-slate-200 lg:shadow-sm overflow-hidden"
+                style={{
+                  // Full height trên mobile (trừ header + tab nav + bottom bar),
+                  // 85vh trên desktop
+                  height: 'calc(100vh - 180px)',
+                  minHeight: 400,
+                }}
+              >
+                <object
+                  data={`/api/exams/${exam.id}/pdf#toolbar=1&navpanes=0&zoom=page-width`}
+                  type="application/pdf"
+                  className="w-full h-full"
+                  style={{ border: 0, display: 'block' }}
+                >
+                  {/* Fallback nếu browser không render được PDF (iOS Safari trong iframe) */}
+                  <div className="p-6 text-center text-sm text-slate-600 space-y-3">
+                    <FileText className="w-12 h-12 mx-auto text-slate-400" />
+                    <p>Trình duyệt không hiển thị PDF inline.</p>
+                    <a
+                      href={`/api/exams/${exam.id}/pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-bold"
+                    >
+                      <ExternalLink className="w-4 h-4" /> Mở PDF trong tab mới
+                    </a>
+                  </div>
+                </object>
               </div>
-              <p className="text-center text-xs text-slate-500">
+              {/* Mobile-only quick actions: mở PDF tab mới + tải về */}
+              <div className="lg:hidden flex items-center gap-2 px-4">
+                <a
+                  href={`/api/exams/${exam.id}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold active:bg-blue-100"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Mở fullscreen
+                </a>
+                <a
+                  href={`/api/exams/${exam.id}/pdf?download=1`}
+                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold active:bg-slate-200"
+                >
+                  <Download className="w-3.5 h-3.5" /> Tải PDF
+                </a>
+              </div>
+              <p className="hidden lg:block text-center text-xs text-slate-500">
                 Xem PDF làm đề và tô đáp án ở bảng bên phải. Có thể zoom / scroll bên trong khung PDF.
               </p>
             </>
@@ -345,8 +415,10 @@ export default function ExamSheetPage() {
           </div>
         </div>
 
-        {/* ═══ RIGHT: Answer sheet (sticky) ═══ */}
-        <div className="lg:sticky lg:top-20 lg:self-start space-y-4 max-h-[calc(100vh-100px)] overflow-y-auto pb-6">
+        {/* ═══ RIGHT: Answer sheet (sticky desktop / fullscreen mobile tab) ═══ */}
+        <div className={`lg:sticky lg:top-20 lg:self-start space-y-4 max-h-[calc(100vh-100px)] overflow-y-auto pb-24 lg:pb-6 px-4 lg:px-0 ${
+          exam.examMode === 'pdf-only' && mobileTab !== 'sheet' ? 'hidden lg:block' : ''
+        }`}>
 
           {/* PHẦN I: Trắc nghiệm A/B/C/D */}
           {sections.phanI.length > 0 && (
@@ -426,6 +498,36 @@ export default function ExamSheetPage() {
           <div className="text-center text-xs text-slate-400 py-2">
             Đã trả lời {Object.keys(answers).filter((k) => answers[k]).length} / {questions.length} câu
           </div>
+        </div>
+      </div>
+
+      {/* MOBILE STICKY BOTTOM BAR — luôn hiển thị Nộp bài + progress */}
+      <div
+        className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 shadow-2xl"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0)' }}
+      >
+        <div className="flex items-center gap-2 px-3 py-2.5">
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] text-slate-500 leading-tight">Tiến độ</div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 flex-1 bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all"
+                  style={{ width: `${(Object.keys(answers).filter(k => answers[k]).length / Math.max(1, questions.length)) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs font-bold text-slate-700 shrink-0">
+                {Object.keys(answers).filter(k => answers[k]).length}/{questions.length}
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => handleSubmit(false)}
+            disabled={submitting}
+            className="px-5 py-2.5 rounded-xl bg-pink-500 active:bg-pink-600 text-white font-bold text-sm inline-flex items-center gap-1.5 shadow-lg shadow-pink-500/30 disabled:opacity-50 shrink-0"
+          >
+            <Send className="w-4 h-4" /> {submitting ? '...' : 'Nộp bài'}
+          </button>
         </div>
       </div>
     </div>
