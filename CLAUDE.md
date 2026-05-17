@@ -16,7 +16,9 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `7f66062` (revision pixiai-00251-tux, 2026-05-17 — TikZ snippet library + fix LatexProject 503 + thêm 14 endpoint stubs)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `2/5`
+  - `46476a7` feat(exam-prep): card đề thi hiển thị avatar HS được phân công + đã làm
+  - `f2d6145` fix(router): LabTwin card click không mở được — sửa redirect loop /labs → /labtwin
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
