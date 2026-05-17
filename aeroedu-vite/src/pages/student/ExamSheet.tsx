@@ -19,6 +19,7 @@ import axios from 'axios'
 import { MathText } from '@/components/common/MathText'
 import { shuffleQuestions, readShufflePrefs } from '@/lib/shuffleQuestions'
 import MusicToggle from '@/components/common/MusicToggle'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 interface Question {
   id: string
@@ -74,6 +75,16 @@ export default function ExamSheetPage() {
         const exam = res.data.exam
         setExam(exam)
         setTimeLeft((exam?.duration || 45) * 60)
+        // RS: track 'view' event ngay khi exam load — signal cho recsys
+        rs.track({
+          action: 'view',
+          targetType: 'exam',
+          targetId: exam.id,
+          metadata: {
+            title: exam.title, subject: exam.subject,
+            grade: exam.grade, totalQuestions: exam.totalQuestions,
+          },
+        })
 
         // ── PDF-only mode: synthesize virtual questions theo sectionCounts ──
         if (exam.examMode === 'pdf-only' && exam.sectionCounts) {
@@ -184,13 +195,32 @@ export default function ExamSheetPage() {
         `/api/exams/${examId}/grade`,
         { answers },
       ).catch(() => null)
+      let finalPct = 0
       if (res?.data) {
-        setResult({ ...res.data, percentage: Math.round(res.data.percentage) })
+        finalPct = Math.round(res.data.percentage)
+        setResult({ ...res.data, percentage: finalPct })
       } else {
         // Fallback: hiển thị tổng số câu trả lời (chưa chấm được)
         for (const qid in answers) if (answers[qid]) correct++
         scored = correct
-        setResult({ score: scored, total, percentage: total ? Math.round((scored/total)*100) : 0, correct: scored })
+        finalPct = total ? Math.round((scored/total)*100) : 0
+        setResult({ score: scored, total, percentage: finalPct, correct: scored })
+      }
+      // RS: track 'complete' + pass/fail tự động (auto-cập nhật mastery
+      // không cần backend wire-up riêng)
+      if (exam) {
+        rs.track({
+          action: 'complete',
+          targetType: 'exam',
+          targetId: exam.id,
+          metadata: { percentage: finalPct, score: scored, total, auto },
+        })
+        rs.track({
+          action: finalPct >= 50 ? 'pass_quiz' : 'fail_quiz',
+          targetType: 'exam',
+          targetId: exam.id,
+          metadata: { percentage: finalPct, subject: exam.subject },
+        })
       }
       toast.success('Đã nộp bài!')
     } catch (err: unknown) {

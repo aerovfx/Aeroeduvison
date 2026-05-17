@@ -30,6 +30,7 @@ import {
   type KgNode, type KgEdge, type KgNodeType, type KgNeighbor,
 } from '@/services/knowledge-graph.service'
 import AiExtractModal from '@/components/knowledge-graph/AiExtractModal'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -514,6 +515,17 @@ export default function KnowledgeGraph() {
     try {
       const r = await kgs.getNode(id)
       setSelectedNode(r)
+      // RS: track click — signal mạnh cho recsys hiểu user quan tâm topic
+      rs.track({
+        action: 'click',
+        targetType: 'kg_node',
+        targetId: id,
+        metadata: {
+          nodeType: r.node.type,
+          label: r.node.label,
+          neighborCount: r.neighbors.length,
+        },
+      })
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Lỗi tải node')
     }

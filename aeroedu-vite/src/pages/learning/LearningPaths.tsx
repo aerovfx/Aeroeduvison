@@ -25,6 +25,7 @@ import studentLearningPathService, {
   type StudentLearningPath, type StudentLearningPathModule,
 } from '@/services/studentLearningPath.service'
 import usePageTitle from '@/hooks/usePageTitle'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 // ── Types cho AI form (giữ nguyên flow cũ) ─────────────────────
 interface LearningPathFormData {
@@ -553,12 +554,32 @@ function TeacherPathCard({ path }: { path: StudentLearningPath }) {
   const totalCount = path.modules?.length || 0
   const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
+  // RS: track view 1 lần khi card mount
+  useEffect(() => {
+    rs.track({
+      action: 'view',
+      targetType: 'learning_path',
+      targetId: path.id,
+      metadata: { subject: path.subject, teacherId: path.teacher?.id, pct },
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path.id])
+
   return (
     <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm overflow-hidden">
       {/* Header */}
       <button
         type="button"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          setExpanded(!expanded)
+          if (!expanded) {
+            // Expand = click → mạnh hơn view
+            rs.track({
+              action: 'click', targetType: 'learning_path', targetId: path.id,
+              metadata: { source: 'card-expand' },
+            })
+          }
+        }}
         className="w-full p-5 hover:bg-white/[0.02] transition-colors text-left"
       >
         <div className="flex items-start justify-between gap-4">
