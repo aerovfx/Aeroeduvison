@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `9533775` (revision pixiai-00282-loy, 2026-05-17 — RS-Phase 7 Sprint Dashboard UI LIVE)
-- Commits since last deploy: `5/5` → DEPLOYING (cc418c3 docs · 8d855f0 Daily page · a0d97f1 Student Dashboard CTA · ac51736 ForYou Calendar link · _next_ time-of-day greeting)
+- Last deployed commit: `bd971e7` (revision pixiai-00283-xok, 2026-05-17 — RS Student Daily Plan UI LIVE)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `9533775` → pixiai-00282-loy (RS-Phase 7 Sprint Dashboard UI)
 - Prev: `7073eb9` → pixiai-00281-moh (RS-Phase 7+10 backend — Cold-start + Teacher trending)
 - Prev: `48ea1c3` → pixiai-00280-hir (RS-Phase 6 Negative feedback)
 - Prev: `bd8cf00` → pixiai-00279-law (RS-Phase 8 Daily digest)
