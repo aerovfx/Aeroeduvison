@@ -1224,15 +1224,27 @@ function extractPinMap(diagram: WokwiDiagram | null): PinMap {
   }
 
   // Build adjacency: each pin-ref → list of pin-refs connected to it
+  // PLUS: internal bridges trong cùng 1 component (resistor 2-pin được nối
+  // qua thân nó). Không có bridge này → BFS không thể đi từ led.A → resistor
+  // pin 1 → board pin.
   const adj = new Map<string, string[]>()
-  for (const c of diagram.connections) {
-    const a = String(c[0]), b = String(c[1])
+  const addEdge = (a: string, b: string) => {
     if (!adj.has(a)) adj.set(a, []); adj.get(a)!.push(b)
     if (!adj.has(b)) adj.set(b, []); adj.get(b)!.push(a)
   }
+  for (const c of diagram.connections) {
+    addEdge(String(c[0]), String(c[1]))
+  }
+  // Bridge internal pins của resistor (id bắt đầu bằng r) — 2 chân :1 và :2
+  // được nối qua thân điện trở (DC).
+  for (const p of diagram.parts) {
+    if (p.type === 'wokwi-resistor') {
+      addEdge(`${p.id}:1`, `${p.id}:2`)
+    }
+  }
 
   // BFS từ 1 component pin → tìm board pin nào kết nối (qua resistor cũng được)
-  const tracePinToBoard = (start: string, maxHops = 3): number | null => {
+  const tracePinToBoard = (start: string, maxHops = 5): number | null => {
     if (!boardId) return null
     const visited = new Set<string>([start])
     let frontier = [start]
@@ -1255,8 +1267,9 @@ function extractPinMap(diagram: WokwiDiagram | null): PinMap {
             if (idx !== null) return idx
             continue
           }
-          // Continue through resistor (allow hop)
-          if (nb.startsWith('r')) next.push(nb)
+          // Continue exploring (qua resistor đã có bridge, hoặc qua bất kỳ
+          // pin nào khác — vd. button có 4 chân, breadboard rail v.v.)
+          next.push(nb)
         }
       }
       frontier = next
@@ -1585,9 +1598,10 @@ export default function CustomWokwiBoard() {
     setShowSerial(true)
     // 1. Transpile Arduino C++ → JS
     const t = transpileArduino(sketchText)
-    if ('error' in t) {
-      setSimError(t.error)
-      toast.error(`Lỗi cú pháp: ${t.error}`)
+    if (!t.ok) {
+      const msg = `Transpile error: ${t.error}${t.line ? ' (dòng ' + t.line + ')' : ''}`
+      setSimError(msg)
+      toast.error(msg.slice(0, 120))
       return
     }
     // 2. Tạo runtime mới + signal
@@ -1595,6 +1609,9 @@ export default function CustomWokwiBoard() {
     const runtime = new ArduinoRuntime(simSignalRef.current, { speed: 1, maxDelayMs: 30_000 })
     simRuntimeRef.current = runtime
     runtime.start()
+    // Sanity-check: nếu sketch không gọi Serial.begin, vẫn cho user thấy
+    // 1 dòng log debug "▶ Sketch started" để confirm runtime đã chạy
+    runtime.Serial.println('▶ Sketch started ' + new Date().toLocaleTimeString())
     // 3. Subscribe để re-render UI khi pin state thay đổi
     const unsub = runtime.subscribe(() => {
       setSimSnapshot(runtime.snapshot())
@@ -1603,13 +1620,16 @@ export default function CustomWokwiBoard() {
     setSimRunning(true)
     // 4. Execute sketch — chạy async, await
     try {
-      await executeSketch(t.code, runtime, simSignalRef.current)
+      // CRITICAL: field là `jsCode` không phải `code` (đã fix bug nghiêm trọng)
+      await executeSketch(t.jsCode, runtime, simSignalRef.current)
     } catch (e: any) {
       const msg = e?.message || String(e)
       setSimError(msg)
+      runtime.Serial.println('✗ Runtime error: ' + msg)
       if (!simSignalRef.current.stopped) toast.error(`Runtime: ${msg.slice(0, 100)}`)
     } finally {
       unsub()
+      setSimSnapshot(runtime.snapshot())  // final snapshot để hiện serial cuối
       setSimRunning(false)
     }
   }, [simRunning, sketchText])
@@ -1978,50 +1998,75 @@ export default function CustomWokwiBoard() {
               )
             })()}
 
-            {/* Simulator info panel — chỉ hiện khi đang chạy */}
-            {simRunning && simSnapshot && (
-              <div className="border-t border-emerald-500/30 bg-emerald-500/5 p-2.5 space-y-2">
+            {/* Simulator info panel — hiện khi đang chạy HOẶC đã chạy (giữ log) */}
+            {simSnapshot && (simRunning || simSnapshot.serial.length > 0 || simError) && (
+              <div className={`border-t p-2.5 space-y-2 ${
+                simRunning ? 'border-emerald-500/30 bg-emerald-500/5'
+                : simError ? 'border-rose-500/30 bg-rose-500/5'
+                : 'border-zinc-700 bg-zinc-950/50'
+              }`}>
                 <div className="flex items-center justify-between text-[11px]">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-emerald-300 font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      SIMULATOR
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1 font-bold ${
+                      simRunning ? 'text-emerald-300' : simError ? 'text-rose-300' : 'text-zinc-400'
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${
+                        simRunning ? 'bg-emerald-400 animate-pulse'
+                        : simError ? 'bg-rose-400' : 'bg-zinc-500'
+                      }`} />
+                      {simRunning ? 'SIMULATOR RUNNING' : simError ? 'STOPPED (error)' : 'STOPPED'}
                     </span>
                     <span className="text-zinc-500">
                       uptime {(simSnapshot.uptimeMs / 1000).toFixed(1)}s ·
                       🔆 {Array.from(simState?.ledOn.values() ?? []).filter(Boolean).length}/{pinMap.leds.size} LED ·
                       🔘 {pinMap.buttons.size} btn ·
-                      🔊 {pinMap.buzzers.size} buzzer
+                      🔊 {pinMap.buzzers.size} buzzer ·
+                      📨 {simSnapshot.serial.length} log lines
                     </span>
                   </div>
                   <button
                     onClick={() => setShowSerial(v => !v)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 inline-flex items-center gap-1"
+                    className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 inline-flex items-center gap-1 shrink-0"
                   >
                     <Terminal className="w-3 h-3" /> {showSerial ? 'Ẩn' : 'Hiện'} Serial
                   </button>
                 </div>
                 {showSerial && (
-                  <div className="bg-black/80 rounded border border-zinc-800 font-mono text-[10px] text-emerald-300 p-2 max-h-32 overflow-y-auto leading-relaxed">
+                  <div className="bg-black/80 rounded border border-zinc-800 font-mono text-[10px] text-emerald-300 p-2 max-h-40 overflow-y-auto leading-relaxed">
                     {simSnapshot.serial.length === 0 ? (
-                      <div className="text-zinc-600 italic">Serial monitor — sketch chưa println dòng nào</div>
+                      <div className="text-zinc-600 italic">
+                        Sketch chưa println dòng nào. Thêm Serial.println("text") trong loop() để xem log.
+                      </div>
                     ) : (
-                      simSnapshot.serial.slice(-30).map((l, i) => (
-                        <div key={i}>
-                          <span className="text-zinc-600">[{(l.t / 1000).toFixed(2)}]</span> {l.text}
-                        </div>
-                      ))
+                      simSnapshot.serial.slice(-50).map((l, i) => {
+                        const isErr = l.text.startsWith('✗')
+                        const isStart = l.text.startsWith('▶')
+                        return (
+                          <div key={i} className={
+                            isErr ? 'text-rose-300' : isStart ? 'text-cyan-300' : ''
+                          }>
+                            <span className="text-zinc-600">[{(l.t / 1000).toFixed(2)}]</span> {l.text}
+                          </div>
+                        )
+                      })
                     )}
                   </div>
                 )}
                 {simError && (
-                  <div className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded p-1.5">
-                    <AlertTriangle className="w-3 h-3 inline mr-1" /> {simError}
+                  <div className="text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded p-2 leading-relaxed">
+                    <AlertTriangle className="w-3.5 h-3.5 inline mr-1" />
+                    <strong>Runtime error:</strong> {simError}
+                    <div className="mt-1 text-zinc-500 text-[9px]">
+                      Sketch có thể dùng API chưa hỗ trợ (vd. class, typedef, attachInterrupt, String).
+                      Đơn giản hoá sketch hoặc xem Console DevTools để debug.
+                    </div>
                   </div>
                 )}
-                <div className="text-[9px] text-zinc-500 italic">
-                  💡 Click vào button trên schematic để nhấn (active LOW). LED tự sáng khi pin HIGH.
-                </div>
+                {simRunning && (
+                  <div className="text-[9px] text-zinc-500 italic">
+                    💡 Click vào button trên schematic để nhấn (active LOW). LED tự sáng khi pin HIGH.
+                  </div>
+                )}
               </div>
             )}
 

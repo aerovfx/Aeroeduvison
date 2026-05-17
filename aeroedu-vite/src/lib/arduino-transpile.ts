@@ -57,6 +57,8 @@ const CONSTS: Record<string, string> = {
   'OUTPUT':       "'OUTPUT'",
   'INPUT':        "'INPUT'",
   'LED_BUILTIN':  '13',
+  'MSBFIRST':     '1',
+  'LSBFIRST':     '0',
   'A0': '14', 'A1': '15', 'A2': '16', 'A3': '17', 'A4': '18', 'A5': '19',
 }
 
@@ -140,6 +142,10 @@ function replaceTypes(src: string): string {
   let r = src
   // unsigned int → let (single token)
   r = r.replace(/\bunsigned\s+(int|long|byte|char|short)\b/g, 'let')
+  // stdint types: uint8_t, uint16_t, uint32_t, uint64_t, int8_t, int16_t,
+  // int32_t, int64_t, size_t, word — đều map về let / const tùy ngữ cảnh
+  r = r.replace(/\b(uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t|size_t|word)\s+(?=\w+\s*[=;,(\[])/g, 'let ')
+  r = r.replace(/\bconst\s+(uint8_t|uint16_t|uint32_t|uint64_t|int8_t|int16_t|int32_t|int64_t|size_t|word)\s+/g, 'const ')
   r = r.replace(/\b(int|long|byte|short|float|double|bool|boolean|char|void)\s+(?=\w+\s*[=;,(\[])/g,
     (m, ty) => {
       if (ty === 'void') return ''  // void f() → f()
@@ -212,6 +218,26 @@ const random = (a, b) => {
 const randomSeed = (_s) => { /* no-op */ };
 const sqrt = Math.sqrt; const pow = Math.pow; const sin = Math.sin;
 const cos = Math.cos; const tan = Math.tan; const PI = Math.PI;
+const bitRead = (v, b) => (v >> b) & 1;
+const bitWrite = (v, b, x) => x ? (v | (1 << b)) : (v & ~(1 << b));
+const bitSet = (v, b) => v | (1 << b);
+const bitClear = (v, b) => v & ~(1 << b);
+const lowByte = (v) => v & 0xFF;
+const highByte = (v) => (v >> 8) & 0xFF;
+// shiftOut: clock 8 bits, MSB(1) hoặc LSB(0) first
+const shiftOut = async (dataPin, clockPin, bitOrder, val) => {
+  for (let i = 0; i < 8; i++) {
+    const bit = bitOrder === 1
+      ? (val >> (7 - i)) & 1
+      : (val >> i) & 1;
+    runtime.digitalWrite(dataPin, bit);
+    runtime.digitalWrite(clockPin, 1);
+    runtime.digitalWrite(clockPin, 0);
+  }
+};
+// pulseIn: stub trả 0 (cần ECHO simulator riêng — chưa hỗ trợ HC-SR04
+// real-time interaction; user có thể setExternalDigitalIn để test).
+const pulseIn = (pin, level, timeout) => 0;
 `
 
 /**
