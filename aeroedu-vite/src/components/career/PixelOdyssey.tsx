@@ -28,6 +28,7 @@ import {
   type Facing as MetroFacing,
 } from '@/lib/pixel-characters'
 import PixelTouchPad from './PixelTouchPad'
+import { useIsVisible } from '@/hooks/useIsVisible'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -207,6 +208,8 @@ interface CharState {
 
 export default function PixelOdyssey() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  /** Pause render loop khi canvas scrolled off-screen (battery saver mobile) */
+  const isVisible = useIsVisible(canvasRef, { threshold: 0.1 })
   const rafRef = useRef<number | null>(null)
   const keysRef = useRef<Set<string>>(new Set())
   const moveTimerRef = useRef(0)
@@ -504,15 +507,19 @@ export default function PixelOdyssey() {
     const render = (t: number) => {
       const dt = Math.min(50, t - lastT)
       lastT = t
-      tick(dt)
-      draw()
+      // Battery saver: chỉ tick + draw khi canvas visible.
+      // Vẫn schedule RAF để khi visible quay lại không miss frame.
+      if (isVisible) {
+        tick(dt)
+        draw()
+      }
       rafRef.current = requestAnimationFrame(render)
     }
     rafRef.current = requestAnimationFrame(render)
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [activeNPC, collectedTokens, findNearbyNPC, playerChar])
+  }, [activeNPC, collectedTokens, findNearbyNPC, playerChar, isVisible])
 
   const tokenCount = collectedTokens.size
   const totalNPCs = NPCS.length

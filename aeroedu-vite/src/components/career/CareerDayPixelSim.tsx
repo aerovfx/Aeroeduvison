@@ -25,6 +25,7 @@ import {
   type Facing as MetroFacing,
 } from '@/lib/pixel-characters'
 import PixelTouchPad from './PixelTouchPad'
+import { useIsVisible } from '@/hooks/useIsVisible'
 
 /* ────────────────────────── Types ────────────────────────── */
 
@@ -291,6 +292,8 @@ type Facing = 'left' | 'right' | 'up' | 'down'
 
 export default function CareerDayPixelSim({ careerName, category, dailyLife }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  /** Pause render loop khi canvas scrolled off-screen */
+  const isVisible = useIsVisible(canvasRef, { threshold: 0.1 })
   const rafRef = useRef<number | null>(null)
   const [mode, setMode] = useState<Mode>('auto')
   const [playing, setPlaying] = useState(true)
@@ -577,15 +580,18 @@ export default function CareerDayPixelSim({ careerName, category, dailyLife }: P
     const render = (t: number) => {
       const dt = Math.min(50, t - lastT)
       lastT = t
-      tick(dt * (mode === 'auto' ? speed : 1))
-      draw()
+      // Battery saver: skip tick + draw khi off-screen
+      if (isVisible) {
+        tick(dt * (mode === 'auto' ? speed : 1))
+        draw()
+      }
       rafRef.current = requestAnimationFrame(render)
     }
     rafRef.current = requestAnimationFrame(render)
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
     }
-  }, [mode, playing, speed, currentIdx, activities, scene, interactedZone])
+  }, [mode, playing, speed, currentIdx, activities, scene, interactedZone, isVisible, character])
 
   const current = activities[currentIdx]
 
