@@ -16766,6 +16766,51 @@ if (!USE_NODEJS_QUESTIONS) {
   app.post('/api/learning/enroll/:courseId', okMsg);
   app.post('/api/learning/like/:courseId', okMsg);
   app.post('/api/learning/bookmark/:courseId', okMsg);
+
+  // ─ Achievements (chưa có data thật) ───────────────────────
+  // Trả structure đúng format AchievementsResponse để FE render được skeleton
+  app.get('/api/achievements', (_req, res) => res.json({
+    achievements: [],
+    totalXP: 0,
+    earnedCount: 0,
+    totalCount: 0,
+    level: 1,
+    currentXP: 0,
+    nextLevelXP: 100,
+    streak: 0,
+  }));
+
+  // ─ Analytics dashboard (chưa có data thật cho dashboard tổng quan) ────────
+  // 4 endpoints frontend analytics.service.ts gọi
+  app.get('/api/analytics/dashboard', (_req, res) => res.json({
+    totalUsers: 0, totalCourses: 0, totalRevenue: 0,
+    totalEnrollments: 0, monthlyGrowth: 0, weeklyActive: 0,
+  }));
+  app.get('/api/analytics/activity', emptyArr);
+  app.get('/api/analytics/courses', emptyArr);
+  app.get('/api/analytics/students', emptyArr);
+
+  // ─ Chat (chưa implement chat thực — trả empty để FE không 503) ────────────
+  app.get('/api/chat/rooms', emptyArr);
+  app.post('/api/chat/rooms', notImpl('Chat đang phát triển'));
+  app.get('/api/chat/rooms/:id/messages', emptyArr);
+  app.post('/api/chat/rooms/:id/messages', notImpl('Chat đang phát triển'));
+  app.post('/api/chat/rooms/:id/read', okMsg);
+  app.get('/api/chat/users/search', emptyArr);
+
+  // ─ Categories CRUD (PUT/DELETE — admin Categories.tsx) ────────────────────
+  app.put('/api/categories/:id', notImpl('Admin categories editor đang phát triển'));
+  app.delete('/api/categories/:id', notImpl('Admin categories editor đang phát triển'));
+
+  // ─ Teacher exam upload PDF + answer-key (CreateExam.tsx) ──────────────────
+  // Frontend gọi multipart/form-data → trả 501 thay vì 503 ECONNREFUSED
+  app.post('/api/teacher/exams/upload-pdf', notImpl('Upload PDF đang phát triển — dùng tạo đề thủ công'));
+  app.post('/api/teacher/exams/:examId/answer-key', okMsg);
+
+  // ─ Generic upload signed URL (useGcsUpload hook) ──────────────────────────
+  // Hook hooks/useGcsUpload.ts POST tới /upload/request để xin signed-URL GCS.
+  // Stub trả 501 — FE đã có fallback data-URL trong instructor.service.ts.
+  app.post('/api/upload/request', notImpl('Upload signed URL đang phát triển — dùng client-side data URL'));
 }
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
