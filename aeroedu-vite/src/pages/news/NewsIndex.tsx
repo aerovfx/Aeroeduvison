@@ -18,8 +18,10 @@ import {
   type NewsArticle,
 } from './articles'
 import { useAuth } from '@/hooks/useAuth'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function NewsIndex() {
+  usePageTitle('Tin tức giáo dục')
   const { user } = useAuth()
 
   // Reco-ranked feed: dùng rankNews mixer khi có user (sẽ personalize theo

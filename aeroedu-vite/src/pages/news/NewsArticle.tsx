@@ -24,10 +24,12 @@ import {
   formatVietnameseDate,
   formatViewCount,
 } from './articles'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function NewsArticle() {
   const { slug } = useParams<{ slug: string }>()
   const article = slug ? getNewsBySlug(slug) : undefined
+  usePageTitle(article?.title)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })

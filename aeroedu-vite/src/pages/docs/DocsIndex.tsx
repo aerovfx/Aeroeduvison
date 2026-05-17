@@ -7,8 +7,10 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Clock } from 'lucide-react'
 import { DocsLayout } from './DocsLayout'
 import { ARTICLES, CATEGORY_LABELS, CATEGORY_ORDER } from './articles'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function DocsIndex() {
+  usePageTitle('Tài liệu hệ thống')
   return (
     <DocsLayout>
       {/* Hero */}

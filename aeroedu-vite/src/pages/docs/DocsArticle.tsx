@@ -9,10 +9,12 @@ import { useEffect } from 'react'
 import { ArrowLeft, Clock } from 'lucide-react'
 import { DocsLayout } from './DocsLayout'
 import { getArticleBySlug, ARTICLES } from './articles'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function DocsArticle() {
   const { slug } = useParams<{ slug: string }>()
   const article = slug ? getArticleBySlug(slug) : undefined
+  usePageTitle(article?.title)
 
   // Scroll up khi navigate sang bài khác (anchor sẽ override)
   useEffect(() => {
