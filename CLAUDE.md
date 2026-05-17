@@ -15,12 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `56886e9` (revision pixiai-00252-zuk, 2026-05-17 — student exam-rooms + leaderboard + learning paths redesign)
-- Commits since last deploy: `4/5`
-  - `cfe7463` feat(iot-lab/custom): tab "Mạch Custom" với Wokwi JSON editor + 4 template (Simon Says)
-  - `a84318e` feat(iot-lab/custom): +7 component renderer + 4 template mới (servo, DHT, HC-SR04, LDR)
-  - `d0e2bc6` feat(iot-lab/custom): hover → highlight dây · click → pin chi tiết
-  - `5b861c2` fix(sidebar): thêm link "Phòng thi Live" → /student/exams (gap fix)
+- Last deployed commit: `cda8aa0` (revision TBD, 2026-05-17 — Custom Wokwi board + Sidebar gap fix + student empty state)
+- Commits since last deploy: `0/5` (vừa deploy 5 commits)
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
