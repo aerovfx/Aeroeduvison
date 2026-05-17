@@ -962,7 +962,16 @@ function connectionColor(c: string | undefined): string {
   return map[key] ?? '#94a3b8'
 }
 
-function DiagramSVG({ diagram }: { diagram: WokwiDiagram }) {
+function DiagramSVG({
+  diagram, focusedPartId, onFocusPart,
+}: {
+  diagram: WokwiDiagram
+  focusedPartId: string | null
+  onFocusPart: (id: string | null) => void
+}) {
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const activeId = hoverId ?? focusedPartId
+
   // Compute bounds
   const bounds = useMemo(() => {
     let minX = 0, minY = 0, maxX = 600, maxY = 400
@@ -991,6 +1000,9 @@ function DiagramSVG({ diagram }: { diagram: WokwiDiagram }) {
       viewBox={`${bounds.minX} ${bounds.minY} ${w} ${h}`}
       className="w-full h-full"
       style={{ maxHeight: 560, background: '#020617' }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onFocusPart(null)
+      }}
     >
       {/* Background grid */}
       <defs>
@@ -998,10 +1010,14 @@ function DiagramSVG({ diagram }: { diagram: WokwiDiagram }) {
           <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#1e293b" strokeWidth={0.5} />
         </pattern>
       </defs>
-      <rect x={bounds.minX} y={bounds.minY} width={w} height={h} fill="url(#grid-pattern)" />
+      <rect
+        x={bounds.minX} y={bounds.minY} width={w} height={h}
+        fill="url(#grid-pattern)"
+        onClick={() => onFocusPart(null)}
+      />
 
       {/* Connections — drawn first so parts overlap them */}
-      <g opacity={0.85}>
+      <g>
         {diagram.connections.map((c, i) => {
           const fromRef = String(c[0]).split(':')[0]
           const toRef = String(c[1]).split(':')[0]
@@ -1012,15 +1028,18 @@ function DiagramSVG({ diagram }: { diagram: WokwiDiagram }) {
           const tp = partCenter(to)
           // Manhattan-ish: horizontal then vertical
           const midX = (fp.x + tp.x) / 2
+          const isHighlighted = activeId !== null && (fromRef === activeId || toRef === activeId)
+          const isDimmed = activeId !== null && !isHighlighted
           return (
             <path
               key={i}
               d={`M ${fp.x} ${fp.y} L ${midX} ${fp.y} L ${midX} ${tp.y} L ${tp.x} ${tp.y}`}
               fill="none"
               stroke={connectionColor(c[2] as string | undefined)}
-              strokeWidth={1.5}
+              strokeWidth={isHighlighted ? 2.5 : 1.5}
               strokeLinecap="round"
-              opacity={0.7}
+              opacity={isDimmed ? 0.15 : isHighlighted ? 1 : 0.7}
+              style={{ transition: 'opacity 120ms, stroke-width 120ms' }}
             />
           )
         })}
@@ -1029,14 +1048,33 @@ function DiagramSVG({ diagram }: { diagram: WokwiDiagram }) {
       {/* Parts */}
       {diagram.parts.map((p) => {
         const shape = shapeFor(p)
-        const cx = (p.left ?? 0) + shape.width / 2
-        const cy = (p.top ?? 0) + shape.height / 2
         const rot = p.rotate ?? 0
+        const isFocused = p.id === focusedPartId
+        const isHover = p.id === hoverId
+        const isDimmed = activeId !== null && p.id !== activeId
         return (
           <g
             key={p.id}
             transform={`translate(${p.left ?? 0}, ${p.top ?? 0}) rotate(${rot}, ${shape.width / 2}, ${shape.height / 2})`}
+            onMouseEnter={() => setHoverId(p.id)}
+            onMouseLeave={() => setHoverId(null)}
+            onClick={(e) => { e.stopPropagation(); onFocusPart(isFocused ? null : p.id) }}
+            style={{
+              cursor: 'pointer',
+              opacity: isDimmed ? 0.45 : 1,
+              transition: 'opacity 120ms',
+            }}
           >
+            {/* Focus / hover halo */}
+            {(isFocused || isHover) && (
+              <rect
+                x={-4} y={-4} width={shape.width + 8} height={shape.height + 8} rx={6}
+                fill="none"
+                stroke={isFocused ? '#22d3ee' : '#94a3b8'}
+                strokeWidth={isFocused ? 2 : 1.2}
+                strokeDasharray={isFocused ? undefined : '3 2'}
+              />
+            )}
             {shape.render(p)}
           </g>
         )
@@ -1075,6 +1113,7 @@ export default function CustomWokwiBoard() {
   const [error, setError] = useState<string | null>(null)
   const [autoParse, setAutoParse] = useState<boolean>(true)
   const [view, setView] = useState<'split' | 'preview' | 'json'>('split')
+  const [focusedPartId, setFocusedPartId] = useState<string | null>(null)
 
   const activeTemplate = useMemo(
     () => TEMPLATES.find(t => t.id === activeTemplateId) ?? TEMPLATES[0],
@@ -1099,6 +1138,7 @@ export default function CustomWokwiBoard() {
     setActiveTemplateId(t.id)
     setDiagramText(safeStringify(t.diagram))
     setSketchText(t.sketch)
+    setFocusedPartId(null)
     setParsed(t.diagram)
     setError(null)
     toast.success(`Đã tải template: ${t.name}`)
@@ -1289,7 +1329,11 @@ export default function CustomWokwiBoard() {
             </div>
             <div className="bg-slate-950">
               {parsed ? (
-                <DiagramSVG diagram={parsed} />
+                <DiagramSVG
+                  diagram={parsed}
+                  focusedPartId={focusedPartId}
+                  onFocusPart={setFocusedPartId}
+                />
               ) : (
                 <div className="h-96 flex items-center justify-center text-xs text-zinc-500">
                   Diagram chưa parse được — xem panel JSON
@@ -1297,9 +1341,70 @@ export default function CustomWokwiBoard() {
               )}
             </div>
 
+            {/* Focused part info panel */}
+            {parsed && focusedPartId && (() => {
+              const part = parsed.parts.find(p => p.id === focusedPartId)
+              if (!part) return null
+              const conns = parsed.connections.filter(c =>
+                String(c[0]).split(':')[0] === focusedPartId ||
+                String(c[1]).split(':')[0] === focusedPartId
+              )
+              return (
+                <div className="p-2.5 border-t border-cyan-500/30 bg-cyan-500/5 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-bold text-cyan-200">
+                      📌 {part.id}
+                      <span className="ml-1.5 text-[10px] font-normal text-cyan-400/70">{part.type}</span>
+                    </div>
+                    <button
+                      onClick={() => setFocusedPartId(null)}
+                      className="text-[10px] text-zinc-400 hover:text-zinc-200"
+                    >
+                      ✕ Bỏ chọn
+                    </button>
+                  </div>
+                  <div className="text-[10px] text-zinc-400">
+                    Vị trí: ({part.left ?? 0}, {part.top ?? 0})
+                    {part.rotate ? ` · xoay ${part.rotate}°` : ''}
+                    {part.attrs && Object.keys(part.attrs).length > 0 && (
+                      <span className="ml-2">
+                        · attrs: {Object.entries(part.attrs).map(([k, v]) => `${k}=${v}`).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                  {conns.length > 0 ? (
+                    <div className="space-y-0.5">
+                      <div className="text-[10px] text-zinc-500 uppercase tracking-wider">
+                        {conns.length} đường nối:
+                      </div>
+                      {conns.map((c, i) => {
+                        const from = String(c[0]), to = String(c[1]), color = String(c[2] ?? '')
+                        const other = from.split(':')[0] === focusedPartId ? to : from
+                        const myPin = from.split(':')[0] === focusedPartId ? from : to
+                        return (
+                          <div key={i} className="text-[10px] text-zinc-300 flex items-center gap-1.5">
+                            <span
+                              className="w-2 h-2 rounded-full inline-block"
+                              style={{ backgroundColor: connectionColor(color) }}
+                            />
+                            <span className="font-mono text-cyan-300">{myPin}</span>
+                            <span className="text-zinc-500">→</span>
+                            <span className="font-mono text-zinc-200">{other}</span>
+                            {color && <span className="text-[9px] text-zinc-500 ml-auto">{color}</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-[10px] text-zinc-500 italic">Chưa có đường nối nào tới part này.</div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Part type legend */}
             {parsed && partTypes.size > 0 && (
-              <div className="p-2 border-t border-zinc-800 bg-zinc-950/50 flex flex-wrap gap-1">
+              <div className="p-2 border-t border-zinc-800 bg-zinc-950/50 flex flex-wrap items-center gap-1">
                 {Array.from(partTypes.entries()).map(([type, count]) => (
                   <span
                     key={type}
@@ -1310,9 +1415,12 @@ export default function CustomWokwiBoard() {
                     }`}
                     title={PART_REGISTRY[type] ? 'Có renderer' : 'Vẽ placeholder'}
                   >
-                    {type.replace('wokwi-', '')} ×{count}
+                    {type.replace('wokwi-', '').replace('board-', '')} ×{count}
                   </span>
                 ))}
+                <span className="ml-auto text-[9px] text-zinc-600 italic">
+                  💡 Hover part = highlight dây · Click = pin để xem chi tiết
+                </span>
               </div>
             )}
           </div>
