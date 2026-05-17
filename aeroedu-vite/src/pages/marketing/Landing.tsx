@@ -228,6 +228,7 @@ export default function Landing() {
             <Link to="/docs" className="land-nav-link">Tài liệu</Link>
             <Link to="/news" className="land-nav-link">Tin tức</Link>
             <a href="#testimonials" className="land-nav-link">Phản hồi</a>
+            <a href="#team" className="land-nav-link">Đội ngũ</a>
           </div>
 
           {/* Desktop CTA */}
@@ -255,9 +256,9 @@ export default function Landing() {
         {/* Mobile menu */}
         {menuOpen && (
           <div style={{ background: 'rgba(2,4,18,0.98)', borderTop: `1px solid ${C.border}`, padding: '16px 24px 24px' }}>
-            {['features', 'platform', 'ai', 'testimonials'].map(s => (
+            {['features', 'platform', 'ai', 'testimonials', 'team'].map(s => (
               <a key={s} href={`#${s}`} onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
-                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Phản hồi' }[s]}
+                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Phản hồi', team: 'Đội ngũ' }[s]}
               </a>
             ))}
             <Link to="/docs" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
@@ -924,6 +925,184 @@ export default function Landing() {
           {' '}<Link to="/contact-sales" style={{ color: C.cyan, textDecoration: 'underline' }}>liên hệ với chúng tôi</Link>.
           Ý kiến trung thực, kể cả phê bình, đều giúp sản phẩm tốt hơn.
         </p>
+      </section>
+
+      {/* ══ TEAM SECTION ══ */}
+      <section id="team" style={{
+        background: `linear-gradient(180deg, ${C.bg0} 0%, ${C.bg2} 50%, ${C.bg0} 100%)`,
+        borderTop: `1px solid ${C.border}`,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '96px 0',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+          {/* Heading */}
+          <div style={{ textAlign: 'center', marginBottom: 64 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '5px 16px', borderRadius: 99,
+              background: C.purpleA(0.1), border: `1px solid ${C.purpleA(0.3)}`,
+              fontSize: 12, fontWeight: 700, color: C.purple, marginBottom: 20,
+            }}>
+              <Sparkles size={13} /> Đội ngũ sáng lập
+            </div>
+            <h2 style={{
+              fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, marginBottom: 16,
+              background: `linear-gradient(135deg, #fff, ${C.purple})`,
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              Người tạo ra AeroEduVision
+            </h2>
+            <p style={{ fontSize: 16, color: C.muted, maxWidth: 640, margin: '0 auto', lineHeight: 1.65 }}>
+              AeroEduVision được xây dựng bởi 2 giáo viên đang trực tiếp đứng lớp tại
+              các trường THPT — hiểu rõ nhất nỗi đau và niềm vui của việc dạy và học
+              ở Việt Nam.
+            </p>
+          </div>
+
+          {/* Cards grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: 32, maxWidth: 880, margin: '0 auto',
+          }}>
+            {[
+              {
+                name: 'Đặng Việt Chung',
+                role: 'Founder',
+                roleColor: C.cyan,
+                photo: '/team/dang-viet-chung.jpg',
+                affiliation: 'Giáo viên trường THPT Phước Bửu',
+                location: 'Xã Hồ Tràm · TP. Hồ Chí Minh',
+                bio: 'Khởi xướng AeroEduVision với tầm nhìn đưa AI và mô phỏng vật lý vào lớp học chính khoá. Trực tiếp viết phần lớn kiến trúc nền tảng + chế độ ôn thi.',
+                accent: C.cyan,
+              },
+              {
+                name: 'Trần Thị Hương',
+                role: 'Co-Founder',
+                roleColor: C.purple,
+                photo: '/team/tran-thi-huong.jpg',
+                affiliation: 'Giáo viên trường THPT Bưng Riềng',
+                location: 'Xã Xuyên Mộc · TP. Hồ Chí Minh',
+                bio: 'Đồng sáng lập, phụ trách thiết kế trải nghiệm sư phạm + thư viện đề thi. Đảm bảo mọi tính năng phải dùng được thực sự trong tiết học 45 phút.',
+                accent: C.purple,
+              },
+            ].map((m) => (
+              <div key={m.name} style={{
+                background: `linear-gradient(180deg, ${C.white(0.04)}, ${C.white(0.015)})`,
+                border: `1px solid ${C.border}`,
+                borderRadius: 20, padding: 28,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                position: 'relative', overflow: 'hidden',
+                transition: 'transform .2s, box-shadow .2s, border-color .2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = `0 16px 48px ${m.accent}33`
+                e.currentTarget.style.borderColor = `${m.accent}66`
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = C.border
+              }}
+              >
+                {/* Glow accent at top */}
+                <div style={{
+                  position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
+                  width: 180, height: 180, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${m.accent}30, transparent 70%)`,
+                  pointerEvents: 'none',
+                }} />
+
+                {/* Photo */}
+                <div style={{
+                  width: 140, height: 140, borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: `3px solid ${m.accent}`,
+                  boxShadow: `0 8px 32px ${m.accent}55`,
+                  marginBottom: 20, position: 'relative', zIndex: 1,
+                  background: C.bg2,
+                }}>
+                  <img
+                    src={m.photo}
+                    alt={m.name}
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    onError={(e) => {
+                      // Graceful fallback nếu ảnh chưa upload — show initials
+                      const t = e.currentTarget
+                      t.style.display = 'none'
+                      const parent = t.parentElement
+                      if (parent && !parent.querySelector('.team-initials')) {
+                        const initials = m.name.split(' ').map(s => s[0]).slice(-2).join('')
+                        const div = document.createElement('div')
+                        div.className = 'team-initials'
+                        div.textContent = initials
+                        Object.assign(div.style, {
+                          width: '100%', height: '100%', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          fontSize: '40px', fontWeight: '800',
+                          background: `linear-gradient(135deg, ${m.accent}, ${C.blue})`,
+                          color: 'white',
+                        })
+                        parent.appendChild(div)
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Role badge */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 14px', borderRadius: 99,
+                  background: `${m.roleColor}1f`,
+                  border: `1px solid ${m.roleColor}55`,
+                  fontSize: 11, fontWeight: 700, color: m.roleColor,
+                  textTransform: 'uppercase', letterSpacing: 1,
+                  marginBottom: 12, position: 'relative', zIndex: 1,
+                }}>
+                  {m.role}
+                </div>
+
+                {/* Name */}
+                <h3 style={{
+                  fontSize: 22, fontWeight: 800, color: C.text,
+                  margin: '0 0 8px', position: 'relative', zIndex: 1,
+                }}>
+                  {m.name}
+                </h3>
+
+                {/* Affiliation + location */}
+                <div style={{ position: 'relative', zIndex: 1, marginBottom: 16 }}>
+                  <p style={{ fontSize: 13, color: C.text, fontWeight: 500, margin: '0 0 4px' }}>
+                    {m.affiliation}
+                  </p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+                    📍 {m.location}
+                  </p>
+                </div>
+
+                {/* Bio */}
+                <p style={{
+                  fontSize: 13, color: C.muted, lineHeight: 1.6,
+                  margin: 0, position: 'relative', zIndex: 1,
+                  maxWidth: 320,
+                }}>
+                  {m.bio}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer note */}
+          <p style={{
+            textAlign: 'center', marginTop: 48,
+            fontSize: 13, color: C.muted, fontStyle: 'italic',
+          }}>
+            Chúng tôi tin rằng công nghệ giáo dục tốt nhất phải được tạo bởi chính người
+            đang dạy học — không phải kỹ sư xa lạ.
+          </p>
+        </div>
       </section>
 
       {/* ══ CTA BANNER ══ */}

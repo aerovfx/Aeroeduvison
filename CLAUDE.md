@@ -15,7 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `389b3cb` (revision TBD, 2026-05-17 — Custom mạch polish: ownership fix + Gallery + LabsIndex card + auto-detect category)
+- Last deployed commit: `870b592` (revision pixiai-00257-weh, 2026-05-17 — Custom polish: ownership fix + Gallery + LabsIndex card + auto-detect)
 - Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
