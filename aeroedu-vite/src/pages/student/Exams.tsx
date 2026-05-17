@@ -18,7 +18,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   Clock, Calendar, User, PlayCircle, Loader2, FileText, Trophy,
-  Medal, Crown, ChevronDown, ChevronUp, Users, RefreshCw,
+  Medal, Crown, ChevronDown, ChevronUp, Users, RefreshCw, BookOpen,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -35,6 +35,8 @@ const D = {
   muted: '#94a3b8',
   purple: '#7c3aed',
   purpleL: '#a78bfa',
+  indigo: '#818cf8',
+  cyan: '#22d3ee',
 }
 
 // ── Types khớp với /api/student/exam-rooms response ───────────
@@ -500,13 +502,89 @@ export default function StudentExamsPage() {
         ) : currentList.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 20px', color: D.muted }}>
             <FileText style={{ width: 48, height: 48, margin: '0 auto 16px', color: 'rgba(148,163,184,0.2)' }} />
-            <div style={{ fontSize: 16, marginBottom: 8 }}>
+            <div style={{ fontSize: 16, marginBottom: 8, color: D.text }}>
               {activeTab === 'active' ? 'Không có phòng thi nào đang mở'
                : activeTab === 'upcoming' ? 'Chưa có phòng thi nào sắp tới'
                : 'Chưa có lịch sử thi'}
             </div>
-            <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)' }}>
-              Giáo viên sẽ tạo phòng thi khi đến lịch — quay lại sau.
+            <div style={{ fontSize: 13, color: 'rgba(148,163,184,0.6)', marginBottom: 24 }}>
+              {activeTab === 'finished'
+                ? 'Sau khi tham gia phòng thi, kết quả sẽ hiện ở đây.'
+                : 'Giáo viên sẽ tạo phòng thi khi đến lịch — quay lại sau.'}
+            </div>
+
+            {/* Actionable CTAs */}
+            <div style={{
+              display: 'flex',
+              gap: 10,
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+              maxWidth: 480,
+              margin: '0 auto',
+            }}>
+              <button
+                onClick={() => navigate('/student/teachers')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${D.indigo}40`,
+                  background: `${D.indigo}15`,
+                  color: D.indigo,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = `${D.indigo}25`)}
+                onMouseLeave={e => (e.currentTarget.style.background = `${D.indigo}15`)}
+              >
+                <Users style={{ width: 14, height: 14 }} />
+                Giáo viên của tôi
+              </button>
+              <button
+                onClick={() => navigate('/student/exam-prep')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${D.cyan}40`,
+                  background: `${D.cyan}15`,
+                  color: D.cyan,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = `${D.cyan}25`)}
+                onMouseLeave={e => (e.currentTarget.style.background = `${D.cyan}15`)}
+              >
+                <BookOpen style={{ width: 14, height: 14 }} />
+                Tự ôn thi
+              </button>
+              <button
+                onClick={() => refetch()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: `1px solid ${D.border}`,
+                  background: 'transparent',
+                  color: D.muted,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = D.text)}
+                onMouseLeave={e => (e.currentTarget.style.color = D.muted)}
+              >
+                <RefreshCw style={{ width: 13, height: 13 }} />
+                Tải lại
+              </button>
             </div>
           </div>
         ) : (
