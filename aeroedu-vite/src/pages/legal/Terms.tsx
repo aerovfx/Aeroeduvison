@@ -6,8 +6,10 @@
  */
 import { Link } from 'react-router-dom'
 import { Shield, FileText, ArrowLeft, Mail, AlertTriangle } from 'lucide-react'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function TermsPage() {
+  usePageTitle('Điều khoản sử dụng')
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-zinc-100 px-4 sm:px-6 py-10">
       <div className="max-w-3xl mx-auto">

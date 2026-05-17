@@ -10,8 +10,10 @@ import {
   Building2, Users, GraduationCap, Send, Clock, CheckCircle2,
 } from 'lucide-react'
 import { useState } from 'react'
+import usePageTitle from '@/hooks/usePageTitle'
 
 export default function ContactSalesPage() {
+  usePageTitle('Liên hệ hỗ trợ')
   const [copied, setCopied] = useState<string | null>(null)
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text).then(() => {
