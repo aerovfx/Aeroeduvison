@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `ed01f05` (revision pixiai-00295-fif, 2026-05-18 — Games hub /student/games + career search + ScrollToTopButton LIVE)
-- Commits since last deploy: `1/5` (this docs)
+- Commits since last deploy: `5/5` → DEPLOYING (e58dfeb docs · f05fe94 completion CTA · f60ccc9 deep-link · ad7deb5 dailyLife list + scroll-top · this docs)
 - Prev: `04ea6e0` → pixiai-00294-not (Odyssey polish: tutorial + modal key block + achievement toast)
 - Prev: `ab1eb69` → pixiai-00293-ced (Pixel games: mobile D-pad + perf off-screen + position save)
 - Prev: `0a42917` → pixiai-00292-yex (MetroCity character library + NPC/player picker)
