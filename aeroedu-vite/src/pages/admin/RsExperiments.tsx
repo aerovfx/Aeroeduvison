@@ -345,6 +345,46 @@ function Metric({ label, value, color }: { label: string; value: string; color: 
   )
 }
 
+/** Pre-filled templates cho admin start nhanh */
+const EXPERIMENT_TEMPLATES = [
+  {
+    label: '🌌 Explore boost +30%',
+    description: 'Tăng score cho curious_topic + embedding_match — kiểm tra HS engagement với content mới',
+    name: 'feed_explore_boost_v1',
+    variantA: 'control',
+    variantB: 'explore_boost_30',
+    configB: '{"boost_explore": 0.3}',
+    alloc: 50,
+  },
+  {
+    label: '🎯 KG weak focus +50%',
+    description: 'Boost mạnh điểm yếu KG — push HS học lại topic chưa thông thạo',
+    name: 'feed_kg_weak_focus_v1',
+    variantA: 'control',
+    variantB: 'kg_weak_focus_50',
+    configB: '{"boost_kg_weak": 0.5}',
+    alloc: 50,
+  },
+  {
+    label: '🔥 Dampen popular −40%',
+    description: 'Giảm score popular content để show item ít phổ biến hơn — diversify',
+    name: 'feed_dampen_popular_v1',
+    variantA: 'control',
+    variantB: 'dampen_popular_40',
+    configB: '{"dampen_popular": 0.4}',
+    alloc: 50,
+  },
+  {
+    label: '⚡ Combo: explore +20% + weak +30%',
+    description: 'Combined effect — explore + KG weak cùng boost vừa phải',
+    name: 'feed_combo_explore_weak_v1',
+    variantA: 'control',
+    variantB: 'combo_boost',
+    configB: '{"boost_explore": 0.2, "boost_kg_weak": 0.3}',
+    alloc: 50,
+  },
+]
+
 function CreateExperimentForm({
   token, onClose, onCreated,
 }: { token: string; onClose: () => void; onCreated: () => void }) {
@@ -355,6 +395,16 @@ function CreateExperimentForm({
   const [configBJson, setConfigBJson] = useState('{"boost_explore": 0.3}')
   const [allocA, setAllocA] = useState(50)
   const [submitting, setSubmitting] = useState(false)
+
+  const applyTemplate = useCallback((t: typeof EXPERIMENT_TEMPLATES[0]) => {
+    setName(t.name)
+    setDescription(t.description)
+    setVariantA(t.variantA)
+    setVariantB(t.variantB)
+    setConfigBJson(t.configB)
+    setAllocA(t.alloc)
+    toast.success(`Áp dụng template: ${t.label}`)
+  }, [])
 
   const handleSubmit = useCallback(async () => {
     if (!name.trim()) { toast.error('Cần name'); return }
@@ -394,6 +444,30 @@ function CreateExperimentForm({
       <h2 className="font-bold mb-3 flex items-center gap-2">
         <Plus className="w-4 h-4 text-cyan-500" /> Tạo Experiment mới
       </h2>
+
+      {/* Templates quick-start */}
+      <div className="mb-4">
+        <p className="text-xs font-bold text-gray-600 dark:text-zinc-400 mb-2">⚡ Quick-start templates:</p>
+        <div className="flex flex-wrap gap-1.5">
+          {EXPERIMENT_TEMPLATES.map(t => (
+            <button
+              key={t.name}
+              onClick={() => applyTemplate(t)}
+              title={t.description}
+              className="px-2.5 py-1 rounded-lg text-[11px] font-bold
+                         bg-gradient-to-r from-cyan-500/10 to-purple-500/10
+                         border border-cyan-500/30 hover:from-cyan-500/20 hover:to-purple-500/20
+                         text-cyan-700 dark:text-cyan-300 transition"
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1.5">
+          Bấm template → form tự fill → bấm "Tạo (draft)" → bấm ▶ Play để active
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
         <div>
           <label className="block text-xs font-bold mb-1">Name (unique)</label>
