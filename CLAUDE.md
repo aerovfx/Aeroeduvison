@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `0a42917` (revision pixiai-00292-yex, 2026-05-17 — MetroCity character library + Pixel Agent + Odyssey NPC/player picker LIVE)
-- Commits since last deploy: `5/5` → DEPLOYING (4690745 docs · 6b5e957 PixelTouchPad mobile · 1b7ecf0 perf pause-off-screen · 2331bdf save position · then docs)
+- Last deployed commit: `ab1eb69` (revision pixiai-00293-ced, 2026-05-18 — Pixel games: mobile D-pad + perf off-screen + position save LIVE)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `0a42917` → pixiai-00292-yex (MetroCity character library + NPC/player picker)
 - Prev: `b2411ee` → pixiai-00291-cof (2 Pixel Games: Pixel Agent v2 keyboard + Pixel Odyssey)
 - Prev: `1edfce5` → pixiai-00290-bih (Career Pixel Sim 1-day)
 - Prev: `6d5d3c5` → pixiai-00289-zom (RS bug fix localStorage userId + adaptive UX parity)
