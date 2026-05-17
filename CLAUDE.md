@@ -15,10 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `0bc841d` (revision TBD, 2026-05-17 — KG Phase 5+6+7: Cross-Subject + Smart Search + Suggestions)
-- Commits since last deploy: `0/5` (early deploy: 3 phases trong 1 batch)
+- Last deployed commit: `b705e79` (revision TBD, 2026-05-17 — KG teacher notification + UX redesign tabbed sidebar)
+- Commits since last deploy: `0/5` (early deploy: BE notification + UX overhaul)
+- Prev: `8a5b391` → pixiai-00268-nix (KG Phase 5+6+7 — Cross-Subject + Smart Search + Suggestions)
 - Prev: `9fede75` → pixiai-00267-mag (KG Phase 4 ext — save-as-LP + edge highlight + time)
-- Prev: `6249470` → pixiai-00266-caw (KG Phase 4 base — BFS path-finding)
 - Prev: `bf50545` → pixiai-00264-zir (Sim 4 critical bug fixes — t.jsCode/extractPinMap/uint8_t/shiftOut)
 - Prev: `b100ff7` → pixiai-00263-lip (Save UX redesign — tách Lưu mới vs Cập nhật)
 - Prev: `a1f9ea8` → pixiai-00262-bop (Custom mạch simulator "Chạy giả lập")
