@@ -9,8 +9,9 @@
  *   2. Pixel Agent picker — chọn 1 nghề để xem mô phỏng 1 ngày
  */
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, Gamepad2, Search, Share2 } from 'lucide-react'
+import { ChevronLeft, Gamepad2, Search, Share2, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ScrollToTopButton from '@/components/common/ScrollToTopButton'
 import { Link, useSearchParams } from 'react-router-dom'
 import PixelOdyssey from '@/components/career/PixelOdyssey'
 import CareerDayPixelSim from '@/components/career/CareerDayPixelSim'
@@ -60,7 +61,8 @@ export default function CareerGamesPage() {
   }, [searchQuery])
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-12">
+    <div id="career-games-scroll" className="min-h-screen bg-zinc-950 text-zinc-100 pb-12 overflow-auto">
+      <ScrollToTopButton containerSelector="#career-games-scroll" />
       {/* Header */}
       <header className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"
         style={{ paddingTop: 'env(safe-area-inset-top, 0)' }}>
@@ -142,6 +144,26 @@ export default function CareerGamesPage() {
             category={selected.category}
             dailyLife={selected.dailyLife}
           />
+
+          {/* Daily life text list — pair với sim, đọc song song */}
+          {selected.dailyLife && selected.dailyLife.length > 0 && (
+            <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                <h4 className="text-xs font-bold text-zinc-200">Chi tiết lịch trình 1 ngày</h4>
+              </div>
+              <ol className="space-y-1.5">
+                {selected.dailyLife.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-[11px] text-zinc-400">
+                    <span className="shrink-0 w-4 h-4 rounded-full bg-cyan-500/15 text-cyan-300 text-[9px] font-bold inline-flex items-center justify-center mt-0.5">
+                      {i + 1}
+                    </span>
+                    <span className="leading-snug">{item}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
 
           {/* Selected career info quick view */}
           <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
