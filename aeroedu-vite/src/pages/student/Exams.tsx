@@ -359,13 +359,17 @@ export default function StudentExamsPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('active')
 
-  const { data, isLoading, refetch } = useQuery<{ rooms: StudentExamRoom[]; count: number }>({
+  const { data, isLoading, refetch, dataUpdatedAt } = useQuery<{ rooms: StudentExamRoom[]; count: number }>({
     queryKey: ['student-exam-rooms'],
     queryFn: async () => {
       const r = await api.get<{ rooms: StudentExamRoom[]; count: number }>('/student/exam-rooms')
       return r.data || { rooms: [], count: 0 }
     },
     staleTime: 30_000,
+    // Auto-poll every 45s — phòng thi LIVE cần realtime đủ tốt mà không
+    // gọi backend quá nhiều. React Query tự pause khi tab off-focus.
+    refetchInterval: 45_000,
+    refetchIntervalInBackground: false,
     retry: false,
   })
 
@@ -415,9 +419,30 @@ export default function StudentExamsPage() {
             <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: D.text, display: 'flex', alignItems: 'center', gap: 10 }}>
               <FileText style={{ width: 26, height: 26, color: D.purpleL }} />
               Phòng thi trực tuyến
+              <span
+                title="Trang tự cập nhật mỗi 45 giây — không cần bấm làm mới"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999,
+                  background: 'rgba(16,185,129,0.15)', color: '#34d399',
+                  border: '1px solid rgba(16,185,129,0.35)',
+                  textTransform: 'uppercase', letterSpacing: 0.5,
+                }}
+              >
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: '#34d399', animation: 'pulse 1.5s ease-in-out infinite',
+                }} />
+                Live
+              </span>
             </h1>
             <p style={{ margin: '6px 0 0', fontSize: 14, color: D.muted }}>
               Tham gia bài kiểm tra do GV tổ chức · xem bảng xếp hạng từng phòng
+              {dataUpdatedAt > 0 && (
+                <span style={{ marginLeft: 8, fontSize: 11, color: 'rgba(148,163,184,0.6)' }}>
+                  · Cập nhật {Math.max(0, Math.floor((Date.now() - dataUpdatedAt) / 1000))}s trước
+                </span>
+              )}
             </p>
           </div>
           <button
