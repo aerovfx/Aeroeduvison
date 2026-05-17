@@ -41,6 +41,8 @@ import ResetPasswordPage from '@/pages/auth/ResetPassword'
 
 // ── Marketing Pages ─────────────────────────────────────────
 const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
+const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
+const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 
 // ── Public Pages (không cần đăng nhập) ───────────────────────
 const ScanAssignmentPage = lazy(() => import('@/pages/public/ScanAssignment'))
@@ -245,9 +247,9 @@ export function AppRouter() {
         <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
         <Route path="/kl/:token"      element={<KeoCoLivePage />} />
         <Route path="/contact-sales"  element={<PageFallback />} />
-        <Route path="/cookies"        element={<PageFallback />} />
-        <Route path="/privacy"        element={<PageFallback />} />
-        <Route path="/terms"          element={<PageFallback />} />
+        <Route path="/cookies"        element={<PrivacyPage />} />
+        <Route path="/privacy"        element={<PrivacyPage />} />
+        <Route path="/terms"          element={<TermsPage />} />
 
         {/* ── DOCS / Hướng dẫn sử dụng (public — ai cũng đọc được) ── */}
         <Route path="/docs"           element={<DocsIndexPage />} />
