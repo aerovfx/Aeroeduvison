@@ -138,6 +138,8 @@ export interface KgPathStep {
   masteryScore: number | null
   /** Tên relation từ step trước → step này (null cho step 1) */
   relFromPrev: string | null
+  /** Estimated phút để học step này */
+  estimatedMinutes?: number
 }
 
 export interface KgPathResult {
@@ -146,7 +148,27 @@ export interface KgPathResult {
   toId: string
   hops: number
   path: KgPathStep[]
+  /** Tổng thời gian estimate (phút) */
+  totalMinutes?: number
   message?: string
+}
+
+export interface KgSaveAsLearningPathInput {
+  path: KgPathStep[]
+  name: string
+  description?: string
+  subject?: string
+  fromLabel?: string
+  toLabel?: string
+}
+
+export interface KgSaveAsLearningPathResult {
+  pathId: string
+  assignmentId: string
+  modulesCount: number
+  totalDuration: number
+  totalXP: number
+  message: string
 }
 
 export const knowledgeGraphService = {
@@ -245,8 +267,15 @@ export const knowledgeGraphService = {
         toId: r.data.toId,
         hops: r.data.hops,
         path: r.data.path || [],
+        totalMinutes: r.data.totalMinutes,
         message: r.data.message,
       })),
+
+  /** Save graph-derived path thành Learning Path thật + auto-assign cho user. */
+  savePathAsLearningPath: (input: KgSaveAsLearningPathInput) =>
+    api.post<{ success: boolean } & KgSaveAsLearningPathResult>(
+      '/kg/path/save-as-learning-path', input
+    ).then(r => r.data),
 }
 
 /** Trả màu mastery overlay theo score 0-100 */

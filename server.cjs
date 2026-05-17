@@ -9444,23 +9444,124 @@ ${plan.content || '<p>(Trống)</p>'}
         for (const m of mr.rows) masteryMap[m.node_id] = Math.round(m.score);
       }
 
-      const path = pathIds.map((id, idx) => ({
-        nodeId: id,
-        order: idx + 1,
-        label: detailMap[id]?.label || id,
-        type: detailMap[id]?.type || 'Unknown',
-        description: detailMap[id]?.description || null,
-        masteryScore: masteryMap[id] ?? null,
-        relFromPrev: idx > 0 ? pathRels[idx - 1] : null,
-      }));
+      // Heuristic estimated time per node type (minutes)
+      const ESTIMATE_MIN = {
+        Subject: 0,    Chapter: 25,   Topic: 30,
+        Concept: 20,   Formula: 15,   Question: 5,
+        Lesson: 40,    Project: 60,   Career: 10,   Person: 5,
+      };
+      const path = pathIds.map((id, idx) => {
+        const type = detailMap[id]?.type || 'Unknown';
+        return {
+          nodeId: id,
+          order: idx + 1,
+          label: detailMap[id]?.label || id,
+          type,
+          description: detailMap[id]?.description || null,
+          masteryScore: masteryMap[id] ?? null,
+          relFromPrev: idx > 0 ? pathRels[idx - 1] : null,
+          estimatedMinutes: ESTIMATE_MIN[type] ?? 20,
+        };
+      });
+      const totalMinutes = path.reduce((sum, s) => sum + (s.estimatedMinutes || 0), 0);
 
       return res.json({
         success: true, found: true, fromId, toId,
         hops: pathIds.length - 1,
         path,
+        totalMinutes,
       });
     } catch (err) {
       console.error('[kg:path:find] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/kg/path/save-as-learning-path
+  // Body: { path: [{ nodeId, label, type, description, estimatedMinutes }],
+  //         name, description?, subject?, fromLabel?, toLabel? }
+  // Creates a new LearningPath + LearningPathAssignment cho current user.
+  app.post('/api/kg/path/save-as-learning-path', express.json({ limit: '128kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgReady();
+      await ensureLPTables(); // ensure LearningPath + LPA tables exist
+      // LearningPath dùng pool khác — but cùng DATABASE_URL nên reuse được
+      const pool = getKcPool();
+      const body = req.body || {};
+      const pathSteps = Array.isArray(body.path) ? body.path : [];
+      if (pathSteps.length < 2) {
+        return res.status(400).json({ success: false, error: 'Path cần ≥2 steps' });
+      }
+      const name = String(body.name || '').trim().slice(0, 200) ||
+        `Lộ trình tự sinh: ${body.fromLabel || 'điểm yếu'} → ${body.toLabel || 'mục tiêu'}`;
+      const description = String(body.description || '').trim().slice(0, 1000) ||
+        `Tự động sinh từ Knowledge Graph: ${pathSteps.length} bước học prerequisite có thứ tự.`;
+      const subject = String(body.subject || 'Vật lí 11').slice(0, 60);
+
+      // Build modules từ path steps
+      const modules = pathSteps.map((step, idx) => ({
+        id: `mod_${step.nodeId}_${idx}`,
+        type: step.type === 'Question' ? 'quiz'
+          : step.type === 'Formula' ? 'reading'
+          : step.type === 'Project' ? 'assignment'
+          : 'lesson',
+        title: step.label || `Bước ${idx + 1}`,
+        description: step.description || `Học khái niệm "${step.label}" trong lộ trình`,
+        duration: Number(step.estimatedMinutes) || 20,
+        xpReward: 10 + (Number(step.estimatedMinutes) || 20),
+        order: idx,
+        // Tham chiếu node KG → frontend mở drawer khi click
+        resourceId: step.nodeId,
+        resourceUrl: `/dashboard/knowledge-graph?focus=${encodeURIComponent(step.nodeId)}`,
+      }));
+
+      const totalDuration = modules.reduce((s, m) => s + m.duration, 0);
+      const totalXP = modules.reduce((s, m) => s + m.xpReward, 0);
+
+      const pathId = 'lp_kg_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+      await pool.query(
+        `INSERT INTO "LearningPath"
+           (id, "teacherId", name, description, subject, difficulty,
+            modules, "estimatedDays", "totalXP", "totalDuration",
+            "isTemplate", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`,
+        [
+          pathId,
+          user.id,  // dùng user.id làm "owner" tạm (HS tự tạo cho mình)
+          name,
+          description,
+          subject,
+          'medium',
+          JSON.stringify(modules),
+          Math.max(1, Math.ceil(totalDuration / 30)), // 30 phút/ngày
+          totalXP,
+          totalDuration,
+          false,  // không phải template
+        ]
+      );
+
+      // Auto-assign cho chính user
+      const lpaId = 'lpa_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      await pool.query(
+        `INSERT INTO "LearningPathAssignment"
+           (id, "pathId", "studentId", "studentName", "studentEmail",
+            status, "progressPct", "moduleStatus",
+            "assignedAt", "lastActivityAt")
+         VALUES ($1, $2, $3, $4, $5, 'assigned', 0, '{}'::jsonb, NOW(), NOW())`,
+        [lpaId, pathId, user.id, '', '']
+      );
+
+      return res.status(201).json({
+        success: true,
+        pathId, assignmentId: lpaId,
+        modulesCount: modules.length,
+        totalDuration, totalXP,
+        message: `Đã tạo lộ trình ${modules.length} module + tự gán cho bạn`,
+      });
+    } catch (err) {
+      console.error('[kg:path:save-as-lp] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
     }
   });

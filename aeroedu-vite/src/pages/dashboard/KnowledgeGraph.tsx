@@ -181,16 +181,30 @@ export default function KnowledgeGraph() {
       nodeId: string; order: number; label: string; type: string
       description?: string | null; masteryScore: number | null
       relFromPrev: string | null
+      estimatedMinutes?: number
     }>
+    totalMinutes?: number
     message?: string
   } | null>(null)
   const [showPathPanel, setShowPathPanel] = useState(false)
+  const [savingAsLP, setSavingAsLP] = useState(false)
 
   // Set các nodeId đang trong path → highlight gold trên graph
   const pathNodeIds = useMemo(
     () => new Set((pathResult?.path ?? []).map(p => p.nodeId)),
     [pathResult]
   )
+  // Set các cặp adjacent trong path → highlight edge gold
+  const pathEdgePairs = useMemo(() => {
+    const s = new Set<string>()
+    const p = pathResult?.path
+    if (!p) return s
+    for (let i = 0; i < p.length - 1; i++) {
+      s.add(`${p[i].nodeId}::${p[i + 1].nodeId}`)
+      s.add(`${p[i + 1].nodeId}::${p[i].nodeId}`) // undirected
+    }
+    return s
+  }, [pathResult])
 
   // Camera
   const [zoom, setZoom] = useState(1)
@@ -263,6 +277,40 @@ export default function KnowledgeGraph() {
       setMasteryLoading(false)
     }
   }, [])
+
+  /** Phase 4: Lưu path hiện tại thành LearningPath thật + assign cho user. */
+  const savePathAsLP = useCallback(async () => {
+    if (!pathResult?.found || pathResult.path.length < 2) return
+    setSavingAsLP(true)
+    try {
+      const last = pathResult.path[pathResult.path.length - 1]
+      const first = pathResult.path[0]
+      const r = await kgs.savePathAsLearningPath({
+        path: pathResult.path,
+        name: `Lộ trình KG: ${first.label} → ${last.label}`,
+        description: `${pathResult.hops + 1} bước (${pathResult.totalMinutes ?? '?'} phút) - tự sinh từ Knowledge Graph`,
+        subject: 'Vật lí 11',
+        fromLabel: first.label,
+        toLabel: last.label,
+      })
+      toast.success(
+        `✓ Đã tạo lộ trình ${r.modulesCount} module · ${r.totalDuration}p`,
+        { duration: 4000 }
+      )
+      // Sau khi save: mở /learning-paths để user thấy ngay
+      setTimeout(() => {
+        if (window.confirm(
+          `Lộ trình đã lưu thành công!\nMở /learning-paths để bắt đầu học?`
+        )) {
+          window.location.href = '/learning-paths'
+        }
+      }, 500)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Không lưu được')
+    } finally {
+      setSavingAsLP(false)
+    }
+  }, [pathResult])
 
   /** Phase 4: Tìm path từ điểm yếu (auto) → node đích. */
   const findPathToNode = useCallback(async (targetNodeId: string) => {
@@ -776,7 +824,28 @@ export default function KnowledgeGraph() {
                 <span className="font-mono mx-1 text-amber-100">
                   {pathResult.path[pathResult.path.length - 1]?.label}
                 </span>
+                {pathResult.totalMinutes !== undefined && (
+                  <div className="mt-1 text-[10px] text-amber-300 inline-flex items-center gap-1">
+                    ⏱ Tổng ~<strong>{pathResult.totalMinutes}</strong> phút
+                    · ~{Math.ceil(pathResult.totalMinutes / 30)} ngày (30p/ngày)
+                  </div>
+                )}
               </div>
+
+              {/* Save as Learning Path — primary CTA */}
+              <button
+                onClick={savePathAsLP}
+                disabled={savingAsLP}
+                className="w-full py-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-bold text-xs inline-flex items-center justify-center gap-2 shadow-lg shadow-amber-500/30 disabled:opacity-50"
+              >
+                {savingAsLP ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <>💾</>
+                )}
+                Lưu thành lộ trình học của tôi
+                <span className="text-[9px] px-1 py-0.5 rounded bg-zinc-950/30">NEW</span>
+              </button>
 
               {/* Path steps list */}
               <div className="space-y-1.5">
@@ -821,6 +890,9 @@ export default function KnowledgeGraph() {
                           </div>
                           <div className="text-[10px] text-zinc-500">
                             {NODE_TYPE_LABELS[step.type] || step.type}
+                            {step.estimatedMinutes !== undefined && step.estimatedMinutes > 0 && (
+                              <span> · <span className="text-amber-400">⏱ {step.estimatedMinutes}p</span></span>
+                            )}
                             {step.relFromPrev && (
                               <span> · <span className="text-amber-400">{REL_TYPE_LABELS[step.relFromPrev] || step.relFromPrev.toLowerCase().replace(/_/g, ' ')}</span></span>
                             )}
@@ -958,20 +1030,24 @@ export default function KnowledgeGraph() {
                 if (!a || !b) return null
                 const midX = (a.x + b.x) / 2
                 const midY = (a.y + b.y) / 2
+                // Phase 4: highlight edges along the path
+                const isPathEdge = pathEdgePairs.has(`${e.from_id}::${e.to_id}`)
                 return (
                   <g key={e.id}>
                     <line
                       x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                      stroke="rgba(148,163,184,0.35)"
-                      strokeWidth={1.2}
+                      stroke={isPathEdge ? '#fbbf24' : 'rgba(148,163,184,0.35)'}
+                      strokeWidth={isPathEdge ? 3 : 1.2}
+                      opacity={isPathEdge ? 0.95 : (pathEdgePairs.size > 0 ? 0.15 : 1)}
                       markerEnd="url(#kgArrow)"
                     />
-                    {/* Edge label (only when zoomed in) */}
-                    {zoom > 0.85 && (
+                    {/* Edge label (only when zoomed in OR path edge) */}
+                    {(zoom > 0.85 || isPathEdge) && (
                       <text
                         x={midX} y={midY}
-                        fill="#64748b"
-                        fontSize="9"
+                        fill={isPathEdge ? '#fbbf24' : '#64748b'}
+                        fontSize={isPathEdge ? 10 : 9}
+                        fontWeight={isPathEdge ? 700 : 400}
                         textAnchor="middle"
                         style={{ pointerEvents: 'none', userSelect: 'none' }}
                       >
