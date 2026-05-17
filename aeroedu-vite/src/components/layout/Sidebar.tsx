@@ -111,6 +111,7 @@ const teacherSections: RouteSection[] = [
     titleKey: 'sectionOverview',
     routes: [
       { icon: Brain,   labelKey: 'routeAiDashboard', href: '/teacher/ai-dashboard', isHighlighted: true },
+      { icon: Zap,     labelKey: 'routeSprint',      href: '/teacher/sprint',       badge: 'AI' },
       { icon: Users,   labelKey: 'routeClassMgmt',   href: '/teacher/dashboard' },
       { icon: BarChart,labelKey: 'routeAnalytics',   href: '/teacher/analytics' },
       { icon: Heart,   labelKey: 'routeEmotionMap',  href: '/teacher/emotion-map' },

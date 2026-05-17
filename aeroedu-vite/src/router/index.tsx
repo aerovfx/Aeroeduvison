@@ -113,6 +113,7 @@ const GraphLab           = lazy(() => import('@/pages/labs/GraphLab'))
 
 // ── Teacher Pages (đã port) ──────────────────────────────────
 const TeacherDashboard      = lazy(() => import('@/pages/teacher/Dashboard'))
+const TeacherSprintPage     = lazy(() => import('@/pages/teacher/Sprint'))
 const ExamMatrixPage        = lazy(() => import('@/pages/teacher/ExamMatrix'))
 const ExamMatrixDetailPage  = lazy(() => import('@/pages/teacher/ExamMatrixDetail'))
 const ExamMatrixCreatePage  = lazy(() => import('@/pages/teacher/ExamMatrixCreate'))
@@ -453,6 +454,7 @@ export function AppRouter() {
             <Route element={<RoleGuard roles={['TEACHER', 'ADMIN']} />}>
               {/* Đã port */}
               <Route path="/teacher/dashboard"              element={<TeacherDashboard />} />
+              <Route path="/teacher/sprint"                 element={<TeacherSprintPage />} />
               <Route path="/teacher/news/create"            element={<TeacherNewsComposePage />} />
               <Route path="/teacher/news"                   element={<TeacherNewsComposePage />} />
               <Route path="/teacher/my-courses"             element={<TeacherMyCoursesPage />} />
