@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `da04588` (revision pixiai-00265-bis, 2026-05-17 — KG Phase 3 Mastery Layer LIVE)
-- Commits since last deploy: `0/5`
+- Last deployed commit: `10adbc3` (revision TBD, 2026-05-17 — KG Phase 4 Auto Learning Path BFS)
+- Commits since last deploy: `0/5` (early deploy: BE+FE phase liền sau Phase 3)
+- Prev: `da04588` → pixiai-00265-bis (KG Phase 3 Mastery Layer)
 - Prev: `bf50545` → pixiai-00264-zir (Sim 4 critical bug fixes — t.jsCode/extractPinMap/uint8_t/shiftOut)
 - Prev: `b100ff7` → pixiai-00263-lip (Save UX redesign — tách Lưu mới vs Cập nhật)
 - Prev: `a1f9ea8` → pixiai-00262-bop (Custom mạch simulator "Chạy giả lập")
@@ -25,7 +26,7 @@
 - Phase 1 ✅ MVP viewer (search/expand/filter/drag/zoom + seed Vật lí 11)
 - Phase 2 ✅ AI Extract + Similarity linking
 - Phase 3 ✅ Personal Mastery Layer (overlay + stats + weak topics)
-- Phase 4 ⏳ Auto Learning Path from graph (BFS shortest path)
+- Phase 4 ✅ Auto Learning Path (BFS shortest path từ điểm yếu)
 - Phase 5 ⏳ Cross-Subject (Toán+Hóa+Lý 11/12, cross-edges)
 - Phase 6 ⏳ Smart Search & Recommendation (AI NL query)
 - Phase 7 ⏳ Collaborative editing (GV vote/version)
