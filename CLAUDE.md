@@ -15,12 +15,8 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `b9661e6` (revision pixiai-00252-zuk, 2026-05-17 — assigned-students avatar + LabTwin router fix)
-- Commits since last deploy: `4/5`
-  - `8832ec7` feat(learning-paths): tách "lộ trình từ GV" (free) vs "AI tạo" (paid + AiSubscriptionGate)
-  - `3091241` docs(claude): cập nhật tracking
-  - `6c2bc1c` fix(exam-room): teacher /online-exam-room không hiển thị phòng — sửa naming mismatch
-  - `a3ea928` feat(student/exam-rooms): trang phòng thi mới + leaderboard inline mỗi phòng
+- Last deployed commit: `56886e9` (revision pixiai-00252-zuk, 2026-05-17 — student exam-rooms + leaderboard + learning paths redesign)
+- Commits since last deploy: `0/5`
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 

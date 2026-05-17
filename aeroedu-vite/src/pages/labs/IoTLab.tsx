@@ -18,6 +18,7 @@ import {
 import CircuitBuilder from './CircuitBuilder'
 import CircuitPresets from './CircuitPresets'
 import SemiconductorLab from './SemiconductorLab'
+import CustomWokwiBoard from './CustomWokwiBoard'
 
 // ───────────────────────────────────────────────────────────────────
 // Types
@@ -1284,7 +1285,7 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 }
 
 export default function IoTLab() {
-  const [mode, setMode] = useState<'arduino' | 'analog' | 'semi'>('arduino')
+  const [mode, setMode] = useState<'arduino' | 'analog' | 'semi' | 'custom'>('arduino')
   const [analogTab, setAnalogTab] = useState<'builder' | 'presets'>('presets')
   const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)
   const [running, setRunning] = useState(true)
@@ -1432,6 +1433,9 @@ export default function IoTLab() {
               {mode === 'semi' && (
                 <>Phòng thí nghiệm bán dẫn &amp; tín hiệu: Diode I-V, Zener, LED · NE555 astable/monostable · Op-Amp 7 topology (inverting, non-inverting, Schmitt…). Phase 2 &amp; 3 sẽ bổ sung BJT, MOSFET, Filter, Oscillator, Function Generator.</>
               )}
+              {mode === 'custom' && (
+                <>Thiết kế mạch <strong>tự do kiểu Wokwi</strong>: dán JSON diagram (Arduino UNO/ESP32 + LED + button + buzzer + 74HC595 + 7-segment…) → xem schematic trực quan + sửa code Arduino. Sẵn 4 template gồm Simon Says, đếm 0-99, Blink, đèn giao thông. Export <code>.json</code> + <code>.ino</code> để dùng trên Wokwi.com.</>
+              )}
             </p>
           </div>
 
@@ -1487,6 +1491,17 @@ export default function IoTLab() {
           >
             <Sigma className="w-4 h-4" /> Bán dẫn & Tín hiệu
           </button>
+          <button
+            onClick={() => setMode('custom')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition font-medium ${
+              mode === 'custom'
+                ? 'bg-gradient-to-r from-pink-500/25 to-rose-500/25 text-pink-200 border border-pink-500/40 shadow-sm'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+          >
+            <Plug className="w-4 h-4" /> Mạch Custom
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-pink-500/30 ml-1">NEW</span>
+          </button>
         </div>
 
         {mode === 'analog' && (
@@ -1519,6 +1534,7 @@ export default function IoTLab() {
           </>
         )}
         {mode === 'semi' && <SemiconductorLab />}
+        {mode === 'custom' && <CustomWokwiBoard />}
 
         {/* Two-pane layout (Arduino mode) */}
         {mode === 'arduino' && (
