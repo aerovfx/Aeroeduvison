@@ -18,6 +18,8 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
 import { ConnectTeacherBanner } from '@/pages/student/MyTeachers'
+import { recommendationService as rs, getRsTypeMeta } from '@/services/recommendation.service'
+import { Sparkles, ChevronRight as ArrowRightSquare } from 'lucide-react'
 import { studentLearningPathService, type StudentLearningPath } from '@/services/studentLearningPath.service'
 import { api } from '@/services/api'
 import usePageTitle from '@/hooks/usePageTitle'
@@ -287,6 +289,9 @@ export default function StudentDashboard() {
         </div>
       </div>
 
+      {/* For You preview — top 3 reco gợi ý */}
+      <StudentRecoPreview />
+
       {/* LIVE Leaderboard — real-time top học sinh dẫn đầu */}
       <LiveLeaderboard highlightUserId={user?.id} />
 
@@ -308,6 +313,59 @@ export default function StudentDashboard() {
           className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 dark:bg-green-500/15 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-500/25 transition-colors text-sm font-medium">
           <CheckCircle2 className="w-4 h-4" /> Bài tập
         </Link>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * StudentRecoPreview — Top 3 gợi ý cá nhân hoá hiển thị trên Dashboard
+ * để dẫn HS tới /student/for-you nếu muốn xem full feed.
+ */
+function StudentRecoPreview() {
+  const { data: feed } = useQuery({
+    queryKey: ['reco-feed-student-dashboard'],
+    queryFn: () => rs.getFeed('student', 3),
+    staleTime: 5 * 60_000, // 5 phút
+  })
+
+  if (!feed || feed.items.length === 0) return null
+
+  return (
+    <div className="rounded-xl border bg-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-cyan-500" /> Gợi ý cho bạn
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-600 font-normal">AI</span>
+        </h2>
+        <Link to="/student/for-you" className="text-xs text-cyan-600 hover:underline inline-flex items-center gap-0.5">
+          Xem tất cả <ArrowRightSquare className="w-3 h-3" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        {feed.items.map((item) => {
+          const meta = getRsTypeMeta(item.type)
+          return (
+            <Link
+              key={`${item.type}-${item.id}`}
+              to={item.link}
+              onClick={() => rs.track({ action: 'click', targetType: item.type, targetId: item.id, metadata: { source: 'dashboard-preview' } })}
+              className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
+              style={{ borderLeftWidth: 3, borderLeftColor: meta.accent }}
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">{meta.emoji}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: meta.accent }}>
+                  {meta.label}
+                </span>
+              </div>
+              <p className="text-sm font-semibold leading-tight line-clamp-2 mb-1">{item.title}</p>
+              {item.subtitle && (
+                <p className="text-[11px] text-muted-foreground line-clamp-1">{item.subtitle}</p>
+              )}
+            </Link>
+          )
+        })}
       </div>
     </div>
   )

@@ -8,9 +8,11 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
+import { recommendationService as rs, getRsTypeMeta } from '@/services/recommendation.service'
 import {
   Users, Brain, TrendingUp, AlertTriangle, Sparkles,
   BarChart3, Heart, Zap, Target, Clock, Award, Eye,
@@ -715,6 +717,9 @@ export default function TeacherDashboard() {
         {/* ── Right column (320px) ── */}
         <div style={{ width: 308, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+          {/* Reco card — HS cần hỗ trợ + tự khảo sát */}
+          <TeacherRecoCard D={D} />
+
           {/* AI Co-Teacher panel */}
           <div style={{ background: D.card, border: `1px solid ${D.purpleA(0.25)}`, borderRadius: 14, overflow: 'hidden' }}>
             {/* Header */}
@@ -842,6 +847,108 @@ export default function TeacherDashboard() {
       {/* ════ LIVE LEADERBOARD — top học sinh dẫn đầu thời gian thực ════ */}
       <div style={{ maxWidth: 1400, margin: '24px auto 0', padding: '0 24px 32px' }}>
         <LiveLeaderboard />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * TeacherRecoCard — Hiển thị gợi ý cho GV trên dashboard:
+ *   - 🆘 HS cần hỗ trợ (mastery yếu)
+ *   - 🛣 HS vừa tự khảo sát lộ trình
+ *
+ * Refetch 5 phút. Click → navigate tới link tương ứng.
+ */
+function TeacherRecoCard({ D }: { D: any }) {
+  const { data: feed } = useQuery({
+    queryKey: ['reco-feed-teacher-dashboard'],
+    queryFn: () => rs.getFeed('teacher', 6),
+    staleTime: 5 * 60_000,
+  })
+
+  if (!feed || feed.items.length === 0) return null
+
+  return (
+    <div style={{
+      background: D.card,
+      border: `1px solid ${D.purpleA(0.25)}`,
+      borderRadius: 14,
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '14px 16px',
+        background: `linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))`,
+        borderBottom: `1px solid rgba(34,211,238,0.2)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 8,
+            background: `linear-gradient(135deg, #22d3ee, #3b82f6)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 2px 10px rgba(34,211,238,0.5)`,
+          }}>
+            <span style={{ fontSize: 14 }}>✨</span>
+          </div>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: 0 }}>Gợi ý cho bạn</p>
+            <p style={{ fontSize: 10, color: '#67e8f9', margin: 0 }}>{feed.count} item · AI cá nhân hoá</p>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {feed.items.map((item) => {
+          const meta = getRsTypeMeta(item.type)
+          return (
+            <Link
+              key={`${item.type}-${item.id}`}
+              to={item.link}
+              onClick={() => rs.track({
+                action: 'click',
+                targetType: item.type,
+                targetId: item.id,
+                metadata: { source: 'teacher-dashboard' },
+              })}
+              style={{
+                display: 'block',
+                padding: '8px 10px',
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.03)',
+                border: `1px solid ${D.border}`,
+                borderLeftWidth: 3,
+                borderLeftColor: meta.accent,
+                textDecoration: 'none',
+                transition: 'background .15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 12 }}>{meta.emoji}</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: 0.5, color: meta.accent,
+                }}>
+                  {meta.label}
+                </span>
+              </div>
+              <p style={{
+                fontSize: 12, fontWeight: 600, color: D.text, margin: 0,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {item.title}
+              </p>
+              {item.subtitle && (
+                <p style={{
+                  fontSize: 10, color: D.muted, margin: 0, marginTop: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {item.subtitle}
+                </p>
+              )}
+            </Link>
+          )
+        })}
       </div>
     </div>
   )
