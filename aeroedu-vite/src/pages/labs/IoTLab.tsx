@@ -1434,7 +1434,7 @@ export default function IoTLab() {
                 <>Phòng thí nghiệm bán dẫn &amp; tín hiệu: Diode I-V, Zener, LED · NE555 astable/monostable · Op-Amp 7 topology (inverting, non-inverting, Schmitt…). Phase 2 &amp; 3 sẽ bổ sung BJT, MOSFET, Filter, Oscillator, Function Generator.</>
               )}
               {mode === 'custom' && (
-                <>Thiết kế mạch <strong>tự do kiểu Wokwi</strong>: dán JSON diagram (Arduino UNO/ESP32 + LED + button + buzzer + 74HC595 + 7-segment…) → xem schematic trực quan + sửa code Arduino. Sẵn 4 template gồm Simon Says, đếm 0-99, Blink, đèn giao thông. Export <code>.json</code> + <code>.ino</code> để dùng trên Wokwi.com.</>
+                <>Thiết kế mạch <strong>tự do kiểu Wokwi</strong> + <strong>💾 lưu vào thư viện cá nhân</strong> với 10 danh mục (LED, Cảm biến, Hiển thị, Game…) → có thể chia sẻ công khai cho cộng đồng. Sẵn 8 template (Simon Says, Servo+POT, DHT22+LCD, HC-SR04, LDR…). Hover part = highlight dây. Click = chi tiết pin. Export <code>.json</code> + <code>.ino</code> tương thích Wokwi.com.</>
               )}
             </p>
           </div>
