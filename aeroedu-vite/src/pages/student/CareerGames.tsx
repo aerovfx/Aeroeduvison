@@ -45,6 +45,15 @@ export default function CareerGamesPage() {
     }
   }, [selectedCareerId, searchParams, setSearchParams])
 
+  // BUG FIX: sync URL → state khi browser navigate (back/forward) đổi URL
+  // mà state chưa update. Trước đó state stale → render wrong career.
+  useEffect(() => {
+    const fromUrl = searchParams.get('career')
+    if (fromUrl && fromUrl !== selectedCareerId && ALL_CAREERS.some(c => c.id === fromUrl)) {
+      setSelectedCareerId(fromUrl)
+    }
+  }, [searchParams, selectedCareerId])
+
   const selected = useMemo(
     () => ALL_CAREERS.find(c => c.id === selectedCareerId) || ALL_CAREERS[0],
     [selectedCareerId]
