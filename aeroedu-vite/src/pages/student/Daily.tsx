@@ -25,6 +25,7 @@ import toast from 'react-hot-toast'
 import { recommendationService as rs, getRsTypeMeta, type RsFeedItem } from '@/services/recommendation.service'
 import usePageTitle from '@/hooks/usePageTitle'
 import OnboardingModal from '@/components/reco/OnboardingModal'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 interface Section {
   id: string
@@ -81,11 +82,13 @@ const SECTIONS: Section[] = [
   },
 ]
 
-/** LocalStorage key — track done items theo ngày để reset tự nhiên mỗi sáng */
-const DONE_LS_KEY = 'rs.daily.done'
-function loadDoneToday(): Set<string> {
+/** LocalStorage key — namespaced theo userId để tránh collision khi share device */
+function doneKey(userId: string | undefined): string {
+  return `rs.daily.done.${userId || 'anon'}`
+}
+function loadDoneToday(userId: string | undefined): Set<string> {
   try {
-    const raw = localStorage.getItem(DONE_LS_KEY)
+    const raw = localStorage.getItem(doneKey(userId))
     if (!raw) return new Set()
     const { date, ids } = JSON.parse(raw)
     const today = new Date().toISOString().slice(0, 10)
@@ -93,19 +96,20 @@ function loadDoneToday(): Set<string> {
     return new Set(Array.isArray(ids) ? ids : [])
   } catch { return new Set() }
 }
-function saveDoneToday(ids: Set<string>) {
+function saveDoneToday(userId: string | undefined, ids: Set<string>) {
   try {
     const today = new Date().toISOString().slice(0, 10)
-    localStorage.setItem(DONE_LS_KEY, JSON.stringify({ date: today, ids: [...ids] }))
+    localStorage.setItem(doneKey(userId), JSON.stringify({ date: today, ids: [...ids] }))
   } catch {}
 }
 
 export default function StudentDailyPage() {
   usePageTitle('Kế hoạch hôm nay')
   const navigate = useNavigate()
-  /** Items đã đánh dấu hoàn thành — persist localStorage theo ngày */
-  const [done, setDone] = useState<Set<string>>(() => loadDoneToday())
-  useEffect(() => { saveDoneToday(done) }, [done])
+  const me = useCurrentUser()
+  /** Items đã đánh dấu hoàn thành — persist localStorage theo ngày + namespace userId */
+  const [done, setDone] = useState<Set<string>>(() => loadDoneToday(me?.id))
+  useEffect(() => { saveDoneToday(me?.id, done) }, [me?.id, done])
   /** Greeting recompute mỗi mount (không cần realtime tick) */
   const greeting = useMemo(() => getGreeting(), [])
   /** RS-Phase 10: cold-start onboarding modal trigger */

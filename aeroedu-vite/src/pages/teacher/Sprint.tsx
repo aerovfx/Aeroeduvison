@@ -20,6 +20,7 @@ import {
 import toast from 'react-hot-toast'
 import { recommendationService as rs, getRsTypeMeta, type RsFeedItem } from '@/services/recommendation.service'
 import usePageTitle from '@/hooks/usePageTitle'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 interface Section {
   id: string
@@ -65,8 +66,10 @@ const SECTIONS: Section[] = [
   },
 ]
 
-/** LocalStorage key — track resolved items theo tuần (Sprint cycle 7 ngày) */
-const RESOLVED_LS_KEY = 'rs.sprint.resolved'
+/** LocalStorage key — namespaced theo userId (tránh collision khi share device GV) */
+function resolvedKey(userId: string | undefined): string {
+  return `rs.sprint.resolved.${userId || 'anon'}`
+}
 function getWeekKey(d = new Date()): string {
   // ISO week-ish: year + week-of-year, không cần chuẩn ISO 8601 vì chỉ rotate
   const startOfYear = new Date(d.getFullYear(), 0, 1)
@@ -74,27 +77,28 @@ function getWeekKey(d = new Date()): string {
   const week = Math.floor((days + startOfYear.getDay()) / 7)
   return `${d.getFullYear()}-W${week}`
 }
-function loadResolvedThisWeek(): Set<string> {
+function loadResolvedThisWeek(userId: string | undefined): Set<string> {
   try {
-    const raw = localStorage.getItem(RESOLVED_LS_KEY)
+    const raw = localStorage.getItem(resolvedKey(userId))
     if (!raw) return new Set()
     const { week, ids } = JSON.parse(raw)
     if (week !== getWeekKey()) return new Set() // tuần khác → reset
     return new Set(Array.isArray(ids) ? ids : [])
   } catch { return new Set() }
 }
-function saveResolvedThisWeek(ids: Set<string>) {
+function saveResolvedThisWeek(userId: string | undefined, ids: Set<string>) {
   try {
-    localStorage.setItem(RESOLVED_LS_KEY, JSON.stringify({ week: getWeekKey(), ids: [...ids] }))
+    localStorage.setItem(resolvedKey(userId), JSON.stringify({ week: getWeekKey(), ids: [...ids] }))
   } catch {}
 }
 
 export default function TeacherSprintPage() {
   usePageTitle('Sprint dashboard GV')
   const navigate = useNavigate()
-  /** Items GV đã "Đã xử lý" — persist localStorage theo tuần */
-  const [resolved, setResolved] = useState<Set<string>>(() => loadResolvedThisWeek())
-  useEffect(() => { saveResolvedThisWeek(resolved) }, [resolved])
+  const me = useCurrentUser()
+  /** Items GV đã "Đã xử lý" — persist localStorage theo tuần + namespace userId */
+  const [resolved, setResolved] = useState<Set<string>>(() => loadResolvedThisWeek(me?.id))
+  useEffect(() => { saveResolvedThisWeek(me?.id, resolved) }, [me?.id, resolved])
 
   const { data: feed, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['reco-feed-teacher-sprint'],
