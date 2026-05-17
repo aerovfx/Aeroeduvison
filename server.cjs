@@ -10329,6 +10329,7 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       // Vẫn chạy regular sources sau để mix in nếu có data.
       // ─────────────────────────────────────────────────────────
       let isColdStart = false;
+      let coldStartPrefs = null; // { subject?, grade?, interestedTopics? }
       try {
         const histCount = await pool.query(
           `SELECT COUNT(*) AS cnt FROM rs_action_log WHERE user_id = $1`,
@@ -10338,19 +10339,40 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         isColdStart = actionCount < 5;
       } catch (_) {}
 
-      if (isColdStart && audience === 'student') {
-        // Cold-start: smart defaults với high score để priority
+      // RS-Phase 10 enhancement: load explicit cold-start preferences
+      // (subject + grade + topics) nếu user đã onboarding.
+      if (isColdStart) {
         try {
-          // 1. Popular published exams (cross all students, sort by takers)
+          await _rsEnsureColdStartPrefsSchema(pool);
+          const pr = await pool.query(
+            `SELECT "coldStartPrefs" FROM "User" WHERE id = $1 LIMIT 1`,
+            [user.id]
+          );
+          if (pr.rows.length > 0 && pr.rows[0].coldStartPrefs) {
+            coldStartPrefs = pr.rows[0].coldStartPrefs;
+          }
+        } catch (_) {}
+      }
+
+      if (isColdStart && audience === 'student') {
+        const prefSubject = coldStartPrefs?.subject || null;
+        const prefGrade   = coldStartPrefs?.grade   || null;
+
+        // Cold-start: smart defaults với high score để priority.
+        // Nếu có prefs → filter theo subject (boost score nếu match).
+        try {
+          // 1. Popular published exams — filter theo subject pref nếu có
           const popular = await pool.query(
             `SELECT e.id, e.title, e.description, e.subject,
                     COUNT(DISTINCT pe."studentId") AS takers
              FROM "Exam" e
              LEFT JOIN "PracticeExam" pe ON pe."examId" = e.id
              WHERE e.published = true
+               ${prefSubject ? `AND e.subject ILIKE '%' || $1 || '%'` : ''}
              GROUP BY e.id, e.title, e.description, e.subject
              HAVING COUNT(DISTINCT pe."studentId") >= 2
-             ORDER BY takers DESC LIMIT 4`
+             ORDER BY takers DESC LIMIT 4`,
+            prefSubject ? [prefSubject] : []
           );
           for (const ex of popular.rows) {
             candidates.push({
@@ -10359,21 +10381,24 @@ CHỈ TRẢ JSON, không bọc markdown.`;
               title: ex.title,
               subtitle: `${ex.subject || 'Đề thi'} · ${ex.takers} HS đã làm`,
               description: ex.description,
-              score: 90, // cold-start ưu tiên cao
+              score: prefSubject ? 105 : 90, // boost nếu match subject pref
               source: 'cold-start',
               link: '/student/exams',
-              meta: { takerCount: Number(ex.takers), subject: ex.subject },
+              meta: { takerCount: Number(ex.takers), subject: ex.subject, matchedPref: !!prefSubject },
               cta: 'Làm thử',
             });
           }
 
-          // 2. KG entry-level topics (Subject + Chapter)
-          const intro = await pool.query(
-            `SELECT id, type, label, description
-             FROM kg_nodes
-             WHERE type IN ('Subject', 'Chapter')
-             ORDER BY type, label LIMIT 4`
-          );
+          // 2. KG entry-level topics — filter theo subject + grade nếu có
+          const introQ = prefSubject
+            ? `SELECT id, type, label, description FROM kg_nodes
+               WHERE type IN ('Subject', 'Chapter')
+                 AND (label ILIKE '%' || $1 || '%' OR description ILIKE '%' || $1 || '%')
+               ORDER BY type, label LIMIT 4`
+            : `SELECT id, type, label, description FROM kg_nodes
+               WHERE type IN ('Subject', 'Chapter')
+               ORDER BY type, label LIMIT 4`;
+          const intro = await pool.query(introQ, prefSubject ? [prefSubject] : []);
           for (const n of intro.rows) {
             candidates.push({
               type: 'cold_start_intro',
@@ -10381,10 +10406,10 @@ CHỈ TRẢ JSON, không bọc markdown.`;
               title: n.label,
               subtitle: `${n.type === 'Subject' ? 'Môn học' : 'Chương'} — bắt đầu khám phá`,
               description: n.description,
-              score: 75,
+              score: prefSubject ? 88 : 75,
               source: 'cold-start',
               link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(n.id)}`,
-              meta: { nodeType: n.type },
+              meta: { nodeType: n.type, grade: prefGrade, matchedPref: !!prefSubject },
               cta: 'Khám phá',
             });
           }
@@ -11498,6 +11523,23 @@ CHỈ TRẢ JSON, không bọc markdown.`;
   }
 
   /**
+   * RS-Phase 10 enhancement: lazy migration cho coldStartPrefs.
+   * Schema: jsonb { subject?: string, grade?: string, interestedTopics?: string[],
+   *                  completedAt?: ISOdate, skipped?: bool }
+   */
+  let _rsColdStartSchemaReady = false;
+  async function _rsEnsureColdStartPrefsSchema(pool) {
+    if (_rsColdStartSchemaReady) return;
+    try {
+      await pool.query(`ALTER TABLE "User"
+        ADD COLUMN IF NOT EXISTS "coldStartPrefs" jsonb`);
+      _rsColdStartSchemaReady = true;
+    } catch (e) {
+      console.error('[rs:cold-start:schema] ❌', e.message);
+    }
+  }
+
+  /**
    * Lazy migration: đảm bảo User có rsDigestChannels jsonb + telegramChatId text.
    * Idempotent, chỉ chạy 1 lần / process lifetime.
    */
@@ -11891,6 +11933,92 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     } catch (err) {
       console.error('[rs:digest:run-all] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // RS-PHASE 10 ENHANCEMENT: COLD-START ONBOARDING PREFERENCES
+  // ═══════════════════════════════════════════════════════════════
+  // User mới vào /student/for-you hoặc /daily lần đầu sẽ thấy modal
+  // 3 bước: pick subject → pick grade → pick interest topics. Server
+  // lưu prefs → cold-start sources sau đó được filter/boost theo prefs.
+  // User có thể skip (chuyển trạng thái skipped=true) hoặc edit lại
+  // trong Settings.
+  // ═══════════════════════════════════════════════════════════════
+
+  // GET /api/reco/onboarding/prefs — load current prefs (cho Settings hoặc check trạng thái)
+  app.get('/api/reco/onboarding/prefs', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureColdStartPrefsSchema(pool);
+      const r = await pool.query(
+        `SELECT "coldStartPrefs" FROM "User" WHERE id = $1 LIMIT 1`,
+        [user.id]
+      );
+      return res.json({
+        success: true,
+        prefs: r.rows[0]?.coldStartPrefs || null,
+      });
+    } catch (err) {
+      console.error('[rs:onboarding:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // PUT /api/reco/onboarding/prefs — save prefs (subject + grade + topics)
+  app.put('/api/reco/onboarding/prefs', express.json({ limit: '20kb' }), async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      const { subject, grade, interestedTopics, skipped } = req.body || {};
+      const prefs = {
+        subject:          typeof subject === 'string' ? subject.slice(0, 50) : null,
+        grade:            typeof grade === 'string' ? grade.slice(0, 20) : null,
+        interestedTopics: Array.isArray(interestedTopics)
+                            ? interestedTopics.slice(0, 10).map(t => String(t).slice(0, 80))
+                            : [],
+        skipped:          !!skipped,
+        completedAt:      new Date().toISOString(),
+      };
+      await ensureRsReady();
+      const pool = getKcPool();
+      await _rsEnsureColdStartPrefsSchema(pool);
+      await pool.query(
+        `UPDATE "User" SET "coldStartPrefs" = $1::jsonb WHERE id = $2`,
+        [JSON.stringify(prefs), user.id]
+      );
+      return res.json({ success: true, prefs });
+    } catch (err) {
+      console.error('[rs:onboarding:put] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/reco/onboarding/subjects — list KG subjects + grades available
+  // (cho modal đầu render dropdown). Hardcoded fallback nếu KG trống.
+  app.get('/api/reco/onboarding/subjects', async (_req, res) => {
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      // Pull distinct Subject từ KG nodes
+      const r = await pool.query(
+        `SELECT DISTINCT label FROM kg_nodes WHERE type = 'Subject' ORDER BY label LIMIT 20`
+      );
+      const subjects = r.rows.length > 0
+        ? r.rows.map(x => x.label)
+        : ['Vật lí', 'Toán', 'Hoá', 'Sinh', 'Tiếng Anh', 'Văn'];
+      const grades = ['Khối 10', 'Khối 11', 'Khối 12', 'Đang ôn thi đại học'];
+      return res.json({ success: true, subjects, grades });
+    } catch (err) {
+      // Fallback hardcoded
+      return res.json({
+        success: true,
+        subjects: ['Vật lí', 'Toán', 'Hoá', 'Sinh', 'Tiếng Anh', 'Văn'],
+        grades: ['Khối 10', 'Khối 11', 'Khối 12', 'Đang ôn thi đại học'],
+      });
     }
   });
 
