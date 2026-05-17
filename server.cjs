@@ -12027,6 +12027,7 @@ if (!USE_NODEJS_QUESTIONS) {
   const { randomUUID: latexUUID } = require('crypto');
 
   let _lpool = null;
+  let _lpoolReady = null; // promise: ensure tables created once
   function getLPool() {
     if (!_lpool) {
       const DATABASE_URL = process.env.DATABASE_URL;
@@ -12038,6 +12039,38 @@ if (!USE_NODEJS_QUESTIONS) {
         connectionTimeoutMillis: 15000 });
     }
     return _lpool;
+  }
+  // Lazy migration — chạy một lần duy nhất, idempotent
+  async function ensureLatexTables() {
+    if (_lpoolReady) return _lpoolReady;
+    const pool = getLPool();
+    _lpoolReady = (async () => {
+      // Main project table
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LatexProject" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT 'Tài liệu LaTeX',
+        "mainContent" TEXT DEFAULT '',
+        "folderId" TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW(),
+        "updatedAt" TIMESTAMP DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_project_user ON "LatexProject" ("userId")`);
+      // Add folderId column if missing (for DB tables created before this column)
+      await pool.query(`ALTER TABLE "LatexProject" ADD COLUMN IF NOT EXISTS "folderId" TEXT`);
+      // Version history table
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LatexProjectVersion" (
+        id TEXT PRIMARY KEY,
+        "projectId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "titleSnapshot" TEXT,
+        "contentSnapshot" TEXT,
+        trigger TEXT DEFAULT 'manual',
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_version_project ON "LatexProjectVersion" ("projectId")`);
+    })();
+    return _lpoolReady;
   }
   const LJWT_SECRET = process.env.JWT_SECRET
     || process.env.NEXTAUTH_SECRET
@@ -12057,8 +12090,9 @@ if (!USE_NODEJS_QUESTIONS) {
     try {
       const userId = getLatexUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      await ensureLatexTables();
       const { rows } = await getLPool().query(
-        `SELECT id, "userId", title, "mainContent", "folderId", "createdAt", "updatedAt"
+        `SELECT id, "userId", title, "folderId", "createdAt", "updatedAt"
          FROM "LatexProject" WHERE "userId" = $1 ORDER BY "updatedAt" DESC`,
         [userId]
       );
@@ -12074,6 +12108,7 @@ if (!USE_NODEJS_QUESTIONS) {
     try {
       const userId = getLatexUserId(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      await ensureLatexTables();
       const { rows } = await getLPool().query(
         `SELECT * FROM "LatexProject" WHERE id = $1 AND "userId" = $2 LIMIT 1`,
         [req.params.id, userId]
@@ -12093,6 +12128,7 @@ if (!USE_NODEJS_QUESTIONS) {
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
       const { title, mainContent } = req.body || {};
       if (!title) return res.status(400).json({ error: 'title required' });
+      await ensureLatexTables();
       const id = latexUUID();
       const now = new Date();
       await getLPool().query(
@@ -12315,6 +12351,61 @@ if (!USE_NODEJS_QUESTIONS) {
       return res.json({ versions: rows });
     } catch (err) {
       console.error('[latex:versions] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── Collaborators (stub — tính năng chia sẻ chưa implement đầy đủ) ────────
+  // Frontend gọi khi GV mở Share dialog. Trả mảng rỗng để tránh 503 từ
+  // aero-backend catch-all khi route không tồn tại.
+  app.get('/api/latex-projects/:id/collaborators', async (req, res) => {
+    const userId = getLatexUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    return res.json({ collaborators: [] });
+  });
+
+  app.post('/api/latex-projects/:id/collaborators', async (req, res) => {
+    const userId = getLatexUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    // Stub — tính năng invite chưa implement: trả 501 thay vì 503
+    return res.status(501).json({ error: 'Tính năng chia sẻ đang phát triển' });
+  });
+
+  app.delete('/api/latex-projects/:id/collaborators/:userId', async (req, res) => {
+    const userId = getLatexUserId(req);
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(501).json({ error: 'Tính năng chia sẻ đang phát triển' });
+  });
+
+  // POST /api/latex-projects/:id/versions/restore — khôi phục version ─────
+  app.post('/api/latex-projects/:id/versions/restore', async (req, res) => {
+    try {
+      const userId = getLatexUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { versionId } = req.body || {};
+      if (!versionId) return res.status(400).json({ error: 'versionId required' });
+      const pool = getLPool();
+      // Lấy content từ version snapshot
+      const { rows: vRows } = await pool.query(
+        `SELECT v."contentSnapshot", v."titleSnapshot"
+         FROM "LatexProjectVersion" v
+         JOIN "LatexProject" p ON p.id = v."projectId"
+         WHERE v.id = $1 AND p."userId" = $2 LIMIT 1`,
+        [versionId, userId]
+      );
+      if (!vRows[0]) return res.status(404).json({ error: 'Version không tồn tại' });
+      const { contentSnapshot, titleSnapshot } = vRows[0];
+      // Cập nhật project với content của version được chọn
+      const sets = [`"mainContent"=$3`, `"updatedAt"=NOW()`];
+      const vals = [req.params.id, userId, contentSnapshot || ''];
+      if (titleSnapshot) { sets.push(`title=$4`); vals.push(titleSnapshot); }
+      await pool.query(
+        `UPDATE "LatexProject" SET ${sets.join(', ')} WHERE id=$1 AND "userId"=$2`,
+        vals
+      );
+      return res.json({ ok: true, content: contentSnapshot || '', title: titleSnapshot });
+    } catch (err) {
+      console.error('[latex:restore] ❌', err.message);
       return res.status(500).json({ error: err.message });
     }
   });
