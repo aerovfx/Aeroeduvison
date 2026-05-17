@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   Sparkles, RefreshCw, Loader2, ChevronRight, ThumbsDown, ArrowRight,
-  Compass, Target, Clock, Users, X, Activity,
+  Compass, Target, Clock, Users, X, Activity, Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -96,6 +96,23 @@ export default function ForYouPage() {
               Cá nhân hoá từ điểm yếu, GV của bạn, và xu hướng
             </p>
           </div>
+          <button
+            onClick={async () => {
+              const r = await rs.sendDigestMe()
+              if (r.sent) {
+                toast.success(`📧 Digest gửi đến notification bell (${r.itemsCount} mục)`)
+              } else if (r.reason === 'already_sent_today') {
+                toast('Đã gửi digest hôm nay rồi, kiểm tra 🔔', { icon: 'ℹ️' })
+              } else {
+                toast.error('Chưa có data để tạo digest')
+              }
+            }}
+            className="p-2 rounded-lg bg-cyan-500/15 active:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30"
+            aria-label="Gửi digest"
+            title="Gửi tóm tắt 3 mục vào notification bell"
+          >
+            <Send className="w-4 h-4" />
+          </button>
           <button
             onClick={() => refetch()}
             disabled={isFetching}

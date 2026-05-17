@@ -116,6 +116,17 @@ export const recommendationService = {
     api.get<{ success: boolean; items: RsHistoryEntry[] }>('/reco/history', {
       params: { limit },
     }).then(r => r.data.items || []),
+
+  /** RS-Phase 8: gửi digest notification cho user hiện tại (idempotent 1/day). */
+  sendDigestMe: () =>
+    api.post<{
+      success: boolean
+      sent: boolean
+      reason?: string
+      notificationId?: string
+      itemsCount?: number
+      existingId?: string
+    }>('/reco/digest/me').then(r => r.data),
 }
 
 /** UI helper: mapping cho từng item type → icon + accent color */

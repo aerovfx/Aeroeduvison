@@ -10830,6 +10830,175 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     }
   });
 
+  // ─────────────────────────────────────────────────────────
+  // RS-PHASE 8: DAILY DIGEST NOTIFICATION
+  // Generate top 3 reco cho user, insert vào Notification bell.
+  // Idempotent: 1/day per user (skip nếu đã có digest hôm nay).
+  // ─────────────────────────────────────────────────────────
+
+  // Helper: fetch top 3 reco cho 1 user (reuse logic /api/reco/feed)
+  // Đơn giản hoá: chỉ dùng kg_weak_topic + teacher_learning_path sources
+  async function _generateDigestPreview(pool, userId) {
+    const items = [];
+
+    // Source 1: top weak topics
+    try {
+      const w = await pool.query(
+        `SELECT m.node_id, m.score, n.label, n.type
+         FROM kg_mastery m JOIN kg_nodes n ON n.id = m.node_id
+         WHERE m.user_id = $1 AND m.score < 50
+         ORDER BY m.score ASC LIMIT 2`,
+        [userId]
+      );
+      for (const x of w.rows) {
+        items.push({
+          emoji: '🎯',
+          title: x.label,
+          subtitle: `Bạn còn yếu (${Math.round(x.score)}%) — học lại`,
+          link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(x.node_id)}`,
+        });
+      }
+    } catch (_) {}
+
+    // Source 2: teacher LP mới
+    try {
+      const tp = await pool.query(
+        `SELECT lp.id, lp.name, lp.subject, u.name AS teacher_name
+         FROM "LearningPath" lp
+         JOIN "TeacherStudentLink" tsl ON tsl."teacherId" = lp."teacherId"
+         LEFT JOIN "User" u ON u.id = lp."teacherId"
+         WHERE tsl."studentId" = $1 AND tsl.status = 'approved'
+           AND lp."createdAt" > NOW() - INTERVAL '14 days'
+         ORDER BY lp."createdAt" DESC LIMIT 2`,
+        [userId]
+      );
+      for (const x of tp.rows) {
+        items.push({
+          emoji: '👩‍🏫',
+          title: x.name,
+          subtitle: `GV ${x.teacher_name || 'phụ trách'} · ${x.subject || 'Lộ trình mới'}`,
+          link: '/learning-paths',
+        });
+      }
+    } catch (_) {}
+
+    // Source 3: popular exam fallback (max 3 total)
+    if (items.length < 3) {
+      try {
+        const pop = await pool.query(
+          `SELECT e.id, e.title, e.subject, COUNT(DISTINCT pe."studentId") AS takers
+           FROM "Exam" e
+           LEFT JOIN "PracticeExam" pe ON pe."examId" = e.id
+           WHERE e.published = true
+           GROUP BY e.id, e.title, e.subject
+           HAVING COUNT(DISTINCT pe."studentId") > 0
+           ORDER BY takers DESC LIMIT ${3 - items.length}`
+        );
+        for (const x of pop.rows) {
+          items.push({
+            emoji: '🔥',
+            title: x.title,
+            subtitle: `${x.subject || 'Đề thi'} · ${x.takers} HS đã làm`,
+            link: '/student/exams',
+          });
+        }
+      } catch (_) {}
+    }
+
+    return items.slice(0, 3);
+  }
+
+  async function _sendDigestNotification(pool, userId) {
+    // Check: đã có digest hôm nay chưa? (idempotent)
+    const dup = await pool.query(
+      `SELECT id FROM "Notification"
+       WHERE "userId" = $1 AND type = 'rs_digest'
+         AND "createdAt" > NOW() - INTERVAL '20 hours'
+       LIMIT 1`,
+      [userId]
+    );
+    if (dup.rows.length > 0) {
+      return { sent: false, reason: 'already_sent_today', existingId: dup.rows[0].id };
+    }
+
+    const items = await _generateDigestPreview(pool, userId);
+    if (items.length === 0) {
+      return { sent: false, reason: 'no_recommendations' };
+    }
+
+    const body = items
+      .map((it, i) => `${i + 1}. ${it.emoji} ${it.title}\n   ${it.subtitle}`)
+      .join('\n\n');
+
+    const notifId = 'notif_digest_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+    await pool.query(
+      `INSERT INTO "Notification"
+         (id, "userId", type, title, body, link, metadata, "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
+      [
+        notifId,
+        userId,
+        'rs_digest',
+        `🎯 Gợi ý học hôm nay — ${items.length} mục cho bạn`,
+        body,
+        '/student/for-you',
+        JSON.stringify({ items, generatedAt: new Date().toISOString() }),
+      ]
+    );
+
+    return { sent: true, notificationId: notifId, itemsCount: items.length };
+  }
+
+  // POST /api/reco/digest/me — generate digest cho user hiện tại
+  app.post('/api/reco/digest/me', async (req, res) => {
+    const user = getRsUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      const result = await _sendDigestNotification(pool, user.id);
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[rs:digest:me] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/reco/digest/run-all — admin batch: chạy cho mọi user active
+  // 7 ngày qua. Dành cho Cloud Scheduler cron (header: x-admin-token).
+  app.post('/api/reco/digest/run-all', async (req, res) => {
+    // Bảo vệ bằng admin token (lưu trong env)
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken || adminToken !== (process.env.RS_DIGEST_ADMIN_TOKEN || 'dev-secret')) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+    try {
+      await ensureRsReady();
+      const pool = getKcPool();
+      // Get active users (đã track action 7 ngày qua)
+      const r = await pool.query(
+        `SELECT DISTINCT user_id FROM rs_action_log
+         WHERE created_at > NOW() - INTERVAL '7 days'
+         LIMIT 5000`
+      );
+      let sent = 0, skipped = 0, errors = 0;
+      for (const row of r.rows) {
+        try {
+          const x = await _sendDigestNotification(pool, row.user_id);
+          if (x.sent) sent++; else skipped++;
+        } catch (e) { errors++; }
+      }
+      return res.json({
+        success: true,
+        totalActiveUsers: r.rows.length,
+        sent, skipped, errors,
+      });
+    } catch (err) {
+      console.error('[rs:digest:run-all] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════
   // KG — PHASE 3: Personal Mastery Layer
   // Mỗi user có mức độ thông thạo (score 0-100) cho từng node — render
