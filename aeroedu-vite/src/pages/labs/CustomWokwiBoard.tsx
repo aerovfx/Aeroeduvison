@@ -1129,6 +1129,7 @@ export default function CustomWokwiBoard() {
   const [view, setView] = useState<'split' | 'preview' | 'json'>('split')
   const [focusedPartId, setFocusedPartId] = useState<string | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
   const [editingCircuit, setEditingCircuit] = useState<CustomCircuit | null>(null)
 
   // Load mạch đã lưu của user (+ public)
@@ -1396,6 +1397,16 @@ export default function CustomWokwiBoard() {
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         )}
+
+        {/* Browse community gallery */}
+        <button
+          onClick={() => setShowGallery(true)}
+          className="text-xs px-3 py-1.5 rounded-md bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-500/40 inline-flex items-center gap-1.5"
+          title="Khám phá tất cả mạch công khai từ cộng đồng + thư viện cá nhân"
+        >
+          <Globe className="w-3.5 h-3.5" />
+          Khám phá ({myCircuits.length + communityCircuits.length})
+        </button>
 
         <div className="flex-1" />
 
@@ -1697,6 +1708,17 @@ export default function CustomWokwiBoard() {
         </div>
       </div>
 
+      {/* Gallery modal — khám phá tất cả mạch công khai */}
+      {showGallery && (
+        <BrowseGalleryModal
+          myCircuits={myCircuits}
+          communityCircuits={communityCircuits}
+          activeId={activeTemplateId}
+          onClose={() => setShowGallery(false)}
+          onOpen={(c) => { loadCustomCircuit(c); setShowGallery(false) }}
+        />
+      )}
+
       {/* Save modal */}
       {showSaveModal && (
         <SaveCircuitModal
@@ -1939,6 +1961,218 @@ function SaveCircuitModal({ initial, isUpdate, onClose, onSubmit }: SaveModalPro
             )}
             {isUpdate ? 'Lưu thay đổi' : 'Lưu mạch'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────
+// BrowseGalleryModal — khám phá tất cả mạch (cá nhân + công khai)
+// ────────────────────────────────────────────────────────────────
+interface GalleryProps {
+  myCircuits: CustomCircuit[]
+  communityCircuits: CustomCircuit[]
+  activeId: string
+  onClose: () => void
+  onOpen: (c: CustomCircuit) => void
+}
+
+function BrowseGalleryModal({
+  myCircuits, communityCircuits, activeId, onClose, onOpen,
+}: GalleryProps) {
+  const [tab, setTab] = useState<'community' | 'mine'>(
+    myCircuits.length === 0 ? 'community' : 'mine'
+  )
+  const [catFilter, setCatFilter] = useState<string>('all')
+  const [searchQ, setSearchQ] = useState('')
+
+  const source = tab === 'mine' ? myCircuits : communityCircuits
+
+  // Filter pipeline
+  const filtered = useMemo(() => {
+    let list = source
+    if (catFilter !== 'all') list = list.filter(c => c.category === catFilter)
+    if (searchQ.trim()) {
+      const q = searchQ.toLowerCase()
+      list = list.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [source, catFilter, searchQ])
+
+  // Group by category for display
+  const grouped = useMemo(() => {
+    const m = new Map<string, CustomCircuit[]>()
+    for (const c of filtered) {
+      const arr = m.get(c.category) ?? []
+      arr.push(c); m.set(c.category, arr)
+    }
+    // Sort by CIRCUIT_CATEGORIES order
+    const ordered: [string, CustomCircuit[]][] = []
+    for (const cat of CIRCUIT_CATEGORIES) {
+      const arr = m.get(cat.id)
+      if (arr) ordered.push([cat.id, arr])
+    }
+    // Append unknown categories at end
+    for (const [k, v] of m) {
+      if (!CIRCUIT_CATEGORIES.find(c => c.id === k)) ordered.push([k, v])
+    }
+    return ordered
+  }, [filtered])
+
+  const usedCategories = useMemo(() => {
+    const s = new Set(source.map(c => c.category))
+    return s
+  }, [source])
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between gap-2 p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <Globe className="w-5 h-5 text-cyan-300" />
+            <h3 className="text-base font-bold text-zinc-100">Khám phá mạch Custom</h3>
+            <div className="flex items-center gap-1 bg-zinc-800/60 border border-zinc-700 rounded-md p-0.5">
+              <button
+                onClick={() => { setTab('mine'); setCatFilter('all') }}
+                className={`text-[11px] px-2.5 py-1 rounded transition ${
+                  tab === 'mine'
+                    ? 'bg-cyan-500/25 text-cyan-200'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                📁 Của tôi ({myCircuits.length})
+              </button>
+              <button
+                onClick={() => { setTab('community'); setCatFilter('all') }}
+                className={`text-[11px] px-2.5 py-1 rounded transition ${
+                  tab === 'community'
+                    ? 'bg-cyan-500/25 text-cyan-200'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                🌍 Cộng đồng ({communityCircuits.length})
+              </button>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-100">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Filter bar */}
+        <div className="p-3 border-b border-zinc-800 flex items-center gap-2 flex-wrap">
+          <input
+            type="search"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Tìm theo tên hoặc mô tả..."
+            className="flex-1 min-w-[200px] px-3 py-1.5 bg-zinc-950 border border-zinc-700 rounded-md text-xs text-zinc-100 focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+          />
+          <select
+            value={catFilter}
+            onChange={(e) => setCatFilter(e.target.value)}
+            className="text-xs bg-zinc-950 border border-zinc-700 rounded-md px-2 py-1.5 text-zinc-200"
+          >
+            <option value="all">Tất cả danh mục ({source.length})</option>
+            {CIRCUIT_CATEGORIES.filter(c => usedCategories.has(c.id)).map(c => (
+              <option key={c.id} value={c.id}>
+                {c.emoji} {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Grid scrollable */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-sm text-zinc-500">
+              {tab === 'mine'
+                ? 'Bạn chưa lưu mạch nào. Hãy thiết kế và bấm "Lưu mạch" để thêm vào thư viện cá nhân!'
+                : source.length === 0
+                ? 'Chưa có mạch công khai nào. Hãy là người đầu tiên chia sẻ!'
+                : 'Không có mạch nào khớp bộ lọc — thử bỏ keyword hoặc đổi danh mục.'}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {grouped.map(([catId, items]) => (
+                <div key={catId}>
+                  <h4 className="text-[11px] uppercase tracking-wider text-zinc-500 font-semibold mb-2 flex items-center gap-1.5">
+                    <span className="text-base">{categoryEmoji(catId)}</span>
+                    {categoryLabel(catId)}
+                    <span className="text-zinc-600">· {items.length}</span>
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                    {items.map(c => {
+                      const partsCount = Array.isArray((c.diagram as any)?.parts)
+                        ? (c.diagram as any).parts.length : 0
+                      const connCount = Array.isArray((c.diagram as any)?.connections)
+                        ? (c.diagram as any).connections.length : 0
+                      const isActive = c.id === activeId
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => onOpen(c)}
+                          className={`text-left rounded-lg border p-3 transition group ${
+                            isActive
+                              ? 'border-cyan-500/60 bg-cyan-500/10 ring-1 ring-cyan-500/40'
+                              : 'border-zinc-800 bg-zinc-950 hover:border-zinc-600 hover:bg-zinc-900'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <span className="text-base">{categoryEmoji(c.category)}</span>
+                              <span className="text-sm font-semibold text-zinc-100 truncate">{c.name}</span>
+                            </div>
+                            <span className={`text-[9px] px-1 py-0.5 rounded shrink-0 ${
+                              c.difficulty === 'Dễ' ? 'bg-emerald-500/15 text-emerald-300'
+                              : c.difficulty === 'Trung bình' ? 'bg-amber-500/15 text-amber-300'
+                              : 'bg-rose-500/15 text-rose-300'
+                            }`}>
+                              {c.difficulty}
+                            </span>
+                          </div>
+                          {c.description && (
+                            <p className="text-[11px] text-zinc-400 mb-1.5 line-clamp-2">{c.description}</p>
+                          )}
+                          <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                            <span>{c.board}</span>
+                            <span>·</span>
+                            <span>{partsCount} parts</span>
+                            <span>·</span>
+                            <span>{connCount} dây</span>
+                            {c.isPublic && (
+                              <>
+                                <span>·</span>
+                                <span className="text-emerald-400 inline-flex items-center gap-0.5">
+                                  <Globe className="w-2.5 h-2.5" /> Công khai
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer hint */}
+        <div className="p-2 border-t border-zinc-800 text-[10px] text-zinc-500 text-center">
+          💡 Click 1 mạch để mở · Mạch cộng đồng có thể "Lưu mạch" để clone về thư viện cá nhân
         </div>
       </div>
     </div>
