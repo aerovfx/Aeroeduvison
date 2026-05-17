@@ -15,10 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `91e6f24` (revision TBD, 2026-05-17 — KG Phase 4 ext: save-as-LP + edge highlight + time)
-- Commits since last deploy: `0/5` (early deploy: Phase 4 extension theo loop)
+- Last deployed commit: `0bc841d` (revision TBD, 2026-05-17 — KG Phase 5+6+7: Cross-Subject + Smart Search + Suggestions)
+- Commits since last deploy: `0/5` (early deploy: 3 phases trong 1 batch)
+- Prev: `9fede75` → pixiai-00267-mag (KG Phase 4 ext — save-as-LP + edge highlight + time)
 - Prev: `6249470` → pixiai-00266-caw (KG Phase 4 base — BFS path-finding)
-- Prev: `da04588` → pixiai-00265-bis (KG Phase 3 Mastery Layer)
 - Prev: `bf50545` → pixiai-00264-zir (Sim 4 critical bug fixes — t.jsCode/extractPinMap/uint8_t/shiftOut)
 - Prev: `b100ff7` → pixiai-00263-lip (Save UX redesign — tách Lưu mới vs Cập nhật)
 - Prev: `a1f9ea8` → pixiai-00262-bop (Custom mạch simulator "Chạy giả lập")
@@ -27,11 +27,11 @@
 - Phase 1 ✅ MVP viewer (search/expand/filter/drag/zoom + seed Vật lí 11)
 - Phase 2 ✅ AI Extract + Similarity linking
 - Phase 3 ✅ Personal Mastery Layer (overlay + stats + weak topics)
-- Phase 4 ✅ Auto Learning Path (BFS shortest path từ điểm yếu)
-- Phase 5 ⏳ Cross-Subject (Toán+Hóa+Lý 11/12, cross-edges)
-- Phase 6 ⏳ Smart Search & Recommendation (AI NL query)
-- Phase 7 ⏳ Collaborative editing (GV vote/version)
-- Phase 8 ⏳ 3D visualization (galaxy/VR)
+- Phase 4 ✅ Auto Learning Path (BFS + save-as-LP + estimated time)
+- Phase 5 ✅ Cross-Subject (Toán 11 + Hóa 11 + 11 cross-edges)
+- Phase 6 ✅ AI Smart Search (Claude NL query → graph slice)
+- Phase 7 ✅ Collaborative editing MVP (kg_suggestions table + upvote)
+- Phase 8 ⏳ 3D visualization (Three.js force-3D + orbit) — deferred
 
 Khi deploy, reset counter về 0 và update last deployed commit hash.
 
