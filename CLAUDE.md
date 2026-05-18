@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `6a185e7` (revision pixiai-00310-zab, 2026-05-18 — KG 3D UX overhaul: center halo + freeze layout + auto-rotate OFF + camera Y=-8 + lớp 4 LIVE)
-- Commits since last deploy: `0/5` (reset sau hotfix UX)
+- Last deployed commit: `4908bc9` (revision pixiai-00311-lib, 2026-05-18 — KG 2D fix: SVG slice + center marker + loading branded LIVE)
+- Commits since last deploy: `0/5` (reset sau hotfix UX 2D)
+- Prev: `6a185e7` → pixiai-00310-zab (KG 3D UX overhaul + lớp 4)
 - Prev: `08f7c40` → pixiai-00309-gul (bundle 8: Mĩ thuật+KTPL+HĐTN+F Focus+Tin học+Lớp 1+2+3)
 - Prev: `c0225c4` → pixiai-00308-nus (KG Công nghệ Công nghiệp 10/11/12)
 - Prev: `ca6b319` → pixiai-00307-yom (🧠 KG Brain v2 Phoenix-style pipeline LIVE)
