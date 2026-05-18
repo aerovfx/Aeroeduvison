@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `c0225c4` (revision pixiai-00308-nus, 2026-05-18 — KG Công nghệ Công nghiệp 10/11/12 LIVE)
-- Commits since last deploy: `6/5 ⚠ DEPLOY WAITING REAUTH` → Mĩ thuật · KTPL · HĐTN · F Focus · Tin học (4 môn mới + UX 3D, ~1485 nodes)
+- Last deployed commit: `08f7c40` (revision pixiai-00309-gul, 2026-05-18 — bundle 8 commits: Mĩ thuật + KTPL + HĐTN + F Focus + Tin học + Khối lớp 1+2+3 LIVE)
+- Commits since last deploy: `1/5` → 8cead13 (Khối lớp 4 — 8 môn, TNXH tách KH+LSĐL, ~2175 nodes)
+- Prev: `c0225c4` → pixiai-00308-nus (KG Công nghệ Công nghiệp 10/11/12)
 - Prev: `ca6b319` → pixiai-00307-yom (🧠 KG Brain v2 Phoenix-style pipeline LIVE)
 - Prev: `97ece65` → pixiai-00306-voz (KG Công nghệ Chăn nuôi 10/11/12)
 - Prev: `aa978bd` → pixiai-00305-gev (KG Địa lí 10/11/12 — HOÀN TẤT 6 môn GDPT)
