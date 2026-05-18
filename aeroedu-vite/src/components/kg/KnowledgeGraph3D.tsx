@@ -182,9 +182,10 @@ function NeuralNetwork({ nodes, edges, centerId, onNodeClick, showLabels }: Prop
       stepForces(pNodes, edges, dt * 30)
     }
 
-    // Update group rotation slightly for cinematic feel (auto-rotate)
+    // Auto-rotation chậm (cinematic, label vẫn đọc được).
+    // 0.02 rad/s = 1 vòng/~5 phút — không gây chóng mặt.
     if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.05
+      groupRef.current.rotation.y += dt * 0.02
     }
   })
 
@@ -208,16 +209,23 @@ function NeuralNetwork({ nodes, edges, centerId, onNodeClick, showLabels }: Prop
       </group>
 
       {/* Nodes as glowing spheres */}
-      {pNodes.map(n => (
-        <NodeSphere
-          key={n.id}
-          node={n}
-          hovered={hoveredId === n.id}
-          onHover={(h) => setHoveredId(h ? n.id : null)}
-          onClick={() => onNodeClick?.(n.id)}
-          showLabel={!!showLabels && (n.isCenter || hoveredId === n.id)}
-        />
-      ))}
+      {pNodes.map(n => {
+        // Hiển thị label cho các node quan trọng (Subject/Chapter/Application/
+        // Phenomenon), không chỉ hover. Topic/Concept/Formula nhỏ hơn — chỉ
+        // show label khi hover để không clutter.
+        const importantTypes = ['Subject', 'Chapter', 'Application', 'Phenomenon']
+        const alwaysShowLabel = importantTypes.includes(n.type)
+        return (
+          <NodeSphere
+            key={n.id}
+            node={n}
+            hovered={hoveredId === n.id}
+            onHover={(h) => setHoveredId(h ? n.id : null)}
+            onClick={() => onNodeClick?.(n.id)}
+            showLabel={!!showLabels && (n.isCenter || alwaysShowLabel || hoveredId === n.id)}
+          />
+        )
+      })}
     </group>
   )
 }
@@ -280,14 +288,26 @@ function NodeSphere({ node, hovered, onHover, onClick, showLabel }: {
       />
       {showLabel && (
         <Html
-          distanceFactor={40}
+          distanceFactor={20}
           position={[0, node.radius + 2, 0]}
           center
-          style={{ pointerEvents: 'none' }}
+          zIndexRange={[100, 0]}
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+          // Html từ drei tự billboard (DOM overlay luôn face camera)
         >
           <div
-            className="px-2 py-0.5 rounded-md bg-black/80 border border-white/30 text-white text-[10px] font-bold whitespace-nowrap shadow-xl"
-            style={{ color: '#' + node.color.getHexString() }}
+            className="rounded-lg whitespace-nowrap shadow-2xl"
+            style={{
+              padding: node.isCenter ? '6px 14px' : '4px 10px',
+              background: 'rgba(0,0,0,0.92)',
+              border: `2px solid #${node.color.getHexString()}`,
+              fontSize: node.isCenter ? 18 : (hovered ? 16 : 14),
+              fontWeight: 800,
+              color: '#fff',
+              textShadow: `0 0 8px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
+              letterSpacing: '0.5px',
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            }}
           >
             {node.label}
           </div>
