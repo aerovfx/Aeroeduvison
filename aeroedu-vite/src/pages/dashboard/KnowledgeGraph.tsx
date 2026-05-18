@@ -31,6 +31,9 @@ import {
 } from '@/services/knowledge-graph.service'
 import AiExtractModal from '@/components/knowledge-graph/AiExtractModal'
 import { recommendationService as rs } from '@/services/recommendation.service'
+import { lazy, Suspense } from 'react'
+// Lazy load 3D view — bundle khá lớn vì Three.js
+const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -164,6 +167,8 @@ export default function KnowledgeGraph() {
     new Set(Object.keys(NODE_TYPE_COLORS))
   )
   const [extractOpen, setExtractOpen] = useState(false)
+  /** View mode: 2D SVG (default) or 3D neural network (Three.js) */
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
 
   // ── Phase 3: Personal Mastery overlay ─────────────────────────
   const [masteryOn, setMasteryOn] = useState(false)
@@ -1233,7 +1238,49 @@ export default function KnowledgeGraph() {
 
         {/* Canvas */}
         <main className="flex-1 relative overflow-hidden bg-[#06030f] pb-14 md:pb-0">
-          {/* Background grid pattern */}
+          {/* View mode toggle — floating top-right */}
+          <div className="absolute top-3 right-3 z-20 flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-zinc-700 p-1">
+            <button
+              onClick={() => setViewMode('2d')}
+              title="Xem dạng 2D (SVG, mặc định)"
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
+                viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              2D
+            </button>
+            <button
+              onClick={() => setViewMode('3d')}
+              title="Xem dạng 3D Neural Network"
+              className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
+                viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              🧠 3D
+            </button>
+          </div>
+
+          {/* 3D view */}
+          {viewMode === '3d' && (
+            <div className="absolute inset-0 p-2 pb-14 md:pb-2">
+              <Suspense fallback={
+                <div className="w-full h-full flex items-center justify-center bg-black rounded-2xl">
+                  <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+                </div>
+              }>
+                <KnowledgeGraph3D
+                  nodes={visibleNodes}
+                  edges={visibleEdges}
+                  centerId={startIdRef.current || 'subj-vatli'}
+                  onNodeClick={onNodeClick}
+                  showLabels
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {/* 2D SVG view (hidden khi 3D) */}
+          {viewMode === '2d' && (
           <svg
             ref={svgRef}
             viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
@@ -1399,6 +1446,7 @@ export default function KnowledgeGraph() {
               })}
             </g>
           </svg>
+          )}
 
           {/* Loading overlay */}
           {loading && (
