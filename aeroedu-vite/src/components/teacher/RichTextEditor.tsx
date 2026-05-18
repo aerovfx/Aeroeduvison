@@ -29,7 +29,9 @@ interface Props {
 export function RichTextEditor({ value, onChange, placeholder = 'Nhập nội dung...', minHeight = 160 }: Props) {
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      // StarterKit 3.x include Underline → disable để khỏi trùng với
+      // @tiptap/extension-underline thêm bên dưới (Tiptap warn deduplicate).
+      StarterKit.configure({ underline: false } as any),
       Underline,
       Placeholder.configure({ placeholder }),
     ],

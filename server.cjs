@@ -2758,12 +2758,180 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
     }
   });
 
-  // ── Stubs cho videos + assets endpoints (chưa implement full) ──
+  // ── Stubs cho video endpoints (videos được implement block dưới) ──
   const _501 = (msg) => (_req, res) => res.status(501).json({ error: msg });
   const _ok  = (_req, res) => res.json({ ok: true });
-  app.get('/api/instructor/courses/:id/assets', (_req, res) => res.json([]));
-  app.post('/api/instructor/courses/:id/assets', _501('Upload assets đang phát triển'));
-  app.delete('/api/instructor/courses/:id/assets/:assetId', _ok);
+
+  // ════════════════════════════════════════════════════════════════
+  // COURSE ASSETS — Tài liệu kèm theo khoá học (PDF/DOCX/ZIP/...).
+  // Multipart upload trực tiếp → GCS bucket aeroedu-media-*/courses/
+  //   <courseId>/assets/<timestamp>-<safe-filename>
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: APool } = require('pg');
+    const aJwt = require('jsonwebtoken');
+    const multer = require('multer');
+    let _aPool = null;
+    function getAPool() {
+      if (!_aPool && process.env.DATABASE_URL) {
+        _aPool = new APool({ connectionString: process.env.DATABASE_URL, max: 3 });
+      }
+      return _aPool;
+    }
+    const A_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getATeacher(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = aJwt.verify(auth.slice(7), A_SECRET, { ignoreExpiration: true });
+        return d.sub || d.userId || d.id || null;
+      } catch { return null; }
+    }
+    const ASSET_BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+    let _aReady = false;
+    async function ensureAssetTable() {
+      if (_aReady) return;
+      const pool = getAPool();
+      if (!pool) return;
+      await pool.query(`CREATE TABLE IF NOT EXISTS "CourseAsset" (
+        id TEXT PRIMARY KEY,
+        "courseId" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        title TEXT NOT NULL,
+        "fileUrl" TEXT NOT NULL,
+        "fileType" TEXT,
+        "fileSize" BIGINT,
+        "gcsPath" TEXT,
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CourseAsset_course_idx"
+        ON "CourseAsset"("courseId", "createdAt" DESC)`);
+      _aReady = true;
+    }
+
+    // multer in-memory storage — file ≤ 50MB
+    const assetUpload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 50 * 1024 * 1024 },
+    });
+
+    // GET /api/instructor/courses/:id/assets
+    app.get('/api/instructor/courses/:id/assets', async (req, res) => {
+      try {
+        const tid = getATeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getAPool();
+        if (!pool) return res.json([]);
+        await ensureAssetTable();
+        // Ownership check
+        const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+          [req.params.id, tid]);
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        const { rows } = await pool.query(
+          `SELECT id, "courseId", title, "fileUrl", "fileType", "fileSize", "createdAt"
+             FROM "CourseAsset"
+            WHERE "courseId"=$1 ORDER BY "createdAt" DESC`,
+          [req.params.id]
+        );
+        return res.json(rows);
+      } catch (err) {
+        console.error('[assets:list]', err.message);
+        return res.json([]);
+      }
+    });
+
+    // POST /api/instructor/courses/:id/assets — multipart form (file + title)
+    app.post('/api/instructor/courses/:id/assets',
+      assetUpload.single('file'),
+      async (req, res) => {
+        try {
+          const tid = getATeacher(req);
+          if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+          const courseId = req.params.id;
+          const title = String(req.body?.title || '').trim();
+          const f = req.file;
+          if (!f) return res.status(400).json({ error: 'Thiếu file' });
+          if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề tài liệu' });
+          const pool = getAPool();
+          if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+          await ensureAssetTable();
+          // Ownership
+          const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+            [courseId, tid]);
+          if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+
+          // Upload tới GCS — courses/<courseId>/assets/<timestamp>-<safe-name>
+          const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+          const gcsPath = `courses/${courseId}/assets/${Date.now()}-${safeName}`;
+          const { Storage } = require('@google-cloud/storage');
+          const storage = new Storage();
+          const gcsFile = storage.bucket(ASSET_BUCKET).file(gcsPath);
+          await gcsFile.save(f.buffer, {
+            contentType: f.mimetype,
+            metadata: { cacheControl: 'public, max-age=86400' },
+          });
+          const fileUrl = `https://storage.googleapis.com/${ASSET_BUCKET}/${gcsPath}`;
+
+          // Save to DB
+          const { randomUUID } = require('crypto');
+          const id = randomUUID();
+          await pool.query(
+            `INSERT INTO "CourseAsset"
+               (id, "courseId", "userId", title, "fileUrl", "fileType", "fileSize", "gcsPath")
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [id, courseId, tid, title.slice(0, 300), fileUrl,
+             f.mimetype.slice(0, 100), f.size, gcsPath]
+          );
+          const { rows } = await pool.query(
+            `SELECT id, "courseId", title, "fileUrl", "fileType", "fileSize", "createdAt"
+               FROM "CourseAsset" WHERE id=$1`, [id]
+          );
+          console.log(`[assets:create] ✅ ${id.slice(0,8)} "${title.slice(0,40)}" ${(f.size/1024).toFixed(1)}KB`);
+          return res.status(201).json(rows[0]);
+        } catch (err) {
+          console.error('[assets:create]', err.message);
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ error: 'File quá lớn (tối đa 50MB)' });
+          }
+          return res.status(500).json({ error: err.message });
+        }
+      });
+
+    // DELETE /api/instructor/courses/:id/assets/:assetId
+    app.delete('/api/instructor/courses/:id/assets/:assetId', async (req, res) => {
+      try {
+        const tid = getATeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getAPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureAssetTable();
+        // Ownership + get gcsPath
+        const own = await pool.query(
+          `SELECT a."gcsPath" FROM "CourseAsset" a
+             JOIN "Course" c ON c.id = a."courseId"
+            WHERE a.id=$1 AND a."courseId"=$2 AND c."userId"=$3 LIMIT 1`,
+          [req.params.assetId, req.params.id, tid]
+        );
+        if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+        const gcsPath = own.rows[0].gcsPath;
+        await pool.query(`DELETE FROM "CourseAsset" WHERE id=$1`, [req.params.assetId]);
+        // Best-effort GCS cleanup (không block response)
+        if (gcsPath) {
+          (async () => {
+            try {
+              const { Storage } = require('@google-cloud/storage');
+              await new Storage().bucket(ASSET_BUCKET).file(gcsPath).delete();
+              console.log(`[assets:delete] cleanup GCS ${gcsPath}`);
+            } catch (e) { console.warn('[assets:delete] GCS cleanup fail:', e.message.slice(0, 80)); }
+          })();
+        }
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[assets:delete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
 
   // ════════════════════════════════════════════════════════════════
   // VIDEO MANAGEMENT — URL paste (YouTube/Vimeo/MP4) + GCS upload
