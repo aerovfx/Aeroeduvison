@@ -15,8 +15,11 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `d218581` (revision pixiai-00298-nag, 2026-05-18 — KG physics extension LIVE: Quang học + VLHĐ + Phenomenon + Application)
-- Commits since last deploy: `2/5` → DEPLOYING (early — user-requested 3D Neural Network view)
+- Last deployed commit: `a260f15` (revision pixiai-00301 imminent, 2026-05-18 — KG rename "Cây Sự Sống Tri Thức" + đường mòn DEPLOYING)
+- Commits since last deploy: `1/5` (this docs)
+- Prev: `2c76933` → pixiai-00300-tuf (KG Brain: Notes + Discussion per node — 🎉 revision 300!)
+- Prev: `b9efbd1` → pixiai-00299-lib (KG 3D Neural Network view)
+- Prev: `d218581` → pixiai-00298-nag (KG physics extension: Quang học + VLHĐ + Phenomenon + Application)
 - Prev: `544c1e8` → pixiai-00297-lak (URL fix + time badge + lastCareer LS persist)
 - Prev: `4677a76` → pixiai-00296-puv (Games hub polish: completion CTA + deep-link + dailyLife list + scroll-top)
 - Prev: `ed01f05` → pixiai-00295-fif (Games hub /student/games + career search + ScrollToTopButton)
