@@ -2787,7 +2787,12 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const auth = req.headers.authorization || '';
         if (!auth.startsWith('Bearer ')) return null;
         const d = vJwt.verify(auth.slice(7), V_SECRET, { ignoreExpiration: true });
-        return { id: d.sub || d.userId || d.id };
+        // PHẢI trả STRING (userId thuần) chứ không phải object.
+        // 4 callers (list/create/delete videos + signed-url) đều dùng `tid`
+        // làm param SQL trực tiếp → trước đây trả {id: ...} → SQL nhận
+        // "[object Object]" → WHERE never match → endpoint trả 404
+        // "Không tìm thấy khoá học" cho MỌI request → BLOCKED upload video.
+        return d.sub || d.userId || d.id || null;
       } catch { return null; }
     }
     let _vReady = false;
