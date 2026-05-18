@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `4677a76` (revision pixiai-00296-puv, 2026-05-18 — Games hub polish: completion CTA + deep-link + dailyLife list + scroll-top LIVE)
-- Commits since last deploy: `1/5` (this docs)
+- Commits since last deploy: `5/5` → DEPLOYING (ca4efc5 docs · 85158bd fix URL sync · f6d0432 time badge · 485a08e lastCareer LS · this docs)
 - Prev: `ed01f05` → pixiai-00295-fif (Games hub /student/games + career search + ScrollToTopButton)
 - Prev: `04ea6e0` → pixiai-00294-not (Odyssey polish: tutorial + modal key block + achievement toast)
 - Prev: `ab1eb69` → pixiai-00293-ced (Pixel games: mobile D-pad + perf off-screen + position save)
