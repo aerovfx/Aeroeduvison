@@ -12393,8 +12393,526 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Hoạt động trải nghiệm, hướng nghiệp 10/11/12 — GDPT 2018
+  // Môn 11/11 — Subject color: orange #f97316
+  // ĐÂY LÀ MÔN BẮC CẦU — kết nối mọi môn học → đời sống + nghề nghiệp
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgHdtn() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-hdtn', type: 'Subject', label: 'Hoạt động trải nghiệm, hướng nghiệp',
+        description: 'Môn HĐTN-HN THPT 10/11/12 GDPT 2018 — bắc cầu giữa học tập và đời sống, 4 mạch: bản thân, xã hội, tự nhiên, hướng nghiệp',
+        properties: { color: '#f97316' } },
+
+      // ═══════════════════════════════════════════
+      // === 4 MẠCH NỘI DUNG (cross-cấp) ===
+      // ═══════════════════════════════════════════
+      { id: 'mach-ban-than',     type: 'Chapter', label: '🌱 Mạch 1: Hướng vào bản thân',   description: 'Tự nhận thức, quản lý cảm xúc, rèn luyện cá nhân' },
+      { id: 'mach-xa-hoi',       type: 'Chapter', label: '👥 Mạch 2: Hướng đến xã hội',      description: 'Gia đình, nhà trường, cộng đồng — kỹ năng giao tiếp + hợp tác' },
+      { id: 'mach-tu-nhien',     type: 'Chapter', label: '🌍 Mạch 3: Hướng đến tự nhiên',    description: 'Môi trường, biến đổi khí hậu, tài nguyên' },
+      { id: 'mach-huong-nghiep', type: 'Chapter', label: '🎯 Mạch 4: Hướng nghiệp',          description: 'Khám phá nghề, lựa chọn nghề, chuẩn bị nghề nghiệp' },
+
+      // === 4 LOẠI HÌNH HOẠT ĐỘNG ===
+      { id: 'loai-shdc',         type: 'Chapter', label: '🏫 Sinh hoạt dưới cờ',             description: 'Đầu tuần — chủ điểm trường, kỉ niệm, tuyên truyền' },
+      { id: 'loai-shl',          type: 'Chapter', label: '📚 Sinh hoạt lớp',                description: 'Cuối tuần — tổng kết, kế hoạch, vấn đề lớp' },
+      { id: 'loai-chu-de',       type: 'Chapter', label: '🎯 HĐ theo chủ đề',                description: 'Trải nghiệm chuyên đề — thực hành, dự án, tham quan' },
+      { id: 'loai-clb',          type: 'Chapter', label: '🎨 Câu lạc bộ',                   description: 'Học sinh chủ động — sở thích, kỹ năng, năng khiếu' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 10: Khám phá bản thân + Định hướng ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-hdtn10-the-hien-bt', type: 'Chapter', label: '[10] Thể hiện bản thân',     description: 'Tự nhận thức điểm mạnh-yếu, xây dựng hình ảnh cá nhân' },
+      { id: 'chap-hdtn10-quan-ly-cx',  type: 'Chapter', label: '[10] Quản lý cảm xúc',       description: 'Nhận diện + điều tiết cảm xúc tích cực + tiêu cực' },
+      { id: 'chap-hdtn10-truong-tc',   type: 'Chapter', label: '[10] Xây dựng trường tích cực', description: 'Văn hoá lớp học, bạn bè, GV — chống bạo lực học đường' },
+      { id: 'chap-hdtn10-trach-nhiem-gd',type:'Chapter',label: '[10] Trách nhiệm với gia đình',description: 'Phụ giúp, lắng nghe, hiếu thảo, chia sẻ' },
+      { id: 'chap-hdtn10-cong-dong',   type: 'Chapter', label: '[10] Hoạt động cộng đồng',   description: 'Tình nguyện, từ thiện, hiến máu, lao động công ích' },
+      { id: 'chap-hdtn10-moi-truong',  type: 'Chapter', label: '[10] Bảo vệ môi trường',     description: 'Giảm rác thải nhựa, phân loại rác, trồng cây, BĐKH' },
+      { id: 'chap-hdtn10-tham-van-nn', type: 'Chapter', label: '[10] Tham vấn nghề nghiệp',  description: 'Tìm hiểu sở thích + năng lực + giá trị nghề' },
+      { id: 'chap-hdtn10-kham-pha-nn', type: 'Chapter', label: '[10] Khám phá nghề + TT LĐ', description: 'Thông tin nghề, xu hướng thị trường lao động VN/TG' },
+      { id: 'chap-hdtn10-ren-nghe',    type: 'Chapter', label: '[10] Rèn luyện theo nghề',   description: 'Trải nghiệm tại doanh nghiệp, hồ sơ năng lực' },
+
+      // Topics LỚP 10
+      { id: 'topic-tu-nhan-thuc',     type: 'Topic', label: 'Tự nhận thức bản thân',         description: 'SWOT cá nhân — strengths, weaknesses, opportunities, threats' },
+      { id: 'topic-hinh-anh-ca-nhan', type: 'Topic', label: 'Hình ảnh cá nhân',              description: 'Personal branding — phong cách, mạng XH, ấn tượng đầu tiên' },
+      { id: 'topic-cx-tich-cuc',      type: 'Topic', label: 'Cảm xúc tích cực',              description: 'Vui, tự hào, biết ơn — nuôi dưỡng qua thực hành nhỏ' },
+      { id: 'topic-cx-tieu-cuc',      type: 'Topic', label: 'Quản lý cảm xúc tiêu cực',      description: 'Buồn, giận, lo âu — kỹ thuật thở 4-7-8, journaling, meditation' },
+      { id: 'topic-stress',           type: 'Topic', label: 'Quản lý căng thẳng (Stress)',    description: 'Áp lực học thi → giải toả lành mạnh (thể thao, sở thích)' },
+      { id: 'topic-vh-lop-hoc',       type: 'Topic', label: 'Văn hoá lớp học',               description: 'Tôn trọng, hỗ trợ, đoàn kết — quy tắc lớp' },
+      { id: 'topic-bao-luc-hd',       type: 'Topic', label: 'Chống bạo lực học đường',       description: 'Vật lý + tinh thần + mạng — báo GV, kênh 111' },
+      { id: 'topic-hieu-thao',        type: 'Topic', label: 'Hiếu thảo + lắng nghe GĐ',      description: 'Cha mẹ, ông bà — giúp việc nhà, tâm sự, không cãi vã' },
+      { id: 'topic-tinh-nguyen',      type: 'Topic', label: 'Tình nguyện viên',              description: 'Mùa hè xanh, tiếp sức mùa thi, dạy học cho trẻ vùng cao' },
+      { id: 'topic-hien-mau',         type: 'Topic', label: 'Hiến máu nhân đạo',             description: 'Trên 18 tuổi — 250-450ml mỗi 3 tháng — cứu người' },
+      { id: 'topic-rac-thai-nhua',    type: 'Topic', label: 'Giảm rác thải nhựa',            description: '3R: Reduce-Reuse-Recycle — túi vải, bình cá nhân, ống hút inox' },
+      { id: 'topic-phan-loai-rac',    type: 'Topic', label: 'Phân loại rác tại nguồn',       description: '3 nhóm: hữu cơ + tái chế + còn lại; bắt buộc HN 2025' },
+      { id: 'topic-trong-cay',        type: 'Topic', label: 'Trồng cây xanh',                description: '1 tỷ cây xanh VN — Tết trồng cây HCM' },
+      { id: 'topic-bdkh-mt10',        type: 'Topic', label: 'Biến đổi khí hậu',              description: 'Trái Đất nóng +1.5°C — VN ảnh hưởng nặng ĐBSCL' },
+      { id: 'topic-so-thich-nn',      type: 'Topic', label: 'Sở thích nghề nghiệp',          description: 'RIASEC test (Holland): Realistic-Investigative-Artistic-...' },
+      { id: 'topic-nang-luc-nn',      type: 'Topic', label: 'Năng lực nghề nghiệp',          description: 'Multiple Intelligences (Gardner) — 8 trí thông minh' },
+      { id: 'topic-gia-tri-nn',       type: 'Topic', label: 'Giá trị nghề nghiệp',           description: 'Tiền · ý nghĩa · sáng tạo · ổn định · giúp người · tự do' },
+      { id: 'topic-tt-ld-vn',         type: 'Topic', label: 'Thị trường LĐ VN 2026',          description: 'Top: IT, y tế, GV, kế toán, nhân sự, ngân hàng, xây dựng' },
+      { id: 'topic-tt-ld-tg',         type: 'Topic', label: 'Xu hướng nghề toàn cầu',         description: 'AI/ML engineer, data scientist, green jobs, healthcare tech' },
+      { id: 'topic-trai-nghiem-dn',   type: 'Topic', label: 'Trải nghiệm DN (Job shadow)',    description: 'Thực tập 1-2 tuần — quan sát công việc thực tế' },
+      { id: 'topic-cv-co-ban',        type: 'Topic', label: 'Hồ sơ năng lực (CV cơ bản)',     description: 'Thông tin + học vấn + kỹ năng + sở thích — 1 trang A4' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 11: Phát triển nhân cách + Lựa chọn nghề ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-hdtn11-nhan-cach',   type: 'Chapter', label: '[11] Phát triển nhân cách',  description: 'Giá trị sống, mục tiêu dài hạn, growth mindset' },
+      { id: 'chap-hdtn11-tu-chu',      type: 'Chapter', label: '[11] Tự chủ + Chi tiêu',     description: 'Quyết định cá nhân + ngân sách + tiết kiệm thông minh' },
+      { id: 'chap-hdtn11-giao-tiep',   type: 'Chapter', label: '[11] Giao tiếp + Thuyết phục',description: 'Lắng nghe chủ động, thuyết trình, đàm phán win-win' },
+      { id: 'chap-hdtn11-tn-xh-gd',    type: 'Chapter', label: '[11] Trách nhiệm XH + GĐ',   description: 'Giúp đỡ người yếu thế, hỗ trợ kinh tế GĐ' },
+      { id: 'chap-hdtn11-vh-dia-phuong',type:'Chapter',label: '[11] Bảo tồn văn hoá địa phương',description: 'Di tích, lễ hội, ẩm thực, làng nghề truyền thống VN' },
+      { id: 'chap-hdtn11-du-an-cd',    type: 'Chapter', label: '[11] Dự án cộng đồng',       description: 'Lập + triển khai dự án XH — từ ý tưởng đến kết quả' },
+      { id: 'chap-hdtn11-tai-nguyen',  type: 'Chapter', label: '[11] Bảo vệ tài nguyên TN',  description: 'Nước, đất, rừng, khoáng sản, đa dạng sinh học' },
+      { id: 'chap-hdtn11-chon-nn',     type: 'Chapter', label: '[11] Lựa chọn nghề + Đại học',description: 'Khối thi, trường ĐH/CĐ, ngành học, điểm chuẩn' },
+      { id: 'chap-hdtn11-lap-kh-ht',   type: 'Chapter', label: '[11] Kế hoạch học định hướng',description: 'Roadmap 11→12 + thi tốt nghiệp + xét tuyển ĐH' },
+
+      // Topics LỚP 11
+      { id: 'topic-gia-tri-song',     type: 'Topic', label: 'Giá trị sống cốt lõi',          description: '12 giá trị UNESCO: hoà bình, tôn trọng, yêu thương, ...' },
+      { id: 'topic-muc-tieu-dh',      type: 'Topic', label: 'Mục tiêu dài hạn (5-10 năm)',   description: 'Vision board, OKR cá nhân, SMART goals' },
+      { id: 'topic-growth-mindset',   type: 'Topic', label: 'Growth Mindset (Tư duy phát triển)', description: 'Carol Dweck — "tôi chưa biết" thay "tôi không biết"' },
+      { id: 'topic-quyet-dinh-cn',    type: 'Topic', label: 'Ra quyết định cá nhân',         description: 'Pros/cons + WRAP framework (Heath)' },
+      { id: 'topic-chi-tieu-tm',      type: 'Topic', label: 'Chi tiêu thông minh',           description: '50-30-20 rule, envelope method, tracking apps' },
+      { id: 'topic-tiet-kiem-hs',     type: 'Topic', label: 'Tiết kiệm cho HS',              description: 'Mục tiêu nhỏ — sách, khoá học, du lịch — tránh nợ' },
+      { id: 'topic-lang-nghe-cd',     type: 'Topic', label: 'Lắng nghe chủ động',            description: 'Active listening — nhắc lại, hỏi, phản hồi, không phán xét' },
+      { id: 'topic-thuyet-trinh',     type: 'Topic', label: 'Kỹ năng thuyết trình',          description: 'Cấu trúc 3 phần + visual + body language + giao lưu' },
+      { id: 'topic-dam-phan',         type: 'Topic', label: 'Đàm phán Win-Win',              description: 'BATNA, anchor, trade-off — Harvard Negotiation Project' },
+      { id: 'topic-nguoi-yeu-the',    type: 'Topic', label: 'Hỗ trợ người yếu thế',          description: 'Trẻ mồ côi, người khuyết tật, vùng cao, vùng lũ lụt' },
+      { id: 'topic-ho-tro-kt-gd',     type: 'Topic', label: 'Hỗ trợ kinh tế GĐ',             description: 'Làm thêm hè + nội trợ + quản lý chi tiêu chung' },
+      { id: 'topic-di-tich-vn',       type: 'Topic', label: 'Di tích lịch sử VN',            description: 'Cố đô Huế, Hội An, Mỹ Sơn — UNESCO 8 di sản' },
+      { id: 'topic-le-hoi-vn',        type: 'Topic', label: 'Lễ hội truyền thống VN',        description: 'Hội Lim, Đền Hùng, Yên Tử, Bà Chúa Xứ — văn hoá địa phương' },
+      { id: 'topic-am-thuc-vn',       type: 'Topic', label: 'Ẩm thực Việt Nam',              description: 'Phở, bún bò, bánh mì, gỏi cuốn — top 50 món Asia' },
+      { id: 'topic-lang-nghe-tt',     type: 'Topic', label: 'Làng nghề truyền thống',         description: 'Gốm Bát Tràng, lụa Vạn Phúc, mộc Đồng Kỵ, đá Non Nước' },
+      { id: 'topic-da-cd',            type: 'Topic', label: 'Quản lý dự án cộng đồng',       description: 'PDCA cycle: Plan-Do-Check-Act; agile cho team trẻ' },
+      { id: 'topic-da-cd-yt',         type: 'Topic', label: 'Dự án CĐ — Y tế',               description: 'Tuyên truyền tiêm chủng, khám sức khoẻ miễn phí' },
+      { id: 'topic-da-cd-gd',         type: 'Topic', label: 'Dự án CĐ — Giáo dục',           description: 'Lớp học tình thương, bookstart, dạy ESL miễn phí' },
+      { id: 'topic-da-cd-mt',         type: 'Topic', label: 'Dự án CĐ — Môi trường',         description: 'Dọn rác bãi biển, tái chế nhựa, vận động bỏ ống hút nhựa' },
+      { id: 'topic-tn-nuoc',          type: 'Topic', label: 'Tài nguyên nước',               description: 'Tiết kiệm — vòi cảm ứng, tái sử dụng, không xả thải' },
+      { id: 'topic-tn-dat',           type: 'Topic', label: 'Tài nguyên đất',                description: 'Chống xói mòn, sa mạc hoá, sử dụng đất nông nghiệp' },
+      { id: 'topic-tn-rung',          type: 'Topic', label: 'Tài nguyên rừng',               description: 'VN che phủ ~42% — chống phá rừng + trồng phục hồi' },
+      { id: 'topic-ddsh',             type: 'Topic', label: 'Đa dạng sinh học',              description: 'VN ~16 ngàn loài thực vật, 11 ngàn động vật — bảo tồn' },
+      { id: 'topic-khoi-thi',         type: 'Topic', label: 'Khối thi ĐH',                   description: 'A00, A01, B00, C00, D01, ... — chọn theo môn mạnh' },
+      { id: 'topic-truong-dh-cd',     type: 'Topic', label: 'Trường ĐH/CĐ',                  description: 'ĐHQG, BK, KT, Y, Sư phạm, ngoại thương — top 30 VN' },
+      { id: 'topic-nganh-hoc',        type: 'Topic', label: 'Ngành học phổ biến',            description: 'CNTT, Y, Kinh tế, Sư phạm, Luật, Ngôn ngữ, Kỹ thuật' },
+      { id: 'topic-diem-chuan',       type: 'Topic', label: 'Điểm chuẩn ĐH',                description: 'Tra cứu các năm — dự đoán theo xu hướng' },
+      { id: 'topic-roadmap-1112',     type: 'Topic', label: 'Roadmap lớp 11→12',             description: '11: vững nền + bổ sung; 12: tăng tốc + thi thử' },
+      { id: 'topic-thi-tot-nghiep',   type: 'Topic', label: 'Thi tốt nghiệp THPT',           description: 'Toán + Văn + Anh + 2 môn tự chọn — Bộ GD&ĐT' },
+      { id: 'topic-xet-tuyen-dh',     type: 'Topic', label: 'Xét tuyển ĐH',                  description: 'Học bạ + điểm thi + xét tuyển sớm + năng khiếu' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 12: Sẵn sàng vào đời + Chốt nghề ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-hdtn12-hoan-thien',  type: 'Chapter', label: '[12] Tự hoàn thiện bản thân', description: 'Sẵn sàng trưởng thành — tâm lý, sức khoẻ, kĩ năng sống' },
+      { id: 'chap-hdtn12-tc-sk',       type: 'Chapter', label: '[12] Tài chính + Sức khoẻ',  description: 'Quản lý tiền + thể chất + tinh thần — nền tảng đời sống' },
+      { id: 'chap-hdtn12-mqh-xh',      type: 'Chapter', label: '[12] Quan hệ XH + Tình yêu', description: 'Bạn bè trưởng thành, tình yêu lành mạnh, hôn nhân tương lai' },
+      { id: 'chap-hdtn12-hop-tac-gd',  type: 'Chapter', label: '[12] Hợp tác GĐ + Cộng đồng', description: 'Giải quyết xung đột, mediation, văn hoá tổ chức' },
+      { id: 'chap-hdtn12-cd-ben-vung', type: 'Chapter', label: '[12] Cộng đồng bền vững',    description: '17 SDGs LHQ — community impact, ESG cá nhân' },
+      { id: 'chap-hdtn12-mt-toan-cau', type: 'Chapter', label: '[12] Môi trường toàn cầu',   description: 'COP, IPCC, Paris Agreement, biển nhựa, tuyệt chủng loài' },
+      { id: 'chap-hdtn12-chon-nn-cuoi',type: 'Chapter', label: '[12] Chốt nghề + ĐH/du học',  description: 'Quyết định cuối: ĐH, CĐ, du học, XKLD, kinh doanh, học nghề' },
+      { id: 'chap-hdtn12-tu-danh-gia', type: 'Chapter', label: '[12] Tự đánh giá NL nghề',   description: 'Portfolio + kỹ năng + experience — sẵn sàng phỏng vấn' },
+      { id: 'chap-hdtn12-buoc-vao-doi',type: 'Chapter', label: '[12] Tâm thế bước vào đời',  description: 'Mindset trưởng thành — kỳ vọng vs thực tế, vượt khó' },
+
+      // Topics LỚP 12
+      { id: 'topic-truong-thanh',     type: 'Topic', label: 'Trưởng thành tâm lý',           description: 'Erik Erikson — tuổi 18 chuyển từ "identity" → "intimacy"' },
+      { id: 'topic-ky-nang-song',     type: 'Topic', label: 'Kỹ năng sống thiết yếu',         description: 'Nấu ăn, sửa đồ, lái xe, sơ cứu, đọc hợp đồng — survival skills' },
+      { id: 'topic-tc-truong-thanh',  type: 'Topic', label: 'Tài chính trưởng thành',         description: 'Tài khoản NH, thẻ ATM, hợp đồng thuê nhà, hoá đơn điện nước' },
+      { id: 'topic-sk-the-chat',      type: 'Topic', label: 'Sức khoẻ thể chất',             description: 'Thể thao 150ph/tuần, ngủ 7-9h, ăn uống cân bằng, hạn chế cồn' },
+      { id: 'topic-sk-tinh-than',     type: 'Topic', label: 'Sức khoẻ tinh thần',            description: 'Mindfulness, therapy nếu cần, tránh burnout — apps Headspace' },
+      { id: 'topic-tinh-yeu-lm',      type: 'Topic', label: 'Tình yêu lành mạnh',             description: '5 ngôn ngữ tình yêu (Chapman), red flags, boundaries' },
+      { id: 'topic-hon-nhan',         type: 'Topic', label: 'Hôn nhân & gia đình tương lai', description: 'Luật HN&GĐ — nam ≥20, nữ ≥18; tự nguyện; bình đẳng' },
+      { id: 'topic-xung-dot',         type: 'Topic', label: 'Giải quyết xung đột',            description: '5 phong cách Thomas-Kilmann: compete-collab-compromise-avoid-accommodate' },
+      { id: 'topic-mediation',        type: 'Topic', label: 'Mediation (Trung gian hoà giải)', description: 'Khi nào dùng bên thứ 3; quy trình 5 bước' },
+      { id: 'topic-vh-to-chuc',       type: 'Topic', label: 'Văn hoá tổ chức',                description: 'Hiểu DN/cơ quan tương lai — values, rituals, communication' },
+      { id: 'topic-sdg-ca-nhan',      type: 'Topic', label: 'SDGs cá nhân',                  description: 'Đóng góp vào 1-3 trong 17 SDGs LHQ — career với purpose' },
+      { id: 'topic-esg-ca-nhan',      type: 'Topic', label: 'ESG cá nhân',                   description: 'Tiêu dùng + đầu tư + đi lại ít carbon — lifestyle 1.5°C' },
+      { id: 'topic-cop',              type: 'Topic', label: 'COP (UN Climate Summit)',        description: 'Hội nghị thượng đỉnh KH năm — COP26 Glasgow, COP28 UAE' },
+      { id: 'topic-ipcc',             type: 'Topic', label: 'IPCC (Báo cáo BĐKH LHQ)',       description: 'Hội đồng liên chính phủ — bằng chứng khoa học BĐKH' },
+      { id: 'topic-paris-agreement',  type: 'Topic', label: 'Hiệp định Paris 2015',          description: 'Mục tiêu giữ nhiệt độ +1.5°C — VN ký NDC 2020' },
+      { id: 'topic-bien-nhua',        type: 'Topic', label: 'Đại dương nhựa',                description: '14M tấn nhựa/năm đổ ra biển — VN top 4 thải nhựa' },
+      { id: 'topic-tuyet-chung-loai', type: 'Topic', label: 'Tuyệt chủng loài',              description: 'Cuộc đại tuyệt chủng lần 6 — bảo tồn rùa biển, voi, hổ' },
+      { id: 'topic-chot-dh',          type: 'Topic', label: 'Chốt nguyện vọng ĐH',           description: '20 NV tối đa; xếp thứ tự ưu tiên; mất sau khi đăng kí' },
+      { id: 'topic-du-hoc',           type: 'Topic', label: 'Du học',                        description: 'Mỹ, Úc, Đức, Hàn, Nhật — tự túc/học bổng; chi phí 200tr-2 tỷ/năm' },
+      { id: 'topic-xkld',             type: 'Topic', label: 'Xuất khẩu lao động',             description: 'Nhật Bản (TTS), Hàn Quốc (EPS), Đài Loan — DOLAB cấp phép' },
+      { id: 'topic-kn-thu-cong',      type: 'Topic', label: 'Học nghề thủ công',             description: 'CĐ nghề 1-3 năm — điện, hàn, may, cơ khí, thẩm mỹ' },
+      { id: 'topic-kn-tu-than',       type: 'Topic', label: 'Khởi nghiệp ngay',              description: 'Online business, content creator, dropship — vốn nhỏ' },
+      { id: 'topic-portfolio-hs',     type: 'Topic', label: 'Portfolio học sinh',            description: 'Behance/Notion — dự án, giải thưởng, hoạt động ngoại khoá' },
+      { id: 'topic-phong-van-pv',     type: 'Topic', label: 'Phỏng vấn nhập học/việc làm',   description: 'STAR method, dress code, body language, follow-up' },
+      { id: 'topic-mindset-tt',       type: 'Topic', label: 'Mindset trưởng thành',          description: 'Trách nhiệm + chủ động + linh hoạt + biết ơn + học suốt đời' },
+      { id: 'topic-vuot-kho',         type: 'Topic', label: 'Vượt khó (Resilience)',         description: 'Bounce back từ thất bại — grit (Angela Duckworth)' },
+      { id: 'topic-ky-vong-tt',       type: 'Topic', label: 'Kỳ vọng vs thực tế',            description: 'Quarter-life crisis — first job + cuộc sống xa nhà' },
+
+      // === PERSONS (KỸ NĂNG + GIÁO DỤC) ===
+      { id: 'person-dweck',           type: 'Person', label: 'Carol Dweck',                  description: '1946- — Stanford — Mindset: The New Psychology of Success' },
+      { id: 'person-gardner',         type: 'Person', label: 'Howard Gardner',               description: '1943- — Harvard — Multiple Intelligences (1983)' },
+      { id: 'person-holland',         type: 'Person', label: 'John Holland',                 description: '1919-2008 — RIASEC career interest model' },
+      { id: 'person-erikson',         type: 'Person', label: 'Erik Erikson',                 description: '1902-1994 — 8 stages of psychosocial development' },
+      { id: 'person-chapman',         type: 'Person', label: 'Gary Chapman',                 description: '1938- — 5 Love Languages' },
+      { id: 'person-duckworth',       type: 'Person', label: 'Angela Duckworth',             description: '1970- — Grit: passion + perseverance' },
+      { id: 'person-thich-nhat-hanh', type: 'Person', label: 'Thiền sư Thích Nhất Hạnh',    description: '1926-2022 — Mindfulness, Plum Village, an lạc từng phút' },
+      { id: 'person-bgd-vn',          type: 'Person', label: 'Bộ Giáo dục & Đào tạo VN',   description: 'moet.gov.vn — quản lý thi cử + cấp bằng + chương trình' },
+
+      // === CONCEPTS ===
+      { id: 'concept-swot',           type: 'Concept', label: 'SWOT cá nhân',                description: 'Strengths-Weaknesses-Opportunities-Threats — phân tích bản thân' },
+      { id: 'concept-riasec',         type: 'Concept', label: 'RIASEC (Holland)',            description: '6 kiểu tính cách nghề: R-I-A-S-E-C — career assessment' },
+      { id: 'concept-mi',             type: 'Concept', label: 'Multiple Intelligences',      description: '8 loại: ngôn ngữ, logic, không gian, vận động, âm nhạc, ...' },
+      { id: 'concept-mindset',        type: 'Concept', label: 'Growth vs Fixed Mindset',     description: 'Tin năng lực phát triển vs cố định — định hình hành động' },
+      { id: 'concept-grit',           type: 'Concept', label: 'Grit',                        description: 'Bền bỉ + đam mê dài hạn — predictor của thành công ≠ IQ' },
+      { id: 'concept-smart',          type: 'Concept', label: 'SMART Goals',                 description: 'Specific-Measurable-Achievable-Relevant-Time-bound' },
+      { id: 'concept-okr',            type: 'Concept', label: 'OKR (Objectives & Key Results)', description: 'Google framework — mục tiêu định lượng theo quý' },
+      { id: 'concept-pdca',           type: 'Concept', label: 'PDCA Cycle',                   description: 'Plan-Do-Check-Act — Deming cycle cho project + improvement' },
+      { id: 'concept-mindfulness',    type: 'Concept', label: 'Mindfulness (Chánh niệm)',    description: 'Tỉnh thức ở hiện tại — giảm stress, tăng tập trung' },
+
+      // === APPLICATIONS ===
+      { id: 'app-moet-vn',            type: 'Application', label: 'Cổng thông tin Bộ GD&ĐT', description: 'moet.gov.vn — tra cứu trường ĐH, điểm chuẩn, quy chế' },
+      { id: 'app-hocmai',             type: 'Application', label: 'Hocmai.vn',               description: 'Luyện thi ĐH online + tư vấn nghề + thi thử' },
+      { id: 'app-tuyen-sinh-247',     type: 'Application', label: 'Tuyensinh247',            description: 'Cẩm nang chọn trường + ngành + điểm + xét tuyển' },
+      { id: 'app-vnedu',              type: 'Application', label: 'VNEdu',                   description: 'Sổ liên lạc điện tử + quản lý điểm + sức khoẻ HS' },
+      { id: 'app-headspace',          type: 'Application', label: 'Headspace / Calm',        description: 'Meditation apps — giảm stress, ngủ ngon, focus' },
+      { id: 'app-110-bao-luc',        type: 'Application', label: 'Tổng đài 111',            description: 'Quốc gia bảo vệ trẻ em — báo bạo lực, lạm dụng 24/7' },
+      { id: 'app-cdc-vn',             type: 'Application', label: 'CDC Việt Nam',            description: 'Trung tâm KS bệnh tật — hiến máu, tiêm chủng, dịch tễ' },
+      { id: 'app-tinh-nguyen-vn',     type: 'Application', label: 'Tình Nguyện VN',          description: 'tinhnguyenvietnam.vn — đăng kí HĐ tình nguyện toàn quốc' },
+      { id: 'app-dolab',              type: 'Application', label: 'DOLAB',                   description: 'Cục Quản lý LĐ ngoài nước — XKLD chính ngạch' },
+      { id: 'app-behance-hdtn',       type: 'Application', label: 'Behance — Portfolio HS',  description: 'Showcase dự án trải nghiệm + sáng tạo' },
+
+      // === CAREERS (CỐ VẤN + HƯỚNG NGHIỆP) ===
+      { id: 'career-tu-van-hn',       type: 'Career', label: 'Chuyên viên hướng nghiệp',     description: 'Trường THPT, ĐH, trung tâm — counsel HS chọn nghề' },
+      { id: 'career-counselor',       type: 'Career', label: 'School Counselor',             description: 'Tư vấn tâm lý + nghề + học tập — bằng tâm lý GD' },
+      { id: 'career-life-coach',      type: 'Career', label: 'Life Coach',                   description: 'Huấn luyện cuộc sống — certification ICF; freelance' },
+      { id: 'career-event-planner',   type: 'Career', label: 'Event Planner',                description: 'Tổ chức sự kiện cộng đồng, gala, conference' },
+      { id: 'career-ngo-staff',       type: 'Career', label: 'Nhân viên NGO',                description: 'Save Children, UNICEF VN, Plan International — đa lĩnh vực' },
+      { id: 'career-content-cr',      type: 'Career', label: 'Content Creator',              description: 'YouTuber, TikToker, blogger — kiếm tiền từ ads + sponsor' },
+      { id: 'career-volunteer-coord', type: 'Career', label: 'Volunteer Coordinator',        description: 'Điều phối tình nguyện viên — Đoàn TN, hội chữ thập đỏ' },
+      { id: 'career-env-activist',    type: 'Career', label: 'Nhà hoạt động môi trường',     description: 'WWF VN, GreenID, Green Cross — bảo vệ thiên nhiên' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-hdtn:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Mạch chính + Loại hình
+      ['subj-hdtn', 'mach-ban-than',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'mach-xa-hoi',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'mach-tu-nhien',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'mach-huong-nghiep', 'HAS_CHAPTER'],
+      ['subj-hdtn', 'loai-shdc',         'HAS_CHAPTER'],
+      ['subj-hdtn', 'loai-shl',          'HAS_CHAPTER'],
+      ['subj-hdtn', 'loai-chu-de',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'loai-clb',          'HAS_CHAPTER'],
+
+      // Subject → Chapter từng lớp
+      ['subj-hdtn', 'chap-hdtn10-the-hien-bt',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-quan-ly-cx',      'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-truong-tc',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-trach-nhiem-gd',  'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-cong-dong',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-moi-truong',      'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-tham-van-nn',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-kham-pha-nn',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn10-ren-nghe',        'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-nhan-cach',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-tu-chu',          'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-giao-tiep',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-tn-xh-gd',        'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-vh-dia-phuong',   'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-du-an-cd',        'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-tai-nguyen',      'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-chon-nn',         'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn11-lap-kh-ht',       'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-hoan-thien',      'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-tc-sk',           'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-mqh-xh',          'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-hop-tac-gd',      'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-cd-ben-vung',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-mt-toan-cau',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-chon-nn-cuoi',    'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-tu-danh-gia',     'HAS_CHAPTER'],
+      ['subj-hdtn', 'chap-hdtn12-buoc-vao-doi',    'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-hdtn10-the-hien-bt',   'topic-tu-nhan-thuc',     'HAS_TOPIC'],
+      ['chap-hdtn10-the-hien-bt',   'topic-hinh-anh-ca-nhan', 'HAS_TOPIC'],
+      ['chap-hdtn10-quan-ly-cx',    'topic-cx-tich-cuc',      'HAS_TOPIC'],
+      ['chap-hdtn10-quan-ly-cx',    'topic-cx-tieu-cuc',      'HAS_TOPIC'],
+      ['chap-hdtn10-quan-ly-cx',    'topic-stress',           'HAS_TOPIC'],
+      ['chap-hdtn10-truong-tc',     'topic-vh-lop-hoc',       'HAS_TOPIC'],
+      ['chap-hdtn10-truong-tc',     'topic-bao-luc-hd',       'HAS_TOPIC'],
+      ['chap-hdtn10-trach-nhiem-gd','topic-hieu-thao',        'HAS_TOPIC'],
+      ['chap-hdtn10-cong-dong',     'topic-tinh-nguyen',      'HAS_TOPIC'],
+      ['chap-hdtn10-cong-dong',     'topic-hien-mau',         'HAS_TOPIC'],
+      ['chap-hdtn10-moi-truong',    'topic-rac-thai-nhua',    'HAS_TOPIC'],
+      ['chap-hdtn10-moi-truong',    'topic-phan-loai-rac',    'HAS_TOPIC'],
+      ['chap-hdtn10-moi-truong',    'topic-trong-cay',        'HAS_TOPIC'],
+      ['chap-hdtn10-moi-truong',    'topic-bdkh-mt10',        'HAS_TOPIC'],
+      ['chap-hdtn10-tham-van-nn',   'topic-so-thich-nn',      'HAS_TOPIC'],
+      ['chap-hdtn10-tham-van-nn',   'topic-nang-luc-nn',      'HAS_TOPIC'],
+      ['chap-hdtn10-tham-van-nn',   'topic-gia-tri-nn',       'HAS_TOPIC'],
+      ['chap-hdtn10-kham-pha-nn',   'topic-tt-ld-vn',         'HAS_TOPIC'],
+      ['chap-hdtn10-kham-pha-nn',   'topic-tt-ld-tg',         'HAS_TOPIC'],
+      ['chap-hdtn10-ren-nghe',      'topic-trai-nghiem-dn',   'HAS_TOPIC'],
+      ['chap-hdtn10-ren-nghe',      'topic-cv-co-ban',        'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-hdtn11-nhan-cach',     'topic-gia-tri-song',     'HAS_TOPIC'],
+      ['chap-hdtn11-nhan-cach',     'topic-muc-tieu-dh',      'HAS_TOPIC'],
+      ['chap-hdtn11-nhan-cach',     'topic-growth-mindset',   'HAS_TOPIC'],
+      ['chap-hdtn11-tu-chu',        'topic-quyet-dinh-cn',    'HAS_TOPIC'],
+      ['chap-hdtn11-tu-chu',        'topic-chi-tieu-tm',      'HAS_TOPIC'],
+      ['chap-hdtn11-tu-chu',        'topic-tiet-kiem-hs',     'HAS_TOPIC'],
+      ['chap-hdtn11-giao-tiep',     'topic-lang-nghe-cd',     'HAS_TOPIC'],
+      ['chap-hdtn11-giao-tiep',     'topic-thuyet-trinh',     'HAS_TOPIC'],
+      ['chap-hdtn11-giao-tiep',     'topic-dam-phan',         'HAS_TOPIC'],
+      ['chap-hdtn11-tn-xh-gd',      'topic-nguoi-yeu-the',    'HAS_TOPIC'],
+      ['chap-hdtn11-tn-xh-gd',      'topic-ho-tro-kt-gd',     'HAS_TOPIC'],
+      ['chap-hdtn11-vh-dia-phuong', 'topic-di-tich-vn',       'HAS_TOPIC'],
+      ['chap-hdtn11-vh-dia-phuong', 'topic-le-hoi-vn',        'HAS_TOPIC'],
+      ['chap-hdtn11-vh-dia-phuong', 'topic-am-thuc-vn',       'HAS_TOPIC'],
+      ['chap-hdtn11-vh-dia-phuong', 'topic-lang-nghe-tt',     'HAS_TOPIC'],
+      ['chap-hdtn11-du-an-cd',      'topic-da-cd',            'HAS_TOPIC'],
+      ['chap-hdtn11-du-an-cd',      'topic-da-cd-yt',         'HAS_TOPIC'],
+      ['chap-hdtn11-du-an-cd',      'topic-da-cd-gd',         'HAS_TOPIC'],
+      ['chap-hdtn11-du-an-cd',      'topic-da-cd-mt',         'HAS_TOPIC'],
+      ['chap-hdtn11-tai-nguyen',    'topic-tn-nuoc',          'HAS_TOPIC'],
+      ['chap-hdtn11-tai-nguyen',    'topic-tn-dat',           'HAS_TOPIC'],
+      ['chap-hdtn11-tai-nguyen',    'topic-tn-rung',          'HAS_TOPIC'],
+      ['chap-hdtn11-tai-nguyen',    'topic-ddsh',             'HAS_TOPIC'],
+      ['chap-hdtn11-chon-nn',       'topic-khoi-thi',         'HAS_TOPIC'],
+      ['chap-hdtn11-chon-nn',       'topic-truong-dh-cd',     'HAS_TOPIC'],
+      ['chap-hdtn11-chon-nn',       'topic-nganh-hoc',        'HAS_TOPIC'],
+      ['chap-hdtn11-chon-nn',       'topic-diem-chuan',       'HAS_TOPIC'],
+      ['chap-hdtn11-lap-kh-ht',     'topic-roadmap-1112',     'HAS_TOPIC'],
+      ['chap-hdtn11-lap-kh-ht',     'topic-thi-tot-nghiep',   'HAS_TOPIC'],
+      ['chap-hdtn11-lap-kh-ht',     'topic-xet-tuyen-dh',     'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-hdtn12-hoan-thien',    'topic-truong-thanh',     'HAS_TOPIC'],
+      ['chap-hdtn12-hoan-thien',    'topic-ky-nang-song',     'HAS_TOPIC'],
+      ['chap-hdtn12-tc-sk',         'topic-tc-truong-thanh',  'HAS_TOPIC'],
+      ['chap-hdtn12-tc-sk',         'topic-sk-the-chat',      'HAS_TOPIC'],
+      ['chap-hdtn12-tc-sk',         'topic-sk-tinh-than',     'HAS_TOPIC'],
+      ['chap-hdtn12-mqh-xh',        'topic-tinh-yeu-lm',      'HAS_TOPIC'],
+      ['chap-hdtn12-mqh-xh',        'topic-hon-nhan',         'HAS_TOPIC'],
+      ['chap-hdtn12-hop-tac-gd',    'topic-xung-dot',         'HAS_TOPIC'],
+      ['chap-hdtn12-hop-tac-gd',    'topic-mediation',        'HAS_TOPIC'],
+      ['chap-hdtn12-hop-tac-gd',    'topic-vh-to-chuc',       'HAS_TOPIC'],
+      ['chap-hdtn12-cd-ben-vung',   'topic-sdg-ca-nhan',      'HAS_TOPIC'],
+      ['chap-hdtn12-cd-ben-vung',   'topic-esg-ca-nhan',      'HAS_TOPIC'],
+      ['chap-hdtn12-mt-toan-cau',   'topic-cop',              'HAS_TOPIC'],
+      ['chap-hdtn12-mt-toan-cau',   'topic-ipcc',             'HAS_TOPIC'],
+      ['chap-hdtn12-mt-toan-cau',   'topic-paris-agreement',  'HAS_TOPIC'],
+      ['chap-hdtn12-mt-toan-cau',   'topic-bien-nhua',        'HAS_TOPIC'],
+      ['chap-hdtn12-mt-toan-cau',   'topic-tuyet-chung-loai', 'HAS_TOPIC'],
+      ['chap-hdtn12-chon-nn-cuoi',  'topic-chot-dh',          'HAS_TOPIC'],
+      ['chap-hdtn12-chon-nn-cuoi',  'topic-du-hoc',           'HAS_TOPIC'],
+      ['chap-hdtn12-chon-nn-cuoi',  'topic-xkld',             'HAS_TOPIC'],
+      ['chap-hdtn12-chon-nn-cuoi',  'topic-kn-thu-cong',      'HAS_TOPIC'],
+      ['chap-hdtn12-chon-nn-cuoi',  'topic-kn-tu-than',       'HAS_TOPIC'],
+      ['chap-hdtn12-tu-danh-gia',   'topic-portfolio-hs',     'HAS_TOPIC'],
+      ['chap-hdtn12-tu-danh-gia',   'topic-phong-van-pv',     'HAS_TOPIC'],
+      ['chap-hdtn12-buoc-vao-doi',  'topic-mindset-tt',       'HAS_TOPIC'],
+      ['chap-hdtn12-buoc-vao-doi',  'topic-vuot-kho',         'HAS_TOPIC'],
+      ['chap-hdtn12-buoc-vao-doi',  'topic-ky-vong-tt',       'HAS_TOPIC'],
+
+      // Mạch → Chapter (assignment đa chiều)
+      ['mach-ban-than',     'chap-hdtn10-the-hien-bt',  'RELATES_TO'],
+      ['mach-ban-than',     'chap-hdtn10-quan-ly-cx',   'RELATES_TO'],
+      ['mach-ban-than',     'chap-hdtn11-nhan-cach',    'RELATES_TO'],
+      ['mach-ban-than',     'chap-hdtn11-tu-chu',       'RELATES_TO'],
+      ['mach-ban-than',     'chap-hdtn12-hoan-thien',   'RELATES_TO'],
+      ['mach-ban-than',     'chap-hdtn12-tc-sk',        'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn10-truong-tc',    'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn10-trach-nhiem-gd','RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn10-cong-dong',    'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn11-giao-tiep',    'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn11-tn-xh-gd',     'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn11-du-an-cd',     'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn11-vh-dia-phuong','RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn12-mqh-xh',       'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn12-hop-tac-gd',   'RELATES_TO'],
+      ['mach-xa-hoi',       'chap-hdtn12-cd-ben-vung',  'RELATES_TO'],
+      ['mach-tu-nhien',     'chap-hdtn10-moi-truong',   'RELATES_TO'],
+      ['mach-tu-nhien',     'chap-hdtn11-tai-nguyen',   'RELATES_TO'],
+      ['mach-tu-nhien',     'chap-hdtn12-mt-toan-cau',  'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn10-tham-van-nn',  'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn10-kham-pha-nn',  'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn10-ren-nghe',     'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn11-chon-nn',      'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn11-lap-kh-ht',    'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn12-chon-nn-cuoi', 'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn12-tu-danh-gia',  'RELATES_TO'],
+      ['mach-huong-nghiep', 'chap-hdtn12-buoc-vao-doi', 'RELATES_TO'],
+
+      // Topic → Person
+      ['topic-growth-mindset',  'person-dweck',          'RELATES_TO'],
+      ['topic-nang-luc-nn',     'person-gardner',        'RELATES_TO'],
+      ['topic-so-thich-nn',     'person-holland',        'RELATES_TO'],
+      ['topic-truong-thanh',    'person-erikson',        'RELATES_TO'],
+      ['topic-tinh-yeu-lm',     'person-chapman',        'RELATES_TO'],
+      ['topic-vuot-kho',        'person-duckworth',      'RELATES_TO'],
+      ['topic-sk-tinh-than',    'person-thich-nhat-hanh','RELATES_TO'],
+      ['topic-stress',          'person-thich-nhat-hanh','RELATES_TO'],
+      ['topic-thi-tot-nghiep',  'person-bgd-vn',         'RELATES_TO'],
+      ['topic-xet-tuyen-dh',    'person-bgd-vn',         'RELATES_TO'],
+
+      // Topic → Concept
+      ['topic-tu-nhan-thuc',    'concept-swot',          'USES_CONCEPT'],
+      ['topic-so-thich-nn',     'concept-riasec',        'USES_CONCEPT'],
+      ['topic-nang-luc-nn',     'concept-mi',            'USES_CONCEPT'],
+      ['topic-growth-mindset',  'concept-mindset',       'USES_CONCEPT'],
+      ['topic-vuot-kho',        'concept-grit',          'USES_CONCEPT'],
+      ['topic-muc-tieu-dh',     'concept-smart',         'USES_CONCEPT'],
+      ['topic-muc-tieu-dh',     'concept-okr',           'USES_CONCEPT'],
+      ['topic-da-cd',           'concept-pdca',          'USES_CONCEPT'],
+      ['topic-sk-tinh-than',    'concept-mindfulness',   'USES_CONCEPT'],
+      ['topic-stress',          'concept-mindfulness',   'USES_CONCEPT'],
+
+      // Topic → Application
+      ['topic-thi-tot-nghiep',  'app-moet-vn',          'APPLIED_IN'],
+      ['topic-truong-dh-cd',    'app-moet-vn',          'APPLIED_IN'],
+      ['topic-diem-chuan',      'app-tuyen-sinh-247',   'APPLIED_IN'],
+      ['topic-khoi-thi',        'app-tuyen-sinh-247',   'APPLIED_IN'],
+      ['topic-roadmap-1112',    'app-hocmai',           'APPLIED_IN'],
+      ['topic-vh-lop-hoc',      'app-vnedu',            'APPLIED_IN'],
+      ['topic-sk-tinh-than',    'app-headspace',        'APPLIED_IN'],
+      ['topic-stress',          'app-headspace',        'APPLIED_IN'],
+      ['topic-bao-luc-hd',      'app-110-bao-luc',      'APPLIED_IN'],
+      ['topic-hien-mau',        'app-cdc-vn',           'APPLIED_IN'],
+      ['topic-tinh-nguyen',     'app-tinh-nguyen-vn',   'APPLIED_IN'],
+      ['topic-xkld',            'app-dolab',            'APPLIED_IN'],
+      ['topic-portfolio-hs',    'app-behance-hdtn',     'APPLIED_IN'],
+
+      // Topic → Career (hướng nghiệp chính)
+      ['topic-so-thich-nn',     'career-tu-van-hn',         'APPLIED_IN_CAREER'],
+      ['topic-nang-luc-nn',     'career-tu-van-hn',         'APPLIED_IN_CAREER'],
+      ['topic-stress',          'career-counselor',         'APPLIED_IN_CAREER'],
+      ['topic-sk-tinh-than',    'career-counselor',         'APPLIED_IN_CAREER'],
+      ['topic-growth-mindset',  'career-life-coach',        'APPLIED_IN_CAREER'],
+      ['topic-da-cd',           'career-event-planner',     'APPLIED_IN_CAREER'],
+      ['topic-tinh-nguyen',     'career-ngo-staff',         'APPLIED_IN_CAREER'],
+      ['topic-nguoi-yeu-the',   'career-ngo-staff',         'APPLIED_IN_CAREER'],
+      ['topic-hinh-anh-ca-nhan','career-content-cr',        'APPLIED_IN_CAREER'],
+      ['topic-kn-tu-than',      'career-content-cr',        'APPLIED_IN_CAREER'],
+      ['topic-tinh-nguyen',     'career-volunteer-coord',   'APPLIED_IN_CAREER'],
+      ['topic-bdkh-mt10',       'career-env-activist',      'APPLIED_IN_CAREER'],
+      ['topic-tn-rung',         'career-env-activist',      'APPLIED_IN_CAREER'],
+      ['topic-tuyet-chung-loai','career-env-activist',      'APPLIED_IN_CAREER'],
+
+      // REQUIRES (lộ trình kĩ năng)
+      ['topic-hinh-anh-ca-nhan','topic-tu-nhan-thuc',     'REQUIRES'],
+      ['topic-cx-tieu-cuc',     'topic-cx-tich-cuc',      'REQUIRES'],
+      ['topic-stress',          'topic-cx-tieu-cuc',      'REQUIRES'],
+      ['topic-muc-tieu-dh',     'topic-tu-nhan-thuc',     'REQUIRES'],
+      ['topic-growth-mindset',  'topic-gia-tri-song',     'REQUIRES'],
+      ['topic-tiet-kiem-hs',    'topic-chi-tieu-tm',      'REQUIRES'],
+      ['topic-thuyet-trinh',    'topic-lang-nghe-cd',     'REQUIRES'],
+      ['topic-dam-phan',        'topic-thuyet-trinh',     'REQUIRES'],
+      ['topic-da-cd',           'topic-da-cd',            'REQUIRES'],
+      ['topic-nang-luc-nn',     'topic-so-thich-nn',      'REQUIRES'],
+      ['topic-gia-tri-nn',      'topic-nang-luc-nn',      'REQUIRES'],
+      ['topic-tt-ld-vn',        'topic-gia-tri-nn',       'REQUIRES'],
+      ['topic-tt-ld-tg',        'topic-tt-ld-vn',         'REQUIRES'],
+      ['topic-trai-nghiem-dn',  'topic-tt-ld-vn',         'REQUIRES'],
+      ['topic-cv-co-ban',       'topic-trai-nghiem-dn',   'REQUIRES'],
+      ['topic-portfolio-hs',    'topic-cv-co-ban',        'REQUIRES'],
+      ['topic-phong-van-pv',    'topic-portfolio-hs',     'REQUIRES'],
+      ['topic-truong-dh-cd',    'topic-khoi-thi',         'REQUIRES'],
+      ['topic-nganh-hoc',       'topic-truong-dh-cd',     'REQUIRES'],
+      ['topic-diem-chuan',      'topic-nganh-hoc',        'REQUIRES'],
+      ['topic-roadmap-1112',    'topic-khoi-thi',         'REQUIRES'],
+      ['topic-xet-tuyen-dh',    'topic-thi-tot-nghiep',   'REQUIRES'],
+      ['topic-chot-dh',         'topic-xet-tuyen-dh',     'REQUIRES'],
+      ['topic-tc-truong-thanh', 'topic-chi-tieu-tm',      'REQUIRES'],
+      ['topic-hon-nhan',        'topic-tinh-yeu-lm',      'REQUIRES'],
+      ['topic-mediation',       'topic-xung-dot',         'REQUIRES'],
+      ['topic-mindset-tt',      'topic-growth-mindset',   'REQUIRES'],
+      ['topic-vuot-kho',        'topic-mindset-tt',       'REQUIRES'],
+
+      // ═══════════════════════════════════════════
+      // CROSS-SUBJECT EDGES — HDTN là môn BẮC CẦU
+      // → kết nối mọi môn học sang nghề nghiệp + đời sống
+      // ═══════════════════════════════════════════
+      // HDTN ↔ KTPL (kinh tế cá nhân + tiêu dùng + an sinh)
+      ['topic-chi-tieu-tm',     'topic-ke-hoach-tckh',  'RELATES_TO'],
+      ['topic-tiet-kiem-hs',    'topic-tiet-kiem',      'RELATES_TO'],
+      ['topic-tc-truong-thanh', 'topic-nh-tm',          'RELATES_TO'],
+      ['topic-kn-tu-than',      'topic-startup',        'RELATES_TO'],
+      ['topic-sdg-ca-nhan',     'topic-pt-ben-vung',    'RELATES_TO'],
+      ['topic-esg-ca-nhan',     'topic-esg',            'RELATES_TO'],
+      ['topic-vh-to-chuc',      'topic-csr',            'RELATES_TO'],
+      // HDTN ↔ Toán (data, xác suất chọn ngành, thống kê việc làm)
+      ['topic-diem-chuan',      'topic-thong-ke',       'RELATES_TO'],
+      ['topic-tt-ld-vn',        'topic-thong-ke',       'RELATES_TO'],
+      ['topic-chi-tieu-tm',     'topic-ham-so',         'RELATES_TO'],
+      // HDTN ↔ Sinh (sức khoẻ thể chất + tinh thần)
+      ['topic-sk-the-chat',     'topic-suc-khoe',       'RELATES_TO'],
+      ['topic-hien-mau',        'topic-mau-suc-khoe',   'RELATES_TO'],
+      ['topic-sk-tinh-than',    'topic-than-kinh',      'RELATES_TO'],
+      // HDTN ↔ Vật lí (BĐKH, năng lượng)
+      ['topic-bdkh-mt10',       'topic-nhiet-dong-luc', 'RELATES_TO'],
+      ['topic-paris-agreement', 'topic-nhiet-dong-luc', 'RELATES_TO'],
+      // HDTN ↔ Hoá (rác thải nhựa)
+      ['topic-rac-thai-nhua',   'topic-polymer-pe',     'RELATES_TO'],
+      ['topic-phan-loai-rac',   'topic-polymer-pe',     'RELATES_TO'],
+      // HDTN ↔ Địa (di sản, vùng kinh tế, tài nguyên)
+      ['topic-di-tich-vn',      'topic-du-lich-vn',     'RELATES_TO'],
+      ['topic-am-thuc-vn',      'topic-du-lich-vn',     'RELATES_TO'],
+      ['topic-le-hoi-vn',       'topic-dan-toc-vn',     'RELATES_TO'],
+      ['topic-tn-nuoc',         'topic-thuy-van-vn',    'RELATES_TO'],
+      ['topic-tn-rung',         'topic-rung-vn',        'RELATES_TO'],
+      ['topic-bdkh-mt10',       'topic-bdkh-vn',        'RELATES_TO'],
+      // HDTN ↔ Sử (truyền thống VN, lễ hội)
+      ['topic-lang-nghe-tt',    'topic-dai-viet',       'RELATES_TO'],
+      ['topic-le-hoi-vn',       'topic-dai-viet',       'RELATES_TO'],
+      // HDTN ↔ CN Công nghiệp (kỹ năng nghề thủ công)
+      ['topic-kn-thu-cong',     'topic-cmcn-40',        'RELATES_TO'],
+      ['topic-trai-nghiem-dn',  'topic-cmcn-40',        'RELATES_TO'],
+      // HDTN ↔ Mĩ thuật (portfolio nghệ thuật)
+      ['topic-portfolio-hs',    'app-behance',          'APPLIED_IN'],
+      ['topic-hinh-anh-ca-nhan','topic-ui-ux',          'RELATES_TO'],
+      // HDTN ↔ CN Chăn nuôi (nghề nông)
+      ['topic-trai-nghiem-dn',  'subj-cncn',            'RELATES_TO'],
+
+      // HDTN → Careers từ các môn (career discovery)
+      ['topic-tt-ld-vn',        'career-uiux-des',         'APPLIED_IN_CAREER'],
+      ['topic-tt-ld-vn',        'career-graphic-des',      'APPLIED_IN_CAREER'],
+      ['topic-tt-ld-vn',        'career-luat-su',          'APPLIED_IN_CAREER'],
+      ['topic-tt-ld-vn',        'career-ke-toan',          'APPLIED_IN_CAREER'],
+      ['topic-tt-ld-vn',        'career-doanh-nhan',       'APPLIED_IN_CAREER'],
+      ['topic-tt-ld-tg',        'career-3d-artist',        'APPLIED_IN_CAREER'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-hdtn:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (10 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn (11 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -12405,6 +12923,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?industry=1   → Công nghệ Công nghiệp 10/11/12
   //        ?art=1        → Mĩ thuật 10/11/12
   //        ?ktpl=1       → Giáo dục Kinh tế & Pháp luật 10/11/12
+  //        ?hdtn=1       → Hoạt động trải nghiệm, hướng nghiệp 10/11/12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -12418,8 +12937,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const industry = req.query.industry === '1' || req.query.cnci === '1' || all;
       const art = req.query.art === '1' || req.query.mt === '1' || all;
       const ktpl = req.query.ktpl === '1' || req.query.econ === '1' || req.query.law === '1' || all;
+      const hdtn = req.query.hdtn === '1' || req.query.experience === '1' || req.query.career === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -12431,7 +12951,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (industry)  r10 = await seedKgIndustry();
       if (art)       r11 = await seedKgArt();
       if (ktpl)      r12 = await seedKgKtpl();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0);
+      if (hdtn)      r13 = await seedKgHdtn();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -12449,9 +12970,10 @@ ${plan.content || '<p>(Trống)</p>'}
         industry: r10,
         art: r11,
         ktpl: r12,
+        hdtn: r13,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật (3 lớp) mở rộng',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật + HĐ trải nghiệm (3 lớp) mở rộng',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -12462,6 +12984,7 @@ ${plan.content || '<p>(Trống)</p>'}
           industry  && !all && '+ Công nghệ Công nghiệp 10/11/12',
           art       && !all && '+ Mĩ thuật 10/11/12',
           ktpl      && !all && '+ Giáo dục Kinh tế & Pháp luật 10/11/12',
+          hdtn      && !all && '+ Hoạt động trải nghiệm, hướng nghiệp 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
