@@ -9923,39 +9923,371 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Hóa học 10, 11, 12 theo SGK Việt Nam (GDPT 2018). Mở rộng đáng kể
+   * so với seedKgMathChem11 (đã có Hóa 11 partial).
+   *
+   * ~100 nodes + ~130 edges. Idempotent.
+   */
+  async function seedKgChemExtended() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === LỚP 10: Đại cương ===
+      { id: 'chap-hoa10-nguyen-tu',  type: 'Chapter', label: '[10] Cấu tạo nguyên tử',     description: 'Electron, proton, neutron, orbital, lớp K/L/M' },
+      { id: 'chap-hoa10-btth',       type: 'Chapter', label: '[10] Bảng tuần hoàn',         description: 'Chu kỳ + nhóm — xu hướng biến đổi tính chất' },
+      { id: 'chap-hoa10-lien-ket',   type: 'Chapter', label: '[10] Liên kết hóa học',       description: 'Ion, cộng hóa trị, kim loại — lai hoá sp/sp²/sp³' },
+      { id: 'chap-hoa10-oxh-kh',     type: 'Chapter', label: '[10] Phản ứng oxi hóa - khử', description: 'Số oxi hóa, chất oxi-khử, cân bằng theo electron' },
+      { id: 'chap-hoa10-nang-luong', type: 'Chapter', label: '[10] Năng lượng phản ứng',    description: 'Enthalpy ΔH, toả nhiệt / thu nhiệt' },
+      { id: 'chap-hoa10-toc-do',     type: 'Chapter', label: '[10] Tốc độ phản ứng',        description: 'Yếu tố ảnh hưởng: nhiệt độ, nồng độ, xúc tác' },
+      { id: 'chap-hoa10-halogen',    type: 'Chapter', label: '[10] Halogen (nhóm VIIA)',    description: 'F, Cl, Br, I — đơn chất + hợp chất' },
+
+      { id: 'topic-cau-tao-nt',       type: 'Topic', label: 'Cấu tạo nguyên tử',           description: 'Hạt nhân (proton + neutron) + electron quay quanh' },
+      { id: 'topic-orbital',          type: 'Topic', label: 'Orbital nguyên tử',           description: 's, p, d, f — hình dạng các vùng electron' },
+      { id: 'topic-cau-hinh-e',       type: 'Topic', label: 'Cấu hình electron',           description: 'Quy tắc Aufbau, Hund, Pauli — 1s² 2s² 2p⁶ ...' },
+      { id: 'topic-btth-chu-ky',      type: 'Topic', label: 'Chu kỳ',                       description: 'Hàng ngang trong BTTH — cùng số lớp electron' },
+      { id: 'topic-btth-nhom',        type: 'Topic', label: 'Nhóm nguyên tố',              description: 'Cột dọc — cùng số electron lớp ngoài cùng' },
+      { id: 'topic-xu-huong-bd',      type: 'Topic', label: 'Xu hướng biến đổi',           description: 'Bán kính, năng lượng ion hoá, độ âm điện trong BTTH' },
+      { id: 'topic-lk-ion',           type: 'Topic', label: 'Liên kết ion',                description: 'Cho-nhận electron tạo cation + anion (NaCl)' },
+      { id: 'topic-lk-cong-hoa-tri',  type: 'Topic', label: 'Liên kết cộng hoá trị',       description: 'Dùng chung cặp electron (H₂O, CO₂)' },
+      { id: 'topic-lk-kim-loai',      type: 'Topic', label: 'Liên kết kim loại',           description: '"Biển electron" tự do giữa các cation kim loại' },
+      { id: 'topic-lai-hoa',          type: 'Topic', label: 'Lai hoá orbital',             description: 'sp, sp², sp³ — quyết định hình học phân tử' },
+      { id: 'topic-so-oxh',           type: 'Topic', label: 'Số oxi hoá',                  description: 'Số đại diện electron mất/nhận — quy tắc tính' },
+      { id: 'topic-pu-oxh-kh',        type: 'Topic', label: 'Phản ứng oxi hoá - khử',      description: 'Có sự thay đổi số oxi hoá — chất oxh nhận e, chất kh nhường e' },
+      { id: 'topic-can-bang-e',       type: 'Topic', label: 'Cân bằng pư oxh-kh',          description: 'Phương pháp thăng bằng electron' },
+      { id: 'topic-enthalpy',         type: 'Topic', label: 'Enthalpy ΔH',                 description: 'Toả nhiệt ΔH < 0, thu nhiệt ΔH > 0' },
+      { id: 'topic-toc-do-pu',        type: 'Topic', label: 'Tốc độ phản ứng',             description: 'v = dC/dt — phụ thuộc nồng độ, T, xúc tác, diện tích' },
+      { id: 'topic-xuc-tac',          type: 'Topic', label: 'Chất xúc tác',                description: 'Giảm năng lượng hoạt hoá, không bị tiêu thụ' },
+      { id: 'topic-clo',              type: 'Topic', label: 'Clo Cl₂',                     description: 'Khí vàng lục, độc, oxi hoá mạnh — khử trùng nước' },
+      { id: 'topic-axit-hcl',         type: 'Topic', label: 'Axit HCl',                    description: 'Axit mạnh, tan vô hạn trong nước (~36%)' },
+      { id: 'topic-iot',              type: 'Topic', label: 'Iot I₂',                       description: 'Tinh thể tím, thăng hoa, thuốc sát trùng + chống bướu cổ' },
+
+      // === LỚP 11 EXTRA (bổ sung topics chưa có) ===
+      { id: 'chap-hoa11-ancol-phenol',type: 'Chapter', label: '[11] Ancol + Phenol',        description: 'C₂H₅OH, C₆H₅OH — phản ứng đặc trưng' },
+      { id: 'chap-hoa11-andehit-axit',type: 'Chapter', label: '[11] Anđehit + Axit',         description: 'CHO, COOH — oxi hoá, khử, este hoá' },
+
+      { id: 'topic-ancol',            type: 'Topic', label: 'Ancol R-OH',                  description: 'C₂H₅OH ethanol — phản ứng với Na, este hoá' },
+      { id: 'topic-phenol',           type: 'Topic', label: 'Phenol C₆H₅OH',               description: 'Tính axit yếu hơn HCl nhưng mạnh hơn ancol' },
+      { id: 'topic-andehit',          type: 'Topic', label: 'Anđehit R-CHO',               description: 'HCHO formaldehyde, CH₃CHO — oxi hoá → axit' },
+      { id: 'topic-axit-cacb',        type: 'Topic', label: 'Axit cacboxylic R-COOH',      description: 'CH₃COOH dấm ăn (5-8%), C₁₇H₃₅COOH acid béo' },
+      { id: 'topic-este-cb',          type: 'Topic', label: 'Este (cơ bản)',               description: 'R-COO-R\' — phản ứng axit + ancol có H₂SO₄' },
+
+      // === LỚP 12: Hữu cơ nâng cao + Vô cơ ===
+      { id: 'chap-hoa12-este-lipid',  type: 'Chapter', label: '[12] Este - Lipid',         description: 'Ester, chất béo, glycerol — xà phòng hoá' },
+      { id: 'chap-hoa12-cacbon-hi',   type: 'Chapter', label: '[12] Carbohydrate',          description: 'Glucose, fructose, saccharose, tinh bột, xenluloza' },
+      { id: 'chap-hoa12-amino-acid',  type: 'Chapter', label: '[12] Amin + Amino acid + Protein', description: 'Amin, amino acid, peptide, protein, enzyme' },
+      { id: 'chap-hoa12-polymer',     type: 'Chapter', label: '[12] Polymer',               description: 'PE, PP, PVC, cao su buna, polyester' },
+      { id: 'chap-hoa12-dien-hoa',    type: 'Chapter', label: '[12] Điện hoá',              description: 'Pin galvanic, ăn mòn, mạ điện, điện phân' },
+      { id: 'chap-hoa12-kim-loai-1a', type: 'Chapter', label: '[12] Kim loại nhóm IA, IIA, Al', description: 'Na, K, Ca, Mg, Al — hợp chất + ứng dụng' },
+      { id: 'chap-hoa12-fe-cu-cr',    type: 'Chapter', label: '[12] Fe, Cu, Cr',            description: 'Sắt, đồng, crom — tính chất + công nghiệp' },
+      { id: 'chap-hoa12-mt',          type: 'Chapter', label: '[12] Hóa học môi trường',    description: 'Ô nhiễm, mưa axit, hiệu ứng nhà kính' },
+
+      { id: 'topic-este-12',          type: 'Topic', label: 'Este 12',                     description: 'R-COO-R\' — thuỷ phân axit/kiềm (xà phòng hoá)' },
+      { id: 'topic-lipid',            type: 'Topic', label: 'Lipid (chất béo)',            description: 'Triglyceride — dầu (lỏng) + mỡ (rắn)' },
+      { id: 'topic-xa-phong',         type: 'Topic', label: 'Xà phòng hoá',                description: 'Chất béo + NaOH → glycerol + muối axit béo' },
+      { id: 'topic-glucose',          type: 'Topic', label: 'Glucose C₆H₁₂O₆',            description: 'Monosaccharide — sản phẩm quang hợp, hô hấp tế bào' },
+      { id: 'topic-fructose',         type: 'Topic', label: 'Fructose',                    description: 'Đồng phân của glucose — ngọt nhất trong trái cây' },
+      { id: 'topic-saccharose',       type: 'Topic', label: 'Saccharose (đường mía)',      description: 'Disaccharide glucose + fructose — đường ăn' },
+      { id: 'topic-tinh-bot',         type: 'Topic', label: 'Tinh bột (starch)',           description: 'Polymer glucose α — cơm, khoai, ngô' },
+      { id: 'topic-xenluloza',        type: 'Topic', label: 'Xenluloza (cellulose)',      description: 'Polymer glucose β — gỗ, bông, giấy' },
+      { id: 'topic-amin',             type: 'Topic', label: 'Amin R-NH₂',                 description: 'Tính bazơ — anilin C₆H₅NH₂ thuốc nhuộm' },
+      { id: 'topic-amino-acid',       type: 'Topic', label: 'Amino acid (α-amino)',       description: 'H₂N-CHR-COOH — 20 loại tạo protein' },
+      { id: 'topic-peptide',          type: 'Topic', label: 'Peptide',                     description: 'Liên kết peptide -CO-NH-, 2-50 amino acid' },
+      { id: 'topic-protein-hoa',      type: 'Topic', label: 'Protein (hoá)',                description: '>50 amino acid, cấu trúc 1-4 bậc, biến tính' },
+      { id: 'topic-polymer-pe',       type: 'Topic', label: 'Polymer PE/PP/PVC',          description: 'Polyethylene, polypropylene, polyvinylchloride' },
+      { id: 'topic-cao-su',           type: 'Topic', label: 'Cao su',                      description: 'Tự nhiên (polyisoprene) + tổng hợp (buna)' },
+      { id: 'topic-pin-galvanic',     type: 'Topic', label: 'Pin galvanic',                description: 'Phản ứng oxh-khử → dòng điện (Zn-Cu pin)' },
+      { id: 'topic-an-mon',           type: 'Topic', label: 'Ăn mòn kim loại',             description: 'Kim loại + O₂/H₂O → rỉ sét — bảo vệ bằng mạ' },
+      { id: 'topic-dien-phan',        type: 'Topic', label: 'Điện phân',                   description: 'Dùng điện phân ly chất — luyện nhôm, mạ vàng' },
+      { id: 'topic-natri',            type: 'Topic', label: 'Natri Na',                    description: 'Kim loại mềm, phản ứng mạnh với H₂O → NaOH + H₂' },
+      { id: 'topic-canxi',            type: 'Topic', label: 'Canxi Ca',                    description: 'Quan trọng cho xương + răng — Ca(OH)₂ vôi tôi' },
+      { id: 'topic-nhom',             type: 'Topic', label: 'Nhôm Al',                    description: 'Nhẹ, không gỉ — khung máy bay, xoong nồi' },
+      { id: 'topic-sat',              type: 'Topic', label: 'Sắt Fe',                     description: 'Kim loại phổ biến nhất — gang + thép' },
+      { id: 'topic-dong',             type: 'Topic', label: 'Đồng Cu',                    description: 'Dẫn điện tốt, đỏ — dây điện, đồ trang sức' },
+      { id: 'topic-crom',             type: 'Topic', label: 'Crom Cr',                    description: 'Kim loại sáng, cứng — mạ chống ăn mòn, thép không gỉ' },
+      { id: 'topic-o-nhiem',          type: 'Topic', label: 'Ô nhiễm không khí',           description: 'SO₂, NOx, CO, bụi mịn PM2.5 — gây bệnh hô hấp' },
+
+      // === FORMULAS ===
+      { id: 'form-cau-hinh-e',        type: 'Formula', label: '1s² 2s² 2p⁶ 3s¹',          description: 'Cấu hình electron Na (Z=11)' },
+      { id: 'form-ne-1',              type: 'Formula', label: 'PV = nRT',                  description: 'Phương trình trạng thái khí lý tưởng' },
+      { id: 'form-mol',               type: 'Formula', label: 'n = m/M',                   description: 'Số mol = khối lượng / khối lượng mol' },
+      { id: 'form-n-co',              type: 'Formula', label: 'n = C·V',                   description: 'Số mol = nồng độ · thể tích (dd)' },
+      { id: 'form-noh-pu',            type: 'Formula', label: 'Cân bằng e: ne(mất) = ne(nhận)', description: 'Quy tắc cân bằng pư oxh-kh' },
+      { id: 'form-arrhenius',         type: 'Formula', label: 'k = A·e^(-Ea/RT)',          description: 'Arrhenius — tốc độ pư theo T' },
+      { id: 'form-este-hoa',          type: 'Formula', label: 'RCOOH + R\'OH ⇌ RCOOR\' + H₂O', description: 'Phản ứng este hoá (xúc tác H₂SO₄)' },
+      { id: 'form-xa-phong',          type: 'Formula', label: '(RCOO)₃C₃H₅ + 3NaOH → 3RCOONa + C₃H₅(OH)₃', description: 'Xà phòng hoá chất béo' },
+      { id: 'form-quang-hop-hoa',     type: 'Formula', label: '6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂', description: 'Quang hợp tạo glucose' },
+      { id: 'form-protein-pt',        type: 'Formula', label: 'H₂N-CHR₁-CO-NH-CHR₂-COOH',  description: 'Cấu trúc dipeptide với liên kết peptide' },
+      { id: 'form-an-mon-fe',         type: 'Formula', label: '4Fe + 3O₂ + 6H₂O → 4Fe(OH)₃', description: 'Phản ứng rỉ sét' },
+
+      // === CONCEPTS ===
+      { id: 'concept-mol',            type: 'Concept', label: 'Mol — đơn vị lượng chất',  description: '1 mol = 6.022×10²³ hạt (số Avogadro)' },
+      { id: 'concept-nong-do',        type: 'Concept', label: 'Nồng độ dung dịch',         description: 'C% (khối lượng), CM (mol/L)' },
+      { id: 'concept-electron',       type: 'Concept', label: 'Electron',                   description: 'Hạt mang điện âm, quay quanh hạt nhân' },
+      { id: 'concept-phan-tu',        type: 'Concept', label: 'Phân tử',                    description: 'Đơn vị nhỏ nhất của chất giữ tính chất hoá học' },
+      { id: 'concept-orbital',        type: 'Concept', label: 'Orbital (vùng xác suất e)',  description: 'Vùng không gian có 90% xác suất tìm electron' },
+      { id: 'concept-do-am-dien',     type: 'Concept', label: 'Độ âm điện',                 description: 'Khả năng hút electron của nguyên tử (F = 4.0 cao nhất)' },
+      { id: 'concept-isomer',         type: 'Concept', label: 'Đồng phân',                  description: 'Cùng CTPT nhưng cấu tạo khác (CH₃-CH₂-OH vs CH₃-O-CH₃)' },
+      { id: 'concept-chat-huu-co',    type: 'Concept', label: 'Hợp chất hữu cơ',           description: 'Có liên kết C-C, C-H — sinh vật, dầu mỏ' },
+      { id: 'concept-chat-vo-co',     type: 'Concept', label: 'Hợp chất vô cơ',            description: 'Không phải hữu cơ — axit, bazơ, muối, oxit' },
+      { id: 'concept-pu-thuan-nghich',type: 'Concept', label: 'Phản ứng thuận nghịch',     description: '⇌ — xảy ra đồng thời 2 chiều, đạt cân bằng' },
+
+      // === PHENOMENA ===
+      { id: 'phen-ri-set',            type: 'Phenomenon', label: 'Rỉ sét',                description: 'Fe + O₂ + H₂O → Fe₂O₃·xH₂O đỏ nâu' },
+      { id: 'phen-le-pao-hoa',        type: 'Phenomenon', label: 'Lên men',                description: 'Glucose → C₂H₅OH + CO₂ (men rượu) — bia, rượu' },
+      { id: 'phen-hieu-ung-nha-kinh-hoa', type: 'Phenomenon', label: 'Hiệu ứng nhà kính',  description: 'CO₂, CH₄ giữ nhiệt → ấm lên toàn cầu' },
+      { id: 'phen-pao-hu',            type: 'Phenomenon', label: 'Phản ứng cháy',          description: 'Chất + O₂ → toả nhiệt + ánh sáng (oxi hoá nhanh)' },
+      { id: 'phen-ket-tinh',          type: 'Phenomenon', label: 'Kết tinh',               description: 'Dung dịch bão hoà → tinh thể đẹp (muối, đường)' },
+      { id: 'phen-do-doi-mau',        type: 'Phenomenon', label: 'Đổi màu chỉ thị',        description: 'Quỳ tím → đỏ (axit), xanh (bazơ)' },
+
+      // === APPLICATIONS ===
+      { id: 'app-nuoc-hoa',           type: 'Application', label: 'Nước hoa',              description: 'Ester tổng hợp + tinh dầu — mùi thơm bền' },
+      { id: 'app-xa-phong',           type: 'Application', label: 'Xà phòng + Chất tẩy rửa', description: 'Muối Na/K của axit béo + surfactant' },
+      { id: 'app-pin-li-ion',         type: 'Application', label: 'Pin Li-ion',            description: 'Điện hoá Li↔C — điện thoại, xe điện' },
+      { id: 'app-nhom-may-bay',       type: 'Application', label: 'Nhôm máy bay',          description: 'Hợp kim Al-Cu-Mg nhẹ + bền' },
+      { id: 'app-thep-khong-gi',      type: 'Application', label: 'Thép không gỉ',         description: 'Fe + Cr + Ni — dao, nồi, y tế' },
+      { id: 'app-plastic',            type: 'Application', label: 'Nhựa (PE/PP/PVC)',     description: 'Polymer tổng hợp — bao bì, ống nước, đồ chơi' },
+      { id: 'app-thuoc-nhuom',        type: 'Application', label: 'Thuốc nhuộm vải',       description: 'Phẩm azoic, anthraquinone — dệt may' },
+      { id: 'app-phan-bon',           type: 'Application', label: 'Phân bón',              description: 'NPK — đạm (urea, NH₄NO₃), lân (DAP), kali (KCl)' },
+      { id: 'app-thuoc-tru-sau',      type: 'Application', label: 'Thuốc trừ sâu',         description: 'DDT (cấm), pyrethroid an toàn hơn' },
+      { id: 'app-xi-mang',            type: 'Application', label: 'Xi măng',               description: 'CaO + SiO₂ + Al₂O₃ — vật liệu xây dựng' },
+      { id: 'app-xang-dau',           type: 'Application', label: 'Xăng dầu',              description: 'Hydrocarbon C₅-C₁₂ (xăng), C₁₂-C₂₀ (dầu)' },
+      { id: 'app-bia-ruou',           type: 'Application', label: 'Bia + Rượu (lên men)',  description: 'Yeast + đường → ethanol + CO₂' },
+
+      // === CAREERS ===
+      { id: 'career-hoa-hoc-vc',      type: 'Career', label: 'Kỹ sư hoá vô cơ',           description: 'Vật liệu, xi măng, luyện kim' },
+      { id: 'career-hoa-huu-co',      type: 'Career', label: 'Kỹ sư hoá hữu cơ',          description: 'Dược phẩm, polymer, hương liệu' },
+      { id: 'career-dau-khi',         type: 'Career', label: 'Kỹ sư dầu khí',             description: 'Khai thác + tinh chế dầu mỏ' },
+      { id: 'career-ks-thuc-pham',    type: 'Career', label: 'Kỹ sư công nghệ thực phẩm', description: 'Bảo quản, lên men, chất tạo hương' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-chem:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters (LỚP 10)
+      ['subj-hoa', 'chap-hoa10-nguyen-tu',  'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-btth',       'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-lien-ket',   'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-oxh-kh',     'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-nang-luong', 'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-toc-do',     'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa10-halogen',    'HAS_CHAPTER'],
+      // LỚP 11 EXTRA
+      ['subj-hoa', 'chap-hoa11-ancol-phenol', 'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa11-andehit-axit', 'HAS_CHAPTER'],
+      // LỚP 12
+      ['subj-hoa', 'chap-hoa12-este-lipid',  'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-cacbon-hi',   'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-amino-acid',  'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-polymer',     'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-dien-hoa',    'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-kim-loai-1a', 'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-fe-cu-cr',    'HAS_CHAPTER'],
+      ['subj-hoa', 'chap-hoa12-mt',          'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-hoa10-nguyen-tu', 'topic-cau-tao-nt',   'HAS_TOPIC'],
+      ['chap-hoa10-nguyen-tu', 'topic-orbital',      'HAS_TOPIC'],
+      ['chap-hoa10-nguyen-tu', 'topic-cau-hinh-e',   'HAS_TOPIC'],
+      ['chap-hoa10-btth',      'topic-btth-chu-ky',  'HAS_TOPIC'],
+      ['chap-hoa10-btth',      'topic-btth-nhom',    'HAS_TOPIC'],
+      ['chap-hoa10-btth',      'topic-xu-huong-bd',  'HAS_TOPIC'],
+      ['chap-hoa10-lien-ket',  'topic-lk-ion',       'HAS_TOPIC'],
+      ['chap-hoa10-lien-ket',  'topic-lk-cong-hoa-tri','HAS_TOPIC'],
+      ['chap-hoa10-lien-ket',  'topic-lk-kim-loai',  'HAS_TOPIC'],
+      ['chap-hoa10-lien-ket',  'topic-lai-hoa',      'HAS_TOPIC'],
+      ['chap-hoa10-oxh-kh',    'topic-so-oxh',       'HAS_TOPIC'],
+      ['chap-hoa10-oxh-kh',    'topic-pu-oxh-kh',    'HAS_TOPIC'],
+      ['chap-hoa10-oxh-kh',    'topic-can-bang-e',   'HAS_TOPIC'],
+      ['chap-hoa10-nang-luong','topic-enthalpy',     'HAS_TOPIC'],
+      ['chap-hoa10-toc-do',    'topic-toc-do-pu',    'HAS_TOPIC'],
+      ['chap-hoa10-toc-do',    'topic-xuc-tac',      'HAS_TOPIC'],
+      ['chap-hoa10-halogen',   'topic-clo',          'HAS_TOPIC'],
+      ['chap-hoa10-halogen',   'topic-axit-hcl',     'HAS_TOPIC'],
+      ['chap-hoa10-halogen',   'topic-iot',          'HAS_TOPIC'],
+
+      // Chapter LỚP 11 extra → Topics
+      ['chap-hoa11-ancol-phenol', 'topic-ancol',     'HAS_TOPIC'],
+      ['chap-hoa11-ancol-phenol', 'topic-phenol',    'HAS_TOPIC'],
+      ['chap-hoa11-andehit-axit', 'topic-andehit',   'HAS_TOPIC'],
+      ['chap-hoa11-andehit-axit', 'topic-axit-cacb', 'HAS_TOPIC'],
+      ['chap-hoa11-andehit-axit', 'topic-este-cb',   'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-hoa12-este-lipid', 'topic-este-12',     'HAS_TOPIC'],
+      ['chap-hoa12-este-lipid', 'topic-lipid',       'HAS_TOPIC'],
+      ['chap-hoa12-este-lipid', 'topic-xa-phong',    'HAS_TOPIC'],
+      ['chap-hoa12-cacbon-hi',  'topic-glucose',     'HAS_TOPIC'],
+      ['chap-hoa12-cacbon-hi',  'topic-fructose',    'HAS_TOPIC'],
+      ['chap-hoa12-cacbon-hi',  'topic-saccharose',  'HAS_TOPIC'],
+      ['chap-hoa12-cacbon-hi',  'topic-tinh-bot',    'HAS_TOPIC'],
+      ['chap-hoa12-cacbon-hi',  'topic-xenluloza',   'HAS_TOPIC'],
+      ['chap-hoa12-amino-acid', 'topic-amin',        'HAS_TOPIC'],
+      ['chap-hoa12-amino-acid', 'topic-amino-acid',  'HAS_TOPIC'],
+      ['chap-hoa12-amino-acid', 'topic-peptide',     'HAS_TOPIC'],
+      ['chap-hoa12-amino-acid', 'topic-protein-hoa', 'HAS_TOPIC'],
+      ['chap-hoa12-polymer',    'topic-polymer-pe',  'HAS_TOPIC'],
+      ['chap-hoa12-polymer',    'topic-cao-su',      'HAS_TOPIC'],
+      ['chap-hoa12-dien-hoa',   'topic-pin-galvanic','HAS_TOPIC'],
+      ['chap-hoa12-dien-hoa',   'topic-an-mon',      'HAS_TOPIC'],
+      ['chap-hoa12-dien-hoa',   'topic-dien-phan',   'HAS_TOPIC'],
+      ['chap-hoa12-kim-loai-1a','topic-natri',       'HAS_TOPIC'],
+      ['chap-hoa12-kim-loai-1a','topic-canxi',       'HAS_TOPIC'],
+      ['chap-hoa12-kim-loai-1a','topic-nhom',        'HAS_TOPIC'],
+      ['chap-hoa12-fe-cu-cr',   'topic-sat',         'HAS_TOPIC'],
+      ['chap-hoa12-fe-cu-cr',   'topic-dong',        'HAS_TOPIC'],
+      ['chap-hoa12-fe-cu-cr',   'topic-crom',        'HAS_TOPIC'],
+      ['chap-hoa12-mt',         'topic-o-nhiem',     'HAS_TOPIC'],
+
+      // Topic → Formula
+      ['topic-cau-hinh-e',     'form-cau-hinh-e',    'USES_FORMULA'],
+      ['topic-can-bang-e',     'form-noh-pu',        'USES_FORMULA'],
+      ['topic-toc-do-pu',      'form-arrhenius',     'USES_FORMULA'],
+      ['topic-este-cb',        'form-este-hoa',      'USES_FORMULA'],
+      ['topic-este-12',        'form-este-hoa',      'USES_FORMULA'],
+      ['topic-xa-phong',       'form-xa-phong',      'USES_FORMULA'],
+      ['topic-glucose',        'form-quang-hop-hoa', 'USES_FORMULA'],
+      ['topic-peptide',        'form-protein-pt',    'USES_FORMULA'],
+      ['topic-an-mon',         'form-an-mon-fe',     'USES_FORMULA'],
+
+      // Topic → Concept
+      ['topic-cau-tao-nt',     'concept-electron',   'USES_CONCEPT'],
+      ['topic-orbital',        'concept-orbital',    'USES_CONCEPT'],
+      ['topic-xu-huong-bd',    'concept-do-am-dien', 'USES_CONCEPT'],
+      ['topic-lk-cong-hoa-tri','concept-do-am-dien', 'USES_CONCEPT'],
+      ['topic-ancol',          'concept-isomer',     'USES_CONCEPT'],
+      ['topic-este-12',        'concept-chat-huu-co','USES_CONCEPT'],
+      ['topic-natri',          'concept-chat-vo-co', 'USES_CONCEPT'],
+
+      // Topic → Phenomenon
+      ['topic-an-mon',         'phen-ri-set',                   'EXHIBITS_PHENOMENON'],
+      ['topic-glucose',        'phen-le-pao-hoa',               'EXHIBITS_PHENOMENON'],
+      ['topic-o-nhiem',        'phen-hieu-ung-nha-kinh-hoa',    'EXHIBITS_PHENOMENON'],
+      ['topic-pu-oxh-kh',      'phen-pao-hu',                   'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-este-12',        'app-nuoc-hoa',         'APPLIED_IN'],
+      ['topic-xa-phong',       'app-xa-phong',         'APPLIED_IN'],
+      ['topic-pin-galvanic',   'app-pin-li-ion',       'APPLIED_IN'],
+      ['topic-nhom',           'app-nhom-may-bay',     'APPLIED_IN'],
+      ['topic-sat',            'app-thep-khong-gi',    'APPLIED_IN'],
+      ['topic-crom',           'app-thep-khong-gi',    'APPLIED_IN'],
+      ['topic-polymer-pe',     'app-plastic',          'APPLIED_IN'],
+      ['topic-amino-acid',     'app-thuoc-nhuom',      'APPLIED_IN'],
+      ['topic-natri',          'app-phan-bon',         'APPLIED_IN'],
+      ['topic-canxi',          'app-xi-mang',          'APPLIED_IN'],
+      ['topic-glucose',        'app-bia-ruou',         'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-este-12',        'career-hoa-huu-co',    'APPLIED_IN_CAREER'],
+      ['topic-amino-acid',     'career-hoa-huu-co',    'APPLIED_IN_CAREER'],
+      ['topic-polymer-pe',     'career-hoa-huu-co',    'APPLIED_IN_CAREER'],
+      ['topic-nhom',           'career-hoa-hoc-vc',    'APPLIED_IN_CAREER'],
+      ['topic-sat',            'career-hoa-hoc-vc',    'APPLIED_IN_CAREER'],
+      ['topic-glucose',        'career-ks-thuc-pham',  'APPLIED_IN_CAREER'],
+
+      // REQUIRES
+      ['topic-cau-hinh-e',     'topic-cau-tao-nt',     'REQUIRES'],
+      ['topic-cau-hinh-e',     'topic-orbital',        'REQUIRES'],
+      ['topic-lk-ion',         'topic-cau-hinh-e',     'REQUIRES'],
+      ['topic-pu-oxh-kh',      'topic-so-oxh',         'REQUIRES'],
+      ['topic-can-bang-e',     'topic-pu-oxh-kh',      'REQUIRES'],
+      ['topic-este-12',        'topic-axit-cacb',      'REQUIRES'],
+      ['topic-este-12',        'topic-ancol',          'REQUIRES'],
+      ['topic-saccharose',     'topic-glucose',        'REQUIRES'],
+      ['topic-saccharose',     'topic-fructose',       'REQUIRES'],
+      ['topic-tinh-bot',       'topic-glucose',        'REQUIRES'],
+      ['topic-protein-hoa',    'topic-peptide',        'REQUIRES'],
+      ['topic-peptide',        'topic-amino-acid',     'REQUIRES'],
+      ['topic-polymer-pe',     'topic-anken',          'REQUIRES'],
+      ['topic-cao-su',         'topic-anken',          'REQUIRES'],
+      ['topic-pin-galvanic',   'topic-pu-oxh-kh',      'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // Hóa ↔ Vật lí
+      ['topic-pin-galvanic',  'topic-mach-dien',      'RELATES_TO'], // pin tạo dòng điện
+      ['topic-dien-phan',     'topic-mach-dien',      'RELATES_TO'],
+      ['topic-enthalpy',      'topic-nhiet-do',       'RELATES_TO'],
+      ['topic-arrhenius',     'topic-nhiet-do',       'RELATES_TO'],
+      // Hóa ↔ Sinh
+      ['topic-glucose',       'topic-ho-hap-tb',      'RELATES_TO'],
+      ['topic-glucose',       'topic-quang-hop',      'RELATES_TO'],
+      ['topic-amino-acid',    'topic-protein',        'RELATES_TO'],
+      ['topic-protein-hoa',   'topic-protein',        'RELATES_TO'],
+      ['topic-enzyme',        'topic-xuc-tac',        'RELATES_TO'], // enzyme là xúc tác sinh học
+      // Hóa ↔ Toán
+      ['topic-toc-do-pu',     'topic-dao-ham-cb',     'RELATES_TO'], // v = dC/dt
+      ['topic-arrhenius',     'topic-mu',             'RELATES_TO'], // e^(-Ea/RT)
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-chem:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
   //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
   //        ?biology=1    → Thêm Sinh học 10, 11, 12
   //        ?math=1       → Thêm Toán 10, 11, 12 (mở rộng SGK đầy đủ)
+  //        ?chem=1       → Thêm Hóa học 10, 11, 12 (mở rộng SGK đầy đủ)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
       const ext = req.query.extended === '1' || req.query.ext === '1';
       const bio = req.query.biology === '1' || req.query.bio === '1' || all;
       const math = req.query.math === '1' || all;
+      const chem = req.query.chem === '1' || req.query.chemistry === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
       if (math) r5 = await seedKgMathExtended();
+      if (chem) r6 = await seedKgChemExtended();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0);
       return res.json({
         success: true,
-        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0) + (r4?.nodeCount || 0) + (r5?.nodeCount || 0),
-        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0) + (r4?.edgeCount || 0) + (r5?.edgeCount || 0),
-        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0) + (r4?.edgeInserted || 0) + (r5?.edgeInserted || 0),
+        nodeCount:    sum('nodeCount'),
+        edgeCount:    sum('edgeCount'),
+        edgeInserted: sum('edgeInserted'),
         physics: r1,
         mathChem: r2,
         physicsExtended: r3,
         biology: r4,
         mathExtended: r5,
+        chemExtended: r6,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán 11 + Hóa 11 + Sinh học 10/11/12 + Toán 10/11/12 mở rộng',
-          ext && '+ Mở rộng (Quang học + VLHĐ + Phenomenon + Application)',
+          all && '+ Toán + Hóa + Sinh học (3 lớp) mở rộng đầy đủ',
+          ext && '+ Mở rộng Vật lí (Quang học + VLHĐ + Phenomenon + Application)',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12 mở rộng',
+          chem && !all && '+ Hóa học 10/11/12 mở rộng',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
