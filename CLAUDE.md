@@ -15,8 +15,12 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `0b8ca78` (revision pixiai-00313-cim, 2026-05-18 — KG trackpad fix + fullscreen + navigation 1-click LIVE)
-- Commits since last deploy: `0/5` (reset sau hotfix UX trackpad)
+- Last deployed commit: `255d3b4` (revision pixiai-00318-xiz, 2026-05-18 — KG nhạc nền + bubble pop + SFX LIVE)
+- Commits since last deploy: `0/5` (reset sau feature audio + UX bubble pop)
+- Prev: `9fb9d5f` → pixiai-00316-cel (fix getVTeacher return string — sửa upload video 404)
+- Prev: `dc134f2` → pixiai-00315-num (NodeExplorer — phân nhóm liên môn highlight tím)
+- Prev: `52c1178` → pixiai-00314-div (KG 3D popup + labels readable)
+- Prev: `0b8ca78` → pixiai-00313-cim (trackpad fix + fullscreen + nav 1-click)
 - Prev: `4908bc9` → pixiai-00311-lib (KG 2D fix: SVG slice + center marker + loading branded)
 - Prev: `6a185e7` → pixiai-00310-zab (KG 3D UX overhaul + lớp 4)
 - Prev: `08f7c40` → pixiai-00309-gul (bundle 8: Mĩ thuật+KTPL+HĐTN+F Focus+Tin học+Lớp 1+2+3)
