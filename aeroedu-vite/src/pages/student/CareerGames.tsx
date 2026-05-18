@@ -19,19 +19,29 @@ import { careerDetails } from '@/lib/career-detail-data'
 import usePageTitle from '@/hooks/usePageTitle'
 
 const ALL_CAREERS = Object.values(careerDetails)
+const LS_LAST_CAREER_KEY = 'rs.games.lastCareer'
 
 export default function CareerGamesPage() {
   usePageTitle('Pixel Games — Khám phá nghề')
 
   const [searchParams, setSearchParams] = useSearchParams()
-  // URL ?career=<id> → deep-link to specific career (validate id exists)
+  // Initial: prefer URL ?career=<id> > localStorage > first career
   const initialId = (() => {
     const fromUrl = searchParams.get('career')
     if (fromUrl && ALL_CAREERS.some(c => c.id === fromUrl)) return fromUrl
+    try {
+      const fromLS = localStorage.getItem(LS_LAST_CAREER_KEY)
+      if (fromLS && ALL_CAREERS.some(c => c.id === fromLS)) return fromLS
+    } catch {}
     return ALL_CAREERS[0].id
   })()
   const [selectedCareerId, setSelectedCareerId] = useState<string>(initialId)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Persist last selected to localStorage cho next visit
+  useEffect(() => {
+    try { localStorage.setItem(LS_LAST_CAREER_KEY, selectedCareerId) } catch {}
+  }, [selectedCareerId])
 
   // Sync state changes back to URL (no scroll, replace history)
   useEffect(() => {
