@@ -19,7 +19,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Search, X, Sparkles, RefreshCw, Network, Loader2,
-  ZoomIn, ZoomOut, Maximize2, ChevronRight, Info, BookOpen, Wand2,
+  ZoomIn, ZoomOut, Maximize2, Minimize2, ChevronRight, Info, BookOpen, Wand2,
   Target, TrendingUp, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
@@ -172,6 +172,9 @@ export default function KnowledgeGraph() {
   const [extractOpen, setExtractOpen] = useState(false)
   /** View mode: 2D SVG (default) or 3D neural network (Three.js) */
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
+  /** Fullscreen mode: mở rộng <main> ra toàn màn hình (HTML5 Fullscreen API) */
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const mainRef = useRef<HTMLElement | null>(null)
 
   // ── Phase 3: Personal Mastery overlay ─────────────────────────
   const [masteryOn, setMasteryOn] = useState(false)
@@ -478,6 +481,25 @@ export default function KnowledgeGraph() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Fullscreen toggle + state sync ──
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await mainRef.current?.requestFullscreen?.()
+      } else {
+        await document.exitFullscreen?.()
+      }
+    } catch {
+      // User cancelled or browser denied — không cần báo lỗi
+    }
+  }, [])
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
   // ── Physics loop ──
   useEffect(() => {
     let frame = 0
@@ -546,6 +568,17 @@ export default function KnowledgeGraph() {
     }
   }, [kgHistory])
 
+  /**
+   * Điều hướng tới 1 node = mở detail + LOAD nó làm tâm graph.
+   * Dùng cho click sidebar (Brain suggestions, related list, search result, ...)
+   * — nơi user mong muốn "nhảy tới" node đó.
+   * Khác `onNodeClick` (chỉ mở detail, không re-load graph).
+   */
+  const onNavigateNode = useCallback(async (id: string) => {
+    await loadFromNode(id, 2)
+    await onNodeClick(id)
+  }, [loadFromNode, onNodeClick])
+
   // ── Mouse handlers (drag node + pan canvas) ──
   const screenToWorld = (clientX: number, clientY: number) => {
     const svg = svgRef.current
@@ -599,20 +632,50 @@ export default function KnowledgeGraph() {
     dragStateRef.current = { type: null, startX: 0, startY: 0 }
   }
 
-  const onDoubleClickNode = (e: React.MouseEvent, nodeId: string) => {
+  /**
+   * Double-click 1 node = ĐƯA NÓ THÀNH TÂM GRAPH (re-load với depth 2).
+   *
+   * Trước đây: double-click = pin/unpin (giữ vị trí cố định trong physics).
+   * Pin là feature ít dùng + khó hiểu cho user mới. Giờ đổi sang
+   * "centre this node" — UX trực quan hơn, không cần dùng menu phụ.
+   *
+   * Hotkey thay thế: nếu cần pin, dùng nút trong detail panel (TBD).
+   */
+  const onDoubleClickNode = async (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation()
-    const node = simRef.current.find(n => n.id === nodeId)
-    if (node) {
-      // Toggle pin
-      if (node.fx != null) { node.fx = null; node.fy = null; toast('Bỏ ghim', { icon: '📍' }) }
-      else { node.fx = node.x; node.fy = node.y; toast('Đã ghim node', { icon: '📌' }) }
-    }
+    toast(`Đang đưa "${nodeId}" thành tâm…`, { icon: '🎯', duration: 1500 })
+    await onNavigateNode(nodeId)
   }
 
+  /**
+   * Wheel handler — TÁCH RIÊNG pinch-zoom vs 2-finger drag (trackpad Mac).
+   *
+   * Trên Mac trackpad:
+   *  - Pinch (zoom in/out 2 ngón mở/khép) → wheel event với `ctrlKey=true`
+   *    (browser tự synthesize từ pinch gesture của OS)
+   *  - 2-finger drag (di chuyển 2 ngón) → wheel event với `ctrlKey=false`,
+   *    có cả `deltaX` lẫn `deltaY`
+   *
+   * Trên mouse:
+   *  - Scroll wheel → ctrlKey=false, chỉ deltaY → user mong PAN dọc
+   *  - Ctrl+wheel → ctrlKey=true → ZOOM
+   *
+   * Trước đây: mọi wheel event đều zoom → user drag trackpad bị "zoom phá"
+   * Giờ: chỉ pinch/ctrl mới zoom, drag/scroll thì PAN (chuẩn Figma/Miro).
+   */
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault()
-    const factor = e.deltaY < 0 ? 1.1 : 0.9
-    setZoom(z => Math.max(0.3, Math.min(3, z * factor)))
+    if (e.ctrlKey || e.metaKey) {
+      // PINCH-ZOOM (trackpad) hoặc Ctrl+wheel (mouse)
+      const factor = e.deltaY < 0 ? 1.04 : 0.96  // gentler than 1.1/0.9
+      setZoom(z => Math.max(0.3, Math.min(3, z * factor)))
+    } else {
+      // 2-FINGER DRAG (trackpad) hoặc scroll wheel → PAN canvas
+      setPan(p => ({
+        x: p.x - e.deltaX / zoom,
+        y: p.y - e.deltaY / zoom,
+      }))
+    }
   }
 
   const expandFromSelected = async () => {
@@ -1021,7 +1084,8 @@ export default function KnowledgeGraph() {
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {/* 🧠 Brain v2 — Phoenix-style smart suggestions */}
-            <BrainSuggestions onNodeClick={onNodeClick} />
+            {/* Sidebar click = navigate (mở detail + load làm tâm) — UX rõ hơn */}
+            <BrainSuggestions onNodeClick={onNavigateNode} />
 
             {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
             <KgHistoryTrail
@@ -1257,27 +1321,44 @@ export default function KnowledgeGraph() {
         </aside>
 
         {/* Canvas */}
-        <main className="flex-1 relative overflow-hidden bg-[#06030f] pb-14 md:pb-0">
-          {/* View mode toggle — floating top-right */}
-          <div className="absolute top-3 right-3 z-20 flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-zinc-700 p-1">
+        <main ref={mainRef} className="flex-1 relative overflow-hidden bg-[#06030f] pb-14 md:pb-0">
+          {/* Toolbar floating top-right — Fullscreen + View mode toggle */}
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
+            {/* Fullscreen button */}
             <button
-              onClick={() => setViewMode('2d')}
-              title="Xem dạng 2D (SVG, mặc định)"
-              className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Thoát toàn màn hình (ESC)' : 'Mở rộng toàn màn hình'}
+              className="p-1.5 rounded-lg bg-zinc-900/95 backdrop-blur border border-zinc-700
+                         hover:bg-zinc-800 hover:border-zinc-600 text-zinc-200 transition
+                         hover:scale-105"
             >
-              2D
+              {isFullscreen
+                ? <Minimize2 className="w-4 h-4" />
+                : <Maximize2 className="w-4 h-4" />
+              }
             </button>
-            <button
-              onClick={() => setViewMode('3d')}
-              title="Xem dạng 3D Neural Network"
-              className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              🧠 3D
-            </button>
+
+            {/* View mode toggle */}
+            <div className="flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-zinc-700 p-1">
+              <button
+                onClick={() => setViewMode('2d')}
+                title="Xem dạng 2D (SVG, mặc định)"
+                className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
+                  viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                2D
+              </button>
+              <button
+                onClick={() => setViewMode('3d')}
+                title="Xem dạng 3D Neural Network"
+                className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
+                  viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                🧠 3D
+              </button>
+            </div>
           </div>
 
           {/* 3D view */}
