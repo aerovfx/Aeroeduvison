@@ -1300,12 +1300,16 @@ export default function KnowledgeGraph() {
             </div>
           )}
 
-          {/* 2D SVG view (hidden khi 3D) */}
+          {/* 2D SVG view (hidden khi 3D)
+              ─ preserveAspectRatio="xMidYMid slice" → SVG FILL toàn canvas
+                + content centered (cropped edges nếu cần) thay vì letterbox
+                → graph luôn ở giữa màn hình, không có vùng đen 2 bên. */}
           {viewMode === '2d' && (
           <svg
             ref={svgRef}
             viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
-            className="w-full h-full"
+            preserveAspectRatio="xMidYMid slice"
+            className="absolute inset-0 w-full h-full"
             onMouseDown={onMouseDownCanvas}
             onMouseMove={onMouseMove}
             onMouseUp={onMouseUp}
@@ -1315,10 +1319,18 @@ export default function KnowledgeGraph() {
           >
             <defs>
               <pattern id="kgGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
               </pattern>
+              {/* Center glow — SÁNG HƠN trước (35% thay 15%) để user thấy "đây là tâm" */}
               <radialGradient id="centerGlow" cx="0.5" cy="0.5" r="0.5">
-                <stop offset="0%" stopColor="rgba(34,211,238,0.15)" />
+                <stop offset="0%" stopColor="rgba(34,211,238,0.35)" />
+                <stop offset="50%" stopColor="rgba(168,85,247,0.18)" />
+                <stop offset="100%" stopColor="rgba(34,211,238,0)" />
+              </radialGradient>
+              {/* Pulse glow cho center marker khi không có dữ liệu */}
+              <radialGradient id="centerPulse" cx="0.5" cy="0.5" r="0.5">
+                <stop offset="0%" stopColor="rgba(255,255,255,0.5)" />
+                <stop offset="40%" stopColor="rgba(34,211,238,0.3)" />
                 <stop offset="100%" stopColor="rgba(34,211,238,0)" />
               </radialGradient>
               {/* Arrow marker for directed edges */}
@@ -1327,8 +1339,36 @@ export default function KnowledgeGraph() {
                 <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
               </marker>
             </defs>
+
+            {/* Background grid — sub-tinted to match dark theme */}
             <rect width={VIEWBOX_W} height={VIEWBOX_H} fill="url(#kgGrid)" />
-            <ellipse cx={VIEWBOX_W / 2} cy={VIEWBOX_H / 2} rx="350" ry="250" fill="url(#centerGlow)" />
+
+            {/* Center glow ellipse — sáng hơn để user thấy ngay vị trí tâm */}
+            <ellipse cx={VIEWBOX_W / 2} cy={VIEWBOX_H / 2} rx="450" ry="320" fill="url(#centerGlow)" />
+
+            {/* CENTER ANCHOR MARKER — luôn hiện, dấu hiệu chính xác trung tâm
+                Khi chưa load xong → user thấy ngay "đây là nơi đồ thị sẽ xuất hiện".
+                Khi đã load → marker này nằm dưới center node, vẫn nhìn được như aura. */}
+            <g transform={`translate(${VIEWBOX_W / 2}, ${VIEWBOX_H / 2})`} style={{ pointerEvents: 'none' }}>
+              {/* Outer pulse ring */}
+              <circle r="40" fill="url(#centerPulse)" opacity={visibleNodes.length > 0 ? 0.3 : 0.9}>
+                <animate attributeName="r" values="40;55;40" dur="2.5s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="0.4;0.15;0.4" dur="2.5s" repeatCount="indefinite" />
+              </circle>
+              {/* Inner crosshair */}
+              <circle r="6" fill="rgba(34,211,238,0.85)" opacity={visibleNodes.length > 0 ? 0 : 1} />
+              <line x1="-18" y1="0" x2="-10" y2="0" stroke="rgba(34,211,238,0.7)" strokeWidth="2" opacity={visibleNodes.length > 0 ? 0 : 1} />
+              <line x1="10" y1="0" x2="18" y2="0" stroke="rgba(34,211,238,0.7)" strokeWidth="2" opacity={visibleNodes.length > 0 ? 0 : 1} />
+              <line x1="0" y1="-18" x2="0" y2="-10" stroke="rgba(34,211,238,0.7)" strokeWidth="2" opacity={visibleNodes.length > 0 ? 0 : 1} />
+              <line x1="0" y1="10" x2="0" y2="18" stroke="rgba(34,211,238,0.7)" strokeWidth="2" opacity={visibleNodes.length > 0 ? 0 : 1} />
+              {/* "Center" label (only when no nodes loaded yet) */}
+              {visibleNodes.length === 0 && (
+                <text y="50" textAnchor="middle" fill="rgba(34,211,238,0.85)" fontSize="14" fontWeight="700"
+                      fontFamily="-apple-system, system-ui, sans-serif" style={{ userSelect: 'none' }}>
+                  TÂM ĐỒ THỊ
+                </text>
+              )}
+            </g>
 
             <g transform={`scale(${zoom}) translate(${pan.x}, ${pan.y})`}>
               {/* Edges */}
@@ -1469,12 +1509,21 @@ export default function KnowledgeGraph() {
           </svg>
           )}
 
-          {/* Loading overlay */}
+          {/* Loading overlay — BIG + branded, dễ nhận biết khi tải lần đầu */}
           {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="text-center">
-                <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin text-cyan-400" />
-                <p className="text-sm text-white/70">Đang tải đồ thị tri thức…</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm z-10 pointer-events-none">
+              <div className="text-center px-6">
+                {/* Pulsing tree icon */}
+                <div className="text-6xl mb-4 animate-pulse" style={{ filter: 'drop-shadow(0 0 20px rgba(34,211,238,0.6))' }}>
+                  🌳
+                </div>
+                <div className="text-xl font-bold mb-2 bg-gradient-to-r from-cyan-300 via-purple-300 to-emerald-300 bg-clip-text text-transparent">
+                  Cây Sự Sống Tri Thức
+                </div>
+                <div className="inline-flex items-center gap-2 text-sm text-cyan-200/80">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Đang khởi tạo đồ thị…
+                </div>
               </div>
             </div>
           )}
