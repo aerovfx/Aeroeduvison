@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `db7ee11` (revision pixiai-00320-yeg, 2026-05-18 — auto-save video sau upload + IAM signBlob granted)
-- Commits since last deploy: `0/5` (reset sau hotfix UX video upload)
+- Last deployed commit: `bba0284` (revision pixiai-00321-nux, 2026-05-18 — Tiptap underline fix + CourseAsset upload endpoint thực)
+- Commits since last deploy: `0/5` (reset sau hotfix editor + assets)
+- Prev: `db7ee11` → pixiai-00320-yeg (auto-save video sau upload + IAM signBlob granted)
 - Prev: `255d3b4` → pixiai-00318-xiz (KG nhạc nền + bubble pop + SFX)
 - Prev: `9fb9d5f` → pixiai-00316-cel (fix getVTeacher return string — sửa upload video 404)
 - Prev: `dc134f2` → pixiai-00315-num (NodeExplorer — phân nhóm liên môn highlight tím)
