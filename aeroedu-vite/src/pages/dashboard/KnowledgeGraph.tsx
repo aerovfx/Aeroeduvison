@@ -37,6 +37,7 @@ const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 import BrainSuggestions from '@/components/kg/BrainSuggestions'
+import NodeExplorer from '@/components/kg/NodeExplorer'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -1709,36 +1710,12 @@ export default function KnowledgeGraph() {
               <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/30 ml-1">NEW</span>
             </button>
 
-            <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">
-              Liên kết ({selectedNode.neighbors.length})
-            </h3>
-            <div className="space-y-1">
-              {selectedNode.neighbors.length === 0 && (
-                <p className="text-xs text-white/40 italic">Chưa có liên kết nào</p>
-              )}
-              {selectedNode.neighbors.map((nb, i) => {
-                const c = getNodeColor(nb.type)
-                return (
-                  <button
-                    key={`${nb.id}-${i}`}
-                    onClick={() => onNodeClick(nb.id)}
-                    className="w-full text-left p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 group"
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: c.stroke }} />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] text-white/50 uppercase tracking-wider mb-0.5">
-                          {nb.direction === 'out' ? '→' : '←'} {REL_TYPE_LABELS[nb.relType] || nb.relType.toLowerCase().replace(/_/g, ' ')}
-                        </div>
-                        <div className="text-sm font-medium text-white leading-tight">{nb.label}</div>
-                        <div className="text-[10px] text-white/40">{NODE_TYPE_LABELS[nb.type] || nb.type}</div>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-white" />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+            {/* NodeExplorer — phân nhóm liên kết + đánh dấu LIÊN MÔN */}
+            <NodeExplorer
+              neighbors={selectedNode.neighbors}
+              currentNodeId={selectedNode.node.id}
+              onNavigate={onNavigateNode}
+            />
             </aside>
           </>
         )}
