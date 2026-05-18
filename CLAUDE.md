@@ -15,8 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `aa978bd` (revision pixiai-00305-gev, 2026-05-18 — KG Địa lí 10/11/12 LIVE — HOÀN TẤT 6 môn GDPT 2018)
+- Last deployed commit: `ca6b319` (revision pixiai-00307-yom, 2026-05-18 — 🧠 KG Brain v2 Phoenix-style pipeline LIVE)
 - Commits since last deploy: `1/5` (this docs)
+- Prev: `97ece65` → pixiai-00306-voz (KG Công nghệ Chăn nuôi 10/11/12)
+- Prev: `aa978bd` → pixiai-00305-gev (KG Địa lí 10/11/12 — HOÀN TẤT 6 môn GDPT)
 - Prev: `a03b726` → pixiai-00304-nag (KG Lịch sử 10/11/12)
 - Prev: `ebc475f` → pixiai-00303-cup (KG Toán 10/11/12 mở rộng)
 - Prev: `a19026b` → pixiai-00302-qev (KG 🎯 Center reset + Sinh học 10/11/12)
