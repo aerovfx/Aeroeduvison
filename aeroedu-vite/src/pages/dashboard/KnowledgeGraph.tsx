@@ -35,6 +35,7 @@ import { lazy, Suspense } from 'react'
 // Lazy load 3D view — bundle khá lớn vì Three.js
 const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
+import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -518,11 +519,16 @@ export default function KnowledgeGraph() {
     await loadFromNode(n.id, 2)
   }
 
+  // ── KG visit history (đường mòn tri thức) ──
+  const kgHistory = useKgHistory()
+
   // ── Click node ──
   const onNodeClick = useCallback(async (id: string) => {
     try {
       const r = await kgs.getNode(id)
       setSelectedNode(r)
+      // Record visit cho đường mòn tri thức
+      kgHistory.record({ id: r.node.id, label: r.node.label, type: r.node.type })
       // RS: track click — signal mạnh cho recsys hiểu user quan tâm topic
       rs.track({
         action: 'click',
@@ -537,7 +543,7 @@ export default function KnowledgeGraph() {
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Lỗi tải node')
     }
-  }, [])
+  }, [kgHistory])
 
   // ── Mouse handlers (drag node + pan canvas) ──
   const screenToWorld = (clientX: number, clientY: number) => {
@@ -639,9 +645,9 @@ export default function KnowledgeGraph() {
           </Link>
           <Network className="w-5 h-5 text-cyan-400 shrink-0 hidden sm:block" />
           <div className="min-w-0 flex-1 sm:flex-none">
-            <h1 className="font-bold text-sm sm:text-base truncate">Knowledge Graph</h1>
+            <h1 className="font-bold text-sm sm:text-base truncate">🌳 Cây Sự Sống Tri Thức</h1>
             <p className="text-[10px] text-cyan-300/80 truncate hidden sm:block">
-              Đồ thị tri thức · 3 môn THPT
+              Mọi khái niệm sinh sôi · kết nối · cùng phát triển
             </p>
           </div>
 
@@ -1012,7 +1018,16 @@ export default function KnowledgeGraph() {
           </div>
 
           {/* Tab content */}
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
+            <KgHistoryTrail
+              history={kgHistory.history}
+              currentId={selectedNode?.node.id}
+              onJump={onNodeClick}
+              onClear={kgHistory.clear}
+              onRemove={kgHistory.remove}
+            />
+
             {/* ── FILTER tab ── */}
             {activeTab === 'filter' && (
               <>
