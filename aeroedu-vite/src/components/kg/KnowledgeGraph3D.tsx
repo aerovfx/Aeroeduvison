@@ -46,7 +46,7 @@ interface PositionedNode extends KgNode {
 /* ────────────────────────── Force simulation ────────────────────────── */
 
 function nodeRadius3D(type: string, isCenter: boolean): number {
-  if (isCenter) return 5
+  if (isCenter) return 7  // ↑ from 5 — center phải nổi bật rõ ràng
   switch (type) {
     case 'Subject':     return 4.5
     case 'Chapter':     return 3.8
@@ -162,10 +162,11 @@ function stepForces(
 
 function NeuralNetwork({
   nodes, edges, centerId, onNodeClick, showLabels,
-  selectedId, onSelect,
+  selectedId, onSelect, autoRotate,
 }: Props & {
   selectedId: string | null
   onSelect: (id: string) => void
+  autoRotate: boolean
 }) {
   const groupRef = useRef<Group>(null)
   const [pNodes, setPNodes] = useState<PositionedNode[]>(() =>
@@ -188,15 +189,14 @@ function NeuralNetwork({
         stepForces(pNodes, edges, dt * 60) // normalize dt
       }
       setStepsRemaining(s => s - stepsThisFrame)
-    } else {
-      // Continue simulating gently for interactive feel
-      stepForces(pNodes, edges, dt * 30)
     }
+    // SAU pre-cook: KHÔNG chạy thêm force — layout đứng yên cho dễ điều hướng.
+    // (Trước: chạy gentle 30 → node trôi liên tục → khó click)
 
-    // Auto-rotation chậm (cinematic, label vẫn đọc được).
-    // 0.02 rad/s = 1 vòng/~5 phút — không gây chóng mặt.
-    if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.02
+    // Auto-rotation OPTIONAL — mặc định OFF, user bật khi muốn cinematic view.
+    // Trước: bật mặc định → user mất phương hướng khi tìm node trung tâm.
+    if (autoRotate && groupRef.current) {
+      groupRef.current.rotation.y += dt * 0.05
     }
   })
 
@@ -272,6 +272,7 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
 }) {
   const meshRef = useRef<Mesh>(null)
   const ringRef = useRef<Mesh>(null)
+  const haloRef = useRef<Mesh>(null)
 
   useFrame((_, dt) => {
     if (!meshRef.current) return
@@ -294,10 +295,30 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
       ringRef.current.position.copy(node.pos)
       ringRef.current.rotation.z += dt * 1.2
     }
+    // Center halo: pulse rộng hơn để dễ tìm trên màn hình
+    if (haloRef.current && node.isCenter) {
+      haloRef.current.position.copy(node.pos)
+      const haloScale = 1 + Math.sin(performance.now() / 800) * 0.15
+      haloRef.current.scale.setScalar(haloScale)
+    }
   })
 
   return (
     <>
+      {/* HALO cho center node — sphere transparent lớn ngoài cho center luôn dễ thấy */}
+      {node.isCenter && (
+        <mesh ref={haloRef}>
+          <sphereGeometry args={[node.radius * 2.2, 32, 32]} />
+          <meshBasicMaterial
+            color={node.color}
+            transparent
+            opacity={0.18}
+            toneMapped={false}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+
       <mesh
         ref={meshRef}
         onPointerOver={(e) => { e.stopPropagation(); onHover(true); document.body.style.cursor = 'pointer' }}
@@ -308,26 +329,33 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
         <meshStandardMaterial
           color={node.color}
           emissive={node.color}
-          emissiveIntensity={node.isCenter ? 2.5 : selected ? 2.8 : hovered ? 2 : 1.2}
+          emissiveIntensity={node.isCenter ? 3.5 : selected ? 2.8 : hovered ? 2 : 1.2}
           toneMapped={false}
         />
         {showLabel && (
           <Html
-            distanceFactor={20}
+            // distanceFactor nhỏ hơn → label TO hơn ở cùng khoảng cách.
+            // Center: 12 (lớn nhất); Selected: 14; còn lại: 18.
+            distanceFactor={node.isCenter ? 12 : selected ? 14 : 18}
             position={[0, node.radius + 2, 0]}
             center
             zIndexRange={[100, 0]}
             style={{ pointerEvents: 'none', userSelect: 'none' }}
-            // Html từ drei tự billboard (DOM overlay luôn face camera)
           >
             <div
               className="rounded-lg whitespace-nowrap shadow-2xl"
               style={{
-                padding: node.isCenter || selected ? '6px 14px' : '4px 10px',
-                background: selected ? 'rgba(20,5,40,0.95)' : 'rgba(0,0,0,0.92)',
-                border: `2px solid #${node.color.getHexString()}`,
-                boxShadow: selected ? `0 0 12px #${node.color.getHexString()}` : undefined,
-                fontSize: node.isCenter ? 18 : selected ? 17 : (hovered ? 16 : 14),
+                padding: node.isCenter ? '8px 18px' : selected ? '6px 14px' : '4px 10px',
+                background: node.isCenter
+                  ? 'linear-gradient(135deg, rgba(8,8,40,0.96), rgba(20,5,40,0.96))'
+                  : selected ? 'rgba(20,5,40,0.95)' : 'rgba(0,0,0,0.92)',
+                border: node.isCenter
+                  ? `3px solid #${node.color.getHexString()}`
+                  : `2px solid #${node.color.getHexString()}`,
+                boxShadow: node.isCenter
+                  ? `0 0 20px #${node.color.getHexString()}, 0 0 40px rgba(255,255,255,0.15)`
+                  : selected ? `0 0 12px #${node.color.getHexString()}` : undefined,
+                fontSize: node.isCenter ? 22 : selected ? 17 : (hovered ? 16 : 14),
                 fontWeight: 800,
                 color: '#fff',
                 textShadow: `0 0 8px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
@@ -335,7 +363,7 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               }}
             >
-              {selected && !node.isCenter ? '✓ ' : ''}{node.label}
+              {node.isCenter ? '🎯 ' : (selected ? '✓ ' : '')}{node.label}
             </div>
           </Html>
         )}
@@ -354,6 +382,15 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
 
 /* ────────────────────────── Main export ────────────────────────── */
 
+/* ──────────────── Camera config ────────────────
+ * - Camera ở Z=110 (gần hơn 150 cũ → node trung tâm to hơn)
+ * - Target Y=-8 → camera nhìn dưới origin → origin (center node)
+ *   appear ở UPPER-MIDDLE viewport, phù hợp rule of thirds.
+ * - User cảm thấy center "cao lên ở trung tâm màn hình".
+ */
+const CAMERA_POS: [number, number, number] = [0, 0, 110]
+const CAMERA_TARGET: [number, number, number] = [0, -8, 0]
+
 export default function KnowledgeGraph3D({
   nodes, edges, centerId, onNodeClick, onFocusCenter, showLabels = true,
 }: Props) {
@@ -366,6 +403,9 @@ export default function KnowledgeGraph3D({
   const [resetTick, setResetTick] = useState(0)
   // ID node đang được CHỌN (click trong 3D) — khác với centerId (đã re-load)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Auto-rotate MẶC ĐỊNH OFF — user bật khi muốn cinematic view.
+  // Trước đây bật mặc định → user khó tìm node trung tâm.
+  const [autoRotate, setAutoRotate] = useState(false)
 
   // Reset selection khi center thay đổi (vừa re-load graph)
   useEffect(() => { setSelectedId(null) }, [centerId])
@@ -374,6 +414,12 @@ export default function KnowledgeGraph3D({
   const selectedNode = useMemo(
     () => memoNodes.find(n => n.id === selectedId) || null,
     [memoNodes, selectedId]
+  )
+
+  // Tên node center (luôn hiện ở badge để user biết đang ở đâu)
+  const centerNode = useMemo(
+    () => memoNodes.find(n => n.id === centerId) || null,
+    [memoNodes, centerId]
   )
 
   // F = focus & make-it-center; phím tắt cho power user
@@ -387,7 +433,8 @@ export default function KnowledgeGraph3D({
     onFocusCenter?.(selectedId)
   }
 
-  // Keyboard: F = focus center, C = camera reset, ESC = clear selection
+  // Keyboard: F = focus center, C = camera reset, ESC = clear selection,
+  // R = toggle auto-rotate
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Bỏ qua nếu user đang gõ trong input/textarea
@@ -395,6 +442,7 @@ export default function KnowledgeGraph3D({
       if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return
       if (e.key === 'f' || e.key === 'F') { e.preventDefault(); handleFocusCenter() }
       else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); setResetTick(t => t + 1) }
+      else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setAutoRotate(r => !r) }
       else if (e.key === 'Escape') setSelectedId(null)
     }
     window.addEventListener('keydown', handler)
@@ -405,7 +453,7 @@ export default function KnowledgeGraph3D({
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-zinc-800">
       <Canvas
-        camera={{ position: [0, 0, 150], fov: 50 }}
+        camera={{ position: CAMERA_POS, fov: 50 }}
         gl={{ antialias: true, alpha: false }}
       >
         <color attach="background" args={['#020617']} />
@@ -431,18 +479,19 @@ export default function KnowledgeGraph3D({
           showLabels={showLabels}
           selectedId={selectedId}
           onSelect={setSelectedId}
+          autoRotate={autoRotate}
         />
 
         <OrbitControls
           ref={controlsRef}
-          target={[0, 0, 0]}
+          target={CAMERA_TARGET}
           enablePan={false}
           enableZoom
           enableRotate
           autoRotate={false}
           rotateSpeed={0.5}
           zoomSpeed={0.8}
-          minDistance={30}
+          minDistance={20}
           maxDistance={400}
         />
         <CameraResetter resetTick={resetTick} controlsRef={controlsRef} />
@@ -457,59 +506,86 @@ export default function KnowledgeGraph3D({
         </EffectComposer>
       </Canvas>
 
-      {/* Overlay hints */}
-      <div className="absolute bottom-3 left-3 text-[10px] text-white/50 leading-tight pointer-events-none space-y-0.5">
-        <div>🖱 Kéo: xoay · 🖱 Cuộn: zoom · Click node để chọn</div>
-        <div className="text-amber-200/70">
-          ⌨ <span className="font-mono font-bold text-amber-300">F</span> = Focus node thành tâm ·
-          <span className="font-mono font-bold text-cyan-300"> C</span> = Reset camera ·
-          <span className="font-mono font-bold text-zinc-300"> ESC</span> = Bỏ chọn
+      {/* ════════ Top-left: Center status badge ════════ */}
+      <div className="absolute top-3 left-3 max-w-[260px] px-2.5 py-1.5 rounded-lg
+                      bg-emerald-500/15 border border-emerald-400/40 text-emerald-200
+                      text-[11px] font-semibold shadow-lg backdrop-blur pointer-events-none">
+        <div className="text-[9px] text-emerald-300/70 uppercase tracking-wide flex items-center gap-1">
+          🎯 Trung tâm
+        </div>
+        <div className="truncate">{centerNode?.label || centerId}</div>
+        <div className="text-[9px] text-emerald-300/60 font-mono mt-0.5">
+          {memoNodes.length} nodes · {memoEdges.length} edges
         </div>
       </div>
-      <div className="absolute top-3 left-3 text-[10px] text-cyan-300 font-bold pointer-events-none">
-        🧠 3D Neural · {memoNodes.length} nodes · {memoEdges.length} edges
+
+      {/* ════════ Bottom-left: Keyboard hint (compact 1-line) ════════ */}
+      <div className="absolute bottom-2 left-3 text-[10px] text-white/60 leading-tight pointer-events-none">
+        🖱 Kéo xoay · Cuộn zoom · Click node ·
+        <span className="text-amber-300 font-mono font-bold"> F</span> Focus ·
+        <span className="text-cyan-300 font-mono font-bold"> C</span> Reset ·
+        <span className="text-purple-300 font-mono font-bold"> R</span> Rotate ·
+        <span className="text-zinc-300 font-mono font-bold"> ESC</span> Bỏ chọn
       </div>
 
-      {/* Status badge: đang chọn node nào (above F button) */}
+      {/* ════════ Selection badge (right side, above F button) ════════ */}
       {selectedNode && (
-        <div className="absolute top-12 right-3 max-w-[260px] px-3 py-1.5 rounded-lg
+        <div className="absolute top-16 right-3 max-w-[260px] px-3 py-1.5 rounded-lg
                         bg-amber-500/15 border border-amber-400/50 text-amber-200
                         text-[11px] font-semibold shadow-lg backdrop-blur pointer-events-none">
-          <div className="text-[9px] text-amber-300/70 uppercase tracking-wide">Đã chọn</div>
-          <div className="truncate">✓ {selectedNode.label}</div>
+          <div className="text-[9px] text-amber-300/70 uppercase tracking-wide">✓ Đã chọn</div>
+          <div className="truncate">{selectedNode.label}</div>
+          <div className="text-[9px] text-amber-300/70 mt-0.5">Bấm F để focus →</div>
         </div>
       )}
 
-      {/* F (Focus) button — đưa node được chọn thành tâm + re-load graph */}
-      <button
-        onClick={handleFocusCenter}
-        disabled={!selectedId}
-        className={`absolute top-3 right-28 px-2.5 py-2 rounded-lg
-                    border-2 text-xs font-bold shadow-lg
-                    inline-flex items-center gap-1 transition-all
-                    ${selectedId
-                      ? 'bg-amber-500/90 hover:bg-amber-500 border-amber-300/70 text-white hover:scale-105'
-                      : 'bg-zinc-700/60 border-zinc-600/40 text-zinc-400 cursor-not-allowed opacity-60'
-                    }`}
-        title={selectedId
-          ? `Đưa "${selectedNode?.label}" thành node trung tâm (phím F)`
-          : 'Click 1 node trước → bấm F (hoặc nút này) để focus + center'}
-      >
-        <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">F</span>
-        Focus
-      </button>
+      {/* ════════ Top-right toolbar (3 buttons) ════════ */}
+      <div className="absolute top-3 right-3 flex gap-1.5">
+        {/* R: Toggle auto-rotate */}
+        <button
+          onClick={() => setAutoRotate(r => !r)}
+          className={`px-2.5 py-2 rounded-lg border-2 text-xs font-bold shadow-lg
+                      inline-flex items-center gap-1 transition hover:scale-105
+                      ${autoRotate
+                        ? 'bg-purple-500/90 hover:bg-purple-500 border-purple-300/70 text-white'
+                        : 'bg-zinc-700/70 hover:bg-zinc-600/70 border-zinc-500/40 text-zinc-200'
+                      }`}
+          title={autoRotate ? 'Tắt tự xoay (phím R)' : 'Bật tự xoay cinematic (phím R)'}
+        >
+          <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">R</span>
+          {autoRotate ? 'Rotating' : 'Rotate'}
+        </button>
 
-      {/* Center reset button — đưa node trung tâm về giữa màn hình */}
-      <button
-        onClick={() => setResetTick(t => t + 1)}
-        className="absolute top-3 right-3 px-2.5 py-2 rounded-lg bg-cyan-500/80 hover:bg-cyan-500
-                   border-2 border-cyan-300/50 text-white text-xs font-bold shadow-lg
-                   inline-flex items-center gap-1 hover:scale-105 transition"
-        title="Reset camera về giữa màn hình (phím C)"
-      >
-        <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">C</span>
-        Center
-      </button>
+        {/* F: Focus selected node */}
+        <button
+          onClick={handleFocusCenter}
+          disabled={!selectedId}
+          className={`px-2.5 py-2 rounded-lg border-2 text-xs font-bold shadow-lg
+                      inline-flex items-center gap-1 transition
+                      ${selectedId
+                        ? 'bg-amber-500/90 hover:bg-amber-500 border-amber-300/70 text-white hover:scale-105'
+                        : 'bg-zinc-700/60 border-zinc-600/40 text-zinc-400 cursor-not-allowed opacity-60'
+                      }`}
+          title={selectedId
+            ? `Đưa "${selectedNode?.label}" thành node trung tâm (phím F)`
+            : 'Click 1 node trước → bấm F để focus + center'}
+        >
+          <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">F</span>
+          Focus
+        </button>
+
+        {/* C: Reset camera to center */}
+        <button
+          onClick={() => setResetTick(t => t + 1)}
+          className="px-2.5 py-2 rounded-lg bg-cyan-500/80 hover:bg-cyan-500
+                     border-2 border-cyan-300/50 text-white text-xs font-bold shadow-lg
+                     inline-flex items-center gap-1 hover:scale-105 transition"
+          title="Reset camera về node trung tâm (phím C)"
+        >
+          <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">C</span>
+          Center
+        </button>
+      </div>
     </div>
   )
 }
@@ -522,11 +598,11 @@ function CameraResetter({ resetTick, controlsRef }: {
   const { camera } = useThree()
   useEffect(() => {
     if (resetTick === 0) return
-    // Reset camera position + orbit target về (0,0,0)
-    camera.position.set(0, 0, 150)
-    camera.lookAt(0, 0, 0)
+    // Reset camera position + orbit target về preset (push center node lên upper-middle)
+    camera.position.set(CAMERA_POS[0], CAMERA_POS[1], CAMERA_POS[2])
+    camera.lookAt(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
     if (controlsRef.current) {
-      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.target.set(CAMERA_TARGET[0], CAMERA_TARGET[1], CAMERA_TARGET[2])
       controlsRef.current.update()
     }
   }, [resetTick, camera, controlsRef])
