@@ -14,13 +14,14 @@
  * - Center node pinned at origin
  * - Damping 0.85/step, run 200 iterations on data change
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Vector3, Color, Group, type Mesh } from 'three'
 import { type KgNode, type KgEdge, getNodeColor, NODE_TYPE_LABELS } from '@/services/knowledge-graph.service'
 import { Target, Info, X } from 'lucide-react'
+import { sfxBubblePop, sfxWhoosh, sfxChime } from '@/lib/kgAudio'
 
 interface Props {
   nodes: KgNode[]
@@ -275,16 +276,53 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
   const meshRef = useRef<Mesh>(null)
   const ringRef = useRef<Mesh>(null)
   const haloRef = useRef<Mesh>(null)
+  // Bubble pop effect — when user clicks node, scale up + fade out then back
+  const [popping, setPopping] = useState(false)
+  const popStartRef = useRef(0)
+  const popRingRef = useRef<Mesh>(null)
+  const [hovTime, setHovTime] = useState(0)
+
+  // Trigger bubble pop animation + SFX
+  const handleClick = useCallback(() => {
+    sfxBubblePop(0.35)
+    setPopping(true)
+    popStartRef.current = performance.now()
+    // Callback ngay (user feedback nhanh), animation chạy tiếp tục độc lập
+    onClick()
+    // Reset sau 600ms
+    setTimeout(() => setPopping(false), 600)
+  }, [onClick])
+
+  const handleHover = useCallback((h: boolean) => {
+    if (h && performance.now() - hovTime > 200) {
+      // Hover sound — chỉ trigger nếu cách lần trước >200ms (anti-spam)
+      sfxWhoosh(0.08)
+      setHovTime(performance.now())
+    }
+    onHover(h)
+  }, [onHover, hovTime])
 
   useFrame((_, dt) => {
     if (!meshRef.current) return
     meshRef.current.position.copy(node.pos)
-    // Pulse center node
-    if (node.isCenter) {
+
+    // BUBBLE POP animation (cao nhất priority)
+    if (popping) {
+      const elapsed = (performance.now() - popStartRef.current) / 600  // 0→1
+      if (elapsed < 0.4) {
+        // Phase 1 (0-40%): scale up 1.0 → 2.0 (expand như bong bóng phình)
+        const t = elapsed / 0.4
+        meshRef.current.scale.setScalar(1 + t * 1.0)
+      } else {
+        // Phase 2 (40-100%): scale back 2.0 → 1.2 + spring oscillation
+        const t = (elapsed - 0.4) / 0.6
+        const spring = Math.sin(t * Math.PI * 3) * (1 - t) * 0.15
+        meshRef.current.scale.setScalar(2 - t * 0.8 + spring)
+      }
+    } else if (node.isCenter) {
       const scale = 1 + Math.sin(performance.now() / 600) * 0.08
       meshRef.current.scale.setScalar(scale)
     } else if (selected) {
-      // Selected: pulse mạnh hơn hover để dễ nhận biết
       const scale = 1.3 + Math.sin(performance.now() / 400) * 0.1
       meshRef.current.scale.setScalar(scale)
     } else if (hovered) {
@@ -292,6 +330,16 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
     } else {
       meshRef.current.scale.lerp({ x: 1, y: 1, z: 1 } as any, dt * 8)
     }
+
+    // Bubble pop SHOCKWAVE ring (lan toả ra ngoài)
+    if (popRingRef.current && popping) {
+      const elapsed = (performance.now() - popStartRef.current) / 600
+      popRingRef.current.position.copy(node.pos)
+      popRingRef.current.scale.setScalar(1 + elapsed * 3)  // 1× → 4×
+      const mat = (popRingRef.current.material as any)
+      if (mat) mat.opacity = Math.max(0, 0.8 - elapsed)
+    }
+
     // Selection ring billboard
     if (ringRef.current && selected && !node.isCenter) {
       ringRef.current.position.copy(node.pos)
@@ -321,11 +369,19 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
         </mesh>
       )}
 
+      {/* BUBBLE POP SHOCKWAVE — lan toả khi click node */}
+      {popping && (
+        <mesh ref={popRingRef}>
+          <torusGeometry args={[node.radius * 1.3, node.radius * 0.15, 8, 32]} />
+          <meshBasicMaterial color={node.color} transparent opacity={0.8} toneMapped={false} depthWrite={false} />
+        </mesh>
+      )}
+
       <mesh
         ref={meshRef}
-        onPointerOver={(e) => { e.stopPropagation(); onHover(true); document.body.style.cursor = 'pointer' }}
-        onPointerOut={() => { onHover(false); document.body.style.cursor = '' }}
-        onClick={(e) => { e.stopPropagation(); onClick() }}
+        onPointerOver={(e) => { e.stopPropagation(); handleHover(true); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { handleHover(false); document.body.style.cursor = '' }}
+        onClick={(e) => { e.stopPropagation(); handleClick() }}
       >
         <sphereGeometry args={[node.radius, 16, 16]} />
         <meshStandardMaterial
@@ -433,6 +489,7 @@ export default function KnowledgeGraph3D({
       setResetTick(t => t + 1)
       return
     }
+    sfxChime(0.3)  // Chime nhẹ khi "dive into" node mới
     onFocusCenter?.(selectedId)
   }
 
@@ -543,6 +600,9 @@ export default function KnowledgeGraph3D({
           onClose={() => setSelectedId(null)}
         />
       )}
+
+      {/* Note: KgAudioPlayer ở component cha KnowledgeGraph.tsx
+          để nhạc liên tục khi toggle 2D ↔ 3D. */}
 
       {/* ════════ Top-right toolbar (3 buttons) ════════ */}
       <div className="absolute top-3 right-3 flex gap-1.5">

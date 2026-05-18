@@ -38,6 +38,8 @@ import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 import BrainSuggestions from '@/components/kg/BrainSuggestions'
 import NodeExplorer from '@/components/kg/NodeExplorer'
+import KgAudioPlayer from '@/components/kg/KgAudioPlayer'
+import { sfxBubblePop, sfxChime } from '@/lib/kgAudio'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -576,6 +578,7 @@ export default function KnowledgeGraph() {
    * Khác `onNodeClick` (chỉ mở detail, không re-load graph).
    */
   const onNavigateNode = useCallback(async (id: string) => {
+    sfxChime(0.25)  // Chime nhẹ — feedback "dive into" node mới
     await loadFromNode(id, 2)
     await onNodeClick(id)
   }, [loadFromNode, onNodeClick])
@@ -594,6 +597,7 @@ export default function KnowledgeGraph() {
 
   const onMouseDownNode = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation()
+    sfxBubblePop(0.3)  // 🫧 Pop sound khi click node 2D
     const { x, y } = screenToWorld(e.clientX, e.clientY)
     dragStateRef.current = { type: 'node', nodeId, startX: x, startY: y }
     const node = simRef.current.find(n => n.id === nodeId)
@@ -1628,6 +1632,11 @@ export default function KnowledgeGraph() {
               </div>
             </div>
           )}
+
+          {/* 🎵 NHẠC NỀN — floating player (bottom-right) cho cả 2D + 3D mode.
+              3 track instrumental thư giãn (Aventure, Hoffy Beats) — giúp HS
+              tập trung khi duyệt cây tri thức. Auto-loop + persist preference. */}
+          <KgAudioPlayer />
         </main>
 
         {/* Right: detail drawer
