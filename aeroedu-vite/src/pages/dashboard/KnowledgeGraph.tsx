@@ -36,6 +36,7 @@ import { lazy, Suspense } from 'react'
 const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
+import BrainSuggestions from '@/components/kg/BrainSuggestions'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -1019,6 +1020,9 @@ export default function KnowledgeGraph() {
 
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {/* 🧠 Brain v2 — Phoenix-style smart suggestions */}
+            <BrainSuggestions onNodeClick={onNodeClick} />
+
             {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
             <KgHistoryTrail
               history={kgHistory.history}

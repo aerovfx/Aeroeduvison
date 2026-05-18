@@ -466,3 +466,71 @@ export const knowledgeGraphBrain = {
   myBrainStats: () =>
     api.get<{ success: boolean } & KgMyBrainStats>('/kg/my-brain').then(r => r.data),
 }
+
+/* ───── KG Brain v2 — Phoenix-style smart recommendation pipeline ───── */
+
+export interface KgBrainItem {
+  id: string
+  type: string
+  label: string
+  description?: string | null
+  score: number
+  sources: string[]
+  reasons: string[]
+  hydration: {
+    userMastery: number
+    prereqTotal?: number
+    prereqMastered?: number
+    prereqPct?: number
+    popularity?: number
+  }
+  link: string
+}
+
+export interface KgBrainRecommendation {
+  audience: 'student' | 'teacher'
+  focus: string
+  count: number
+  items: KgBrainItem[]
+  pipeline: { hydrateMs: number; sourceMs: number; enrichMs: number; filterMs: number; scoreMs: number; totalMs: number }
+  stats: {
+    candidatesCollected: number
+    afterFilter: number
+    finalSelected: number
+    recentVisitsLoaded: number
+    masteryNodesLoaded: number
+  }
+}
+
+export interface KgRelatedNode {
+  id: string
+  label: string
+  type: string
+  description?: string | null
+  depth: number
+  relevance: number
+}
+
+export const knowledgeGraphBrainV2 = {
+  /** Phoenix-style smart recommendation từ KG */
+  recommend: (opts: {
+    focus?: 'next-to-learn' | 'review' | 'discover' | 'goal'
+    goalId?: string
+    limit?: number
+  } = {}) =>
+    api.post<{ success: boolean } & KgBrainRecommendation>(
+      '/kg/brain/recommend', opts
+    ).then(r => r.data),
+
+  /** Related nodes — graph-walk 2 hops với relevance scoring */
+  related: (nodeId: string, limit = 10) =>
+    api.get<{ success: boolean; related: KgRelatedNode[]; count: number }>(
+      `/kg/brain/related`, { params: { node: nodeId, limit } }
+    ).then(r => r.data),
+
+  /** Library-style faceted browse */
+  library: (opts: { subject?: string; type?: string; q?: string; limit?: number } = {}) =>
+    api.get<{ success: boolean; nodes: KgNode[]; count: number }>(
+      `/kg/brain/library`, { params: opts }
+    ).then(r => r.data),
+}

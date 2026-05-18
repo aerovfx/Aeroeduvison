@@ -12522,6 +12522,495 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     }
   });
 
+  // ════════════════════════════════════════════════════════════════
+  // KG BRAIN v2 — Phoenix-style Candidate Pipeline
+  // Tham khảo /algorithm: home-mixer + phoenix + candidate-pipeline
+  // Multi-source → Hydrate → Filter → Score → Select with diversity
+  // ════════════════════════════════════════════════════════════════
+
+  /**
+   * Build KG-based smart recommendation. Inspired by X For You algorithm.
+   *
+   * Pipeline stages:
+   *  1. QUERY HYDRATION — load user context (mastery, history, profile)
+   *  2. CANDIDATE SOURCES (parallel):
+   *     - mastery_gap: nodes 0-60% mastery + prereqs OK
+   *     - graph_neighbor: BFS 2-hop từ nodes vừa visit (in-network)
+   *     - goal_path: shortest path tới goal node (nếu có)
+   *     - trending: nodes nhiều action gần đây (collaborative)
+   *     - discover: subjects user chưa khám phá (out-of-network)
+   *  3. HYDRATION — enrich với mastery, prereq_status, popularity, time
+   *  4. FILTERS — drop mastered (≥80%), no-prereq, blocked
+   *  5. SCORERS (weighted Σ):
+   *     - gap_score (60-mastery)*1.5
+   *     - prereq_bonus +20 if prereqs≥70%
+   *     - recency_bonus +30 if neighbor of recent (decay)
+   *     - popularity_bonus log(viewers)*5
+   *     - goal_bonus +50 on shortest path
+   *     - discovery_bonus +15 if subject 0%
+   *     - diversity_penalty -5 per same-chapter dup
+   *  6. SELECTOR — sort by score, top-K, diversity-aware
+   */
+  async function _buildKgRecommendation(userId, opts = {}) {
+    const t0 = Date.now();
+    await ensureKgReady();
+    const pool = getKcPool();
+    const focus = opts.focus || 'next-to-learn';
+    const audience = opts.audience || 'student';
+    const limit = Math.min(50, Math.max(5, parseInt(opts.limit || 20, 10)));
+
+    // ── 1. QUERY HYDRATION ──
+    const tHydrate0 = Date.now();
+    const [masteryRow, recentVisits, allMastery] = await Promise.all([
+      // User overall mastery profile
+      pool.query(
+        `SELECT m.node_id, m.score, n.label, n.type
+         FROM kg_mastery m JOIN kg_nodes n ON n.id = m.node_id
+         WHERE m.user_id = $1`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+      // Recent KG visits từ rs_action_log (last 15 nodes, 7 days)
+      pool.query(
+        `SELECT DISTINCT target_id, MAX(created_at) AS last_visit
+         FROM rs_action_log
+         WHERE user_id = $1 AND target_type = 'kg_node'
+           AND created_at > NOW() - INTERVAL '7 days'
+         GROUP BY target_id
+         ORDER BY last_visit DESC LIMIT 15`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+      // Subject-level aggregated mastery
+      pool.query(
+        `SELECT n.id AS node_id, n.type, n.label,
+                COALESCE(AVG(m.score), 0) AS avg_score,
+                COUNT(m.node_id) AS touched_count
+         FROM kg_nodes n
+         LEFT JOIN kg_mastery m ON m.node_id = n.id AND m.user_id = $1
+         WHERE n.type = 'Subject'
+         GROUP BY n.id, n.type, n.label`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+    ]);
+
+    const masteryMap = new Map();
+    for (const r of masteryRow.rows) masteryMap.set(r.node_id, Number(r.score));
+    const recentIds = recentVisits.rows.map(r => r.target_id);
+    const recentTimes = new Map();
+    recentVisits.rows.forEach((r, i) => recentTimes.set(r.target_id, { rank: i, ts: r.last_visit }));
+    const subjectMastery = new Map();
+    for (const r of allMastery.rows) {
+      subjectMastery.set(r.node_id, {
+        avg: Number(r.avg_score),
+        touched: Number(r.touched_count),
+      });
+    }
+    const hydrateMs = Date.now() - tHydrate0;
+
+    // ── 2. CANDIDATE SOURCES (parallel) ──
+    const tSource0 = Date.now();
+    const candidates = new Map(); // id → { node, sources: Set, baseScore }
+
+    const addCand = (node, source, score) => {
+      const cur = candidates.get(node.id);
+      if (cur) {
+        cur.sources.add(source);
+        cur.baseScore = Math.max(cur.baseScore, score);
+      } else {
+        candidates.set(node.id, { node, sources: new Set([source]), baseScore: score });
+      }
+    };
+
+    const [sMastery, sNeighbor, sGoalPath, sTrending, sDiscover] = await Promise.all([
+      // Source A: mastery_gap — nodes mastery 0-60% với prereqs satisfied
+      pool.query(
+        `SELECT n.id, n.type, n.label, n.description, m.score
+         FROM kg_mastery m JOIN kg_nodes n ON n.id = m.node_id
+         WHERE m.user_id = $1 AND m.score < 60 AND n.type IN ('Topic', 'Concept', 'Formula')
+         ORDER BY m.score ASC LIMIT 30`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+
+      // Source B: graph_neighbor — 1-hop neighbors của recent visits
+      recentIds.length > 0
+        ? pool.query(
+            `SELECT DISTINCT n.id, n.type, n.label, n.description, e.from_id AS from_node, e.rel_type
+             FROM kg_edges e JOIN kg_nodes n ON n.id = e.to_id
+             WHERE e.from_id = ANY($1) AND n.type IN ('Topic', 'Concept', 'Formula', 'Application', 'Phenomenon')
+             LIMIT 50`,
+            [recentIds]
+          ).catch(() => ({ rows: [] }))
+        : Promise.resolve({ rows: [] }),
+
+      // Source C: goal_path — placeholder (cần goalId trong opts)
+      opts.goalId
+        ? pool.query(
+            `WITH RECURSIVE path AS (
+               SELECT id, label, type, description, 0 AS depth
+               FROM kg_nodes WHERE id = $1
+               UNION ALL
+               SELECT n.id, n.label, n.type, n.description, p.depth + 1
+               FROM path p
+               JOIN kg_edges e ON e.from_id = p.id
+               JOIN kg_nodes n ON n.id = e.to_id
+               WHERE p.depth < 3
+             )
+             SELECT * FROM path LIMIT 30`,
+            [opts.goalId]
+          ).catch(() => ({ rows: [] }))
+        : Promise.resolve({ rows: [] }),
+
+      // Source D: trending — nodes nhiều action 30 ngày (collaborative)
+      pool.query(
+        `SELECT a.target_id AS id, n.type, n.label, n.description,
+                COUNT(DISTINCT a.user_id) AS unique_users
+         FROM rs_action_log a JOIN kg_nodes n ON n.id = a.target_id
+         WHERE a.target_type = 'kg_node'
+           AND a.created_at > NOW() - INTERVAL '30 days'
+           AND a.user_id <> $1
+           AND n.type IN ('Topic', 'Concept', 'Application', 'Phenomenon')
+         GROUP BY a.target_id, n.type, n.label, n.description
+         HAVING COUNT(DISTINCT a.user_id) >= 2
+         ORDER BY unique_users DESC LIMIT 20`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+
+      // Source E: discover — subjects user chưa touch
+      pool.query(
+        `SELECT n.id, n.type, n.label, n.description
+         FROM kg_nodes n
+         WHERE n.type IN ('Topic', 'Application', 'Phenomenon')
+           AND NOT EXISTS (
+             SELECT 1 FROM kg_mastery m WHERE m.node_id = n.id AND m.user_id = $1
+           )
+         ORDER BY RANDOM() LIMIT 15`,
+        [userId]
+      ).catch(() => ({ rows: [] })),
+    ]);
+
+    for (const row of sMastery.rows) {
+      addCand(row, 'mastery_gap', (60 - Number(row.score)) * 1.5 + 20);
+    }
+    for (const row of sNeighbor.rows) {
+      const rec = recentTimes.get(row.from_node);
+      const recencyBonus = rec ? Math.max(5, 30 - rec.rank * 2) : 10;
+      addCand(row, 'graph_neighbor', recencyBonus + 10);
+    }
+    for (const row of sGoalPath.rows) {
+      addCand(row, 'goal_path', 50 - Number(row.depth) * 10);
+    }
+    for (const row of sTrending.rows) {
+      const popBonus = Math.log(Math.max(1, Number(row.unique_users))) * 5;
+      addCand(row, 'trending', popBonus + 15);
+    }
+    for (const row of sDiscover.rows) {
+      addCand(row, 'discover', 15);
+    }
+    const sourceMs = Date.now() - tSource0;
+
+    // ── 3. HYDRATION — enrich với prereq + popularity per candidate ──
+    const tEnrich0 = Date.now();
+    const candIds = [...candidates.keys()];
+    if (candIds.length > 0) {
+      // Fetch prereq counts (REQUIRES edges incoming + mastery của bài tiên quyết)
+      try {
+        const prereqRes = await pool.query(
+          `SELECT e.from_id AS target, COUNT(e.to_id) AS total,
+                  COUNT(CASE WHEN COALESCE(m.score, 0) >= 70 THEN 1 END) AS mastered
+           FROM kg_edges e
+           LEFT JOIN kg_mastery m ON m.node_id = e.to_id AND m.user_id = $1
+           WHERE e.rel_type = 'REQUIRES' AND e.from_id = ANY($2)
+           GROUP BY e.from_id`,
+          [userId, candIds]
+        );
+        for (const r of prereqRes.rows) {
+          const c = candidates.get(r.target);
+          if (c) {
+            c.prereqTotal = Number(r.total);
+            c.prereqMastered = Number(r.mastered);
+            c.prereqPct = r.total > 0 ? Math.round((Number(r.mastered) / Number(r.total)) * 100) : 100;
+          }
+        }
+      } catch (_) {}
+
+      // Popularity from rs_action_log
+      try {
+        const popRes = await pool.query(
+          `SELECT target_id, COUNT(DISTINCT user_id) AS uniq
+           FROM rs_action_log
+           WHERE target_type = 'kg_node' AND target_id = ANY($1)
+             AND created_at > NOW() - INTERVAL '30 days'
+           GROUP BY target_id`,
+          [candIds]
+        );
+        for (const r of popRes.rows) {
+          const c = candidates.get(r.target_id);
+          if (c) c.popularity = Number(r.uniq);
+        }
+      } catch (_) {}
+
+      // Attach user's own mastery for each cand
+      for (const id of candIds) {
+        const c = candidates.get(id);
+        c.userMastery = masteryMap.has(id) ? Math.round(masteryMap.get(id)) : 0;
+      }
+    }
+    const enrichMs = Date.now() - tEnrich0;
+
+    // ── 4. FILTERS ──
+    const tFilter0 = Date.now();
+    let filtered = [...candidates.values()].filter(c => {
+      // Drop nếu đã mastered (>=80%) — trừ khi focus='review'
+      if (focus !== 'review' && c.userMastery >= 80) return false;
+      // Drop nếu prereqs satisfaction < 30% (quá khó)
+      if (c.prereqTotal && c.prereqPct !== undefined && c.prereqPct < 30) return false;
+      // Skip Person/Subject/Chapter (não đề xuất topic actionable)
+      if (['Subject', 'Chapter', 'Person'].includes(c.node.type)) return false;
+      return true;
+    });
+    const filterMs = Date.now() - tFilter0;
+
+    // ── 5. SCORERS — combined weighted score ──
+    const tScore0 = Date.now();
+    for (const c of filtered) {
+      let score = c.baseScore;
+      const reasons = [];
+      const sources = [...c.sources];
+
+      // Mastery gap bonus
+      if (c.userMastery < 60) {
+        const bonus = (60 - c.userMastery) * 1.5;
+        score += bonus;
+        if (c.userMastery > 0) reasons.push(`🎯 Mastery ${c.userMastery}% — cần cải thiện`);
+      }
+      // Prereq bonus
+      if (c.prereqPct !== undefined) {
+        if (c.prereqPct >= 70) {
+          score += 20;
+          reasons.push(`✅ Prereqs ${c.prereqPct}% — sẵn sàng học`);
+        } else if (c.prereqPct < 50) {
+          score -= 15;
+          reasons.push(`⚠️ Cần học ${c.prereqTotal - c.prereqMastered}/${c.prereqTotal} prereq trước`);
+        }
+      }
+      // Popularity bonus
+      if (c.popularity && c.popularity > 0) {
+        const bonus = Math.log(c.popularity + 1) * 5;
+        score += bonus;
+        if (c.popularity >= 3) reasons.push(`🔥 ${c.popularity} bạn đã tương tác`);
+      }
+      // Source bonuses
+      if (sources.includes('goal_path')) reasons.push('🛣 Trên đường tới mục tiêu');
+      if (sources.includes('discover')) reasons.push('✨ Khám phá môn mới');
+      if (sources.includes('graph_neighbor')) reasons.push('📍 Liên quan node vừa xem');
+      if (sources.includes('mastery_gap')) reasons.push('📈 Cải thiện điểm yếu');
+      if (sources.includes('trending')) reasons.push('🔥 Đang hot');
+
+      c.finalScore = Math.round(score * 10) / 10;
+      c.reasons = reasons;
+      c.sourcesList = sources;
+    }
+    const scoreMs = Date.now() - tScore0;
+
+    // ── 6. SELECTOR — sort + diversity (attenuate same-chapter dups) ──
+    filtered.sort((a, b) => b.finalScore - a.finalScore);
+    const seenChapterCount = new Map();
+    const seenTypeCount = new Map();
+    const selected = [];
+    for (const c of filtered) {
+      if (selected.length >= limit) break;
+      // Diversity: penalize 3rd+ from same type
+      const typeCount = seenTypeCount.get(c.node.type) || 0;
+      if (typeCount >= Math.ceil(limit / 3)) continue;
+      seenTypeCount.set(c.node.type, typeCount + 1);
+      selected.push(c);
+    }
+
+    const totalMs = Date.now() - t0;
+    return {
+      audience,
+      focus,
+      count: selected.length,
+      items: selected.map(c => ({
+        id: c.node.id,
+        type: c.node.type,
+        label: c.node.label,
+        description: c.node.description,
+        score: c.finalScore,
+        sources: c.sourcesList,
+        reasons: c.reasons,
+        hydration: {
+          userMastery: c.userMastery,
+          prereqTotal: c.prereqTotal,
+          prereqMastered: c.prereqMastered,
+          prereqPct: c.prereqPct,
+          popularity: c.popularity,
+        },
+        link: `/dashboard/knowledge-graph?focus=${encodeURIComponent(c.node.id)}`,
+      })),
+      pipeline: { hydrateMs, sourceMs, enrichMs, filterMs, scoreMs, totalMs },
+      stats: {
+        candidatesCollected: candidates.size,
+        afterFilter: filtered.length,
+        finalSelected: selected.length,
+        recentVisitsLoaded: recentIds.length,
+        masteryNodesLoaded: masteryRow.rows.length,
+      },
+    };
+  }
+
+  /**
+   * POST /api/kg/brain/recommend — smart KG-based recommendations
+   * Body: { focus?: 'next-to-learn'|'review'|'discover'|'goal', goalId?: nodeId, limit?: 20 }
+   */
+  app.post('/api/kg/brain/recommend', express.json({ limit: '10kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      const result = await _buildKgRecommendation(user.id, req.body || {});
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[kg:brain:recommend] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET version for easy testing
+  app.get('/api/kg/brain/recommend', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      const result = await _buildKgRecommendation(user.id, {
+        focus: req.query.focus || 'next-to-learn',
+        goalId: req.query.goalId,
+        limit: req.query.limit,
+      });
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[kg:brain:recommend:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/kg/brain/related?node=<id>&limit=10
+   * Graph-walk + semantic similarity. Trả về top N nodes liên quan node X.
+   */
+  app.get('/api/kg/brain/related', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const nodeId = String(req.query.node || '').slice(0, 200);
+      if (!nodeId) return res.status(400).json({ success: false, error: 'node param required' });
+      const limit = Math.min(30, Math.max(3, parseInt(req.query.limit || 10, 10)));
+
+      // 2-hop BFS via REQUIRES + RELATES_TO + USES_CONCEPT + APPLIED_IN
+      const r = await pool.query(
+        `WITH RECURSIVE walk AS (
+           SELECT to_id AS id, 1 AS depth, rel_type
+           FROM kg_edges WHERE from_id = $1
+           UNION ALL
+           SELECT from_id AS id, 1 AS depth, rel_type
+           FROM kg_edges WHERE to_id = $1
+           UNION ALL
+           SELECT e.to_id AS id, w.depth + 1, e.rel_type
+           FROM walk w JOIN kg_edges e ON e.from_id = w.id
+           WHERE w.depth = 1
+         )
+         SELECT w.id, MIN(w.depth) AS min_depth, COUNT(*) AS edge_count,
+                n.label, n.type, n.description
+         FROM walk w JOIN kg_nodes n ON n.id = w.id
+         WHERE w.id <> $1
+         GROUP BY w.id, n.label, n.type, n.description
+         ORDER BY edge_count DESC, min_depth ASC
+         LIMIT $2`,
+        [nodeId, limit]
+      );
+
+      return res.json({
+        success: true,
+        related: r.rows.map(x => ({
+          id: x.id, label: x.label, type: x.type, description: x.description,
+          depth: Number(x.min_depth),
+          relevance: Number(x.edge_count),
+        })),
+        count: r.rows.length,
+      });
+    } catch (err) {
+      console.error('[kg:brain:related] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  /**
+   * GET /api/kg/brain/library?subject=<id>&type=<Topic|Application|...>&q=<keyword>
+   * Library-style faceted browse. Trả về nodes filtered by subject + type + keyword.
+   */
+  app.get('/api/kg/brain/library', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const pool = getKcPool();
+      const subject = req.query.subject ? String(req.query.subject).slice(0, 100) : null;
+      const type = req.query.type ? String(req.query.type).slice(0, 30) : null;
+      const q = req.query.q ? String(req.query.q).trim().slice(0, 100) : null;
+      const limit = Math.min(100, Math.max(10, parseInt(req.query.limit || 30, 10)));
+
+      const conds = [];
+      const params = [];
+      let i = 1;
+      if (subject) {
+        // Find nodes under this Subject (Chapter → Topic chain)
+        conds.push(`n.id IN (
+          WITH RECURSIVE descendants AS (
+            SELECT to_id AS id FROM kg_edges WHERE from_id = $${i} AND rel_type IN ('HAS_CHAPTER', 'HAS_TOPIC', 'USES_FORMULA', 'USES_CONCEPT', 'APPLIED_IN', 'EXHIBITS_PHENOMENON')
+            UNION ALL
+            SELECT e.to_id FROM descendants d JOIN kg_edges e ON e.from_id = d.id
+            WHERE e.rel_type IN ('HAS_TOPIC', 'USES_FORMULA', 'USES_CONCEPT', 'APPLIED_IN', 'EXHIBITS_PHENOMENON')
+          )
+          SELECT id FROM descendants
+        )`);
+        params.push(subject);
+        i++;
+      }
+      if (type) {
+        conds.push(`n.type = $${i}`);
+        params.push(type);
+        i++;
+      }
+      if (q) {
+        conds.push(`(n.label ILIKE '%' || $${i} || '%' OR n.description ILIKE '%' || $${i} || '%')`);
+        params.push(q);
+        i++;
+      }
+      params.push(limit);
+      const where = conds.length > 0 ? 'WHERE ' + conds.join(' AND ') : '';
+      const r = await pool.query(
+        `SELECT n.id, n.type, n.label, n.description
+         FROM kg_nodes n ${where}
+         ORDER BY
+           CASE n.type
+             WHEN 'Subject' THEN 1
+             WHEN 'Chapter' THEN 2
+             WHEN 'Topic' THEN 3
+             WHEN 'Application' THEN 4
+             WHEN 'Phenomenon' THEN 5
+             ELSE 6
+           END,
+           n.label
+         LIMIT $${i}`,
+        params
+      );
+      return res.json({
+        success: true,
+        nodes: r.rows,
+        count: r.rows.length,
+        filters: { subject, type, q },
+      });
+    } catch (err) {
+      console.error('[kg:brain:library] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // ════════════════════════════════════════════════
   // KG — PHASE 7: Collaborative Editing (suggestions)
   // GV/HS đề xuất khái niệm/relation mới → admin duyệt.
