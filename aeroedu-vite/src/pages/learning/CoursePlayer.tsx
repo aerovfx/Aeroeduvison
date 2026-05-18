@@ -33,7 +33,19 @@ import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimelin
 import type { CourseVideo } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
-function VideoPlayer({ videoUrl }: { videoUrl: string }) {
+function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
+  // Defensive: nếu DB row có url=NULL hoặc API response thiếu field
+  // → render placeholder thay vì crash ".includes of undefined".
+  if (!videoUrl) {
+    return (
+      <div className="relative w-full aspect-video bg-zinc-900 rounded-xl overflow-hidden
+                      flex flex-col items-center justify-center text-gray-400 gap-2">
+        <Play className="w-12 h-12 opacity-40" />
+        <p className="text-sm">Video chưa có URL hợp lệ</p>
+        <p className="text-[10px] text-gray-600">Liên hệ giáo viên để cập nhật</p>
+      </div>
+    )
+  }
   const isYoutube = videoUrl.includes('youtube') || videoUrl.includes('youtu.be')
   const isVimeo = videoUrl.includes('vimeo')
 
@@ -433,7 +445,7 @@ export default function CoursePlayer() {
         {/* Video */}
         <div className="p-4 lg:p-6">
           {currentVideo ? (
-            <VideoPlayer videoUrl={currentVideo.videoUrl} />
+            <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as any).url} />
           ) : (
             <div className="aspect-video bg-gray-800 rounded-xl flex items-center justify-center">
               <Play className="w-16 h-16 text-gray-600" />

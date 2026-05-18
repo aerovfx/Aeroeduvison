@@ -3014,8 +3014,12 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const own = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
           [req.params.id, tid]);
         if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        // FE type CourseVideo expects `videoUrl` — alias DB column `url`.
         const { rows } = await pool.query(
-          `SELECT * FROM "CourseVideo" WHERE "courseId"=$1 ORDER BY position ASC, "createdAt" ASC`,
+          `SELECT *, url AS "videoUrl"
+             FROM "CourseVideo"
+            WHERE "courseId"=$1
+            ORDER BY position ASC, "createdAt" ASC`,
           [req.params.id]
         );
         return res.json(rows);
@@ -3064,7 +3068,8 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
            b.groupName ? String(b.groupName).slice(0, 200) : null,
            b.gcsPath ? String(b.gcsPath).slice(0, 500) : null]
         );
-        const { rows } = await pool.query(`SELECT * FROM "CourseVideo" WHERE id=$1`, [id]);
+        const { rows } = await pool.query(
+          `SELECT *, url AS "videoUrl" FROM "CourseVideo" WHERE id=$1`, [id]);
         console.log(`[videos:create] ✅ ${id.slice(0,8)} "${title.slice(0,40)}" type=${type}`);
         return res.status(201).json(rows[0]);
       } catch (err) {
@@ -27933,8 +27938,12 @@ if (!USE_NODEJS_QUESTIONS) {
     try {
       const pool = getLearnPool();
       if (!pool) return res.json([]);
+      // FE type CourseVideo expects field `videoUrl`, DB column is `url`.
+      // Alias `url AS "videoUrl"` + return cả 2 cho backward-compat.
       const { rows } = await pool.query(
-        `SELECT id, "courseId", title, type, url, "thumbUrl", duration,
+        `SELECT id, "courseId", title, type,
+                url, url AS "videoUrl",
+                "thumbUrl", duration,
                 position, "isPreview", "groupName", "createdAt"
            FROM "CourseVideo"
           WHERE "courseId" = $1
