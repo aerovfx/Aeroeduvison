@@ -125,45 +125,66 @@ export default function VideoSecurityOverlay({ children, videoTitle, disableWate
     }
   }, [])
 
-  // ── Pause/hide when tab loses focus (deter window-capture screen recording) ──
+  // Detect mobile UA — tắt các overlay false-positive (DevTools dh, focus blur)
+  const isMobile = typeof navigator !== 'undefined' &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
+  // ── Pause/hide when tab loses focus ──
+  // Mobile: CHỈ dùng `document.hidden` (visibility API chuẩn) —
+  // KHÔNG dùng `document.hasFocus()` vì trên iOS/Android, focus mất khi:
+  //   - User chạm vào element không focusable (false positive → overlay block click)
+  //   - Bàn phím ảo mở/đóng
+  //   - Address bar bounce
+  // Desktop: dùng cả 2 để chặn OBS window-capture chính xác.
   useEffect(() => {
     const onVis = () => {
-      const isHidden = document.hidden || !document.hasFocus()
+      const isHidden = isMobile ? document.hidden : (document.hidden || !document.hasFocus())
       setHidden(isHidden)
       if (isHidden) {
-        // Pause tất cả video tags trong container
         const videos = containerRef.current?.querySelectorAll('video')
         videos?.forEach(v => { try { v.pause() } catch { /* ignore */ } })
       }
     }
     document.addEventListener('visibilitychange', onVis)
-    window.addEventListener('blur', onVis)
-    window.addEventListener('focus', onVis)
+    if (!isMobile) {
+      window.addEventListener('blur', onVis)
+      window.addEventListener('focus', onVis)
+    }
     onVis()
     return () => {
       document.removeEventListener('visibilitychange', onVis)
-      window.removeEventListener('blur', onVis)
-      window.removeEventListener('focus', onVis)
+      if (!isMobile) {
+        window.removeEventListener('blur', onVis)
+        window.removeEventListener('focus', onVis)
+      }
     }
-  }, [])
+  }, [isMobile])
 
-  // ── DevTools detection (best-effort timing trick) ──
-  // Khi devtools mở, browser dành thêm time render → window.outerWidth lớn hơn
-  // inner nhiều, hoặc debugger paused detection chậm.
+  // ── DevTools detection — DISABLE trên mobile ──
+  // Mobile có address bar dynamic + virtual keyboard pushUp → outerWidth/innerWidth
+  // chênh lệch >160px nhiều TRƯỜNG HỢP HỢP LỆ:
+  //   - Safari iOS có toolbar bottom → dh ~80-130px
+  //   - Chrome Android scroll → address bar collapse → dh thay đổi liên tục
+  //   - Bàn phím mở → dh tăng vọt → overlay block toàn bộ tương tác
+  // → CHỈ check trên desktop. Mobile thay bằng simple check Cmd+Opt+I (no-op).
   useEffect(() => {
+    if (isMobile) {
+      setDevtoolsOpen(false)
+      return
+    }
     let cancelled = false
     const check = () => {
       if (cancelled) return
       const dw = Math.abs(window.outerWidth - window.innerWidth)
       const dh = Math.abs(window.outerHeight - window.innerHeight)
-      // Threshold: nếu chênh > 160px (devtools mở thường > 200px)
-      const open = dw > 160 || dh > 160
+      // Desktop threshold cao hơn (200 → tránh edge case browser zoom)
+      const open = dw > 200 || dh > 200
       setDevtoolsOpen(open)
     }
     check()
     const id = setInterval(check, 1500)
     return () => { cancelled = true; clearInterval(id) }
-  }, [])
+  }, [isMobile])
 
   // Watermark text — tên + email + thời gian (UTC)
   const wmText = user

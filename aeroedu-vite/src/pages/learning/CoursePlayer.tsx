@@ -136,17 +136,20 @@ function VideoSidebar({
         </p>
       </div>
 
-      {/* Video list */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      {/* Video list — touch-action manipulation để bỏ 300ms tap delay trên mobile */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ WebkitOverflowScrolling: 'touch' }}>
         {videos.map((video, idx) => (
           <button
             key={video.id}
             onClick={() => onSelect(video)}
+            type="button"
+            style={{ touchAction: 'manipulation' }}
             className={cn(
               'w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors',
+              'min-h-[56px] active:scale-[0.98]',  // 56px Apple HIG touch target + tactile feedback
               video.id === currentVideoId
                 ? 'bg-purple-600/30 border border-purple-500/50'
-                : 'hover:bg-white/5'
+                : 'hover:bg-white/5 active:bg-white/10'
             )}
           >
             {video.isCompleted ? (
@@ -341,7 +344,11 @@ export default function CoursePlayer() {
   const { slug, courseId } = useParams<{ slug: string; courseId: string }>()
   const [currentVideo, setCurrentVideo] = useState<CourseVideo | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('overview')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Mobile mặc định ĐÓNG sidebar (w-80 = 320px nuốt hết video player trên màn nhỏ).
+  // Desktop (≥1024px) mở mặc định.
+  const [sidebarOpen, setSidebarOpen] = useState(
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  )
   const qc = useQueryClient()
 
   // Track which videos we've already logged in this session so we can emit
@@ -446,7 +453,12 @@ export default function CoursePlayer() {
           </h1>
           <button
             onClick={() => setSidebarOpen((v) => !v)}
-            className="text-gray-400 hover:text-white transition-colors"
+            type="button"
+            style={{ touchAction: 'manipulation' }}
+            aria-label={sidebarOpen ? 'Đóng menu' : 'Mở menu khoá học'}
+            className="text-gray-400 hover:text-white transition-colors
+                       p-2 -m-2 rounded-lg hover:bg-white/10 active:bg-white/20
+                       min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -512,15 +524,18 @@ export default function CoursePlayer() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
+                type="button"
+                style={{ touchAction: 'manipulation' }}
                 className={cn(
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                  'min-h-[44px] active:bg-white/5',  // touch target + tactile
                   activeTab === key
                     ? 'border-purple-500 text-purple-300'
                     : 'border-transparent text-gray-400 hover:text-white'
                 )}
               >
                 <Icon className="w-4 h-4" />
-                {label}
+                <span className="whitespace-nowrap">{label}</span>
               </button>
             ))}
           </div>
@@ -540,23 +555,49 @@ export default function CoursePlayer() {
         </div>
       </div>
 
-      {/* Sidebar */}
+      {/* Sidebar — Desktop: column flex-shrink-0 inline; Mobile: drawer overlay fixed */}
       {sidebarOpen && (
-        <div className="w-80 flex-shrink-0 border-l border-white/10 bg-gray-900/30 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-white/10">
-            <h3 className="font-semibold text-white text-sm">Nội dung khoá học</h3>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            {courseId && (
-              <VideoSidebar
-                videos={videos}
-                currentVideoId={currentVideo?.id || ''}
-                onSelect={setCurrentVideo}
-                courseId={courseId}
-              />
-            )}
-          </div>
-        </div>
+        <>
+          {/* MOBILE backdrop — bấm để đóng */}
+          <div
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <aside
+            className="lg:w-80 lg:flex-shrink-0 lg:static lg:border-l lg:border-white/10
+                       fixed top-0 right-0 z-50 h-full w-[85vw] max-w-sm
+                       bg-gray-900/95 backdrop-blur-md
+                       overflow-hidden flex flex-col
+                       shadow-2xl lg:shadow-none"
+          >
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h3 className="font-semibold text-white text-sm">Nội dung khoá học</h3>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white"
+                aria-label="Đóng menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {courseId && (
+                <VideoSidebar
+                  videos={videos}
+                  currentVideoId={currentVideo?.id || ''}
+                  onSelect={(v) => {
+                    setCurrentVideo(v)
+                    // Auto-đóng sidebar trên mobile khi chọn video → user thấy player ngay
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      setSidebarOpen(false)
+                    }
+                  }}
+                  courseId={courseId}
+                />
+              )}
+            </div>
+          </aside>
+        </>
       )}
     </div>
   )
