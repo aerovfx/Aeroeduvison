@@ -30,6 +30,7 @@ import { learningService } from '@/services/learning.service'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
+import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
 import type { CourseVideo } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
@@ -84,7 +85,16 @@ function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
         src={videoUrl}
         controls
         autoPlay
-        controlsList="nodownload"
+        // Hardened anti-copy attributes (chuẩn LMS — Coursera/Udemy pattern):
+        // - nodownload: ẩn nút Download trong control bar
+        // - noremoteplayback: tắt cast tới TV/Chromecast
+        // - nofullscreen: ép xem inline (giảm khả năng OS-level recording)
+        controlsList="nodownload noremoteplayback"
+        disablePictureInPicture
+        disableRemotePlayback
+        onContextMenu={(e) => e.preventDefault()}
+        // Sandbox-style: kéo-thả nội dung block
+        draggable={false}
       />
     </div>
   )
@@ -442,10 +452,12 @@ export default function CoursePlayer() {
           </button>
         </div>
 
-        {/* Video */}
+        {/* Video — wrap với VideoSecurityOverlay (watermark + chống quay) */}
         <div className="p-4 lg:p-6">
           {currentVideo ? (
-            <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as any).url} />
+            <VideoSecurityOverlay videoTitle={currentVideo.title}>
+              <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as any).url} />
+            </VideoSecurityOverlay>
           ) : (
             <div className="aspect-video bg-gray-800 rounded-xl flex items-center justify-center">
               <Play className="w-16 h-16 text-gray-600" />
