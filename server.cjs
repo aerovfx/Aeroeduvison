@@ -13463,8 +13463,503 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Khối lớp 1 — Tiểu học (GDPT 2018)
+  // 7 môn: Toán 1, Tiếng Việt 1, TNXH 1, HĐTN 1, Đạo đức 1,
+  //        Âm nhạc 1, Mĩ thuật 1
+  // Subject IDs đặt riêng (subj-toan1 ≠ subj-toan) để KG lớp 1
+  // tự thành cluster riêng — phù hợp với HS nhỏ, phụ huynh, GV TH.
+  // Cross-edge nhẹ lên THPT (progression "lớn lên sẽ học gì")
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgGrade1() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === META: Cụm khối lớp 1 ===
+      { id: 'meta-lop1', type: 'Subject', label: '🌟 Khối lớp 1 — Tiểu học',
+        description: 'Năm đầu tiên của hành trình học chữ — 7 môn theo GDPT 2018, nền tảng cho cả cuộc đời',
+        properties: { color: '#fbbf24', grade: 1 } },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 1: TOÁN 1 (105 tiết / năm) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-toan1', type: 'Subject', label: 'Toán 1',
+        description: 'Số đếm 0-100 + cộng/trừ + hình học + đo lường — nền tảng tư duy',
+        properties: { color: '#3b82f6', grade: 1 } },
+
+      { id: 'chap-toan1-so-10',   type: 'Chapter', label: '[T1] Số 0 đến 10',          description: 'Đếm, đọc, viết, so sánh số 0-10 — giai đoạn đầu' },
+      { id: 'chap-toan1-so-20',   type: 'Chapter', label: '[T1] Số 11 đến 20',         description: 'Mở rộng dãy số, cấu tạo số có 2 chữ số' },
+      { id: 'chap-toan1-so-100',  type: 'Chapter', label: '[T1] Số đến 100',           description: 'Hàng chục, hàng đơn vị, đếm cách 5, cách 10' },
+      { id: 'chap-toan1-pc-tr',   type: 'Chapter', label: '[T1] Phép cộng + trừ',      description: 'Trong phạm vi 10 → 20 → 100, không nhớ + có nhớ' },
+      { id: 'chap-toan1-hh',      type: 'Chapter', label: '[T1] Hình học',             description: 'Hình vuông, hình tròn, hình tam giác, hình chữ nhật' },
+      { id: 'chap-toan1-do',      type: 'Chapter', label: '[T1] Đo lường',             description: 'Đo độ dài (cm/dm), giờ chẵn, ngày-tuần-tháng' },
+
+      { id: 'topic-t1-dem-10',    type: 'Topic', label: 'Đếm 0-10',                    description: 'Đếm đồ vật bằng tay, hình vẽ — tương ứng 1-1' },
+      { id: 'topic-t1-doc-viet-10',type:'Topic', label: 'Đọc, viết số 0-10',           description: '"không", "một", ..., "mười" + viết chữ số' },
+      { id: 'topic-t1-so-sanh',   type: 'Topic', label: 'So sánh > < =',               description: 'Dấu lớn, bé, bằng — VD: 5 < 7' },
+      { id: 'topic-t1-cong-10',   type: 'Topic', label: 'Cộng trong phạm vi 10',       description: '3 + 4 = 7 — học thuộc bảng cộng' },
+      { id: 'topic-t1-tru-10',    type: 'Topic', label: 'Trừ trong phạm vi 10',        description: '8 - 3 = 5 — học thuộc bảng trừ' },
+      { id: 'topic-t1-cong-co-nho',type:'Topic', label: 'Cộng có nhớ qua 10',          description: '7 + 5 = 12 — tách 5 = 3+2, 7+3 = 10' },
+      { id: 'topic-t1-tru-co-nho',type:'Topic', label: 'Trừ có nhớ qua 10',            description: '13 - 5 = 8 — tách 13 = 10+3' },
+      { id: 'topic-t1-100',       type: 'Topic', label: 'Đếm đến 100',                 description: 'Hàng chục + đơn vị; 35 = 3 chục + 5 đơn vị' },
+      { id: 'topic-t1-vuong',     type: 'Topic', label: 'Hình vuông',                  description: '4 cạnh bằng nhau, 4 góc vuông — VD viên gạch' },
+      { id: 'topic-t1-tron',      type: 'Topic', label: 'Hình tròn',                   description: 'Đồng tiền, đĩa, bánh xe' },
+      { id: 'topic-t1-tam-giac',  type: 'Topic', label: 'Hình tam giác',               description: '3 cạnh — biển báo, nóc nhà' },
+      { id: 'topic-t1-cn',        type: 'Topic', label: 'Hình chữ nhật',               description: '2 cạnh dài + 2 cạnh ngắn — quyển vở, bảng' },
+      { id: 'topic-t1-cm-dm',     type: 'Topic', label: 'Đo độ dài (cm, dm)',           description: 'Thước kẻ — 1 dm = 10 cm' },
+      { id: 'topic-t1-gio',       type: 'Topic', label: 'Đồng hồ — giờ chẵn',          description: '"7 giờ", "12 giờ" — kim ngắn chỉ giờ' },
+      { id: 'topic-t1-tuan',      type: 'Topic', label: 'Tuần — 7 ngày',                description: 'Thứ 2 → Chủ nhật; cuối tuần là Thứ 7 + Chủ nhật' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 2: TIẾNG VIỆT 1 (420 tiết — môn lớn nhất!) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-tv1', type: 'Subject', label: 'Tiếng Việt 1',
+        description: 'Học chữ + vần + đọc thông + viết chữ — môn QUAN TRỌNG NHẤT lớp 1',
+        properties: { color: '#ef4444', grade: 1 } },
+
+      { id: 'chap-tv1-chu-cai',   type: 'Chapter', label: '[TV1] 29 chữ cái',            description: 'Bảng chữ cái tiếng Việt: a, ă, â, b, c, ..., y' },
+      { id: 'chap-tv1-am-van',    type: 'Chapter', label: '[TV1] Âm + vần',              description: 'Âm đầu + vần + thanh điệu (6 thanh)' },
+      { id: 'chap-tv1-tap-doc',   type: 'Chapter', label: '[TV1] Tập đọc',               description: 'Đánh vần → đọc trơn → đọc đoạn ngắn' },
+      { id: 'chap-tv1-tap-viet',  type: 'Chapter', label: '[TV1] Tập viết',              description: 'Viết chữ cái, chữ ghép, từ, câu — đúng nét + đẹp' },
+      { id: 'chap-tv1-ke-chuyen', type: 'Chapter', label: '[TV1] Kể chuyện',             description: 'Kể chuyện ngắn theo tranh + nhớ + sáng tạo' },
+      { id: 'chap-tv1-noi-nghe',  type: 'Chapter', label: '[TV1] Nói + nghe',            description: 'Chào hỏi, giới thiệu bản thân, trả lời câu hỏi' },
+
+      { id: 'topic-tv1-29-chu',   type: 'Topic', label: '29 chữ cái VN',                 description: 'a, ă, â, b, c, d, đ, e, ê, g, h, i, k, l, m, n, o, ô, ơ, p, q, r, s, t, u, ư, v, x, y' },
+      { id: 'topic-tv1-nguyen-am',type: 'Topic', label: 'Nguyên âm',                    description: 'a, ă, â, e, ê, i, o, ô, ơ, u, ư, y — phát âm tự do' },
+      { id: 'topic-tv1-phu-am',   type: 'Topic', label: 'Phụ âm',                       description: 'b, c, ch, d, đ, g, gh, h, k, ... — đứng đầu chữ' },
+      { id: 'topic-tv1-van-don',  type: 'Topic', label: 'Vần đơn (ai, oi, ưi, ...)',    description: '2-3 chữ ghép thành 1 âm tiết — "mai", "oi"' },
+      { id: 'topic-tv1-van-ghep', type: 'Topic', label: 'Vần ghép (oan, uyên, ...)',    description: 'Vần phức tạp — học muộn hơn HK2' },
+      { id: 'topic-tv1-thanh-dieu',type:'Topic', label: '6 thanh điệu',                 description: 'Ngang · huyền · sắc · hỏi · ngã · nặng — phân biệt nghĩa' },
+      { id: 'topic-tv1-danh-van', type: 'Topic', label: 'Đánh vần',                     description: '"mờ-a-ma"; "tờ-anh-tanh-sắc-tánh"' },
+      { id: 'topic-tv1-doc-tron', type: 'Topic', label: 'Đọc trơn',                     description: 'Nhìn từ → đọc ngay không cần đánh vần' },
+      { id: 'topic-tv1-doc-doan', type: 'Topic', label: 'Đọc đoạn ngắn',                description: 'Cuối HK1: đọc 30-50 chữ có ngữ điệu' },
+      { id: 'topic-tv1-viet-net', type: 'Topic', label: 'Viết các nét cơ bản',          description: 'Nét thẳng, cong, móc, khuyết — luyện tay' },
+      { id: 'topic-tv1-viet-chu', type: 'Topic', label: 'Viết chữ cái',                 description: 'Trong vở ô li — đúng độ cao + khoảng cách' },
+      { id: 'topic-tv1-viet-chu-hoa',type:'Topic',label: 'Viết chữ hoa',                description: 'A, Ă, Â, B, C ... — học chính HK2' },
+      { id: 'topic-tv1-chinh-ta', type: 'Topic', label: 'Chính tả',                     description: 'Nghe-viết, nhìn-viết — học cách viết đúng' },
+      { id: 'topic-tv1-chu-de-gd',type: 'Topic', label: 'Chủ điểm Gia đình',            description: 'Bài đọc về cha, mẹ, anh, chị, em — yêu thương' },
+      { id: 'topic-tv1-chu-de-th',type: 'Topic', label: 'Chủ điểm Trường học',          description: 'Bạn bè, thầy cô, đồ dùng, sân trường' },
+      { id: 'topic-tv1-chu-de-tn',type: 'Topic', label: 'Chủ điểm Thiên nhiên',         description: 'Cây, hoa, con vật, bốn mùa, mặt trời mưa' },
+      { id: 'topic-tv1-chao-hoi', type: 'Topic', label: 'Chào hỏi lễ phép',             description: '"Con chào mẹ!", "Em chào thầy cô ạ!"' },
+      { id: 'topic-tv1-gioi-thieu',type:'Topic', label: 'Giới thiệu bản thân',          description: 'Tên, tuổi, học lớp nào, trường gì' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 3: TỰ NHIÊN XÃ HỘI 1 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-tnxh1', type: 'Subject', label: 'Tự nhiên & Xã hội 1',
+        description: 'Khám phá thế giới quanh em — gia đình, trường, cơ thể, thiên nhiên',
+        properties: { color: '#10b981', grade: 1 } },
+
+      { id: 'chap-tnxh1-gd',      type: 'Chapter', label: '[TNXH1] Gia đình',           description: 'Thành viên, mối quan hệ, công việc, an toàn ở nhà' },
+      { id: 'chap-tnxh1-th',      type: 'Chapter', label: '[TNXH1] Trường học',         description: 'Bạn bè, GV, lớp học, sân chơi, đồ dùng' },
+      { id: 'chap-tnxh1-cd',      type: 'Chapter', label: '[TNXH1] Cộng đồng',          description: 'Hàng xóm, nghề nghiệp, nơi công cộng' },
+      { id: 'chap-tnxh1-tv-dv',   type: 'Chapter', label: '[TNXH1] Thực vật + Động vật',description: 'Cây, hoa, con vật quen thuộc — bảo vệ' },
+      { id: 'chap-tnxh1-co-the',  type: 'Chapter', label: '[TNXH1] Cơ thể em',          description: 'Bộ phận cơ thể, 5 giác quan, giữ vệ sinh' },
+      { id: 'chap-tnxh1-bau-troi',type: 'Chapter', label: '[TNXH1] Bầu trời + Trái đất',description: 'Mặt trời, mặt trăng, sao, ngày-đêm, các mùa' },
+
+      { id: 'topic-tnxh1-tv-gd',  type: 'Topic', label: 'Thành viên gia đình',          description: 'Ông bà, cha mẹ, anh chị em — vai trò + tình cảm' },
+      { id: 'topic-tnxh1-cv-gd',  type: 'Topic', label: 'Công việc gia đình',           description: 'Quét nhà, rửa bát, nấu cơm — em giúp gì được?' },
+      { id: 'topic-tnxh1-bb-th',  type: 'Topic', label: 'Bạn bè trường học',            description: 'Kết bạn, chơi cùng, chia sẻ, không bắt nạt' },
+      { id: 'topic-tnxh1-do-dung',type: 'Topic', label: 'Đồ dùng học tập',              description: 'Bút, vở, bảng con, hộp bút — giữ gìn cẩn thận' },
+      { id: 'topic-tnxh1-nghe-bs',type: 'Topic', label: 'Bác sĩ + Y tá',                description: 'Khám chữa bệnh — em yêu quý + biết ơn' },
+      { id: 'topic-tnxh1-nghe-gv',type: 'Topic', label: 'Giáo viên',                    description: 'Dạy em học, lễ phép, biết ơn' },
+      { id: 'topic-tnxh1-nghe-ca',type: 'Topic', label: 'Công an + Bộ đội',             description: 'Bảo vệ Tổ quốc + an ninh trật tự' },
+      { id: 'topic-tnxh1-nghe-nd',type: 'Topic', label: 'Nông dân + Công nhân',          description: 'Trồng lúa, may áo, xây nhà — của cải XH' },
+      { id: 'topic-tnxh1-cay',    type: 'Topic', label: 'Cây xanh quanh em',            description: 'Cây ăn quả, cây bóng mát, cây hoa — chăm sóc' },
+      { id: 'topic-tnxh1-con-vat',type: 'Topic', label: 'Con vật quen thuộc',           description: 'Chó, mèo, gà, vịt, trâu, bò — yêu quý' },
+      { id: 'topic-tnxh1-co-the', type: 'Topic', label: 'Các bộ phận cơ thể',            description: 'Đầu, mình, tay, chân — giữ sạch + bảo vệ' },
+      { id: 'topic-tnxh1-5-gq',   type: 'Topic', label: '5 giác quan',                   description: 'Mắt, tai, mũi, lưỡi, da — nhìn nghe ngửi nếm cảm' },
+      { id: 'topic-tnxh1-ve-sinh',type: 'Topic', label: 'Giữ vệ sinh thân thể',         description: 'Rửa tay, đánh răng, tắm gội, cắt móng tay' },
+      { id: 'topic-tnxh1-mat-troi',type:'Topic', label: 'Mặt trời + Mặt trăng',         description: 'Ngày có mặt trời, đêm có mặt trăng + sao' },
+      { id: 'topic-tnxh1-thoi-tiet',type:'Topic',label: 'Thời tiết',                    description: 'Nắng, mưa, gió, lạnh — mặc đồ phù hợp' },
+      { id: 'topic-tnxh1-4-mua',  type: 'Topic', label: 'Bốn mùa',                       description: 'Xuân ấm, hạ nóng, thu mát, đông lạnh' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 4: HOẠT ĐỘNG TRẢI NGHIỆM 1 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-hdtn1', type: 'Subject', label: 'Hoạt động trải nghiệm 1',
+        description: 'HĐTN theo chủ điểm tháng + sinh hoạt dưới cờ + sinh hoạt lớp — em là HS lớp 1',
+        properties: { color: '#f97316', grade: 1 } },
+
+      { id: 'chap-hdtn1-t9',      type: 'Chapter', label: '[HĐTN1] T9: Em là HS lớp 1',   description: 'Làm quen trường mới, bạn mới, nội quy lớp' },
+      { id: 'chap-hdtn1-t10',     type: 'Chapter', label: '[HĐTN1] T10: Mái trường thân yêu',description: 'Yêu trường, yêu lớp, giữ vệ sinh trường' },
+      { id: 'chap-hdtn1-t11',     type: 'Chapter', label: '[HĐTN1] T11: Biết ơn thầy cô (20/11)',description: 'Ngày Nhà giáo VN — tặng hoa, làm thiệp, hát' },
+      { id: 'chap-hdtn1-t12',     type: 'Chapter', label: '[HĐTN1] T12: Anh bộ đội (22/12)',description: 'Yêu quý chú bộ đội bảo vệ Tổ quốc' },
+      { id: 'chap-hdtn1-t1',      type: 'Chapter', label: '[HĐTN1] T1: Mừng Đảng - Xuân', description: 'Tết Nguyên đán, lì xì, chúc Tết, văn hoá truyền thống' },
+      { id: 'chap-hdtn1-t2',      type: 'Chapter', label: '[HĐTN1] T2: An toàn giao thông',description: 'Đèn xanh-đỏ-vàng, đội mũ bảo hiểm, sang đường' },
+      { id: 'chap-hdtn1-t3',      type: 'Chapter', label: '[HĐTN1] T3: Mẹ và Cô (8/3)',  description: 'Ngày QT Phụ nữ — yêu mẹ, yêu cô, tặng hoa' },
+      { id: 'chap-hdtn1-t4',      type: 'Chapter', label: '[HĐTN1] T4: Hoà bình hữu nghị (30/4)',description: 'Ngày thống nhất đất nước — yêu hoà bình' },
+      { id: 'chap-hdtn1-t5',      type: 'Chapter', label: '[HĐTN1] T5: Bác Hồ kính yêu (19/5)',description: 'Sinh nhật Bác — 5 điều Bác Hồ dạy' },
+
+      { id: 'topic-hdtn1-noi-quy',type: 'Topic', label: 'Nội quy lớp học',              description: 'Đi học đúng giờ, không nói chuyện riêng, giơ tay xin nói' },
+      { id: 'topic-hdtn1-don-dep',type: 'Topic', label: 'Dọn dẹp lớp học',              description: 'Quét lớp, lau bảng, xếp bàn ghế ngay ngắn' },
+      { id: 'topic-hdtn1-tu-phuc-vu',type:'Topic',label: 'Tự phục vụ bản thân',         description: 'Mặc quần áo, cài cúc, đi dép, đeo cặp' },
+      { id: 'topic-hdtn1-hop-tac',type: 'Topic', label: 'Hợp tác với bạn',              description: 'Chơi nhóm, giúp bạn, cùng làm bài tập' },
+      { id: 'topic-hdtn1-tang-hoa',type:'Topic', label: 'Tặng hoa thầy cô 20/11',       description: 'Vẽ thiệp, làm hoa giấy — bày tỏ lòng biết ơn' },
+      { id: 'topic-hdtn1-tet',    type: 'Topic', label: 'Tết Nguyên đán',                description: 'Chúc Tết, lì xì, gói bánh chưng, sum họp GĐ' },
+      { id: 'topic-hdtn1-den-gt', type: 'Topic', label: 'Đèn giao thông',               description: 'Đỏ dừng - Vàng chuẩn bị - Xanh đi' },
+      { id: 'topic-hdtn1-mu-bao-hiem',type:'Topic',label: 'Đội mũ bảo hiểm',            description: 'Ngồi xe máy, xe đạp — bắt buộc' },
+      { id: 'topic-hdtn1-yeu-me', type: 'Topic', label: 'Em yêu mẹ',                    description: 'Giúp mẹ, ngoan, chia sẻ, không làm mẹ buồn' },
+      { id: 'topic-hdtn1-bac-ho', type: 'Topic', label: '5 điều Bác Hồ dạy',            description: '1.Yêu TQ 2.Học giỏi 3.Đoàn kết 4.Khiêm tốn 5.Vệ sinh' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 5: ĐẠO ĐỨC 1 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-dd1', type: 'Subject', label: 'Đạo đức 1',
+        description: 'Hình thành phẩm chất, tình cảm, hành vi đạo đức ban đầu cho HS lớp 1',
+        properties: { color: '#8b5cf6', grade: 1 } },
+
+      { id: 'chap-dd1-gd',        type: 'Chapter', label: '[ĐĐ1] Yêu thương gia đình',  description: 'Yêu ông bà, cha mẹ, anh chị em — hiếu thảo' },
+      { id: 'chap-dd1-th',        type: 'Chapter', label: '[ĐĐ1] Kính thầy yêu bạn',     description: 'Kính trọng thầy cô, thân ái với bạn bè' },
+      { id: 'chap-dd1-le-phep',   type: 'Chapter', label: '[ĐĐ1] Lễ phép biết ơn',       description: 'Chào hỏi, cảm ơn, xin lỗi, biết ơn người giúp' },
+      { id: 'chap-dd1-trung-thuc',type: 'Chapter', label: '[ĐĐ1] Trung thực dũng cảm',    description: 'Không nói dối, dũng cảm nhận lỗi, bảo vệ điều đúng' },
+      { id: 'chap-dd1-tai-san',   type: 'Chapter', label: '[ĐĐ1] Bảo vệ tài sản chung',  description: 'Bàn ghế, bảng đen, cây xanh trường — đồ chung' },
+      { id: 'chap-dd1-ve-sinh',   type: 'Chapter', label: '[ĐĐ1] Giữ vệ sinh',           description: 'Vệ sinh cá nhân, lớp, trường, môi trường' },
+      { id: 'chap-dd1-atgt-dd',   type: 'Chapter', label: '[ĐĐ1] An toàn giao thông',    description: 'Quy tắc đi đường, đèn báo, đi vỉa hè' },
+      { id: 'chap-dd1-yeu-tq',    type: 'Chapter', label: '[ĐĐ1] Yêu Tổ quốc, Bác Hồ',   description: 'Yêu lá cờ đỏ sao vàng, kính yêu Bác Hồ' },
+      { id: 'chap-dd1-tu-lap',    type: 'Chapter', label: '[ĐĐ1] Tự lập',                description: 'Tự ăn, tự mặc, tự học, tự đi vệ sinh' },
+
+      { id: 'topic-dd1-hieu-thao',type: 'Topic', label: 'Hiếu thảo',                     description: 'Vâng lời, giúp đỡ, không làm cha mẹ buồn' },
+      { id: 'topic-dd1-on-ong-ba',type: 'Topic', label: 'Yêu kính ông bà',               description: 'Hỏi thăm, chăm sóc, kể chuyện cho ông bà nghe' },
+      { id: 'topic-dd1-kinh-thay',type: 'Topic', label: 'Kính trọng thầy cô',            description: 'Chào, xưng "thưa thầy/cô", lắng nghe' },
+      { id: 'topic-dd1-thuong-ban',type:'Topic', label: 'Thương yêu bạn bè',             description: 'Chia kẹo, giúp bài, không tranh giành, không bắt nạt' },
+      { id: 'topic-dd1-cam-on',   type: 'Topic', label: 'Cảm ơn + Xin lỗi',              description: 'Khi được giúp → cảm ơn; khi sai → xin lỗi chân thành' },
+      { id: 'topic-dd1-khong-noi-doi',type:'Topic',label: 'Không nói dối',               description: 'Trung thực với cha mẹ, thầy cô, bạn bè' },
+      { id: 'topic-dd1-co-loi',   type: 'Topic', label: 'Nhận lỗi khi sai',              description: 'Dũng cảm thừa nhận + sửa chữa' },
+      { id: 'topic-dd1-rua-tay',  type: 'Topic', label: 'Rửa tay trước khi ăn',          description: 'Phòng bệnh tay-chân-miệng, COVID, cúm' },
+      { id: 'topic-dd1-danh-rang',type: 'Topic', label: 'Đánh răng buổi sáng + tối',     description: 'Phòng sâu răng — kem fluor cho trẻ' },
+      { id: 'topic-dd1-co-vn',    type: 'Topic', label: 'Lá cờ đỏ sao vàng',             description: 'Cờ Tổ quốc — chào cờ thứ Hai đầu tuần nghiêm trang' },
+      { id: 'topic-dd1-bac-ho-yeu',type:'Topic', label: 'Bác Hồ kính yêu',               description: 'Cha già của dân tộc — em học tập + làm theo' },
+      { id: 'topic-dd1-tu-an',    type: 'Topic', label: 'Tự ăn cơm',                     description: 'Cầm thìa, đũa, không để cha mẹ đút' },
+      { id: 'topic-dd1-tu-mac',   type: 'Topic', label: 'Tự mặc quần áo',                description: 'Cài cúc, kéo khoá, mặc tất, đi giày' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 6: ÂM NHẠC 1 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-amnhac1', type: 'Subject', label: 'Âm nhạc 1',
+        description: 'Hát + nghe + đọc nhạc + trò chơi — phát triển cảm thụ âm nhạc cho HS lớp 1',
+        properties: { color: '#ec4899', grade: 1 } },
+
+      { id: 'chap-am1-hat',       type: 'Chapter', label: '[ÂN1] Hát',                  description: 'Các bài hát thiếu nhi + dân ca dễ hát, vui nhộn' },
+      { id: 'chap-am1-nghe',      type: 'Chapter', label: '[ÂN1] Nghe nhạc',             description: 'Nghe bài hát + nhạc cụ — phân biệt cao thấp, nhanh chậm' },
+      { id: 'chap-am1-doc',       type: 'Chapter', label: '[ÂN1] Đọc nhạc đơn giản',     description: 'Đô-rê-mi cơ bản, đọc theo cô' },
+      { id: 'chap-am1-tro-choi',  type: 'Chapter', label: '[ÂN1] Trò chơi âm nhạc',      description: 'Đoán bài, đoán nhạc cụ, vận động theo nhạc' },
+      { id: 'chap-am1-nhac-cu',   type: 'Chapter', label: '[ÂN1] Nhạc cụ gõ',            description: 'Thanh phách, trống nhỏ, song loan — giữ nhịp' },
+
+      { id: 'topic-am1-bai-1',    type: 'Topic', label: '"Mẹ yêu không nào" (Lê Xuân Thọ)',description: 'Bài hát về tình mẹ — dễ thuộc, đầy yêu thương' },
+      { id: 'topic-am1-bai-2',    type: 'Topic', label: '"Cả nhà thương nhau" (Phan Văn Minh)',description: 'Tình GĐ ấm áp — phổ biến nhất' },
+      { id: 'topic-am1-bai-3',    type: 'Topic', label: '"Cháu lên ba" (Phạm Tuyên)',    description: 'Bài hát thiếu nhi kinh điển VN' },
+      { id: 'topic-am1-bai-4',    type: 'Topic', label: '"Bắc kim thang" (dân ca Nam Bộ)',description: 'Dân ca vui nhộn — kèm vận động + trò chơi' },
+      { id: 'topic-am1-bai-5',    type: 'Topic', label: '"Em yêu trường em" (Hoàng Vân)',description: 'Tình cảm với mái trường lớp 1' },
+      { id: 'topic-am1-bai-6',    type: 'Topic', label: '"Ai yêu Bác Hồ Chí Minh" (Phong Nhã)',description: 'Tình cảm với Bác Hồ kính yêu' },
+      { id: 'topic-am1-bai-7',    type: 'Topic', label: '"Tết đến rồi" (Phạm Tuyên)',    description: 'Vui Tết Nguyên đán — không khí mừng Xuân' },
+      { id: 'topic-am1-cao-thap', type: 'Topic', label: 'Âm thanh cao - thấp',           description: 'Phân biệt nốt cao (như chim hót) vs thấp (như tiếng trống)' },
+      { id: 'topic-am1-nhanh-cham',type:'Topic', label: 'Nhịp điệu nhanh - chậm',        description: 'Bài nhanh (vui), bài chậm (buồn / dịu dàng)' },
+      { id: 'topic-am1-do-re-mi', type: 'Topic', label: 'Nốt Đô-Rê-Mi',                  description: '3 nốt đầu tiên — đọc theo cô + xoè tay' },
+      { id: 'topic-am1-thanh-phach',type:'Topic',label: 'Thanh phách',                   description: '2 que tre — gõ theo nhịp, dễ chơi nhất' },
+      { id: 'topic-am1-trong',    type: 'Topic', label: 'Trống nhỏ',                     description: 'Trống lắc tay — giữ phách + vận động theo nhạc' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 7: MĨ THUẬT 1 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-mt1', type: 'Subject', label: 'Mĩ thuật 1',
+        description: 'Yếu tố tạo hình cơ bản + vẽ + tô màu + xé dán + nặn — kích thích sáng tạo',
+        properties: { color: '#eab308', grade: 1 } },
+
+      { id: 'chap-mt1-yt',        type: 'Chapter', label: '[MT1] Yếu tố tạo hình',       description: 'Chấm · nét · hình · màu — ngôn ngữ visual' },
+      { id: 'chap-mt1-ve',        type: 'Chapter', label: '[MT1] Vẽ đơn giản',           description: 'Vẽ cây, hoa, lá, nhà, con vật, người que' },
+      { id: 'chap-mt1-to-mau',    type: 'Chapter', label: '[MT1] Tô màu',                description: 'Sáp màu, màu nước — tô đều, không lem ra ngoài' },
+      { id: 'chap-mt1-xe-dan',    type: 'Chapter', label: '[MT1] Xé dán giấy',           description: 'Xé hình → dán thành bức tranh — phát triển khéo tay' },
+      { id: 'chap-mt1-nan',       type: 'Chapter', label: '[MT1] Nặn đất',               description: 'Nặn quả, con vật, đồ vật — phát triển không gian 3D' },
+      { id: 'chap-mt1-trang-tri', type: 'Chapter', label: '[MT1] Trang trí cơ bản',      description: 'Trang trí thiệp, khung tranh, đồ vật thân quen' },
+
+      { id: 'topic-mt1-cham',     type: 'Topic', label: 'Chấm',                          description: 'Yếu tố nhỏ nhất — chấm to/nhỏ/dày/thưa tạo hình' },
+      { id: 'topic-mt1-net-thang',type: 'Topic', label: 'Nét thẳng',                     description: 'Nét đứng, ngang, xiên — xây cột, cầu' },
+      { id: 'topic-mt1-net-cong', type: 'Topic', label: 'Nét cong',                      description: 'Vẽ tròn, lượn sóng — mặt cười, đám mây' },
+      { id: 'topic-mt1-net-gay',  type: 'Topic', label: 'Nét gãy',                       description: 'Mũi tên, răng cưa, biểu cảm năng động' },
+      { id: 'topic-mt1-mau-co-ban',type:'Topic', label: '3 màu cơ bản',                  description: 'Đỏ · Vàng · Xanh lam — pha 2 màu = ra màu khác' },
+      { id: 'topic-mt1-mau-pha',  type: 'Topic', label: 'Pha màu đơn giản',              description: 'Đỏ + Vàng = Cam; Vàng + Xanh = Xanh lá; Đỏ + Xanh = Tím' },
+      { id: 'topic-mt1-ve-hoa',   type: 'Topic', label: 'Vẽ hoa',                        description: 'Hoa cúc, hoa đào, hoa mai — vẽ tròn cánh + nhuỵ' },
+      { id: 'topic-mt1-ve-cay',   type: 'Topic', label: 'Vẽ cây',                        description: 'Thân + tán lá hình tròn/tam giác — cây chuối, cây dừa' },
+      { id: 'topic-mt1-ve-nha',   type: 'Topic', label: 'Vẽ nhà',                        description: 'Mái tam giác + thân chữ nhật + cửa + cửa sổ vuông' },
+      { id: 'topic-mt1-ve-con-vat',type:'Topic', label: 'Vẽ con vật quen thuộc',         description: 'Con cá, con gà, con thỏ — hình đơn giản dễ vẽ' },
+      { id: 'topic-mt1-ve-nguoi-que',type:'Topic',label: 'Vẽ người que',                 description: 'Đầu tròn + thân + 2 tay + 2 chân — cơ bản' },
+      { id: 'topic-mt1-to-deu',   type: 'Topic', label: 'Tô màu đều, không lem',         description: 'Cầm bút màu đúng cách + tô theo 1 hướng' },
+      { id: 'topic-mt1-xe-tron',  type: 'Topic', label: 'Xé giấy hình tròn',             description: 'Vò giấy → xé thành hình quả cam, mặt trời' },
+      { id: 'topic-mt1-nan-qua',  type: 'Topic', label: 'Nặn quả + con vật',             description: 'Nặn quả táo, quả chuối, con thỏ — đất nặn an toàn' },
+      { id: 'topic-mt1-trang-tri-thiep',type:'Topic',label: 'Trang trí thiệp 20/11',     description: 'Vẽ + dán hoa + viết "Chúc mừng cô" tặng thầy cô' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-g1:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Meta lớp 1 → 7 môn (cluster)
+      ['meta-lop1', 'subj-toan1',   'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-tv1',     'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-tnxh1',   'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-hdtn1',   'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-dd1',     'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-amnhac1', 'HAS_CHAPTER'],
+      ['meta-lop1', 'subj-mt1',     'HAS_CHAPTER'],
+
+      // === TOÁN 1: Subject → Chapter → Topic ===
+      ['subj-toan1', 'chap-toan1-so-10',  'HAS_CHAPTER'],
+      ['subj-toan1', 'chap-toan1-so-20',  'HAS_CHAPTER'],
+      ['subj-toan1', 'chap-toan1-so-100', 'HAS_CHAPTER'],
+      ['subj-toan1', 'chap-toan1-pc-tr',  'HAS_CHAPTER'],
+      ['subj-toan1', 'chap-toan1-hh',     'HAS_CHAPTER'],
+      ['subj-toan1', 'chap-toan1-do',     'HAS_CHAPTER'],
+      ['chap-toan1-so-10', 'topic-t1-dem-10',       'HAS_TOPIC'],
+      ['chap-toan1-so-10', 'topic-t1-doc-viet-10',  'HAS_TOPIC'],
+      ['chap-toan1-so-10', 'topic-t1-so-sanh',      'HAS_TOPIC'],
+      ['chap-toan1-pc-tr', 'topic-t1-cong-10',      'HAS_TOPIC'],
+      ['chap-toan1-pc-tr', 'topic-t1-tru-10',       'HAS_TOPIC'],
+      ['chap-toan1-pc-tr', 'topic-t1-cong-co-nho',  'HAS_TOPIC'],
+      ['chap-toan1-pc-tr', 'topic-t1-tru-co-nho',   'HAS_TOPIC'],
+      ['chap-toan1-so-100','topic-t1-100',          'HAS_TOPIC'],
+      ['chap-toan1-hh',    'topic-t1-vuong',        'HAS_TOPIC'],
+      ['chap-toan1-hh',    'topic-t1-tron',         'HAS_TOPIC'],
+      ['chap-toan1-hh',    'topic-t1-tam-giac',     'HAS_TOPIC'],
+      ['chap-toan1-hh',    'topic-t1-cn',           'HAS_TOPIC'],
+      ['chap-toan1-do',    'topic-t1-cm-dm',        'HAS_TOPIC'],
+      ['chap-toan1-do',    'topic-t1-gio',          'HAS_TOPIC'],
+      ['chap-toan1-do',    'topic-t1-tuan',         'HAS_TOPIC'],
+
+      // === TIẾNG VIỆT 1 ===
+      ['subj-tv1', 'chap-tv1-chu-cai',   'HAS_CHAPTER'],
+      ['subj-tv1', 'chap-tv1-am-van',    'HAS_CHAPTER'],
+      ['subj-tv1', 'chap-tv1-tap-doc',   'HAS_CHAPTER'],
+      ['subj-tv1', 'chap-tv1-tap-viet',  'HAS_CHAPTER'],
+      ['subj-tv1', 'chap-tv1-ke-chuyen', 'HAS_CHAPTER'],
+      ['subj-tv1', 'chap-tv1-noi-nghe',  'HAS_CHAPTER'],
+      ['chap-tv1-chu-cai',  'topic-tv1-29-chu',       'HAS_TOPIC'],
+      ['chap-tv1-chu-cai',  'topic-tv1-nguyen-am',    'HAS_TOPIC'],
+      ['chap-tv1-chu-cai',  'topic-tv1-phu-am',       'HAS_TOPIC'],
+      ['chap-tv1-am-van',   'topic-tv1-van-don',      'HAS_TOPIC'],
+      ['chap-tv1-am-van',   'topic-tv1-van-ghep',     'HAS_TOPIC'],
+      ['chap-tv1-am-van',   'topic-tv1-thanh-dieu',   'HAS_TOPIC'],
+      ['chap-tv1-tap-doc',  'topic-tv1-danh-van',     'HAS_TOPIC'],
+      ['chap-tv1-tap-doc',  'topic-tv1-doc-tron',     'HAS_TOPIC'],
+      ['chap-tv1-tap-doc',  'topic-tv1-doc-doan',     'HAS_TOPIC'],
+      ['chap-tv1-tap-viet', 'topic-tv1-viet-net',     'HAS_TOPIC'],
+      ['chap-tv1-tap-viet', 'topic-tv1-viet-chu',     'HAS_TOPIC'],
+      ['chap-tv1-tap-viet', 'topic-tv1-viet-chu-hoa', 'HAS_TOPIC'],
+      ['chap-tv1-tap-viet', 'topic-tv1-chinh-ta',     'HAS_TOPIC'],
+      ['chap-tv1-ke-chuyen','topic-tv1-chu-de-gd',    'HAS_TOPIC'],
+      ['chap-tv1-ke-chuyen','topic-tv1-chu-de-th',    'HAS_TOPIC'],
+      ['chap-tv1-ke-chuyen','topic-tv1-chu-de-tn',    'HAS_TOPIC'],
+      ['chap-tv1-noi-nghe', 'topic-tv1-chao-hoi',     'HAS_TOPIC'],
+      ['chap-tv1-noi-nghe', 'topic-tv1-gioi-thieu',   'HAS_TOPIC'],
+
+      // === TNXH 1 ===
+      ['subj-tnxh1', 'chap-tnxh1-gd',      'HAS_CHAPTER'],
+      ['subj-tnxh1', 'chap-tnxh1-th',      'HAS_CHAPTER'],
+      ['subj-tnxh1', 'chap-tnxh1-cd',      'HAS_CHAPTER'],
+      ['subj-tnxh1', 'chap-tnxh1-tv-dv',   'HAS_CHAPTER'],
+      ['subj-tnxh1', 'chap-tnxh1-co-the',  'HAS_CHAPTER'],
+      ['subj-tnxh1', 'chap-tnxh1-bau-troi','HAS_CHAPTER'],
+      ['chap-tnxh1-gd',     'topic-tnxh1-tv-gd',   'HAS_TOPIC'],
+      ['chap-tnxh1-gd',     'topic-tnxh1-cv-gd',   'HAS_TOPIC'],
+      ['chap-tnxh1-th',     'topic-tnxh1-bb-th',   'HAS_TOPIC'],
+      ['chap-tnxh1-th',     'topic-tnxh1-do-dung', 'HAS_TOPIC'],
+      ['chap-tnxh1-cd',     'topic-tnxh1-nghe-bs', 'HAS_TOPIC'],
+      ['chap-tnxh1-cd',     'topic-tnxh1-nghe-gv', 'HAS_TOPIC'],
+      ['chap-tnxh1-cd',     'topic-tnxh1-nghe-ca', 'HAS_TOPIC'],
+      ['chap-tnxh1-cd',     'topic-tnxh1-nghe-nd', 'HAS_TOPIC'],
+      ['chap-tnxh1-tv-dv',  'topic-tnxh1-cay',     'HAS_TOPIC'],
+      ['chap-tnxh1-tv-dv',  'topic-tnxh1-con-vat', 'HAS_TOPIC'],
+      ['chap-tnxh1-co-the', 'topic-tnxh1-co-the',  'HAS_TOPIC'],
+      ['chap-tnxh1-co-the', 'topic-tnxh1-5-gq',    'HAS_TOPIC'],
+      ['chap-tnxh1-co-the', 'topic-tnxh1-ve-sinh', 'HAS_TOPIC'],
+      ['chap-tnxh1-bau-troi','topic-tnxh1-mat-troi',  'HAS_TOPIC'],
+      ['chap-tnxh1-bau-troi','topic-tnxh1-thoi-tiet', 'HAS_TOPIC'],
+      ['chap-tnxh1-bau-troi','topic-tnxh1-4-mua',     'HAS_TOPIC'],
+
+      // === HDTN 1 ===
+      ['subj-hdtn1', 'chap-hdtn1-t9',  'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t10', 'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t11', 'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t12', 'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t1',  'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t2',  'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t3',  'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t4',  'HAS_CHAPTER'],
+      ['subj-hdtn1', 'chap-hdtn1-t5',  'HAS_CHAPTER'],
+      ['chap-hdtn1-t9',  'topic-hdtn1-noi-quy',      'HAS_TOPIC'],
+      ['chap-hdtn1-t9',  'topic-hdtn1-tu-phuc-vu',   'HAS_TOPIC'],
+      ['chap-hdtn1-t10', 'topic-hdtn1-don-dep',      'HAS_TOPIC'],
+      ['chap-hdtn1-t10', 'topic-hdtn1-hop-tac',      'HAS_TOPIC'],
+      ['chap-hdtn1-t11', 'topic-hdtn1-tang-hoa',     'HAS_TOPIC'],
+      ['chap-hdtn1-t1',  'topic-hdtn1-tet',          'HAS_TOPIC'],
+      ['chap-hdtn1-t2',  'topic-hdtn1-den-gt',       'HAS_TOPIC'],
+      ['chap-hdtn1-t2',  'topic-hdtn1-mu-bao-hiem',  'HAS_TOPIC'],
+      ['chap-hdtn1-t3',  'topic-hdtn1-yeu-me',       'HAS_TOPIC'],
+      ['chap-hdtn1-t5',  'topic-hdtn1-bac-ho',       'HAS_TOPIC'],
+
+      // === ĐẠO ĐỨC 1 ===
+      ['subj-dd1', 'chap-dd1-gd',        'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-th',        'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-le-phep',   'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-trung-thuc','HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-tai-san',   'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-ve-sinh',   'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-atgt-dd',   'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-yeu-tq',    'HAS_CHAPTER'],
+      ['subj-dd1', 'chap-dd1-tu-lap',    'HAS_CHAPTER'],
+      ['chap-dd1-gd',        'topic-dd1-hieu-thao',     'HAS_TOPIC'],
+      ['chap-dd1-gd',        'topic-dd1-on-ong-ba',     'HAS_TOPIC'],
+      ['chap-dd1-th',        'topic-dd1-kinh-thay',     'HAS_TOPIC'],
+      ['chap-dd1-th',        'topic-dd1-thuong-ban',    'HAS_TOPIC'],
+      ['chap-dd1-le-phep',   'topic-dd1-cam-on',        'HAS_TOPIC'],
+      ['chap-dd1-trung-thuc','topic-dd1-khong-noi-doi', 'HAS_TOPIC'],
+      ['chap-dd1-trung-thuc','topic-dd1-co-loi',        'HAS_TOPIC'],
+      ['chap-dd1-ve-sinh',   'topic-dd1-rua-tay',       'HAS_TOPIC'],
+      ['chap-dd1-ve-sinh',   'topic-dd1-danh-rang',     'HAS_TOPIC'],
+      ['chap-dd1-yeu-tq',    'topic-dd1-co-vn',         'HAS_TOPIC'],
+      ['chap-dd1-yeu-tq',    'topic-dd1-bac-ho-yeu',    'HAS_TOPIC'],
+      ['chap-dd1-tu-lap',    'topic-dd1-tu-an',         'HAS_TOPIC'],
+      ['chap-dd1-tu-lap',    'topic-dd1-tu-mac',        'HAS_TOPIC'],
+
+      // === ÂM NHẠC 1 ===
+      ['subj-amnhac1', 'chap-am1-hat',      'HAS_CHAPTER'],
+      ['subj-amnhac1', 'chap-am1-nghe',     'HAS_CHAPTER'],
+      ['subj-amnhac1', 'chap-am1-doc',      'HAS_CHAPTER'],
+      ['subj-amnhac1', 'chap-am1-tro-choi', 'HAS_CHAPTER'],
+      ['subj-amnhac1', 'chap-am1-nhac-cu',  'HAS_CHAPTER'],
+      ['chap-am1-hat',     'topic-am1-bai-1',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-2',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-3',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-4',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-5',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-6',      'HAS_TOPIC'],
+      ['chap-am1-hat',     'topic-am1-bai-7',      'HAS_TOPIC'],
+      ['chap-am1-nghe',    'topic-am1-cao-thap',   'HAS_TOPIC'],
+      ['chap-am1-nghe',    'topic-am1-nhanh-cham', 'HAS_TOPIC'],
+      ['chap-am1-doc',     'topic-am1-do-re-mi',   'HAS_TOPIC'],
+      ['chap-am1-nhac-cu', 'topic-am1-thanh-phach','HAS_TOPIC'],
+      ['chap-am1-nhac-cu', 'topic-am1-trong',      'HAS_TOPIC'],
+
+      // === MĨ THUẬT 1 ===
+      ['subj-mt1', 'chap-mt1-yt',        'HAS_CHAPTER'],
+      ['subj-mt1', 'chap-mt1-ve',        'HAS_CHAPTER'],
+      ['subj-mt1', 'chap-mt1-to-mau',    'HAS_CHAPTER'],
+      ['subj-mt1', 'chap-mt1-xe-dan',    'HAS_CHAPTER'],
+      ['subj-mt1', 'chap-mt1-nan',       'HAS_CHAPTER'],
+      ['subj-mt1', 'chap-mt1-trang-tri', 'HAS_CHAPTER'],
+      ['chap-mt1-yt',        'topic-mt1-cham',          'HAS_TOPIC'],
+      ['chap-mt1-yt',        'topic-mt1-net-thang',     'HAS_TOPIC'],
+      ['chap-mt1-yt',        'topic-mt1-net-cong',      'HAS_TOPIC'],
+      ['chap-mt1-yt',        'topic-mt1-net-gay',       'HAS_TOPIC'],
+      ['chap-mt1-yt',        'topic-mt1-mau-co-ban',    'HAS_TOPIC'],
+      ['chap-mt1-yt',        'topic-mt1-mau-pha',       'HAS_TOPIC'],
+      ['chap-mt1-ve',        'topic-mt1-ve-hoa',        'HAS_TOPIC'],
+      ['chap-mt1-ve',        'topic-mt1-ve-cay',        'HAS_TOPIC'],
+      ['chap-mt1-ve',        'topic-mt1-ve-nha',        'HAS_TOPIC'],
+      ['chap-mt1-ve',        'topic-mt1-ve-con-vat',    'HAS_TOPIC'],
+      ['chap-mt1-ve',        'topic-mt1-ve-nguoi-que',  'HAS_TOPIC'],
+      ['chap-mt1-to-mau',    'topic-mt1-to-deu',        'HAS_TOPIC'],
+      ['chap-mt1-xe-dan',    'topic-mt1-xe-tron',       'HAS_TOPIC'],
+      ['chap-mt1-nan',       'topic-mt1-nan-qua',       'HAS_TOPIC'],
+      ['chap-mt1-trang-tri', 'topic-mt1-trang-tri-thiep','HAS_TOPIC'],
+
+      // === REQUIRES (lộ trình học) ===
+      // Toán: số 10 → số 20 → số 100; cộng có nhớ cần cộng cơ bản
+      ['chap-toan1-so-20', 'chap-toan1-so-10',  'REQUIRES'],
+      ['chap-toan1-so-100','chap-toan1-so-20',  'REQUIRES'],
+      ['topic-t1-cong-co-nho','topic-t1-cong-10','REQUIRES'],
+      ['topic-t1-tru-co-nho','topic-t1-tru-10', 'REQUIRES'],
+      ['topic-t1-100',       'topic-t1-doc-viet-10','REQUIRES'],
+      // TV: chữ cái → âm vần → đọc trơn
+      ['topic-tv1-van-don',  'topic-tv1-29-chu','REQUIRES'],
+      ['topic-tv1-danh-van', 'topic-tv1-van-don','REQUIRES'],
+      ['topic-tv1-doc-tron', 'topic-tv1-danh-van','REQUIRES'],
+      ['topic-tv1-doc-doan', 'topic-tv1-doc-tron','REQUIRES'],
+      ['topic-tv1-viet-chu', 'topic-tv1-viet-net','REQUIRES'],
+      ['topic-tv1-viet-chu-hoa','topic-tv1-viet-chu','REQUIRES'],
+      ['topic-tv1-chinh-ta', 'topic-tv1-viet-chu','REQUIRES'],
+      // MT: yếu tố tạo hình → vẽ → tô màu
+      ['topic-mt1-mau-pha',  'topic-mt1-mau-co-ban','REQUIRES'],
+      ['topic-mt1-ve-hoa',   'topic-mt1-net-cong','REQUIRES'],
+      ['topic-mt1-ve-nha',   'topic-mt1-net-thang','REQUIRES'],
+      // ÂN: đọc nốt → hát
+      ['topic-am1-bai-1',    'topic-am1-do-re-mi','REQUIRES'],
+
+      // === CROSS-SUBJECT EDGES (trong khối lớp 1) ===
+      // Toán ↔ TV (đếm + đọc chữ số)
+      ['topic-t1-doc-viet-10','topic-tv1-viet-chu','RELATES_TO'],
+      // TNXH ↔ Đạo đức (gia đình + thầy cô)
+      ['topic-tnxh1-tv-gd',  'topic-dd1-hieu-thao','RELATES_TO'],
+      ['topic-tnxh1-nghe-gv','topic-dd1-kinh-thay','RELATES_TO'],
+      ['topic-tnxh1-ve-sinh','topic-dd1-rua-tay','RELATES_TO'],
+      ['topic-tnxh1-ve-sinh','topic-dd1-danh-rang','RELATES_TO'],
+      // HDTN ↔ Đạo đức (Bác Hồ + Tết + ATGT)
+      ['topic-hdtn1-bac-ho', 'topic-dd1-bac-ho-yeu','RELATES_TO'],
+      ['topic-hdtn1-tet',    'topic-dd1-on-ong-ba','RELATES_TO'],
+      ['topic-hdtn1-den-gt', 'chap-dd1-atgt-dd','RELATES_TO'],
+      ['topic-hdtn1-yeu-me', 'topic-dd1-hieu-thao','RELATES_TO'],
+      ['topic-hdtn1-tang-hoa','topic-dd1-kinh-thay','RELATES_TO'],
+      // ÂN ↔ HDTN (bài Bác Hồ + Tết)
+      ['topic-am1-bai-6',    'topic-hdtn1-bac-ho','RELATES_TO'], // Ai yêu Bác Hồ
+      ['topic-am1-bai-7',    'topic-hdtn1-tet','RELATES_TO'],     // Tết đến rồi
+      ['topic-am1-bai-1',    'topic-hdtn1-yeu-me','RELATES_TO'],  // Mẹ yêu không nào
+      ['topic-am1-bai-2',    'topic-tnxh1-tv-gd','RELATES_TO'],   // Cả nhà thương nhau
+      // MT ↔ HDTN (thiệp 20/11)
+      ['topic-mt1-trang-tri-thiep','topic-hdtn1-tang-hoa','RELATES_TO'],
+      // TV ↔ TNXH (chủ điểm gia đình + thiên nhiên + trường)
+      ['topic-tv1-chu-de-gd','topic-tnxh1-tv-gd','RELATES_TO'],
+      ['topic-tv1-chu-de-th','topic-tnxh1-bb-th','RELATES_TO'],
+      ['topic-tv1-chu-de-tn','topic-tnxh1-cay','RELATES_TO'],
+      ['topic-tv1-chu-de-tn','topic-tnxh1-con-vat','RELATES_TO'],
+      ['topic-tv1-chao-hoi', 'topic-dd1-kinh-thay','RELATES_TO'],
+
+      // === PROGRESSION lớp 1 → THPT (đường đời học vấn) ===
+      // Toán 1 → Toán 10
+      ['subj-toan',          'subj-toan1',           'REQUIRES'],
+      // Mĩ thuật 1 → Mĩ thuật 10
+      ['subj-mt',            'subj-mt1',             'REQUIRES'],
+      // HDTN 1 → HDTN 10
+      ['subj-hdtn',          'subj-hdtn1',           'REQUIRES'],
+      // Đạo đức 1 → KTPL (đạo đức công dân tiến hoá)
+      ['subj-ktpl',          'subj-dd1',             'REQUIRES'],
+      // TNXH 1 → Sinh + Địa + Sử (tách dần khi lớn)
+      ['subj-sinh',          'subj-tnxh1',           'REQUIRES'],
+      ['subj-diali',         'subj-tnxh1',           'REQUIRES'],
+      ['subj-lichsu',        'subj-tnxh1',           'REQUIRES'],
+      // TV 1 → Văn (THPT chưa có nhưng có thể link sau)
+      // Âm nhạc 1 (THPT không bắt buộc — không link)
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-g1:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (12 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn THPT (12 môn × 3 lớp) + lớp 1
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -13477,6 +13972,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?ktpl=1       → Giáo dục Kinh tế & Pháp luật 10/11/12
   //        ?hdtn=1       → Hoạt động trải nghiệm, hướng nghiệp 10/11/12
   //        ?tin=1        → Tin học 10/11/12 (ICT + CS)
+  //        ?g1=1         → Khối lớp 1 — Tiểu học (7 môn GDPT 2018)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -13492,8 +13988,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const ktpl = req.query.ktpl === '1' || req.query.econ === '1' || req.query.law === '1' || all;
       const hdtn = req.query.hdtn === '1' || req.query.experience === '1' || req.query.career === '1' || all;
       const tin = req.query.tin === '1' || req.query.informatics === '1' || req.query.it === '1' || req.query.cs === '1' || all;
+      const g1 = req.query.g1 === '1' || req.query.grade1 === '1' || req.query.lop1 === '1' || req.query.elementary === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null, r15 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -13507,7 +14004,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (ktpl)      r12 = await seedKgKtpl();
       if (hdtn)      r13 = await seedKgHdtn();
       if (tin)       r14 = await seedKgInformatics();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0);
+      if (g1)        r15 = await seedKgGrade1();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0) + (r15?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -13527,9 +14025,10 @@ ${plan.content || '<p>(Trống)</p>'}
         ktpl: r12,
         hdtn: r13,
         tin: r14,
+        grade1: r15,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật + HĐ trải nghiệm + Tin học (3 lớp) mở rộng',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật + HĐ trải nghiệm + Tin học (3 lớp THPT) + Khối lớp 1 Tiểu học',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -13542,6 +14041,7 @@ ${plan.content || '<p>(Trống)</p>'}
           ktpl      && !all && '+ Giáo dục Kinh tế & Pháp luật 10/11/12',
           hdtn      && !all && '+ Hoạt động trải nghiệm, hướng nghiệp 10/11/12',
           tin       && !all && '+ Tin học 10/11/12 (ICT + CS)',
+          g1        && !all && '+ Khối lớp 1 — Tiểu học (7 môn)',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
