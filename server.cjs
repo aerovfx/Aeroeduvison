@@ -11283,8 +11283,363 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Công nghệ Công nghiệp 10, 11, 12 theo SGK GDPT 2018.
+   * ~120 nodes + ~160 edges. Idempotent.
+   */
+  async function seedKgIndustry() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-cncn-ind', type: 'Subject', label: 'Công nghệ Công nghiệp',
+        description: 'Môn Công nghệ Công nghiệp THPT 10, 11, 12 theo GDPT 2018',
+        properties: { color: '#475569' } },
+
+      // === LỚP 10: Cơ sở công nghệ + Vẽ kỹ thuật + Vật liệu ===
+      { id: 'chap-cnci10-dc',    type: 'Chapter', label: '[10] Đại cương công nghệ',     description: 'Khái niệm, vai trò, hệ thống công nghệ' },
+      { id: 'chap-cnci10-doisong',type: 'Chapter', label: '[10] Công nghệ + đời sống',    description: 'Ứng dụng CN trong sinh hoạt, sản xuất, y tế' },
+      { id: 'chap-cnci10-vekt',  type: 'Chapter', label: '[10] Vẽ kỹ thuật',             description: 'Hình chiếu, mặt cắt, ghi kích thước' },
+      { id: 'chap-cnci10-vatlieu',type: 'Chapter', label: '[10] Vật liệu cơ khí',         description: 'Kim loại, phi kim, polymer, composite, gốm' },
+      { id: 'chap-cnci10-giacong',type: 'Chapter', label: '[10] Phương pháp gia công',    description: 'Cắt gọt, hàn, đúc, rèn, dập, kéo' },
+
+      // Topics LỚP 10
+      { id: 'topic-cn-khai-niem',    type: 'Topic', label: 'Khái niệm công nghệ',         description: 'Ứng dụng KHKT vào sản xuất + đời sống' },
+      { id: 'topic-cn-vai-tro',      type: 'Topic', label: 'Vai trò công nghệ',           description: 'Năng suất, chất lượng, an toàn, môi trường' },
+      { id: 'topic-he-thong-cn',     type: 'Topic', label: 'Hệ thống công nghệ',          description: 'Input → Process → Output — feedback loop' },
+      { id: 'topic-san-pham-cn',     type: 'Topic', label: 'Sản phẩm công nghệ',          description: 'Vòng đời: thiết kế → sản xuất → sử dụng → tái chế' },
+      { id: 'topic-hinh-chieu',      type: 'Topic', label: 'Hình chiếu',                  description: 'Hình chiếu đứng + bằng + cạnh — vẽ 3 hình chiếu' },
+      { id: 'topic-mat-cat',         type: 'Topic', label: 'Mặt cắt + Hình cắt',         description: 'Thể hiện cấu tạo bên trong vật thể' },
+      { id: 'topic-ghi-kt',          type: 'Topic', label: 'Ghi kích thước',              description: 'Đường kích thước, mũi tên, chữ số đo' },
+      { id: 'topic-tieu-chuan-bv',   type: 'Topic', label: 'Tiêu chuẩn bản vẽ',          description: 'TCVN, ISO — khổ giấy A0-A4, nét vẽ, tỉ lệ' },
+      { id: 'topic-kim-loai-den',    type: 'Topic', label: 'Kim loại đen',                description: 'Sắt + gang + thép — chiếm 90% sản lượng kim loại' },
+      { id: 'topic-kim-loai-mau',    type: 'Topic', label: 'Kim loại màu',                description: 'Đồng, nhôm, kẽm, vàng — đặc tính tốt' },
+      { id: 'topic-polymer-ind',     type: 'Topic', label: 'Polymer công nghiệp',         description: 'PE, PP, PVC, nylon, ABS — nhẹ, bền, rẻ' },
+      { id: 'topic-composite',       type: 'Topic', label: 'Composite',                   description: 'Sợi thuỷ tinh, sợi carbon — máy bay, du thuyền' },
+      { id: 'topic-gom-su',          type: 'Topic', label: 'Gốm + sứ kỹ thuật',           description: 'Al₂O₃, SiC — chịu nhiệt cao, cứng' },
+      { id: 'topic-cat-got',         type: 'Topic', label: 'Cắt gọt kim loại',            description: 'Tiện, phay, bào, khoan, mài — máy CNC tự động' },
+      { id: 'topic-han',             type: 'Topic', label: 'Hàn (Welding)',               description: 'Hàn hồ quang, MIG, TIG, laser — nối kim loại' },
+      { id: 'topic-duc',             type: 'Topic', label: 'Đúc kim loại',                description: 'Rót kim loại lỏng vào khuôn → kết tinh' },
+      { id: 'topic-ren',             type: 'Topic', label: 'Rèn + Dập',                   description: 'Tạo hình kim loại nóng — bulông, đai ốc' },
+
+      // === LỚP 11: Cơ khí ứng dụng + Tự động hoá ===
+      { id: 'chap-cnci11-cokhi',     type: 'Chapter', label: '[11] Giới thiệu cơ khí',     description: 'Vai trò ngành cơ khí, máy + thiết bị' },
+      { id: 'chap-cnci11-vekt-ud',   type: 'Chapter', label: '[11] Vẽ kỹ thuật ứng dụng',  description: 'AutoCAD, SolidWorks, Inventor — vẽ 2D + 3D' },
+      { id: 'chap-cnci11-co-cau',    type: 'Chapter', label: '[11] Cơ cấu truyền động',    description: 'Bánh răng, đai, xích, cam, vít me-đai ốc' },
+      { id: 'chap-cnci11-chi-tiet',  type: 'Chapter', label: '[11] Chi tiết máy + Lắp ghép', description: 'Bulông, đai ốc, then, chốt — ghép cố định + động' },
+      { id: 'chap-cnci11-tu-dong',   type: 'Chapter', label: '[11] Tự động hoá sản xuất',  description: 'CNC, PLC, robot, dây chuyền lắp ráp' },
+      { id: 'chap-cnci11-lean',      type: 'Chapter', label: '[11] Sản xuất tinh gọn',     description: 'Lean Manufacturing (Toyota) — kanban, 5S, kaizen' },
+
+      // Topics LỚP 11
+      { id: 'topic-co-khi-vn',       type: 'Topic', label: 'Cơ khí Việt Nam',             description: 'Doosan, VinFast, Thaco — ngành chiến lược' },
+      { id: 'topic-autocad',         type: 'Topic', label: 'AutoCAD',                     description: 'Phần mềm vẽ 2D phổ biến — chuẩn ngành xây dựng + cơ khí' },
+      { id: 'topic-solidworks',      type: 'Topic', label: 'SolidWorks',                  description: 'Vẽ 3D + mô phỏng — thiết kế chi tiết máy' },
+      { id: 'topic-banh-rang',       type: 'Topic', label: 'Bánh răng',                   description: 'Truyền lực + đổi tỉ số tốc độ — hộp số ô tô' },
+      { id: 'topic-dai-truyen',      type: 'Topic', label: 'Đai truyền',                  description: 'Đai phẳng, V — truyền lực xa, êm' },
+      { id: 'topic-xich',            type: 'Topic', label: 'Xích',                         description: 'Xích con lăn — xe đạp, mô tô, máy nông nghiệp' },
+      { id: 'topic-co-cau-cam',      type: 'Topic', label: 'Cơ cấu cam',                  description: 'Biến chuyển động quay → tịnh tiến — động cơ' },
+      { id: 'topic-vit-me',          type: 'Topic', label: 'Vít me - Đai ốc',             description: 'Biến quay → tịnh tiến chính xác — máy CNC' },
+      { id: 'topic-bulong',          type: 'Topic', label: 'Bulông + Đai ốc',             description: 'Ghép tháo được — M6, M8, M10, M12...' },
+      { id: 'topic-then-chot',       type: 'Topic', label: 'Then + Chốt',                  description: 'Cố định bánh răng/puly lên trục' },
+      { id: 'topic-cnc',             type: 'Topic', label: 'CNC (Computer Numerical Control)', description: 'Máy gia công điều khiển số — tự động + chính xác' },
+      { id: 'topic-plc',             type: 'Topic', label: 'PLC (Programmable Logic Controller)', description: 'Siemens S7, Mitsubishi FX — điều khiển công nghiệp' },
+      { id: 'topic-robot-ind',       type: 'Topic', label: 'Robot công nghiệp',           description: 'KUKA, Fanuc, ABB — hàn, sơn, lắp ráp xe hơi' },
+      { id: 'topic-day-chuyen',      type: 'Topic', label: 'Dây chuyền lắp ráp',          description: 'Henry Ford 1913 — sản xuất hàng loạt' },
+      { id: 'topic-lean-mfg',        type: 'Topic', label: 'Lean Manufacturing',          description: 'Loại bỏ 7 lãng phí — Toyota Production System' },
+      { id: 'topic-5s',              type: 'Topic', label: '5S',                          description: 'Sàng lọc, Sắp xếp, Sạch sẽ, Săn sóc, Sẵn sàng' },
+      { id: 'topic-kanban',          type: 'Topic', label: 'Kanban',                      description: 'Hệ thống thẻ — Just-In-Time, không tồn kho' },
+      { id: 'topic-kaizen',          type: 'Topic', label: 'Kaizen',                      description: 'Cải tiến liên tục — mỗi nhân viên đóng góp ý' },
+
+      // === LỚP 12: Động cơ + Điện tử + IoT + Industry 4.0 ===
+      { id: 'chap-cnci12-dotr',      type: 'Chapter', label: '[12] Động cơ đốt trong',     description: 'Động cơ 4 kỳ + 2 kỳ + diesel — xăng dầu' },
+      { id: 'chap-cnci12-oto',       type: 'Chapter', label: '[12] Ô tô',                  description: 'Hệ thống truyền lực, lái, phanh, treo' },
+      { id: 'chap-cnci12-mfd',       type: 'Chapter', label: '[12] Máy phát điện + Động cơ điện', description: 'Generator + Motor — biến đổi cơ ↔ điện' },
+      { id: 'chap-cnci12-dien-tu',   type: 'Chapter', label: '[12] Mạch điện tử cơ bản',  description: 'R, L, C, diode, transistor, op-amp' },
+      { id: 'chap-cnci12-vi-dieu',   type: 'Chapter', label: '[12] Vi điều khiển',         description: 'Arduino, ESP32, STM32 — IoT + DIY' },
+      { id: 'chap-cnci12-iot',       type: 'Chapter', label: '[12] IoT + Industry 4.0',   description: 'IoT + Big Data + AI + Cloud → nhà máy thông minh' },
+      { id: 'chap-cnci12-startup',   type: 'Chapter', label: '[12] Khởi nghiệp CN 4.0',    description: 'Startup công nghệ — kế hoạch, vốn, scale' },
+
+      // Topics LỚP 12
+      { id: 'topic-dotr-4-ky',       type: 'Topic', label: 'Động cơ 4 kỳ',                description: 'Nạp → Nén → Nổ → Xả — Otto cycle, xe hơi xăng' },
+      { id: 'topic-dotr-2-ky',       type: 'Topic', label: 'Động cơ 2 kỳ',                description: 'Mỗi 2 hành trình 1 chu kì — xe máy, thuyền' },
+      { id: 'topic-dotr-diesel',     type: 'Topic', label: 'Động cơ Diesel',              description: 'Nén nóng cao → tự cháy — xe tải, tàu, máy phát' },
+      { id: 'topic-htl',             type: 'Topic', label: 'Hệ thống truyền lực ô tô',    description: 'Ly hợp → hộp số → vi sai → bánh xe' },
+      { id: 'topic-h-lai',           type: 'Topic', label: 'Hệ thống lái',                description: 'Vô lăng → cơ cấu lái → bánh xe — power steering' },
+      { id: 'topic-h-phanh',         type: 'Topic', label: 'Hệ thống phanh',              description: 'Phanh đĩa + phanh tang trống — ABS chống bó' },
+      { id: 'topic-h-treo',          type: 'Topic', label: 'Hệ thống treo',               description: 'Giảm xóc + lò xo — êm khi chạy đường xấu' },
+      { id: 'topic-may-phat-dien',   type: 'Topic', label: 'Máy phát điện (Generator)',   description: 'Biến cơ năng → điện năng — nhà máy + xe + ups' },
+      { id: 'topic-dong-co-dien',    type: 'Topic', label: 'Động cơ điện',                description: 'AC + DC + servo + bước — robot + máy giặt' },
+      { id: 'topic-rlc',             type: 'Topic', label: 'R, L, C',                     description: 'Điện trở + Cảm + Tụ — 3 thành phần cơ bản' },
+      { id: 'topic-diode-ind',       type: 'Topic', label: 'Diode',                       description: 'LED + chỉnh lưu — dòng 1 chiều' },
+      { id: 'topic-transistor',      type: 'Topic', label: 'Transistor',                  description: 'Khuếch đại + đóng cắt — nền tảng vi xử lý' },
+      { id: 'topic-op-amp',          type: 'Topic', label: 'Op-amp (LM358, LM741)',       description: 'Khuếch đại tín hiệu — cảm biến, audio' },
+      { id: 'topic-arduino',         type: 'Topic', label: 'Arduino',                     description: 'Vi điều khiển dễ học — DIY: robot, IoT, smart home' },
+      { id: 'topic-esp32',           type: 'Topic', label: 'ESP32',                       description: 'WiFi + Bluetooth tích hợp — IoT projects' },
+      { id: 'topic-stm32',           type: 'Topic', label: 'STM32',                       description: 'ARM Cortex-M — công nghiệp + ô tô' },
+      { id: 'topic-iot-ind',         type: 'Topic', label: 'IoT (Internet of Things)',    description: 'Thiết bị kết nối Internet → thu thập + chia sẻ data' },
+      { id: 'topic-industry-40',     type: 'Topic', label: 'Industry 4.0',                description: 'Nhà máy thông minh: IoT + AI + Big Data + Cloud + Robot' },
+      { id: 'topic-smart-factory',   type: 'Topic', label: 'Smart Factory',               description: 'Tự động hoá toàn diện — Siemens MindSphere, Bosch' },
+      { id: 'topic-digital-twin',    type: 'Topic', label: 'Digital Twin',                description: 'Bản sao số 3D của máy/nhà máy — mô phỏng + tối ưu' },
+      { id: 'topic-3d-printing',     type: 'Topic', label: 'In 3D (Additive Manufacturing)', description: 'FDM, SLA, SLS — tạo mẫu nhanh, prosthetic, kim loại' },
+      { id: 'topic-startup-cn',      type: 'Topic', label: 'Khởi nghiệp công nghệ',       description: 'Kế hoạch kinh doanh, MVP, gọi vốn VC, scale' },
+
+      // === FORMULAS ===
+      { id: 'form-ti-so-truyen',     type: 'Formula', label: 'i = n₁/n₂ = z₂/z₁',         description: 'Tỉ số truyền bánh răng' },
+      { id: 'form-cong-suat-co',     type: 'Formula', label: 'P = F·v = M·ω',             description: 'Công suất cơ học' },
+      { id: 'form-cs-dien',          type: 'Formula', label: 'P = U·I',                   description: 'Công suất điện' },
+      { id: 'form-ohm-ind',          type: 'Formula', label: 'U = I·R',                   description: 'Định luật Ohm' },
+      { id: 'form-tu-dien-cs',       type: 'Formula', label: 'Q = C·U',                   description: 'Điện tích tụ điện' },
+      { id: 'form-hieu-suat',        type: 'Formula', label: 'η = P_out/P_in × 100%',    description: 'Hiệu suất máy' },
+
+      // === CONCEPTS ===
+      { id: 'concept-tieu-chuan',    type: 'Concept', label: 'Tiêu chuẩn kỹ thuật',       description: 'TCVN, ISO, JIS, ASME — quy định chất lượng' },
+      { id: 'concept-an-toan-cn',    type: 'Concept', label: 'An toàn lao động',          description: 'PPE: kính, găng, mũ — phòng tai nạn' },
+      { id: 'concept-do-chinh-xac',  type: 'Concept', label: 'Độ chính xác',              description: 'Sai số ±0.01mm — yêu cầu CNC cao' },
+      { id: 'concept-ben-vung',      type: 'Concept', label: 'Phát triển bền vững CN',    description: 'Giảm khí thải, tái chế, năng lượng sạch' },
+      { id: 'concept-tu-dong-hoa',   type: 'Concept', label: 'Tự động hoá',                description: 'Thay sức người bằng máy + điều khiển tự động' },
+      { id: 'concept-iot-c',         type: 'Concept', label: 'Kết nối vạn vật (IoT)',     description: 'Mọi thiết bị có cảm biến + Internet' },
+
+      // === PHENOMENA ===
+      { id: 'phen-cmcn-4',           type: 'Phenomenon', label: 'Cách mạng CN 4.0',       description: 'AI + IoT + Big Data + Cloud + Robot đang định hình tương lai' },
+      { id: 'phen-mat-vc',           type: 'Phenomenon', label: 'Mất việc do tự động hoá', description: 'Robot thay người làm việc lặp lại — thách thức xã hội' },
+      { id: 'phen-supply-chain',     type: 'Phenomenon', label: 'Đứt gãy chuỗi cung ứng', description: 'Covid 2020 → thiếu chip → kẹt sản xuất ô tô toàn cầu' },
+
+      // === APPLICATIONS ===
+      { id: 'app-vinfast',           type: 'Application', label: 'VinFast (xe điện)',     description: 'Nhà máy Hải Phòng — 250k xe/năm, IPO Nasdaq' },
+      { id: 'app-thaco',             type: 'Application', label: 'Thaco Trường Hải',     description: 'Lắp ráp KIA, Mazda, Peugeot — Chu Lai Quảng Nam' },
+      { id: 'app-samsung-vn',        type: 'Application', label: 'Samsung Vietnam',       description: 'Bắc Ninh + Thái Nguyên — 50% smartphone Samsung TG' },
+      { id: 'app-lego-binh-duong',   type: 'Application', label: 'LEGO Bình Dương',       description: 'Nhà máy LEGO $1 tỷ — 2024 vận hành' },
+      { id: 'app-nha-may-thong-minh',type: 'Application', label: 'Smart factory',          description: 'Siemens Amberg — 75% tự động, 7.5K thiết bị IoT' },
+      { id: 'app-cnc-vn',            type: 'Application', label: 'Máy CNC nhập + nội',    description: 'Mazak Nhật, DMG MORI Đức + Hồng Ký VN' },
+      { id: 'app-3d-print-vn',       type: 'Application', label: 'In 3D Việt Nam',        description: '3DSpace, Saigon3DP — prototype + giáo dục' },
+      { id: 'app-arduino-edu',       type: 'Application', label: 'Arduino STEM',          description: 'Phổ biến giáo dục — robot, smart home, IoT projects' },
+      { id: 'app-tesla-model',       type: 'Application', label: 'Tesla Model 3',         description: 'Xe điện hot nhất — 100% tự động Gigafactory Texas' },
+      { id: 'app-toyota-tps',        type: 'Application', label: 'Toyota Production System', description: 'Khởi nguồn Lean Mfg — JIT + Kaizen + Andon' },
+      { id: 'app-grab-mobility',     type: 'Application', label: 'Grab + Be (xe công nghệ)', description: 'IoT + GPS + app → cách mạng giao thông VN' },
+      { id: 'app-may-tinh-cn',       type: 'Application', label: 'Máy tính công nghiệp',  description: 'Beckhoff, Advantech — bền + chịu nhiệt' },
+
+      // === CAREERS ===
+      { id: 'career-ks-co-khi',      type: 'Career', label: 'Kỹ sư cơ khí',              description: 'Thiết kế máy, dây chuyền — VinFast 18-30 triệu' },
+      { id: 'career-ks-dien-tu',     type: 'Career', label: 'Kỹ sư điện tử',             description: 'Mạch + vi điều khiển — Samsung, Intel' },
+      { id: 'career-ks-tu-dong',     type: 'Career', label: 'Kỹ sư tự động hoá',         description: 'PLC, SCADA, robot — Siemens, Schneider' },
+      { id: 'career-ks-co-khi-oto',  type: 'Career', label: 'Kỹ sư ô tô',                description: 'Toyota, Honda, Ford, VinFast — R&D + sản xuất' },
+      { id: 'career-iot-eng',        type: 'Career', label: 'Kỹ sư IoT',                 description: 'Connectivity + cloud + AI — startup + tập đoàn' },
+      { id: 'career-cnc-op',         type: 'Career', label: 'Vận hành CNC',              description: 'Cần đào tạo nghề — 12-20 triệu/tháng' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-ind:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-cncn-ind', 'chap-cnci10-dc',      'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci10-doisong', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci10-vekt',    'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci10-vatlieu', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci10-giacong', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-cokhi',   'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-vekt-ud', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-co-cau',  'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-chi-tiet','HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-tu-dong', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci11-lean',    'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-dotr',    'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-oto',     'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-mfd',     'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-dien-tu', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-vi-dieu', 'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-iot',     'HAS_CHAPTER'],
+      ['subj-cncn-ind', 'chap-cnci12-startup', 'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-cnci10-dc',      'topic-cn-khai-niem',  'HAS_TOPIC'],
+      ['chap-cnci10-dc',      'topic-cn-vai-tro',    'HAS_TOPIC'],
+      ['chap-cnci10-dc',      'topic-he-thong-cn',   'HAS_TOPIC'],
+      ['chap-cnci10-doisong', 'topic-san-pham-cn',   'HAS_TOPIC'],
+      ['chap-cnci10-vekt',    'topic-hinh-chieu',    'HAS_TOPIC'],
+      ['chap-cnci10-vekt',    'topic-mat-cat',       'HAS_TOPIC'],
+      ['chap-cnci10-vekt',    'topic-ghi-kt',        'HAS_TOPIC'],
+      ['chap-cnci10-vekt',    'topic-tieu-chuan-bv', 'HAS_TOPIC'],
+      ['chap-cnci10-vatlieu', 'topic-kim-loai-den',  'HAS_TOPIC'],
+      ['chap-cnci10-vatlieu', 'topic-kim-loai-mau',  'HAS_TOPIC'],
+      ['chap-cnci10-vatlieu', 'topic-polymer-ind',   'HAS_TOPIC'],
+      ['chap-cnci10-vatlieu', 'topic-composite',     'HAS_TOPIC'],
+      ['chap-cnci10-vatlieu', 'topic-gom-su',        'HAS_TOPIC'],
+      ['chap-cnci10-giacong', 'topic-cat-got',       'HAS_TOPIC'],
+      ['chap-cnci10-giacong', 'topic-han',           'HAS_TOPIC'],
+      ['chap-cnci10-giacong', 'topic-duc',           'HAS_TOPIC'],
+      ['chap-cnci10-giacong', 'topic-ren',           'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-cnci11-cokhi',    'topic-co-khi-vn',  'HAS_TOPIC'],
+      ['chap-cnci11-vekt-ud',  'topic-autocad',    'HAS_TOPIC'],
+      ['chap-cnci11-vekt-ud',  'topic-solidworks', 'HAS_TOPIC'],
+      ['chap-cnci11-co-cau',   'topic-banh-rang',  'HAS_TOPIC'],
+      ['chap-cnci11-co-cau',   'topic-dai-truyen', 'HAS_TOPIC'],
+      ['chap-cnci11-co-cau',   'topic-xich',       'HAS_TOPIC'],
+      ['chap-cnci11-co-cau',   'topic-co-cau-cam', 'HAS_TOPIC'],
+      ['chap-cnci11-co-cau',   'topic-vit-me',     'HAS_TOPIC'],
+      ['chap-cnci11-chi-tiet', 'topic-bulong',     'HAS_TOPIC'],
+      ['chap-cnci11-chi-tiet', 'topic-then-chot',  'HAS_TOPIC'],
+      ['chap-cnci11-tu-dong',  'topic-cnc',        'HAS_TOPIC'],
+      ['chap-cnci11-tu-dong',  'topic-plc',        'HAS_TOPIC'],
+      ['chap-cnci11-tu-dong',  'topic-robot-ind',  'HAS_TOPIC'],
+      ['chap-cnci11-tu-dong',  'topic-day-chuyen', 'HAS_TOPIC'],
+      ['chap-cnci11-lean',     'topic-lean-mfg',   'HAS_TOPIC'],
+      ['chap-cnci11-lean',     'topic-5s',         'HAS_TOPIC'],
+      ['chap-cnci11-lean',     'topic-kanban',     'HAS_TOPIC'],
+      ['chap-cnci11-lean',     'topic-kaizen',     'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-cnci12-dotr',    'topic-dotr-4-ky',     'HAS_TOPIC'],
+      ['chap-cnci12-dotr',    'topic-dotr-2-ky',     'HAS_TOPIC'],
+      ['chap-cnci12-dotr',    'topic-dotr-diesel',   'HAS_TOPIC'],
+      ['chap-cnci12-oto',     'topic-htl',           'HAS_TOPIC'],
+      ['chap-cnci12-oto',     'topic-h-lai',         'HAS_TOPIC'],
+      ['chap-cnci12-oto',     'topic-h-phanh',       'HAS_TOPIC'],
+      ['chap-cnci12-oto',     'topic-h-treo',        'HAS_TOPIC'],
+      ['chap-cnci12-mfd',     'topic-may-phat-dien', 'HAS_TOPIC'],
+      ['chap-cnci12-mfd',     'topic-dong-co-dien',  'HAS_TOPIC'],
+      ['chap-cnci12-dien-tu', 'topic-rlc',           'HAS_TOPIC'],
+      ['chap-cnci12-dien-tu', 'topic-diode-ind',     'HAS_TOPIC'],
+      ['chap-cnci12-dien-tu', 'topic-transistor',    'HAS_TOPIC'],
+      ['chap-cnci12-dien-tu', 'topic-op-amp',        'HAS_TOPIC'],
+      ['chap-cnci12-vi-dieu', 'topic-arduino',       'HAS_TOPIC'],
+      ['chap-cnci12-vi-dieu', 'topic-esp32',         'HAS_TOPIC'],
+      ['chap-cnci12-vi-dieu', 'topic-stm32',         'HAS_TOPIC'],
+      ['chap-cnci12-iot',     'topic-iot-ind',       'HAS_TOPIC'],
+      ['chap-cnci12-iot',     'topic-industry-40',   'HAS_TOPIC'],
+      ['chap-cnci12-iot',     'topic-smart-factory', 'HAS_TOPIC'],
+      ['chap-cnci12-iot',     'topic-digital-twin',  'HAS_TOPIC'],
+      ['chap-cnci12-iot',     'topic-3d-printing',   'HAS_TOPIC'],
+      ['chap-cnci12-startup', 'topic-startup-cn',    'HAS_TOPIC'],
+
+      // Topic → Formula
+      ['topic-banh-rang',      'form-ti-so-truyen',  'USES_FORMULA'],
+      ['topic-may-phat-dien',  'form-cong-suat-co',  'USES_FORMULA'],
+      ['topic-dong-co-dien',   'form-cs-dien',       'USES_FORMULA'],
+      ['topic-rlc',            'form-ohm-ind',       'USES_FORMULA'],
+      ['topic-rlc',            'form-tu-dien-cs',    'USES_FORMULA'],
+      ['topic-may-phat-dien',  'form-hieu-suat',     'USES_FORMULA'],
+      ['topic-dotr-4-ky',      'form-hieu-suat',     'USES_FORMULA'],
+
+      // Topic → Concept
+      ['topic-tieu-chuan-bv',  'concept-tieu-chuan',    'USES_CONCEPT'],
+      ['topic-han',            'concept-an-toan-cn',    'USES_CONCEPT'],
+      ['topic-cnc',            'concept-do-chinh-xac',  'USES_CONCEPT'],
+      ['topic-iot-ind',        'concept-iot-c',         'USES_CONCEPT'],
+      ['topic-robot-ind',      'concept-tu-dong-hoa',   'USES_CONCEPT'],
+      ['topic-cnc',            'concept-tu-dong-hoa',   'USES_CONCEPT'],
+      ['topic-day-chuyen',     'concept-tu-dong-hoa',   'USES_CONCEPT'],
+      ['topic-lean-mfg',       'concept-ben-vung',      'USES_CONCEPT'],
+
+      // Topic → Phenomenon
+      ['topic-industry-40',    'phen-cmcn-4',           'EXHIBITS_PHENOMENON'],
+      ['topic-robot-ind',      'phen-mat-vc',           'EXHIBITS_PHENOMENON'],
+      ['topic-co-khi-vn',      'phen-supply-chain',     'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-co-khi-vn',      'app-vinfast',         'APPLIED_IN'],
+      ['topic-co-khi-vn',      'app-thaco',           'APPLIED_IN'],
+      ['topic-dien-tu',        'app-samsung-vn',      'APPLIED_IN'],
+      ['topic-polymer-ind',    'app-lego-binh-duong', 'APPLIED_IN'],
+      ['topic-industry-40',    'app-nha-may-thong-minh', 'APPLIED_IN'],
+      ['topic-smart-factory',  'app-nha-may-thong-minh', 'APPLIED_IN'],
+      ['topic-cnc',            'app-cnc-vn',          'APPLIED_IN'],
+      ['topic-3d-printing',    'app-3d-print-vn',     'APPLIED_IN'],
+      ['topic-arduino',        'app-arduino-edu',     'APPLIED_IN'],
+      ['topic-dong-co-dien',   'app-tesla-model',     'APPLIED_IN'],
+      ['topic-htl',            'app-tesla-model',     'APPLIED_IN'],
+      ['topic-lean-mfg',       'app-toyota-tps',      'APPLIED_IN'],
+      ['topic-kanban',         'app-toyota-tps',      'APPLIED_IN'],
+      ['topic-iot-ind',        'app-grab-mobility',   'APPLIED_IN'],
+      ['topic-plc',            'app-may-tinh-cn',     'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-co-khi-vn',      'career-ks-co-khi',      'APPLIED_IN_CAREER'],
+      ['topic-solidworks',     'career-ks-co-khi',      'APPLIED_IN_CAREER'],
+      ['topic-transistor',     'career-ks-dien-tu',     'APPLIED_IN_CAREER'],
+      ['topic-arduino',        'career-ks-dien-tu',     'APPLIED_IN_CAREER'],
+      ['topic-plc',            'career-ks-tu-dong',     'APPLIED_IN_CAREER'],
+      ['topic-robot-ind',      'career-ks-tu-dong',     'APPLIED_IN_CAREER'],
+      ['topic-dotr-4-ky',      'career-ks-co-khi-oto',  'APPLIED_IN_CAREER'],
+      ['topic-htl',            'career-ks-co-khi-oto',  'APPLIED_IN_CAREER'],
+      ['topic-iot-ind',        'career-iot-eng',        'APPLIED_IN_CAREER'],
+      ['topic-esp32',          'career-iot-eng',        'APPLIED_IN_CAREER'],
+      ['topic-cnc',            'career-cnc-op',         'APPLIED_IN_CAREER'],
+
+      // REQUIRES
+      ['topic-mat-cat',        'topic-hinh-chieu',      'REQUIRES'],
+      ['topic-solidworks',     'topic-autocad',         'REQUIRES'],
+      ['topic-cnc',            'topic-cat-got',         'REQUIRES'],
+      ['topic-cnc',            'topic-autocad',         'REQUIRES'],
+      ['topic-plc',            'topic-rlc',             'REQUIRES'],
+      ['topic-iot-ind',        'topic-arduino',         'REQUIRES'],
+      ['topic-industry-40',    'topic-iot-ind',         'REQUIRES'],
+      ['topic-smart-factory',  'topic-industry-40',     'REQUIRES'],
+      ['topic-dotr-diesel',    'topic-dotr-4-ky',       'REQUIRES'],
+      ['topic-transistor',     'topic-diode-ind',       'REQUIRES'],
+      ['topic-op-amp',         'topic-transistor',      'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // Industrial ↔ Vật lí
+      ['topic-banh-rang',      'topic-luc-newton',     'RELATES_TO'],
+      ['topic-dong-co-dien',   'topic-cam-ung-dt',     'RELATES_TO'],
+      ['topic-may-phat-dien',  'topic-cam-ung-dt',     'RELATES_TO'],
+      ['topic-rlc',            'topic-mach-dien',      'RELATES_TO'],
+      ['topic-diode-ind',      'topic-dien-tich',      'RELATES_TO'],
+      ['topic-dotr-4-ky',      'topic-cong',           'RELATES_TO'],
+      // Industrial ↔ Hóa
+      ['topic-kim-loai-den',   'topic-sat',            'RELATES_TO'],
+      ['topic-kim-loai-mau',   'topic-nhom',           'RELATES_TO'],
+      ['topic-polymer-ind',    'topic-polymer-pe',     'RELATES_TO'],
+      ['topic-han',            'topic-pu-oxh-kh',      'RELATES_TO'], // hàn = phản ứng hoá học cao nhiệt
+      // Industrial ↔ Toán
+      ['topic-hinh-chieu',     'topic-vector-kg',      'RELATES_TO'],
+      ['topic-autocad',        'topic-vector-mp',      'RELATES_TO'],
+      ['topic-solidworks',     'topic-vector-kg',      'RELATES_TO'],
+      // Industrial ↔ Lịch sử
+      ['topic-day-chuyen',     'topic-cmcn2',          'RELATES_TO'], // Henry Ford 1913
+      ['topic-industry-40',    'topic-cmcn4',          'RELATES_TO'],
+      ['topic-lean-mfg',       'topic-cmcn3',          'RELATES_TO'], // Toyota post-WW2
+      // Industrial ↔ Địa lí
+      ['topic-co-khi-vn',      'topic-cn-vn',          'RELATES_TO'],
+      ['topic-app-samsung-vn', 'topic-dbsh',           'RELATES_TO'], // Bắc Ninh thuộc ĐBSH (note: app id, có thể skip)
+      // Industrial ↔ CN Chăn nuôi
+      ['topic-iot-ind',        'topic-iot-cn',         'RELATES_TO'],
+      ['topic-robot-ind',      'topic-robot-cn',       'RELATES_TO'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-ind:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (7 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn (8 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -11292,6 +11647,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?history=1    → Lịch sử 10/11/12
   //        ?geo=1        → Địa lí 10/11/12
   //        ?livestock=1  → Công nghệ Chăn nuôi 10/11/12
+  //        ?industry=1   → Công nghệ Công nghiệp 10/11/12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -11302,8 +11658,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const hist = req.query.history === '1' || req.query.hist === '1' || all;
       const geo = req.query.geo === '1' || req.query.geography === '1' || req.query.dia === '1' || all;
       const livestock = req.query.livestock === '1' || req.query.cncn === '1' || all;
+      const industry = req.query.industry === '1' || req.query.cnci === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -11312,7 +11669,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (hist) r7 = await seedKgHistory();
       if (geo)  r8 = await seedKgGeography();
       if (livestock) r9 = await seedKgLivestock();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0);
+      if (industry)  r10 = await seedKgIndustry();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -11327,16 +11685,18 @@ ${plan.content || '<p>(Trống)</p>'}
         history: r7,
         geography: r8,
         livestock: r9,
+        industry: r10,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + Chăn nuôi (3 lớp) mở rộng đầy đủ',
-          ext && '+ Mở rộng Vật lí (Quang học + VLHĐ + Phenomenon + Application)',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp (3 lớp) mở rộng',
+          ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
-          math && !all && '+ Toán 10/11/12 mở rộng',
-          chem && !all && '+ Hóa học 10/11/12 mở rộng',
+          math && !all && '+ Toán 10/11/12',
+          chem && !all && '+ Hóa học 10/11/12',
           hist && !all && '+ Lịch sử 10/11/12',
           geo  && !all && '+ Địa lí 10/11/12',
           livestock && !all && '+ Công nghệ Chăn nuôi 10/11/12',
+          industry  && !all && '+ Công nghệ Công nghiệp 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
