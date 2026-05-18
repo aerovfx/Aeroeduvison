@@ -34,6 +34,7 @@ import { recommendationService as rs } from '@/services/recommendation.service'
 import { lazy, Suspense } from 'react'
 // Lazy load 3D view — bundle khá lớn vì Three.js
 const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
+import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -1529,6 +1530,14 @@ export default function KnowledgeGraph() {
                 </div>
               </div>
             )}
+
+            {/* Brain panel — collaborative notes + discussions */}
+            <div className="mb-4">
+              <h3 className="text-[10px] uppercase font-bold text-cyan-300/60 tracking-wider mb-2 inline-flex items-center gap-1">
+                🧠 Bộ não tri thức
+              </h3>
+              <NodeBrainPanel nodeId={selectedNode.node.id} nodeLabel={selectedNode.node.label} />
+            </div>
 
             <button
               onClick={expandFromSelected}

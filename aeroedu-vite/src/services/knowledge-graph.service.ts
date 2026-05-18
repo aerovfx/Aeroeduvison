@@ -390,3 +390,79 @@ export const REL_TYPE_LABELS: Record<string, string> = {
 export function getNodeColor(type: string) {
   return NODE_TYPE_COLORS[type] || { fill: 'rgba(148,163,184,0.15)', stroke: '#94a3b8', text: '#e2e8f0' }
 }
+
+/* ─────────── BRAIN: Notes + Comments + My-brain stats ─────────── */
+
+export interface KgNote {
+  id: string
+  content: string
+  is_public: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface KgComment {
+  id: string
+  userId: string
+  content: string
+  parentId: string | null
+  upvotes: number
+  createdAt: string
+  authorName: string
+  authorRole: string
+  myUpvoted: boolean
+  isOwn: boolean
+}
+
+export interface KgSharedNote {
+  id: string
+  userId: string
+  content: string
+  createdAt: string
+  authorName: string
+  authorRole: string
+}
+
+export interface KgMyBrainStats {
+  mastery: { total: number; mastered: number; learning: number; weak: number; avgScore: number }
+  notes:   { total: number; shared: number }
+  comments:{ total: number; totalUpvotes: number }
+  suggestions: { total: number; approved: number }
+}
+
+export const knowledgeGraphBrain = {
+  getNote: (nodeId: string) =>
+    api.get<{ success: boolean; note: KgNote | null }>(
+      `/kg/nodes/${encodeURIComponent(nodeId)}/note`
+    ).then(r => r.data),
+
+  saveNote: (nodeId: string, content: string, isPublic = false) =>
+    api.put<{ success: boolean; deleted?: boolean }>(
+      `/kg/nodes/${encodeURIComponent(nodeId)}/note`,
+      { content, isPublic }
+    ).then(r => r.data),
+
+  listComments: (nodeId: string) =>
+    api.get<{ success: boolean; comments: KgComment[]; sharedNotes: KgSharedNote[] }>(
+      `/kg/nodes/${encodeURIComponent(nodeId)}/comments`
+    ).then(r => r.data),
+
+  addComment: (nodeId: string, content: string, parentId?: string | null) =>
+    api.post<{ success: boolean; id: string }>(
+      `/kg/nodes/${encodeURIComponent(nodeId)}/comments`,
+      { content, parentId: parentId || null }
+    ).then(r => r.data),
+
+  upvoteComment: (commentId: string) =>
+    api.post<{ success: boolean; action: 'added' | 'removed' }>(
+      `/kg/comments/${encodeURIComponent(commentId)}/upvote`
+    ).then(r => r.data),
+
+  deleteComment: (commentId: string) =>
+    api.delete<{ success: boolean }>(
+      `/kg/comments/${encodeURIComponent(commentId)}`
+    ).then(r => r.data),
+
+  myBrainStats: () =>
+    api.get<{ success: boolean } & KgMyBrainStats>('/kg/my-brain').then(r => r.data),
+}

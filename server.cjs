@@ -10222,6 +10222,287 @@ CHỈ TRẢ JSON, không bọc markdown.`;
   });
 
   // ════════════════════════════════════════════════
+  // ════════════════════════════════════════════════
+  // KG — BRAIN: Collaborative Notes + Comments per node
+  // "Bộ não tri thức của người học + GV cùng xây"
+  // ════════════════════════════════════════════════
+
+  let _kgBrainReady = false;
+  async function ensureKgBrainReady() {
+    if (_kgBrainReady) return;
+    await ensureKgReady();
+    const pool = getKcPool();
+    // Personal notes per user per node
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_node_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        is_public BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (user_id, node_id)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_notes_node ON kg_node_notes(node_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_notes_user ON kg_node_notes(user_id)`);
+    // Public discussion comments
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_node_comments (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        node_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        parent_id TEXT,
+        upvotes INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_kg_comments_node ON kg_node_comments(node_id, created_at DESC)`);
+    // Track comment upvotes per user (avoid double-upvote)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS kg_comment_upvotes (
+        comment_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (comment_id, user_id)
+      )
+    `);
+    _kgBrainReady = true;
+  }
+
+  // GET /api/kg/nodes/:id/note — my note cho node này (or null)
+  app.get('/api/kg/nodes/:id/note', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      const r = await pool.query(
+        `SELECT id, content, is_public, created_at, updated_at FROM kg_node_notes
+         WHERE user_id = $1 AND node_id = $2`,
+        [user.id, req.params.id]
+      );
+      return res.json({ success: true, note: r.rows[0] || null });
+    } catch (err) {
+      console.error('[kg:note:get] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // PUT /api/kg/nodes/:id/note — save/update my note
+  app.put('/api/kg/nodes/:id/note', express.json({ limit: '50kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      const { content, isPublic } = req.body || {};
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ success: false, error: 'content required' });
+      }
+      const trimmed = content.trim().slice(0, 4000);
+      if (!trimmed) {
+        // Empty → delete note
+        await pool.query(
+          `DELETE FROM kg_node_notes WHERE user_id = $1 AND node_id = $2`,
+          [user.id, req.params.id]
+        );
+        return res.json({ success: true, deleted: true });
+      }
+      const id = 'note_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      await pool.query(
+        `INSERT INTO kg_node_notes (id, user_id, node_id, content, is_public, updated_at)
+         VALUES ($1, $2, $3, $4, $5, NOW())
+         ON CONFLICT (user_id, node_id) DO UPDATE
+           SET content = EXCLUDED.content,
+               is_public = EXCLUDED.is_public,
+               updated_at = NOW()`,
+        [id, user.id, req.params.id, trimmed, !!isPublic]
+      );
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[kg:note:put] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/nodes/:id/comments — list public comments + public notes shared by others
+  app.get('/api/kg/nodes/:id/comments', async (req, res) => {
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      const myUserId = getKgUser(req)?.id || null;
+      // Comments với author name + upvote count + my-upvoted-flag
+      const r = await pool.query(
+        `SELECT c.id, c.user_id, c.content, c.parent_id, c.upvotes, c.created_at,
+                u.name AS author_name, u.role AS author_role,
+                EXISTS(SELECT 1 FROM kg_comment_upvotes uv WHERE uv.comment_id = c.id AND uv.user_id = $2) AS my_upvoted
+         FROM kg_node_comments c
+         LEFT JOIN "User" u ON u.id = c.user_id
+         WHERE c.node_id = $1
+         ORDER BY c.upvotes DESC, c.created_at DESC
+         LIMIT 100`,
+        [req.params.id, myUserId || 'anon']
+      );
+      // Public shared notes (is_public=true) — show as "notes" not comments
+      const sn = await pool.query(
+        `SELECT n.id, n.user_id, n.content, n.created_at, u.name AS author_name, u.role AS author_role
+         FROM kg_node_notes n
+         LEFT JOIN "User" u ON u.id = n.user_id
+         WHERE n.node_id = $1 AND n.is_public = true
+         ORDER BY n.updated_at DESC
+         LIMIT 30`,
+        [req.params.id]
+      );
+      return res.json({
+        success: true,
+        comments: r.rows.map(c => ({
+          id: c.id, userId: c.user_id, content: c.content,
+          parentId: c.parent_id, upvotes: c.upvotes,
+          createdAt: c.created_at,
+          authorName: c.author_name || 'HS',
+          authorRole: c.author_role || 'STUDENT',
+          myUpvoted: !!c.my_upvoted,
+          isOwn: c.user_id === myUserId,
+        })),
+        sharedNotes: sn.rows.map(n => ({
+          id: n.id, userId: n.user_id, content: n.content,
+          createdAt: n.created_at,
+          authorName: n.author_name || 'HS',
+          authorRole: n.author_role || 'STUDENT',
+        })),
+      });
+    } catch (err) {
+      console.error('[kg:comments:list] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/kg/nodes/:id/comments — add comment
+  app.post('/api/kg/nodes/:id/comments', express.json({ limit: '20kb' }), async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      const content = String(req.body?.content || '').trim().slice(0, 2000);
+      if (!content) return res.status(400).json({ success: false, error: 'content required' });
+      const parentId = req.body?.parentId ? String(req.body.parentId).slice(0, 100) : null;
+      const id = 'cmt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+      await pool.query(
+        `INSERT INTO kg_node_comments (id, user_id, node_id, content, parent_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [id, user.id, req.params.id, content, parentId]
+      );
+      return res.status(201).json({ success: true, id });
+    } catch (err) {
+      console.error('[kg:comments:create] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/kg/comments/:id/upvote — toggle upvote
+  app.post('/api/kg/comments/:id/upvote', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      // Check existing
+      const dup = await pool.query(
+        `SELECT 1 FROM kg_comment_upvotes WHERE comment_id = $1 AND user_id = $2`,
+        [req.params.id, user.id]
+      );
+      if (dup.rows.length > 0) {
+        // Toggle off
+        await pool.query(`DELETE FROM kg_comment_upvotes WHERE comment_id = $1 AND user_id = $2`, [req.params.id, user.id]);
+        await pool.query(`UPDATE kg_node_comments SET upvotes = GREATEST(0, upvotes - 1) WHERE id = $1`, [req.params.id]);
+        return res.json({ success: true, action: 'removed' });
+      }
+      await pool.query(`INSERT INTO kg_comment_upvotes (comment_id, user_id) VALUES ($1, $2)`, [req.params.id, user.id]);
+      await pool.query(`UPDATE kg_node_comments SET upvotes = upvotes + 1 WHERE id = $1`, [req.params.id]);
+      return res.json({ success: true, action: 'added' });
+    } catch (err) {
+      console.error('[kg:comments:upvote] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // DELETE /api/kg/comments/:id — author own delete
+  app.delete('/api/kg/comments/:id', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      // Verify ownership
+      const r = await pool.query(`SELECT user_id FROM kg_node_comments WHERE id = $1`, [req.params.id]);
+      if (r.rows.length === 0) return res.status(404).json({ success: false, error: 'Not found' });
+      if (r.rows[0].user_id !== user.id) return res.status(403).json({ success: false, error: 'Not your comment' });
+      await pool.query(`DELETE FROM kg_node_comments WHERE id = $1`, [req.params.id]);
+      await pool.query(`DELETE FROM kg_comment_upvotes WHERE comment_id = $1`, [req.params.id]);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error('[kg:comments:delete] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // GET /api/kg/my-brain — personal stats (cho "Bộ não" overview)
+  app.get('/api/kg/my-brain', async (req, res) => {
+    const user = getKgUser(req);
+    if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+    try {
+      await ensureKgBrainReady();
+      const pool = getKcPool();
+      const [mastery, notes, comments, suggestions] = await Promise.all([
+        pool.query(
+          `SELECT COUNT(*) AS total,
+                  COUNT(*) FILTER (WHERE score >= 70) AS mastered,
+                  COUNT(*) FILTER (WHERE score >= 50 AND score < 70) AS learning,
+                  COUNT(*) FILTER (WHERE score < 50) AS weak,
+                  COALESCE(AVG(score), 0) AS avg_score
+           FROM kg_mastery WHERE user_id = $1`,
+          [user.id]
+        ).catch(() => ({ rows: [{ total: 0, mastered: 0, learning: 0, weak: 0, avg_score: 0 }] })),
+        pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE is_public) AS shared FROM kg_node_notes WHERE user_id = $1`, [user.id])
+          .catch(() => ({ rows: [{ total: 0, shared: 0 }] })),
+        pool.query(`SELECT COUNT(*) AS total, COALESCE(SUM(upvotes), 0) AS total_upvotes FROM kg_node_comments WHERE user_id = $1`, [user.id])
+          .catch(() => ({ rows: [{ total: 0, total_upvotes: 0 }] })),
+        pool.query(`SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'approved') AS approved FROM kg_suggestions WHERE author_id = $1`, [user.id])
+          .catch(() => ({ rows: [{ total: 0, approved: 0 }] })),
+      ]);
+      return res.json({
+        success: true,
+        mastery: {
+          total: Number(mastery.rows[0].total || 0),
+          mastered: Number(mastery.rows[0].mastered || 0),
+          learning: Number(mastery.rows[0].learning || 0),
+          weak: Number(mastery.rows[0].weak || 0),
+          avgScore: Math.round(Number(mastery.rows[0].avg_score || 0) * 10) / 10,
+        },
+        notes: {
+          total: Number(notes.rows[0].total || 0),
+          shared: Number(notes.rows[0].shared || 0),
+        },
+        comments: {
+          total: Number(comments.rows[0].total || 0),
+          totalUpvotes: Number(comments.rows[0].total_upvotes || 0),
+        },
+        suggestions: {
+          total: Number(suggestions.rows[0].total || 0),
+          approved: Number(suggestions.rows[0].approved || 0),
+        },
+      });
+    } catch (err) {
+      console.error('[kg:my-brain] ❌', err.message);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
   // KG — PHASE 7: Collaborative Editing (suggestions)
   // GV/HS đề xuất khái niệm/relation mới → admin duyệt.
   // ════════════════════════════════════════════════
