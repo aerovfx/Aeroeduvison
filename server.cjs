@@ -27913,8 +27913,59 @@ if (!USE_NODEJS_QUESTIONS) {
   app.get('/api/learning/my-courses', emptyArr);
   app.get('/api/learning/certificate/:courseId',
     notImpl('Chứng chỉ chưa khả dụng — hoàn thành khoá học để nhận'));
-  app.get('/api/learning/course/:courseId/videos', emptyArr);
-  app.get('/api/learning/course/:courseId/assets', emptyArr);
+
+  // ════════════════════════════════════════════════════════════════
+  // LEARNING — Course player: fetch videos + assets PUBLIC (any logged-in
+  // user có thể xem để học). Trước đây trả stub [] → student player báo
+  // "Khoá học chưa có video" dù instructor đã upload.
+  // Dùng module-cached pool để tránh scope issue (getKcPool ở block khác).
+  // ════════════════════════════════════════════════════════════════
+  let _lrnPool = null;
+  function getLearnPool() {
+    if (!_lrnPool && process.env.DATABASE_URL) {
+      const { Pool } = require('pg');
+      _lrnPool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+    }
+    return _lrnPool;
+  }
+
+  app.get('/api/learning/course/:courseId/videos', async (req, res) => {
+    try {
+      const pool = getLearnPool();
+      if (!pool) return res.json([]);
+      const { rows } = await pool.query(
+        `SELECT id, "courseId", title, type, url, "thumbUrl", duration,
+                position, "isPreview", "groupName", "createdAt"
+           FROM "CourseVideo"
+          WHERE "courseId" = $1
+          ORDER BY position ASC, "createdAt" ASC`,
+        [req.params.courseId]
+      );
+      return res.json(rows);
+    } catch (err) {
+      console.error('[learning:videos]', err.message);
+      return res.json([]);
+    }
+  });
+
+  app.get('/api/learning/course/:courseId/assets', async (req, res) => {
+    try {
+      const pool = getLearnPool();
+      if (!pool) return res.json([]);
+      const { rows } = await pool.query(
+        `SELECT id, "courseId", title, "fileUrl", "fileType", "fileSize", "createdAt"
+           FROM "CourseAsset"
+          WHERE "courseId" = $1
+          ORDER BY "createdAt" DESC`,
+        [req.params.courseId]
+      );
+      return res.json(rows);
+    } catch (err) {
+      console.error('[learning:assets]', err.message);
+      return res.json([]);
+    }
+  });
+
   app.get('/api/learning/course/:courseId/reviews', emptyArr);
   app.post('/api/learning/course/:courseId/reviews', okMsg);
   // my-courses-activity đã có handler thật ở trên (line ~2226), không stub đè.
