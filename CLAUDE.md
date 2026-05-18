@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `544c1e8` (revision pixiai-00297-lak, 2026-05-18 — URL fix + time badge + lastCareer LS persist LIVE)
-- Commits since last deploy: `1/5` (this docs)
+- Commits since last deploy: `2/5` → DEPLOYING (early — user-requested KG expansion feature complete)
 - Prev: `4677a76` → pixiai-00296-puv (Games hub polish: completion CTA + deep-link + dailyLife list + scroll-top)
 - Prev: `ed01f05` → pixiai-00295-fif (Games hub /student/games + career search + ScrollToTopButton)
 - Prev: `04ea6e0` → pixiai-00294-not (Odyssey polish: tutorial + modal key block + achievement toast)
