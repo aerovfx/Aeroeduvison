@@ -10591,13 +10591,384 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Địa lí 10, 11, 12 theo SGK Việt Nam (GDPT 2018).
+   * ~140 nodes + ~190 edges. Idempotent.
+   */
+  async function seedKgGeography() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-diali', type: 'Subject', label: 'Địa lí',
+        description: 'Môn Địa lí THPT 10, 11, 12 theo GDPT 2018',
+        properties: { color: '#0ea5e9' } },
+
+      // === LỚP 10: Địa lí Đại cương ===
+      { id: 'chap-dia10-ban-do',     type: 'Chapter', label: '[10] Sử dụng bản đồ',         description: 'Tỉ lệ, kinh tuyến, vĩ tuyến, phép chiếu, GIS' },
+      { id: 'chap-dia10-trai-dat',   type: 'Chapter', label: '[10] Trái Đất',                description: 'Vũ trụ, hệ Mặt Trời, chuyển động Trái Đất' },
+      { id: 'chap-dia10-thach',      type: 'Chapter', label: '[10] Thạch quyển',             description: 'Vỏ Trái Đất, khoáng sản, kiến tạo mảng' },
+      { id: 'chap-dia10-khi',        type: 'Chapter', label: '[10] Khí quyển',                description: 'Khí áp, gió, mưa, biến đổi khí hậu toàn cầu' },
+      { id: 'chap-dia10-thuy',       type: 'Chapter', label: '[10] Thuỷ quyển',               description: 'Đại dương, sông, hồ, nước ngầm, băng' },
+      { id: 'chap-dia10-sinh',       type: 'Chapter', label: '[10] Sinh quyển + Thổ nhưỡng',  description: 'Hệ sinh thái, đa dạng SH, đất' },
+      { id: 'chap-dia10-dan-cu',     type: 'Chapter', label: '[10] Dân cư',                   description: 'Dân số, kết cấu, đô thị hoá' },
+      { id: 'chap-dia10-nguon-luc',  type: 'Chapter', label: '[10] Nguồn lực + cơ cấu KT',    description: 'Tài nguyên, lao động, vốn, KHCN' },
+      { id: 'chap-dia10-nganh-kt',   type: 'Chapter', label: '[10] Các ngành kinh tế',        description: 'Nông nghiệp, công nghiệp, dịch vụ' },
+
+      { id: 'topic-ban-do',           type: 'Topic', label: 'Bản đồ',                       description: 'Tỉ lệ + phép chiếu — phân loại theo nội dung + mục đích' },
+      { id: 'topic-toa-do-dia',       type: 'Topic', label: 'Kinh độ + Vĩ độ',              description: 'Tọa độ trên Trái Đất — Greenwich 0°' },
+      { id: 'topic-gis',              type: 'Topic', label: 'GIS - Bản đồ số',              description: 'Hệ thống thông tin địa lý — ArcGIS, QGIS, Google Earth' },
+      { id: 'topic-vu-tru',           type: 'Topic', label: 'Vũ trụ + Hệ Mặt Trời',         description: 'Big Bang, dải Ngân Hà, 8 hành tinh' },
+      { id: 'topic-chuyen-dong-td',   type: 'Topic', label: 'Chuyển động Trái Đất',         description: 'Tự quay (24h) + quay quanh MT (365.25d) → mùa' },
+      { id: 'topic-kien-tao-mang',    type: 'Topic', label: 'Kiến tạo mảng',                description: '7 mảng lớn — ranh giới hội tụ/phân kỳ/trượt → núi lửa + động đất' },
+      { id: 'topic-khoang-san',       type: 'Topic', label: 'Khoáng sản',                   description: 'Năng lượng (than, dầu), kim loại (Fe, Cu, Au)' },
+      { id: 'topic-noi-luc',          type: 'Topic', label: 'Nội lực',                      description: 'Lực từ trong Trái Đất → uốn nếp, đứt gãy, núi lửa' },
+      { id: 'topic-ngoai-luc',        type: 'Topic', label: 'Ngoại lực',                    description: 'Phong hoá, xâm thực, vận chuyển → bồi tụ, đồng bằng' },
+      { id: 'topic-khi-ap',           type: 'Topic', label: 'Khí áp + Gió',                 description: 'Áp cao/thấp → gió thổi từ cao về thấp' },
+      { id: 'topic-gio-mua',          type: 'Topic', label: 'Gió mùa',                      description: 'Đặc trưng Đông Nam Á — mùa đông Đông Bắc, mùa hè Tây Nam' },
+      { id: 'topic-mua',              type: 'Topic', label: 'Mưa',                          description: 'Đối lưu, frông, địa hình — gây mưa khi hơi nước ngưng' },
+      { id: 'topic-bien-doi-kh',      type: 'Topic', label: 'Biến đổi khí hậu',             description: 'CO₂ tăng → nhiệt độ tăng 1.5°C → tan băng + nước biển dâng' },
+      { id: 'topic-dai-duong',        type: 'Topic', label: 'Đại dương',                     description: '5 đại dương (Thái Bình, Đại Tây, Ấn, Bắc Băng, Nam) — chiếm 71%' },
+      { id: 'topic-song-ngoi',        type: 'Topic', label: 'Sông ngòi',                    description: 'Vùng tập trung nước mưa + tuyết → chảy ra biển' },
+      { id: 'topic-nuoc-ngam',        type: 'Topic', label: 'Nước ngầm',                    description: 'Nước trong đất đá xốp — nguồn nước uống quan trọng' },
+      { id: 'topic-da-dang-sh-dia',   type: 'Topic', label: 'Đa dạng sinh học',             description: 'Loài + gen + hệ sinh thái — VN top 16 thế giới' },
+      { id: 'topic-tho-nhuong',       type: 'Topic', label: 'Thổ nhưỡng (Đất)',             description: 'Tầng phong hoá + mùn — feralit, phù sa, mặn' },
+      { id: 'topic-dan-so',           type: 'Topic', label: 'Dân số thế giới',              description: '8 tỉ (2022) — phân bố không đều, châu Á 60%' },
+      { id: 'topic-co-cau-ds',        type: 'Topic', label: 'Cơ cấu dân số',                description: 'Theo tuổi, giới, lao động, dân tộc, tôn giáo' },
+      { id: 'topic-do-thi-hoa',       type: 'Topic', label: 'Đô thị hoá',                   description: '55% dân số TG sống ở thành thị (2022, dự 70% 2050)' },
+      { id: 'topic-nong-nghiep-dl',   type: 'Topic', label: 'Nông nghiệp',                  description: 'Trồng trọt + chăn nuôi — 26% lao động TG' },
+      { id: 'topic-cong-nghiep-dl',   type: 'Topic', label: 'Công nghiệp',                  description: 'Khai khoáng + chế biến + năng lượng' },
+      { id: 'topic-dich-vu-dl',       type: 'Topic', label: 'Dịch vụ',                       description: 'Thương mại + tài chính + du lịch — chiếm >60% GDP nước phát triển' },
+      { id: 'topic-thuong-mai-qt',    type: 'Topic', label: 'Thương mại quốc tế',          description: 'WTO, xuất nhập khẩu, FTA, CPTPP' },
+
+      // === LỚP 11: Khu vực + Quốc gia ===
+      { id: 'chap-dia11-dong-a',     type: 'Chapter', label: '[11] Khu vực Đông Á',        description: 'Trung Quốc, Nhật Bản, Hàn Quốc' },
+      { id: 'chap-dia11-dna',        type: 'Chapter', label: '[11] Đông Nam Á + ASEAN',     description: '11 nước ASEAN — kinh tế, dân số, văn hoá' },
+      { id: 'chap-dia11-tay-nam-a',  type: 'Chapter', label: '[11] Tây Á + Nam Á',          description: 'Dầu mỏ Trung Đông, Israel, Ấn Độ' },
+      { id: 'chap-dia11-nga',        type: 'Chapter', label: '[11] Liên Bang Nga',          description: 'Diện tích lớn nhất TG, tài nguyên dồi dào' },
+      { id: 'chap-dia11-hoa-ky',     type: 'Chapter', label: '[11] Hoa Kỳ',                 description: 'Siêu cường kinh tế + công nghệ' },
+      { id: 'chap-dia11-eu',         type: 'Chapter', label: '[11] Liên minh châu Âu (EU)', description: '27 thành viên, đồng Euro, thị trường chung' },
+      { id: 'chap-dia11-my-latin',   type: 'Chapter', label: '[11] Mỹ Latin',                description: 'Brazil, Mexico, Argentina — rừng Amazon, biển Caribe' },
+      { id: 'chap-dia11-chau-phi',   type: 'Chapter', label: '[11] Châu Phi',                description: 'Sa mạc Sahara, sông Nile, đói nghèo + tăng trưởng' },
+      { id: 'chap-dia11-dai-duong',  type: 'Chapter', label: '[11] Châu Đại Dương',         description: 'Australia, New Zealand — 14 quốc đảo' },
+
+      { id: 'topic-trung-quoc',       type: 'Topic', label: 'Trung Quốc',                  description: '1.4 tỉ dân, GDP #2 TG, "công xưởng thế giới"' },
+      { id: 'topic-nhat-ban',         type: 'Topic', label: 'Nhật Bản',                    description: 'Đảo quốc, công nghệ cao, dân số già' },
+      { id: 'topic-han-quoc',         type: 'Topic', label: 'Hàn Quốc',                    description: 'Phép màu sông Hàn, K-pop, công nghệ Samsung-LG' },
+      { id: 'topic-asean-dl',         type: 'Topic', label: 'ASEAN',                       description: '11 nước (gồm Đông Timor 2025) — thị trường 670 triệu dân' },
+      { id: 'topic-singapore',        type: 'Topic', label: 'Singapore',                   description: 'Đảo nhỏ giàu nhất ĐNA — cảng biển + tài chính' },
+      { id: 'topic-thai-lan',         type: 'Topic', label: 'Thái Lan',                    description: 'Du lịch + xuất khẩu gạo + ô tô' },
+      { id: 'topic-trung-dong',       type: 'Topic', label: 'Trung Đông',                  description: 'Dầu mỏ chiếm 60% trữ lượng TG — OPEC' },
+      { id: 'topic-an-do',            type: 'Topic', label: 'Ấn Độ',                       description: 'Dân số #1 (1.4 tỉ), IT-BPO Bangalore' },
+      { id: 'topic-nga',              type: 'Topic', label: 'Liên Bang Nga',               description: '17 triệu km² (lớn nhất), gas + dầu khí khổng lồ' },
+      { id: 'topic-hoa-ky',           type: 'Topic', label: 'Hoa Kỳ',                       description: 'GDP #1 TG, USD đồng tiền dự trữ, Silicon Valley' },
+      { id: 'topic-eu-dl',            type: 'Topic', label: 'Liên minh EU',                description: '27 nước (sau Brexit 2020), GDP gần Mỹ' },
+      { id: 'topic-duc',              type: 'Topic', label: 'Đức',                          description: 'Kinh tế lớn nhất EU — xe hơi, công nghệ chính xác' },
+      { id: 'topic-brazil',           type: 'Topic', label: 'Brazil',                       description: 'Rừng Amazon + cà phê + đậu nành — lớn nhất Mỹ Latin' },
+      { id: 'topic-sahara',           type: 'Topic', label: 'Sa mạc Sahara',                description: 'Sa mạc lớn nhất TG (9 triệu km²), nắng + nóng' },
+      { id: 'topic-australia',        type: 'Topic', label: 'Australia',                   description: 'Lục địa-quốc gia duy nhất, khai khoáng + nông nghiệp' },
+
+      // === LỚP 12: Địa lí Việt Nam ===
+      { id: 'chap-dia12-vi-tri',     type: 'Chapter', label: '[12] Vị trí VN + Lịch sử lãnh thổ', description: 'Bán đảo Đông Dương, biển Đông, hình thành 4 vùng' },
+      { id: 'chap-dia12-tu-nhien',   type: 'Chapter', label: '[12] Đặc điểm tự nhiên VN',  description: 'Địa hình, khí hậu, sông ngòi, sinh vật, đất' },
+      { id: 'chap-dia12-tnxh',       type: 'Chapter', label: '[12] Tài nguyên + Môi trường VN', description: 'Khoáng sản, rừng, biển, ô nhiễm, bảo vệ' },
+      { id: 'chap-dia12-dan-cu-vn',  type: 'Chapter', label: '[12] Dân cư VN',              description: '99 triệu (2022), 54 dân tộc, đô thị hoá nhanh' },
+      { id: 'chap-dia12-cdc-kt',     type: 'Chapter', label: '[12] Chuyển dịch cơ cấu KT',   description: 'Từ nông nghiệp → công nghiệp → dịch vụ' },
+      { id: 'chap-dia12-nganh-vn',   type: 'Chapter', label: '[12] Các ngành KT VN',        description: 'NN, lâm-thuỷ sản, CN, dịch vụ, giao thông' },
+      { id: 'chap-dia12-vung-vn',    type: 'Chapter', label: '[12] 7 vùng kinh tế VN',     description: 'TDMN BB, ĐBSH, BTB, DH NTB, TN, ĐNB, ĐBSCL' },
+      { id: 'chap-dia12-bien-dao',   type: 'Chapter', label: '[12] Biển đảo + Chủ quyền',   description: 'Biển Đông, Hoàng Sa, Trường Sa — 3260 km bờ biển' },
+
+      { id: 'topic-vi-tri-vn',        type: 'Topic', label: 'Vị trí VN',                   description: 'Đông Nam Á, bán đảo Đông Dương, ven biển Đông' },
+      { id: 'topic-dh-vn',            type: 'Topic', label: 'Địa hình VN',                  description: '3/4 đồi núi, 1/4 đồng bằng, kéo dài Bắc-Nam 1650km' },
+      { id: 'topic-khi-hau-vn',       type: 'Topic', label: 'Khí hậu VN',                   description: 'Nhiệt đới gió mùa — Bắc 4 mùa, Nam 2 mùa' },
+      { id: 'topic-song-vn',          type: 'Topic', label: 'Sông ngòi VN',                 description: '2360 sông >10km — Hồng + Cửu Long + Đồng Nai + Mã + Cả' },
+      { id: 'topic-bien-vn',          type: 'Topic', label: 'Biển Đông',                    description: '3260 km bờ biển, 1 triệu km² vùng biển + thềm lục địa' },
+      { id: 'topic-rung-vn',          type: 'Topic', label: 'Rừng + Đất VN',                description: 'Rừng nhiệt đới ẩm — đất feralit đồi núi + phù sa đồng bằng' },
+      { id: 'topic-khoang-san-vn',   type: 'Topic', label: 'Khoáng sản VN',                description: 'Bauxite Tây Nguyên, dầu khí Vũng Tàu, than Quảng Ninh' },
+      { id: 'topic-dan-toc-vn',       type: 'Topic', label: '54 dân tộc VN',                description: 'Kinh 85%, Tày, Thái, Mường, Khmer, Hmong, ... 53 thiểu số' },
+      { id: 'topic-do-thi-vn',        type: 'Topic', label: 'Đô thị VN',                    description: '38% dân số (2022), Hà Nội + TP.HCM 2 cực' },
+      { id: 'topic-lao-dong-vn',      type: 'Topic', label: 'Lao động VN',                  description: '54 triệu lao động — chuyển dịch nông nghiệp → công nghiệp + dịch vụ' },
+      { id: 'topic-nong-nghiep-vn',   type: 'Topic', label: 'Nông nghiệp VN',               description: 'Lúa #1 Đông Nam Á, xuất khẩu cà phê + tiêu + điều' },
+      { id: 'topic-thuy-san-vn',      type: 'Topic', label: 'Thuỷ sản VN',                  description: 'Tôm + cá tra — xuất khẩu top 3 TG' },
+      { id: 'topic-cn-vn',            type: 'Topic', label: 'Công nghiệp VN',               description: 'Dệt may, điện tử, ô tô (VinFast), xi măng' },
+      { id: 'topic-dl-vn',            type: 'Topic', label: 'Du lịch VN',                   description: 'Hạ Long, Hội An, Phú Quốc — 19 triệu khách 2023' },
+      { id: 'topic-giao-thong-vn',    type: 'Topic', label: 'Giao thông VN',                description: 'Quốc lộ 1A, cao tốc Bắc-Nam, sân bay Tân Sơn Nhất + Nội Bài' },
+      { id: 'topic-tdmnbb',           type: 'Topic', label: 'Trung du miền núi Bắc Bộ',     description: 'Thuỷ điện Hòa Bình + Sơn La, chè + cây ăn quả' },
+      { id: 'topic-dbsh',             type: 'Topic', label: 'Đồng bằng Sông Hồng',          description: '11 tỉnh — vựa lúa + trung tâm chính trị + công nghiệp' },
+      { id: 'topic-btb',              type: 'Topic', label: 'Bắc Trung Bộ',                  description: '6 tỉnh từ Thanh Hoá → TT-Huế — bão lũ + nghèo' },
+      { id: 'topic-dhntb',            type: 'Topic', label: 'Duyên hải Nam Trung Bộ',       description: '8 tỉnh từ Đà Nẵng → Bình Thuận — du lịch + cảng biển' },
+      { id: 'topic-tn',               type: 'Topic', label: 'Tây Nguyên',                    description: '5 tỉnh — cà phê + cao su + bauxite + thuỷ điện' },
+      { id: 'topic-dnb',              type: 'Topic', label: 'Đông Nam Bộ',                  description: '6 tỉnh + TP.HCM — đầu tàu KT, dầu khí Bà Rịa-VT' },
+      { id: 'topic-dbscl',            type: 'Topic', label: 'ĐB Sông Cửu Long',             description: '13 tỉnh — vựa lúa 50% sản lượng VN, thuỷ sản' },
+      { id: 'topic-hoang-sa',         type: 'Topic', label: 'Hoàng Sa',                     description: 'Quần đảo Đà Nẵng — chủ quyền VN bị TQ chiếm 1974' },
+      { id: 'topic-truong-sa',        type: 'Topic', label: 'Trường Sa',                    description: 'Quần đảo Khánh Hoà — VN, TQ, Phil, Malay, Brunei tranh chấp' },
+      { id: 'topic-o-nhiem-vn',       type: 'Topic', label: 'Ô nhiễm môi trường VN',        description: 'PM2.5 Hà Nội + TP.HCM, rác nhựa đại dương, đất nhiễm độc' },
+
+      // === CONCEPTS ===
+      { id: 'concept-dia-ly',         type: 'Concept', label: 'Địa lý học',                 description: 'Khoa học nghiên cứu Trái Đất + con người + môi trường' },
+      { id: 'concept-bien-dl',        type: 'Concept', label: 'Đại dương + Biển',           description: 'Diện tích lớn nước mặn — quyết định khí hậu + tài nguyên' },
+      { id: 'concept-cong-nghiep-h',  type: 'Concept', label: 'Công nghiệp hóa',            description: 'Chuyển từ nông nghiệp → công nghiệp — nhân tố phát triển' },
+      { id: 'concept-do-thi-h',       type: 'Concept', label: 'Đô thị hóa',                  description: 'Tỷ lệ dân số sống ở thành thị tăng — 4.5 tỉ người (2022)' },
+      { id: 'concept-toan-cau-hoa-dl',type: 'Concept', label: 'Toàn cầu hoá',                description: 'Hàng hoá, vốn, lao động lưu thông không biên giới' },
+      { id: 'concept-bien-doi-kh',    type: 'Concept', label: 'Biến đổi khí hậu',           description: 'Nhiệt độ TĐ tăng do khí nhà kính — đe doạ sinh tồn' },
+      { id: 'concept-phat-trien-bv',  type: 'Concept', label: 'Phát triển bền vững',        description: 'Kinh tế + xã hội + môi trường cùng phát triển' },
+      { id: 'concept-tai-nguyen',     type: 'Concept', label: 'Tài nguyên thiên nhiên',     description: 'Mọi vật chất + năng lượng có ích — tái tạo / không tái tạo' },
+
+      // === PHENOMENA ===
+      { id: 'phen-gio-mua-d',         type: 'Phenomenon', label: 'Gió mùa',                description: 'Mưa đổ về theo mùa — đặc trưng VN + Đông Nam Á' },
+      { id: 'phen-nui-lua',           type: 'Phenomenon', label: 'Núi lửa phun',           description: 'Magma trào lên — Indonesia, Nhật, Iceland' },
+      { id: 'phen-dong-dat-d',        type: 'Phenomenon', label: 'Động đất',                description: 'Vỏ Trái Đất rung — ranh giới mảng kiến tạo, Richter scale' },
+      { id: 'phen-song-than-d',       type: 'Phenomenon', label: 'Sóng thần (Tsunami)',     description: 'Sóng lớn từ động đất biển — Indonesia 2004 ~230k chết' },
+      { id: 'phen-bao',               type: 'Phenomenon', label: 'Bão (Typhoon)',           description: 'VN trung bình 10 cơn bão/năm — gió >100 km/h' },
+      { id: 'phen-lu-lut',            type: 'Phenomenon', label: 'Lũ lụt',                  description: 'Mưa nhiều + sông tràn — miền Trung VN tháng 10-11' },
+      { id: 'phen-han-han',           type: 'Phenomenon', label: 'Hạn hán',                  description: 'Thiếu mưa kéo dài — ĐBSCL nhiễm mặn nghiêm trọng' },
+      { id: 'phen-nuoc-bien-dang',    type: 'Phenomenon', label: 'Nước biển dâng',         description: '+3.4 mm/năm — đe doạ ĐBSCL, Bangladesh, Maldives' },
+      { id: 'phen-en-nino',           type: 'Phenomenon', label: 'El Niño - La Niña',       description: 'Nước biển Thái Bình ấm bất thường → khí hậu bất ổn toàn cầu' },
+      { id: 'phen-ng-h-vn',           type: 'Phenomenon', label: 'Hiệu ứng nhà kính',      description: 'CO₂, CH₄ giữ nhiệt → nóng lên — đe doạ Mekong delta' },
+
+      // === APPLICATIONS ===
+      { id: 'app-gps-dia',            type: 'Application', label: 'GPS định vị',           description: 'Google Maps, Grab, Be — định vị mọi nơi trên TĐ' },
+      { id: 'app-vt-vt',              type: 'Application', label: 'Viễn thám (Remote Sensing)', description: 'Vệ tinh chụp ảnh — theo dõi rừng, băng tan, nông nghiệp' },
+      { id: 'app-quy-hoach-dt',       type: 'Application', label: 'Quy hoạch đô thị',      description: 'Thiết kế thành phố — phân khu, hạ tầng, giao thông' },
+      { id: 'app-du-bao-tt',          type: 'Application', label: 'Dự báo thời tiết',       description: 'Mô hình khí tượng + radar + vệ tinh → 7 ngày tới' },
+      { id: 'app-bao-lu-canh-bao',    type: 'Application', label: 'Cảnh báo bão + lũ',     description: 'Center khí tượng + SMS + radio — cứu hàng nghìn sinh mạng' },
+      { id: 'app-tham-do-dau',        type: 'Application', label: 'Thăm dò dầu khí',       description: 'Địa vật lý + khoan thăm dò — VN: Bạch Hổ, Đại Hùng' },
+      { id: 'app-du-lich-st',         type: 'Application', label: 'Du lịch sinh thái',     description: 'Vườn quốc gia + bảo tồn — Cát Tiên, Ba Bể' },
+      { id: 'app-nong-nghiep-cn',     type: 'Application', label: 'Nông nghiệp công nghệ', description: 'IoT + thuỷ canh + nhà kính — Dalat, Lâm Đồng' },
+      { id: 'app-cang-bien',          type: 'Application', label: 'Cảng biển',              description: 'Cát Lái, Cái Mép, Hải Phòng — xuất nhập khẩu VN' },
+      { id: 'app-ban-do-so',          type: 'Application', label: 'Bản đồ số (Google Maps)', description: 'Quản lý + chia sẻ thông tin địa lý mở' },
+
+      // === CAREERS ===
+      { id: 'career-ks-dia-chat',     type: 'Career', label: 'Kỹ sư địa chất',             description: 'Khảo sát mỏ, dầu khí, xây dựng — PetroVietnam' },
+      { id: 'career-khi-tuong',       type: 'Career', label: 'Nhà khí tượng',              description: 'Dự báo thời tiết, biến đổi khí hậu — TT KTTV QG' },
+      { id: 'career-quy-hoach',       type: 'Career', label: 'Chuyên viên quy hoạch',      description: 'Quy hoạch đô thị + vùng — UBND + viện thiết kế' },
+      { id: 'career-gis-eng',         type: 'Career', label: 'Kỹ sư GIS',                  description: 'Phân tích không gian + bản đồ số — IT + địa lý' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-geo:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-diali', 'chap-dia10-ban-do',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-trai-dat',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-thach',      'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-khi',        'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-thuy',       'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-sinh',       'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-dan-cu',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-nguon-luc',  'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia10-nganh-kt',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-dong-a',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-dna',        'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-tay-nam-a',  'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-nga',        'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-hoa-ky',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-eu',         'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-my-latin',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-chau-phi',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia11-dai-duong',  'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-vi-tri',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-tu-nhien',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-tnxh',       'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-dan-cu-vn',  'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-cdc-kt',     'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-nganh-vn',   'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-vung-vn',    'HAS_CHAPTER'],
+      ['subj-diali', 'chap-dia12-bien-dao',   'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-dia10-ban-do',   'topic-ban-do',          'HAS_TOPIC'],
+      ['chap-dia10-ban-do',   'topic-toa-do-dia',      'HAS_TOPIC'],
+      ['chap-dia10-ban-do',   'topic-gis',             'HAS_TOPIC'],
+      ['chap-dia10-trai-dat', 'topic-vu-tru',          'HAS_TOPIC'],
+      ['chap-dia10-trai-dat', 'topic-chuyen-dong-td',  'HAS_TOPIC'],
+      ['chap-dia10-thach',    'topic-kien-tao-mang',   'HAS_TOPIC'],
+      ['chap-dia10-thach',    'topic-khoang-san',      'HAS_TOPIC'],
+      ['chap-dia10-thach',    'topic-noi-luc',         'HAS_TOPIC'],
+      ['chap-dia10-thach',    'topic-ngoai-luc',       'HAS_TOPIC'],
+      ['chap-dia10-khi',      'topic-khi-ap',          'HAS_TOPIC'],
+      ['chap-dia10-khi',      'topic-gio-mua',         'HAS_TOPIC'],
+      ['chap-dia10-khi',      'topic-mua',             'HAS_TOPIC'],
+      ['chap-dia10-khi',      'topic-bien-doi-kh',     'HAS_TOPIC'],
+      ['chap-dia10-thuy',     'topic-dai-duong',       'HAS_TOPIC'],
+      ['chap-dia10-thuy',     'topic-song-ngoi',       'HAS_TOPIC'],
+      ['chap-dia10-thuy',     'topic-nuoc-ngam',       'HAS_TOPIC'],
+      ['chap-dia10-sinh',     'topic-da-dang-sh-dia',  'HAS_TOPIC'],
+      ['chap-dia10-sinh',     'topic-tho-nhuong',      'HAS_TOPIC'],
+      ['chap-dia10-dan-cu',   'topic-dan-so',          'HAS_TOPIC'],
+      ['chap-dia10-dan-cu',   'topic-co-cau-ds',       'HAS_TOPIC'],
+      ['chap-dia10-dan-cu',   'topic-do-thi-hoa',      'HAS_TOPIC'],
+      ['chap-dia10-nganh-kt', 'topic-nong-nghiep-dl',  'HAS_TOPIC'],
+      ['chap-dia10-nganh-kt', 'topic-cong-nghiep-dl',  'HAS_TOPIC'],
+      ['chap-dia10-nganh-kt', 'topic-dich-vu-dl',      'HAS_TOPIC'],
+      ['chap-dia10-nguon-luc','topic-thuong-mai-qt',   'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-dia11-dong-a',   'topic-trung-quoc',  'HAS_TOPIC'],
+      ['chap-dia11-dong-a',   'topic-nhat-ban',    'HAS_TOPIC'],
+      ['chap-dia11-dong-a',   'topic-han-quoc',    'HAS_TOPIC'],
+      ['chap-dia11-dna',      'topic-asean-dl',    'HAS_TOPIC'],
+      ['chap-dia11-dna',      'topic-singapore',   'HAS_TOPIC'],
+      ['chap-dia11-dna',      'topic-thai-lan',    'HAS_TOPIC'],
+      ['chap-dia11-tay-nam-a','topic-trung-dong',  'HAS_TOPIC'],
+      ['chap-dia11-tay-nam-a','topic-an-do',       'HAS_TOPIC'],
+      ['chap-dia11-nga',      'topic-nga',         'HAS_TOPIC'],
+      ['chap-dia11-hoa-ky',   'topic-hoa-ky',      'HAS_TOPIC'],
+      ['chap-dia11-eu',       'topic-eu-dl',       'HAS_TOPIC'],
+      ['chap-dia11-eu',       'topic-duc',         'HAS_TOPIC'],
+      ['chap-dia11-my-latin', 'topic-brazil',      'HAS_TOPIC'],
+      ['chap-dia11-chau-phi', 'topic-sahara',      'HAS_TOPIC'],
+      ['chap-dia11-dai-duong','topic-australia',   'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-dia12-vi-tri',   'topic-vi-tri-vn',     'HAS_TOPIC'],
+      ['chap-dia12-tu-nhien', 'topic-dh-vn',         'HAS_TOPIC'],
+      ['chap-dia12-tu-nhien', 'topic-khi-hau-vn',    'HAS_TOPIC'],
+      ['chap-dia12-tu-nhien', 'topic-song-vn',       'HAS_TOPIC'],
+      ['chap-dia12-tu-nhien', 'topic-bien-vn',       'HAS_TOPIC'],
+      ['chap-dia12-tu-nhien', 'topic-rung-vn',       'HAS_TOPIC'],
+      ['chap-dia12-tnxh',     'topic-khoang-san-vn', 'HAS_TOPIC'],
+      ['chap-dia12-tnxh',     'topic-o-nhiem-vn',    'HAS_TOPIC'],
+      ['chap-dia12-dan-cu-vn','topic-dan-toc-vn',    'HAS_TOPIC'],
+      ['chap-dia12-dan-cu-vn','topic-do-thi-vn',     'HAS_TOPIC'],
+      ['chap-dia12-dan-cu-vn','topic-lao-dong-vn',   'HAS_TOPIC'],
+      ['chap-dia12-nganh-vn', 'topic-nong-nghiep-vn','HAS_TOPIC'],
+      ['chap-dia12-nganh-vn', 'topic-thuy-san-vn',   'HAS_TOPIC'],
+      ['chap-dia12-nganh-vn', 'topic-cn-vn',         'HAS_TOPIC'],
+      ['chap-dia12-nganh-vn', 'topic-dl-vn',         'HAS_TOPIC'],
+      ['chap-dia12-nganh-vn', 'topic-giao-thong-vn', 'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-tdmnbb',        'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-dbsh',          'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-btb',           'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-dhntb',         'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-tn',            'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-dnb',           'HAS_TOPIC'],
+      ['chap-dia12-vung-vn',  'topic-dbscl',         'HAS_TOPIC'],
+      ['chap-dia12-bien-dao', 'topic-hoang-sa',      'HAS_TOPIC'],
+      ['chap-dia12-bien-dao', 'topic-truong-sa',     'HAS_TOPIC'],
+
+      // Topic → Concept
+      ['topic-ban-do',         'concept-dia-ly',           'USES_CONCEPT'],
+      ['topic-dai-duong',      'concept-bien-dl',          'USES_CONCEPT'],
+      ['topic-cong-nghiep-dl', 'concept-cong-nghiep-h',    'USES_CONCEPT'],
+      ['topic-cn-vn',          'concept-cong-nghiep-h',    'USES_CONCEPT'],
+      ['topic-do-thi-hoa',     'concept-do-thi-h',         'USES_CONCEPT'],
+      ['topic-do-thi-vn',      'concept-do-thi-h',         'USES_CONCEPT'],
+      ['topic-thuong-mai-qt',  'concept-toan-cau-hoa-dl',  'USES_CONCEPT'],
+      ['topic-bien-doi-kh',    'concept-bien-doi-kh',      'USES_CONCEPT'],
+      ['topic-o-nhiem-vn',     'concept-phat-trien-bv',    'USES_CONCEPT'],
+      ['topic-khoang-san',     'concept-tai-nguyen',       'USES_CONCEPT'],
+
+      // Topic → Phenomenon
+      ['topic-gio-mua',        'phen-gio-mua-d',        'EXHIBITS_PHENOMENON'],
+      ['topic-khi-hau-vn',     'phen-gio-mua-d',        'EXHIBITS_PHENOMENON'],
+      ['topic-noi-luc',        'phen-nui-lua',          'EXHIBITS_PHENOMENON'],
+      ['topic-kien-tao-mang',  'phen-dong-dat-d',       'EXHIBITS_PHENOMENON'],
+      ['topic-kien-tao-mang',  'phen-song-than-d',      'EXHIBITS_PHENOMENON'],
+      ['topic-khi-ap',         'phen-bao',              'EXHIBITS_PHENOMENON'],
+      ['topic-song-ngoi',      'phen-lu-lut',           'EXHIBITS_PHENOMENON'],
+      ['topic-mua',            'phen-han-han',          'EXHIBITS_PHENOMENON'],
+      ['topic-bien-doi-kh',    'phen-nuoc-bien-dang',   'EXHIBITS_PHENOMENON'],
+      ['topic-dai-duong',      'phen-en-nino',          'EXHIBITS_PHENOMENON'],
+      ['topic-bien-doi-kh',    'phen-ng-h-vn',          'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-toa-do-dia',     'app-gps-dia',           'APPLIED_IN'],
+      ['topic-gis',            'app-ban-do-so',         'APPLIED_IN'],
+      ['topic-gis',            'app-vt-vt',             'APPLIED_IN'],
+      ['topic-do-thi-hoa',     'app-quy-hoach-dt',      'APPLIED_IN'],
+      ['topic-mua',            'app-du-bao-tt',         'APPLIED_IN'],
+      ['topic-khi-ap',         'app-du-bao-tt',         'APPLIED_IN'],
+      ['topic-khi-hau-vn',     'app-bao-lu-canh-bao',   'APPLIED_IN'],
+      ['topic-khoang-san-vn',  'app-tham-do-dau',       'APPLIED_IN'],
+      ['topic-dl-vn',          'app-du-lich-st',        'APPLIED_IN'],
+      ['topic-nong-nghiep-vn', 'app-nong-nghiep-cn',    'APPLIED_IN'],
+      ['topic-giao-thong-vn',  'app-cang-bien',         'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-khoang-san',     'career-ks-dia-chat',    'APPLIED_IN_CAREER'],
+      ['topic-khoang-san-vn',  'career-ks-dia-chat',    'APPLIED_IN_CAREER'],
+      ['topic-khi-hau-vn',     'career-khi-tuong',      'APPLIED_IN_CAREER'],
+      ['topic-bien-doi-kh',    'career-khi-tuong',      'APPLIED_IN_CAREER'],
+      ['topic-do-thi-hoa',     'career-quy-hoach',      'APPLIED_IN_CAREER'],
+      ['topic-do-thi-vn',      'career-quy-hoach',      'APPLIED_IN_CAREER'],
+      ['topic-gis',            'career-gis-eng',        'APPLIED_IN_CAREER'],
+
+      // REQUIRES
+      ['topic-gio-mua',        'topic-khi-ap',          'REQUIRES'],
+      ['topic-bien-doi-kh',    'topic-mua',             'REQUIRES'],
+      ['topic-kien-tao-mang',  'topic-noi-luc',         'REQUIRES'],
+      ['topic-vi-tri-vn',      'topic-toa-do-dia',      'REQUIRES'],
+      ['topic-khi-hau-vn',     'topic-gio-mua',         'REQUIRES'],
+      ['topic-song-vn',        'topic-song-ngoi',       'REQUIRES'],
+      ['topic-bien-vn',        'topic-dai-duong',       'REQUIRES'],
+      ['topic-asean-dl',       'topic-singapore',       'REQUIRES'],
+      ['topic-do-thi-vn',      'topic-do-thi-hoa',      'REQUIRES'],
+      ['topic-cn-vn',          'topic-cong-nghiep-dl',  'REQUIRES'],
+      ['topic-nong-nghiep-vn', 'topic-nong-nghiep-dl',  'REQUIRES'],
+      ['topic-dl-vn',          'topic-dich-vu-dl',      'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // Địa ↔ Vật lí
+      ['topic-gio-mua',        'topic-luc-newton',      'RELATES_TO'], // gió là chuyển động không khí
+      ['topic-noi-luc',        'topic-luc-newton',      'RELATES_TO'],
+      ['topic-dai-duong',      'topic-song-co',         'RELATES_TO'], // sóng biển = sóng cơ
+      ['topic-chuyen-dong-td', 'topic-trong-luc',       'RELATES_TO'], // quỹ đạo do trọng lực
+      // Địa ↔ Hóa
+      ['topic-o-nhiem-vn',     'topic-pu-oxh-kh',       'RELATES_TO'], // SO₂, NOx, CO
+      ['topic-khoang-san',     'topic-natri',           'RELATES_TO'],
+      ['topic-bien-doi-kh',    'phen-hieu-ung-nha-kinh-hoa', 'RELATES_TO'],
+      // Địa ↔ Sinh
+      ['topic-da-dang-sh-dia', 'topic-quan-xa',         'RELATES_TO'],
+      ['topic-rung-vn',        'topic-he-sinh-thai',    'RELATES_TO'],
+      ['topic-tho-nhuong',     'topic-quang-hop',       'RELATES_TO'], // đất nuôi cây quang hợp
+      // Địa ↔ Sử
+      ['topic-dan-toc-vn',     'topic-van-lang',        'RELATES_TO'],
+      ['topic-hoang-sa',       'topic-bach-dang-938',   'RELATES_TO'], // chủ quyền biển từ xưa
+      ['topic-asean-dl',       'topic-asean-vn-1995',   'RELATES_TO'],
+      // Địa ↔ Toán
+      ['topic-co-cau-ds',      'topic-tba',             'RELATES_TO'], // thống kê dân số
+      ['topic-co-cau-ds',      'topic-phuong-sai',      'RELATES_TO'],
+      ['topic-toa-do-dia',     'topic-vector-kg',       'RELATES_TO'], // tọa độ 3D
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-geo:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
-  //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
-  //        ?biology=1    → Thêm Sinh học 10, 11, 12
-  //        ?math=1       → Thêm Toán 10, 11, 12 (mở rộng SGK đầy đủ)
-  //        ?chem=1       → Thêm Hóa học 10, 11, 12 (mở rộng SGK đầy đủ)
-  //        ?history=1    → Thêm Lịch sử 10, 11, 12 (SGK GDPT 2018)
+  // Query: ?subjects=all → tất cả môn (5 môn × 3 lớp)
+  //        ?extended=1   → Thêm physics extension
+  //        ?biology=1    → Sinh học 10/11/12
+  //        ?math=1       → Toán 10/11/12 mở rộng
+  //        ?chem=1       → Hóa học 10/11/12 mở rộng
+  //        ?history=1    → Lịch sử 10/11/12
+  //        ?geo=1        → Địa lí 10/11/12 (GDPT 2018)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -10606,15 +10977,17 @@ ${plan.content || '<p>(Trống)</p>'}
       const math = req.query.math === '1' || all;
       const chem = req.query.chem === '1' || req.query.chemistry === '1' || all;
       const hist = req.query.history === '1' || req.query.hist === '1' || all;
+      const geo = req.query.geo === '1' || req.query.geography === '1' || req.query.dia === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
       if (math) r5 = await seedKgMathExtended();
       if (chem) r6 = await seedKgChemExtended();
       if (hist) r7 = await seedKgHistory();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0);
+      if (geo)  r8 = await seedKgGeography();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -10627,14 +11000,16 @@ ${plan.content || '<p>(Trống)</p>'}
         mathExtended: r5,
         chemExtended: r6,
         history: r7,
+        geography: r8,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh học + Lịch sử (3 lớp) mở rộng đầy đủ',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa (3 lớp) mở rộng đầy đủ',
           ext && '+ Mở rộng Vật lí (Quang học + VLHĐ + Phenomenon + Application)',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12 mở rộng',
           chem && !all && '+ Hóa học 10/11/12 mở rộng',
           hist && !all && '+ Lịch sử 10/11/12',
+          geo  && !all && '+ Địa lí 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
