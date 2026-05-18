@@ -12911,8 +12911,560 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Tin học 10/11/12 — SGK GDPT 2018 (định hướng ICT + CS)
+  // Môn 12/12 — Subject color: indigo #6366f1
+  // 2 nhánh: ICT (Information Tech) + CS (Computer Science)
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgInformatics() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-tin', type: 'Subject', label: 'Tin học',
+        description: 'Môn Tin học THPT 10/11/12 GDPT 2018 — 2 định hướng: ICT (ứng dụng) + CS (khoa học máy tính)',
+        properties: { color: '#6366f1' } },
+
+      // === 2 NHÁNH PHÂN HÓA ===
+      { id: 'branch-ict', type: 'Chapter', label: '💼 Định hướng ICT (Ứng dụng)',
+        description: 'Information & Communication Technology — Office, Web, Multimedia, CSDL ứng dụng' },
+      { id: 'branch-cs',  type: 'Chapter', label: '🧠 Định hướng CS (Khoa học MT)',
+        description: 'Computer Science — Thuật toán, Cấu trúc DL, Lập trình, AI/ML' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 10: Nền tảng chung 2 định hướng ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-tin10-a',   type: 'Chapter', label: '[10] A. MT & xã hội tri thức',     description: 'Lịch sử MT, các thế hệ, vai trò, social impact' },
+      { id: 'chap-tin10-b',   type: 'Chapter', label: '[10] B. Mạng MT & Internet',       description: 'LAN/WAN, TCP/IP, DNS, HTTP, mạng XH, IoT' },
+      { id: 'chap-tin10-c',   type: 'Chapter', label: '[10] C. Tổ chức + tìm thông tin',  description: 'File system, search engine, đánh giá nguồn tin' },
+      { id: 'chap-tin10-d',   type: 'Chapter', label: '[10] D. Đạo đức + PL số',          description: 'Bản quyền, an toàn TT, văn hóa số' },
+      { id: 'chap-tin10-e',   type: 'Chapter', label: '[10] E. Ứng dụng Tin học',         description: 'MS Office: Word + Excel + PowerPoint' },
+      { id: 'chap-tin10-f',   type: 'Chapter', label: '[10] F. GQVĐ với MT — Python cơ bản', description: 'Khái niệm thuật toán, Python: biến, IF/ELSE, vòng lặp' },
+      { id: 'chap-tin10-g',   type: 'Chapter', label: '[10] G. Hướng nghiệp Tin học',     description: 'Nghề CNTT, kỹ năng cần thiết, lộ trình' },
+
+      // Topics LỚP 10
+      { id: 'topic-ls-mt',          type: 'Topic', label: 'Lịch sử máy tính',           description: 'Babbage 1822 → ENIAC 1946 → PC 1980 → smartphone 2007 → AI 2022' },
+      { id: 'topic-the-he-mt',      type: 'Topic', label: '5 thế hệ máy tính',          description: 'Đèn điện tử → Transistor → IC → VLSI → AI chip' },
+      { id: 'topic-cmcn-40',        type: 'Topic', label: 'Cách mạng Công nghiệp 4.0',  description: 'AI + IoT + Big Data + Cloud + Robot — thay đổi mọi ngành' },
+      { id: 'topic-lan-wan',        type: 'Topic', label: 'LAN / WAN / MAN',             description: 'Mạng cục bộ — diện rộng — đô thị, băng thông + kết nối' },
+      { id: 'topic-tcp-ip',         type: 'Topic', label: 'TCP/IP & Internet',           description: '4 tầng: Application → Transport → Internet → Link' },
+      { id: 'topic-dns',            type: 'Topic', label: 'DNS (Domain Name System)',    description: 'inphysic.com → IP 35.247.x.x — danh bạ Internet' },
+      { id: 'topic-http-https',     type: 'Topic', label: 'HTTP / HTTPS',                description: 'Giao thức Web — HTTPS = HTTP + TLS encryption' },
+      { id: 'topic-mang-xh',        type: 'Topic', label: 'Mạng xã hội',                 description: 'Facebook, TikTok, Instagram — VN ~70M user, hệ luỵ + cơ hội' },
+      { id: 'topic-iot-10',         type: 'Topic', label: 'IoT (Internet of Things)',    description: 'Thiết bị kết nối Internet — đèn smart, đồng hồ, xe điện' },
+      { id: 'topic-file-system',    type: 'Topic', label: 'Hệ thống file',               description: 'Folder, file, đường dẫn — Windows / macOS / Linux khác nhau' },
+      { id: 'topic-search-engine',  type: 'Topic', label: 'Công cụ tìm kiếm',            description: 'Google, Bing, DuckDuckGo — toán tử "AND", "OR", site:, "..."' },
+      { id: 'topic-fake-news',      type: 'Topic', label: 'Tin giả + Đánh giá nguồn',    description: 'Fact-check, SIFT method, deepfake AI 2024+' },
+      { id: 'topic-ban-quyen',      type: 'Topic', label: 'Bản quyền số',                description: 'Copyright, Creative Commons, plagiarism — Luật SHTT 2005' },
+      { id: 'topic-attt',           type: 'Topic', label: 'An toàn thông tin',           description: 'Phishing, virus, ransomware, social engineering' },
+      { id: 'topic-mat-khau',       type: 'Topic', label: 'Mật khẩu mạnh + 2FA',         description: 'Min 12 ký tự + Special + Capital + 2FA SMS/Authenticator' },
+      { id: 'topic-vh-so',          type: 'Topic', label: 'Văn hóa số',                  description: 'Netiquette, không spam, không bullying online' },
+      { id: 'topic-ms-word',        type: 'Topic', label: 'MS Word — Soạn thảo',          description: 'Heading, styles, ToC, mail merge, track changes' },
+      { id: 'topic-ms-excel',       type: 'Topic', label: 'MS Excel — Bảng tính',         description: 'SUM, VLOOKUP, IF, Pivot Table, biểu đồ — phổ biến mọi nghề' },
+      { id: 'topic-ms-ppt',         type: 'Topic', label: 'MS PowerPoint — Trình chiếu',  description: 'Slide design, animation, transition — Canva thay thế?' },
+      { id: 'topic-google-suite',   type: 'Topic', label: 'Google Workspace',            description: 'Docs/Sheets/Slides/Drive cloud — real-time collab' },
+      { id: 'topic-thuat-toan-cb',  type: 'Topic', label: 'Thuật toán cơ bản',            description: 'Định nghĩa: dãy bước có thứ tự giải bài toán — flowchart, pseudo' },
+      { id: 'topic-python-intro',   type: 'Topic', label: 'Python intro',                description: 'print("Hello world"), input(), kiểu dữ liệu int/float/str/bool' },
+      { id: 'topic-py-bien',        type: 'Topic', label: 'Python — Biến',                description: 'x = 5; name = "An"; a, b = 1, 2 — dynamic typing' },
+      { id: 'topic-py-if',          type: 'Topic', label: 'Python — IF/ELSE',             description: 'if x > 10: ... elif ... else: ... — indent 4 spaces' },
+      { id: 'topic-py-loop',        type: 'Topic', label: 'Python — Vòng lặp',            description: 'for i in range(10): ... while x < 100: ... break/continue' },
+      { id: 'topic-py-list',        type: 'Topic', label: 'Python — List',               description: 'a = [1, 2, 3]; a[0], a[-1], len(a), append/pop/sort' },
+      { id: 'topic-nghe-cntt',      type: 'Topic', label: 'Nghề CNTT VN 2026',            description: 'Lập trình viên, data, AI, mobile, web — lương 15-200tr+' },
+      { id: 'topic-cv-tech',        type: 'Topic', label: 'CV cho Tech',                 description: 'GitHub portfolio + LinkedIn + project demo > điểm số' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 11: Phân hóa ICT vs CS ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-tin11-csdl-ict',  type: 'Chapter', label: '[11-ICT] CSDL Quan hệ + SQL',      description: 'Access / MySQL: table, query, form, report' },
+      { id: 'chap-tin11-do-hoa-ict',type: 'Chapter', label: '[11-ICT] Đồ họa số',              description: 'Photoshop, Illustrator, Canva — raster vs vector' },
+      { id: 'chap-tin11-web-ict',   type: 'Chapter', label: '[11-ICT] Web cơ bản',             description: 'HTML + CSS + JS cơ bản, hosting GitHub Pages' },
+      { id: 'chap-tin11-multimedia',type: 'Chapter', label: '[11-ICT] Multimedia',              description: 'Video editing CapCut, audio, animation, podcast' },
+
+      { id: 'chap-tin11-py-oop',    type: 'Chapter', label: '[11-CS] Python OOP',              description: 'Class, object, inheritance, encapsulation, polymorphism' },
+      { id: 'chap-tin11-thuat-toan',type: 'Chapter', label: '[11-CS] Thuật toán nâng cao',     description: 'Tìm kiếm tuyến tính/nhị phân, sắp xếp (bubble, selection, quick)' },
+      { id: 'chap-tin11-de-quy',    type: 'Chapter', label: '[11-CS] Đệ quy',                  description: 'Recursive functions — giai thừa, Fibonacci, tháp Hà Nội' },
+      { id: 'chap-tin11-bigo',      type: 'Chapter', label: '[11-CS] Độ phức tạp Big O',       description: 'O(1), O(log n), O(n), O(n²), O(2ⁿ) — chọn thuật toán đúng' },
+
+      // Topics LỚP 11
+      { id: 'topic-csdl-rdbms',     type: 'Topic', label: 'CSDL Quan hệ (RDBMS)',         description: 'Table, row, column, key — chuẩn hoá 1NF/2NF/3NF' },
+      { id: 'topic-sql-cb',         type: 'Topic', label: 'SQL — SELECT/INSERT/UPDATE',  description: 'SELECT * FROM users WHERE id = 1; cơ bản CRUD' },
+      { id: 'topic-sql-join',       type: 'Topic', label: 'SQL — JOIN',                  description: 'INNER, LEFT, RIGHT, FULL — ghép 2 bảng theo key' },
+      { id: 'topic-ms-access',      type: 'Topic', label: 'MS Access',                   description: 'CSDL desktop — table, form, query, report — học CSDL' },
+      { id: 'topic-photoshop-tin',  type: 'Topic', label: 'Adobe Photoshop',             description: 'Layer, mask, filter — chỉnh ảnh + design + manipulation' },
+      { id: 'topic-illustrator-tin',type: 'Topic', label: 'Adobe Illustrator',           description: 'Vector — logo, infographic, icon scalable' },
+      { id: 'topic-canva-tin',      type: 'Topic', label: 'Canva',                       description: 'Online design, template, AI generate — phổ biến HS 2026' },
+      { id: 'topic-figma-tin',      type: 'Topic', label: 'Figma — UI/UX',               description: 'Cloud-based, collaborative — chuẩn industry design 2026' },
+      { id: 'topic-html',           type: 'Topic', label: 'HTML5',                       description: '<h1>, <p>, <a>, <img>, <div> — structure of web' },
+      { id: 'topic-css',            type: 'Topic', label: 'CSS3',                        description: 'Selectors, box model, flexbox, grid, animations' },
+      { id: 'topic-js-cb',          type: 'Topic', label: 'JavaScript cơ bản',           description: 'var/let/const, function, DOM manipulation' },
+      { id: 'topic-github-pages',   type: 'Topic', label: 'GitHub Pages',                description: 'Free hosting static site — yourname.github.io' },
+      { id: 'topic-capcut',         type: 'Topic', label: 'CapCut — Video edit',         description: 'Mobile + desktop, cut, transition, AI effect — TikTok creator' },
+      { id: 'topic-davinci',        type: 'Topic', label: 'DaVinci Resolve',             description: 'Pro video editing free — color grading Hollywood' },
+      { id: 'topic-audacity',       type: 'Topic', label: 'Audacity — Audio',            description: 'Free audio editor — podcast, music, noise removal' },
+      { id: 'topic-oop-class',      type: 'Topic', label: 'OOP — Class & Object',         description: 'class Dog: def bark(self): ...; d = Dog(); d.bark()' },
+      { id: 'topic-oop-inherit',    type: 'Topic', label: 'OOP — Kế thừa',                description: 'class Cat(Animal): — Cat thừa hưởng method của Animal' },
+      { id: 'topic-oop-encap',      type: 'Topic', label: 'OOP — Đóng gói',               description: 'private/public — bảo vệ data, expose qua getter/setter' },
+      { id: 'topic-oop-poly',       type: 'Topic', label: 'OOP — Đa hình',                description: 'Cùng method name khác behavior theo class — override' },
+      { id: 'topic-tk-tuyen-tinh',  type: 'Topic', label: 'Tìm kiếm tuyến tính',          description: 'O(n) — duyệt từng phần tử; đơn giản, không cần sort' },
+      { id: 'topic-tk-nhi-phan',    type: 'Topic', label: 'Tìm kiếm nhị phân',            description: 'O(log n) — bisect; array PHẢI sort trước' },
+      { id: 'topic-sx-bubble',      type: 'Topic', label: 'Sắp xếp Bubble Sort',          description: 'O(n²) — đơn giản, swap đôi liền kề — chỉ dùng học' },
+      { id: 'topic-sx-selection',   type: 'Topic', label: 'Sắp xếp Selection Sort',       description: 'O(n²) — tìm min mỗi vòng' },
+      { id: 'topic-sx-quick',       type: 'Topic', label: 'Sắp xếp Quick Sort',           description: 'O(n log n) avg — pivot + divide & conquer; built-in Python sort' },
+      { id: 'topic-fibonacci',      type: 'Topic', label: 'Fibonacci đệ quy',             description: 'fib(n) = fib(n-1) + fib(n-2); base case fib(0)=0, fib(1)=1' },
+      { id: 'topic-thap-hanoi',     type: 'Topic', label: 'Tháp Hà Nội',                  description: 'Cổ điển recursion — 2ⁿ-1 bước chuyển n đĩa' },
+      { id: 'topic-big-o',          type: 'Topic', label: 'Big O Notation',              description: 'O(1) const, O(log n) log, O(n) linear, O(n²) quad, O(2ⁿ) exp' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 12: ICT nâng cao + CS nâng cao + AI ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-tin12-csdl-na',   type: 'Chapter', label: '[12-ICT] CSDL nâng cao',          description: 'MySQL/PostgreSQL, normalization, indexing, transactions' },
+      { id: 'chap-tin12-web-na',    type: 'Chapter', label: '[12-ICT] Web nâng cao',           description: 'JS framework cơ bản, deploy hosting, SEO' },
+      { id: 'chap-tin12-dao-duc-na',type: 'Chapter', label: '[12-ICT] Đạo đức số nâng cao',    description: 'AI bias, deepfake, surveillance, privacy GDPR' },
+      { id: 'chap-tin12-ai-app',    type: 'Chapter', label: '[12-ICT] Ứng dụng AI',            description: 'ChatGPT, Claude, Midjourney, Stable Diffusion — prompt engineering' },
+
+      { id: 'chap-tin12-ctdl',      type: 'Chapter', label: '[12-CS] Cấu trúc dữ liệu',         description: 'Stack, Queue, Linked List, Tree, Graph, Hash' },
+      { id: 'chap-tin12-tt-na',     type: 'Chapter', label: '[12-CS] Thuật toán nâng cao',      description: 'BFS, DFS, Dynamic Programming, Greedy' },
+      { id: 'chap-tin12-ai-cs',     type: 'Chapter', label: '[12-CS] AI/ML căn bản',            description: 'ML basics, supervised vs unsupervised, neural net intro' },
+      { id: 'chap-tin12-thi-dau',   type: 'Chapter', label: '[12-CS] Lập trình thi đấu',        description: 'Codeforces, LeetCode, HSG Tin, ICPC, IOI' },
+
+      // Topics LỚP 12
+      { id: 'topic-mysql',          type: 'Topic', label: 'MySQL / MariaDB',             description: 'RDBMS phổ biến — open source, free, WordPress dùng' },
+      { id: 'topic-postgresql',     type: 'Topic', label: 'PostgreSQL',                  description: 'RDBMS mạnh nhất open-source — JSONB, advanced types' },
+      { id: 'topic-normalization',  type: 'Topic', label: 'Chuẩn hoá CSDL (1NF/2NF/3NF)',description: 'Loại bỏ trùng lặp, dependency, transitive dependency' },
+      { id: 'topic-index-db',       type: 'Topic', label: 'Index trong CSDL',            description: 'B-tree index — tăng tốc SELECT, chậm INSERT/UPDATE' },
+      { id: 'topic-transaction',    type: 'Topic', label: 'Transaction (ACID)',          description: 'Atomicity, Consistency, Isolation, Durability — bank transfer' },
+      { id: 'topic-react-vue',      type: 'Topic', label: 'React / Vue framework',       description: 'Component-based JS — phổ biến nhất frontend 2026' },
+      { id: 'topic-node-express',   type: 'Topic', label: 'Node.js + Express',           description: 'JS backend — server.cjs của inphysic.com dùng' },
+      { id: 'topic-deploy-hosting', type: 'Topic', label: 'Deploy + Hosting',            description: 'Vercel, Netlify, Cloud Run, AWS — CI/CD pipeline' },
+      { id: 'topic-seo',            type: 'Topic', label: 'SEO (Search Engine Optimization)', description: 'Meta tags, sitemap, structured data, Core Web Vitals' },
+      { id: 'topic-ai-bias',        type: 'Topic', label: 'AI Bias',                     description: 'Mô hình AI phản ánh bias trong data — racial, gender bias' },
+      { id: 'topic-deepfake',       type: 'Topic', label: 'Deepfake',                    description: 'AI tạo video giả mạo — luật cấm bầu cử Mỹ 2024+' },
+      { id: 'topic-gdpr',           type: 'Topic', label: 'GDPR / Luật BVDLCN',          description: 'EU privacy law 2018, VN PDPL 2023 — quyền cá nhân' },
+      { id: 'topic-chatgpt',        type: 'Topic', label: 'ChatGPT / Claude',            description: 'LLM assistant — viết, lập trình, học, tư vấn — 100M+ user' },
+      { id: 'topic-midjourney',     type: 'Topic', label: 'Midjourney / DALL-E',         description: 'Text-to-image AI — Discord-based, $10-30/tháng' },
+      { id: 'topic-stable-diff',    type: 'Topic', label: 'Stable Diffusion',            description: 'Open-source AI art — chạy local trên GPU, free' },
+      { id: 'topic-prompt-eng',     type: 'Topic', label: 'Prompt Engineering',           description: 'Kỹ năng "nói chuyện" với AI — role, context, few-shot examples' },
+      { id: 'topic-stack',          type: 'Topic', label: 'Stack (LIFO)',                description: 'Last In First Out — undo, browser back, call stack' },
+      { id: 'topic-queue',          type: 'Topic', label: 'Queue (FIFO)',                description: 'First In First Out — print job, BFS, task queue' },
+      { id: 'topic-linked-list',    type: 'Topic', label: 'Linked List',                 description: 'Node trỏ tới node tiếp theo — insert/delete O(1)' },
+      { id: 'topic-tree',           type: 'Topic', label: 'Tree (Cây)',                  description: 'Hierarchy: file system, DOM, BST, heap, trie' },
+      { id: 'topic-graph',          type: 'Topic', label: 'Graph (Đồ thị)',              description: 'Nodes + edges — social network, Google Maps, KG của inphysic!' },
+      { id: 'topic-hash',           type: 'Topic', label: 'Hash Table / Dictionary',     description: 'O(1) lookup avg — Python dict, JS object' },
+      { id: 'topic-bfs',            type: 'Topic', label: 'BFS (Breadth-First Search)',  description: 'Queue-based, shortest path unweighted, level order tree' },
+      { id: 'topic-dfs',            type: 'Topic', label: 'DFS (Depth-First Search)',    description: 'Stack/recursion, find connected components, topological sort' },
+      { id: 'topic-dp',             type: 'Topic', label: 'Dynamic Programming',         description: 'Chia bài toán + memoize — Fibonacci, knapsack, LCS' },
+      { id: 'topic-greedy',         type: 'Topic', label: 'Greedy Algorithm',            description: 'Chọn tối ưu local — Dijkstra, Kruskal, Huffman' },
+      { id: 'topic-ml-basic',       type: 'Topic', label: 'Machine Learning căn bản',     description: 'Pattern recognition từ data — Andrew Ng Coursera' },
+      { id: 'topic-supervised',     type: 'Topic', label: 'Supervised Learning',         description: 'Có label — classification + regression: house price, spam' },
+      { id: 'topic-unsupervised',   type: 'Topic', label: 'Unsupervised Learning',       description: 'Không label — clustering K-means, dimensionality reduction' },
+      { id: 'topic-neural-net',     type: 'Topic', label: 'Neural Network',              description: 'Layer of neurons — perceptron 1958, deep learning 2012+' },
+      { id: 'topic-codeforces',     type: 'Topic', label: 'Codeforces',                  description: 'Lập trình thi đấu online — rating system, weekly contest' },
+      { id: 'topic-leetcode',       type: 'Topic', label: 'LeetCode',                    description: 'Phỏng vấn FAANG — 3000+ problems, must-do Top 75' },
+      { id: 'topic-hsg-tin',        type: 'Topic', label: 'HSG Tin VN',                  description: 'HSG tỉnh, QG, QT — 5 huy chương IOI hằng năm' },
+      { id: 'topic-icpc',           type: 'Topic', label: 'ICPC (đại học)',              description: 'International Collegiate Programming Contest — đội 3 SV' },
+
+      // === PERSONS (Lịch sử CS) ===
+      { id: 'person-turing',        type: 'Person', label: 'Alan Turing',                description: '1912-1954 — cha đẻ Computer Science, Turing Machine, Enigma WWII' },
+      { id: 'person-ada',           type: 'Person', label: 'Ada Lovelace',               description: '1815-1852 — lập trình viên đầu tiên — Analytical Engine notes' },
+      { id: 'person-von-neumann',   type: 'Person', label: 'John von Neumann',           description: '1903-1957 — kiến trúc Von Neumann — mọi PC ngày nay' },
+      { id: 'person-tim-bl',        type: 'Person', label: 'Tim Berners-Lee',            description: '1955- — phát minh World Wide Web 1989 tại CERN' },
+      { id: 'person-linus',         type: 'Person', label: 'Linus Torvalds',             description: '1969- — Linux kernel (1991) + Git (2005)' },
+      { id: 'person-gates',         type: 'Person', label: 'Bill Gates',                 description: '1955- — đồng sáng lập Microsoft 1975, Windows + Office' },
+      { id: 'person-jobs',          type: 'Person', label: 'Steve Jobs',                 description: '1955-2011 — đồng sáng lập Apple, iPhone 2007 thay đổi TG' },
+      { id: 'person-zuck',          type: 'Person', label: 'Mark Zuckerberg',            description: '1984- — Facebook 2004 (Meta) — 3 tỷ user' },
+      { id: 'person-page-brin',     type: 'Person', label: 'Larry Page & Sergey Brin',   description: '1973+1973 — Google 1998, PageRank algorithm' },
+      { id: 'person-hinton',        type: 'Person', label: 'Geoffrey Hinton',            description: '1947- — "Godfather of AI", backpropagation, Nobel Vật lí 2024' },
+      { id: 'person-lecun',         type: 'Person', label: 'Yann LeCun',                 description: '1960- — CNN (Convolutional NN), Meta AI Chief' },
+      { id: 'person-altman',        type: 'Person', label: 'Sam Altman',                 description: '1985- — CEO OpenAI, ChatGPT 2022 — AI revolution' },
+      { id: 'person-nha-dong',      type: 'Person', label: 'Nguyễn Hà Đông',             description: '1985- — Flappy Bird 2014 — $50K/day, kỷ lục VN' },
+
+      // === CONCEPTS ===
+      { id: 'concept-thuat-toan-c', type: 'Concept', label: 'Thuật toán (Algorithm)',     description: 'Dãy bước hữu hạn giải bài toán — input → process → output' },
+      { id: 'concept-ctdl-c',       type: 'Concept', label: 'Cấu trúc dữ liệu',           description: 'Cách tổ chức + lưu trữ data — chọn đúng = nhanh + memory ít' },
+      { id: 'concept-binary',       type: 'Concept', label: 'Hệ nhị phân (Binary)',       description: '0 và 1 — máy tính dùng — 8 bit = 1 byte, 1KB = 1024 byte' },
+      { id: 'concept-bit-byte',     type: 'Concept', label: 'Bit / Byte / Word',          description: 'Đơn vị dữ liệu — RAM, CPU 64-bit, file size MB/GB' },
+      { id: 'concept-cpu-ram',     type: 'Concept', label: 'CPU / RAM / Storage',         description: 'CPU = "não", RAM = "bàn làm việc", Storage = "kho"' },
+      { id: 'concept-oop-c',        type: 'Concept', label: 'OOP — 4 tính chất',          description: 'Encapsulation + Inheritance + Polymorphism + Abstraction' },
+      { id: 'concept-api',          type: 'Concept', label: 'API (Application Programming Interface)', description: 'Hợp đồng giao tiếp giữa các phần mềm — REST, GraphQL' },
+      { id: 'concept-version-control', type: 'Concept', label: 'Version Control (Git)',  description: 'Theo dõi thay đổi code — commit, branch, merge, GitHub' },
+      { id: 'concept-cloud',        type: 'Concept', label: 'Cloud Computing',            description: 'AWS, GCP, Azure — IaaS/PaaS/SaaS thay vì server riêng' },
+      { id: 'concept-cia-triad',    type: 'Concept', label: 'CIA Triad',                  description: 'Confidentiality + Integrity + Availability — bảo mật cốt lõi' },
+      { id: 'concept-open-source',  type: 'Concept', label: 'Open Source',                description: 'Mã nguồn mở — Linux, Python, React; license MIT, GPL, Apache' },
+      { id: 'concept-ai-ml-dl',     type: 'Concept', label: 'AI vs ML vs DL',             description: 'AI ⊃ ML ⊃ DL — Trí tuệ NT > Học máy > Học sâu' },
+
+      // === APPLICATIONS ===
+      { id: 'app-vscode',           type: 'Application', label: 'VS Code',                description: 'Microsoft editor — free, extensions, terminal — chuẩn dev 2026' },
+      { id: 'app-github',           type: 'Application', label: 'GitHub',                 description: '100M+ developers — code hosting + collab + CI/CD + AI Copilot' },
+      { id: 'app-stackoverflow',    type: 'Application', label: 'Stack Overflow',         description: 'Q&A cho dev — 23M+ Q, golden tag age 2008-2022' },
+      { id: 'app-python-org',       type: 'Application', label: 'Python.org',             description: 'Ngôn ngữ #1 — easy syntax, vạn lib, AI/ML/web/script' },
+      { id: 'app-jupyter',          type: 'Application', label: 'Jupyter Notebook',       description: 'Interactive Python — data science, ML, học toán' },
+      { id: 'app-colab',            type: 'Application', label: 'Google Colab',           description: 'Jupyter trên cloud — free GPU/TPU cho HS' },
+      { id: 'app-postman',          type: 'Application', label: 'Postman',                description: 'API testing — gửi request HTTP, xem response — backend dev' },
+      { id: 'app-docker',           type: 'Application', label: 'Docker',                 description: 'Container hoá ứng dụng — chạy giống nhau mọi máy' },
+      { id: 'app-aws',              type: 'Application', label: 'AWS / GCP / Azure',      description: '3 cloud lớn nhất — VN: hosting, AI APIs, database managed' },
+      { id: 'app-chatgpt',          type: 'Application', label: 'ChatGPT',                description: 'chat.openai.com — LLM hỗ trợ học + làm — free + Plus $20/mo' },
+      { id: 'app-claude',           type: 'Application', label: 'Claude (Anthropic)',     description: 'claude.ai — competitor ChatGPT, 200K context, mạnh coding' },
+      { id: 'app-midjourney-app',   type: 'Application', label: 'Midjourney',             description: 'Discord AI art — chất lượng cao nhất 2026' },
+      { id: 'app-coursera',         type: 'Application', label: 'Coursera + edX',         description: 'MOOC — Andrew Ng ML, Harvard CS50, MIT — free audit' },
+      { id: 'app-hackerrank',       type: 'Application', label: 'HackerRank',             description: 'Coding interview prep — companies test candidates' },
+      { id: 'app-itviec',           type: 'Application', label: 'ITviec / TopDev',        description: 'Tuyển dụng IT VN — lương trung bình theo skill, kinh nghiệm' },
+
+      // === CAREERS ===
+      { id: 'career-swe',           type: 'Career', label: 'Software Engineer',           description: 'Backend/Frontend/Fullstack — VN 15-100tr, FAANG $150K+' },
+      { id: 'career-mobile-dev',    type: 'Career', label: 'Mobile Developer',            description: 'iOS (Swift) + Android (Kotlin) + Flutter cross-platform' },
+      { id: 'career-data-sci',      type: 'Career', label: 'Data Scientist',              description: 'Python + R + SQL + ML — hot job, 20-80tr VN' },
+      { id: 'career-ml-eng',        type: 'Career', label: 'ML / AI Engineer',            description: 'TensorFlow, PyTorch — VN 30-150tr, OpenAI $300K+' },
+      { id: 'career-devops',        type: 'Career', label: 'DevOps Engineer',             description: 'CI/CD, Docker, K8s, AWS — bridge dev & ops' },
+      { id: 'career-cloud-arch',    type: 'Career', label: 'Cloud Architect',             description: 'Thiết kế hệ thống cloud — AWS Solution Architect cert' },
+      { id: 'career-cyber',         type: 'Career', label: 'Cybersecurity',               description: 'Pentester, SOC, malware analyst — VNISA, CEH cert' },
+      { id: 'career-game-dev',      type: 'Career', label: 'Game Developer',              description: 'Unity (C#) + Unreal (C++) — VN: VNG, Garena, indie' },
+      { id: 'career-dba',           type: 'Career', label: 'Database Administrator',      description: 'MySQL/Oracle/MongoDB — quản lý CSDL doanh nghiệp' },
+      { id: 'career-it-support',    type: 'Career', label: 'IT Support / SysAdmin',       description: 'Help desk → senior — phổ biến công ty mọi cỡ' },
+      { id: 'career-tech-pm',       type: 'Career', label: 'Technical Product Manager',   description: 'Cầu nối business + tech — VN 30-100tr' },
+      { id: 'career-tech-founder',  type: 'Career', label: 'Tech Founder / CTO',          description: 'Khởi nghiệp công nghệ — VinFast, MoMo, VNG, Tiki' },
+      { id: 'career-prompt-eng',    type: 'Career', label: 'Prompt Engineer',             description: 'Nghề mới 2023+ — $100-300K Anthropic, OpenAI' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-tin:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Branches + Chapters
+      ['subj-tin', 'branch-ict',       'HAS_CHAPTER'],
+      ['subj-tin', 'branch-cs',        'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-a',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-b',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-c',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-d',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-e',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-f',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin10-g',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-csdl-ict',   'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-do-hoa-ict', 'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-web-ict',    'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-multimedia', 'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-py-oop',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-thuat-toan', 'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-de-quy',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin11-bigo',       'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-csdl-na',    'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-web-na',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-dao-duc-na', 'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-ai-app',     'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-ctdl',       'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-tt-na',      'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-ai-cs',      'HAS_CHAPTER'],
+      ['subj-tin', 'chap-tin12-thi-dau',    'HAS_CHAPTER'],
+
+      // Branch ICT/CS → Chapters phân hóa
+      ['branch-ict', 'chap-tin11-csdl-ict',   'RELATES_TO'],
+      ['branch-ict', 'chap-tin11-do-hoa-ict', 'RELATES_TO'],
+      ['branch-ict', 'chap-tin11-web-ict',    'RELATES_TO'],
+      ['branch-ict', 'chap-tin11-multimedia', 'RELATES_TO'],
+      ['branch-ict', 'chap-tin12-csdl-na',    'RELATES_TO'],
+      ['branch-ict', 'chap-tin12-web-na',     'RELATES_TO'],
+      ['branch-ict', 'chap-tin12-dao-duc-na', 'RELATES_TO'],
+      ['branch-ict', 'chap-tin12-ai-app',     'RELATES_TO'],
+      ['branch-cs',  'chap-tin11-py-oop',     'RELATES_TO'],
+      ['branch-cs',  'chap-tin11-thuat-toan', 'RELATES_TO'],
+      ['branch-cs',  'chap-tin11-de-quy',     'RELATES_TO'],
+      ['branch-cs',  'chap-tin11-bigo',       'RELATES_TO'],
+      ['branch-cs',  'chap-tin12-ctdl',       'RELATES_TO'],
+      ['branch-cs',  'chap-tin12-tt-na',      'RELATES_TO'],
+      ['branch-cs',  'chap-tin12-ai-cs',      'RELATES_TO'],
+      ['branch-cs',  'chap-tin12-thi-dau',    'RELATES_TO'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-tin10-a', 'topic-ls-mt',          'HAS_TOPIC'],
+      ['chap-tin10-a', 'topic-the-he-mt',      'HAS_TOPIC'],
+      ['chap-tin10-a', 'topic-cmcn-40',        'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-lan-wan',        'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-tcp-ip',         'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-dns',            'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-http-https',     'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-mang-xh',        'HAS_TOPIC'],
+      ['chap-tin10-b', 'topic-iot-10',         'HAS_TOPIC'],
+      ['chap-tin10-c', 'topic-file-system',    'HAS_TOPIC'],
+      ['chap-tin10-c', 'topic-search-engine',  'HAS_TOPIC'],
+      ['chap-tin10-c', 'topic-fake-news',      'HAS_TOPIC'],
+      ['chap-tin10-d', 'topic-ban-quyen',      'HAS_TOPIC'],
+      ['chap-tin10-d', 'topic-attt',           'HAS_TOPIC'],
+      ['chap-tin10-d', 'topic-mat-khau',       'HAS_TOPIC'],
+      ['chap-tin10-d', 'topic-vh-so',          'HAS_TOPIC'],
+      ['chap-tin10-e', 'topic-ms-word',        'HAS_TOPIC'],
+      ['chap-tin10-e', 'topic-ms-excel',       'HAS_TOPIC'],
+      ['chap-tin10-e', 'topic-ms-ppt',         'HAS_TOPIC'],
+      ['chap-tin10-e', 'topic-google-suite',   'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-thuat-toan-cb',  'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-python-intro',   'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-py-bien',        'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-py-if',          'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-py-loop',        'HAS_TOPIC'],
+      ['chap-tin10-f', 'topic-py-list',        'HAS_TOPIC'],
+      ['chap-tin10-g', 'topic-nghe-cntt',      'HAS_TOPIC'],
+      ['chap-tin10-g', 'topic-cv-tech',        'HAS_TOPIC'],
+
+      // Chapter LỚP 11 ICT → Topics
+      ['chap-tin11-csdl-ict',   'topic-csdl-rdbms',     'HAS_TOPIC'],
+      ['chap-tin11-csdl-ict',   'topic-sql-cb',         'HAS_TOPIC'],
+      ['chap-tin11-csdl-ict',   'topic-sql-join',       'HAS_TOPIC'],
+      ['chap-tin11-csdl-ict',   'topic-ms-access',      'HAS_TOPIC'],
+      ['chap-tin11-do-hoa-ict', 'topic-photoshop-tin',  'HAS_TOPIC'],
+      ['chap-tin11-do-hoa-ict', 'topic-illustrator-tin','HAS_TOPIC'],
+      ['chap-tin11-do-hoa-ict', 'topic-canva-tin',      'HAS_TOPIC'],
+      ['chap-tin11-do-hoa-ict', 'topic-figma-tin',      'HAS_TOPIC'],
+      ['chap-tin11-web-ict',    'topic-html',           'HAS_TOPIC'],
+      ['chap-tin11-web-ict',    'topic-css',            'HAS_TOPIC'],
+      ['chap-tin11-web-ict',    'topic-js-cb',          'HAS_TOPIC'],
+      ['chap-tin11-web-ict',    'topic-github-pages',   'HAS_TOPIC'],
+      ['chap-tin11-multimedia', 'topic-capcut',         'HAS_TOPIC'],
+      ['chap-tin11-multimedia', 'topic-davinci',        'HAS_TOPIC'],
+      ['chap-tin11-multimedia', 'topic-audacity',       'HAS_TOPIC'],
+
+      // Chapter LỚP 11 CS → Topics
+      ['chap-tin11-py-oop',     'topic-oop-class',      'HAS_TOPIC'],
+      ['chap-tin11-py-oop',     'topic-oop-inherit',    'HAS_TOPIC'],
+      ['chap-tin11-py-oop',     'topic-oop-encap',      'HAS_TOPIC'],
+      ['chap-tin11-py-oop',     'topic-oop-poly',       'HAS_TOPIC'],
+      ['chap-tin11-thuat-toan', 'topic-tk-tuyen-tinh',  'HAS_TOPIC'],
+      ['chap-tin11-thuat-toan', 'topic-tk-nhi-phan',    'HAS_TOPIC'],
+      ['chap-tin11-thuat-toan', 'topic-sx-bubble',      'HAS_TOPIC'],
+      ['chap-tin11-thuat-toan', 'topic-sx-selection',   'HAS_TOPIC'],
+      ['chap-tin11-thuat-toan', 'topic-sx-quick',       'HAS_TOPIC'],
+      ['chap-tin11-de-quy',     'topic-fibonacci',      'HAS_TOPIC'],
+      ['chap-tin11-de-quy',     'topic-thap-hanoi',     'HAS_TOPIC'],
+      ['chap-tin11-bigo',       'topic-big-o',          'HAS_TOPIC'],
+
+      // Chapter LỚP 12 ICT → Topics
+      ['chap-tin12-csdl-na',   'topic-mysql',          'HAS_TOPIC'],
+      ['chap-tin12-csdl-na',   'topic-postgresql',     'HAS_TOPIC'],
+      ['chap-tin12-csdl-na',   'topic-normalization',  'HAS_TOPIC'],
+      ['chap-tin12-csdl-na',   'topic-index-db',       'HAS_TOPIC'],
+      ['chap-tin12-csdl-na',   'topic-transaction',    'HAS_TOPIC'],
+      ['chap-tin12-web-na',    'topic-react-vue',      'HAS_TOPIC'],
+      ['chap-tin12-web-na',    'topic-node-express',   'HAS_TOPIC'],
+      ['chap-tin12-web-na',    'topic-deploy-hosting', 'HAS_TOPIC'],
+      ['chap-tin12-web-na',    'topic-seo',            'HAS_TOPIC'],
+      ['chap-tin12-dao-duc-na','topic-ai-bias',        'HAS_TOPIC'],
+      ['chap-tin12-dao-duc-na','topic-deepfake',       'HAS_TOPIC'],
+      ['chap-tin12-dao-duc-na','topic-gdpr',           'HAS_TOPIC'],
+      ['chap-tin12-ai-app',    'topic-chatgpt',        'HAS_TOPIC'],
+      ['chap-tin12-ai-app',    'topic-midjourney',     'HAS_TOPIC'],
+      ['chap-tin12-ai-app',    'topic-stable-diff',    'HAS_TOPIC'],
+      ['chap-tin12-ai-app',    'topic-prompt-eng',     'HAS_TOPIC'],
+
+      // Chapter LỚP 12 CS → Topics
+      ['chap-tin12-ctdl',      'topic-stack',          'HAS_TOPIC'],
+      ['chap-tin12-ctdl',      'topic-queue',          'HAS_TOPIC'],
+      ['chap-tin12-ctdl',      'topic-linked-list',    'HAS_TOPIC'],
+      ['chap-tin12-ctdl',      'topic-tree',           'HAS_TOPIC'],
+      ['chap-tin12-ctdl',      'topic-graph',          'HAS_TOPIC'],
+      ['chap-tin12-ctdl',      'topic-hash',           'HAS_TOPIC'],
+      ['chap-tin12-tt-na',     'topic-bfs',            'HAS_TOPIC'],
+      ['chap-tin12-tt-na',     'topic-dfs',            'HAS_TOPIC'],
+      ['chap-tin12-tt-na',     'topic-dp',             'HAS_TOPIC'],
+      ['chap-tin12-tt-na',     'topic-greedy',         'HAS_TOPIC'],
+      ['chap-tin12-ai-cs',     'topic-ml-basic',       'HAS_TOPIC'],
+      ['chap-tin12-ai-cs',     'topic-supervised',     'HAS_TOPIC'],
+      ['chap-tin12-ai-cs',     'topic-unsupervised',   'HAS_TOPIC'],
+      ['chap-tin12-ai-cs',     'topic-neural-net',     'HAS_TOPIC'],
+      ['chap-tin12-thi-dau',   'topic-codeforces',     'HAS_TOPIC'],
+      ['chap-tin12-thi-dau',   'topic-leetcode',       'HAS_TOPIC'],
+      ['chap-tin12-thi-dau',   'topic-hsg-tin',        'HAS_TOPIC'],
+      ['chap-tin12-thi-dau',   'topic-icpc',           'HAS_TOPIC'],
+
+      // Topic → Person
+      ['topic-ls-mt',         'person-turing',     'RELATES_TO'],
+      ['topic-ls-mt',         'person-ada',        'RELATES_TO'],
+      ['topic-the-he-mt',     'person-von-neumann','RELATES_TO'],
+      ['topic-http-https',    'person-tim-bl',     'RELATES_TO'],
+      ['topic-ml-basic',      'person-hinton',     'RELATES_TO'],
+      ['topic-neural-net',    'person-hinton',     'RELATES_TO'],
+      ['topic-neural-net',    'person-lecun',      'RELATES_TO'],
+      ['topic-chatgpt',       'person-altman',     'RELATES_TO'],
+      ['topic-ms-word',       'person-gates',      'RELATES_TO'],
+      ['topic-mang-xh',       'person-zuck',       'RELATES_TO'],
+      ['topic-search-engine', 'person-page-brin',  'RELATES_TO'],
+      ['topic-nghe-cntt',     'person-nha-dong',   'RELATES_TO'],
+
+      // Topic → Concept
+      ['topic-thuat-toan-cb', 'concept-thuat-toan-c',     'USES_CONCEPT'],
+      ['topic-stack',         'concept-ctdl-c',           'USES_CONCEPT'],
+      ['topic-queue',         'concept-ctdl-c',           'USES_CONCEPT'],
+      ['topic-tree',          'concept-ctdl-c',           'USES_CONCEPT'],
+      ['topic-graph',         'concept-ctdl-c',           'USES_CONCEPT'],
+      ['topic-the-he-mt',     'concept-binary',           'USES_CONCEPT'],
+      ['topic-the-he-mt',     'concept-bit-byte',         'USES_CONCEPT'],
+      ['topic-the-he-mt',     'concept-cpu-ram',          'USES_CONCEPT'],
+      ['topic-oop-class',     'concept-oop-c',            'USES_CONCEPT'],
+      ['topic-oop-inherit',   'concept-oop-c',            'USES_CONCEPT'],
+      ['topic-react-vue',     'concept-api',              'USES_CONCEPT'],
+      ['topic-deploy-hosting','concept-version-control',  'USES_CONCEPT'],
+      ['topic-deploy-hosting','concept-cloud',            'USES_CONCEPT'],
+      ['topic-attt',          'concept-cia-triad',        'USES_CONCEPT'],
+      ['topic-mat-khau',      'concept-cia-triad',        'USES_CONCEPT'],
+      ['topic-python-intro',  'concept-open-source',      'USES_CONCEPT'],
+      ['topic-ml-basic',      'concept-ai-ml-dl',         'USES_CONCEPT'],
+      ['topic-chatgpt',       'concept-ai-ml-dl',         'USES_CONCEPT'],
+
+      // Topic → Application
+      ['topic-python-intro',  'app-vscode',           'APPLIED_IN'],
+      ['topic-python-intro',  'app-python-org',       'APPLIED_IN'],
+      ['topic-py-loop',       'app-colab',            'APPLIED_IN'],
+      ['topic-ml-basic',      'app-jupyter',          'APPLIED_IN'],
+      ['topic-ml-basic',      'app-colab',            'APPLIED_IN'],
+      ['topic-ml-basic',      'app-coursera',         'APPLIED_IN'],
+      ['topic-cv-tech',       'app-github',           'APPLIED_IN'],
+      ['topic-deploy-hosting','app-github',           'APPLIED_IN'],
+      ['topic-deploy-hosting','app-docker',           'APPLIED_IN'],
+      ['topic-deploy-hosting','app-aws',              'APPLIED_IN'],
+      ['topic-sql-cb',        'app-postman',          'APPLIED_IN'],
+      ['topic-react-vue',     'app-stackoverflow',    'APPLIED_IN'],
+      ['topic-chatgpt',       'app-chatgpt',          'APPLIED_IN'],
+      ['topic-chatgpt',       'app-claude',           'APPLIED_IN'],
+      ['topic-prompt-eng',    'app-claude',           'APPLIED_IN'],
+      ['topic-midjourney',    'app-midjourney-app',   'APPLIED_IN'],
+      ['topic-leetcode',      'app-hackerrank',       'APPLIED_IN'],
+      ['topic-nghe-cntt',     'app-itviec',           'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-python-intro',  'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-react-vue',     'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-node-express',  'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-html',          'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-css',           'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-js-cb',         'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-figma-tin',     'career-swe',           'APPLIED_IN_CAREER'],
+      ['topic-capcut',        'career-mobile-dev',    'APPLIED_IN_CAREER'],
+      ['topic-ml-basic',      'career-data-sci',      'APPLIED_IN_CAREER'],
+      ['topic-supervised',    'career-data-sci',      'APPLIED_IN_CAREER'],
+      ['topic-neural-net',    'career-ml-eng',        'APPLIED_IN_CAREER'],
+      ['topic-supervised',    'career-ml-eng',        'APPLIED_IN_CAREER'],
+      ['topic-deploy-hosting','career-devops',        'APPLIED_IN_CAREER'],
+      ['topic-deploy-hosting','career-cloud-arch',    'APPLIED_IN_CAREER'],
+      ['topic-attt',          'career-cyber',         'APPLIED_IN_CAREER'],
+      ['topic-mat-khau',      'career-cyber',         'APPLIED_IN_CAREER'],
+      ['topic-deepfake',      'career-cyber',         'APPLIED_IN_CAREER'],
+      ['topic-oop-class',     'career-game-dev',      'APPLIED_IN_CAREER'],
+      ['topic-sql-cb',        'career-dba',           'APPLIED_IN_CAREER'],
+      ['topic-mysql',         'career-dba',           'APPLIED_IN_CAREER'],
+      ['topic-postgresql',    'career-dba',           'APPLIED_IN_CAREER'],
+      ['topic-lan-wan',       'career-it-support',    'APPLIED_IN_CAREER'],
+      ['topic-tcp-ip',        'career-it-support',    'APPLIED_IN_CAREER'],
+      ['topic-nghe-cntt',     'career-tech-pm',       'APPLIED_IN_CAREER'],
+      ['topic-cv-tech',       'career-tech-founder',  'APPLIED_IN_CAREER'],
+      ['topic-prompt-eng',    'career-prompt-eng',    'APPLIED_IN_CAREER'],
+      ['topic-chatgpt',       'career-prompt-eng',    'APPLIED_IN_CAREER'],
+
+      // REQUIRES (lộ trình học)
+      ['topic-py-bien',       'topic-python-intro',   'REQUIRES'],
+      ['topic-py-if',         'topic-py-bien',        'REQUIRES'],
+      ['topic-py-loop',       'topic-py-if',          'REQUIRES'],
+      ['topic-py-list',       'topic-py-loop',        'REQUIRES'],
+      ['topic-oop-class',     'topic-py-list',        'REQUIRES'],
+      ['topic-oop-inherit',   'topic-oop-class',      'REQUIRES'],
+      ['topic-oop-encap',     'topic-oop-class',      'REQUIRES'],
+      ['topic-oop-poly',      'topic-oop-inherit',    'REQUIRES'],
+      ['topic-fibonacci',     'topic-py-loop',        'REQUIRES'],
+      ['topic-thap-hanoi',    'topic-fibonacci',      'REQUIRES'],
+      ['topic-tk-nhi-phan',   'topic-tk-tuyen-tinh',  'REQUIRES'],
+      ['topic-sx-quick',      'topic-sx-bubble',      'REQUIRES'],
+      ['topic-big-o',         'topic-sx-quick',       'REQUIRES'],
+      ['topic-sql-join',      'topic-sql-cb',         'REQUIRES'],
+      ['topic-sql-cb',        'topic-csdl-rdbms',     'REQUIRES'],
+      ['topic-normalization', 'topic-csdl-rdbms',     'REQUIRES'],
+      ['topic-index-db',      'topic-sql-cb',         'REQUIRES'],
+      ['topic-transaction',   'topic-sql-cb',         'REQUIRES'],
+      ['topic-css',           'topic-html',           'REQUIRES'],
+      ['topic-js-cb',         'topic-html',           'REQUIRES'],
+      ['topic-react-vue',     'topic-js-cb',          'REQUIRES'],
+      ['topic-node-express',  'topic-js-cb',          'REQUIRES'],
+      ['topic-deploy-hosting','topic-react-vue',      'REQUIRES'],
+      ['topic-seo',           'topic-html',           'REQUIRES'],
+      ['topic-queue',         'topic-stack',          'REQUIRES'],
+      ['topic-tree',          'topic-linked-list',    'REQUIRES'],
+      ['topic-graph',         'topic-tree',           'REQUIRES'],
+      ['topic-bfs',           'topic-queue',          'REQUIRES'],
+      ['topic-bfs',           'topic-graph',          'REQUIRES'],
+      ['topic-dfs',           'topic-stack',          'REQUIRES'],
+      ['topic-dfs',           'topic-graph',          'REQUIRES'],
+      ['topic-dp',            'topic-fibonacci',      'REQUIRES'],
+      ['topic-supervised',    'topic-ml-basic',       'REQUIRES'],
+      ['topic-unsupervised',  'topic-ml-basic',       'REQUIRES'],
+      ['topic-neural-net',    'topic-supervised',     'REQUIRES'],
+      ['topic-leetcode',      'topic-big-o',          'REQUIRES'],
+      ['topic-icpc',          'topic-codeforces',     'REQUIRES'],
+      ['topic-prompt-eng',    'topic-chatgpt',        'REQUIRES'],
+
+      // ═══════════════════════════════════════════
+      // CROSS-SUBJECT EDGES — Tin học = trục công nghệ
+      // ═══════════════════════════════════════════
+      // Tin học ↔ Toán (logic + xác suất + ma trận)
+      ['topic-py-if',           'topic-menh-de-logic',  'RELATES_TO'],
+      ['topic-thuat-toan-cb',   'topic-thong-ke',       'RELATES_TO'],
+      ['topic-ml-basic',        'topic-xs-tk-co-ban',   'RELATES_TO'],
+      ['topic-neural-net',      'topic-ham-so',         'RELATES_TO'],
+      ['topic-big-o',           'topic-ham-so',         'RELATES_TO'],
+      // Tin học ↔ Vật lí (semiconductor, transistor)
+      ['topic-the-he-mt',       'topic-dien-tro',       'RELATES_TO'],
+      ['topic-iot-10',          'topic-dien-tu-mach',   'RELATES_TO'],
+      // Tin học ↔ Sinh (bioinformatics, sequencing)
+      ['topic-ml-basic',        'topic-dna-rna',        'RELATES_TO'],
+      ['topic-graph',           'topic-than-kinh',      'RELATES_TO'],
+      // Tin học ↔ Lịch sử (CMCN 4.0, hist of Internet)
+      ['topic-cmcn-40',         'topic-cmcn1',          'RELATES_TO'],
+      ['topic-cmcn-40',         'topic-vn-hoi-nhap',    'RELATES_TO'],
+      // Tin học ↔ KTPL (fintech, ecommerce, kinh tế số)
+      ['topic-deploy-hosting',  'topic-startup',        'RELATES_TO'],
+      ['topic-attt',            'topic-vi-dien-tu',     'RELATES_TO'],
+      ['topic-mang-xh',         'topic-csr',            'RELATES_TO'],
+      ['topic-gdpr',            'topic-quyen-cn',       'RELATES_TO'],
+      // Tin học ↔ Mĩ thuật (UI/UX, AI art, game art)
+      ['topic-figma-tin',       'topic-ui-ux',          'RELATES_TO'],
+      ['topic-canva-tin',       'topic-do-hoa-ud',      'RELATES_TO'],
+      ['topic-midjourney',      'topic-ai-art',         'RELATES_TO'],
+      ['topic-stable-diff',     'topic-ai-art',         'RELATES_TO'],
+      // Tin học ↔ HĐTN (CV + portfolio)
+      ['topic-cv-tech',         'topic-cv-co-ban',      'RELATES_TO'],
+      ['topic-cv-tech',         'topic-portfolio-hs',   'RELATES_TO'],
+      ['topic-nghe-cntt',       'topic-tt-ld-vn',       'RELATES_TO'],
+      ['topic-prompt-eng',      'topic-ky-nang-so',     'RELATES_TO'],
+      // Tin học ↔ CN Công nghiệp (IoT, automation, mechatronics)
+      ['topic-iot-10',          'topic-cmcn-40',        'RELATES_TO'],
+      // Tin học ↔ Địa (GIS, satellite, big data địa lý)
+      ['topic-ml-basic',        'topic-bdkh-vn',        'RELATES_TO'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-tin:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (11 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn (12 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -12924,6 +13476,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?art=1        → Mĩ thuật 10/11/12
   //        ?ktpl=1       → Giáo dục Kinh tế & Pháp luật 10/11/12
   //        ?hdtn=1       → Hoạt động trải nghiệm, hướng nghiệp 10/11/12
+  //        ?tin=1        → Tin học 10/11/12 (ICT + CS)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -12938,8 +13491,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const art = req.query.art === '1' || req.query.mt === '1' || all;
       const ktpl = req.query.ktpl === '1' || req.query.econ === '1' || req.query.law === '1' || all;
       const hdtn = req.query.hdtn === '1' || req.query.experience === '1' || req.query.career === '1' || all;
+      const tin = req.query.tin === '1' || req.query.informatics === '1' || req.query.it === '1' || req.query.cs === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -12952,7 +13506,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (art)       r11 = await seedKgArt();
       if (ktpl)      r12 = await seedKgKtpl();
       if (hdtn)      r13 = await seedKgHdtn();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0);
+      if (tin)       r14 = await seedKgInformatics();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -12971,9 +13526,10 @@ ${plan.content || '<p>(Trống)</p>'}
         art: r11,
         ktpl: r12,
         hdtn: r13,
+        tin: r14,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật + HĐ trải nghiệm (3 lớp) mở rộng',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật + HĐ trải nghiệm + Tin học (3 lớp) mở rộng',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -12985,6 +13541,7 @@ ${plan.content || '<p>(Trống)</p>'}
           art       && !all && '+ Mĩ thuật 10/11/12',
           ktpl      && !all && '+ Giáo dục Kinh tế & Pháp luật 10/11/12',
           hdtn      && !all && '+ Hoạt động trải nghiệm, hướng nghiệp 10/11/12',
+          tin       && !all && '+ Tin học 10/11/12 (ICT + CS)',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
