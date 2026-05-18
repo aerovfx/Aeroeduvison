@@ -9006,24 +9006,318 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed mở rộng Vật lí: thêm Quang học + Vật lý hiện đại + Phenomenon
+   * + Application + chiều sâu cho các topic hiện có.
+   *
+   * Mục tiêu: HS không chỉ thấy "Sóng cơ" mà còn thấy "Sóng thần" (hiện
+   * tượng), "Máy MRI" (ứng dụng), "Hiệu ứng Doppler" (định nghĩa sâu).
+   *
+   * Idempotent — ON CONFLICT DO NOTHING. An toàn chạy lại.
+   */
+  async function seedKgPhysicsExtended() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    // ──────────────── NODES ────────────────
+    const nodes = [
+      // === NEW CHAPTERS ===
+      { id: 'chap-quang-hoc',    type: 'Chapter', label: 'Quang học',         description: 'Ánh sáng, gương, thấu kính, sóng ánh sáng' },
+      { id: 'chap-vlhd',         type: 'Chapter', label: 'Vật lý hiện đại',   description: 'Thuyết tương đối, lượng tử, nguyên tử, hạt nhân' },
+
+      // === CO HOC mở rộng ===
+      { id: 'topic-cd-tron-deu', type: 'Topic', label: 'Chuyển động tròn đều', description: 'Vận tốc dài, vận tốc góc, gia tốc hướng tâm' },
+      { id: 'topic-luc-huong-tam', type: 'Topic', label: 'Lực hướng tâm',     description: 'F = m·v²/r — gây ra chuyển động tròn' },
+      { id: 'topic-momen-luc',   type: 'Topic', label: 'Momen lực',            description: 'M = F·d — đại lượng gây quay' },
+      { id: 'topic-can-bang-vr', type: 'Topic', label: 'Cân bằng vật rắn',     description: 'ΣF = 0 và ΣM = 0' },
+      { id: 'topic-cd-roi',      type: 'Topic', label: 'Chuyển động rơi tự do', description: 'g = 9.8 m/s², v = g·t' },
+      { id: 'topic-cd-nem-ngang',type: 'Topic', label: 'Chuyển động ném ngang', description: 'Quỹ đạo parabol' },
+
+      // === DIEN HOC mở rộng ===
+      { id: 'topic-tu-dien',     type: 'Topic', label: 'Tụ điện',              description: 'Lưu trữ năng lượng điện trong điện trường' },
+      { id: 'topic-mach-rc',     type: 'Topic', label: 'Mạch RC',              description: 'Mạch tụ điện + điện trở — nạp/xả mũ' },
+      { id: 'topic-dong-xc',     type: 'Topic', label: 'Dòng điện xoay chiều', description: 'i = I₀·cos(ωt+φ), tần số f = 50 Hz tại VN' },
+      { id: 'topic-may-bien-ap', type: 'Topic', label: 'Máy biến áp',          description: 'U₁/U₂ = N₁/N₂' },
+
+      // === TU TRUONG mở rộng ===
+      { id: 'topic-cam-ung-cb',  type: 'Topic', label: 'Cảm ứng điện từ (chi tiết)', description: 'Định luật Faraday + Lenz về suất điện động cảm ứng' },
+      { id: 'topic-tu-cam',      type: 'Topic', label: 'Tự cảm',                description: 'Cuộn dây kháng lại thay đổi dòng điện' },
+
+      // === NHIET HOC mở rộng ===
+      { id: 'topic-ntdh1',       type: 'Topic', label: 'Nguyên lý I nhiệt động lực học', description: 'ΔU = Q + A (bảo toàn năng lượng)' },
+      { id: 'topic-ntdh2',       type: 'Topic', label: 'Nguyên lý II nhiệt động lực học', description: 'Entropy tăng — không thể có máy lý tưởng 100%' },
+      { id: 'topic-noi-nang',    type: 'Topic', label: 'Nội năng',              description: 'Tổng động + thế năng các phân tử' },
+      { id: 'topic-truyen-nhiet',type: 'Topic', label: 'Truyền nhiệt',          description: 'Dẫn nhiệt, đối lưu, bức xạ' },
+
+      // === QUANG HOC topics ===
+      { id: 'topic-phan-xa-as',  type: 'Topic', label: 'Phản xạ ánh sáng',     description: 'Góc tới = góc phản xạ' },
+      { id: 'topic-khuc-xa-as',  type: 'Topic', label: 'Khúc xạ ánh sáng',     description: 'n₁·sin(i) = n₂·sin(r) — định luật Snell' },
+      { id: 'topic-thau-kinh',   type: 'Topic', label: 'Thấu kính',            description: 'Hội tụ + phân kì, công thức 1/f = 1/d + 1/d\'' },
+      { id: 'topic-guong-cau',   type: 'Topic', label: 'Gương cầu',            description: 'Lõm + lồi, công thức tương tự thấu kính' },
+      { id: 'topic-lang-kinh',   type: 'Topic', label: 'Lăng kính',            description: 'Tách ánh sáng trắng thành màu' },
+      { id: 'topic-tan-sac',     type: 'Topic', label: 'Tán sắc ánh sáng',     description: 'Các bước sóng khác nhau bị khúc xạ khác nhau' },
+      { id: 'topic-giao-thoa-as',type: 'Topic', label: 'Giao thoa ánh sáng',    description: 'Thí nghiệm Young — bằng chứng tính sóng' },
+      { id: 'topic-soi-quang',   type: 'Topic', label: 'Sợi quang',             description: 'Phản xạ toàn phần trong sợi quang' },
+
+      // === VAT LY HIEN DAI topics ===
+      { id: 'topic-tuong-doi',   type: 'Topic', label: 'Thuyết tương đối hẹp', description: 'Einstein 1905 — thời gian + không gian co giãn theo vận tốc' },
+      { id: 'topic-emc2',        type: 'Topic', label: 'Tương đương khối lượng - năng lượng', description: 'E = mc² — khối lượng có thể chuyển thành năng lượng' },
+      { id: 'topic-quang-dien',  type: 'Topic', label: 'Hiệu ứng quang điện',  description: 'Ánh sáng đánh bật electron khỏi kim loại' },
+      { id: 'topic-bohr',        type: 'Topic', label: 'Mẫu nguyên tử Bohr',   description: 'Electron quay quanh hạt nhân ở quỹ đạo lượng tử' },
+      { id: 'topic-quang-tu',    type: 'Topic', label: 'Lượng tử ánh sáng',    description: 'Photon: hạt mang năng lượng E = h·f' },
+      { id: 'topic-hat-nhan',    type: 'Topic', label: 'Vật lý hạt nhân',       description: 'Cấu tạo proton + neutron, lực hạt nhân mạnh' },
+      { id: 'topic-phong-xa',    type: 'Topic', label: 'Phóng xạ',              description: 'Alpha, Beta, Gamma — phân rã tự nhiên' },
+      { id: 'topic-phan-ung-ht', type: 'Topic', label: 'Phản ứng hạt nhân',    description: 'Phân hạch + nhiệt hạch — nguồn năng lượng mạnh' },
+
+      // === FORMULAS mới ===
+      { id: 'form-luc-huong-tam',type: 'Formula', label: 'F = m·v²/r',          description: 'Lực hướng tâm', properties: { unit: 'N' } },
+      { id: 'form-omega-r',      type: 'Formula', label: 'v = ω·r',              description: 'Liên hệ vận tốc dài - góc' },
+      { id: 'form-cd-roi',       type: 'Formula', label: 'v = g·t, h = ½gt²',   description: 'Rơi tự do' },
+      { id: 'form-momen',        type: 'Formula', label: 'M = F·d',              description: 'Momen lực', properties: { unit: 'N·m' } },
+      { id: 'form-tu-dien',      type: 'Formula', label: 'Q = C·U',              description: 'Điện tích tụ điện', properties: { unit: 'C' } },
+      { id: 'form-bien-ap',      type: 'Formula', label: 'U₁/U₂ = N₁/N₂',       description: 'Biến áp' },
+      { id: 'form-snell',        type: 'Formula', label: 'n₁·sin(i) = n₂·sin(r)', description: 'Định luật Snell — khúc xạ' },
+      { id: 'form-thau-kinh',    type: 'Formula', label: '1/f = 1/d + 1/d\'',   description: 'Công thức thấu kính' },
+      { id: 'form-emc2',         type: 'Formula', label: 'E = m·c²',             description: 'Tương đương khối-năng (Einstein)' },
+      { id: 'form-photon',       type: 'Formula', label: 'E = h·f',              description: 'Năng lượng photon (Planck)', properties: { unit: 'J', h: '6.626e-34' } },
+      { id: 'form-young',        type: 'Formula', label: 'i = λ·D/a',            description: 'Khoảng vân giao thoa Young' },
+      { id: 'form-phong-xa',     type: 'Formula', label: 'N(t) = N₀·2^(-t/T)',  description: 'Phân rã phóng xạ' },
+
+      // === CONCEPTS mới ===
+      { id: 'concept-entropy',   type: 'Concept', label: 'Entropy',              description: 'Đại lượng đo độ hỗn loạn / thông tin' },
+      { id: 'concept-photon',    type: 'Concept', label: 'Photon (hạt ánh sáng)', description: 'Đơn vị lượng tử của ánh sáng' },
+      { id: 'concept-luong-tu',  type: 'Concept', label: 'Lượng tử hóa',         description: 'Năng lượng chỉ nhận giá trị rời rạc' },
+      { id: 'concept-song-hat',  type: 'Concept', label: 'Lưỡng tính sóng - hạt', description: 'Vật chất vừa là sóng vừa là hạt' },
+      { id: 'concept-truong-as', type: 'Concept', label: 'Trường ánh sáng',      description: 'Sóng điện từ — không cần môi trường' },
+
+      // === PHENOMENA (hiện tượng) — TYPE MỚI ===
+      { id: 'phen-cau-vong',     type: 'Phenomenon', label: 'Cầu vồng',          description: 'Khúc xạ + phản xạ trong giọt nước tạo ra 7 màu' },
+      { id: 'phen-sao-bang',     type: 'Phenomenon', label: 'Sao băng',          description: 'Thiên thạch ma sát với khí quyển → cháy sáng' },
+      { id: 'phen-sam-chop',     type: 'Phenomenon', label: 'Sấm chớp',          description: 'Phóng tĩnh điện giữa mây và đất — V có thể lên 100 triệu Volt' },
+      { id: 'phen-nhat-thuc',    type: 'Phenomenon', label: 'Nhật thực',         description: 'Mặt trăng che khuất Mặt trời' },
+      { id: 'phen-cuc-quang',    type: 'Phenomenon', label: 'Cực quang (Aurora)', description: 'Hạt mặt trời va chạm với khí quyển ở cực — phát sáng xanh/đỏ' },
+      { id: 'phen-doppler',      type: 'Phenomenon', label: 'Hiệu ứng Doppler',  description: 'Tần số sóng thay đổi khi nguồn/người quan sát di chuyển' },
+      { id: 'phen-nha-kinh',     type: 'Phenomenon', label: 'Hiệu ứng nhà kính', description: 'Khí CO₂ giữ bức xạ hồng ngoại → ấm lên toàn cầu' },
+      { id: 'phen-song-than',    type: 'Phenomenon', label: 'Sóng thần (Tsunami)', description: 'Sóng cơ địa chấn truyền qua đại dương' },
+      { id: 'phen-mirage',       type: 'Phenomenon', label: 'Ảo ảnh (Mirage)',    description: 'Khúc xạ ánh sáng qua không khí có gradient nhiệt' },
+      { id: 'phen-tia-x',        type: 'Phenomenon', label: 'Tia X',              description: 'Bức xạ điện từ năng lượng cao — xuyên qua mô mềm' },
+      { id: 'phen-supernova',    type: 'Phenomenon', label: 'Sao siêu mới (Supernova)', description: 'Phản ứng hạt nhân nổ tung của sao khổng lồ' },
+      { id: 'phen-trang-luong',  type: 'Phenomenon', label: 'Triều cường',        description: 'Lực hấp dẫn Mặt trăng + Mặt trời tác động lên đại dương' },
+
+      // === APPLICATIONS (ứng dụng) — TYPE MỚI ===
+      { id: 'app-pin-mt',        type: 'Application', label: 'Pin Mặt trời',      description: 'Hiệu ứng quang điện chuyển ánh sáng → điện' },
+      { id: 'app-mri',           type: 'Application', label: 'Máy MRI',           description: 'Cộng hưởng từ hạt nhân — chẩn đoán y khoa' },
+      { id: 'app-maglev',        type: 'Application', label: 'Tàu cao tốc Maglev', description: 'Lực từ nâng tàu lên — Trung Quốc 600 km/h' },
+      { id: 'app-lo-vi-song',    type: 'Application', label: 'Lò vi sóng',         description: 'Sóng điện từ 2.45 GHz làm nước rung → nóng' },
+      { id: 'app-laser',         type: 'Application', label: 'Laser',              description: 'Khuếch đại ánh sáng — phẫu thuật mắt, quét mã' },
+      { id: 'app-cap-quang',     type: 'Application', label: 'Cáp quang Internet', description: 'Phản xạ toàn phần — truyền data tốc độ ánh sáng' },
+      { id: 'app-may-phat-dien', type: 'Application', label: 'Máy phát điện',      description: 'Cảm ứng điện từ — quay roto sinh dòng điện' },
+      { id: 'app-dong-co-dien',  type: 'Application', label: 'Động cơ điện',        description: 'Lực Lorentz — dòng điện trong từ trường sinh momen quay' },
+      { id: 'app-gps',           type: 'Application', label: 'GPS',                 description: 'Thuyết tương đối: hiệu chỉnh đồng hồ vệ tinh theo Einstein' },
+      { id: 'app-smartphone',    type: 'Application', label: 'Smartphone',          description: 'Cảm biến gia tốc, con quay hồi chuyển, GPS, từ trường' },
+      { id: 'app-tu-lanh',       type: 'Application', label: 'Tủ lạnh',             description: 'Chu trình nhiệt động lực học ngược' },
+      { id: 'app-pin-nhien-lieu',type: 'Application', label: 'Pin nhiên liệu',     description: 'H₂ + O₂ → điện + nước, sạch' },
+      { id: 'app-nha-may-dien-hn',type: 'Application', label: 'Nhà máy điện hạt nhân', description: 'Phản ứng phân hạch U-235 sinh nhiệt → hơi → tuabin' },
+      { id: 'app-camera-so',     type: 'Application', label: 'Camera số',            description: 'Cảm biến CMOS dùng hiệu ứng quang điện' },
+      { id: 'app-kinh-hien-vi',  type: 'Application', label: 'Kính hiển vi điện tử', description: 'Lưỡng tính sóng-hạt: electron có λ → tạo ảnh ở scale nm' },
+      { id: 'app-radar',         type: 'Application', label: 'Radar',               description: 'Phát sóng vô tuyến + đo thời gian phản xạ' },
+      { id: 'app-cong-hoa-am',   type: 'Application', label: 'Loa cộng hưởng âm',   description: 'Sóng âm cộng hưởng trong hộp loa khuếch đại' },
+      { id: 'app-mat-kinh',      type: 'Application', label: 'Mắt kính cận/viễn',   description: 'Thấu kính phân kì (cận) / hội tụ (viễn)' },
+
+      // === CAREERS mở rộng ===
+      { id: 'career-vlh-nguyenly',type: 'Career', label: 'Nhà vật lý lý thuyết',   description: 'Nghiên cứu nguyên lý cơ bản của tự nhiên' },
+      { id: 'career-quang-hoc-eng',type: 'Career', label: 'Kỹ sư quang học',       description: 'Thiết kế ống kính, laser, sợi quang' },
+      { id: 'career-vat-ly-y-hoc',type: 'Career', label: 'Vật lý y học',           description: 'Vận hành máy MRI, xạ trị, X-quang' },
+      { id: 'career-ks-hat-nhan',  type: 'Career', label: 'Kỹ sư hạt nhân',         description: 'Nhà máy điện hạt nhân + ứng dụng phóng xạ' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-ext:node]', n.id, e.message); }
+    }
+
+    // ──────────────── EDGES ────────────────
+    const edges = [
+      // Subject → New chapters
+      ['subj-vatli', 'chap-quang-hoc', 'HAS_CHAPTER'],
+      ['subj-vatli', 'chap-vlhd',      'HAS_CHAPTER'],
+
+      // Cơ học mở rộng
+      ['chap-co-hoc',     'topic-cd-tron-deu',    'HAS_TOPIC'],
+      ['chap-co-hoc',     'topic-luc-huong-tam',  'HAS_TOPIC'],
+      ['chap-co-hoc',     'topic-momen-luc',      'HAS_TOPIC'],
+      ['chap-co-hoc',     'topic-can-bang-vr',    'HAS_TOPIC'],
+      ['chap-co-hoc',     'topic-cd-roi',         'HAS_TOPIC'],
+      ['chap-co-hoc',     'topic-cd-nem-ngang',   'HAS_TOPIC'],
+      ['topic-luc-huong-tam', 'form-luc-huong-tam', 'USES_FORMULA'],
+      ['topic-cd-tron-deu',   'form-omega-r',     'USES_FORMULA'],
+      ['topic-cd-roi',        'form-cd-roi',      'USES_FORMULA'],
+      ['topic-momen-luc',     'form-momen',       'USES_FORMULA'],
+      ['topic-cd-tron-deu',   'topic-luc-huong-tam', 'RELATES_TO'],
+      ['topic-can-bang-vr',   'topic-momen-luc',  'REQUIRES'],
+
+      // Điện học mở rộng
+      ['chap-dien-hoc',   'topic-tu-dien',        'HAS_TOPIC'],
+      ['chap-dien-hoc',   'topic-mach-rc',        'HAS_TOPIC'],
+      ['chap-dien-hoc',   'topic-dong-xc',        'HAS_TOPIC'],
+      ['chap-dien-hoc',   'topic-may-bien-ap',    'HAS_TOPIC'],
+      ['topic-tu-dien',   'form-tu-dien',         'USES_FORMULA'],
+      ['topic-may-bien-ap', 'form-bien-ap',       'USES_FORMULA'],
+      ['topic-mach-rc',   'topic-tu-dien',        'REQUIRES'],
+      ['topic-may-bien-ap','topic-dong-xc',       'REQUIRES'],
+
+      // Từ trường mở rộng
+      ['chap-tu-truong',  'topic-cam-ung-cb',     'HAS_TOPIC'],
+      ['chap-tu-truong',  'topic-tu-cam',         'HAS_TOPIC'],
+      ['topic-cam-ung-cb','topic-tu-cam',         'RELATES_TO'],
+
+      // Nhiệt học mở rộng
+      ['chap-nhiet-hoc',  'topic-ntdh1',          'HAS_TOPIC'],
+      ['chap-nhiet-hoc',  'topic-ntdh2',          'HAS_TOPIC'],
+      ['chap-nhiet-hoc',  'topic-noi-nang',       'HAS_TOPIC'],
+      ['chap-nhiet-hoc',  'topic-truyen-nhiet',   'HAS_TOPIC'],
+      ['topic-ntdh1',     'topic-noi-nang',       'REQUIRES'],
+      ['topic-ntdh2',     'concept-entropy',      'USES_CONCEPT'],
+
+      // Quang học chapter
+      ['chap-quang-hoc',  'topic-phan-xa-as',     'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-khuc-xa-as',     'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-thau-kinh',      'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-guong-cau',      'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-lang-kinh',      'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-tan-sac',        'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-giao-thoa-as',   'HAS_TOPIC'],
+      ['chap-quang-hoc',  'topic-soi-quang',      'HAS_TOPIC'],
+      ['topic-khuc-xa-as','form-snell',           'USES_FORMULA'],
+      ['topic-thau-kinh', 'form-thau-kinh',       'USES_FORMULA'],
+      ['topic-giao-thoa-as','form-young',         'USES_FORMULA'],
+      ['topic-tan-sac',   'topic-khuc-xa-as',     'REQUIRES'],
+      ['topic-soi-quang', 'topic-phan-xa-as',     'REQUIRES'],
+
+      // Vật lý hiện đại chapter
+      ['chap-vlhd',       'topic-tuong-doi',      'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-emc2',           'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-quang-dien',     'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-bohr',           'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-quang-tu',       'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-hat-nhan',       'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-phong-xa',       'HAS_TOPIC'],
+      ['chap-vlhd',       'topic-phan-ung-ht',    'HAS_TOPIC'],
+      ['topic-emc2',      'form-emc2',            'USES_FORMULA'],
+      ['topic-quang-tu',  'form-photon',          'USES_FORMULA'],
+      ['topic-phong-xa',  'form-phong-xa',        'USES_FORMULA'],
+      ['topic-tuong-doi', 'topic-emc2',           'REQUIRES'],
+      ['topic-quang-tu',  'concept-photon',       'USES_CONCEPT'],
+      ['topic-quang-tu',  'concept-luong-tu',     'USES_CONCEPT'],
+      ['topic-bohr',      'concept-luong-tu',     'USES_CONCEPT'],
+      ['topic-quang-dien','concept-song-hat',     'USES_CONCEPT'],
+      ['topic-giao-thoa-as','concept-truong-as',  'USES_CONCEPT'],
+
+      // PHENOMENA — EXHIBITS_PHENOMENON edges (topic → phenomenon)
+      ['topic-tan-sac',       'phen-cau-vong',    'EXHIBITS_PHENOMENON'],
+      ['topic-khuc-xa-as',    'phen-cau-vong',    'EXHIBITS_PHENOMENON'],
+      ['topic-luc-ma-sat',    'phen-sao-bang',    'EXHIBITS_PHENOMENON'],
+      ['topic-dien-tich',     'phen-sam-chop',    'EXHIBITS_PHENOMENON'],
+      ['topic-phan-xa-as',    'phen-nhat-thuc',   'EXHIBITS_PHENOMENON'],
+      ['topic-tu-truong',     'phen-cuc-quang',   'EXHIBITS_PHENOMENON'],
+      ['topic-song-co',       'phen-doppler',     'EXHIBITS_PHENOMENON'],
+      ['topic-dao-dong-dh',   'phen-doppler',     'EXHIBITS_PHENOMENON'],
+      ['topic-truyen-nhiet',  'phen-nha-kinh',    'EXHIBITS_PHENOMENON'],
+      ['topic-song-co',       'phen-song-than',   'EXHIBITS_PHENOMENON'],
+      ['topic-khuc-xa-as',    'phen-mirage',      'EXHIBITS_PHENOMENON'],
+      ['topic-phong-xa',      'phen-tia-x',       'EXHIBITS_PHENOMENON'],
+      ['topic-phan-ung-ht',   'phen-supernova',   'EXHIBITS_PHENOMENON'],
+      ['topic-trong-luc',     'phen-trang-luong', 'EXHIBITS_PHENOMENON'],
+
+      // APPLICATIONS — APPLIED_IN edges (topic → application)
+      ['topic-quang-dien',    'app-pin-mt',           'APPLIED_IN'],
+      ['topic-quang-dien',    'app-camera-so',        'APPLIED_IN'],
+      ['topic-hat-nhan',      'app-mri',              'APPLIED_IN'],
+      ['topic-cam-ung-cb',    'app-mri',              'APPLIED_IN'],
+      ['topic-tu-truong',     'app-maglev',           'APPLIED_IN'],
+      ['topic-cam-ung-dt',    'app-may-phat-dien',    'APPLIED_IN'],
+      ['topic-cam-ung-cb',    'app-may-phat-dien',    'APPLIED_IN'],
+      ['topic-tu-truong',     'app-dong-co-dien',     'APPLIED_IN'],
+      ['topic-tuong-doi',     'app-gps',              'APPLIED_IN'],
+      ['topic-emc2',          'app-gps',              'APPLIED_IN'],
+      ['topic-soi-quang',     'app-cap-quang',        'APPLIED_IN'],
+      ['topic-phan-xa-as',    'app-cap-quang',        'APPLIED_IN'],
+      ['topic-song-co',       'app-lo-vi-song',       'APPLIED_IN'],
+      ['topic-cam-ung-dt',    'app-lo-vi-song',       'APPLIED_IN'],
+      ['topic-quang-tu',      'app-laser',            'APPLIED_IN'],
+      ['topic-ntdh2',         'app-tu-lanh',          'APPLIED_IN'],
+      ['topic-phan-ung-ht',   'app-nha-may-dien-hn',  'APPLIED_IN'],
+      ['topic-phan-ung-ht',   'app-pin-nhien-lieu',   'APPLIED_IN'],
+      ['topic-thau-kinh',     'app-mat-kinh',         'APPLIED_IN'],
+      ['topic-thau-kinh',     'app-kinh-hien-vi',     'APPLIED_IN'],
+      ['topic-song-co',       'app-cong-hoa-am',      'APPLIED_IN'],
+      ['topic-cam-ung-dt',    'app-radar',            'APPLIED_IN'],
+      ['topic-luc-huong-tam', 'app-smartphone',       'APPLIED_IN'],
+      ['topic-may-bien-ap',   'app-smartphone',       'APPLIED_IN'],
+
+      // CAREERS → Topics applied
+      ['topic-tuong-doi',     'career-vlh-nguyenly',  'APPLIED_IN_CAREER'],
+      ['topic-quang-tu',      'career-vlh-nguyenly',  'APPLIED_IN_CAREER'],
+      ['topic-thau-kinh',     'career-quang-hoc-eng', 'APPLIED_IN_CAREER'],
+      ['topic-soi-quang',     'career-quang-hoc-eng', 'APPLIED_IN_CAREER'],
+      ['topic-quang-dien',    'career-quang-hoc-eng', 'APPLIED_IN_CAREER'],
+      ['topic-hat-nhan',      'career-vat-ly-y-hoc',  'APPLIED_IN_CAREER'],
+      ['topic-phong-xa',      'career-vat-ly-y-hoc',  'APPLIED_IN_CAREER'],
+      ['topic-phan-ung-ht',   'career-ks-hat-nhan',   'APPLIED_IN_CAREER'],
+      ['topic-cam-ung-cb',    'career-ky-su-dien',    'APPLIED_IN_CAREER'],
+      ['topic-dong-xc',       'career-ky-su-dien',    'APPLIED_IN_CAREER'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-ext:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
+  //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
+      const ext = req.query.extended === '1' || req.query.ext === '1';
       const r1 = await seedKgPhysics11();
       let r2 = null;
+      let r3 = null;
       if (all) r2 = await seedKgMathChem11();
+      if (ext) r3 = await seedKgPhysicsExtended();
       return res.json({
         success: true,
-        nodeCount: r1.nodeCount + (r2?.nodeCount || 0),
-        edgeCount: r1.edgeCount + (r2?.edgeCount || 0),
-        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0),
+        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0),
+        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0),
+        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0),
         physics: r1,
         mathChem: r2,
-        message: all
-          ? 'Đã seed Vật lí 11 + Toán 11 + Hóa 11 (3 subjects, cross-edges)'
-          : 'Đã seed Vật lí 11 (thêm ?subjects=all để seed cả Toán + Hóa)',
+        physicsExtended: r3,
+        message: [
+          'Đã seed Vật lí 11',
+          all && '+ Toán + Hóa',
+          ext && '+ Mở rộng (Quang học + VLHĐ + Phenomenon + Application)',
+        ].filter(Boolean).join(' '),
       });
     } catch (err) {
       console.error('[kg:seed] ❌', err.message);

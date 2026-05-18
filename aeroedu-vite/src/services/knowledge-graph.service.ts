@@ -278,10 +278,11 @@ export const knowledgeGraphService = {
     ).then(r => r.data),
 
   // ── Phase 5: Cross-Subject seed ──────────────────────────────────
-  /** Seed cả 3 môn Lý + Toán + Hóa với cross-edges. */
+  /** Seed cả 3 môn Lý + Toán + Hóa + Physics extended (Quang học,
+   *  VLHĐ, Phenomenon, Application) với cross-edges. */
   seedAllSubjects: () =>
     api.get<{ success: boolean; nodeCount: number; edgeInserted: number; message: string }>(
-      '/kg/seed?subjects=all'
+      '/kg/seed?subjects=all&extended=1'
     ).then(r => r.data),
 
   // ── Phase 6: AI Smart Search ─────────────────────────────────────
@@ -340,43 +341,49 @@ export function getMasteryColor(score: number | undefined): {
 
 // ─── Helpers cho UI ────────────────────────────────────────────────
 export const NODE_TYPE_COLORS: Record<string, { fill: string; stroke: string; text: string }> = {
-  Subject:  { fill: 'rgba(96,165,250,0.15)',  stroke: '#60a5fa', text: '#bfdbfe' },
-  Chapter:  { fill: 'rgba(167,139,250,0.15)', stroke: '#a78bfa', text: '#ddd6fe' },
-  Topic:    { fill: 'rgba(52,211,153,0.15)',  stroke: '#34d399', text: '#a7f3d0' },
-  Concept:  { fill: 'rgba(250,204,21,0.15)',  stroke: '#facc15', text: '#fef08a' },
-  Formula:  { fill: 'rgba(251,146,60,0.15)',  stroke: '#fb923c', text: '#fed7aa' },
-  Question: { fill: 'rgba(248,113,113,0.15)', stroke: '#f87171', text: '#fecaca' },
-  Lesson:   { fill: 'rgba(34,211,238,0.15)',  stroke: '#22d3ee', text: '#a5f3fc' },
-  Project:  { fill: 'rgba(192,132,252,0.15)', stroke: '#c084fc', text: '#e9d5ff' },
-  Career:   { fill: 'rgba(244,114,182,0.15)', stroke: '#f472b6', text: '#fbcfe8' },
-  Person:   { fill: 'rgba(148,163,184,0.15)', stroke: '#94a3b8', text: '#e2e8f0' },
+  Subject:    { fill: 'rgba(96,165,250,0.15)',  stroke: '#60a5fa', text: '#bfdbfe' },
+  Chapter:    { fill: 'rgba(167,139,250,0.15)', stroke: '#a78bfa', text: '#ddd6fe' },
+  Topic:      { fill: 'rgba(52,211,153,0.15)',  stroke: '#34d399', text: '#a7f3d0' },
+  Concept:    { fill: 'rgba(250,204,21,0.15)',  stroke: '#facc15', text: '#fef08a' },
+  Formula:    { fill: 'rgba(251,146,60,0.15)',  stroke: '#fb923c', text: '#fed7aa' },
+  Question:   { fill: 'rgba(248,113,113,0.15)', stroke: '#f87171', text: '#fecaca' },
+  Lesson:     { fill: 'rgba(34,211,238,0.15)',  stroke: '#22d3ee', text: '#a5f3fc' },
+  Project:    { fill: 'rgba(192,132,252,0.15)', stroke: '#c084fc', text: '#e9d5ff' },
+  Career:     { fill: 'rgba(244,114,182,0.15)', stroke: '#f472b6', text: '#fbcfe8' },
+  Person:     { fill: 'rgba(148,163,184,0.15)', stroke: '#94a3b8', text: '#e2e8f0' },
+  Phenomenon: { fill: 'rgba(56,189,248,0.18)',  stroke: '#38bdf8', text: '#bae6fd' },
+  Application:{ fill: 'rgba(245,158,11,0.18)',  stroke: '#f59e0b', text: '#fde68a' },
 }
 
 export const NODE_TYPE_LABELS: Record<string, string> = {
-  Subject:  'Môn học',
-  Chapter:  'Chương',
-  Topic:    'Chủ đề',
-  Concept:  'Khái niệm',
-  Formula:  'Công thức',
-  Question: 'Câu hỏi',
-  Lesson:   'Bài giảng',
-  Project:  'Dự án',
-  Career:   'Nghề nghiệp',
-  Person:   'Người',
+  Subject:    'Môn học',
+  Chapter:    'Chương',
+  Topic:      'Chủ đề',
+  Concept:    'Khái niệm',
+  Formula:    'Công thức',
+  Question:   'Câu hỏi',
+  Lesson:     'Bài giảng',
+  Project:    'Dự án',
+  Career:     'Nghề nghiệp',
+  Person:     'Người',
+  Phenomenon: 'Hiện tượng',
+  Application:'Ứng dụng',
 }
 
 export const REL_TYPE_LABELS: Record<string, string> = {
-  HAS_CHAPTER:        'có chương',
-  HAS_TOPIC:          'có chủ đề',
-  USES_FORMULA:       'dùng công thức',
-  USES_CONCEPT:       'dùng khái niệm',
-  RELATES_TO:         'liên quan',
-  APPLIED_IN_CAREER:  'ứng dụng trong nghề',
-  REQUIRES:           'yêu cầu',
-  IS_A:               'là một',
-  PART_OF_PATH:       'thuộc lộ trình',
-  ASSESSES_TOPIC:     'kiểm tra chủ đề',
-  MASTERED_BY:        'đã thông thạo',
+  HAS_CHAPTER:          'có chương',
+  HAS_TOPIC:            'có chủ đề',
+  USES_FORMULA:         'dùng công thức',
+  USES_CONCEPT:         'dùng khái niệm',
+  RELATES_TO:           'liên quan',
+  APPLIED_IN_CAREER:    'ứng dụng trong nghề',
+  APPLIED_IN:           'ứng dụng vào',
+  EXHIBITS_PHENOMENON:  'biểu hiện',
+  REQUIRES:             'yêu cầu',
+  IS_A:                 'là một',
+  PART_OF_PATH:         'thuộc lộ trình',
+  ASSESSES_TOPIC:       'kiểm tra chủ đề',
+  MASTERED_BY:          'đã thông thạo',
 }
 
 /** Trả màu cho type, fallback grey nếu type lạ. */

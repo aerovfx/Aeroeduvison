@@ -53,13 +53,15 @@ const PHYSICS = {
 function nodeRadius(type: string, isCenter: boolean): number {
   if (isCenter) return 32
   switch (type) {
-    case 'Subject': return 30
-    case 'Chapter': return 26
-    case 'Topic':   return 22
-    case 'Career':  return 20
-    case 'Concept': return 18
-    case 'Formula': return 18
-    default:        return 18
+    case 'Subject':     return 30
+    case 'Chapter':     return 26
+    case 'Topic':       return 22
+    case 'Career':      return 20
+    case 'Application': return 20  // ứng dụng — visually prominent
+    case 'Phenomenon':  return 19  // hiện tượng
+    case 'Concept':     return 18
+    case 'Formula':     return 18
+    default:            return 18
   }
 }
 
