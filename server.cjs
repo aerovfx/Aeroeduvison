@@ -10961,14 +10961,337 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Công nghệ Chăn nuôi 10, 11, 12 theo SGK GDPT 2018.
+   * Môn chuyên ngành: vai trò chăn nuôi VN, giống vật nuôi, thức ăn,
+   * chuồng trại, bệnh, từng loại vật nuôi (gà/lợn/bò/dê/thuỷ sản/ong),
+   * công nghệ cao + khởi nghiệp.
+   *
+   * ~110 nodes + ~150 edges. Idempotent.
+   */
+  async function seedKgLivestock() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-cncn', type: 'Subject', label: 'Công nghệ Chăn nuôi',
+        description: 'Môn Công nghệ Chăn nuôi THPT 10, 11, 12 theo GDPT 2018',
+        properties: { color: '#92400e' } },
+
+      // === LỚP 10: Cơ sở chăn nuôi ===
+      { id: 'chap-cn10-gioi-thieu', type: 'Chapter', label: '[10] Giới thiệu chăn nuôi',     description: 'Vai trò + xu hướng chăn nuôi VN + thế giới' },
+      { id: 'chap-cn10-giong',      type: 'Chapter', label: '[10] Giống vật nuôi',          description: 'Phân loại, chọn lọc, nhân giống, di truyền giống' },
+      { id: 'chap-cn10-thuc-an',    type: 'Chapter', label: '[10] Thức ăn chăn nuôi',       description: 'Phân loại, dinh dưỡng, chế biến, bảo quản TĂ' },
+      { id: 'chap-cn10-chuong',     type: 'Chapter', label: '[10] Chuồng trại',              description: 'Thiết kế, vật liệu, vệ sinh chuồng nuôi' },
+      { id: 'chap-cn10-benh',       type: 'Chapter', label: '[10] Phòng + trị bệnh',         description: 'Bệnh truyền nhiễm, vaccine, kháng sinh, kiểm dịch' },
+      { id: 'chap-cn10-moi-truong', type: 'Chapter', label: '[10] Bảo vệ môi trường CN',    description: 'Xử lý chất thải, biogas, chăn nuôi xanh' },
+
+      // Topics LỚP 10
+      { id: 'topic-vai-tro-cn',       type: 'Topic', label: 'Vai trò chăn nuôi',           description: 'Cung cấp thực phẩm (thịt, sữa, trứng), nguyên liệu (lông, da)' },
+      { id: 'topic-xu-huong-cn',      type: 'Topic', label: 'Xu hướng chăn nuôi hiện đại', description: 'Quy mô lớn, công nghệ cao, hữu cơ, an toàn sinh học' },
+      { id: 'topic-chan-nuoi-vn',     type: 'Topic', label: 'Chăn nuôi Việt Nam',          description: '28M lợn, 558M gia cầm, 6.5M bò, top 3 TG thuỷ sản' },
+      { id: 'topic-giong-vat-nuoi',   type: 'Topic', label: 'Giống vật nuôi',              description: 'Quần thể cùng loài, di truyền tính trạng đặc trưng' },
+      { id: 'topic-phan-loai-giong',  type: 'Topic', label: 'Phân loại giống',             description: 'Giống nội (Móng Cái, Ỉ), giống ngoại (Yorkshire), giống lai' },
+      { id: 'topic-chon-loc-giong',   type: 'Topic', label: 'Chọn lọc giống',              description: 'Chọn lọc cá thể, gia đình, hậu duệ — cải tiến năng suất' },
+      { id: 'topic-nhan-giong',       type: 'Topic', label: 'Nhân giống',                   description: 'Nhân thuần + lai giống — tạo F1, F2 ưu thế lai' },
+      { id: 'topic-tttt',             type: 'Topic', label: 'Thụ tinh nhân tạo (TTNT)',    description: 'Bơm tinh trùng — tăng tốc lan giống tốt' },
+      { id: 'topic-thuc-an-xanh',     type: 'Topic', label: 'Thức ăn xanh',                description: 'Cỏ, rau, lá cây — giàu vitamin, chất xơ' },
+      { id: 'topic-thuc-an-tho',      type: 'Topic', label: 'Thức ăn thô khô',             description: 'Rơm rạ, cỏ khô, vỏ trấu — bảo quản lâu dài' },
+      { id: 'topic-thuc-an-tinh',     type: 'Topic', label: 'Thức ăn tinh',                description: 'Ngô, gạo, đậu nành, cám — năng lượng + đạm cao' },
+      { id: 'topic-thuc-an-hh',       type: 'Topic', label: 'Thức ăn hỗn hợp',              description: 'Premix vitamin + khoáng + amino acid — công nghiệp' },
+      { id: 'topic-u-chua-thua',      type: 'Topic', label: 'Ủ chua thức ăn',               description: 'Lên men yếm khí cỏ → bảo quản dinh dưỡng + ngon' },
+      { id: 'topic-chuong-trai',      type: 'Topic', label: 'Thiết kế chuồng trại',         description: 'Hướng đón gió, mát mùa hè + ấm mùa đông + thoát nước' },
+      { id: 'topic-ve-sinh-chuong',   type: 'Topic', label: 'Vệ sinh chuồng',               description: 'Dọn phân, khử trùng, kiểm soát ruồi muỗi, ánh sáng' },
+      { id: 'topic-benh-tn',          type: 'Topic', label: 'Bệnh truyền nhiễm',           description: 'LMLM, dịch tả lợn châu Phi, cúm gia cầm — virus + vi khuẩn' },
+      { id: 'topic-vaccine-cn',       type: 'Topic', label: 'Vaccine chăn nuôi',           description: 'Phòng bệnh chủ động — tiêm khi vật nuôi khoẻ mạnh' },
+      { id: 'topic-khang-sinh-cn',    type: 'Topic', label: 'Kháng sinh + thuốc thú y',    description: 'Trị bệnh — nhưng cấm dùng cho ăn liên tục (kháng kháng sinh)' },
+      { id: 'topic-bio-gas',          type: 'Topic', label: 'Biogas từ chất thải',         description: 'Phân + nước thải → CH4 → đun nấu, chạy máy phát điện' },
+      { id: 'topic-chat-thai-cn',     type: 'Topic', label: 'Xử lý chất thải chăn nuôi',   description: 'Phân, nước tiểu, xác chết — composting, biogas, làm phân bón' },
+
+      // === LỚP 11: Công nghệ chăn nuôi chuyên sâu ===
+      { id: 'chap-cn11-gia-cam',    type: 'Chapter', label: '[11] Chăn nuôi Gia cầm',       description: 'Gà, vịt, ngan, ngỗng — lấy thịt + trứng' },
+      { id: 'chap-cn11-lon',        type: 'Chapter', label: '[11] Chăn nuôi Lợn (Heo)',     description: 'Lợn thịt + lợn nái — nguồn protein chính VN' },
+      { id: 'chap-cn11-trau-bo',    type: 'Chapter', label: '[11] Chăn nuôi Trâu Bò',       description: 'Bò sữa, bò thịt, trâu cày kéo' },
+      { id: 'chap-cn11-de-cuu',     type: 'Chapter', label: '[11] Chăn nuôi Dê Cừu',         description: 'Dê sữa Saanen, cừu len — vùng đồi núi' },
+      { id: 'chap-cn11-thuy-san',   type: 'Chapter', label: '[11] Chăn nuôi Thuỷ sản',      description: 'Cá tra, tôm sú, tôm thẻ — top 3 TG' },
+      { id: 'chap-cn11-ong',        type: 'Chapter', label: '[11] Nuôi Ong',                 description: 'Ong mật + ong vò vẽ — mật ong, sữa ong chúa' },
+      { id: 'chap-cn11-san-pham',   type: 'Chapter', label: '[11] Sản phẩm chăn nuôi',      description: 'Thịt, sữa, trứng, mật ong — bảo quản + chế biến' },
+
+      // Topics LỚP 11
+      { id: 'topic-ga-cong-nghiep',   type: 'Topic', label: 'Gà công nghiệp',              description: 'Ross 308, Cobb 500 — 40 ngày đạt 2.5 kg' },
+      { id: 'topic-ga-tha-vuon',      type: 'Topic', label: 'Gà thả vườn',                 description: 'Gà ri, Mía, Đông Tảo — chất lượng cao, giá tốt' },
+      { id: 'topic-vit-ngan',         type: 'Topic', label: 'Vịt + Ngan',                  description: 'Vịt siêu trứng CV2000, vịt thịt Bắc Kinh' },
+      { id: 'topic-ap-trung',         type: 'Topic', label: 'Ấp trứng nhân tạo',           description: 'Máy ấp 37.8°C, độ ẩm 60% — gà 21 ngày, vịt 28 ngày' },
+      { id: 'topic-lon-nai',          type: 'Topic', label: 'Lợn nái sinh sản',            description: 'Móng Cái, Yorkshire — 22-24 con/năm, mỗi lứa 10-12 con' },
+      { id: 'topic-lon-thit',         type: 'Topic', label: 'Lợn thịt',                    description: 'Landrace, Pietrain, F1, F2 — 4-6 tháng đạt 90-110 kg' },
+      { id: 'topic-bo-sua',           type: 'Topic', label: 'Bò sữa',                       description: 'Holstein Friesian, HF — 25-30 lít sữa/ngày' },
+      { id: 'topic-bo-thit',          type: 'Topic', label: 'Bò thịt',                     description: 'Bò lai Sind, Brahman, Wagyu — chất lượng cao' },
+      { id: 'topic-trau',             type: 'Topic', label: 'Trâu',                        description: 'Trâu nội Vĩnh Phúc — cày kéo + thịt, vùng đầm lầy' },
+      { id: 'topic-de-sua',           type: 'Topic', label: 'Dê sữa Saanen',               description: 'Nhập Pháp — 3-5 lít sữa/ngày, giàu protein' },
+      { id: 'topic-tom-su',           type: 'Topic', label: 'Tôm sú',                       description: 'Penaeus monodon — 25-40g/con, xuất khẩu chính VN' },
+      { id: 'topic-tom-the',          type: 'Topic', label: 'Tôm thẻ chân trắng',          description: 'L. vannamei — 15-25g, năng suất cao, kháng bệnh tốt' },
+      { id: 'topic-ca-tra',           type: 'Topic', label: 'Cá tra',                       description: 'Pangasius — ĐBSCL, xuất khẩu Mỹ + EU' },
+      { id: 'topic-ca-ro-phi',        type: 'Topic', label: 'Cá rô phi',                   description: 'Tilapia — nhanh lớn, kháng bệnh, ăn tạp' },
+      { id: 'topic-ong-mat',          type: 'Topic', label: 'Ong mật',                      description: 'Apis mellifera + Apis cerana — mật ong + sữa ong chúa' },
+      { id: 'topic-thit-tuoi',        type: 'Topic', label: 'Thịt tươi',                   description: 'Giết mổ → bảo quản 0-4°C, sản phẩm nhanh hỏng' },
+      { id: 'topic-thit-che-bien',    type: 'Topic', label: 'Thịt chế biến',               description: 'Xúc xích, giò chả, lạp xưởng, đồ hộp — gia tăng giá trị' },
+      { id: 'topic-sua-tuoi',         type: 'Topic', label: 'Sữa tươi + Chế biến',         description: 'UHT, tiệt trùng, sữa chua, phô mai, bơ' },
+      { id: 'topic-trung-cb',         type: 'Topic', label: 'Trứng + Chế biến',            description: 'Trứng muối, trứng bắc thảo, bột trứng' },
+
+      // === LỚP 12: Công nghệ cao + Khởi nghiệp ===
+      { id: 'chap-cn12-cn-cao',     type: 'Chapter', label: '[12] Công nghệ cao trong CN',  description: 'IoT, AI, robot, cảm biến trong chăn nuôi 4.0' },
+      { id: 'chap-cn12-cn-sinh-hoc',type: 'Chapter', label: '[12] Công nghệ sinh học CN',   description: 'Chuyển gen, nhân bản, CRISPR cải tạo giống' },
+      { id: 'chap-cn12-huu-co',     type: 'Chapter', label: '[12] Chăn nuôi hữu cơ',       description: 'Không kháng sinh, không hormone — premium' },
+      { id: 'chap-cn12-bao-quan',   type: 'Chapter', label: '[12] Bảo quản + Chế biến',   description: 'Lạnh, đông lạnh, sấy, đóng hộp, lên men' },
+      { id: 'chap-cn12-quan-ly',    type: 'Chapter', label: '[12] Quản lý trang trại',    description: 'Tài chính, nhân lực, sản xuất, kế toán' },
+      { id: 'chap-cn12-khoi-nghiep',type: 'Chapter', label: '[12] Khởi nghiệp chăn nuôi',  description: 'Kế hoạch kinh doanh, vốn, marketing, brand' },
+
+      // Topics LỚP 12
+      { id: 'topic-iot-cn',           type: 'Topic', label: 'IoT chăn nuôi',                description: 'Cảm biến nhiệt độ, độ ẩm, CO2 → tự điều khiển chuồng' },
+      { id: 'topic-ai-cn',            type: 'Topic', label: 'AI chẩn đoán bệnh',           description: 'Camera + AI nhận diện hành vi bất thường → cảnh báo' },
+      { id: 'topic-robot-cn',         type: 'Topic', label: 'Robot tự động',                description: 'Robot vắt sữa, cho ăn, dọn phân — giảm lao động' },
+      { id: 'topic-chuyen-gen-cn',    type: 'Topic', label: 'Chuyển gen vật nuôi',         description: 'Bò chuyển gen lactoferrin → sữa kháng khuẩn' },
+      { id: 'topic-nhan-ban-vn',      type: 'Topic', label: 'Nhân bản vật nuôi',           description: 'Cừu Dolly 1996 → nhân bản bò sữa cao sản' },
+      { id: 'topic-crispr-cn',        type: 'Topic', label: 'CRISPR cải tạo giống',        description: 'Cắt-sửa gen chính xác → lợn kháng bệnh dịch tả' },
+      { id: 'topic-cn-huu-co',        type: 'Topic', label: 'Chăn nuôi hữu cơ',            description: 'TĂ tự nhiên, không hormone, sân thả rộng — chứng nhận USDA Organic' },
+      { id: 'topic-an-toan-sh',       type: 'Topic', label: 'An toàn sinh học (biosecurity)',description: 'Kiểm soát ra vào, khử trùng — phòng dịch tả lợn châu Phi' },
+      { id: 'topic-lanh-dong',        type: 'Topic', label: 'Lạnh + đông lạnh sản phẩm',    description: '0-4°C tươi, -18°C đông lạnh — bảo quản 6-12 tháng' },
+      { id: 'topic-len-men-cb',       type: 'Topic', label: 'Lên men + chế biến',          description: 'Phô mai, sữa chua, nem chua — vi khuẩn có lợi' },
+      { id: 'topic-quan-ly-tt',       type: 'Topic', label: 'Quản lý trang trại',         description: 'ERP cho nông trại — quản lý đàn, thức ăn, doanh thu' },
+      { id: 'topic-truy-xuat-ng',     type: 'Topic', label: 'Truy xuất nguồn gốc',         description: 'QR code → người tiêu dùng biết nguồn gốc + lịch sử dùng thuốc' },
+      { id: 'topic-marketing-cn',     type: 'Topic', label: 'Marketing sản phẩm CN',       description: 'Brand thịt sạch, OCOP, GAP, organic — bán giá cao' },
+      { id: 'topic-von-kn',           type: 'Topic', label: 'Vốn khởi nghiệp CN',          description: 'NHCS xã hội + quỹ start-up nông nghiệp + crowdfunding' },
+
+      // === CONCEPTS ===
+      { id: 'concept-di-truyen-cn',   type: 'Concept', label: 'Di truyền vật nuôi',        description: 'Chuyển tính trạng từ bố mẹ → con cái qua gen' },
+      { id: 'concept-uu-the-lai',     type: 'Concept', label: 'Ưu thế lai (Heterosis)',     description: 'Con lai vượt trội bố mẹ về năng suất + sức đề kháng' },
+      { id: 'concept-dinh-duong',     type: 'Concept', label: 'Dinh dưỡng',                 description: 'Protein, glucid, lipid, vitamin, khoáng — cân bằng' },
+      { id: 'concept-mien-dich',      type: 'Concept', label: 'Hệ miễn dịch',               description: 'Cơ thể tự bảo vệ — kháng thể + tế bào T/B' },
+      { id: 'concept-quan-the-vn',    type: 'Concept', label: 'Quần thể vật nuôi',          description: 'Cá thể cùng giống cùng đàn — quản lý + nhân giống' },
+      { id: 'concept-chuoi-ttp',      type: 'Concept', label: 'Chuỗi cung ứng thực phẩm',   description: 'Trang trại → vận chuyển → giết mổ → phân phối → bán lẻ' },
+      { id: 'concept-vsv-co-loi',     type: 'Concept', label: 'Vi sinh vật có lợi',        description: 'Probiotic ruột — tăng tiêu hoá + miễn dịch vật nuôi' },
+      { id: 'concept-stress-vn',      type: 'Concept', label: 'Stress vật nuôi',             description: 'Tiếng ồn, nhiệt độ, chật chội → giảm năng suất + sinh bệnh' },
+
+      // === PHENOMENA / PROCESSES ===
+      { id: 'phen-dich-ta-lon',       type: 'Phenomenon', label: 'Dịch tả lợn châu Phi (ASF)', description: '2019 VN — chết 6 triệu con, không có vaccine' },
+      { id: 'phen-cum-ga-h5n1',       type: 'Phenomenon', label: 'Cúm gia cầm H5N1',         description: '2003+ — virus chết người, tiêu huỷ hàng triệu gà' },
+      { id: 'phen-lmlm',              type: 'Phenomenon', label: 'Lở mồm long móng (LMLM)',  description: 'Virus aphthous — cấm xuất khẩu thịt' },
+      { id: 'phen-sieu-vi-tom',       type: 'Phenomenon', label: 'Bệnh đốm trắng tôm',      description: 'WSSV virus — chết hàng loạt trong 3-10 ngày' },
+
+      // === APPLICATIONS ===
+      { id: 'app-may-vat-sua',        type: 'Application', label: 'Máy vắt sữa tự động',    description: 'Cảm biến nhận diện núm vú → vắt chính xác' },
+      { id: 'app-may-ap-trung-tu',    type: 'Application', label: 'Máy ấp trứng tự động',   description: 'Đảo trứng + điều ẩm + báo nở — 1000 trứng/lượt' },
+      { id: 'app-ekg-cn',             type: 'Application', label: 'Hệ thống ăn tự động',    description: 'Cảm biến cân lợn → tự cấp TĂ theo cân nặng' },
+      { id: 'app-camera-ai',          type: 'Application', label: 'Camera AI quan sát',     description: 'Phát hiện gà ốm, đẻ trứng → nông dân không cần check 24/7' },
+      { id: 'app-vinamilk',           type: 'Application', label: 'Trang trại Vinamilk',     description: 'TH true Milk, Vinamilk — 100K bò sữa CN cao 4.0' },
+      { id: 'app-bach-hoa-xanh',      type: 'Application', label: 'Chuỗi BHX, WinMart',      description: 'Bán lẻ thịt sạch — chuỗi cung ứng truy xuất QR' },
+      { id: 'app-c-p-vn',             type: 'Application', label: 'C.P. Vietnam',            description: 'Tập đoàn Thái Lan — top 1 chăn nuôi lợn + gia cầm VN' },
+      { id: 'app-minh-phu-tom',       type: 'Application', label: 'Minh Phú tôm xuất khẩu',  description: '#1 thế giới xuất khẩu tôm sú — $700 triệu/năm' },
+      { id: 'app-ocop',               type: 'Application', label: 'OCOP — One Commune One Product', description: 'Sản phẩm địa phương — mật ong Cao Bằng, gà Đông Tảo' },
+      { id: 'app-vietgap',            type: 'Application', label: 'VietGAP + GlobalGAP',     description: 'Chứng nhận chăn nuôi an toàn — yêu cầu xuất khẩu' },
+
+      // === CAREERS ===
+      { id: 'career-ks-chan-nuoi',    type: 'Career', label: 'Kỹ sư chăn nuôi',            description: 'Quản lý trang trại lớn — TH, Vinamilk, CP — 15-30 triệu/tháng' },
+      { id: 'career-bs-thu-y',        type: 'Career', label: 'Bác sĩ thú y',               description: 'Khám chữa bệnh vật nuôi — phòng mạch riêng hoặc trang trại' },
+      { id: 'career-nong-dan-cn',     type: 'Career', label: 'Chủ trang trại',             description: 'Khởi nghiệp riêng — tự đầu tư, lãi 200-500 triệu/năm' },
+      { id: 'career-thuy-san-ks',     type: 'Career', label: 'Kỹ sư thuỷ sản',             description: 'Nuôi tôm, cá — Minh Phú, Hùng Vương' },
+      { id: 'career-tu-van-cn',       type: 'Career', label: 'Tư vấn dinh dưỡng vật nuôi', description: 'Công ty TĂ chăn nuôi — Cargill, ADM, GreenFeed' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-cncn:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-cncn', 'chap-cn10-gioi-thieu', 'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn10-giong',      'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn10-thuc-an',    'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn10-chuong',     'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn10-benh',       'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn10-moi-truong', 'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-gia-cam',    'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-lon',        'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-trau-bo',    'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-de-cuu',     'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-thuy-san',   'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-ong',        'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn11-san-pham',   'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-cn-cao',     'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-cn-sinh-hoc','HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-huu-co',     'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-bao-quan',   'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-quan-ly',    'HAS_CHAPTER'],
+      ['subj-cncn', 'chap-cn12-khoi-nghiep','HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-cn10-gioi-thieu', 'topic-vai-tro-cn',     'HAS_TOPIC'],
+      ['chap-cn10-gioi-thieu', 'topic-xu-huong-cn',    'HAS_TOPIC'],
+      ['chap-cn10-gioi-thieu', 'topic-chan-nuoi-vn',   'HAS_TOPIC'],
+      ['chap-cn10-giong',      'topic-giong-vat-nuoi', 'HAS_TOPIC'],
+      ['chap-cn10-giong',      'topic-phan-loai-giong','HAS_TOPIC'],
+      ['chap-cn10-giong',      'topic-chon-loc-giong', 'HAS_TOPIC'],
+      ['chap-cn10-giong',      'topic-nhan-giong',     'HAS_TOPIC'],
+      ['chap-cn10-giong',      'topic-tttt',           'HAS_TOPIC'],
+      ['chap-cn10-thuc-an',    'topic-thuc-an-xanh',   'HAS_TOPIC'],
+      ['chap-cn10-thuc-an',    'topic-thuc-an-tho',    'HAS_TOPIC'],
+      ['chap-cn10-thuc-an',    'topic-thuc-an-tinh',   'HAS_TOPIC'],
+      ['chap-cn10-thuc-an',    'topic-thuc-an-hh',     'HAS_TOPIC'],
+      ['chap-cn10-thuc-an',    'topic-u-chua-thua',    'HAS_TOPIC'],
+      ['chap-cn10-chuong',     'topic-chuong-trai',    'HAS_TOPIC'],
+      ['chap-cn10-chuong',     'topic-ve-sinh-chuong', 'HAS_TOPIC'],
+      ['chap-cn10-benh',       'topic-benh-tn',        'HAS_TOPIC'],
+      ['chap-cn10-benh',       'topic-vaccine-cn',     'HAS_TOPIC'],
+      ['chap-cn10-benh',       'topic-khang-sinh-cn',  'HAS_TOPIC'],
+      ['chap-cn10-moi-truong', 'topic-bio-gas',        'HAS_TOPIC'],
+      ['chap-cn10-moi-truong', 'topic-chat-thai-cn',   'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-cn11-gia-cam',  'topic-ga-cong-nghiep', 'HAS_TOPIC'],
+      ['chap-cn11-gia-cam',  'topic-ga-tha-vuon',    'HAS_TOPIC'],
+      ['chap-cn11-gia-cam',  'topic-vit-ngan',       'HAS_TOPIC'],
+      ['chap-cn11-gia-cam',  'topic-ap-trung',       'HAS_TOPIC'],
+      ['chap-cn11-lon',      'topic-lon-nai',        'HAS_TOPIC'],
+      ['chap-cn11-lon',      'topic-lon-thit',       'HAS_TOPIC'],
+      ['chap-cn11-trau-bo',  'topic-bo-sua',         'HAS_TOPIC'],
+      ['chap-cn11-trau-bo',  'topic-bo-thit',        'HAS_TOPIC'],
+      ['chap-cn11-trau-bo',  'topic-trau',           'HAS_TOPIC'],
+      ['chap-cn11-de-cuu',   'topic-de-sua',         'HAS_TOPIC'],
+      ['chap-cn11-thuy-san', 'topic-tom-su',         'HAS_TOPIC'],
+      ['chap-cn11-thuy-san', 'topic-tom-the',        'HAS_TOPIC'],
+      ['chap-cn11-thuy-san', 'topic-ca-tra',         'HAS_TOPIC'],
+      ['chap-cn11-thuy-san', 'topic-ca-ro-phi',      'HAS_TOPIC'],
+      ['chap-cn11-ong',      'topic-ong-mat',        'HAS_TOPIC'],
+      ['chap-cn11-san-pham', 'topic-thit-tuoi',      'HAS_TOPIC'],
+      ['chap-cn11-san-pham', 'topic-thit-che-bien',  'HAS_TOPIC'],
+      ['chap-cn11-san-pham', 'topic-sua-tuoi',       'HAS_TOPIC'],
+      ['chap-cn11-san-pham', 'topic-trung-cb',       'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-cn12-cn-cao',     'topic-iot-cn',         'HAS_TOPIC'],
+      ['chap-cn12-cn-cao',     'topic-ai-cn',          'HAS_TOPIC'],
+      ['chap-cn12-cn-cao',     'topic-robot-cn',       'HAS_TOPIC'],
+      ['chap-cn12-cn-sinh-hoc','topic-chuyen-gen-cn',  'HAS_TOPIC'],
+      ['chap-cn12-cn-sinh-hoc','topic-nhan-ban-vn',    'HAS_TOPIC'],
+      ['chap-cn12-cn-sinh-hoc','topic-crispr-cn',      'HAS_TOPIC'],
+      ['chap-cn12-huu-co',     'topic-cn-huu-co',      'HAS_TOPIC'],
+      ['chap-cn12-huu-co',     'topic-an-toan-sh',     'HAS_TOPIC'],
+      ['chap-cn12-bao-quan',   'topic-lanh-dong',      'HAS_TOPIC'],
+      ['chap-cn12-bao-quan',   'topic-len-men-cb',     'HAS_TOPIC'],
+      ['chap-cn12-quan-ly',    'topic-quan-ly-tt',     'HAS_TOPIC'],
+      ['chap-cn12-quan-ly',    'topic-truy-xuat-ng',   'HAS_TOPIC'],
+      ['chap-cn12-khoi-nghiep','topic-marketing-cn',   'HAS_TOPIC'],
+      ['chap-cn12-khoi-nghiep','topic-von-kn',         'HAS_TOPIC'],
+
+      // Topic → Concept
+      ['topic-nhan-giong',      'concept-di-truyen-cn', 'USES_CONCEPT'],
+      ['topic-nhan-giong',      'concept-uu-the-lai',   'USES_CONCEPT'],
+      ['topic-thuc-an-hh',      'concept-dinh-duong',   'USES_CONCEPT'],
+      ['topic-vaccine-cn',      'concept-mien-dich',    'USES_CONCEPT'],
+      ['topic-lon-nai',         'concept-quan-the-vn',  'USES_CONCEPT'],
+      ['topic-marketing-cn',    'concept-chuoi-ttp',    'USES_CONCEPT'],
+      ['topic-thuc-an-hh',      'concept-vsv-co-loi',   'USES_CONCEPT'],
+      ['topic-ve-sinh-chuong',  'concept-stress-vn',    'USES_CONCEPT'],
+
+      // Topic → Phenomenon (bệnh dịch lớn)
+      ['topic-benh-tn',         'phen-dich-ta-lon',     'EXHIBITS_PHENOMENON'],
+      ['topic-benh-tn',         'phen-cum-ga-h5n1',     'EXHIBITS_PHENOMENON'],
+      ['topic-benh-tn',         'phen-lmlm',            'EXHIBITS_PHENOMENON'],
+      ['topic-tom-su',          'phen-sieu-vi-tom',     'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-robot-cn',        'app-may-vat-sua',      'APPLIED_IN'],
+      ['topic-ap-trung',        'app-may-ap-trung-tu',  'APPLIED_IN'],
+      ['topic-iot-cn',          'app-ekg-cn',           'APPLIED_IN'],
+      ['topic-ai-cn',           'app-camera-ai',        'APPLIED_IN'],
+      ['topic-bo-sua',          'app-vinamilk',         'APPLIED_IN'],
+      ['topic-thit-tuoi',       'app-bach-hoa-xanh',    'APPLIED_IN'],
+      ['topic-truy-xuat-ng',    'app-bach-hoa-xanh',    'APPLIED_IN'],
+      ['topic-lon-thit',        'app-c-p-vn',           'APPLIED_IN'],
+      ['topic-tom-su',          'app-minh-phu-tom',     'APPLIED_IN'],
+      ['topic-ong-mat',         'app-ocop',             'APPLIED_IN'],
+      ['topic-cn-huu-co',       'app-vietgap',          'APPLIED_IN'],
+      ['topic-an-toan-sh',      'app-vietgap',          'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-lon-thit',        'career-ks-chan-nuoi',  'APPLIED_IN_CAREER'],
+      ['topic-bo-sua',          'career-ks-chan-nuoi',  'APPLIED_IN_CAREER'],
+      ['topic-benh-tn',         'career-bs-thu-y',      'APPLIED_IN_CAREER'],
+      ['topic-vaccine-cn',      'career-bs-thu-y',      'APPLIED_IN_CAREER'],
+      ['topic-marketing-cn',    'career-nong-dan-cn',   'APPLIED_IN_CAREER'],
+      ['topic-von-kn',          'career-nong-dan-cn',   'APPLIED_IN_CAREER'],
+      ['topic-tom-su',          'career-thuy-san-ks',   'APPLIED_IN_CAREER'],
+      ['topic-ca-tra',          'career-thuy-san-ks',   'APPLIED_IN_CAREER'],
+      ['topic-thuc-an-hh',      'career-tu-van-cn',     'APPLIED_IN_CAREER'],
+
+      // REQUIRES
+      ['topic-nhan-giong',      'topic-chon-loc-giong', 'REQUIRES'],
+      ['topic-tttt',            'topic-nhan-giong',     'REQUIRES'],
+      ['topic-ai-cn',           'topic-iot-cn',         'REQUIRES'],
+      ['topic-crispr-cn',       'topic-chuyen-gen-cn',  'REQUIRES'],
+      ['topic-marketing-cn',    'topic-truy-xuat-ng',   'REQUIRES'],
+      ['topic-cn-huu-co',       'topic-an-toan-sh',     'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // CNCN ↔ Sinh học
+      ['topic-nhan-giong',      'topic-mendel',         'RELATES_TO'], // Mendel apply chăn nuôi
+      ['topic-uu-the-lai',      'topic-mendel',         'RELATES_TO'],
+      ['topic-chuyen-gen-cn',   'topic-cong-nghe-gen',  'RELATES_TO'],
+      ['topic-crispr-cn',       'app-crispr',           'RELATES_TO'],
+      ['topic-vaccine-cn',      'topic-virus',          'RELATES_TO'],
+      ['topic-vaccine-cn',      'app-vaccine',          'RELATES_TO'],
+      ['topic-thuc-an-xanh',    'topic-quang-hop',      'RELATES_TO'], // cây làm thức ăn
+      ['topic-bio-gas',         'topic-len-men-cb',     'RELATES_TO'],
+      // CNCN ↔ Hóa
+      ['topic-bio-gas',         'topic-pu-oxh-kh',      'RELATES_TO'],
+      ['topic-thuc-an-hh',      'topic-protein-hoa',    'RELATES_TO'],
+      ['topic-len-men-cb',      'topic-glucose',        'RELATES_TO'],
+      // CNCN ↔ Địa lí
+      ['topic-chan-nuoi-vn',    'topic-nong-nghiep-vn', 'RELATES_TO'],
+      ['topic-tom-su',          'topic-thuy-san-vn',    'RELATES_TO'],
+      ['topic-bo-sua',          'topic-tn',             'RELATES_TO'], // Tây Nguyên
+      ['topic-trau',            'topic-tdmnbb',         'RELATES_TO'],
+      // CNCN ↔ Vật lí
+      ['topic-iot-cn',          'topic-mach-dien',      'RELATES_TO'],
+      ['topic-robot-cn',        'topic-luc-newton',     'RELATES_TO'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-cncn:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (5 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn (7 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
   //        ?chem=1       → Hóa học 10/11/12 mở rộng
   //        ?history=1    → Lịch sử 10/11/12
-  //        ?geo=1        → Địa lí 10/11/12 (GDPT 2018)
+  //        ?geo=1        → Địa lí 10/11/12
+  //        ?livestock=1  → Công nghệ Chăn nuôi 10/11/12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -10978,8 +11301,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const chem = req.query.chem === '1' || req.query.chemistry === '1' || all;
       const hist = req.query.history === '1' || req.query.hist === '1' || all;
       const geo = req.query.geo === '1' || req.query.geography === '1' || req.query.dia === '1' || all;
+      const livestock = req.query.livestock === '1' || req.query.cncn === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -10987,7 +11311,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (chem) r6 = await seedKgChemExtended();
       if (hist) r7 = await seedKgHistory();
       if (geo)  r8 = await seedKgGeography();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0);
+      if (livestock) r9 = await seedKgLivestock();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -11001,15 +11326,17 @@ ${plan.content || '<p>(Trống)</p>'}
         chemExtended: r6,
         history: r7,
         geography: r8,
+        livestock: r9,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa (3 lớp) mở rộng đầy đủ',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + Chăn nuôi (3 lớp) mở rộng đầy đủ',
           ext && '+ Mở rộng Vật lí (Quang học + VLHĐ + Phenomenon + Application)',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12 mở rộng',
           chem && !all && '+ Hóa học 10/11/12 mở rộng',
           hist && !all && '+ Lịch sử 10/11/12',
           geo  && !all && '+ Địa lí 10/11/12',
+          livestock && !all && '+ Công nghệ Chăn nuôi 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
