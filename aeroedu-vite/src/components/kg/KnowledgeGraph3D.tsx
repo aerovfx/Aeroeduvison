@@ -19,7 +19,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Vector3, Color, Group, type Mesh } from 'three'
-import { type KgNode, type KgEdge, getNodeColor } from '@/services/knowledge-graph.service'
+import { type KgNode, type KgEdge, getNodeColor, NODE_TYPE_LABELS } from '@/services/knowledge-graph.service'
+import { Target, Info, X } from 'lucide-react'
 
 interface Props {
   nodes: KgNode[]
@@ -219,13 +220,12 @@ function NeuralNetwork({
         })}
       </group>
 
-      {/* Nodes as glowing spheres */}
+      {/* Nodes as glowing spheres
+          Label policy 3D (sau khi user phản hồi):
+          - CHỈ hiện label cho: center (luôn) + selected (đang chọn) + hover
+          - KHÔNG hiện label "always" cho Subject/Chapter — tránh clutter
+            với graph 100+ nodes. Click node → popup hiển thị info đầy đủ. */}
       {pNodes.map(n => {
-        // Hiển thị label cho các node quan trọng (Subject/Chapter/Application/
-        // Phenomenon), không chỉ hover. Topic/Concept/Formula nhỏ hơn — chỉ
-        // show label khi hover để không clutter.
-        const importantTypes = ['Subject', 'Chapter', 'Application', 'Phenomenon']
-        const alwaysShowLabel = importantTypes.includes(n.type)
         const isSelected = selectedId === n.id
         return (
           <NodeSphere
@@ -234,8 +234,10 @@ function NeuralNetwork({
             hovered={hoveredId === n.id}
             selected={isSelected}
             onHover={(h) => setHoveredId(h ? n.id : null)}
-            onClick={() => { onSelect(n.id); onNodeClick?.(n.id) }}
-            showLabel={!!showLabels && (n.isCenter || isSelected || alwaysShowLabel || hoveredId === n.id)}
+            // Click = chỉ setSelectedId → trigger popup. KHÔNG còn auto
+            // open detail panel; user phải bấm nút trong popup mới mở.
+            onClick={() => onSelect(n.id)}
+            showLabel={!!showLabels && (n.isCenter || isSelected || hoveredId === n.id)}
           />
         )
       })}
@@ -334,9 +336,9 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
         />
         {showLabel && (
           <Html
-            // distanceFactor nhỏ hơn → label TO hơn ở cùng khoảng cách.
-            // Center: 12 (lớn nhất); Selected: 14; còn lại: 18.
-            distanceFactor={node.isCenter ? 12 : selected ? 14 : 18}
+            // KHÔNG dùng `distanceFactor` — vì ở Z=110, scale = factor/110
+            // sẽ làm chữ chỉ còn ~2px (vô hình). Loại bỏ → label luôn
+            // hiển thị ở pixel size cố định, đảm bảo đọc được mọi góc nhìn.
             position={[0, node.radius + 2, 0]}
             center
             zIndexRange={[100, 0]}
@@ -345,21 +347,22 @@ function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
             <div
               className="rounded-lg whitespace-nowrap shadow-2xl"
               style={{
-                padding: node.isCenter ? '8px 18px' : selected ? '6px 14px' : '4px 10px',
+                padding: node.isCenter ? '6px 14px' : selected ? '5px 12px' : '3px 9px',
                 background: node.isCenter
                   ? 'linear-gradient(135deg, rgba(8,8,40,0.96), rgba(20,5,40,0.96))'
                   : selected ? 'rgba(20,5,40,0.95)' : 'rgba(0,0,0,0.92)',
                 border: node.isCenter
-                  ? `3px solid #${node.color.getHexString()}`
-                  : `2px solid #${node.color.getHexString()}`,
+                  ? `2px solid #${node.color.getHexString()}`
+                  : `1.5px solid #${node.color.getHexString()}`,
                 boxShadow: node.isCenter
-                  ? `0 0 20px #${node.color.getHexString()}, 0 0 40px rgba(255,255,255,0.15)`
-                  : selected ? `0 0 12px #${node.color.getHexString()}` : undefined,
-                fontSize: node.isCenter ? 22 : selected ? 17 : (hovered ? 16 : 14),
-                fontWeight: 800,
+                  ? `0 0 16px #${node.color.getHexString()}, 0 0 32px rgba(255,255,255,0.15)`
+                  : selected ? `0 0 10px #${node.color.getHexString()}` : undefined,
+                // Fixed pixel size — luôn đọc được, không co theo distance
+                fontSize: node.isCenter ? 16 : selected ? 13 : (hovered ? 12 : 11),
+                fontWeight: 700,
                 color: '#fff',
-                textShadow: `0 0 8px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
-                letterSpacing: '0.5px',
+                textShadow: `0 0 6px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
+                letterSpacing: '0.3px',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               }}
             >
@@ -528,15 +531,17 @@ export default function KnowledgeGraph3D({
         <span className="text-zinc-300 font-mono font-bold"> ESC</span> Bỏ chọn
       </div>
 
-      {/* ════════ Selection badge (right side, above F button) ════════ */}
+      {/* ════════ NODE INFO POPUP — hiện khi click 1 node ════════
+          Thay vì auto-mở sidebar detail (cũ), giờ hiện popup gọn ở giữa
+          phía dưới, user chọn hành động tiếp theo bằng nút. */}
       {selectedNode && (
-        <div className="absolute top-16 right-3 max-w-[260px] px-3 py-1.5 rounded-lg
-                        bg-amber-500/15 border border-amber-400/50 text-amber-200
-                        text-[11px] font-semibold shadow-lg backdrop-blur pointer-events-none">
-          <div className="text-[9px] text-amber-300/70 uppercase tracking-wide">✓ Đã chọn</div>
-          <div className="truncate">{selectedNode.label}</div>
-          <div className="text-[9px] text-amber-300/70 mt-0.5">Bấm F để focus →</div>
-        </div>
+        <NodeInfoPopup
+          node={selectedNode}
+          isCenter={selectedId === centerId}
+          onFocusCenter={handleFocusCenter}
+          onOpenDetail={() => { onNodeClick?.(selectedNode.id) }}
+          onClose={() => setSelectedId(null)}
+        />
       )}
 
       {/* ════════ Top-right toolbar (3 buttons) ════════ */}
@@ -607,4 +612,150 @@ function CameraResetter({ resetTick, controlsRef }: {
     }
   }, [resetTick, camera, controlsRef])
   return null
+}
+
+/* ──────────────── Node Info Popup ────────────────
+ * Hiện ở bottom-center của canvas khi user click 1 node.
+ * Cung cấp 3 hành động chính:
+ *   - 🎯 Đưa làm tâm (re-load graph centered ở node này)
+ *   - ℹ Mở chi tiết (gọi parent.onNodeClick → mở sidebar detail panel)
+ *   - ✕ Đóng (bỏ chọn)
+ * Bấm ESC ngoài popup hoặc nút ✕ để đóng.
+ */
+function NodeInfoPopup({
+  node, isCenter, onFocusCenter, onOpenDetail, onClose,
+}: {
+  node: KgNode
+  isCenter: boolean
+  onFocusCenter: () => void
+  onOpenDetail: () => void
+  onClose: () => void
+}) {
+  const colors = getNodeColor(node.type)
+  const typeLabel = NODE_TYPE_LABELS[node.type] || node.type
+
+  return (
+    <>
+    {/* Keyframes inline — không cần plugin animate ngoài */}
+    <style>{`
+      @keyframes kgPopupIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+    `}</style>
+    <div
+      className="absolute left-1/2 -translate-x-1/2 bottom-12 z-30
+                 w-[min(440px,calc(100%-24px))]
+                 rounded-2xl shadow-2xl border-2 backdrop-blur-lg"
+      style={{
+        background: 'linear-gradient(135deg, rgba(10,8,30,0.97), rgba(20,8,40,0.97))',
+        borderColor: colors.stroke,
+        boxShadow: `0 0 30px ${colors.stroke}40, 0 20px 60px rgba(0,0,0,0.8)`,
+        animation: 'kgPopupIn 0.2s ease-out',
+      }}
+    >
+      {/* Top accent strip */}
+      <div
+        className="h-1 rounded-t-2xl"
+        style={{ background: `linear-gradient(90deg, transparent, ${colors.stroke}, transparent)` }}
+      />
+
+      {/* Body */}
+      <div className="p-4 pb-3">
+        {/* Header: type badge + close */}
+        <div className="flex items-start gap-2 mb-2">
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0"
+            style={{
+              background: colors.fill,
+              color: colors.text,
+              border: `1px solid ${colors.stroke}`,
+            }}
+          >
+            {typeLabel}
+          </span>
+          {isCenter && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md
+                             bg-emerald-500/20 text-emerald-200 border border-emerald-400/50
+                             uppercase tracking-wider shrink-0">
+              🎯 Đang là tâm
+            </span>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md hover:bg-white/10 text-zinc-400 hover:text-white transition shrink-0"
+            title="Đóng (ESC)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Label */}
+        <h3
+          className="text-lg font-extrabold leading-tight mb-1.5"
+          style={{ color: colors.text }}
+        >
+          {node.label}
+        </h3>
+
+        {/* Description */}
+        {node.description ? (
+          <p className="text-xs text-zinc-300/90 leading-relaxed mb-3 line-clamp-4">
+            {node.description}
+          </p>
+        ) : (
+          <p className="text-xs text-zinc-500 italic mb-3">
+            (Chưa có mô tả — bấm "Mở chi tiết" để xem các liên kết)
+          </p>
+        )}
+
+        {/* Properties row (compact) */}
+        {node.properties && Object.keys(node.properties).length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Object.entries(node.properties).slice(0, 4).map(([k, v]) => (
+              <span key={k} className="text-[9px] font-mono px-1.5 py-0.5 rounded
+                                       bg-zinc-800/70 border border-zinc-700/50 text-zinc-300">
+                {k}: {typeof v === 'object' ? JSON.stringify(v).slice(0, 20) : String(v).slice(0, 20)}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Action row */}
+        <div className="flex gap-2">
+          <button
+            onClick={onFocusCenter}
+            disabled={isCenter}
+            className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition
+                        inline-flex items-center justify-center gap-1.5
+                        ${isCenter
+                          ? 'bg-zinc-700/40 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
+                          : 'bg-amber-500/90 hover:bg-amber-500 text-white border-2 border-amber-300/50 hover:scale-[1.02] shadow-lg'
+                        }`}
+            title={isCenter ? 'Node này đã là tâm' : 'Đưa node này thành tâm (phím F)'}
+          >
+            <Target className="w-3.5 h-3.5" />
+            {isCenter ? 'Đang là tâm' : 'Đưa làm tâm'}
+          </button>
+          <button
+            onClick={onOpenDetail}
+            className="flex-1 px-3 py-2 rounded-lg bg-cyan-500/90 hover:bg-cyan-500 text-white
+                       text-xs font-bold transition border-2 border-cyan-300/50 hover:scale-[1.02] shadow-lg
+                       inline-flex items-center justify-center gap-1.5"
+            title="Mở chi tiết đầy đủ (sidebar phải)"
+          >
+            <Info className="w-3.5 h-3.5" />
+            Mở chi tiết
+          </button>
+        </div>
+
+        {/* ID footer (debug, small) */}
+        <div className="mt-2 text-[9px] text-zinc-600 font-mono truncate">
+          id: {node.id}
+        </div>
+      </div>
+    </div>
+    </>
+  )
 }
