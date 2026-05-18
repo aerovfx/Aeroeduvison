@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `a702e4b` (revision pixiai-00322-dim, 2026-05-18 — Learning endpoint thực: videos+assets từ DB thay [] stub)
-- Commits since last deploy: `0/5` (reset sau hotfix learning)
+- Last deployed commit: `d1d4c5d` (revision pixiai-00323-giw, 2026-05-18 — Player crash fix: alias url→videoUrl + defensive guard)
+- Commits since last deploy: `0/5` (reset sau hotfix player crash)
+- Prev: `a702e4b` → pixiai-00322-dim (Learning endpoint thực: videos+assets từ DB thay [] stub)
 - Prev: `bba0284` → pixiai-00321-nux (Tiptap underline + CourseAsset upload endpoint)
 - Prev: `db7ee11` → pixiai-00320-yeg (auto-save video sau upload + IAM signBlob granted)
 - Prev: `255d3b4` → pixiai-00318-xiz (KG nhạc nền + bubble pop + SFX)
