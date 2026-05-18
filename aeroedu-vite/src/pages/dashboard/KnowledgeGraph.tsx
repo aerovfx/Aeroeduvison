@@ -1293,6 +1293,7 @@ export default function KnowledgeGraph() {
                   edges={visibleEdges}
                   centerId={startIdRef.current || 'subj-vatli'}
                   onNodeClick={onNodeClick}
+                  onFocusCenter={(id) => loadFromNode(id, 2)}
                   showLabels
                 />
               </Suspense>

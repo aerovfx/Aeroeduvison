@@ -26,6 +26,11 @@ interface Props {
   edges: KgEdge[]
   centerId: string
   onNodeClick?: (id: string) => void
+  /**
+   * Khi user bấm F hoặc nút "F Focus": gọi callback này với ID node
+   * vừa chọn → parent sẽ re-load graph với node đó làm trung tâm.
+   */
+  onFocusCenter?: (id: string) => void
   /** Nếu set, hover node hiển thị label */
   showLabels?: boolean
 }
@@ -155,7 +160,13 @@ function stepForces(
 
 /* ────────────────────────── Three.js scene ────────────────────────── */
 
-function NeuralNetwork({ nodes, edges, centerId, onNodeClick, showLabels }: Props) {
+function NeuralNetwork({
+  nodes, edges, centerId, onNodeClick, showLabels,
+  selectedId, onSelect,
+}: Props & {
+  selectedId: string | null
+  onSelect: (id: string) => void
+}) {
   const groupRef = useRef<Group>(null)
   const [pNodes, setPNodes] = useState<PositionedNode[]>(() =>
     initPositions(nodes, centerId)
@@ -215,14 +226,16 @@ function NeuralNetwork({ nodes, edges, centerId, onNodeClick, showLabels }: Prop
         // show label khi hover để không clutter.
         const importantTypes = ['Subject', 'Chapter', 'Application', 'Phenomenon']
         const alwaysShowLabel = importantTypes.includes(n.type)
+        const isSelected = selectedId === n.id
         return (
           <NodeSphere
             key={n.id}
             node={n}
             hovered={hoveredId === n.id}
+            selected={isSelected}
             onHover={(h) => setHoveredId(h ? n.id : null)}
-            onClick={() => onNodeClick?.(n.id)}
-            showLabel={!!showLabels && (n.isCenter || alwaysShowLabel || hoveredId === n.id)}
+            onClick={() => { onSelect(n.id); onNodeClick?.(n.id) }}
+            showLabel={!!showLabels && (n.isCenter || isSelected || alwaysShowLabel || hoveredId === n.id)}
           />
         )
       })}
@@ -249,14 +262,16 @@ function EdgeLine({ from, to, color, opacity }: {
 }
 
 /** Node as glowing sphere với label on hover */
-function NodeSphere({ node, hovered, onHover, onClick, showLabel }: {
+function NodeSphere({ node, hovered, selected, onHover, onClick, showLabel }: {
   node: PositionedNode
   hovered: boolean
+  selected: boolean
   onHover: (h: boolean) => void
   onClick: () => void
   showLabel: boolean
 }) {
   const meshRef = useRef<Mesh>(null)
+  const ringRef = useRef<Mesh>(null)
 
   useFrame((_, dt) => {
     if (!meshRef.current) return
@@ -265,62 +280,82 @@ function NodeSphere({ node, hovered, onHover, onClick, showLabel }: {
     if (node.isCenter) {
       const scale = 1 + Math.sin(performance.now() / 600) * 0.08
       meshRef.current.scale.setScalar(scale)
+    } else if (selected) {
+      // Selected: pulse mạnh hơn hover để dễ nhận biết
+      const scale = 1.3 + Math.sin(performance.now() / 400) * 0.1
+      meshRef.current.scale.setScalar(scale)
     } else if (hovered) {
       meshRef.current.scale.lerp({ x: 1.4, y: 1.4, z: 1.4 } as any, dt * 8)
     } else {
       meshRef.current.scale.lerp({ x: 1, y: 1, z: 1 } as any, dt * 8)
     }
+    // Selection ring billboard
+    if (ringRef.current && selected && !node.isCenter) {
+      ringRef.current.position.copy(node.pos)
+      ringRef.current.rotation.z += dt * 1.2
+    }
   })
 
   return (
-    <mesh
-      ref={meshRef}
-      onPointerOver={(e) => { e.stopPropagation(); onHover(true); document.body.style.cursor = 'pointer' }}
-      onPointerOut={() => { onHover(false); document.body.style.cursor = '' }}
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-    >
-      <sphereGeometry args={[node.radius, 16, 16]} />
-      <meshStandardMaterial
-        color={node.color}
-        emissive={node.color}
-        emissiveIntensity={node.isCenter ? 2.5 : hovered ? 2 : 1.2}
-        toneMapped={false}
-      />
-      {showLabel && (
-        <Html
-          distanceFactor={20}
-          position={[0, node.radius + 2, 0]}
-          center
-          zIndexRange={[100, 0]}
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-          // Html từ drei tự billboard (DOM overlay luôn face camera)
-        >
-          <div
-            className="rounded-lg whitespace-nowrap shadow-2xl"
-            style={{
-              padding: node.isCenter ? '6px 14px' : '4px 10px',
-              background: 'rgba(0,0,0,0.92)',
-              border: `2px solid #${node.color.getHexString()}`,
-              fontSize: node.isCenter ? 18 : (hovered ? 16 : 14),
-              fontWeight: 800,
-              color: '#fff',
-              textShadow: `0 0 8px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
-              letterSpacing: '0.5px',
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            }}
+    <>
+      <mesh
+        ref={meshRef}
+        onPointerOver={(e) => { e.stopPropagation(); onHover(true); document.body.style.cursor = 'pointer' }}
+        onPointerOut={() => { onHover(false); document.body.style.cursor = '' }}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+      >
+        <sphereGeometry args={[node.radius, 16, 16]} />
+        <meshStandardMaterial
+          color={node.color}
+          emissive={node.color}
+          emissiveIntensity={node.isCenter ? 2.5 : selected ? 2.8 : hovered ? 2 : 1.2}
+          toneMapped={false}
+        />
+        {showLabel && (
+          <Html
+            distanceFactor={20}
+            position={[0, node.radius + 2, 0]}
+            center
+            zIndexRange={[100, 0]}
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+            // Html từ drei tự billboard (DOM overlay luôn face camera)
           >
-            {node.label}
-          </div>
-        </Html>
+            <div
+              className="rounded-lg whitespace-nowrap shadow-2xl"
+              style={{
+                padding: node.isCenter || selected ? '6px 14px' : '4px 10px',
+                background: selected ? 'rgba(20,5,40,0.95)' : 'rgba(0,0,0,0.92)',
+                border: `2px solid #${node.color.getHexString()}`,
+                boxShadow: selected ? `0 0 12px #${node.color.getHexString()}` : undefined,
+                fontSize: node.isCenter ? 18 : selected ? 17 : (hovered ? 16 : 14),
+                fontWeight: 800,
+                color: '#fff',
+                textShadow: `0 0 8px #${node.color.getHexString()}, 0 2px 4px rgba(0,0,0,0.9)`,
+                letterSpacing: '0.5px',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              }}
+            >
+              {selected && !node.isCenter ? '✓ ' : ''}{node.label}
+            </div>
+          </Html>
+        )}
+      </mesh>
+
+      {/* Selection ring (torus quay quanh node được chọn) */}
+      {selected && !node.isCenter && (
+        <mesh ref={ringRef}>
+          <torusGeometry args={[node.radius * 1.8, 0.25, 8, 32]} />
+          <meshBasicMaterial color={node.color} transparent opacity={0.85} toneMapped={false} />
+        </mesh>
       )}
-    </mesh>
+    </>
   )
 }
 
 /* ────────────────────────── Main export ────────────────────────── */
 
 export default function KnowledgeGraph3D({
-  nodes, edges, centerId, onNodeClick, showLabels = true,
+  nodes, edges, centerId, onNodeClick, onFocusCenter, showLabels = true,
 }: Props) {
   // Memoize to avoid re-render thrash
   const memoNodes = useMemo(() => nodes, [nodes.length, nodes.map(n => n.id).join(',')])
@@ -329,6 +364,43 @@ export default function KnowledgeGraph3D({
   const controlsRef = useRef<any>(null)
   // Trigger reset (counter, mỗi increment = 1 reset call)
   const [resetTick, setResetTick] = useState(0)
+  // ID node đang được CHỌN (click trong 3D) — khác với centerId (đã re-load)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Reset selection khi center thay đổi (vừa re-load graph)
+  useEffect(() => { setSelectedId(null) }, [centerId])
+
+  // Label hiển thị tên node đang chọn
+  const selectedNode = useMemo(
+    () => memoNodes.find(n => n.id === selectedId) || null,
+    [memoNodes, selectedId]
+  )
+
+  // F = focus & make-it-center; phím tắt cho power user
+  const handleFocusCenter = () => {
+    if (!selectedId) return
+    if (selectedId === centerId) {
+      // Đã là center — chỉ reset camera
+      setResetTick(t => t + 1)
+      return
+    }
+    onFocusCenter?.(selectedId)
+  }
+
+  // Keyboard: F = focus center, C = camera reset, ESC = clear selection
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Bỏ qua nếu user đang gõ trong input/textarea
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase()
+      if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); handleFocusCenter() }
+      else if (e.key === 'c' || e.key === 'C') { e.preventDefault(); setResetTick(t => t + 1) }
+      else if (e.key === 'Escape') setSelectedId(null)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, centerId])
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-zinc-800">
@@ -357,6 +429,8 @@ export default function KnowledgeGraph3D({
           centerId={centerId}
           onNodeClick={onNodeClick}
           showLabels={showLabels}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
         />
 
         <OrbitControls
@@ -383,22 +457,58 @@ export default function KnowledgeGraph3D({
         </EffectComposer>
       </Canvas>
 
-      {/* Overlay hint */}
-      <div className="absolute bottom-3 left-3 text-[10px] text-white/50 leading-tight pointer-events-none">
-        🖱 Kéo: xoay · 🖱 Cuộn: zoom · Click node để focus
+      {/* Overlay hints */}
+      <div className="absolute bottom-3 left-3 text-[10px] text-white/50 leading-tight pointer-events-none space-y-0.5">
+        <div>🖱 Kéo: xoay · 🖱 Cuộn: zoom · Click node để chọn</div>
+        <div className="text-amber-200/70">
+          ⌨ <span className="font-mono font-bold text-amber-300">F</span> = Focus node thành tâm ·
+          <span className="font-mono font-bold text-cyan-300"> C</span> = Reset camera ·
+          <span className="font-mono font-bold text-zinc-300"> ESC</span> = Bỏ chọn
+        </div>
       </div>
       <div className="absolute top-3 left-3 text-[10px] text-cyan-300 font-bold pointer-events-none">
         🧠 3D Neural · {memoNodes.length} nodes · {memoEdges.length} edges
       </div>
+
+      {/* Status badge: đang chọn node nào (above F button) */}
+      {selectedNode && (
+        <div className="absolute top-12 right-3 max-w-[260px] px-3 py-1.5 rounded-lg
+                        bg-amber-500/15 border border-amber-400/50 text-amber-200
+                        text-[11px] font-semibold shadow-lg backdrop-blur pointer-events-none">
+          <div className="text-[9px] text-amber-300/70 uppercase tracking-wide">Đã chọn</div>
+          <div className="truncate">✓ {selectedNode.label}</div>
+        </div>
+      )}
+
+      {/* F (Focus) button — đưa node được chọn thành tâm + re-load graph */}
+      <button
+        onClick={handleFocusCenter}
+        disabled={!selectedId}
+        className={`absolute top-3 right-28 px-2.5 py-2 rounded-lg
+                    border-2 text-xs font-bold shadow-lg
+                    inline-flex items-center gap-1 transition-all
+                    ${selectedId
+                      ? 'bg-amber-500/90 hover:bg-amber-500 border-amber-300/70 text-white hover:scale-105'
+                      : 'bg-zinc-700/60 border-zinc-600/40 text-zinc-400 cursor-not-allowed opacity-60'
+                    }`}
+        title={selectedId
+          ? `Đưa "${selectedNode?.label}" thành node trung tâm (phím F)`
+          : 'Click 1 node trước → bấm F (hoặc nút này) để focus + center'}
+      >
+        <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">F</span>
+        Focus
+      </button>
+
       {/* Center reset button — đưa node trung tâm về giữa màn hình */}
       <button
         onClick={() => setResetTick(t => t + 1)}
-        className="absolute top-3 right-14 p-2 rounded-lg bg-cyan-500/80 hover:bg-cyan-500
+        className="absolute top-3 right-3 px-2.5 py-2 rounded-lg bg-cyan-500/80 hover:bg-cyan-500
                    border-2 border-cyan-300/50 text-white text-xs font-bold shadow-lg
-                   inline-flex items-center gap-1"
-        title="Đưa node trung tâm về giữa màn hình"
+                   inline-flex items-center gap-1 hover:scale-105 transition"
+        title="Reset camera về giữa màn hình (phím C)"
       >
-        🎯 Center
+        <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-black/30 border border-white/20">C</span>
+        Center
       </button>
     </div>
   )
