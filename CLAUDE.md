@@ -16,7 +16,7 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `c0225c4` (revision pixiai-00308-nus, 2026-05-18 — KG Công nghệ Công nghiệp 10/11/12 LIVE)
-- Commits since last deploy: `3/5` → 6b81e51 (Mĩ thuật) · 1c54725 (KTPL) · ede2867 (HĐ Trải nghiệm — môn 11 BẮC CẦU, tổng ~1340 nodes)
+- Commits since last deploy: `5/5 ⚡ DEPLOYING` → Mĩ thuật · KTPL · HĐTN · F Focus button (3 môn mới + UX 3D, ~1340 nodes)
 - Prev: `ca6b319` → pixiai-00307-yom (🧠 KG Brain v2 Phoenix-style pipeline LIVE)
 - Prev: `97ece65` → pixiai-00306-voz (KG Công nghệ Chăn nuôi 10/11/12)
 - Prev: `aa978bd` → pixiai-00305-gev (KG Địa lí 10/11/12 — HOÀN TẤT 6 môn GDPT)
