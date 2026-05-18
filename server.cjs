@@ -9293,30 +9293,336 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Sinh học 10, 11, 12 theo SGK Việt Nam (Chương trình GDPT 2018).
+   * Bao gồm: 3 lớp + ~25 chapters + ~50 topics + ~30 formulas/processes +
+   * ~20 concepts + ~10 phenomena + ~12 applications + 4 careers.
+   *
+   * Idempotent — ON CONFLICT DO NOTHING.
+   */
+  async function seedKgBiology() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-sinh', type: 'Subject', label: 'Sinh học',
+        description: 'Môn Sinh học THPT 10, 11, 12 theo GDPT 2018',
+        properties: { color: '#10b981' } },
+
+      // === LỚP 10: Tế bào & Vi sinh vật ===
+      { id: 'chap-sinh10-mo-dau',    type: 'Chapter', label: '[10] Mở đầu Sinh học',     description: 'Cấp tổ chức sống, phương pháp khoa học' },
+      { id: 'chap-sinh10-te-bao',    type: 'Chapter', label: '[10] Sinh học Tế bào',     description: 'Cấu trúc + chức năng tế bào nhân sơ/nhân thực' },
+      { id: 'chap-sinh10-vsv',       type: 'Chapter', label: '[10] Vi sinh vật + Virus', description: 'Vi khuẩn, archaea, virus — ứng dụng + kiểm soát' },
+
+      // Topics Sinh 10
+      { id: 'topic-cap-to-chuc',     type: 'Topic', label: 'Cấp tổ chức sống',          description: 'Phân tử → tế bào → mô → cơ quan → hệ → cơ thể → quần thể → quần xã → sinh quyển' },
+      { id: 'topic-te-bao-ns',       type: 'Topic', label: 'Tế bào nhân sơ',            description: 'Vi khuẩn, archaea — không có nhân + bào quan màng' },
+      { id: 'topic-te-bao-nt',       type: 'Topic', label: 'Tế bào nhân thực',          description: 'Có nhân + nhiều bào quan màng (ti thể, lưới ER, Golgi, ...)' },
+      { id: 'topic-mang-tb',         type: 'Topic', label: 'Màng tế bào',               description: 'Phospholipid bilayer + protein — vận chuyển chất' },
+      { id: 'topic-bao-quan',        type: 'Topic', label: 'Bào quan tế bào',           description: 'Ti thể, lục lạp, ribosome, lysosome, ER, Golgi, ...' },
+      { id: 'topic-quang-hop',       type: 'Topic', label: 'Quang hợp',                 description: '6CO₂ + 6H₂O + ánh sáng → C₆H₁₂O₆ + 6O₂ (lục lạp)' },
+      { id: 'topic-ho-hap-tb',       type: 'Topic', label: 'Hô hấp tế bào',             description: 'C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + ~36 ATP (ti thể)' },
+      { id: 'topic-atp',             type: 'Topic', label: 'ATP — đồng tiền năng lượng', description: 'Adenosine triphosphate — chuyển E các phản ứng' },
+      { id: 'topic-enzyme',          type: 'Topic', label: 'Enzyme',                    description: 'Protein xúc tác sinh học, giảm năng lượng hoạt hóa' },
+      { id: 'topic-nguyen-phan',     type: 'Topic', label: 'Nguyên phân (Mitosis)',     description: 'Tế bào → 2 tế bào con giống hệt (sinh trưởng + thay thế)' },
+      { id: 'topic-giam-phan',       type: 'Topic', label: 'Giảm phân (Meiosis)',       description: '2n → 4 tế bào n (sinh sản hữu tính, tạo đa dạng)' },
+      { id: 'topic-vi-khuan',        type: 'Topic', label: 'Vi khuẩn',                  description: 'Đơn bào nhân sơ — có lợi (probiotic) và có hại (gây bệnh)' },
+      { id: 'topic-virus',           type: 'Topic', label: 'Virus',                     description: 'Hạt nhỏ DNA/RNA + vỏ protein, ký sinh bắt buộc' },
+
+      // === LỚP 11: Sinh học cơ thể ===
+      { id: 'chap-sinh11-trao-doi',  type: 'Chapter', label: '[11] Trao đổi chất + Chuyển hóa', description: 'Quang hợp, hô hấp, dinh dưỡng, tuần hoàn' },
+      { id: 'chap-sinh11-cam-ung',   type: 'Chapter', label: '[11] Cảm ứng',                    description: 'Cảm ứng ở thực vật + động vật (hệ thần kinh)' },
+      { id: 'chap-sinh11-sinh-truong',type: 'Chapter', label: '[11] Sinh trưởng + Phát triển',  description: 'Hormone TV, biến thái côn trùng, dậy thì' },
+      { id: 'chap-sinh11-sinh-san',  type: 'Chapter', label: '[11] Sinh sản',                   description: 'Sinh sản hữu tính + vô tính ở TV/ĐV' },
+
+      // Topics Sinh 11
+      { id: 'topic-trao-doi-nuoc',   type: 'Topic', label: 'Trao đổi nước ở TV',       description: 'Rễ hút → mạch gỗ → lá thoát hơi nước (transpiration)' },
+      { id: 'topic-khoang-tv',       type: 'Topic', label: 'Trao đổi khoáng ở TV',     description: 'Đa lượng (N, P, K) + vi lượng (Fe, Mn, Zn)' },
+      { id: 'topic-tieu-hoa-dv',     type: 'Topic', label: 'Tiêu hóa ở động vật',      description: 'Cơ học + hóa học — enzyme phân giải' },
+      { id: 'topic-tuan-hoan',       type: 'Topic', label: 'Tuần hoàn máu',            description: 'Tim → động mạch → mao mạch → tĩnh mạch → tim' },
+      { id: 'topic-ho-hap-dv',       type: 'Topic', label: 'Hô hấp ở động vật',        description: 'Cá: mang · Côn trùng: ống khí · Người: phổi' },
+      { id: 'topic-cam-ung-tv',      type: 'Topic', label: 'Cảm ứng ở thực vật',       description: 'Hướng sáng, hướng đất, hướng nước, ngủ ngày-đêm' },
+      { id: 'topic-than-kinh',       type: 'Topic', label: 'Hệ thần kinh',             description: 'Neuron + synapse + cung phản xạ' },
+      { id: 'topic-noi-tiet',        type: 'Topic', label: 'Hệ nội tiết',              description: 'Hormone — insulin, adrenaline, hormone giới tính' },
+      { id: 'topic-hormone-tv',      type: 'Topic', label: 'Hormone thực vật',         description: 'Auxin, gibberellin, cytokinin, abscisic, ethylene' },
+      { id: 'topic-bien-thai',       type: 'Topic', label: 'Biến thái côn trùng',      description: 'Trứng → sâu → nhộng → bướm (hoàn toàn) hoặc không hoàn toàn' },
+      { id: 'topic-sinh-san-tv',     type: 'Topic', label: 'Sinh sản ở thực vật',      description: 'Vô tính (giâm, chiết, ghép) + hữu tính (thụ phấn)' },
+      { id: 'topic-sinh-san-dv',     type: 'Topic', label: 'Sinh sản ở động vật',      description: 'Phân đôi, nảy chồi, tái sinh, hữu tính' },
+
+      // === LỚP 12: Di truyền · Tiến hóa · Sinh thái ===
+      { id: 'chap-sinh12-di-truyen', type: 'Chapter', label: '[12] Di truyền học',    description: 'DNA, gen, NST, đột biến, ứng dụng công nghệ gen' },
+      { id: 'chap-sinh12-tien-hoa',  type: 'Chapter', label: '[12] Tiến hóa',          description: 'Darwin → thuyết tiến hóa hiện đại → hình thành loài' },
+      { id: 'chap-sinh12-sinh-thai', type: 'Chapter', label: '[12] Sinh thái học',    description: 'Cá thể → quần thể → quần xã → hệ sinh thái → sinh quyển' },
+
+      // Topics Sinh 12
+      { id: 'topic-dna',             type: 'Topic', label: 'DNA — vật chất di truyền', description: 'Double helix nucleotide A-T, G-C — Watson & Crick 1953' },
+      { id: 'topic-rna',             type: 'Topic', label: 'RNA',                      description: 'mRNA, tRNA, rRNA — chuyển + dịch mã' },
+      { id: 'topic-gen',             type: 'Topic', label: 'Gen',                      description: 'Đoạn DNA mã hóa 1 protein/RNA chức năng' },
+      { id: 'topic-protein',         type: 'Topic', label: 'Protein',                  description: 'Chuỗi amino acid — enzyme, hormone, kháng thể, cấu trúc' },
+      { id: 'topic-phien-ma',        type: 'Topic', label: 'Phiên mã (Transcription)', description: 'DNA → mRNA bởi RNA polymerase (trong nhân)' },
+      { id: 'topic-dich-ma',         type: 'Topic', label: 'Dịch mã (Translation)',    description: 'mRNA → protein bởi ribosome (codon → amino acid)' },
+      { id: 'topic-nst',             type: 'Topic', label: 'Nhiễm sắc thể',            description: 'DNA + histone đóng gói chặt — người 46 NST (23 cặp)' },
+      { id: 'topic-mendel',          type: 'Topic', label: 'Quy luật Mendel',          description: 'Phân ly + phân ly độc lập — đậu Hà Lan 1865' },
+      { id: 'topic-lien-ket-gen',    type: 'Topic', label: 'Liên kết gen + hoán vị',   description: 'Gen trên cùng NST liên kết, hoán vị tỉ lệ % theo khoảng cách' },
+      { id: 'topic-di-truyen-gt',    type: 'Topic', label: 'Di truyền giới tính',      description: 'X, Y — tính trạng liên kết X (mù màu, máu khó đông)' },
+      { id: 'topic-dot-bien-gen',    type: 'Topic', label: 'Đột biến gen',             description: 'Thay thế, mất, thêm 1 nucleotide → đột biến điểm' },
+      { id: 'topic-dot-bien-nst',    type: 'Topic', label: 'Đột biến NST',             description: 'Mất, lặp, đảo, chuyển đoạn (cấu trúc) + đa bội (số lượng)' },
+      { id: 'topic-cong-nghe-gen',   type: 'Topic', label: 'Công nghệ gen',            description: 'Cắt-ghép DNA bằng enzyme restriction + ligase' },
+      { id: 'topic-darwin',          type: 'Topic', label: 'Học thuyết Darwin',        description: 'Biến dị + chọn lọc tự nhiên + di truyền (1859 Origin of Species)' },
+      { id: 'topic-tien-hoa-hd',     type: 'Topic', label: 'Thuyết tiến hóa hiện đại', description: 'Darwin + di truyền học + sinh học phân tử' },
+      { id: 'topic-hinh-thanh-loai', type: 'Topic', label: 'Hình thành loài',          description: 'Cách li địa lí + sinh thái → loài mới' },
+      { id: 'topic-quan-the',        type: 'Topic', label: 'Quần thể',                 description: 'Nhóm cùng loài, cùng khu vực — đặc trưng N, mật độ, tỉ lệ giới tính' },
+      { id: 'topic-quan-xa',         type: 'Topic', label: 'Quần xã',                  description: 'Nhiều quần thể khác loài chung khu vực — chuỗi thức ăn' },
+      { id: 'topic-he-sinh-thai',    type: 'Topic', label: 'Hệ sinh thái',             description: 'Quần xã + sinh cảnh — dòng năng lượng + chu trình vật chất' },
+      { id: 'topic-sinh-quyen',      type: 'Topic', label: 'Sinh quyển',               description: 'Toàn bộ sinh vật trên Trái Đất + môi trường sống' },
+
+      // === Formulas / Processes ===
+      { id: 'form-quang-hop',        type: 'Formula', label: '6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂',  description: 'Phương trình quang hợp tổng quát' },
+      { id: 'form-ho-hap-tb',        type: 'Formula', label: 'C₆H₁₂O₆ + 6O₂ → 6CO₂ + 6H₂O + 36ATP', description: 'Hô hấp tế bào hiếu khí' },
+      { id: 'form-mendel-3-1',       type: 'Formula', label: 'F₂: 3 trội : 1 lặn',          description: 'Tỉ lệ kiểu hình Mendel — lai 1 tính trạng' },
+      { id: 'form-mendel-9-3-3-1',   type: 'Formula', label: 'F₂: 9:3:3:1',                 description: 'Lai 2 tính trạng phân ly độc lập' },
+      { id: 'form-nguyen-phan',      type: 'Formula', label: '1 tế bào → 2 tế bào con (2n)', description: 'Kết quả nguyên phân — bộ NST giữ nguyên' },
+      { id: 'form-giam-phan',        type: 'Formula', label: '1 tế bào (2n) → 4 tế bào (n)', description: 'Kết quả giảm phân — bộ NST giảm 1 nửa' },
+      { id: 'form-codon-aa',         type: 'Formula', label: '3 nucleotide = 1 codon = 1 amino acid', description: 'Mã di truyền — 64 codon mã hóa 20 amino acid' },
+
+      // === Concepts ===
+      { id: 'concept-te-bao',        type: 'Concept', label: 'Tế bào',                  description: 'Đơn vị cấu trúc + chức năng cơ bản của sự sống' },
+      { id: 'concept-dna-helix',     type: 'Concept', label: 'Cấu trúc xoắn kép DNA',   description: 'Double helix antiparallel — base pairs A-T, G-C' },
+      { id: 'concept-allele',        type: 'Concept', label: 'Allele',                  description: 'Dạng khác nhau của 1 gen (trội/lặn)' },
+      { id: 'concept-genotype',      type: 'Concept', label: 'Kiểu gen + kiểu hình',    description: 'Genotype (gen) → Phenotype (biểu hiện)' },
+      { id: 'concept-cnss',          type: 'Concept', label: 'Chọn lọc tự nhiên',       description: 'Cá thể thích nghi hơn → sống sót + truyền gen' },
+      { id: 'concept-chu-trinh-vc',  type: 'Concept', label: 'Chu trình vật chất',      description: 'Carbon, nitrogen, nước — tuần hoàn trong sinh quyển' },
+      { id: 'concept-da-dang',       type: 'Concept', label: 'Đa dạng sinh học',        description: 'Đa dạng loài + gen + hệ sinh thái' },
+      { id: 'concept-thich-nghi',    type: 'Concept', label: 'Thích nghi',              description: 'Đặc điểm giúp sinh vật sống sót + sinh sản' },
+
+      // === Phenomena ===
+      { id: 'phen-tien-hoa',         type: 'Phenomenon', label: 'Tiến hóa',            description: 'Biến đổi đặc tính loài qua các thế hệ — 3.8 tỉ năm' },
+      { id: 'phen-thu-phan',         type: 'Phenomenon', label: 'Thụ phấn',            description: 'Hạt phấn từ bao phấn → đầu nhụy — nhờ gió, ong, chim' },
+      { id: 'phen-di-cu',            type: 'Phenomenon', label: 'Di cư động vật',      description: 'Chim, cá voi, bướm vua di chuyển hàng nghìn km mùa đông' },
+      { id: 'phen-cong-sinh',        type: 'Phenomenon', label: 'Cộng sinh',           description: 'Quan hệ 2 loài cùng có lợi (ong-hoa, san hô-tảo)' },
+      { id: 'phen-ngu-dong',         type: 'Phenomenon', label: 'Ngủ đông + hè',       description: 'Gấu, sóc, ếch — giảm chuyển hóa khi điều kiện khắc nghiệt' },
+      { id: 'phen-hoa-thach',        type: 'Phenomenon', label: 'Hóa thạch',           description: 'Di tích sinh vật cổ — bằng chứng tiến hóa' },
+      { id: 'phen-bien-doi-khi-hau', type: 'Phenomenon', label: 'Biến đổi khí hậu',    description: 'CO₂ tăng → nhiệt độ Trái Đất tăng → tan băng, mất loài' },
+      { id: 'phen-mua-axit',         type: 'Phenomenon', label: 'Mưa axit',            description: 'SO₂, NOx + H₂O → axit, hại rừng + hồ' },
+
+      // === Applications ===
+      { id: 'app-vaccine',           type: 'Application', label: 'Vaccine',             description: 'Kích thích miễn dịch — bảo vệ trước bệnh (Pasteur, Jenner)' },
+      { id: 'app-khang-sinh',        type: 'Application', label: 'Kháng sinh',          description: 'Penicillin (Fleming 1928) → tiêu diệt vi khuẩn' },
+      { id: 'app-gmo',               type: 'Application', label: 'Sinh vật biến đổi gen (GMO)', description: 'Ngô, đậu nành kháng sâu — giảm thuốc trừ sâu' },
+      { id: 'app-crispr',            type: 'Application', label: 'CRISPR-Cas9',         description: 'Cắt-sửa DNA chính xác — Nobel Hóa học 2020' },
+      { id: 'app-ivf',               type: 'Application', label: 'Thụ tinh trong ống nghiệm (IVF)', description: 'Phôi tạo ngoài cơ thể → cấy vào tử cung' },
+      { id: 'app-cloning',           type: 'Application', label: 'Nhân bản (Cloning)',  description: 'Cừu Dolly 1996 — nhân bản từ tế bào trưởng thành' },
+      { id: 'app-pcr',               type: 'Application', label: 'PCR — khuếch đại DNA', description: 'Nhân DNA exponentially — chẩn đoán Covid-19, ADN tội phạm' },
+      { id: 'app-insulin-gmo',       type: 'Application', label: 'Insulin tái tổ hợp',  description: 'Vi khuẩn E.coli sản xuất insulin cho bệnh nhân tiểu đường' },
+      { id: 'app-bao-ton',           type: 'Application', label: 'Bảo tồn đa dạng',     description: 'Vườn quốc gia, ngân hàng gen — bảo vệ loài quý hiếm' },
+      { id: 'app-pho-hai-san',       type: 'Application', label: 'Nuôi trồng thủy sản', description: 'Cá tra, tôm, rong biển — kinh tế biển Việt Nam' },
+      { id: 'app-the-thao-doping',   type: 'Application', label: 'Kiểm tra doping',     description: 'Phát hiện hormone, EPO trong nước tiểu vận động viên' },
+      { id: 'app-bio-fuel',          type: 'Application', label: 'Nhiên liệu sinh học', description: 'Ethanol từ mía, dầu diesel từ tảo — thay xăng dầu' },
+
+      // === Careers ===
+      { id: 'career-bac-si-sinh',    type: 'Career', label: 'Bác sĩ',                   description: 'Sinh học + Hóa + Y khoa — chẩn đoán + điều trị' },
+      { id: 'career-ky-su-cnsh',     type: 'Career', label: 'Kỹ sư công nghệ sinh học', description: 'GMO, vaccine, dược phẩm — công ty lớn 30-100 triệu' },
+      { id: 'career-nha-sinh-thai',  type: 'Career', label: 'Nhà sinh thái học',        description: 'Nghiên cứu hệ sinh thái, bảo tồn — viện nghiên cứu' },
+      { id: 'career-nha-di-truyen',  type: 'Career', label: 'Nhà di truyền học',        description: 'Phân tích DNA, tư vấn di truyền y khoa' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-bio:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → 3 lớp Chapters
+      ['subj-sinh', 'chap-sinh10-mo-dau',      'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh10-te-bao',      'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh10-vsv',         'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh11-trao-doi',    'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh11-cam-ung',     'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh11-sinh-truong', 'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh11-sinh-san',    'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh12-di-truyen',   'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh12-tien-hoa',    'HAS_CHAPTER'],
+      ['subj-sinh', 'chap-sinh12-sinh-thai',   'HAS_CHAPTER'],
+
+      // Chapter Sinh 10 → Topics
+      ['chap-sinh10-mo-dau', 'topic-cap-to-chuc',   'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-te-bao-ns',     'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-te-bao-nt',     'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-mang-tb',       'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-bao-quan',      'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-quang-hop',     'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-ho-hap-tb',     'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-atp',           'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-enzyme',        'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-nguyen-phan',   'HAS_TOPIC'],
+      ['chap-sinh10-te-bao', 'topic-giam-phan',     'HAS_TOPIC'],
+      ['chap-sinh10-vsv',    'topic-vi-khuan',      'HAS_TOPIC'],
+      ['chap-sinh10-vsv',    'topic-virus',         'HAS_TOPIC'],
+
+      // Chapter Sinh 11 → Topics
+      ['chap-sinh11-trao-doi',   'topic-trao-doi-nuoc', 'HAS_TOPIC'],
+      ['chap-sinh11-trao-doi',   'topic-khoang-tv',     'HAS_TOPIC'],
+      ['chap-sinh11-trao-doi',   'topic-tieu-hoa-dv',   'HAS_TOPIC'],
+      ['chap-sinh11-trao-doi',   'topic-tuan-hoan',     'HAS_TOPIC'],
+      ['chap-sinh11-trao-doi',   'topic-ho-hap-dv',     'HAS_TOPIC'],
+      ['chap-sinh11-cam-ung',    'topic-cam-ung-tv',    'HAS_TOPIC'],
+      ['chap-sinh11-cam-ung',    'topic-than-kinh',     'HAS_TOPIC'],
+      ['chap-sinh11-cam-ung',    'topic-noi-tiet',      'HAS_TOPIC'],
+      ['chap-sinh11-sinh-truong','topic-hormone-tv',    'HAS_TOPIC'],
+      ['chap-sinh11-sinh-truong','topic-bien-thai',     'HAS_TOPIC'],
+      ['chap-sinh11-sinh-san',   'topic-sinh-san-tv',   'HAS_TOPIC'],
+      ['chap-sinh11-sinh-san',   'topic-sinh-san-dv',   'HAS_TOPIC'],
+
+      // Chapter Sinh 12 → Topics
+      ['chap-sinh12-di-truyen', 'topic-dna',           'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-rna',           'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-gen',           'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-protein',       'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-phien-ma',      'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-dich-ma',       'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-nst',           'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-mendel',        'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-lien-ket-gen',  'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-di-truyen-gt',  'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-dot-bien-gen',  'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-dot-bien-nst',  'HAS_TOPIC'],
+      ['chap-sinh12-di-truyen', 'topic-cong-nghe-gen', 'HAS_TOPIC'],
+      ['chap-sinh12-tien-hoa',  'topic-darwin',        'HAS_TOPIC'],
+      ['chap-sinh12-tien-hoa',  'topic-tien-hoa-hd',   'HAS_TOPIC'],
+      ['chap-sinh12-tien-hoa',  'topic-hinh-thanh-loai','HAS_TOPIC'],
+      ['chap-sinh12-sinh-thai', 'topic-quan-the',      'HAS_TOPIC'],
+      ['chap-sinh12-sinh-thai', 'topic-quan-xa',       'HAS_TOPIC'],
+      ['chap-sinh12-sinh-thai', 'topic-he-sinh-thai',  'HAS_TOPIC'],
+      ['chap-sinh12-sinh-thai', 'topic-sinh-quyen',    'HAS_TOPIC'],
+
+      // Topic → Formula
+      ['topic-quang-hop',    'form-quang-hop',      'USES_FORMULA'],
+      ['topic-ho-hap-tb',    'form-ho-hap-tb',      'USES_FORMULA'],
+      ['topic-mendel',       'form-mendel-3-1',     'USES_FORMULA'],
+      ['topic-mendel',       'form-mendel-9-3-3-1', 'USES_FORMULA'],
+      ['topic-nguyen-phan',  'form-nguyen-phan',    'USES_FORMULA'],
+      ['topic-giam-phan',    'form-giam-phan',      'USES_FORMULA'],
+      ['topic-dich-ma',      'form-codon-aa',       'USES_FORMULA'],
+
+      // Topic → Concept
+      ['topic-te-bao-ns',    'concept-te-bao',      'USES_CONCEPT'],
+      ['topic-te-bao-nt',    'concept-te-bao',      'USES_CONCEPT'],
+      ['topic-dna',          'concept-dna-helix',   'USES_CONCEPT'],
+      ['topic-mendel',       'concept-allele',      'USES_CONCEPT'],
+      ['topic-mendel',       'concept-genotype',    'USES_CONCEPT'],
+      ['topic-darwin',       'concept-cnss',        'USES_CONCEPT'],
+      ['topic-tien-hoa-hd',  'concept-cnss',        'USES_CONCEPT'],
+      ['topic-he-sinh-thai', 'concept-chu-trinh-vc','USES_CONCEPT'],
+      ['topic-he-sinh-thai', 'concept-da-dang',     'USES_CONCEPT'],
+      ['topic-darwin',       'concept-thich-nghi',  'USES_CONCEPT'],
+
+      // Topic → Phenomenon
+      ['topic-darwin',         'phen-tien-hoa',          'EXHIBITS_PHENOMENON'],
+      ['topic-tien-hoa-hd',    'phen-tien-hoa',          'EXHIBITS_PHENOMENON'],
+      ['topic-sinh-san-tv',    'phen-thu-phan',          'EXHIBITS_PHENOMENON'],
+      ['topic-quan-xa',        'phen-cong-sinh',         'EXHIBITS_PHENOMENON'],
+      ['topic-sinh-san-dv',    'phen-di-cu',             'EXHIBITS_PHENOMENON'],
+      ['topic-cam-ung-tv',     'phen-ngu-dong',          'EXHIBITS_PHENOMENON'],
+      ['topic-tien-hoa-hd',    'phen-hoa-thach',         'EXHIBITS_PHENOMENON'],
+      ['topic-sinh-quyen',     'phen-bien-doi-khi-hau',  'EXHIBITS_PHENOMENON'],
+      ['topic-sinh-quyen',     'phen-mua-axit',          'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-virus',          'app-vaccine',         'APPLIED_IN'],
+      ['topic-vi-khuan',       'app-khang-sinh',      'APPLIED_IN'],
+      ['topic-cong-nghe-gen',  'app-gmo',             'APPLIED_IN'],
+      ['topic-cong-nghe-gen',  'app-crispr',          'APPLIED_IN'],
+      ['topic-cong-nghe-gen',  'app-insulin-gmo',     'APPLIED_IN'],
+      ['topic-sinh-san-dv',    'app-ivf',             'APPLIED_IN'],
+      ['topic-nguyen-phan',    'app-cloning',         'APPLIED_IN'],
+      ['topic-dna',            'app-pcr',             'APPLIED_IN'],
+      ['topic-sinh-quyen',     'app-bao-ton',         'APPLIED_IN'],
+      ['topic-quan-the',       'app-pho-hai-san',     'APPLIED_IN'],
+      ['topic-noi-tiet',       'app-the-thao-doping', 'APPLIED_IN'],
+      ['topic-quang-hop',      'app-bio-fuel',        'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-than-kinh',      'career-bac-si-sinh',  'APPLIED_IN_CAREER'],
+      ['topic-cong-nghe-gen',  'career-ky-su-cnsh',   'APPLIED_IN_CAREER'],
+      ['topic-he-sinh-thai',   'career-nha-sinh-thai','APPLIED_IN_CAREER'],
+      ['topic-dna',            'career-nha-di-truyen','APPLIED_IN_CAREER'],
+
+      // REQUIRES — prerequisite chain
+      ['topic-protein',        'topic-gen',           'REQUIRES'],
+      ['topic-phien-ma',       'topic-dna',           'REQUIRES'],
+      ['topic-dich-ma',        'topic-phien-ma',      'REQUIRES'],
+      ['topic-mendel',         'topic-nst',           'REQUIRES'],
+      ['topic-lien-ket-gen',   'topic-mendel',        'REQUIRES'],
+      ['topic-tien-hoa-hd',    'topic-darwin',        'REQUIRES'],
+      ['topic-quan-xa',        'topic-quan-the',      'REQUIRES'],
+      ['topic-he-sinh-thai',   'topic-quan-xa',       'REQUIRES'],
+      ['topic-sinh-quyen',     'topic-he-sinh-thai',  'REQUIRES'],
+
+      // CROSS-SUBJECT edges
+      // Sinh ↔ Hóa
+      ['topic-quang-hop',      'topic-axit-bazo',     'RELATES_TO'],
+      ['topic-ho-hap-tb',      'topic-axit-bazo',     'RELATES_TO'],
+      ['topic-enzyme',         'topic-hang-so-kc',    'RELATES_TO'],
+      // Sinh ↔ Vật lí (nếu có cross)
+      ['topic-than-kinh',      'topic-dien-tich',     'RELATES_TO'], // điện thế màng neuron
+      // Sinh ↔ Toán
+      ['topic-mendel',         'topic-xac-suat',      'RELATES_TO'], // tỉ lệ kiểu hình
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-bio:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
   //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
+  //        ?biology=1    → Thêm Sinh học 10, 11, 12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
       const ext = req.query.extended === '1' || req.query.ext === '1';
+      const bio = req.query.biology === '1' || req.query.bio === '1' || all; // all includes bio
       const r1 = await seedKgPhysics11();
-      let r2 = null;
-      let r3 = null;
+      let r2 = null, r3 = null, r4 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
+      if (bio) r4 = await seedKgBiology();
       return res.json({
         success: true,
-        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0),
-        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0),
-        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0),
+        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0) + (r4?.nodeCount || 0),
+        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0) + (r4?.edgeCount || 0),
+        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0) + (r4?.edgeInserted || 0),
         physics: r1,
         mathChem: r2,
         physicsExtended: r3,
+        biology: r4,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa',
+          all && '+ Toán + Hóa + Sinh học 10/11/12',
           ext && '+ Mở rộng (Quang học + VLHĐ + Phenomenon + Application)',
+          bio && !all && '+ Sinh học 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
