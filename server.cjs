@@ -14478,8 +14478,531 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Khối lớp 3 — Tiểu học (GDPT 2018)
+  // 7 môn: Toán 3, Tiếng Việt 3, TNXH 3, HĐTN 3, Đạo đức 3,
+  //        Âm nhạc 3, Mĩ thuật 3
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgGrade3() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === META: Cụm khối lớp 3 ===
+      { id: 'meta-lop3', type: 'Subject', label: '🌟 Khối lớp 3 — Tiểu học',
+        description: 'Năm thứ 3 Tiểu học — phân số đầu tiên, văn miêu tả, quang hợp, kiến thức XH mở rộng',
+        properties: { color: '#fbbf24', grade: 3 } },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 1: TOÁN 3 (175 tiết) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-toan3', type: 'Subject', label: 'Toán 3',
+        description: 'Số đến 100000 + nhân/chia 2-10 + phân số đầu tiên + diện tích + chu vi',
+        properties: { color: '#3b82f6', grade: 3 } },
+
+      { id: 'chap-toan3-so-100k', type: 'Chapter', label: '[T3] Số đến 100 000',         description: 'Đọc/viết/so sánh số 5 chữ số' },
+      { id: 'chap-toan3-bang-nc', type: 'Chapter', label: '[T3] Bảng nhân/chia 2-10',     description: 'Học thuộc đầy đủ bảng nhân + chia 2-10' },
+      { id: 'chap-toan3-bieu-thuc',type:'Chapter', label: '[T3] Biểu thức + Tìm X',       description: 'Tính giá trị biểu thức, tìm thành phần chưa biết' },
+      { id: 'chap-toan3-phan-so', type: 'Chapter', label: '[T3] Phân số đơn giản (mới!)', description: '1/2, 1/3, 1/4 — chia 1 phần thành nhiều phần' },
+      { id: 'chap-toan3-hh',      type: 'Chapter', label: '[T3] Chu vi + Diện tích',      description: 'P/S hình vuông + chữ nhật; đơn vị cm², dm², m²' },
+      { id: 'chap-toan3-do',      type: 'Chapter', label: '[T3] Đo lường mở rộng',        description: 'km, mm, gam, ml, tháng-năm' },
+      { id: 'chap-toan3-giai-toan',type:'Chapter', label: '[T3] Giải toán 2 phép tính',   description: 'Bài toán cần 2 bước; câu trả lời ý nghĩa' },
+
+      { id: 'topic-t3-100k',      type: 'Topic', label: 'Số 5 chữ số',                   description: '37 524 = 3 chục nghìn + 7 nghìn + 5 trăm + 2 chục + 4 đơn vị' },
+      { id: 'topic-t3-doc-100k',  type: 'Topic', label: 'Đọc số 5 CS',                   description: '"ba mươi bảy nghìn năm trăm hai mươi tư"' },
+      { id: 'topic-t3-bang-3-4',  type: 'Topic', label: 'Bảng nhân/chia 3, 4',           description: '3×7=21, 4×8=32 — luyện học thuộc' },
+      { id: 'topic-t3-bang-6-7',  type: 'Topic', label: 'Bảng nhân/chia 6, 7',           description: '6×9=54, 7×8=56 — khó nhớ nhất, cần thuộc lòng' },
+      { id: 'topic-t3-bang-8-9',  type: 'Topic', label: 'Bảng nhân/chia 8, 9',           description: '8×7=56, 9×9=81' },
+      { id: 'topic-t3-bang-10',   type: 'Topic', label: 'Bảng nhân/chia 10',             description: '10×n = n0; chia 10 = bỏ 1 số 0' },
+      { id: 'topic-t3-bt-co-ngoac',type:'Topic', label: 'Biểu thức có ngoặc',            description: '(5+3)×2 = 16; phải tính trong ngoặc trước' },
+      { id: 'topic-t3-thu-tu-tt', type: 'Topic', label: 'Thứ tự thực hiện phép tính',     description: 'Nhân/chia trước cộng/trừ sau; trái sang phải nếu cùng cấp' },
+      { id: 'topic-t3-tim-x',     type: 'Topic', label: 'Tìm X',                         description: 'X + 5 = 12 → X = 12 - 5 = 7; "lấy kết quả trừ số kia"' },
+      { id: 'topic-t3-ps-1-2',    type: 'Topic', label: 'Phân số 1/2, 1/3, 1/4',         description: '"Một phần hai" = chia thành 2 phần bằng nhau, lấy 1' },
+      { id: 'topic-t3-ps-so-sanh',type: 'Topic', label: 'So sánh phân số đơn giản',       description: '1/2 > 1/3 > 1/4 (cùng tử, mẫu càng lớn càng nhỏ)' },
+      { id: 'topic-t3-cv-vuong',  type: 'Topic', label: 'Chu vi hình vuông',             description: 'P = cạnh × 4 — đơn vị cm, dm, m' },
+      { id: 'topic-t3-cv-cn',     type: 'Topic', label: 'Chu vi hình chữ nhật',          description: 'P = (dài + rộng) × 2' },
+      { id: 'topic-t3-dt-vuong',  type: 'Topic', label: 'Diện tích hình vuông',          description: 'S = cạnh × cạnh — đơn vị cm² đọc "xăng-ti-mét vuông"' },
+      { id: 'topic-t3-dt-cn',     type: 'Topic', label: 'Diện tích hình chữ nhật',       description: 'S = dài × rộng' },
+      { id: 'topic-t3-km',        type: 'Topic', label: 'Ki-lô-mét (km)',                description: '1 km = 1000 m — đo khoảng cách xa' },
+      { id: 'topic-t3-mm',        type: 'Topic', label: 'Mi-li-mét (mm)',                description: '1 cm = 10 mm — đo nhỏ chính xác' },
+      { id: 'topic-t3-gam',       type: 'Topic', label: 'Gam (g)',                        description: '1 kg = 1000 g — đo nhỏ hơn kg' },
+      { id: 'topic-t3-ml',        type: 'Topic', label: 'Mi-li-lít (ml)',                description: '1 lít = 1000 ml — đo dung tích nhỏ' },
+      { id: 'topic-t3-thang-nam', type: 'Topic', label: 'Tháng - Năm - Lịch',             description: '1 năm = 12 tháng; tháng có 28/29/30/31 ngày; năm nhuận' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 2: TIẾNG VIỆT 3 (245 tiết) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-tv3', type: 'Subject', label: 'Tiếng Việt 3',
+        description: 'Đọc 150-200 chữ + viết đoạn văn ngắn + 3 mẫu câu + tả + kể + viết thư',
+        properties: { color: '#ef4444', grade: 3 } },
+
+      { id: 'chap-tv3-tap-doc',   type: 'Chapter', label: '[TV3] Tập đọc nâng cao',      description: 'Đọc 150-200 chữ, đọc thầm, đọc phân vai' },
+      { id: 'chap-tv3-doc-hieu',  type: 'Chapter', label: '[TV3] Đọc hiểu sâu',          description: 'Ý chính + chi tiết + suy luận + cảm nhận' },
+      { id: 'chap-tv3-vong-tu',   type: 'Chapter', label: '[TV3] Mở rộng vốn từ',         description: 'Từ theo chủ điểm: GĐ, thiên nhiên, đất nước, ...' },
+      { id: 'chap-tv3-mau-cau',   type: 'Chapter', label: '[TV3] 3 mẫu câu',             description: 'Ai là gì? · Ai làm gì? · Ai thế nào?' },
+      { id: 'chap-tv3-dau-cau',   type: 'Chapter', label: '[TV3] Dấu câu',               description: 'Dấu chấm, phẩy, hỏi, than, hai chấm' },
+      { id: 'chap-tv3-tlv-ta',    type: 'Chapter', label: '[TV3] Văn miêu tả',           description: 'Tả con vật, đồ vật, cây cối — 1 đoạn 5-7 câu' },
+      { id: 'chap-tv3-tlv-ke',    type: 'Chapter', label: '[TV3] Văn kể chuyện',          description: 'Kể chuyện đã đọc/đã nghe, kể chuyện chứng kiến' },
+      { id: 'chap-tv3-thu',       type: 'Chapter', label: '[TV3] Viết thư',              description: 'Thư cho bạn bè, người thân — đủ 3 phần (mở-thân-kết)' },
+
+      { id: 'topic-tv3-doc-phan-vai',type:'Topic',label: 'Đọc phân vai',                  description: 'Đọc theo nhân vật — đoạn hội thoại, giọng khác nhau' },
+      { id: 'topic-tv3-doc-tham', type: 'Topic', label: 'Đọc thầm',                      description: 'Không phát âm, nhanh hơn đọc to — kĩ năng đọc của người lớn' },
+      { id: 'topic-tv3-tom-tat-bai',type:'Topic',label: 'Tóm tắt nội dung bài',           description: '2-3 câu — nói được bài kể về ai, làm gì, kết quả' },
+      { id: 'topic-tv3-suy-luan', type: 'Topic', label: 'Suy luận từ bài đọc',            description: '"Vì sao nhân vật làm thế?" — không cần ghi rõ trong bài' },
+      { id: 'topic-tv3-cam-nhan', type: 'Topic', label: 'Cảm nhận cá nhân',              description: '"Em thích nhân vật nào nhất? Vì sao?" — bày tỏ ý kiến' },
+      { id: 'topic-tv3-tu-gd',    type: 'Topic', label: 'Từ về gia đình',                 description: 'Bố/mẹ/anh/chị/em + hiếu thảo/yêu thương/đoàn kết' },
+      { id: 'topic-tv3-tu-tn',    type: 'Topic', label: 'Từ về thiên nhiên',              description: 'Núi/sông/biển/đồng + xanh tươi/bát ngát/hùng vĩ' },
+      { id: 'topic-tv3-tu-dn',    type: 'Topic', label: 'Từ về đất nước',                 description: 'Tổ quốc/quê hương/dân tộc + tự hào/yêu mến' },
+      { id: 'topic-tv3-ai-la-gi', type: 'Topic', label: '"Ai là gì?"',                   description: '"Em là HS." "Bố em là bác sĩ." — câu định nghĩa' },
+      { id: 'topic-tv3-ai-lam-gi',type: 'Topic', label: '"Ai làm gì?"',                  description: '"Em học bài." "Mẹ nấu cơm." — câu hành động' },
+      { id: 'topic-tv3-ai-the-nao',type:'Topic', label: '"Ai thế nào?"',                 description: '"Em rất ngoan." "Hoa hồng đẹp." — câu đặc điểm' },
+      { id: 'topic-tv3-dau-phay', type: 'Topic', label: 'Dấu phẩy (,)',                  description: 'Ngăn cách bộ phận đồng chức, vế câu phụ' },
+      { id: 'topic-tv3-hai-cham', type: 'Topic', label: 'Dấu hai chấm (:)',              description: 'Dẫn lời nói, liệt kê — VD: Em có: bút, vở, sách.' },
+      { id: 'topic-tv3-ta-con-vat',type:'Topic', label: 'Tả con vật',                    description: 'Hình dáng + hoạt động + tính cách + tình cảm em' },
+      { id: 'topic-tv3-ta-do-vat',type: 'Topic', label: 'Tả đồ vật',                     description: 'Cặp sách, đồng hồ, bàn ghế — hình dáng + công dụng + ý nghĩa' },
+      { id: 'topic-tv3-ta-cay',   type: 'Topic', label: 'Tả cây cối',                    description: 'Rễ + thân + lá + hoa + quả + ích lợi' },
+      { id: 'topic-tv3-ke-da-doc',type: 'Topic', label: 'Kể chuyện đã đọc',              description: 'Tóm tắt nội dung + cảm nhận về truyện cổ tích, ngụ ngôn' },
+      { id: 'topic-tv3-ke-chung-kien',type:'Topic',label:'Kể chuyện chứng kiến',          description: '"Một việc tốt em đã làm/đã thấy"' },
+      { id: 'topic-tv3-thu-3p',   type: 'Topic', label: 'Cấu trúc thư 3 phần',            description: 'Mở: đầu thư + chào · Thân: nội dung · Kết: lời chúc + ký tên' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 3: TỰ NHIÊN XÃ HỘI 3 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-tnxh3', type: 'Subject', label: 'Tự nhiên & Xã hội 3',
+        description: 'Mở rộng XH + nghề · cây quang hợp · động vật sinh sản · nước · không khí · vũ trụ',
+        properties: { color: '#10b981', grade: 3 } },
+
+      { id: 'chap-tnxh3-gd-xh',   type: 'Chapter', label: '[TNXH3] Gia đình + Xã hội',   description: 'Nghề nghiệp đa dạng, hoạt động kinh tế, văn hoá địa phương' },
+      { id: 'chap-tnxh3-cay',     type: 'Chapter', label: '[TNXH3] Cây xanh',            description: 'Quang hợp, cách chăm sóc, ích lợi của cây' },
+      { id: 'chap-tnxh3-dv',      type: 'Chapter', label: '[TNXH3] Động vật',            description: 'Thức ăn, sinh sản, bảo vệ động vật' },
+      { id: 'chap-tnxh3-nuoc',    type: 'Chapter', label: '[TNXH3] Nước',                description: 'Nguồn nước, vòng tuần hoàn, ô nhiễm, tiết kiệm' },
+      { id: 'chap-tnxh3-khong-khi',type:'Chapter', label: '[TNXH3] Không khí',          description: 'Thành phần, ô nhiễm, vai trò với cuộc sống' },
+      { id: 'chap-tnxh3-vu-tru',  type: 'Chapter', label: '[TNXH3] Mặt trời + Trái đất + Mặt trăng',description: 'Quỹ đạo, ngày-đêm, các mùa khoa học' },
+
+      { id: 'topic-tnxh3-nghe-dd',type: 'Topic', label: 'Nghề nghiệp đa dạng',           description: 'Bs, GV, kĩ sư, nông dân, công nhân, nghệ sĩ, lập trình viên' },
+      { id: 'topic-tnxh3-kt-nong-nghiep',type:'Topic',label:'Kinh tế nông nghiệp',       description: 'Trồng trọt (lúa, rau, cây ăn quả) + chăn nuôi (gà, heo, bò)' },
+      { id: 'topic-tnxh3-kt-cn',  type: 'Topic', label: 'Kinh tế công nghiệp',           description: 'Nhà máy, xí nghiệp — dệt may, lắp ráp xe' },
+      { id: 'topic-tnxh3-kt-dv',  type: 'Topic', label: 'Kinh tế dịch vụ',               description: 'Mua bán, ngân hàng, y tế, giáo dục, du lịch' },
+      { id: 'topic-tnxh3-le-hoi-dp',type:'Topic', label: 'Lễ hội địa phương',            description: 'Hội làng, hội xuân — đặc trưng từng vùng miền' },
+      { id: 'topic-tnxh3-di-tich-dp',type:'Topic',label: 'Di tích lịch sử địa phương',   description: 'Đình, chùa, tháp, lăng — di sản văn hoá quê em' },
+      { id: 'topic-tnxh3-quang-hop',type:'Topic', label: 'Quang hợp (cơ bản)',           description: 'Cây dùng ánh sáng + nước + CO₂ → tạo thức ăn + nhả O₂' },
+      { id: 'topic-tnxh3-cs-cay', type: 'Topic', label: 'Chăm sóc cây xanh',             description: 'Tưới nước, bón phân, bắt sâu, vun xới' },
+      { id: 'topic-tnxh3-ich-cay',type: 'Topic', label: 'Ích lợi của cây',               description: 'Bóng mát, gỗ, hoa quả, nhả O₂, giữ đất' },
+      { id: 'topic-tnxh3-dv-an',  type: 'Topic', label: 'Thức ăn động vật',              description: 'Ăn cỏ (trâu, bò), ăn thịt (hổ, sư tử), ăn tạp (gà, lợn)' },
+      { id: 'topic-tnxh3-dv-de',  type: 'Topic', label: 'Cách sinh sản',                 description: 'Đẻ trứng (gà, vịt, rắn) vs đẻ con (chó, mèo, người)' },
+      { id: 'topic-tnxh3-bao-ve-dv',type:'Topic', label: 'Bảo vệ động vật',              description: 'Không săn bắt, không nuôi nhốt thú hoang' },
+      { id: 'topic-tnxh3-nguon-nuoc',type:'Topic',label: 'Nguồn nước',                   description: 'Sông, suối, hồ, biển, nước ngầm, mưa' },
+      { id: 'topic-tnxh3-vong-tuan-hoan-nuoc',type:'Topic',label:'Vòng tuần hoàn nước',  description: 'Bốc hơi → mây → mưa → sông → biển → bốc hơi (lặp lại)' },
+      { id: 'topic-tnxh3-o-nhiem-nuoc',type:'Topic',label:'Ô nhiễm nước',                description: 'Rác, chất thải, dầu — cá chết, không uống được' },
+      { id: 'topic-tnxh3-tk-nuoc',type: 'Topic', label: 'Tiết kiệm nước',                description: 'Khoá vòi, hứng nước mưa, không xả lãng phí' },
+      { id: 'topic-tnxh3-kk-tp',  type: 'Topic', label: 'Thành phần không khí',          description: 'N₂ (78%) + O₂ (21%) + CO₂ + hơi nước + khí khác' },
+      { id: 'topic-tnxh3-kk-vai-tro',type:'Topic',label: 'Vai trò không khí',            description: 'Hít thở, cây quang hợp, đốt cháy nhiên liệu' },
+      { id: 'topic-tnxh3-o-nhiem-kk',type:'Topic',label: 'Ô nhiễm không khí',            description: 'Khói xe, khói nhà máy, bụi mịn — hại phổi' },
+      { id: 'topic-tnxh3-quy-dao',type: 'Topic', label: 'Trái đất quay quanh mặt trời',  description: '365 ngày 1 vòng → 4 mùa (do trục nghiêng)' },
+      { id: 'topic-tnxh3-tu-quay',type: 'Topic', label: 'Trái đất tự quay',              description: '24 giờ 1 vòng → ngày-đêm' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 4: HOẠT ĐỘNG TRẢI NGHIỆM 3 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-hdtn3', type: 'Subject', label: 'Hoạt động trải nghiệm 3',
+        description: 'Em tự lập + em với cộng đồng + quản lí cảm xúc + ngoại khoá phong phú',
+        properties: { color: '#f97316', grade: 3 } },
+
+      { id: 'chap-hdtn3-tu-lap',  type: 'Chapter', label: '[HĐTN3] Em là người tự lập',   description: 'Tự quản lý thời gian, tiền tiêu vặt, đồ cá nhân' },
+      { id: 'chap-hdtn3-cong-dong',type:'Chapter', label: '[HĐTN3] Em với cộng đồng',     description: 'Quan tâm hàng xóm, tham gia hoạt động địa phương' },
+      { id: 'chap-hdtn3-cam-xuc', type: 'Chapter', label: '[HĐTN3] Quản lý cảm xúc',      description: 'Nhận diện vui-buồn-giận-sợ + cách bình tĩnh' },
+      { id: 'chap-hdtn3-ngoai-khoa',type:'Chapter',label: '[HĐTN3] Hoạt động ngoại khoá', description: 'Câu lạc bộ, thi vẽ, thi hát, dã ngoại' },
+      { id: 'chap-hdtn3-le-3',    type: 'Chapter', label: '[HĐTN3] Các ngày lễ',          description: 'Tết · 20/11 · 8/3 · 30/4 · 1/6 · 19/5' },
+
+      { id: 'topic-hdtn3-tg-bieu',type: 'Topic', label: 'Lập thời gian biểu',             description: 'Sáng/chiều/tối — cân bằng học, ăn, chơi, ngủ' },
+      { id: 'topic-hdtn3-tien-vat',type:'Topic', label: 'Quản lý tiền tiêu vặt',          description: 'Tiền lì xì, tiền ăn vặt — cân nhắc mua' },
+      { id: 'topic-hdtn3-dcv',    type: 'Topic', label: 'Đồ cá nhân',                     description: 'Bàn chải, khăn, cốc — không dùng chung tránh bệnh' },
+      { id: 'topic-hdtn3-hang-xom',type:'Topic', label: 'Quan tâm hàng xóm',              description: 'Chào hỏi, không gây ồn, giúp đỡ khi cần' },
+      { id: 'topic-hdtn3-mua-the',type: 'Topic', label: 'Tham gia hoạt động phố/làng',    description: 'Văn nghệ thiếu nhi, dọn dẹp ngõ, trồng cây' },
+      { id: 'topic-hdtn3-vui',    type: 'Topic', label: 'Cảm xúc Vui',                    description: 'Khi nào em vui? — cười, chia sẻ niềm vui với người khác' },
+      { id: 'topic-hdtn3-buon',   type: 'Topic', label: 'Cảm xúc Buồn',                   description: 'Khi nào em buồn? — kể với người tin cậy, ôm thú bông' },
+      { id: 'topic-hdtn3-gian',   type: 'Topic', label: 'Cảm xúc Giận',                   description: 'Khi nào em giận? — hít sâu 5 lần, đếm 1-10, không la' },
+      { id: 'topic-hdtn3-so',     type: 'Topic', label: 'Cảm xúc Sợ',                     description: 'Khi nào em sợ? — nói với bố mẹ, không xem phim/clip kinh dị' },
+      { id: 'topic-hdtn3-clb',    type: 'Topic', label: 'Câu lạc bộ trường',              description: 'CLB Tin học, MT, Âm nhạc, Cờ vua — em chọn theo sở thích' },
+      { id: 'topic-hdtn3-thi-thuat',type:'Topic', label: 'Thi văn nghệ - vẽ - hát',       description: 'Cấp lớp/trường/quận — luyện tự tin trước đám đông' },
+      { id: 'topic-hdtn3-da-ngoai',type:'Topic', label: 'Dã ngoại / Tham quan',           description: 'Cùng lớp đi vườn thú, bảo tàng, làng nghề' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 5: ĐẠO ĐỨC 3 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-dd3', type: 'Subject', label: 'Đạo đức 3',
+        description: 'Tôn trọng cộng đồng + bảo vệ trẻ em + môi trường sống + yêu dân tộc + an toàn cá nhân',
+        properties: { color: '#8b5cf6', grade: 3 } },
+
+      { id: 'chap-dd3-ton-trong-lt',type:'Chapter', label: '[ĐĐ3] Tôn trọng người lớn tuổi',description: 'Người già, ông bà, hàng xóm cao tuổi' },
+      { id: 'chap-dd3-quan-tam-hx',type:'Chapter', label: '[ĐĐ3] Quan tâm hàng xóm',     description: 'Tình làng nghĩa xóm, giúp nhau khi khó khăn' },
+      { id: 'chap-dd3-bv-tre',    type: 'Chapter', label: '[ĐĐ3] Bảo vệ trẻ em',         description: 'Không bắt nạt, không xâm hại, biết kêu cứu' },
+      { id: 'chap-dd3-dam-tang',  type: 'Chapter', label: '[ĐĐ3] Tôn trọng đám tang',    description: 'Không cười đùa, không gây ồn, đi nhẹ nói khẽ' },
+      { id: 'chap-dd3-mt-song',   type: 'Chapter', label: '[ĐĐ3] Bảo vệ MT sống',        description: 'Phố sạch, làng đẹp, không xả rác, trồng cây' },
+      { id: 'chap-dd3-tu-hao-vn', type: 'Chapter', label: '[ĐĐ3] Tự hào người Việt Nam', description: 'Lịch sử oai hùng, văn hoá phong phú, ngôn ngữ tiếng Việt' },
+      { id: 'chap-dd3-dan-toc',   type: 'Chapter', label: '[ĐĐ3] Yêu các dân tộc VN',    description: '54 dân tộc anh em — Tày, Thái, H\'Mông, Khmer, Kinh' },
+      { id: 'chap-dd3-an-toan-bt',type: 'Chapter', label: '[ĐĐ3] An toàn cho bản thân',   description: 'Phòng đuối nước, điện giật, bỏng, ngã' },
+
+      { id: 'topic-dd3-ng-gia-tt',type: 'Topic', label: 'Cách tôn trọng người già',       description: 'Chào hỏi, nhường ghế, hỏi thăm sức khoẻ' },
+      { id: 'topic-dd3-tinh-lang',type: 'Topic', label: 'Tình làng nghĩa xóm',           description: '"Hàng xóm tốt hơn anh em xa"' },
+      { id: 'topic-dd3-giup-hx',  type: 'Topic', label: 'Giúp hàng xóm khó khăn',        description: 'Người ốm, người nghèo, nhà thiên tai' },
+      { id: 'topic-dd3-bat-nat',  type: 'Topic', label: 'Không bắt nạt bạn',             description: 'Không trêu chọc, không đánh, không cô lập' },
+      { id: 'topic-dd3-xam-hai',  type: 'Topic', label: 'Phòng tránh xâm hại',           description: '5 vùng kín không cho ai sờ; nói "KHÔNG"; kể bố mẹ ngay' },
+      { id: 'topic-dd3-keu-cuu',  type: 'Topic', label: 'Cách kêu cứu',                  description: 'Hét to, chạy đến nơi đông người, gọi 113/111' },
+      { id: 'topic-dd3-le-tang',  type: 'Topic', label: 'Cách dự đám tang',              description: 'Mặc đồ tối, đi nhẹ, không cười, chia buồn' },
+      { id: 'topic-dd3-pho-sach', type: 'Topic', label: 'Giữ phố/làng sạch đẹp',         description: 'Quét trước nhà, không vứt rác, không đổ nước thải bừa' },
+      { id: 'topic-dd3-trong-cay-3',type:'Topic', label: 'Trồng cây xanh',               description: 'Tết trồng cây 19/5 — góp xanh cho địa phương' },
+      { id: 'topic-dd3-tieng-viet',type:'Topic', label: 'Tự hào tiếng Việt',             description: 'Ngôn ngữ giàu đẹp, ngân nga, có 6 thanh điệu' },
+      { id: 'topic-dd3-dt-thieu-so',type:'Topic', label: '54 dân tộc anh em',            description: 'Đoàn kết, tôn trọng văn hoá riêng từng dân tộc' },
+      { id: 'topic-dd3-trang-phuc-dt',type:'Topic',label: 'Trang phục dân tộc',          description: 'Áo dài Kinh, áo chàm Tày, váy H\'Mông — đẹp riêng' },
+      { id: 'topic-dd3-an-toan-nuoc',type:'Topic',label: 'An toàn nước',                 description: 'Không bơi sông/hồ một mình, mặc áo phao, học bơi' },
+      { id: 'topic-dd3-an-toan-dien',type:'Topic',label: 'An toàn điện',                 description: 'Không sờ ổ điện, không cắm đồ ướt, có người lớn giám sát' },
+      { id: 'topic-dd3-an-toan-lua',type:'Topic', label: 'An toàn lửa',                  description: 'Không nghịch diêm/bật lửa, không tự nấu khi không có người lớn' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 6: ÂM NHẠC 3 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-amnhac3', type: 'Subject', label: 'Âm nhạc 3',
+        description: 'Bài hát dân ca dân tộc + đọc nhạc có nhịp + múa minh hoạ + nhạc cụ phong phú',
+        properties: { color: '#ec4899', grade: 3 } },
+
+      { id: 'chap-am3-hat',       type: 'Chapter', label: '[ÂN3] Hát',                   description: 'Bài hát thiếu nhi mới + dân ca các dân tộc' },
+      { id: 'chap-am3-nghe',      type: 'Chapter', label: '[ÂN3] Nghe nhạc',             description: 'Nghe có chú ý, phân biệt nhạc cụ + thể loại' },
+      { id: 'chap-am3-doc',       type: 'Chapter', label: '[ÂN3] Đọc nhạc + nhịp',       description: 'Đọc nốt có dấu lặng + nhịp 2/4' },
+      { id: 'chap-am3-mua-mh',    type: 'Chapter', label: '[ÂN3] Múa minh hoạ',          description: 'Múa đơn giản theo bài hát — biểu cảm + đội hình' },
+      { id: 'chap-am3-nhac-cu-3', type: 'Chapter', label: '[ÂN3] Nhạc cụ',               description: 'Trống cơm, song loan, sáo trúc' },
+
+      { id: 'topic-am3-bai-1',    type: 'Topic', label: '"Em yêu hoà bình" (Nguyễn Đức Toàn)',description: 'Hát yêu hoà bình + mặt trời + cánh chim' },
+      { id: 'topic-am3-bai-2',    type: 'Topic', label: '"Hành khúc tới trường" (Phan Trần Bảng)',description: 'Hành khúc vui đến trường' },
+      { id: 'topic-am3-bai-3',    type: 'Topic', label: '"Bài ca đi học" (Phan Trần Bảng)',description: 'Bài ca quen thuộc của HS VN nhiều thế hệ' },
+      { id: 'topic-am3-bai-4',    type: 'Topic', label: '"Reo vang bình minh" (Lưu Hữu Phước)',description: 'Buổi sáng vui tươi đón ngày mới' },
+      { id: 'topic-am3-bai-5',    type: 'Topic', label: '"Inh lả ơi" (dân ca Thái)',     description: 'Dân ca dân tộc Thái — nốt giai điệu đặc trưng' },
+      { id: 'topic-am3-bai-6',    type: 'Topic', label: '"Đi cấy" (dân ca Thanh Hoá)',   description: 'Dân ca Bắc Trung Bộ — về cấy lúa' },
+      { id: 'topic-am3-nghe-tcc', type: 'Topic', label: 'Nghe nhạc cổ điển ngắn',         description: 'Mozart, Beethoven — bài ngắn cho thiếu nhi' },
+      { id: 'topic-am3-dau-lang', type: 'Topic', label: 'Dấu lặng',                       description: 'Khoảng nghỉ trong nhạc — lặng đen, lặng đơn' },
+      { id: 'topic-am3-nhip-24',  type: 'Topic', label: 'Nhịp 2/4',                       description: 'Mỗi ô có 2 phách, phách 1 mạnh, phách 2 nhẹ' },
+      { id: 'topic-am3-mua-vong-3',type:'Topic', label: 'Múa vòng tròn cải tiến',         description: 'Bước đôi + xoay + nhịp nhàng theo nhóm' },
+      { id: 'topic-am3-mua-tay',  type: 'Topic', label: 'Múa minh hoạ bằng tay',          description: 'Vẽ hình tròn, vung tay, vỗ — theo lời bài hát' },
+      { id: 'topic-am3-song-loan',type: 'Topic', label: 'Song loan',                     description: 'Nhạc cụ gõ dân tộc — 2 nửa gỗ bóp vào nhau' },
+      { id: 'topic-am3-sao-na',   type: 'Topic', label: 'Sáo trúc nâng cao',             description: '6 lỗ — thổi được giai điệu đơn giản' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 7: MĨ THUẬT 3 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-mt3', type: 'Subject', label: 'Mĩ thuật 3',
+        description: 'Vẽ tranh đề tài + vẽ theo mẫu + trang trí + nặn 3D + tranh thiếu nhi quốc tế + kiến trúc VN',
+        properties: { color: '#eab308', grade: 3 } },
+
+      { id: 'chap-mt3-ve-de-tai', type: 'Chapter', label: '[MT3] Vẽ tranh đề tài',       description: 'Đề tài 20/11, Tết, lễ hội, môi trường' },
+      { id: 'chap-mt3-ve-mau',    type: 'Chapter', label: '[MT3] Vẽ theo mẫu',           description: 'Vẽ tĩnh vật: quả, chai, lọ, hoa — quan sát thật' },
+      { id: 'chap-mt3-trang-tri-3',type:'Chapter', label: '[MT3] Trang trí',             description: 'Trang trí hình chữ nhật, bìa sách, lọ hoa' },
+      { id: 'chap-mt3-nan-3',     type: 'Chapter', label: '[MT3] Nặn',                   description: 'Tạo hình 3D phức tạp: nhóm người, cảnh vật' },
+      { id: 'chap-mt3-thuong-thuc-3',type:'Chapter',label: '[MT3] Thường thức',          description: 'Tranh thiếu nhi quốc tế + kiến trúc cổ Việt Nam' },
+
+      { id: 'topic-mt3-de-2011',  type: 'Topic', label: 'Vẽ ngày Nhà giáo 20/11',        description: 'Cô + HS + hoa + thiệp + nụ cười' },
+      { id: 'topic-mt3-de-tet',   type: 'Topic', label: 'Vẽ Tết Nguyên đán',             description: 'Bánh chưng, hoa đào/mai, lì xì, đoàn tụ' },
+      { id: 'topic-mt3-de-le-hoi',type: 'Topic', label: 'Vẽ lễ hội',                     description: 'Múa lân, rồng, kéo co, đèn lồng — sôi động' },
+      { id: 'topic-mt3-de-mt',    type: 'Topic', label: 'Vẽ bảo vệ môi trường',           description: 'Trồng cây + dọn rác + cứu động vật + Trái đất xanh' },
+      { id: 'topic-mt3-quan-sat', type: 'Topic', label: 'Quan sát rồi vẽ',                description: 'Nhìn kĩ tỉ lệ, hình dạng, ánh sáng — không tưởng tượng' },
+      { id: 'topic-mt3-tinh-vat', type: 'Topic', label: 'Vẽ tĩnh vật đơn giản',          description: 'Đặt 1 quả + 1 cốc — vẽ đúng vị trí, kích thước' },
+      { id: 'topic-mt3-hoa',      type: 'Topic', label: 'Vẽ hoa từ mẫu',                  description: 'Quan sát hoa thật → vẽ cánh, nhuỵ, lá' },
+      { id: 'topic-mt3-tt-cn-mt', type: 'Topic', label: 'Trang trí hình chữ nhật',       description: 'Đối xứng dọc/ngang — bằng khen, thẻ, tem' },
+      { id: 'topic-mt3-tt-bia',   type: 'Topic', label: 'Trang trí bìa sách',            description: 'Tên sách to + hình minh hoạ + tên tác giả nhỏ' },
+      { id: 'topic-mt3-tt-lo',    type: 'Topic', label: 'Trang trí lọ hoa',              description: 'Hoạ tiết theo viền cổ lọ + thân lọ + đáy lọ' },
+      { id: 'topic-mt3-nan-nhom', type: 'Topic', label: 'Nặn nhóm người',                description: 'Gia đình 4 người: cha-mẹ-anh-em — tỉ lệ tương đối' },
+      { id: 'topic-mt3-nan-canh', type: 'Topic', label: 'Nặn cảnh vật',                  description: 'Cây + nhà + người + động vật — bố cục như 1 bức tranh 3D' },
+      { id: 'topic-mt3-tn-qt-mt', type: 'Topic', label: 'Tranh thiếu nhi quốc tế',       description: 'Trẻ em vẽ tranh khắp TG về hoà bình, môi trường, GĐ' },
+      { id: 'topic-mt3-dinh-vn',  type: 'Topic', label: 'Kiến trúc cổ VN — Đình làng',   description: 'Đình Tây Đằng, Đình Bảng — gỗ chạm khắc tinh xảo' },
+      { id: 'topic-mt3-chua-vn',  type: 'Topic', label: 'Kiến trúc cổ VN — Chùa',        description: 'Chùa Một Cột, chùa Trấn Quốc — kiến trúc Phật giáo' },
+      { id: 'topic-mt3-thap-vn',  type: 'Topic', label: 'Kiến trúc cổ VN — Tháp',        description: 'Tháp Bà Po Nagar, tháp Mỹ Sơn — văn hoá Chăm' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-g3:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Meta → 7 môn
+      ['meta-lop3', 'subj-toan3',   'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-tv3',     'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-tnxh3',   'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-hdtn3',   'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-dd3',     'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-amnhac3', 'HAS_CHAPTER'],
+      ['meta-lop3', 'subj-mt3',     'HAS_CHAPTER'],
+
+      // === TOÁN 3 ===
+      ['subj-toan3', 'chap-toan3-so-100k', 'HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-bang-nc', 'HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-bieu-thuc','HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-phan-so', 'HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-hh',      'HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-do',      'HAS_CHAPTER'],
+      ['subj-toan3', 'chap-toan3-giai-toan','HAS_CHAPTER'],
+      ['chap-toan3-so-100k', 'topic-t3-100k',      'HAS_TOPIC'],
+      ['chap-toan3-so-100k', 'topic-t3-doc-100k',  'HAS_TOPIC'],
+      ['chap-toan3-bang-nc', 'topic-t3-bang-3-4',  'HAS_TOPIC'],
+      ['chap-toan3-bang-nc', 'topic-t3-bang-6-7',  'HAS_TOPIC'],
+      ['chap-toan3-bang-nc', 'topic-t3-bang-8-9',  'HAS_TOPIC'],
+      ['chap-toan3-bang-nc', 'topic-t3-bang-10',   'HAS_TOPIC'],
+      ['chap-toan3-bieu-thuc','topic-t3-bt-co-ngoac','HAS_TOPIC'],
+      ['chap-toan3-bieu-thuc','topic-t3-thu-tu-tt','HAS_TOPIC'],
+      ['chap-toan3-bieu-thuc','topic-t3-tim-x',    'HAS_TOPIC'],
+      ['chap-toan3-phan-so', 'topic-t3-ps-1-2',    'HAS_TOPIC'],
+      ['chap-toan3-phan-so', 'topic-t3-ps-so-sanh','HAS_TOPIC'],
+      ['chap-toan3-hh',      'topic-t3-cv-vuong',  'HAS_TOPIC'],
+      ['chap-toan3-hh',      'topic-t3-cv-cn',     'HAS_TOPIC'],
+      ['chap-toan3-hh',      'topic-t3-dt-vuong',  'HAS_TOPIC'],
+      ['chap-toan3-hh',      'topic-t3-dt-cn',     'HAS_TOPIC'],
+      ['chap-toan3-do',      'topic-t3-km',        'HAS_TOPIC'],
+      ['chap-toan3-do',      'topic-t3-mm',        'HAS_TOPIC'],
+      ['chap-toan3-do',      'topic-t3-gam',       'HAS_TOPIC'],
+      ['chap-toan3-do',      'topic-t3-ml',        'HAS_TOPIC'],
+      ['chap-toan3-do',      'topic-t3-thang-nam', 'HAS_TOPIC'],
+
+      // === TIẾNG VIỆT 3 ===
+      ['subj-tv3', 'chap-tv3-tap-doc',  'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-doc-hieu', 'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-vong-tu',  'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-mau-cau',  'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-dau-cau',  'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-tlv-ta',   'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-tlv-ke',   'HAS_CHAPTER'],
+      ['subj-tv3', 'chap-tv3-thu',      'HAS_CHAPTER'],
+      ['chap-tv3-tap-doc',  'topic-tv3-doc-phan-vai','HAS_TOPIC'],
+      ['chap-tv3-tap-doc',  'topic-tv3-doc-tham',    'HAS_TOPIC'],
+      ['chap-tv3-doc-hieu', 'topic-tv3-tom-tat-bai', 'HAS_TOPIC'],
+      ['chap-tv3-doc-hieu', 'topic-tv3-suy-luan',    'HAS_TOPIC'],
+      ['chap-tv3-doc-hieu', 'topic-tv3-cam-nhan',    'HAS_TOPIC'],
+      ['chap-tv3-vong-tu',  'topic-tv3-tu-gd',       'HAS_TOPIC'],
+      ['chap-tv3-vong-tu',  'topic-tv3-tu-tn',       'HAS_TOPIC'],
+      ['chap-tv3-vong-tu',  'topic-tv3-tu-dn',       'HAS_TOPIC'],
+      ['chap-tv3-mau-cau',  'topic-tv3-ai-la-gi',    'HAS_TOPIC'],
+      ['chap-tv3-mau-cau',  'topic-tv3-ai-lam-gi',   'HAS_TOPIC'],
+      ['chap-tv3-mau-cau',  'topic-tv3-ai-the-nao',  'HAS_TOPIC'],
+      ['chap-tv3-dau-cau',  'topic-tv3-dau-phay',    'HAS_TOPIC'],
+      ['chap-tv3-dau-cau',  'topic-tv3-hai-cham',    'HAS_TOPIC'],
+      ['chap-tv3-tlv-ta',   'topic-tv3-ta-con-vat',  'HAS_TOPIC'],
+      ['chap-tv3-tlv-ta',   'topic-tv3-ta-do-vat',   'HAS_TOPIC'],
+      ['chap-tv3-tlv-ta',   'topic-tv3-ta-cay',      'HAS_TOPIC'],
+      ['chap-tv3-tlv-ke',   'topic-tv3-ke-da-doc',   'HAS_TOPIC'],
+      ['chap-tv3-tlv-ke',   'topic-tv3-ke-chung-kien','HAS_TOPIC'],
+      ['chap-tv3-thu',      'topic-tv3-thu-3p',      'HAS_TOPIC'],
+
+      // === TNXH 3 ===
+      ['subj-tnxh3', 'chap-tnxh3-gd-xh',    'HAS_CHAPTER'],
+      ['subj-tnxh3', 'chap-tnxh3-cay',      'HAS_CHAPTER'],
+      ['subj-tnxh3', 'chap-tnxh3-dv',       'HAS_CHAPTER'],
+      ['subj-tnxh3', 'chap-tnxh3-nuoc',     'HAS_CHAPTER'],
+      ['subj-tnxh3', 'chap-tnxh3-khong-khi','HAS_CHAPTER'],
+      ['subj-tnxh3', 'chap-tnxh3-vu-tru',   'HAS_CHAPTER'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-nghe-dd',         'HAS_TOPIC'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-kt-nong-nghiep',  'HAS_TOPIC'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-kt-cn',           'HAS_TOPIC'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-kt-dv',           'HAS_TOPIC'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-le-hoi-dp',       'HAS_TOPIC'],
+      ['chap-tnxh3-gd-xh', 'topic-tnxh3-di-tich-dp',      'HAS_TOPIC'],
+      ['chap-tnxh3-cay',   'topic-tnxh3-quang-hop',       'HAS_TOPIC'],
+      ['chap-tnxh3-cay',   'topic-tnxh3-cs-cay',          'HAS_TOPIC'],
+      ['chap-tnxh3-cay',   'topic-tnxh3-ich-cay',         'HAS_TOPIC'],
+      ['chap-tnxh3-dv',    'topic-tnxh3-dv-an',           'HAS_TOPIC'],
+      ['chap-tnxh3-dv',    'topic-tnxh3-dv-de',           'HAS_TOPIC'],
+      ['chap-tnxh3-dv',    'topic-tnxh3-bao-ve-dv',       'HAS_TOPIC'],
+      ['chap-tnxh3-nuoc',  'topic-tnxh3-nguon-nuoc',      'HAS_TOPIC'],
+      ['chap-tnxh3-nuoc',  'topic-tnxh3-vong-tuan-hoan-nuoc','HAS_TOPIC'],
+      ['chap-tnxh3-nuoc',  'topic-tnxh3-o-nhiem-nuoc',    'HAS_TOPIC'],
+      ['chap-tnxh3-nuoc',  'topic-tnxh3-tk-nuoc',         'HAS_TOPIC'],
+      ['chap-tnxh3-khong-khi','topic-tnxh3-kk-tp',        'HAS_TOPIC'],
+      ['chap-tnxh3-khong-khi','topic-tnxh3-kk-vai-tro',   'HAS_TOPIC'],
+      ['chap-tnxh3-khong-khi','topic-tnxh3-o-nhiem-kk',   'HAS_TOPIC'],
+      ['chap-tnxh3-vu-tru','topic-tnxh3-quy-dao',         'HAS_TOPIC'],
+      ['chap-tnxh3-vu-tru','topic-tnxh3-tu-quay',         'HAS_TOPIC'],
+
+      // === HDTN 3 ===
+      ['subj-hdtn3', 'chap-hdtn3-tu-lap',    'HAS_CHAPTER'],
+      ['subj-hdtn3', 'chap-hdtn3-cong-dong', 'HAS_CHAPTER'],
+      ['subj-hdtn3', 'chap-hdtn3-cam-xuc',   'HAS_CHAPTER'],
+      ['subj-hdtn3', 'chap-hdtn3-ngoai-khoa','HAS_CHAPTER'],
+      ['subj-hdtn3', 'chap-hdtn3-le-3',      'HAS_CHAPTER'],
+      ['chap-hdtn3-tu-lap',   'topic-hdtn3-tg-bieu','HAS_TOPIC'],
+      ['chap-hdtn3-tu-lap',   'topic-hdtn3-tien-vat','HAS_TOPIC'],
+      ['chap-hdtn3-tu-lap',   'topic-hdtn3-dcv',     'HAS_TOPIC'],
+      ['chap-hdtn3-cong-dong','topic-hdtn3-hang-xom','HAS_TOPIC'],
+      ['chap-hdtn3-cong-dong','topic-hdtn3-mua-the', 'HAS_TOPIC'],
+      ['chap-hdtn3-cam-xuc',  'topic-hdtn3-vui',     'HAS_TOPIC'],
+      ['chap-hdtn3-cam-xuc',  'topic-hdtn3-buon',    'HAS_TOPIC'],
+      ['chap-hdtn3-cam-xuc',  'topic-hdtn3-gian',    'HAS_TOPIC'],
+      ['chap-hdtn3-cam-xuc',  'topic-hdtn3-so',      'HAS_TOPIC'],
+      ['chap-hdtn3-ngoai-khoa','topic-hdtn3-clb',    'HAS_TOPIC'],
+      ['chap-hdtn3-ngoai-khoa','topic-hdtn3-thi-thuat','HAS_TOPIC'],
+      ['chap-hdtn3-ngoai-khoa','topic-hdtn3-da-ngoai','HAS_TOPIC'],
+
+      // === ĐẠO ĐỨC 3 ===
+      ['subj-dd3', 'chap-dd3-ton-trong-lt','HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-quan-tam-hx','HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-bv-tre',     'HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-dam-tang',   'HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-mt-song',    'HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-tu-hao-vn',  'HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-dan-toc',    'HAS_CHAPTER'],
+      ['subj-dd3', 'chap-dd3-an-toan-bt', 'HAS_CHAPTER'],
+      ['chap-dd3-ton-trong-lt','topic-dd3-ng-gia-tt','HAS_TOPIC'],
+      ['chap-dd3-quan-tam-hx', 'topic-dd3-tinh-lang','HAS_TOPIC'],
+      ['chap-dd3-quan-tam-hx', 'topic-dd3-giup-hx',  'HAS_TOPIC'],
+      ['chap-dd3-bv-tre',      'topic-dd3-bat-nat',  'HAS_TOPIC'],
+      ['chap-dd3-bv-tre',      'topic-dd3-xam-hai',  'HAS_TOPIC'],
+      ['chap-dd3-bv-tre',      'topic-dd3-keu-cuu',  'HAS_TOPIC'],
+      ['chap-dd3-dam-tang',    'topic-dd3-le-tang',  'HAS_TOPIC'],
+      ['chap-dd3-mt-song',     'topic-dd3-pho-sach', 'HAS_TOPIC'],
+      ['chap-dd3-mt-song',     'topic-dd3-trong-cay-3','HAS_TOPIC'],
+      ['chap-dd3-tu-hao-vn',   'topic-dd3-tieng-viet','HAS_TOPIC'],
+      ['chap-dd3-dan-toc',     'topic-dd3-dt-thieu-so','HAS_TOPIC'],
+      ['chap-dd3-dan-toc',     'topic-dd3-trang-phuc-dt','HAS_TOPIC'],
+      ['chap-dd3-an-toan-bt',  'topic-dd3-an-toan-nuoc','HAS_TOPIC'],
+      ['chap-dd3-an-toan-bt',  'topic-dd3-an-toan-dien','HAS_TOPIC'],
+      ['chap-dd3-an-toan-bt',  'topic-dd3-an-toan-lua', 'HAS_TOPIC'],
+
+      // === ÂM NHẠC 3 ===
+      ['subj-amnhac3', 'chap-am3-hat',      'HAS_CHAPTER'],
+      ['subj-amnhac3', 'chap-am3-nghe',     'HAS_CHAPTER'],
+      ['subj-amnhac3', 'chap-am3-doc',      'HAS_CHAPTER'],
+      ['subj-amnhac3', 'chap-am3-mua-mh',   'HAS_CHAPTER'],
+      ['subj-amnhac3', 'chap-am3-nhac-cu-3','HAS_CHAPTER'],
+      ['chap-am3-hat',     'topic-am3-bai-1', 'HAS_TOPIC'],
+      ['chap-am3-hat',     'topic-am3-bai-2', 'HAS_TOPIC'],
+      ['chap-am3-hat',     'topic-am3-bai-3', 'HAS_TOPIC'],
+      ['chap-am3-hat',     'topic-am3-bai-4', 'HAS_TOPIC'],
+      ['chap-am3-hat',     'topic-am3-bai-5', 'HAS_TOPIC'],
+      ['chap-am3-hat',     'topic-am3-bai-6', 'HAS_TOPIC'],
+      ['chap-am3-nghe',    'topic-am3-nghe-tcc','HAS_TOPIC'],
+      ['chap-am3-doc',     'topic-am3-dau-lang','HAS_TOPIC'],
+      ['chap-am3-doc',     'topic-am3-nhip-24', 'HAS_TOPIC'],
+      ['chap-am3-mua-mh',  'topic-am3-mua-vong-3','HAS_TOPIC'],
+      ['chap-am3-mua-mh',  'topic-am3-mua-tay', 'HAS_TOPIC'],
+      ['chap-am3-nhac-cu-3','topic-am3-song-loan','HAS_TOPIC'],
+      ['chap-am3-nhac-cu-3','topic-am3-sao-na',  'HAS_TOPIC'],
+
+      // === MĨ THUẬT 3 ===
+      ['subj-mt3', 'chap-mt3-ve-de-tai',    'HAS_CHAPTER'],
+      ['subj-mt3', 'chap-mt3-ve-mau',       'HAS_CHAPTER'],
+      ['subj-mt3', 'chap-mt3-trang-tri-3',  'HAS_CHAPTER'],
+      ['subj-mt3', 'chap-mt3-nan-3',        'HAS_CHAPTER'],
+      ['subj-mt3', 'chap-mt3-thuong-thuc-3','HAS_CHAPTER'],
+      ['chap-mt3-ve-de-tai', 'topic-mt3-de-2011',  'HAS_TOPIC'],
+      ['chap-mt3-ve-de-tai', 'topic-mt3-de-tet',   'HAS_TOPIC'],
+      ['chap-mt3-ve-de-tai', 'topic-mt3-de-le-hoi','HAS_TOPIC'],
+      ['chap-mt3-ve-de-tai', 'topic-mt3-de-mt',    'HAS_TOPIC'],
+      ['chap-mt3-ve-mau',    'topic-mt3-quan-sat', 'HAS_TOPIC'],
+      ['chap-mt3-ve-mau',    'topic-mt3-tinh-vat', 'HAS_TOPIC'],
+      ['chap-mt3-ve-mau',    'topic-mt3-hoa',      'HAS_TOPIC'],
+      ['chap-mt3-trang-tri-3','topic-mt3-tt-cn-mt','HAS_TOPIC'],
+      ['chap-mt3-trang-tri-3','topic-mt3-tt-bia',  'HAS_TOPIC'],
+      ['chap-mt3-trang-tri-3','topic-mt3-tt-lo',   'HAS_TOPIC'],
+      ['chap-mt3-nan-3',     'topic-mt3-nan-nhom', 'HAS_TOPIC'],
+      ['chap-mt3-nan-3',     'topic-mt3-nan-canh', 'HAS_TOPIC'],
+      ['chap-mt3-thuong-thuc-3','topic-mt3-tn-qt-mt','HAS_TOPIC'],
+      ['chap-mt3-thuong-thuc-3','topic-mt3-dinh-vn', 'HAS_TOPIC'],
+      ['chap-mt3-thuong-thuc-3','topic-mt3-chua-vn', 'HAS_TOPIC'],
+      ['chap-mt3-thuong-thuc-3','topic-mt3-thap-vn', 'HAS_TOPIC'],
+
+      // === REQUIRES nội bộ lớp 3 ===
+      ['topic-t3-bang-3-4',  'topic-t2-bang-2',    'REQUIRES'],
+      ['topic-t3-bang-6-7',  'topic-t3-bang-3-4',  'REQUIRES'],
+      ['topic-t3-bt-co-ngoac','topic-t3-thu-tu-tt','REQUIRES'],
+      ['topic-t3-tim-x',     'topic-t3-bt-co-ngoac','REQUIRES'],
+      ['topic-t3-ps-1-2',    'topic-t2-chia-cb',   'REQUIRES'],
+      ['topic-t3-ps-so-sanh','topic-t3-ps-1-2',    'REQUIRES'],
+      ['topic-t3-dt-vuong',  'topic-t3-cv-vuong',  'REQUIRES'],
+      ['topic-t3-dt-cn',     'topic-t3-cv-cn',     'REQUIRES'],
+      ['topic-t3-100k',      'topic-t2-doc-viet-1000','REQUIRES'],
+      ['topic-t3-km',        'topic-t2-met',       'REQUIRES'],
+      ['topic-t3-gam',       'topic-t2-kg',        'REQUIRES'],
+      ['topic-t3-ml',        'topic-t2-lit',       'REQUIRES'],
+      // TV
+      ['topic-tv3-doc-tham',  'topic-tv2-doc-dc',    'REQUIRES'],
+      ['topic-tv3-suy-luan',  'topic-tv2-y-chinh',   'REQUIRES'],
+      ['topic-tv3-ai-la-gi',  'topic-tv2-cau-ke',    'REQUIRES'],
+      ['topic-tv3-ai-lam-gi', 'topic-tv2-dong-tu',   'REQUIRES'],
+      ['topic-tv3-ai-the-nao','topic-tv2-tinh-tu',   'REQUIRES'],
+      ['topic-tv3-ta-con-vat','topic-tv2-ta-ngan',   'REQUIRES'],
+      ['topic-tv3-ta-do-vat', 'topic-tv2-ta-ngan',   'REQUIRES'],
+      ['topic-tv3-ta-cay',    'topic-tv2-ta-ngan',   'REQUIRES'],
+      ['topic-tv3-thu-3p',    'topic-tv2-thiep',     'REQUIRES'],
+      // TNXH
+      ['topic-tnxh3-quang-hop','topic-tnxh2-cay-la', 'REQUIRES'],
+      ['topic-tnxh3-cs-cay',  'topic-tnxh2-cay-re',  'REQUIRES'],
+      ['topic-tnxh3-quy-dao', 'topic-tnxh2-troi-cao-thap','REQUIRES'],
+      // MT
+      ['topic-mt3-tinh-vat',  'topic-mt2-dam-nhat',  'REQUIRES'],
+      ['topic-mt3-de-tet',    'topic-mt2-su-kien',   'REQUIRES'],
+      ['topic-mt3-nan-nhom',  'topic-mt2-nan-nguoi', 'REQUIRES'],
+      ['topic-mt3-dinh-vn',   'topic-mt2-dong-ho-2', 'REQUIRES'],
+      // ÂN
+      ['topic-am3-nhip-24',   'topic-am2-vo-phach',  'REQUIRES'],
+      ['topic-am3-dau-lang',  'topic-am2-do-re-mi-fa-sol','REQUIRES'],
+
+      // === CROSS-SUBJECT trong lớp 3 ===
+      ['topic-tv3-ta-cay',         'topic-tnxh3-quang-hop',  'RELATES_TO'],
+      ['topic-tv3-ta-con-vat',     'topic-tnxh3-dv-an',      'RELATES_TO'],
+      ['topic-tnxh3-le-hoi-dp',    'topic-mt3-de-le-hoi',    'RELATES_TO'],
+      ['topic-tnxh3-tk-nuoc',      'topic-dd3-pho-sach',     'RELATES_TO'],
+      ['topic-tnxh3-o-nhiem-kk',   'topic-mt3-de-mt',        'RELATES_TO'],
+      ['topic-hdtn3-tien-vat',     'topic-t3-tim-x',         'RELATES_TO'],
+      ['topic-hdtn3-tg-bieu',      'topic-t3-thang-nam',     'RELATES_TO'],
+      ['topic-hdtn3-gian',         'topic-dd3-bat-nat',      'RELATES_TO'],
+      ['topic-dd3-dt-thieu-so',    'topic-am3-bai-5',        'RELATES_TO'], // Inh lả ơi dân ca Thái
+      ['topic-dd3-tieng-viet',     'topic-tv3-tu-dn',        'RELATES_TO'],
+      ['topic-am3-bai-1',          'topic-mt3-de-mt',        'RELATES_TO'], // Em yêu hoà bình
+      ['topic-mt3-de-2011',        'topic-tv3-thu-3p',       'RELATES_TO'],
+
+      // === PROGRESSION lớp 2 → lớp 3 ===
+      ['subj-toan3',   'subj-toan2',   'REQUIRES'],
+      ['subj-tv3',     'subj-tv2',     'REQUIRES'],
+      ['subj-tnxh3',   'subj-tnxh2',   'REQUIRES'],
+      ['subj-hdtn3',   'subj-hdtn2',   'REQUIRES'],
+      ['subj-dd3',     'subj-dd2',     'REQUIRES'],
+      ['subj-amnhac3', 'subj-amnhac2', 'REQUIRES'],
+      ['subj-mt3',     'subj-mt2',     'REQUIRES'],
+      ['meta-lop3',    'meta-lop2',    'REQUIRES'],
+
+      // === PROGRESSION lớp 3 → THPT (chain leo lên) ===
+      ['subj-toan',  'subj-toan3',  'REQUIRES'],
+      ['subj-mt',    'subj-mt3',    'REQUIRES'],
+      ['subj-hdtn',  'subj-hdtn3',  'REQUIRES'],
+      ['subj-ktpl',  'subj-dd3',    'REQUIRES'],
+      ['subj-sinh',  'subj-tnxh3',  'REQUIRES'],
+      ['subj-diali', 'subj-tnxh3',  'REQUIRES'],
+      ['subj-lichsu','subj-tnxh3',  'REQUIRES'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-g3:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn THPT (12 môn × 3 lớp) + Tiểu học lớp 1+2
+  // Query: ?subjects=all → tất cả môn THPT (12 môn × 3 lớp) + Tiểu học 1+2+3
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -14494,6 +15017,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?tin=1        → Tin học 10/11/12 (ICT + CS)
   //        ?g1=1         → Khối lớp 1 — Tiểu học (7 môn GDPT 2018)
   //        ?g2=1         → Khối lớp 2 — Tiểu học (7 môn GDPT 2018)
+  //        ?g3=1         → Khối lớp 3 — Tiểu học (7 môn GDPT 2018)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -14511,8 +15035,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const tin = req.query.tin === '1' || req.query.informatics === '1' || req.query.it === '1' || req.query.cs === '1' || all;
       const g1 = req.query.g1 === '1' || req.query.grade1 === '1' || req.query.lop1 === '1' || req.query.elementary === '1' || all;
       const g2 = req.query.g2 === '1' || req.query.grade2 === '1' || req.query.lop2 === '1' || all;
+      const g3 = req.query.g3 === '1' || req.query.grade3 === '1' || req.query.lop3 === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null, r15 = null, r16 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null, r15 = null, r16 = null, r17 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -14528,7 +15053,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (tin)       r14 = await seedKgInformatics();
       if (g1)        r15 = await seedKgGrade1();
       if (g2)        r16 = await seedKgGrade2();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0) + (r15?.[k] || 0) + (r16?.[k] || 0);
+      if (g3)        r17 = await seedKgGrade3();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0) + (r15?.[k] || 0) + (r16?.[k] || 0) + (r17?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -14550,9 +15076,10 @@ ${plan.content || '<p>(Trống)</p>'}
         tin: r14,
         grade1: r15,
         grade2: r16,
+        grade3: r17,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ THPT 12 môn (3 lớp) + Khối lớp 1 + Khối lớp 2 Tiểu học',
+          all && '+ THPT 12 môn (3 lớp) + Khối lớp 1+2+3 Tiểu học',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -14567,6 +15094,7 @@ ${plan.content || '<p>(Trống)</p>'}
           tin       && !all && '+ Tin học 10/11/12 (ICT + CS)',
           g1        && !all && '+ Khối lớp 1 — Tiểu học (7 môn)',
           g2        && !all && '+ Khối lớp 2 — Tiểu học (7 môn)',
+          g3        && !all && '+ Khối lớp 3 — Tiểu học (7 môn)',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
