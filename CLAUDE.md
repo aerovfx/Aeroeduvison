@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `a260f15` (revision pixiai-00301 imminent, 2026-05-18 — KG rename "Cây Sự Sống Tri Thức" + đường mòn DEPLOYING)
-- Commits since last deploy: `1/5` (this docs)
+- Last deployed commit: `a19026b` (revision pixiai-00302-qev, 2026-05-18 — KG 🎯 Center reset + Sinh học 10/11/12 LIVE)
+- Commits since last deploy: `1/5` → DEPLOYING (ebc475f Toán 10/11/12 mở rộng)
+- Prev: `51d0748` → pixiai-00301-kap (KG rename "Cây Sự Sống" + đường mòn + 3D labels)
 - Prev: `2c76933` → pixiai-00300-tuf (KG Brain: Notes + Discussion per node — 🎉 revision 300!)
 - Prev: `b9efbd1` → pixiai-00299-lib (KG 3D Neural Network view)
 - Prev: `d218581` → pixiai-00298-nag (KG physics extension: Quang học + VLHĐ + Phenomenon + Application)
