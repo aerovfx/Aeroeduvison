@@ -11638,8 +11638,331 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Mĩ thuật 10, 11, 12 theo SGK GDPT 2018.
+   * ~100 nodes + ~130 edges. Idempotent.
+   */
+  async function seedKgArt() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-mt', type: 'Subject', label: 'Mĩ thuật',
+        description: 'Môn Mĩ thuật THPT 10, 11, 12 theo GDPT 2018 — tạo hình + ứng dụng + lịch sử',
+        properties: { color: '#ec4899' } },
+
+      // === LỚP 10: Cơ sở tạo hình + Đại cương ===
+      { id: 'chap-mt10-tao-hinh',    type: 'Chapter', label: '[10] Mĩ thuật tạo hình',      description: 'Vẽ chì, màu nước, sơn dầu — chân dung, phong cảnh, tĩnh vật' },
+      { id: 'chap-mt10-ung-dung',    type: 'Chapter', label: '[10] Mĩ thuật ứng dụng',      description: 'Trang trí, đồ họa, thiệp, bao bì' },
+      { id: 'chap-mt10-thuong-thuc', type: 'Chapter', label: '[10] Thường thức Mĩ thuật',   description: 'Yếu tố tạo hình: đường, hình, màu, đậm nhạt' },
+      { id: 'chap-mt10-lich-su',     type: 'Chapter', label: '[10] Lịch sử Mĩ thuật',        description: 'Tổng quan MT thế giới + Việt Nam' },
+
+      // Topics LỚP 10
+      { id: 'topic-ve-chi',           type: 'Topic', label: 'Vẽ chì + Phác hoạ',           description: 'HB, 2B-8B — sketch nhanh, đậm nhạt, perspective' },
+      { id: 'topic-mau-nuoc',         type: 'Topic', label: 'Màu nước (Watercolor)',       description: 'Trong suốt, layer mỏng — Wash, wet-on-wet' },
+      { id: 'topic-son-dau',          type: 'Topic', label: 'Sơn dầu (Oil paint)',         description: 'Khô chậm, blend mịn — kỹ thuật cổ điển từ TK 15' },
+      { id: 'topic-acrylic',          type: 'Topic', label: 'Sơn Acrylic',                 description: 'Khô nhanh, tan trong nước — phổ biến hiện đại' },
+      { id: 'topic-chan-dung',        type: 'Topic', label: 'Vẽ chân dung',                description: 'Tỉ lệ khuôn mặt 1:1.5, mắt giữa, mũi ⅓ dưới' },
+      { id: 'topic-phong-canh',       type: 'Topic', label: 'Vẽ phong cảnh',                description: 'Foreground/middleground/background, ánh sáng, không khí' },
+      { id: 'topic-tinh-vat',         type: 'Topic', label: 'Vẽ tĩnh vật',                  description: 'Hoa quả, bình, vải — bố cục, ánh sáng đối tượng' },
+      { id: 'topic-trang-tri-cb',     type: 'Topic', label: 'Trang trí cơ bản',             description: 'Họa tiết, đối xứng, tự do, đường viền' },
+      { id: 'topic-do-hoa-ud',        type: 'Topic', label: 'Đồ họa ứng dụng',              description: 'Thiệp, lịch, bao bì — Adobe Illustrator, Canva' },
+      { id: 'topic-yt-tao-hinh',      type: 'Topic', label: '4 yếu tố tạo hình',           description: 'Đường + Hình + Mảng + Màu — ngôn ngữ visual' },
+      { id: 'topic-bo-cuc',           type: 'Topic', label: 'Bố cục (Composition)',         description: 'Rule of thirds, golden ratio, đối xứng, tam giác' },
+      { id: 'topic-mau-sac',          type: 'Topic', label: 'Lý thuyết màu sắc',           description: 'Vòng tròn màu, primary/secondary, bổ túc, đồng vị' },
+      { id: 'topic-dam-nhat',         type: 'Topic', label: 'Đậm nhạt (Value)',             description: 'Light, mid-tone, dark — tạo khối + chiều sâu' },
+      { id: 'topic-mt-tg-tong-quan',  type: 'Topic', label: 'MT thế giới tổng quan',       description: 'Cổ đại → Phục hưng → Hiện đại — các thời kỳ chính' },
+      { id: 'topic-mt-vn-tong-quan',  type: 'Topic', label: 'MT Việt Nam tổng quan',       description: 'Dân gian + cung đình + đương đại' },
+
+      // === LỚP 11: Chuyên sâu + Lịch sử MT chi tiết ===
+      { id: 'chap-mt11-tao-hinh-ns',  type: 'Chapter', label: '[11] Tạo hình nâng cao',     description: 'Chân dung tâm lý, phong cảnh ấn tượng, biểu cảm' },
+      { id: 'chap-mt11-dieu-khac',    type: 'Chapter', label: '[11] Điêu khắc cơ bản',      description: 'Đất sét, thạch cao — phù điêu + tượng tròn' },
+      { id: 'chap-mt11-do-hoa-cs',    type: 'Chapter', label: '[11] Đồ hoạ chuyên sâu',     description: 'Logo, branding, poster, typography' },
+      { id: 'chap-mt11-mt-vn-cd',     type: 'Chapter', label: '[11] MT Việt Nam cổ-trung đại', description: 'Đông Sơn, Lý-Trần-Lê-Nguyễn — đình chùa, tranh dân gian' },
+      { id: 'chap-mt11-mt-tg-phr',    type: 'Chapter', label: '[11] MT phương Tây Phục hưng', description: 'TK 14-17: Florence, Venice — Da Vinci, Michelangelo, Raphael' },
+
+      // Topics LỚP 11
+      { id: 'topic-chan-dung-tl',     type: 'Topic', label: 'Chân dung tâm lý',            description: 'Diễn tả nội tâm — Rembrandt self-portraits, Frida Kahlo' },
+      { id: 'topic-phong-canh-an-tg', type: 'Topic', label: 'Phong cảnh ấn tượng',         description: 'Monet, Van Gogh — light + atmosphere + brush stroke' },
+      { id: 'topic-bieu-cam',         type: 'Topic', label: 'Tranh biểu cảm',              description: 'Expression — màu mạnh, hình biến dạng' },
+      { id: 'topic-phu-dieu',         type: 'Topic', label: 'Phù điêu',                    description: 'Khắc nổi trên mặt phẳng — đền Angkor, Mỹ Sơn' },
+      { id: 'topic-tuong-tron',       type: 'Topic', label: 'Tượng tròn',                  description: 'David (Michelangelo), Thinker (Rodin)' },
+      { id: 'topic-tuong-vn',         type: 'Topic', label: 'Tượng Việt Nam',              description: 'Tượng Phật A-di-đà chùa Phật Tích, tượng đài Lý Thái Tổ' },
+      { id: 'topic-logo-design',      type: 'Topic', label: 'Thiết kế Logo',               description: 'Biểu tượng thương hiệu — đơn giản, ý nghĩa, scale OK' },
+      { id: 'topic-branding',         type: 'Topic', label: 'Branding',                    description: 'Color palette + typography + tone of voice + style guide' },
+      { id: 'topic-poster',           type: 'Topic', label: 'Thiết kế Poster',             description: 'Hierarchy: title > image > body — bố cục tập trung' },
+      { id: 'topic-typography',       type: 'Topic', label: 'Typography',                  description: 'Serif vs sans-serif, kerning, leading, hierarchy' },
+      { id: 'topic-tranh-dong-ho',    type: 'Topic', label: 'Tranh Đông Hồ',               description: 'Dân gian Bắc Ninh — gà, lợn âm dương, mẹ con, đám cưới chuột' },
+      { id: 'topic-tranh-hang-trong', type: 'Topic', label: 'Tranh Hàng Trống',            description: 'Hà Nội — Tứ bình (mai/lan/cúc/trúc), Ngũ Hổ' },
+      { id: 'topic-tranh-lang-sinh',  type: 'Topic', label: 'Tranh Làng Sình',             description: 'Huế — tranh thờ cúng, đạo Mẫu' },
+      { id: 'topic-dinh-vn',          type: 'Topic', label: 'Đình làng Việt Nam',          description: 'Kiến trúc gỗ chạm khắc — Đình Tây Đằng, Đình Bảng' },
+      { id: 'topic-phuc-hung',        type: 'Topic', label: 'Phục hưng (Renaissance)',      description: 'TK 14-17 — humanism, perspective, kỹ thuật cao' },
+      { id: 'topic-da-vinci',         type: 'Topic', label: 'Leonardo da Vinci',           description: 'Mona Lisa, The Last Supper — đa tài 1452-1519' },
+      { id: 'topic-michelangelo',     type: 'Topic', label: 'Michelangelo',                description: 'David, Sistine Chapel — 1475-1564' },
+
+      // === LỚP 12: Đương đại + Số + Khởi nghiệp ===
+      { id: 'chap-mt12-duong-dai',    type: 'Chapter', label: '[12] MT đương đại',          description: 'TK 20-21 — phá vỡ truyền thống, conceptual, multimedia' },
+      { id: 'chap-mt12-thiet-ke',     type: 'Chapter', label: '[12] Thiết kế (Design)',     description: 'Graphic, UI/UX, nội thất, thời trang' },
+      { id: 'chap-mt12-mt-so',        type: 'Chapter', label: '[12] Mĩ thuật số',           description: 'Photoshop, Illustrator, Procreate, Blender 3D, AI art' },
+      { id: 'chap-mt12-mt-tg-hd',     type: 'Chapter', label: '[12] MT thế giới hiện đại',  description: 'Impressionism → Cubism → Surreal → Pop Art → Contemporary' },
+      { id: 'chap-mt12-khoi-nghiep',  type: 'Chapter', label: '[12] Khởi nghiệp nghệ thuật', description: 'Freelance, brand cá nhân, gallery, NFT, Etsy' },
+
+      // Topics LỚP 12
+      { id: 'topic-mt-duong-dai',     type: 'Topic', label: 'MT đương đại VN',             description: 'Bùi Xuân Phái phố Phái, Lê Kinh Tài, Đinh Quân — Hà Nội + SG' },
+      { id: 'topic-installation',     type: 'Topic', label: 'Nghệ thuật sắp đặt',          description: 'Installation art — không gian + ý tưởng' },
+      { id: 'topic-performance',      type: 'Topic', label: 'Nghệ thuật trình diễn',       description: 'Performance art — cơ thể + thời gian' },
+      { id: 'topic-graphic-ds',       type: 'Topic', label: 'Graphic Design chuyên nghiệp', description: 'Branding, editorial, packaging, web — Adobe Suite' },
+      { id: 'topic-ui-ux',            type: 'Topic', label: 'UI/UX Design',                description: 'User Interface + User Experience — Figma, Sketch, hot job 2026' },
+      { id: 'topic-noi-that',         type: 'Topic', label: 'Thiết kế nội thất',           description: 'AutoCAD + 3DSMax + Sketchup — màu sắc, ánh sáng, vật liệu' },
+      { id: 'topic-thoi-trang',       type: 'Topic', label: 'Thiết kế thời trang',         description: 'Sketch + pattern + chất liệu — fashion week' },
+      { id: 'topic-photoshop',        type: 'Topic', label: 'Adobe Photoshop',             description: 'Chỉnh ảnh + photo manipulation + digital painting' },
+      { id: 'topic-illustrator',      type: 'Topic', label: 'Adobe Illustrator',           description: 'Vector graphics — logo, infographic, icons' },
+      { id: 'topic-procreate',        type: 'Topic', label: 'Procreate (iPad)',            description: 'Digital illustration on iPad — phổ biến nhất artist trẻ' },
+      { id: 'topic-blender-3d',       type: 'Topic', label: 'Blender 3D',                  description: 'Open-source 3D modeling + animation + render' },
+      { id: 'topic-ai-art',           type: 'Topic', label: 'AI Art (Midjourney, Dall-E)', description: 'Text-to-image AI — Stable Diffusion, ChatGPT image gen' },
+      { id: 'topic-impressionism',    type: 'Topic', label: 'Ấn tượng (Impressionism)',    description: 'Monet 1872 — Sunrise, Water Lilies — bắt sáng + atmosphere' },
+      { id: 'topic-cubism',           type: 'Topic', label: 'Lập thể (Cubism)',            description: 'Picasso + Braque 1907 — phá vỡ hình + nhiều góc nhìn' },
+      { id: 'topic-surreal',          type: 'Topic', label: 'Siêu thực (Surrealism)',      description: 'Dali, Magritte 1920s — mộng + tiềm thức' },
+      { id: 'topic-pop-art',          type: 'Topic', label: 'Pop Art',                     description: 'Warhol, Lichtenstein 1960s — văn hoá đại chúng, Marilyn Monroe' },
+      { id: 'topic-nft-art',          type: 'Topic', label: 'NFT Art',                     description: 'Crypto-based art — Beeple $69M (Christie\'s 2021)' },
+      { id: 'topic-freelance-art',    type: 'Topic', label: 'Freelance Artist',             description: 'Behance, Dribbble, Upwork — VN $10-50/giờ' },
+      { id: 'topic-etsy-shop',        type: 'Topic', label: 'Bán art trên Etsy',           description: 'Print on demand + handmade — thu nhập passive' },
+
+      // === PERSONS ===
+      { id: 'person-bxp',             type: 'Person', label: 'Bùi Xuân Phái',              description: '1920-1988 — phố Hà Nội xưa, "Phái cũ Phái mới"' },
+      { id: 'person-tngv',            type: 'Person', label: 'Tô Ngọc Vân',                description: '1908-1954 — Thiếu nữ bên hoa huệ (1943), trường phái Đông Dương' },
+      { id: 'person-ngt',             type: 'Person', label: 'Nguyễn Gia Trí',             description: '1908-1993 — bậc thầy sơn mài Việt Nam' },
+      { id: 'person-tvc',             type: 'Person', label: 'Trần Văn Cẩn',               description: '1910-1994 — Em Thuý (1943) — biểu tượng MT VN' },
+      { id: 'person-vincent',         type: 'Person', label: 'Vincent Van Gogh',           description: '1853-1890 — Hà Lan — Sunflowers, Starry Night, hậu Ấn tượng' },
+      { id: 'person-picasso',         type: 'Person', label: 'Pablo Picasso',              description: '1881-1973 — TBN — Cubism founder, Guernica' },
+      { id: 'person-monet-art',       type: 'Person', label: 'Claude Monet',               description: '1840-1926 — Pháp — Impressionism founder, Water Lilies' },
+      { id: 'person-warhol',          type: 'Person', label: 'Andy Warhol',                description: '1928-1987 — Mỹ — Pop Art icon, Marilyn Monroe' },
+
+      // === CONCEPTS ===
+      { id: 'concept-tinh-anh',       type: 'Concept', label: 'Cảm thụ thẩm mỹ',           description: 'Khả năng cảm nhận cái đẹp — phát triển qua trải nghiệm' },
+      { id: 'concept-sang-tao-mt',    type: 'Concept', label: 'Sáng tạo nghệ thuật',       description: 'Biểu đạt cá nhân + ý tưởng độc đáo' },
+      { id: 'concept-perspective',    type: 'Concept', label: 'Perspective (Phối cảnh)',    description: '1-point, 2-point, 3-point — chiều sâu trên mặt phẳng' },
+      { id: 'concept-golden-ratio',   type: 'Concept', label: 'Tỉ lệ vàng (φ=1.618)',      description: 'Bố cục hài hoà tự nhiên — Mona Lisa, Parthenon' },
+      { id: 'concept-color-theory',   type: 'Concept', label: 'Lý thuyết màu',              description: 'Newton 1666 — vòng tròn màu, primary/secondary, harmonies' },
+      { id: 'concept-conceptual',     type: 'Concept', label: 'Nghệ thuật ý niệm',         description: 'Concept art — ý tưởng > kỹ thuật' },
+
+      // === APPLICATIONS ===
+      { id: 'app-bao-tang-mt-vn',     type: 'Application', label: 'Bảo tàng MT Việt Nam',  description: '66 Nguyễn Thái Học, Hà Nội — bộ sưu tập MT VN' },
+      { id: 'app-louvre',             type: 'Application', label: 'Bảo tàng Louvre',       description: 'Paris — Mona Lisa, Venus de Milo, Liberty Leading' },
+      { id: 'app-moma',               type: 'Application', label: 'MoMA NYC',              description: 'Bảo tàng MT hiện đại Manhattan — Starry Night, Campbell soup' },
+      { id: 'app-figma-design',       type: 'Application', label: 'Figma — UI design',     description: 'Tool design cloud collaborative — bắt buộc designer' },
+      { id: 'app-behance',            type: 'Application', label: 'Behance portfolio',     description: 'Adobe — showcase portfolio cho freelancer + employer' },
+      { id: 'app-dribbble',           type: 'Application', label: 'Dribbble',              description: 'Community designer + tìm job + cảm hứng' },
+      { id: 'app-canva',              type: 'Application', label: 'Canva',                 description: 'Easy design cho non-designer — template + drag-drop' },
+      { id: 'app-pixar-anim',         type: 'Application', label: 'Pixar Animation',       description: 'Toy Story, Up, Inside Out — render 3D nâng cao' },
+      { id: 'app-disney-anim',        type: 'Application', label: 'Disney + Studio Ghibli', description: 'Hand-drawn + digital — Spirited Away, Frozen, Encanto' },
+      { id: 'app-galaxy-cinema',      type: 'Application', label: 'Phim VN (Bố Già, ...)',  description: 'Đạo diễn nghệ thuật — bối cảnh, màu sắc, costume' },
+
+      // === CAREERS ===
+      { id: 'career-graphic-des',     type: 'Career', label: 'Graphic Designer',           description: 'Branding, ấn phẩm, web — VN 10-30 triệu' },
+      { id: 'career-uiux-des',        type: 'Career', label: 'UI/UX Designer',             description: 'App + website — hot job 20-60 triệu' },
+      { id: 'career-illustrator',     type: 'Career', label: 'Illustrator',                description: 'Sách thiếu nhi, comic, concept art — freelance + studio' },
+      { id: 'career-noi-that',        type: 'Career', label: 'Thiết kế nội thất',         description: 'Nhà ở + văn phòng + nhà hàng — 15-40 triệu' },
+      { id: 'career-thoi-trang-des',  type: 'Career', label: 'Fashion Designer',           description: 'Thời trang riêng + tập đoàn (LV, Gucci, Marc Jacobs)' },
+      { id: 'career-hoa-si',          type: 'Career', label: 'Hoạ sĩ tự do',                description: 'Bán tranh + commissioned + gallery' },
+      { id: 'career-3d-artist',       type: 'Career', label: '3D Artist + Animator',       description: 'Game, phim, kiến trúc — 25-80 triệu' },
+      { id: 'career-art-teacher',     type: 'Career', label: 'Giáo viên Mĩ thuật',         description: 'Trường THCS/THPT + lớp tư + trung tâm' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-art:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-mt', 'chap-mt10-tao-hinh',    'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt10-ung-dung',    'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt10-thuong-thuc', 'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt10-lich-su',     'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt11-tao-hinh-ns', 'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt11-dieu-khac',   'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt11-do-hoa-cs',   'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt11-mt-vn-cd',    'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt11-mt-tg-phr',   'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt12-duong-dai',   'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt12-thiet-ke',    'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt12-mt-so',       'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt12-mt-tg-hd',    'HAS_CHAPTER'],
+      ['subj-mt', 'chap-mt12-khoi-nghiep', 'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-mt10-tao-hinh',    'topic-ve-chi',         'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-mau-nuoc',       'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-son-dau',        'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-acrylic',        'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-chan-dung',      'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-phong-canh',     'HAS_TOPIC'],
+      ['chap-mt10-tao-hinh',    'topic-tinh-vat',       'HAS_TOPIC'],
+      ['chap-mt10-ung-dung',    'topic-trang-tri-cb',   'HAS_TOPIC'],
+      ['chap-mt10-ung-dung',    'topic-do-hoa-ud',      'HAS_TOPIC'],
+      ['chap-mt10-thuong-thuc', 'topic-yt-tao-hinh',    'HAS_TOPIC'],
+      ['chap-mt10-thuong-thuc', 'topic-bo-cuc',         'HAS_TOPIC'],
+      ['chap-mt10-thuong-thuc', 'topic-mau-sac',        'HAS_TOPIC'],
+      ['chap-mt10-thuong-thuc', 'topic-dam-nhat',       'HAS_TOPIC'],
+      ['chap-mt10-lich-su',     'topic-mt-tg-tong-quan','HAS_TOPIC'],
+      ['chap-mt10-lich-su',     'topic-mt-vn-tong-quan','HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-mt11-tao-hinh-ns', 'topic-chan-dung-tl',     'HAS_TOPIC'],
+      ['chap-mt11-tao-hinh-ns', 'topic-phong-canh-an-tg', 'HAS_TOPIC'],
+      ['chap-mt11-tao-hinh-ns', 'topic-bieu-cam',         'HAS_TOPIC'],
+      ['chap-mt11-dieu-khac',   'topic-phu-dieu',         'HAS_TOPIC'],
+      ['chap-mt11-dieu-khac',   'topic-tuong-tron',       'HAS_TOPIC'],
+      ['chap-mt11-dieu-khac',   'topic-tuong-vn',         'HAS_TOPIC'],
+      ['chap-mt11-do-hoa-cs',   'topic-logo-design',      'HAS_TOPIC'],
+      ['chap-mt11-do-hoa-cs',   'topic-branding',         'HAS_TOPIC'],
+      ['chap-mt11-do-hoa-cs',   'topic-poster',           'HAS_TOPIC'],
+      ['chap-mt11-do-hoa-cs',   'topic-typography',       'HAS_TOPIC'],
+      ['chap-mt11-mt-vn-cd',    'topic-tranh-dong-ho',    'HAS_TOPIC'],
+      ['chap-mt11-mt-vn-cd',    'topic-tranh-hang-trong', 'HAS_TOPIC'],
+      ['chap-mt11-mt-vn-cd',    'topic-tranh-lang-sinh',  'HAS_TOPIC'],
+      ['chap-mt11-mt-vn-cd',    'topic-dinh-vn',          'HAS_TOPIC'],
+      ['chap-mt11-mt-tg-phr',   'topic-phuc-hung',        'HAS_TOPIC'],
+      ['chap-mt11-mt-tg-phr',   'topic-da-vinci',         'HAS_TOPIC'],
+      ['chap-mt11-mt-tg-phr',   'topic-michelangelo',     'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-mt12-duong-dai',  'topic-mt-duong-dai',  'HAS_TOPIC'],
+      ['chap-mt12-duong-dai',  'topic-installation',  'HAS_TOPIC'],
+      ['chap-mt12-duong-dai',  'topic-performance',   'HAS_TOPIC'],
+      ['chap-mt12-thiet-ke',   'topic-graphic-ds',    'HAS_TOPIC'],
+      ['chap-mt12-thiet-ke',   'topic-ui-ux',         'HAS_TOPIC'],
+      ['chap-mt12-thiet-ke',   'topic-noi-that',      'HAS_TOPIC'],
+      ['chap-mt12-thiet-ke',   'topic-thoi-trang',    'HAS_TOPIC'],
+      ['chap-mt12-mt-so',      'topic-photoshop',     'HAS_TOPIC'],
+      ['chap-mt12-mt-so',      'topic-illustrator',   'HAS_TOPIC'],
+      ['chap-mt12-mt-so',      'topic-procreate',     'HAS_TOPIC'],
+      ['chap-mt12-mt-so',      'topic-blender-3d',    'HAS_TOPIC'],
+      ['chap-mt12-mt-so',      'topic-ai-art',        'HAS_TOPIC'],
+      ['chap-mt12-mt-tg-hd',   'topic-impressionism', 'HAS_TOPIC'],
+      ['chap-mt12-mt-tg-hd',   'topic-cubism',        'HAS_TOPIC'],
+      ['chap-mt12-mt-tg-hd',   'topic-surreal',       'HAS_TOPIC'],
+      ['chap-mt12-mt-tg-hd',   'topic-pop-art',       'HAS_TOPIC'],
+      ['chap-mt12-khoi-nghiep','topic-nft-art',       'HAS_TOPIC'],
+      ['chap-mt12-khoi-nghiep','topic-freelance-art', 'HAS_TOPIC'],
+      ['chap-mt12-khoi-nghiep','topic-etsy-shop',     'HAS_TOPIC'],
+
+      // Topic → Person
+      ['topic-mt-vn-tong-quan',  'person-bxp',      'RELATES_TO'],
+      ['topic-mt-duong-dai',     'person-bxp',      'RELATES_TO'],
+      ['topic-mt-vn-tong-quan',  'person-tngv',     'RELATES_TO'],
+      ['topic-mt-vn-tong-quan',  'person-ngt',      'RELATES_TO'],
+      ['topic-mt-vn-tong-quan',  'person-tvc',      'RELATES_TO'],
+      ['topic-phong-canh-an-tg', 'person-vincent',  'RELATES_TO'],
+      ['topic-phong-canh-an-tg', 'person-monet-art','RELATES_TO'],
+      ['topic-impressionism',    'person-monet-art','RELATES_TO'],
+      ['topic-impressionism',    'person-vincent',  'RELATES_TO'],
+      ['topic-cubism',           'person-picasso',  'RELATES_TO'],
+      ['topic-pop-art',          'person-warhol',   'RELATES_TO'],
+      // da Vinci + Michelangelo có Topic riêng cùng tên — không cần Person-edge thêm
+
+      // Topic → Concept
+      ['topic-mau-sac',          'concept-color-theory',  'USES_CONCEPT'],
+      ['topic-bo-cuc',           'concept-golden-ratio',  'USES_CONCEPT'],
+      ['topic-phong-canh',       'concept-perspective',   'USES_CONCEPT'],
+      ['topic-mt-duong-dai',     'concept-conceptual',    'USES_CONCEPT'],
+      ['topic-installation',     'concept-conceptual',    'USES_CONCEPT'],
+      ['topic-mt-tg-tong-quan',  'concept-tinh-anh',      'USES_CONCEPT'],
+      ['topic-bieu-cam',         'concept-sang-tao-mt',   'USES_CONCEPT'],
+      ['topic-ai-art',           'concept-sang-tao-mt',   'USES_CONCEPT'],
+
+      // Topic → Application
+      ['topic-mt-vn-tong-quan',  'app-bao-tang-mt-vn',  'APPLIED_IN'],
+      ['topic-da-vinci',         'app-louvre',          'APPLIED_IN'],
+      ['topic-phuc-hung',        'app-louvre',          'APPLIED_IN'],
+      ['topic-pop-art',          'app-moma',            'APPLIED_IN'],
+      ['topic-impressionism',    'app-moma',            'APPLIED_IN'],
+      ['topic-ui-ux',            'app-figma-design',    'APPLIED_IN'],
+      ['topic-graphic-ds',       'app-behance',         'APPLIED_IN'],
+      ['topic-freelance-art',    'app-behance',         'APPLIED_IN'],
+      ['topic-ui-ux',            'app-dribbble',        'APPLIED_IN'],
+      ['topic-do-hoa-ud',        'app-canva',           'APPLIED_IN'],
+      ['topic-blender-3d',       'app-pixar-anim',      'APPLIED_IN'],
+      ['topic-mt-duong-dai',     'app-disney-anim',     'APPLIED_IN'],
+      ['topic-noi-that',         'app-galaxy-cinema',   'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-logo-design',      'career-graphic-des',  'APPLIED_IN_CAREER'],
+      ['topic-branding',         'career-graphic-des',  'APPLIED_IN_CAREER'],
+      ['topic-poster',           'career-graphic-des',  'APPLIED_IN_CAREER'],
+      ['topic-ui-ux',            'career-uiux-des',     'APPLIED_IN_CAREER'],
+      ['topic-procreate',        'career-illustrator',  'APPLIED_IN_CAREER'],
+      ['topic-photoshop',        'career-illustrator',  'APPLIED_IN_CAREER'],
+      ['topic-noi-that',         'career-noi-that',     'APPLIED_IN_CAREER'],
+      ['topic-thoi-trang',       'career-thoi-trang-des','APPLIED_IN_CAREER'],
+      ['topic-mt-duong-dai',     'career-hoa-si',       'APPLIED_IN_CAREER'],
+      ['topic-blender-3d',       'career-3d-artist',    'APPLIED_IN_CAREER'],
+      ['topic-mt-tg-tong-quan',  'career-art-teacher',  'APPLIED_IN_CAREER'],
+
+      // REQUIRES (kỹ năng tiên quyết)
+      ['topic-chan-dung',        'topic-ve-chi',         'REQUIRES'],
+      ['topic-phong-canh',       'topic-ve-chi',         'REQUIRES'],
+      ['topic-son-dau',          'topic-mau-nuoc',       'REQUIRES'],
+      ['topic-acrylic',          'topic-mau-nuoc',       'REQUIRES'],
+      ['topic-chan-dung-tl',     'topic-chan-dung',      'REQUIRES'],
+      ['topic-phong-canh-an-tg', 'topic-phong-canh',     'REQUIRES'],
+      ['topic-tuong-tron',       'topic-phu-dieu',       'REQUIRES'],
+      ['topic-branding',         'topic-logo-design',    'REQUIRES'],
+      ['topic-illustrator',      'topic-do-hoa-ud',      'REQUIRES'],
+      ['topic-ui-ux',            'topic-graphic-ds',     'REQUIRES'],
+      ['topic-cubism',           'topic-phuc-hung',      'REQUIRES'],
+      ['topic-impressionism',    'topic-phuc-hung',      'REQUIRES'],
+      ['topic-pop-art',          'topic-impressionism',  'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // MT ↔ Toán
+      ['topic-bo-cuc',           'topic-vector-mp',      'RELATES_TO'],
+      ['topic-phong-canh',       'topic-vector-kg',      'RELATES_TO'], // perspective = 3D
+      // MT ↔ Vật lí
+      ['topic-mau-sac',          'topic-tan-sac',        'RELATES_TO'], // ánh sáng + tán sắc = màu
+      ['topic-phong-canh',       'topic-quang-hop',      'RELATES_TO'], // ánh sáng tự nhiên
+      // MT ↔ Hóa
+      ['topic-son-dau',          'topic-polymer-pe',     'RELATES_TO'], // sơn = polymer
+      ['topic-acrylic',          'topic-polymer-pe',     'RELATES_TO'],
+      // MT ↔ Lịch sử
+      ['topic-phuc-hung',        'topic-cmcn1',          'RELATES_TO'], // post Renaissance → CMCN
+      ['topic-tranh-dong-ho',    'topic-dai-viet',       'RELATES_TO'], // tranh dân gian VN
+      ['topic-dinh-vn',          'topic-dai-viet',       'RELATES_TO'],
+      ['topic-pop-art',          'topic-chien-tranh-lanh','RELATES_TO'], // 1960s
+      // MT ↔ Địa lí
+      ['topic-mt-vn-tong-quan',  'topic-dan-toc-vn',     'RELATES_TO'],
+      ['topic-tranh-dong-ho',    'topic-dbsh',           'RELATES_TO'], // Bắc Ninh
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-art:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn (8 môn × 3 lớp)
+  // Query: ?subjects=all → tất cả môn (10 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -11648,6 +11971,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?geo=1        → Địa lí 10/11/12
   //        ?livestock=1  → Công nghệ Chăn nuôi 10/11/12
   //        ?industry=1   → Công nghệ Công nghiệp 10/11/12
+  //        ?art=1        → Mĩ thuật 10/11/12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -11659,8 +11983,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const geo = req.query.geo === '1' || req.query.geography === '1' || req.query.dia === '1' || all;
       const livestock = req.query.livestock === '1' || req.query.cncn === '1' || all;
       const industry = req.query.industry === '1' || req.query.cnci === '1' || all;
+      const art = req.query.art === '1' || req.query.mt === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -11670,7 +11995,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (geo)  r8 = await seedKgGeography();
       if (livestock) r9 = await seedKgLivestock();
       if (industry)  r10 = await seedKgIndustry();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0);
+      if (art)       r11 = await seedKgArt();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -11686,9 +12012,10 @@ ${plan.content || '<p>(Trống)</p>'}
         geography: r8,
         livestock: r9,
         industry: r10,
+        art: r11,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp (3 lớp) mở rộng',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật (3 lớp) mở rộng',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -11697,6 +12024,7 @@ ${plan.content || '<p>(Trống)</p>'}
           geo  && !all && '+ Địa lí 10/11/12',
           livestock && !all && '+ Công nghệ Chăn nuôi 10/11/12',
           industry  && !all && '+ Công nghệ Công nghiệp 10/11/12',
+          art       && !all && '+ Mĩ thuật 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
