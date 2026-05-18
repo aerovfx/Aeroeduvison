@@ -9595,34 +9595,367 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Toán 10, 11, 12 theo SGK Việt Nam (GDPT 2018). Mở rộng đáng kể
+   * so với seedKgMathChem11 (đã có sẵn Toán 11 partial).
+   *
+   * Bao gồm: 3 lớp + ~22 chapters + ~70 topics + ~25 formulas + ~12 concepts
+   * + ~10 applications + 4 careers. Idempotent.
+   */
+  async function seedKgMathExtended() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // SUBJECT đã có từ seedKgMathChem11: 'subj-toan' — bỏ qua
+
+      // === LỚP 10 ===
+      { id: 'chap-toan10-menh-de',    type: 'Chapter', label: '[10] Mệnh đề + Tập hợp',     description: 'Logic mệnh đề, tập hợp, phép toán tập' },
+      { id: 'chap-toan10-bpt-bn',     type: 'Chapter', label: '[10] BPT + Hệ BPT bậc nhất', description: 'Bất phương trình + hệ BPT 2 ẩn — quy hoạch tuyến tính' },
+      { id: 'chap-toan10-ham-bac-2',  type: 'Chapter', label: '[10] Hàm số bậc 2',          description: 'y = ax² + bx + c — đồ thị parabol, đỉnh, trục đối xứng' },
+      { id: 'chap-toan10-hslt',       type: 'Chapter', label: '[10] Hệ thức lượng tam giác', description: 'Định lý sin, cos — giải tam giác' },
+      { id: 'chap-toan10-vector',     type: 'Chapter', label: '[10] Vector',                 description: 'Vector trong mặt phẳng — phép toán, tọa độ' },
+      { id: 'chap-toan10-thong-ke',   type: 'Chapter', label: '[10] Thống kê',               description: 'Số trung bình, trung vị, mốt, phương sai' },
+      { id: 'chap-toan10-bpt-b2',     type: 'Chapter', label: '[10] Bất phương trình bậc 2', description: 'ax² + bx + c <> 0 — xét dấu tam thức bậc 2' },
+      { id: 'chap-toan10-to-hop',     type: 'Chapter', label: '[10] Đại số tổ hợp',         description: 'Hoán vị, chỉnh hợp, tổ hợp, nhị thức Newton' },
+      { id: 'chap-toan10-xac-suat',   type: 'Chapter', label: '[10] Xác suất',               description: 'Không gian mẫu, biến cố, xác suất cổ điển' },
+
+      { id: 'topic-menh-de',          type: 'Topic', label: 'Mệnh đề',                     description: 'Phát biểu Đ/S, phủ định, kéo theo, tương đương' },
+      { id: 'topic-tap-hop',          type: 'Topic', label: 'Tập hợp',                      description: 'A∪B, A∩B, A\\B, complement — biểu đồ Venn' },
+      { id: 'topic-bpt-bn',           type: 'Topic', label: 'BPT bậc nhất 2 ẩn',           description: 'ax + by + c <> 0 → miền nghiệm trên mặt phẳng' },
+      { id: 'topic-hpt-bn',           type: 'Topic', label: 'Quy hoạch tuyến tính',        description: 'Tìm GTLN/NN trên miền nghiệm hệ BPT' },
+      { id: 'topic-parabol',          type: 'Topic', label: 'Parabol',                     description: 'Đồ thị y = ax² — đỉnh (-b/2a, -Δ/4a)' },
+      { id: 'topic-dl-sin',           type: 'Topic', label: 'Định lý Sin',                 description: 'a/sin A = b/sin B = c/sin C = 2R' },
+      { id: 'topic-dl-cos',           type: 'Topic', label: 'Định lý Cosin',               description: 'a² = b² + c² − 2bc·cos A' },
+      { id: 'topic-vector-mp',        type: 'Topic', label: 'Vector trên mặt phẳng',      description: 'Cộng, trừ, nhân vô hướng (dot product)' },
+      { id: 'topic-tba',              type: 'Topic', label: 'Số trung bình + Trung vị',    description: 'Mean, median, mode — đo xu hướng trung tâm' },
+      { id: 'topic-phuong-sai',       type: 'Topic', label: 'Phương sai · Độ lệch chuẩn',  description: 's², s — đo mức độ phân tán' },
+      { id: 'topic-tam-thuc-b2',      type: 'Topic', label: 'Tam thức bậc 2',              description: 'f(x) = ax² + bx + c, xét dấu theo Δ' },
+      { id: 'topic-bpt-b2',           type: 'Topic', label: 'BPT bậc 2',                   description: 'Giải bằng cách xét dấu tam thức' },
+      { id: 'topic-hoan-vi-10',       type: 'Topic', label: 'Hoán vị',                     description: 'Pn = n!' },
+      { id: 'topic-chinh-hop',        type: 'Topic', label: 'Chỉnh hợp',                   description: 'Aᵏₙ = n!/(n-k)!' },
+      { id: 'topic-to-hop-10',        type: 'Topic', label: 'Tổ hợp',                       description: 'Cᵏₙ = n!/[k!(n-k)!]' },
+      { id: 'topic-nhi-thuc',         type: 'Topic', label: 'Nhị thức Newton',             description: '(a+b)ⁿ = ΣCᵏₙaⁿ⁻ᵏbᵏ' },
+      { id: 'topic-xs-co-dien',       type: 'Topic', label: 'Xác suất cổ điển',            description: 'P(A) = số kết quả thuận lợi / không gian mẫu' },
+
+      // === LỚP 11 mở rộng (bổ sung topics chưa có ngoài Math11 cũ) ===
+      { id: 'chap-toan11-songsong',   type: 'Chapter', label: '[11] Quan hệ song song',     description: 'Đường-mp, mp-mp trong không gian' },
+      { id: 'chap-toan11-vuonggoc',   type: 'Chapter', label: '[11] Quan hệ vuông góc',     description: 'Đường-đường, đường-mp, mp-mp vuông góc' },
+      { id: 'chap-toan11-the-tich',   type: 'Chapter', label: '[11] Thể tích khối đa diện', description: 'Khối chóp, lăng trụ, hình hộp' },
+      { id: 'chap-toan11-gh-day',     type: 'Chapter', label: '[11] Giới hạn dãy số',       description: 'Khái niệm giới hạn, định lý kẹp' },
+      { id: 'chap-toan11-gh-ham',     type: 'Chapter', label: '[11] Giới hạn hàm số + Liên tục', description: 'lim f(x), tính liên tục' },
+
+      { id: 'topic-songsong-dt-mp',   type: 'Topic', label: 'Đường thẳng song song mặt phẳng', description: 'd // (P) khi d không có điểm chung với (P)' },
+      { id: 'topic-vuonggoc-dt-mp',   type: 'Topic', label: 'Đường thẳng vuông góc mặt phẳng', description: 'd ⊥ (P) khi d ⊥ mọi đt trong (P)' },
+      { id: 'topic-goc-dt-mp',        type: 'Topic', label: 'Góc giữa đt và mp',            description: 'Góc giữa d và hình chiếu của d lên (P)' },
+      { id: 'topic-khoang-cach-kg',   type: 'Topic', label: 'Khoảng cách trong không gian', description: 'Điểm-mp, đt-mp, mp-mp, đt-đt chéo nhau' },
+      { id: 'topic-the-tich-chop',    type: 'Topic', label: 'Thể tích khối chóp',           description: 'V = (1/3)·S·h' },
+      { id: 'topic-the-tich-lt',      type: 'Topic', label: 'Thể tích khối lăng trụ',       description: 'V = S·h' },
+      { id: 'topic-gh-day',           type: 'Topic', label: 'Giới hạn dãy số',              description: 'lim aₙ — định nghĩa ε-N' },
+      { id: 'topic-gh-ham',           type: 'Topic', label: 'Giới hạn hàm số',              description: 'lim f(x) khi x → x₀' },
+      { id: 'topic-lien-tuc',         type: 'Topic', label: 'Hàm số liên tục',              description: 'lim f(x) = f(x₀) khi x → x₀' },
+
+      // === LỚP 12 ===
+      { id: 'chap-toan12-ud-dao-ham', type: 'Chapter', label: '[12] Ứng dụng đạo hàm',      description: 'Khảo sát + vẽ đồ thị, tiệm cận, GTLN/GTNN' },
+      { id: 'chap-toan12-mu-log',     type: 'Chapter', label: '[12] Hàm số mũ + Logarit',   description: 'aˣ, log_a(x) — phương trình + bất phương trình' },
+      { id: 'chap-toan12-tich-phan',  type: 'Chapter', label: '[12] Nguyên hàm + Tích phân', description: '∫f(x)dx — ứng dụng tính diện tích, thể tích' },
+      { id: 'chap-toan12-so-phuc',    type: 'Chapter', label: '[12] Số phức',               description: 'z = a + bi — biểu diễn hình học, phép toán' },
+      { id: 'chap-toan12-khoi-tron',  type: 'Chapter', label: '[12] Mặt cầu, trụ, nón',     description: 'Diện tích + thể tích khối tròn xoay' },
+      { id: 'chap-toan12-toa-do-kg',  type: 'Chapter', label: '[12] Tọa độ không gian',     description: 'Vector trong Oxyz, mặt phẳng, đường thẳng' },
+
+      { id: 'topic-khao-sat-hs',      type: 'Topic', label: 'Khảo sát hàm số',              description: 'TXĐ → đạo hàm → biến thiên → vẽ đồ thị' },
+      { id: 'topic-cuc-tri',          type: 'Topic', label: 'Cực trị hàm số',                description: 'f\'(x) = 0 → so sánh dấu' },
+      { id: 'topic-tiem-can',         type: 'Topic', label: 'Tiệm cận',                      description: 'Tiệm cận đứng (x→x₀ thì y→∞) + ngang (x→∞ thì y→L)' },
+      { id: 'topic-gtln-gtnn',        type: 'Topic', label: 'GTLN · GTNN trên đoạn',        description: 'So sánh f tại cực trị + 2 đầu mút' },
+      { id: 'topic-mu',               type: 'Topic', label: 'Hàm số mũ aˣ',                 description: 'Đồng biến nếu a>1, nghịch biến nếu 0<a<1' },
+      { id: 'topic-log',              type: 'Topic', label: 'Hàm số Logarit',               description: 'log_a(b) = c ⟺ aᶜ = b' },
+      { id: 'topic-pt-mu',            type: 'Topic', label: 'Phương trình mũ',              description: 'aᶠ⁽ˣ⁾ = aᵍ⁽ˣ⁾ ⟺ f(x) = g(x)' },
+      { id: 'topic-pt-log',           type: 'Topic', label: 'Phương trình logarit',         description: 'log_a f(x) = log_a g(x) ⟺ f(x) = g(x) > 0' },
+      { id: 'topic-nguyen-ham',       type: 'Topic', label: 'Nguyên hàm',                    description: '∫f(x)dx = F(x) + C khi F\'(x) = f(x)' },
+      { id: 'topic-tich-phan-xd',     type: 'Topic', label: 'Tích phân xác định',           description: '∫ₐᵇ f(x)dx = F(b) - F(a) (Newton-Leibniz)' },
+      { id: 'topic-ud-tich-phan',     type: 'Topic', label: 'Ứng dụng tích phân',           description: 'Diện tích S = ∫|f(x)−g(x)|dx, V quay = π∫f²dx' },
+      { id: 'topic-so-phuc',          type: 'Topic', label: 'Số phức z = a + bi',          description: 'a phần thực, b phần ảo, |z| = √(a²+b²)' },
+      { id: 'topic-pt-so-phuc',       type: 'Topic', label: 'Phương trình bậc 2 nghiệm phức', description: 'Δ < 0 → 2 nghiệm phức liên hợp' },
+      { id: 'topic-mat-cau',          type: 'Topic', label: 'Mặt cầu',                       description: 'S = 4πR², V = (4/3)πR³' },
+      { id: 'topic-mat-tru',          type: 'Topic', label: 'Mặt trụ',                       description: 'V = πR²h, S_xq = 2πRh' },
+      { id: 'topic-mat-non',          type: 'Topic', label: 'Mặt nón',                       description: 'V = (1/3)πR²h, S_xq = πRl' },
+      { id: 'topic-vector-kg',        type: 'Topic', label: 'Vector trong không gian',      description: 'Tọa độ Oxyz, phép toán vector 3D' },
+      { id: 'topic-mp-kg',            type: 'Topic', label: 'Phương trình mặt phẳng',       description: 'Ax + By + Cz + D = 0' },
+      { id: 'topic-dt-kg',            type: 'Topic', label: 'Phương trình đường thẳng',     description: 'Tham số: (x,y,z) = (x₀,y₀,z₀) + t(a,b,c)' },
+      { id: 'topic-goc-mp',           type: 'Topic', label: 'Góc + khoảng cách trong Oxyz', description: 'cos(α) = |n₁·n₂|/(|n₁||n₂|)' },
+
+      // === FORMULAS ===
+      { id: 'form-pn',                type: 'Formula', label: 'Pn = n!',                    description: 'Hoán vị n phần tử' },
+      { id: 'form-akn',               type: 'Formula', label: 'Aᵏₙ = n!/(n-k)!',           description: 'Chỉnh hợp k của n' },
+      { id: 'form-ckn',               type: 'Formula', label: 'Cᵏₙ = n!/[k!(n-k)!]',       description: 'Tổ hợp k của n' },
+      { id: 'form-dl-sin',            type: 'Formula', label: 'a/sin A = 2R',               description: 'Định lý sin trong tam giác' },
+      { id: 'form-dl-cos',            type: 'Formula', label: 'a² = b² + c² − 2bc·cosA',   description: 'Định lý cosin' },
+      { id: 'form-the-tich-chop',     type: 'Formula', label: 'V = (1/3)·S·h',              description: 'Thể tích khối chóp', properties: { unit: 'm³' } },
+      { id: 'form-the-tich-cau',      type: 'Formula', label: 'V = (4/3)πR³',               description: 'Thể tích khối cầu' },
+      { id: 'form-dt-mat-cau',        type: 'Formula', label: 'S = 4πR²',                   description: 'Diện tích mặt cầu' },
+      { id: 'form-the-tich-tru',      type: 'Formula', label: 'V = πR²h',                   description: 'Thể tích khối trụ' },
+      { id: 'form-the-tich-non',      type: 'Formula', label: 'V = (1/3)πR²h',              description: 'Thể tích khối nón' },
+      { id: 'form-euler-mu',          type: 'Formula', label: 'eˣ = lim(1+x/n)ⁿ',          description: 'Định nghĩa hàm mũ tự nhiên' },
+      { id: 'form-log-tch',           type: 'Formula', label: 'log(ab) = log a + log b',    description: 'Quy tắc tích logarit' },
+      { id: 'form-newton-leibniz',    type: 'Formula', label: '∫ₐᵇ f(x)dx = F(b) − F(a)', description: 'Công thức Newton-Leibniz' },
+      { id: 'form-do-dai',            type: 'Formula', label: '|z| = √(a²+b²)',             description: 'Mô-đun số phức' },
+      { id: 'form-mp-pt',             type: 'Formula', label: 'Ax + By + Cz + D = 0',       description: 'Phương trình mặt phẳng' },
+
+      // === CONCEPTS ===
+      { id: 'concept-ham-so',         type: 'Concept', label: 'Hàm số',                     description: 'Quy tắc gán mỗi x → duy nhất 1 y' },
+      { id: 'concept-do-thi',         type: 'Concept', label: 'Đồ thị hàm số',              description: 'Tập điểm (x, f(x)) trên mặt phẳng tọa độ' },
+      { id: 'concept-vector',         type: 'Concept', label: 'Vector',                      description: 'Đại lượng có hướng + độ lớn (khác scalar)' },
+      { id: 'concept-pt-bdt',         type: 'Concept', label: 'Phương trình + Bất phương trình', description: 'Đẳng thức/bất đẳng thức chứa ẩn' },
+      { id: 'concept-lim',            type: 'Concept', label: 'Giới hạn',                    description: 'Giá trị mà hàm số tiến gần khi biến tiến đến điểm' },
+      { id: 'concept-tich-phan',      type: 'Concept', label: 'Tích phân',                    description: 'Tổng vô số diện tích nhỏ — nghịch đảo đạo hàm' },
+      { id: 'concept-so-phuc',        type: 'Concept', label: 'Trường số phức',              description: 'ℂ = {a + bi | a, b ∈ ℝ} — mở rộng ℝ' },
+      { id: 'concept-toa-do',         type: 'Concept', label: 'Hệ tọa độ',                   description: 'Oxy (mặt phẳng), Oxyz (không gian) — đại số hoá hình học' },
+      { id: 'concept-xs',             type: 'Concept', label: 'Xác suất',                    description: 'Đo lường khả năng xảy ra biến cố — [0, 1]' },
+      { id: 'concept-bao-toan-vec',   type: 'Concept', label: 'Tổng vector = 0 (cân bằng)', description: 'Hệ vector tổng = 0 → cân bằng tĩnh' },
+
+      // === APPLICATIONS ===
+      { id: 'app-tai-chinh-lai-suat', type: 'Application', label: 'Lãi suất kép',            description: 'A = P(1+r)ⁿ — hàm mũ trong tài chính' },
+      { id: 'app-ma-hoa-rsa',         type: 'Application', label: 'Mã hoá RSA',              description: 'Số nguyên tố + modular arithmetic — bảo mật internet' },
+      { id: 'app-ai-nn',              type: 'Application', label: 'AI Neural Network',        description: 'Đạo hàm + gradient descent → train AI' },
+      { id: 'app-google-pagerank',    type: 'Application', label: 'Google PageRank',          description: 'Đại số tuyến tính + xác suất → xếp hạng web' },
+      { id: 'app-gps-toa-do',         type: 'Application', label: 'GPS định vị',             description: 'Tọa độ 3D + hệ phương trình → định vị toàn cầu' },
+      { id: 'app-game-vat-ly-3d',     type: 'Application', label: 'Game vật lý 3D',          description: 'Vector + ma trận → animation 3D, collision' },
+      { id: 'app-ky-thuat-cau',       type: 'Application', label: 'Kỹ thuật xây cầu',        description: 'Định lý sin/cos + tích phân → tính lực, độ võng' },
+      { id: 'app-thong-ke-y',         type: 'Application', label: 'Thống kê y khoa',         description: 'Mean + phân phối → đánh giá thuốc, vaccine' },
+      { id: 'app-mo-hinh-dich-benh',  type: 'Application', label: 'Mô hình dịch bệnh',       description: 'Hàm mũ + ODE → dự báo Covid' },
+      { id: 'app-am-thanh-ft',        type: 'Application', label: 'Xử lý âm thanh (Fourier)', description: 'Tích phân Fourier → MP3, nhạc số' },
+
+      // === CAREERS ===
+      { id: 'career-toan-ung-dung',   type: 'Career', label: 'Nhà toán học ứng dụng',       description: 'Mô hình hoá vấn đề thực tế — viện nghiên cứu' },
+      { id: 'career-actuary-12',      type: 'Career', label: 'Chuyên viên thống kê (Actuary)', description: 'Xác suất + thống kê → đánh giá rủi ro bảo hiểm' },
+      { id: 'career-data-science',    type: 'Career', label: 'Data Scientist',              description: 'Thống kê + đại số tuyến tính + AI' },
+      { id: 'career-quant-finance',   type: 'Career', label: 'Quant Finance',               description: 'Mô hình toán cho thị trường tài chính — lương cao' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-math:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters (LỚP 10)
+      ['subj-toan', 'chap-toan10-menh-de',    'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-bpt-bn',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-ham-bac-2',  'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-hslt',       'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-vector',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-thong-ke',   'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-bpt-b2',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-to-hop',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan10-xac-suat',   'HAS_CHAPTER'],
+      // LỚP 11 extra
+      ['subj-toan', 'chap-toan11-songsong',   'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan11-vuonggoc',   'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan11-the-tich',   'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan11-gh-day',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan11-gh-ham',     'HAS_CHAPTER'],
+      // LỚP 12
+      ['subj-toan', 'chap-toan12-ud-dao-ham', 'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan12-mu-log',     'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan12-tich-phan',  'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan12-so-phuc',    'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan12-khoi-tron',  'HAS_CHAPTER'],
+      ['subj-toan', 'chap-toan12-toa-do-kg',  'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-toan10-menh-de',    'topic-menh-de',      'HAS_TOPIC'],
+      ['chap-toan10-menh-de',    'topic-tap-hop',      'HAS_TOPIC'],
+      ['chap-toan10-bpt-bn',     'topic-bpt-bn',       'HAS_TOPIC'],
+      ['chap-toan10-bpt-bn',     'topic-hpt-bn',       'HAS_TOPIC'],
+      ['chap-toan10-ham-bac-2',  'topic-parabol',      'HAS_TOPIC'],
+      ['chap-toan10-hslt',       'topic-dl-sin',       'HAS_TOPIC'],
+      ['chap-toan10-hslt',       'topic-dl-cos',       'HAS_TOPIC'],
+      ['chap-toan10-vector',     'topic-vector-mp',    'HAS_TOPIC'],
+      ['chap-toan10-thong-ke',   'topic-tba',          'HAS_TOPIC'],
+      ['chap-toan10-thong-ke',   'topic-phuong-sai',   'HAS_TOPIC'],
+      ['chap-toan10-bpt-b2',     'topic-tam-thuc-b2',  'HAS_TOPIC'],
+      ['chap-toan10-bpt-b2',     'topic-bpt-b2',       'HAS_TOPIC'],
+      ['chap-toan10-to-hop',     'topic-hoan-vi-10',   'HAS_TOPIC'],
+      ['chap-toan10-to-hop',     'topic-chinh-hop',    'HAS_TOPIC'],
+      ['chap-toan10-to-hop',     'topic-to-hop-10',    'HAS_TOPIC'],
+      ['chap-toan10-to-hop',     'topic-nhi-thuc',     'HAS_TOPIC'],
+      ['chap-toan10-xac-suat',   'topic-xs-co-dien',   'HAS_TOPIC'],
+
+      // Chapter LỚP 11 extra → Topics
+      ['chap-toan11-songsong', 'topic-songsong-dt-mp', 'HAS_TOPIC'],
+      ['chap-toan11-vuonggoc', 'topic-vuonggoc-dt-mp', 'HAS_TOPIC'],
+      ['chap-toan11-vuonggoc', 'topic-goc-dt-mp',      'HAS_TOPIC'],
+      ['chap-toan11-vuonggoc', 'topic-khoang-cach-kg', 'HAS_TOPIC'],
+      ['chap-toan11-the-tich', 'topic-the-tich-chop',  'HAS_TOPIC'],
+      ['chap-toan11-the-tich', 'topic-the-tich-lt',    'HAS_TOPIC'],
+      ['chap-toan11-gh-day',   'topic-gh-day',         'HAS_TOPIC'],
+      ['chap-toan11-gh-ham',   'topic-gh-ham',         'HAS_TOPIC'],
+      ['chap-toan11-gh-ham',   'topic-lien-tuc',       'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-toan12-ud-dao-ham', 'topic-khao-sat-hs',   'HAS_TOPIC'],
+      ['chap-toan12-ud-dao-ham', 'topic-cuc-tri',       'HAS_TOPIC'],
+      ['chap-toan12-ud-dao-ham', 'topic-tiem-can',      'HAS_TOPIC'],
+      ['chap-toan12-ud-dao-ham', 'topic-gtln-gtnn',     'HAS_TOPIC'],
+      ['chap-toan12-mu-log',     'topic-mu',            'HAS_TOPIC'],
+      ['chap-toan12-mu-log',     'topic-log',           'HAS_TOPIC'],
+      ['chap-toan12-mu-log',     'topic-pt-mu',         'HAS_TOPIC'],
+      ['chap-toan12-mu-log',     'topic-pt-log',        'HAS_TOPIC'],
+      ['chap-toan12-tich-phan',  'topic-nguyen-ham',    'HAS_TOPIC'],
+      ['chap-toan12-tich-phan',  'topic-tich-phan-xd',  'HAS_TOPIC'],
+      ['chap-toan12-tich-phan',  'topic-ud-tich-phan',  'HAS_TOPIC'],
+      ['chap-toan12-so-phuc',    'topic-so-phuc',       'HAS_TOPIC'],
+      ['chap-toan12-so-phuc',    'topic-pt-so-phuc',    'HAS_TOPIC'],
+      ['chap-toan12-khoi-tron',  'topic-mat-cau',       'HAS_TOPIC'],
+      ['chap-toan12-khoi-tron',  'topic-mat-tru',       'HAS_TOPIC'],
+      ['chap-toan12-khoi-tron',  'topic-mat-non',       'HAS_TOPIC'],
+      ['chap-toan12-toa-do-kg',  'topic-vector-kg',     'HAS_TOPIC'],
+      ['chap-toan12-toa-do-kg',  'topic-mp-kg',         'HAS_TOPIC'],
+      ['chap-toan12-toa-do-kg',  'topic-dt-kg',         'HAS_TOPIC'],
+      ['chap-toan12-toa-do-kg',  'topic-goc-mp',        'HAS_TOPIC'],
+
+      // Topic → Formula
+      ['topic-hoan-vi-10',  'form-pn',             'USES_FORMULA'],
+      ['topic-chinh-hop',   'form-akn',            'USES_FORMULA'],
+      ['topic-to-hop-10',   'form-ckn',            'USES_FORMULA'],
+      ['topic-dl-sin',      'form-dl-sin',         'USES_FORMULA'],
+      ['topic-dl-cos',      'form-dl-cos',         'USES_FORMULA'],
+      ['topic-the-tich-chop','form-the-tich-chop', 'USES_FORMULA'],
+      ['topic-mat-cau',     'form-the-tich-cau',   'USES_FORMULA'],
+      ['topic-mat-cau',     'form-dt-mat-cau',     'USES_FORMULA'],
+      ['topic-mat-tru',     'form-the-tich-tru',   'USES_FORMULA'],
+      ['topic-mat-non',     'form-the-tich-non',   'USES_FORMULA'],
+      ['topic-mu',          'form-euler-mu',       'USES_FORMULA'],
+      ['topic-log',         'form-log-tch',        'USES_FORMULA'],
+      ['topic-tich-phan-xd','form-newton-leibniz', 'USES_FORMULA'],
+      ['topic-so-phuc',     'form-do-dai',         'USES_FORMULA'],
+      ['topic-mp-kg',       'form-mp-pt',          'USES_FORMULA'],
+
+      // Topic → Concept
+      ['topic-parabol',       'concept-ham-so',      'USES_CONCEPT'],
+      ['topic-parabol',       'concept-do-thi',      'USES_CONCEPT'],
+      ['topic-vector-mp',     'concept-vector',      'USES_CONCEPT'],
+      ['topic-vector-kg',     'concept-vector',      'USES_CONCEPT'],
+      ['topic-bpt-b2',        'concept-pt-bdt',      'USES_CONCEPT'],
+      ['topic-gh-day',        'concept-lim',         'USES_CONCEPT'],
+      ['topic-gh-ham',        'concept-lim',         'USES_CONCEPT'],
+      ['topic-tich-phan-xd',  'concept-tich-phan',   'USES_CONCEPT'],
+      ['topic-so-phuc',       'concept-so-phuc',     'USES_CONCEPT'],
+      ['topic-vector-kg',     'concept-toa-do',      'USES_CONCEPT'],
+      ['topic-mp-kg',         'concept-toa-do',      'USES_CONCEPT'],
+      ['topic-xs-co-dien',    'concept-xs',          'USES_CONCEPT'],
+
+      // Topic → Application
+      ['topic-mu',            'app-tai-chinh-lai-suat',  'APPLIED_IN'],
+      ['topic-to-hop-10',     'app-ma-hoa-rsa',          'APPLIED_IN'],
+      ['topic-vector-kg',     'app-game-vat-ly-3d',      'APPLIED_IN'],
+      ['topic-mp-kg',         'app-game-vat-ly-3d',      'APPLIED_IN'],
+      ['topic-vector-kg',     'app-gps-toa-do',          'APPLIED_IN'],
+      ['topic-dl-sin',        'app-ky-thuat-cau',        'APPLIED_IN'],
+      ['topic-dl-cos',        'app-ky-thuat-cau',        'APPLIED_IN'],
+      ['topic-tba',           'app-thong-ke-y',          'APPLIED_IN'],
+      ['topic-phuong-sai',    'app-thong-ke-y',          'APPLIED_IN'],
+      ['topic-mu',            'app-mo-hinh-dich-benh',   'APPLIED_IN'],
+      ['topic-tich-phan-xd',  'app-am-thanh-ft',         'APPLIED_IN'],
+      ['topic-ud-tich-phan',  'app-am-thanh-ft',         'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-khao-sat-hs',   'career-toan-ung-dung',  'APPLIED_IN_CAREER'],
+      ['topic-xs-co-dien',    'career-actuary-12',     'APPLIED_IN_CAREER'],
+      ['topic-tba',           'career-data-science',   'APPLIED_IN_CAREER'],
+      ['topic-vector-kg',     'career-data-science',   'APPLIED_IN_CAREER'],
+      ['topic-mu',            'career-quant-finance',  'APPLIED_IN_CAREER'],
+      ['topic-tich-phan-xd',  'career-quant-finance',  'APPLIED_IN_CAREER'],
+
+      // REQUIRES prerequisite chain
+      ['topic-bpt-b2',         'topic-tam-thuc-b2',      'REQUIRES'],
+      ['topic-tich-phan-xd',   'topic-nguyen-ham',       'REQUIRES'],
+      ['topic-ud-tich-phan',   'topic-tich-phan-xd',     'REQUIRES'],
+      ['topic-khao-sat-hs',    'topic-dao-ham-cb',       'REQUIRES'],
+      ['topic-cuc-tri',        'topic-dao-ham-cb',       'REQUIRES'],
+      ['topic-tiem-can',       'topic-gh-ham',           'REQUIRES'],
+      ['topic-pt-mu',          'topic-mu',               'REQUIRES'],
+      ['topic-pt-log',         'topic-log',              'REQUIRES'],
+      ['topic-log',            'topic-mu',               'REQUIRES'],
+      ['topic-vector-kg',      'topic-vector-mp',        'REQUIRES'],
+      ['topic-mp-kg',          'topic-vector-kg',        'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES
+      // Toán ↔ Vật lí
+      ['topic-vector-mp',      'topic-luc-newton',       'RELATES_TO'], // F = ma là vector
+      ['topic-vector-kg',      'topic-dong-luong',       'RELATES_TO'], // p = mv vector 3D
+      ['topic-tich-phan-xd',   'topic-cong',             'RELATES_TO'], // W = ∫Fdx
+      ['topic-dao-ham-cb',     'topic-luc-newton',       'RELATES_TO'], // a = dv/dt
+      ['topic-mu',             'topic-phong-xa',         'RELATES_TO'], // N = N₀e^(-λt)
+
+      // Toán ↔ Hóa
+      ['topic-log',            'form-ph-log',            'RELATES_TO'], // pH = -log[H+]
+      ['topic-xs-co-dien',     'topic-hang-so-kc',       'RELATES_TO'],
+
+      // Toán ↔ Sinh
+      ['topic-xs-co-dien',     'topic-mendel',           'RELATES_TO'], // tỉ lệ phân ly
+      ['topic-mu',             'topic-quan-the',         'RELATES_TO'], // tăng trưởng quần thể
+      ['topic-tba',            'topic-quan-the',         'RELATES_TO'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-math:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
   //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
   //        ?biology=1    → Thêm Sinh học 10, 11, 12
+  //        ?math=1       → Thêm Toán 10, 11, 12 (mở rộng SGK đầy đủ)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
       const ext = req.query.extended === '1' || req.query.ext === '1';
-      const bio = req.query.biology === '1' || req.query.bio === '1' || all; // all includes bio
+      const bio = req.query.biology === '1' || req.query.bio === '1' || all;
+      const math = req.query.math === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
+      if (math) r5 = await seedKgMathExtended();
       return res.json({
         success: true,
-        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0) + (r4?.nodeCount || 0),
-        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0) + (r4?.edgeCount || 0),
-        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0) + (r4?.edgeInserted || 0),
+        nodeCount: r1.nodeCount + (r2?.nodeCount || 0) + (r3?.nodeCount || 0) + (r4?.nodeCount || 0) + (r5?.nodeCount || 0),
+        edgeCount: r1.edgeCount + (r2?.edgeCount || 0) + (r3?.edgeCount || 0) + (r4?.edgeCount || 0) + (r5?.edgeCount || 0),
+        edgeInserted: r1.edgeInserted + (r2?.edgeInserted || 0) + (r3?.edgeInserted || 0) + (r4?.edgeInserted || 0) + (r5?.edgeInserted || 0),
         physics: r1,
         mathChem: r2,
         physicsExtended: r3,
         biology: r4,
+        mathExtended: r5,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh học 10/11/12',
+          all && '+ Toán 11 + Hóa 11 + Sinh học 10/11/12 + Toán 10/11/12 mở rộng',
           ext && '+ Mở rộng (Quang học + VLHĐ + Phenomenon + Application)',
           bio && !all && '+ Sinh học 10/11/12',
+          math && !all && '+ Toán 10/11/12 mở rộng',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
