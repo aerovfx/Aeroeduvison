@@ -15,7 +15,7 @@
  * - Damping 0.85/step, run 200 iterations on data change
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Stars, Html } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { Vector3, Color, Group, type Mesh } from 'three'
@@ -325,6 +325,10 @@ export default function KnowledgeGraph3D({
   // Memoize to avoid re-render thrash
   const memoNodes = useMemo(() => nodes, [nodes.length, nodes.map(n => n.id).join(',')])
   const memoEdges = useMemo(() => edges, [edges.length, edges.map(e => e.id).join(',')])
+  // Ref tới OrbitControls để có thể reset camera khi user click button
+  const controlsRef = useRef<any>(null)
+  // Trigger reset (counter, mỗi increment = 1 reset call)
+  const [resetTick, setResetTick] = useState(0)
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden border border-zinc-800">
@@ -356,7 +360,9 @@ export default function KnowledgeGraph3D({
         />
 
         <OrbitControls
-          enablePan
+          ref={controlsRef}
+          target={[0, 0, 0]}
+          enablePan={false}
           enableZoom
           enableRotate
           autoRotate={false}
@@ -365,6 +371,7 @@ export default function KnowledgeGraph3D({
           minDistance={30}
           maxDistance={400}
         />
+        <CameraResetter resetTick={resetTick} controlsRef={controlsRef} />
 
         <EffectComposer>
           <Bloom
@@ -378,11 +385,40 @@ export default function KnowledgeGraph3D({
 
       {/* Overlay hint */}
       <div className="absolute bottom-3 left-3 text-[10px] text-white/50 leading-tight pointer-events-none">
-        🖱 Kéo: xoay · 🖱 Cuộn: zoom · 🖱 Phải: pan · Click node để focus
+        🖱 Kéo: xoay · 🖱 Cuộn: zoom · Click node để focus
       </div>
       <div className="absolute top-3 left-3 text-[10px] text-cyan-300 font-bold pointer-events-none">
         🧠 3D Neural · {memoNodes.length} nodes · {memoEdges.length} edges
       </div>
+      {/* Center reset button — đưa node trung tâm về giữa màn hình */}
+      <button
+        onClick={() => setResetTick(t => t + 1)}
+        className="absolute top-3 right-14 p-2 rounded-lg bg-cyan-500/80 hover:bg-cyan-500
+                   border-2 border-cyan-300/50 text-white text-xs font-bold shadow-lg
+                   inline-flex items-center gap-1"
+        title="Đưa node trung tâm về giữa màn hình"
+      >
+        🎯 Center
+      </button>
     </div>
   )
+}
+
+/** Internal: reset camera về vị trí mặc định khi resetTick tăng. */
+function CameraResetter({ resetTick, controlsRef }: {
+  resetTick: number
+  controlsRef: React.MutableRefObject<any>
+}) {
+  const { camera } = useThree()
+  useEffect(() => {
+    if (resetTick === 0) return
+    // Reset camera position + orbit target về (0,0,0)
+    camera.position.set(0, 0, 150)
+    camera.lookAt(0, 0, 0)
+    if (controlsRef.current) {
+      controlsRef.current.target.set(0, 0, 0)
+      controlsRef.current.update()
+    }
+  }, [resetTick, camera, controlsRef])
+  return null
 }
