@@ -11961,6 +11961,438 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Giáo dục Kinh tế & Pháp luật 10/11/12 — SGK GDPT 2018
+  // Môn 10/10 — Subject color: emerald #10b981
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgKtpl() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-ktpl', type: 'Subject', label: 'Giáo dục Kinh tế & Pháp luật',
+        description: 'Môn KTPL THPT 10/11/12 GDPT 2018 — kinh tế thị trường + pháp luật VN + công dân toàn cầu',
+        properties: { color: '#10b981' } },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 10: Kinh tế cơ bản + Pháp luật & Hiến pháp ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-ktpl10-nen-kt',   type: 'Chapter', label: '[10] Nền kinh tế & chủ thể',    description: 'Sản xuất – phân phối – trao đổi – tiêu dùng; hộ GĐ, DN, NN' },
+      { id: 'chap-ktpl10-thi-truong',type: 'Chapter', label: '[10] Thị trường & cơ chế TT',   description: 'Cung – cầu – giá cả – cạnh tranh – chức năng thị trường' },
+      { id: 'chap-ktpl10-nsnn',     type: 'Chapter', label: '[10] Ngân sách NN & Thuế',      description: 'Thu chi NSNN, các loại thuế, nghĩa vụ nộp thuế' },
+      { id: 'chap-ktpl10-sxkd',     type: 'Chapter', label: '[10] Sản xuất kinh doanh',      description: 'Mô hình SXKD: hộ KD, DNTN, công ty CP/TNHH, HTX' },
+      { id: 'chap-ktpl10-tin-dung', type: 'Chapter', label: '[10] Tín dụng & dịch vụ TD',     description: 'NH thương mại, vay tiêu dùng, thẻ tín dụng, ví điện tử' },
+      { id: 'chap-ktpl10-tckh',     type: 'Chapter', label: '[10] Tài chính cá nhân',        description: 'Lập kế hoạch tài chính, tiết kiệm, đầu tư cơ bản' },
+      { id: 'chap-ktpl10-pl-vn',    type: 'Chapter', label: '[10] Pháp luật nước CHXHCN VN', description: 'Khái niệm PL, đặc điểm, vai trò, hệ thống PL' },
+      { id: 'chap-ktpl10-htct',     type: 'Chapter', label: '[10] Hệ thống chính trị VN',     description: 'Đảng – Nhà nước – MTTQ – tổ chức CT-XH' },
+      { id: 'chap-ktpl10-hp',       type: 'Chapter', label: '[10] Hiến pháp CHXHCN VN',      description: 'Hiến pháp 2013 — chế độ chính trị, quyền con người, bộ máy NN' },
+
+      // Topics LỚP 10
+      { id: 'topic-hh-kt',          type: 'Topic', label: 'Kinh tế hàng hoá',                description: 'SX hàng hoá để trao đổi — tiền tệ là thước đo giá trị' },
+      { id: 'topic-cthe-kt',        type: 'Topic', label: 'Các chủ thể kinh tế',             description: 'Hộ GĐ + Doanh nghiệp + Nhà nước (3 chủ thể chính)' },
+      { id: 'topic-sx-pp-td',       type: 'Topic', label: 'Sản xuất – phân phối – tiêu dùng', description: 'Vòng tuần hoàn 4 khâu trong nền kinh tế' },
+      { id: 'topic-cung-cau',       type: 'Topic', label: 'Cung & cầu (Supply/Demand)',       description: 'Giá tăng → cầu giảm, cung tăng; ngược lại với hàng thiết yếu' },
+      { id: 'topic-gia-ca',         type: 'Topic', label: 'Giá cả thị trường',                description: 'Hình thành từ cung-cầu, quy luật giá trị, vai trò điều tiết' },
+      { id: 'topic-canh-tranh',     type: 'Topic', label: 'Cạnh tranh',                       description: 'Lành mạnh ↔ không lành mạnh; chống độc quyền' },
+      { id: 'topic-co-che-tt',      type: 'Topic', label: 'Cơ chế thị trường',                description: 'Bàn tay vô hình (Adam Smith) + bàn tay NN' },
+      { id: 'topic-nsnn-vn',        type: 'Topic', label: 'Ngân sách Nhà nước VN',           description: 'Thu thuế + phí + viện trợ; chi đầu tư, an sinh, quốc phòng' },
+      { id: 'topic-thue',           type: 'Topic', label: 'Thuế (Tax)',                       description: 'VAT 10%, TNCN luỹ tiến 5-35%, TNDN 20%, XNK, TTĐB' },
+      { id: 'topic-ho-kd',          type: 'Topic', label: 'Hộ kinh doanh',                   description: '< 10 LĐ — 1 chủ chịu TN vô hạn; phổ biến VN' },
+      { id: 'topic-dntn',           type: 'Topic', label: 'Doanh nghiệp tư nhân',            description: '1 cá nhân chủ sở hữu, TN vô hạn bằng toàn bộ tài sản' },
+      { id: 'topic-cong-ty-tnhh',   type: 'Topic', label: 'Công ty TNHH',                    description: '1 hoặc 2-50 thành viên; TN hữu hạn trong vốn góp' },
+      { id: 'topic-cong-ty-cp',     type: 'Topic', label: 'Công ty Cổ phần',                 description: 'Ít nhất 3 cổ đông; phát hành cổ phiếu; phổ biến niêm yết' },
+      { id: 'topic-htx',            type: 'Topic', label: 'Hợp tác xã',                       description: '≥7 thành viên; dân chủ; phổ biến nông nghiệp + dịch vụ' },
+      { id: 'topic-nh-tm',          type: 'Topic', label: 'Ngân hàng thương mại',            description: 'Vietcombank, BIDV, Techcombank — huy động + cho vay + thanh toán' },
+      { id: 'topic-vay-tieu-dung',  type: 'Topic', label: 'Vay tiêu dùng',                   description: 'Mua trả góp; lãi suất 1-3%/tháng — cẩn thận bẫy tín dụng đen' },
+      { id: 'topic-the-tin-dung',   type: 'Topic', label: 'Thẻ tín dụng (Credit card)',      description: 'Visa/Mastercard; miễn lãi 45 ngày; phí trễ hạn cao' },
+      { id: 'topic-vi-dien-tu',     type: 'Topic', label: 'Ví điện tử',                       description: 'Momo, ZaloPay, VNPay — thanh toán QR phổ biến VN 2026' },
+      { id: 'topic-ke-hoach-tckh',  type: 'Topic', label: 'Lập kế hoạch tài chính',          description: '50-30-20 rule: nhu cầu thiết yếu, mong muốn, tiết kiệm' },
+      { id: 'topic-tiet-kiem',      type: 'Topic', label: 'Tiết kiệm',                       description: 'Quỹ khẩn cấp 3-6 tháng chi tiêu; gửi NH lãi suất' },
+      { id: 'topic-dau-tu-cb',      type: 'Topic', label: 'Đầu tư cơ bản',                   description: 'Cổ phiếu, trái phiếu, vàng, BĐS — nguyên tắc đa dạng hoá' },
+      { id: 'topic-pl-khai-niem',   type: 'Topic', label: 'Khái niệm Pháp luật',             description: 'Hệ thống quy tắc xử sự chung do NN ban hành, bảo đảm thực hiện' },
+      { id: 'topic-pl-vai-tro',     type: 'Topic', label: 'Vai trò của Pháp luật',           description: 'Công cụ quản lý XH, bảo vệ quyền công dân, công bằng' },
+      { id: 'topic-htpl',           type: 'Topic', label: 'Hệ thống Pháp luật VN',           description: 'Hiến pháp → Luật → Nghị định → Thông tư' },
+      { id: 'topic-dang-csvn',      type: 'Topic', label: 'Đảng Cộng sản Việt Nam',         description: 'Lực lượng lãnh đạo NN và XH — Điều 4 Hiến pháp' },
+      { id: 'topic-quoc-hoi',       type: 'Topic', label: 'Quốc hội',                         description: 'Cơ quan quyền lực NN cao nhất; lập hiến + lập pháp' },
+      { id: 'topic-chinh-phu',      type: 'Topic', label: 'Chính phủ',                       description: 'Cơ quan hành pháp; Thủ tướng đứng đầu' },
+      { id: 'topic-tand',           type: 'Topic', label: 'Toà án nhân dân',                 description: 'Cơ quan tư pháp; xét xử các vụ án dân sự, hình sự, hành chính' },
+      { id: 'topic-vksnd',          type: 'Topic', label: 'Viện kiểm sát nhân dân',          description: 'Công tố + kiểm sát hoạt động tư pháp' },
+      { id: 'topic-mttq',           type: 'Topic', label: 'Mặt trận Tổ quốc VN',             description: 'Tổ chức liên minh CT — tập hợp khối đại đoàn kết dân tộc' },
+      { id: 'topic-hp-2013',        type: 'Topic', label: 'Hiến pháp 2013',                  description: 'Hiến pháp hiện hành VN — 11 chương, 120 điều, quyền con người ↑' },
+      { id: 'topic-quyen-cn',       type: 'Topic', label: 'Quyền con người (Hiến pháp)',     description: 'Quyền sống, tự do, mưu cầu hạnh phúc — Điều 14-49 HP 2013' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 11: Kinh tế vĩ mô + Quyền công dân ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-ktpl11-ct-cc',    type: 'Chapter', label: '[11] Cạnh tranh & Cung cầu',     description: 'Vai trò cạnh tranh; quy luật cung-cầu nâng cao' },
+      { id: 'chap-ktpl11-lp-tn',    type: 'Chapter', label: '[11] Lạm phát & Thất nghiệp',    description: 'Đo lường, nguyên nhân, hậu quả, biện pháp' },
+      { id: 'chap-ktpl11-tt-ld',    type: 'Chapter', label: '[11] Thị trường LĐ & Việc làm',  description: 'Cung-cầu LĐ, kỹ năng mềm, kỹ năng số 4.0' },
+      { id: 'chap-ktpl11-y-tuong-kd',type: 'Chapter', label: '[11] Ý tưởng & Cơ hội KD',      description: 'Startup, MVP, pivot, lean canvas' },
+      { id: 'chap-ktpl11-dao-duc-kd',type:'Chapter', label: '[11] Đạo đức kinh doanh',        description: 'CSR, minh bạch, chống tham nhũng, môi trường' },
+      { id: 'chap-ktpl11-vh-td',    type: 'Chapter', label: '[11] Văn hoá tiêu dùng',         description: 'Tiêu dùng xanh, thông minh, có trách nhiệm' },
+      { id: 'chap-ktpl11-q-bd',     type: 'Chapter', label: '[11] Quyền bình đẳng công dân',  description: 'Trước PL, giới tính, dân tộc, tôn giáo' },
+      { id: 'chap-ktpl11-q-dc',     type: 'Chapter', label: '[11] Quyền dân chủ',             description: 'Bầu cử, ứng cử, khiếu nại, tố cáo, biểu quyết trưng cầu' },
+      { id: 'chap-ktpl11-q-td',     type: 'Chapter', label: '[11] Quyền tự do cơ bản',        description: 'Tự do ngôn luận, tín ngưỡng, đi lại, bí mật thư tín' },
+
+      // Topics LỚP 11
+      { id: 'topic-ct-vai-tro',     type: 'Topic', label: 'Vai trò của cạnh tranh',          description: 'Động lực phát triển KT — kích thích đổi mới, sáng tạo' },
+      { id: 'topic-ct-doc-quyen',   type: 'Topic', label: 'Cạnh tranh ↔ Độc quyền',          description: 'Luật cạnh tranh 2018; chống lạm dụng vị thế thống lĩnh' },
+      { id: 'topic-cau-cao-cap',    type: 'Topic', label: 'Cầu hàng hoá cao cấp',            description: 'Hàng xa xỉ — cầu tăng khi thu nhập tăng (≠ thiết yếu)' },
+      { id: 'topic-lam-phat',       type: 'Topic', label: 'Lạm phát (Inflation)',            description: 'CPI tăng — VN mục tiêu 4%/năm; lạm phát chi phí, cầu kéo' },
+      { id: 'topic-that-nghiep',    type: 'Topic', label: 'Thất nghiệp (Unemployment)',      description: 'Cơ cấu, tạm thời, chu kỳ; tỉ lệ TN VN ~2-3%' },
+      { id: 'topic-cung-cau-ld',    type: 'Topic', label: 'Cung-cầu lao động',                description: 'Cung lớn (dân số vàng) > cầu chất lượng cao → thiếu kỹ năng' },
+      { id: 'topic-ky-nang-mem',    type: 'Topic', label: 'Kỹ năng mềm',                      description: 'Giao tiếp, làm việc nhóm, giải quyết vấn đề, lãnh đạo' },
+      { id: 'topic-ky-nang-so',     type: 'Topic', label: 'Kỹ năng số 4.0',                  description: 'AI, data, no-code, prompt engineering — chuẩn nghề nghiệp mới' },
+      { id: 'topic-startup',        type: 'Topic', label: 'Startup',                         description: 'Khởi nghiệp công nghệ — VinFast, MoMo, VNG, Tiki' },
+      { id: 'topic-mvp',            type: 'Topic', label: 'MVP (Minimum Viable Product)',    description: 'Sản phẩm tối thiểu khả thi — test thị trường rẻ + nhanh' },
+      { id: 'topic-lean-canvas',    type: 'Topic', label: 'Lean Canvas',                     description: '9 ô: problem, solution, segment, channel, revenue, ...' },
+      { id: 'topic-csr',            type: 'Topic', label: 'CSR (Trách nhiệm XH DN)',         description: 'Corporate Social Responsibility — môi trường, lao động, cộng đồng' },
+      { id: 'topic-minh-bach',      type: 'Topic', label: 'Minh bạch & chống tham nhũng',    description: 'Luật phòng chống tham nhũng 2018; ESG báo cáo' },
+      { id: 'topic-td-xanh',        type: 'Topic', label: 'Tiêu dùng xanh',                  description: 'Sản phẩm bền vững, ít nhựa, ít carbon — eco-conscious' },
+      { id: 'topic-td-thong-minh',  type: 'Topic', label: 'Tiêu dùng thông minh',            description: 'So sánh giá, đọc nhãn, tránh nợ tiêu dùng' },
+      { id: 'topic-bd-pl',          type: 'Topic', label: 'Bình đẳng trước pháp luật',       description: 'Mọi công dân bình đẳng — không phân biệt giới, tuổi, dân tộc' },
+      { id: 'topic-bd-gioi',        type: 'Topic', label: 'Bình đẳng giới',                  description: 'Luật BĐ giới 2006; quyền lợi vợ-chồng, cha-mẹ, lao động' },
+      { id: 'topic-bd-dt',          type: 'Topic', label: 'Bình đẳng dân tộc',               description: '54 dân tộc VN bình đẳng; ưu tiên dân tộc thiểu số' },
+      { id: 'topic-bd-tg',          type: 'Topic', label: 'Bình đẳng tôn giáo',              description: 'Tự do tín ngưỡng; tôn giáo bình đẳng trước PL' },
+      { id: 'topic-bau-cu',         type: 'Topic', label: 'Quyền bầu cử & ứng cử',           description: 'Cử tri ≥18; ứng cử ≥21 — 5 năm/lần QH + HĐND' },
+      { id: 'topic-khieu-nai',      type: 'Topic', label: 'Quyền khiếu nại',                 description: 'Phản đối quyết định hành chính sai — Luật khiếu nại 2011' },
+      { id: 'topic-to-cao',         type: 'Topic', label: 'Quyền tố cáo',                    description: 'Báo hành vi vi phạm PL — Luật tố cáo 2018' },
+      { id: 'topic-tu-do-nl',       type: 'Topic', label: 'Quyền tự do ngôn luận',           description: 'Điều 25 HP 2013 — trong khuôn khổ PL, không xúc phạm DN/QN' },
+      { id: 'topic-tu-do-tn',       type: 'Topic', label: 'Quyền tự do tín ngưỡng',          description: 'Theo/không theo tôn giáo — Luật tín ngưỡng 2016' },
+      { id: 'topic-bm-thu-tin',     type: 'Topic', label: 'Bí mật thư tín, điện thoại',      description: 'Điều 21 HP 2013 — vi phạm có thể truy tố hình sự' },
+
+      // ═══════════════════════════════════════════
+      // === LỚP 12: Kinh tế phát triển + PL quốc tế ===
+      // ═══════════════════════════════════════════
+      { id: 'chap-ktpl12-tang-truong',type:'Chapter', label: '[12] Tăng trưởng & Phát triển KT', description: 'GDP, GNI, HDI; chất lượng tăng trưởng, bền vững' },
+      { id: 'chap-ktpl12-hnktqt',   type: 'Chapter', label: '[12] Hội nhập kinh tế quốc tế',  description: 'WTO, CPTPP, EVFTA, RCEP — VN trong chuỗi cung ứng toàn cầu' },
+      { id: 'chap-ktpl12-bh-as',    type: 'Chapter', label: '[12] Bảo hiểm & An sinh XH',     description: 'BHXH, BHYT, BHTN; hệ thống an sinh đa tầng' },
+      { id: 'chap-ktpl12-kh-kd',    type: 'Chapter', label: '[12] Lập kế hoạch KD',           description: 'Business plan, dự báo tài chính, KPI' },
+      { id: 'chap-ktpl12-tnxh-dn',  type: 'Chapter', label: '[12] Trách nhiệm XH DN nâng cao', description: 'ESG, net-zero 2050, COP26 cam kết VN' },
+      { id: 'chap-ktpl12-qly-tc-gd',type: 'Chapter', label: '[12] Quản lý thu chi gia đình',   description: 'Ngân sách hộ GĐ, đầu tư, bảo hiểm, hưu trí' },
+      { id: 'chap-ktpl12-pl-qt',    type: 'Chapter', label: '[12] Pháp luật quốc tế',         description: 'Luật quốc tế, công ước, điều ước; UNCLOS, WTO' },
+      { id: 'chap-ktpl12-q-cd',     type: 'Chapter', label: '[12] Quyền & nghĩa vụ công dân',  description: 'Tổng hợp — bảo vệ TQ, học tập, lao động, kinh doanh' },
+      { id: 'chap-ktpl12-q-kt',     type: 'Chapter', label: '[12] Quyền & nghĩa vụ KT',       description: 'Quyền KD, sở hữu tài sản, tự do hợp đồng' },
+
+      // Topics LỚP 12
+      { id: 'topic-gdp',            type: 'Topic', label: 'GDP (Tổng sản phẩm trong nước)',  description: 'Tổng giá trị HH+DV cuối cùng SX trong lãnh thổ' },
+      { id: 'topic-gni',            type: 'Topic', label: 'GNI (Tổng thu nhập quốc gia)',    description: 'GDP + thu nhập ròng từ nước ngoài; per capita đo mức sống' },
+      { id: 'topic-hdi',            type: 'Topic', label: 'HDI (Chỉ số phát triển con người)', description: 'Tuổi thọ + giáo dục + thu nhập — VN xếp ~110/189 (2024)' },
+      { id: 'topic-pt-ben-vung',    type: 'Topic', label: 'Phát triển bền vững',             description: '17 SDGs LHQ 2030 — KT + XH + Môi trường cân bằng' },
+      { id: 'topic-wto',            type: 'Topic', label: 'WTO (Tổ chức Thương mại TG)',     description: 'VN gia nhập 2007 — 164 thành viên, giảm rào cản thương mại' },
+      { id: 'topic-cptpp',          type: 'Topic', label: 'CPTPP',                           description: 'Hiệp định Đối tác Toàn diện và Tiến bộ xuyên TBD — 11 nước' },
+      { id: 'topic-evfta',          type: 'Topic', label: 'EVFTA (EU-VN FTA)',               description: 'Hiệu lực 2020 — thuế ↓ 99% hàng hoá, dệt may + thuỷ sản' },
+      { id: 'topic-rcep',           type: 'Topic', label: 'RCEP',                            description: 'Đối tác KT toàn diện khu vực — 15 nước châu Á-TBD' },
+      { id: 'topic-bhxh',           type: 'Topic', label: 'Bảo hiểm xã hội (BHXH)',          description: 'Bắt buộc cho NLĐ; chế độ ốm đau, thai sản, hưu trí, tử tuất' },
+      { id: 'topic-bhyt',           type: 'Topic', label: 'Bảo hiểm y tế (BHYT)',            description: 'Toàn dân — mua 4.5% lương; khám chữa bệnh hỗ trợ 80-100%' },
+      { id: 'topic-bhtn',           type: 'Topic', label: 'Bảo hiểm thất nghiệp (BHTN)',     description: 'NLĐ đóng 1% — trợ cấp 60% lương khi mất việc' },
+      { id: 'topic-bn-kd',          type: 'Topic', label: 'Business Plan',                   description: 'Tầm nhìn, sản phẩm, thị trường, marketing, tài chính 3-5 năm' },
+      { id: 'topic-kpi',            type: 'Topic', label: 'KPI (Key Performance Indicator)', description: 'Chỉ số đo lường hiệu suất — SMART: cụ thể, đo được, đạt được' },
+      { id: 'topic-esg',            type: 'Topic', label: 'ESG (Environmental-Social-Gov)',   description: 'Báo cáo bền vững — thay thế CSR; bắt buộc DN niêm yết EU' },
+      { id: 'topic-net-zero',       type: 'Topic', label: 'Net-zero 2050',                   description: 'VN cam kết COP26 — phát thải ròng = 0 đến 2050' },
+      { id: 'topic-ngan-sach-gd',   type: 'Topic', label: 'Ngân sách gia đình',              description: 'Thu nhập - chi phí - tiết kiệm; quy tắc envelope, 50-30-20' },
+      { id: 'topic-huu-tri',        type: 'Topic', label: 'Kế hoạch hưu trí',                description: 'BHXH + bảo hiểm tự nguyện + đầu tư dài hạn 30-40 năm' },
+      { id: 'topic-luat-qt',        type: 'Topic', label: 'Luật quốc tế',                    description: 'Điều ước (treaty) + tập quán quốc tế + nguyên tắc cơ bản' },
+      { id: 'topic-unclos',         type: 'Topic', label: 'UNCLOS 1982',                     description: 'Công ước Luật biển — VN chủ quyền Hoàng Sa, Trường Sa' },
+      { id: 'topic-cong-uoc-nq',    type: 'Topic', label: 'Công ước nhân quyền (UDHR)',      description: 'Tuyên ngôn nhân quyền 1948; ICCPR + ICESCR' },
+      { id: 'topic-q-bv-tq',        type: 'Topic', label: 'Nghĩa vụ bảo vệ Tổ quốc',         description: 'Điều 45 HP 2013 — nghĩa vụ quân sự, dân quân tự vệ' },
+      { id: 'topic-q-hoc-tap',      type: 'Topic', label: 'Quyền & nghĩa vụ học tập',         description: 'Điều 39 HP 2013 — giáo dục phổ cập, bắt buộc tiểu học' },
+      { id: 'topic-q-ld',           type: 'Topic', label: 'Quyền lao động',                  description: 'Bộ luật LĐ 2019 — hợp đồng, lương tối thiểu, an toàn LĐ' },
+      { id: 'topic-q-kd',           type: 'Topic', label: 'Quyền tự do kinh doanh',           description: 'Điều 33 HP 2013 — kinh doanh các ngành không cấm' },
+      { id: 'topic-q-so-huu',       type: 'Topic', label: 'Quyền sở hữu tài sản',            description: 'Sở hữu, sử dụng, định đoạt — Bộ luật Dân sự 2015' },
+
+      // === PERSONS ===
+      { id: 'person-adam-smith',    type: 'Person', label: 'Adam Smith',                     description: '1723-1790 — Cha đẻ kinh tế học, "Bàn tay vô hình", The Wealth of Nations' },
+      { id: 'person-keynes',        type: 'Person', label: 'John Maynard Keynes',             description: '1883-1946 — Kinh tế vĩ mô hiện đại, can thiệp NN' },
+      { id: 'person-hcm-ktpl',      type: 'Person', label: 'Hồ Chí Minh',                    description: '1890-1969 — Tư tưởng pháp quyền XHCN Việt Nam' },
+      { id: 'person-vo-van-thuong', type: 'Person', label: 'Lãnh đạo VN đương đại',          description: 'Tổng Bí thư, Chủ tịch nước, Thủ tướng — bộ máy NN VN' },
+
+      // === CONCEPTS ===
+      { id: 'concept-ban-tay-vh',   type: 'Concept', label: 'Bàn tay vô hình',               description: 'Adam Smith — thị trường tự điều tiết qua cung-cầu + giá' },
+      { id: 'concept-keynes',       type: 'Concept', label: 'Học thuyết Keynes',             description: 'NN cần can thiệp khi suy thoái — chi tiêu công kích cầu' },
+      { id: 'concept-cnxh-vn',      type: 'Concept', label: 'CNXH VN — KT thị trường định hướng XHCN', description: 'Đa thành phần KT + định hướng XHCN — đặc thù VN' },
+      { id: 'concept-phap-quyen',   type: 'Concept', label: 'Nhà nước pháp quyền',           description: 'Mọi chủ thể, kể cả NN, đều tuân theo PL' },
+      { id: 'concept-quyen-cn',     type: 'Concept', label: 'Quyền con người (UDHR)',         description: 'Cố hữu, không thể chia tách — mọi người sinh ra bình đẳng' },
+      { id: 'concept-cong-bang',    type: 'Concept', label: 'Công bằng xã hội',              description: 'Cơ hội bình đẳng + phân phối hợp lý + an sinh tốt' },
+
+      // === APPLICATIONS ===
+      { id: 'app-toa-an-vn',        type: 'Application', label: 'Toà án nhân dân tối cao',    description: 'Cơ quan xét xử cao nhất VN; án lệ + bản án' },
+      { id: 'app-vingroup-csr',     type: 'Application', label: 'Vingroup — CSR + ESG',      description: 'Quỹ Thiện Tâm + VinFuture + Net-zero — DN VN tiên phong' },
+      { id: 'app-vcb-banking',      type: 'Application', label: 'Vietcombank — NH thương mại', description: 'NH lớn nhất VN — vốn hoá $20B; dịch vụ TC đa dạng' },
+      { id: 'app-momo-fintech',     type: 'Application', label: 'MoMo — Fintech',            description: 'Ví điện tử lớn nhất VN — 30M user; kì lân $2B' },
+      { id: 'app-vnstock',          type: 'Application', label: 'Sàn HOSE/HNX',              description: 'Thị trường chứng khoán VN — vốn hoá $300B+' },
+      { id: 'app-bhxh-vn',          type: 'Application', label: 'BHXH Việt Nam',             description: 'baohiemxahoi.gov.vn — quản lý BHXH + BHYT + BHTN toàn dân' },
+      { id: 'app-thuvienpl',        type: 'Application', label: 'Thư viện Pháp luật VN',     description: 'thuvienphapluat.vn — tra cứu toàn bộ văn bản PL hiện hành' },
+      { id: 'app-cong-bao',         type: 'Application', label: 'Công báo CP',               description: 'congbao.chinhphu.vn — văn bản chính thức của CP' },
+      { id: 'app-wto-org',          type: 'Application', label: 'WTO.org',                   description: 'Tổ chức Thương mại Thế giới — VN thành viên 2007' },
+
+      // === CAREERS ===
+      { id: 'career-luat-su',       type: 'Career', label: 'Luật sư',                         description: 'Tư vấn + tranh tụng — VN 20-100tr/tháng; quốc tế $200/giờ' },
+      { id: 'career-cong-chuc',     type: 'Career', label: 'Công chức Nhà nước',              description: 'Bộ ban ngành, UBND — ổn định, lương cơ sở 2.34tr (2026)' },
+      { id: 'career-tham-phan',     type: 'Career', label: 'Thẩm phán',                       description: 'Xét xử tại Toà — sau 5 năm hành nghề LS + thi tuyển' },
+      { id: 'career-kiem-sat',      type: 'Career', label: 'Kiểm sát viên',                   description: 'Công tố tại VKSND — bằng cử nhân luật + thi tuyển' },
+      { id: 'career-cong-an',       type: 'Career', label: 'Công an / Cảnh sát',              description: 'Lực lượng vũ trang nhân dân — Học viện An ninh, CSND' },
+      { id: 'career-chuyen-vien-kt',type: 'Career', label: 'Chuyên viên kinh tế',             description: 'Phân tích KT vĩ mô — NH, công ty CK, tổ chức QT' },
+      { id: 'career-ke-toan',       type: 'Career', label: 'Kế toán',                         description: 'CPA/ACCA — hot job 15-40tr; báo cáo TC, kiểm toán' },
+      { id: 'career-mar-ngo-vu',    type: 'Career', label: 'Ngoại giao',                      description: 'Đại sứ quán, lãnh sự — Học viện Ngoại giao + bằng QHQT' },
+      { id: 'career-doanh-nhan',    type: 'Career', label: 'Doanh nhân / Startup founder',    description: 'Khởi nghiệp, CEO — Pham Nhật Vượng, Đặng Lê Nguyên Vũ' },
+      { id: 'career-nhan-quyen',    type: 'Career', label: 'Hoạt động nhân quyền + NGO',      description: 'UNDP, Oxfam, Save the Children VN — cử nhân QHQT + luật' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-ktpl:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-ktpl', 'chap-ktpl10-nen-kt',      'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-thi-truong',  'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-nsnn',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-sxkd',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-tin-dung',    'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-tckh',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-pl-vn',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-htct',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl10-hp',          'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-ct-cc',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-lp-tn',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-tt-ld',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-y-tuong-kd',  'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-dao-duc-kd',  'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-vh-td',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-q-bd',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-q-dc',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl11-q-td',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-tang-truong', 'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-hnktqt',      'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-bh-as',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-kh-kd',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-tnxh-dn',     'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-qly-tc-gd',   'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-pl-qt',       'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-q-cd',        'HAS_CHAPTER'],
+      ['subj-ktpl', 'chap-ktpl12-q-kt',        'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-ktpl10-nen-kt',    'topic-hh-kt',         'HAS_TOPIC'],
+      ['chap-ktpl10-nen-kt',    'topic-cthe-kt',       'HAS_TOPIC'],
+      ['chap-ktpl10-nen-kt',    'topic-sx-pp-td',      'HAS_TOPIC'],
+      ['chap-ktpl10-thi-truong','topic-cung-cau',      'HAS_TOPIC'],
+      ['chap-ktpl10-thi-truong','topic-gia-ca',        'HAS_TOPIC'],
+      ['chap-ktpl10-thi-truong','topic-canh-tranh',    'HAS_TOPIC'],
+      ['chap-ktpl10-thi-truong','topic-co-che-tt',     'HAS_TOPIC'],
+      ['chap-ktpl10-nsnn',      'topic-nsnn-vn',       'HAS_TOPIC'],
+      ['chap-ktpl10-nsnn',      'topic-thue',          'HAS_TOPIC'],
+      ['chap-ktpl10-sxkd',      'topic-ho-kd',         'HAS_TOPIC'],
+      ['chap-ktpl10-sxkd',      'topic-dntn',          'HAS_TOPIC'],
+      ['chap-ktpl10-sxkd',      'topic-cong-ty-tnhh',  'HAS_TOPIC'],
+      ['chap-ktpl10-sxkd',      'topic-cong-ty-cp',    'HAS_TOPIC'],
+      ['chap-ktpl10-sxkd',      'topic-htx',           'HAS_TOPIC'],
+      ['chap-ktpl10-tin-dung',  'topic-nh-tm',         'HAS_TOPIC'],
+      ['chap-ktpl10-tin-dung',  'topic-vay-tieu-dung', 'HAS_TOPIC'],
+      ['chap-ktpl10-tin-dung',  'topic-the-tin-dung',  'HAS_TOPIC'],
+      ['chap-ktpl10-tin-dung',  'topic-vi-dien-tu',    'HAS_TOPIC'],
+      ['chap-ktpl10-tckh',      'topic-ke-hoach-tckh', 'HAS_TOPIC'],
+      ['chap-ktpl10-tckh',      'topic-tiet-kiem',     'HAS_TOPIC'],
+      ['chap-ktpl10-tckh',      'topic-dau-tu-cb',     'HAS_TOPIC'],
+      ['chap-ktpl10-pl-vn',     'topic-pl-khai-niem',  'HAS_TOPIC'],
+      ['chap-ktpl10-pl-vn',     'topic-pl-vai-tro',    'HAS_TOPIC'],
+      ['chap-ktpl10-pl-vn',     'topic-htpl',          'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-dang-csvn',     'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-quoc-hoi',      'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-chinh-phu',     'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-tand',          'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-vksnd',         'HAS_TOPIC'],
+      ['chap-ktpl10-htct',      'topic-mttq',          'HAS_TOPIC'],
+      ['chap-ktpl10-hp',        'topic-hp-2013',       'HAS_TOPIC'],
+      ['chap-ktpl10-hp',        'topic-quyen-cn',      'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-ktpl11-ct-cc',      'topic-ct-vai-tro',    'HAS_TOPIC'],
+      ['chap-ktpl11-ct-cc',      'topic-ct-doc-quyen',  'HAS_TOPIC'],
+      ['chap-ktpl11-ct-cc',      'topic-cau-cao-cap',   'HAS_TOPIC'],
+      ['chap-ktpl11-lp-tn',      'topic-lam-phat',      'HAS_TOPIC'],
+      ['chap-ktpl11-lp-tn',      'topic-that-nghiep',   'HAS_TOPIC'],
+      ['chap-ktpl11-tt-ld',      'topic-cung-cau-ld',   'HAS_TOPIC'],
+      ['chap-ktpl11-tt-ld',      'topic-ky-nang-mem',   'HAS_TOPIC'],
+      ['chap-ktpl11-tt-ld',      'topic-ky-nang-so',    'HAS_TOPIC'],
+      ['chap-ktpl11-y-tuong-kd', 'topic-startup',       'HAS_TOPIC'],
+      ['chap-ktpl11-y-tuong-kd', 'topic-mvp',           'HAS_TOPIC'],
+      ['chap-ktpl11-y-tuong-kd', 'topic-lean-canvas',   'HAS_TOPIC'],
+      ['chap-ktpl11-dao-duc-kd', 'topic-csr',           'HAS_TOPIC'],
+      ['chap-ktpl11-dao-duc-kd', 'topic-minh-bach',     'HAS_TOPIC'],
+      ['chap-ktpl11-vh-td',      'topic-td-xanh',       'HAS_TOPIC'],
+      ['chap-ktpl11-vh-td',      'topic-td-thong-minh', 'HAS_TOPIC'],
+      ['chap-ktpl11-q-bd',       'topic-bd-pl',         'HAS_TOPIC'],
+      ['chap-ktpl11-q-bd',       'topic-bd-gioi',       'HAS_TOPIC'],
+      ['chap-ktpl11-q-bd',       'topic-bd-dt',         'HAS_TOPIC'],
+      ['chap-ktpl11-q-bd',       'topic-bd-tg',         'HAS_TOPIC'],
+      ['chap-ktpl11-q-dc',       'topic-bau-cu',        'HAS_TOPIC'],
+      ['chap-ktpl11-q-dc',       'topic-khieu-nai',     'HAS_TOPIC'],
+      ['chap-ktpl11-q-dc',       'topic-to-cao',        'HAS_TOPIC'],
+      ['chap-ktpl11-q-td',       'topic-tu-do-nl',      'HAS_TOPIC'],
+      ['chap-ktpl11-q-td',       'topic-tu-do-tn',      'HAS_TOPIC'],
+      ['chap-ktpl11-q-td',       'topic-bm-thu-tin',    'HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-ktpl12-tang-truong','topic-gdp',           'HAS_TOPIC'],
+      ['chap-ktpl12-tang-truong','topic-gni',           'HAS_TOPIC'],
+      ['chap-ktpl12-tang-truong','topic-hdi',           'HAS_TOPIC'],
+      ['chap-ktpl12-tang-truong','topic-pt-ben-vung',   'HAS_TOPIC'],
+      ['chap-ktpl12-hnktqt',     'topic-wto',           'HAS_TOPIC'],
+      ['chap-ktpl12-hnktqt',     'topic-cptpp',         'HAS_TOPIC'],
+      ['chap-ktpl12-hnktqt',     'topic-evfta',         'HAS_TOPIC'],
+      ['chap-ktpl12-hnktqt',     'topic-rcep',          'HAS_TOPIC'],
+      ['chap-ktpl12-bh-as',      'topic-bhxh',          'HAS_TOPIC'],
+      ['chap-ktpl12-bh-as',      'topic-bhyt',          'HAS_TOPIC'],
+      ['chap-ktpl12-bh-as',      'topic-bhtn',          'HAS_TOPIC'],
+      ['chap-ktpl12-kh-kd',      'topic-bn-kd',         'HAS_TOPIC'],
+      ['chap-ktpl12-kh-kd',      'topic-kpi',           'HAS_TOPIC'],
+      ['chap-ktpl12-tnxh-dn',    'topic-esg',           'HAS_TOPIC'],
+      ['chap-ktpl12-tnxh-dn',    'topic-net-zero',      'HAS_TOPIC'],
+      ['chap-ktpl12-qly-tc-gd',  'topic-ngan-sach-gd',  'HAS_TOPIC'],
+      ['chap-ktpl12-qly-tc-gd',  'topic-huu-tri',       'HAS_TOPIC'],
+      ['chap-ktpl12-pl-qt',      'topic-luat-qt',       'HAS_TOPIC'],
+      ['chap-ktpl12-pl-qt',      'topic-unclos',        'HAS_TOPIC'],
+      ['chap-ktpl12-pl-qt',      'topic-cong-uoc-nq',   'HAS_TOPIC'],
+      ['chap-ktpl12-q-cd',       'topic-q-bv-tq',       'HAS_TOPIC'],
+      ['chap-ktpl12-q-cd',       'topic-q-hoc-tap',     'HAS_TOPIC'],
+      ['chap-ktpl12-q-cd',       'topic-q-ld',          'HAS_TOPIC'],
+      ['chap-ktpl12-q-kt',       'topic-q-kd',          'HAS_TOPIC'],
+      ['chap-ktpl12-q-kt',       'topic-q-so-huu',      'HAS_TOPIC'],
+
+      // Topic → Person
+      ['topic-co-che-tt',       'person-adam-smith',  'RELATES_TO'],
+      ['topic-cung-cau',        'person-adam-smith',  'RELATES_TO'],
+      ['topic-lam-phat',        'person-keynes',      'RELATES_TO'],
+      ['topic-that-nghiep',     'person-keynes',      'RELATES_TO'],
+      ['topic-hp-2013',         'person-hcm-ktpl',    'RELATES_TO'],
+      ['topic-dang-csvn',       'person-hcm-ktpl',    'RELATES_TO'],
+      ['topic-chinh-phu',       'person-vo-van-thuong','RELATES_TO'],
+      ['topic-quoc-hoi',        'person-vo-van-thuong','RELATES_TO'],
+
+      // Topic → Concept
+      ['topic-co-che-tt',       'concept-ban-tay-vh',  'USES_CONCEPT'],
+      ['topic-canh-tranh',      'concept-ban-tay-vh',  'USES_CONCEPT'],
+      ['topic-nsnn-vn',         'concept-keynes',      'USES_CONCEPT'],
+      ['topic-lam-phat',        'concept-keynes',      'USES_CONCEPT'],
+      ['topic-co-che-tt',       'concept-cnxh-vn',     'USES_CONCEPT'],
+      ['topic-pl-khai-niem',    'concept-phap-quyen',  'USES_CONCEPT'],
+      ['topic-quyen-cn',        'concept-quyen-cn',    'USES_CONCEPT'],
+      ['topic-cong-uoc-nq',     'concept-quyen-cn',    'USES_CONCEPT'],
+      ['topic-bd-pl',           'concept-cong-bang',   'USES_CONCEPT'],
+      ['topic-bhxh',            'concept-cong-bang',   'USES_CONCEPT'],
+
+      // Topic → Application
+      ['topic-tand',            'app-toa-an-vn',      'APPLIED_IN'],
+      ['topic-csr',             'app-vingroup-csr',   'APPLIED_IN'],
+      ['topic-esg',             'app-vingroup-csr',   'APPLIED_IN'],
+      ['topic-net-zero',        'app-vingroup-csr',   'APPLIED_IN'],
+      ['topic-nh-tm',           'app-vcb-banking',    'APPLIED_IN'],
+      ['topic-vi-dien-tu',      'app-momo-fintech',   'APPLIED_IN'],
+      ['topic-dau-tu-cb',       'app-vnstock',        'APPLIED_IN'],
+      ['topic-cong-ty-cp',      'app-vnstock',        'APPLIED_IN'],
+      ['topic-bhxh',            'app-bhxh-vn',        'APPLIED_IN'],
+      ['topic-bhyt',            'app-bhxh-vn',        'APPLIED_IN'],
+      ['topic-bhtn',            'app-bhxh-vn',        'APPLIED_IN'],
+      ['topic-htpl',            'app-thuvienpl',      'APPLIED_IN'],
+      ['topic-hp-2013',         'app-thuvienpl',      'APPLIED_IN'],
+      ['topic-chinh-phu',       'app-cong-bao',       'APPLIED_IN'],
+      ['topic-wto',             'app-wto-org',        'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-pl-khai-niem',    'career-luat-su',         'APPLIED_IN_CAREER'],
+      ['topic-htpl',            'career-luat-su',         'APPLIED_IN_CAREER'],
+      ['topic-tand',            'career-tham-phan',       'APPLIED_IN_CAREER'],
+      ['topic-vksnd',           'career-kiem-sat',        'APPLIED_IN_CAREER'],
+      ['topic-quoc-hoi',        'career-cong-chuc',       'APPLIED_IN_CAREER'],
+      ['topic-chinh-phu',       'career-cong-chuc',       'APPLIED_IN_CAREER'],
+      ['topic-htpl',            'career-cong-an',         'APPLIED_IN_CAREER'],
+      ['topic-gdp',             'career-chuyen-vien-kt',  'APPLIED_IN_CAREER'],
+      ['topic-lam-phat',        'career-chuyen-vien-kt',  'APPLIED_IN_CAREER'],
+      ['topic-thue',            'career-ke-toan',         'APPLIED_IN_CAREER'],
+      ['topic-bn-kd',           'career-ke-toan',         'APPLIED_IN_CAREER'],
+      ['topic-luat-qt',         'career-mar-ngo-vu',      'APPLIED_IN_CAREER'],
+      ['topic-cong-uoc-nq',     'career-mar-ngo-vu',      'APPLIED_IN_CAREER'],
+      ['topic-startup',         'career-doanh-nhan',      'APPLIED_IN_CAREER'],
+      ['topic-mvp',             'career-doanh-nhan',      'APPLIED_IN_CAREER'],
+      ['topic-cong-uoc-nq',     'career-nhan-quyen',      'APPLIED_IN_CAREER'],
+
+      // REQUIRES (tiên quyết)
+      ['topic-cong-ty-cp',      'topic-cong-ty-tnhh',    'REQUIRES'],
+      ['topic-dau-tu-cb',       'topic-tiet-kiem',        'REQUIRES'],
+      ['topic-tiet-kiem',       'topic-ke-hoach-tckh',    'REQUIRES'],
+      ['topic-the-tin-dung',    'topic-nh-tm',            'REQUIRES'],
+      ['topic-htpl',            'topic-pl-khai-niem',     'REQUIRES'],
+      ['topic-hp-2013',         'topic-pl-khai-niem',     'REQUIRES'],
+      ['topic-quyen-cn',        'topic-hp-2013',          'REQUIRES'],
+      ['topic-bd-gioi',         'topic-bd-pl',            'REQUIRES'],
+      ['topic-bd-dt',           'topic-bd-pl',            'REQUIRES'],
+      ['topic-bd-tg',           'topic-bd-pl',            'REQUIRES'],
+      ['topic-lam-phat',        'topic-cung-cau',         'REQUIRES'],
+      ['topic-gdp',             'topic-sx-pp-td',         'REQUIRES'],
+      ['topic-gni',             'topic-gdp',              'REQUIRES'],
+      ['topic-hdi',             'topic-gni',              'REQUIRES'],
+      ['topic-esg',             'topic-csr',              'REQUIRES'],
+      ['topic-net-zero',        'topic-esg',              'REQUIRES'],
+      ['topic-mvp',             'topic-startup',          'REQUIRES'],
+      ['topic-lean-canvas',     'topic-mvp',              'REQUIRES'],
+      ['topic-bn-kd',           'topic-lean-canvas',      'REQUIRES'],
+      ['topic-huu-tri',         'topic-bhxh',             'REQUIRES'],
+      ['topic-unclos',          'topic-luat-qt',          'REQUIRES'],
+
+      // ═══════════════════════════════════════════
+      // CROSS-SUBJECT EDGES
+      // ═══════════════════════════════════════════
+      // KTPL ↔ Toán (xác suất + thống kê + tài chính)
+      ['topic-dau-tu-cb',       'topic-xs-tk-co-ban',   'RELATES_TO'], // đa dạng hoá rủi ro
+      ['topic-lam-phat',        'topic-thong-ke',       'RELATES_TO'], // CPI
+      ['topic-kpi',             'topic-thong-ke',       'RELATES_TO'],
+      // KTPL ↔ Lịch sử (đổi mới + hội nhập VN)
+      ['topic-co-che-tt',       'topic-doi-moi',        'RELATES_TO'], // Đổi mới 1986
+      ['topic-wto',             'topic-vn-hoi-nhap',    'RELATES_TO'],
+      ['topic-cnxh-vn',         'topic-cm8',            'RELATES_TO'], // Cách mạng tháng 8
+      ['topic-hp-2013',         'topic-vnch-vndcch',    'RELATES_TO'], // hình thành NN VN
+      // KTPL ↔ Địa lí (kinh tế vùng + dân số)
+      ['topic-gdp',             'topic-kt-vung-vn',     'RELATES_TO'],
+      ['topic-cung-cau-ld',     'topic-dan-so-vn',      'RELATES_TO'],
+      ['topic-rcep',            'topic-asean',          'RELATES_TO'],
+      // KTPL ↔ Sinh học (sức khoẻ + an sinh)
+      ['topic-bhyt',            'topic-suc-khoe',       'RELATES_TO'],
+      // KTPL ↔ CN Công nghiệp (4.0)
+      ['topic-ky-nang-so',      'topic-cmcn-40',        'RELATES_TO'],
+      ['topic-startup',         'topic-cmcn-40',        'RELATES_TO'],
+      // KTPL ↔ Mĩ thuật (kinh tế sáng tạo)
+      ['topic-startup',         'career-uiux-des',      'APPLIED_IN_CAREER'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-ktpl:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → tất cả môn (10 môn × 3 lớp)
   //        ?extended=1   → Thêm physics extension
@@ -11972,6 +12404,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?livestock=1  → Công nghệ Chăn nuôi 10/11/12
   //        ?industry=1   → Công nghệ Công nghiệp 10/11/12
   //        ?art=1        → Mĩ thuật 10/11/12
+  //        ?ktpl=1       → Giáo dục Kinh tế & Pháp luật 10/11/12
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -11984,8 +12417,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const livestock = req.query.livestock === '1' || req.query.cncn === '1' || all;
       const industry = req.query.industry === '1' || req.query.cnci === '1' || all;
       const art = req.query.art === '1' || req.query.mt === '1' || all;
+      const ktpl = req.query.ktpl === '1' || req.query.econ === '1' || req.query.law === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -11996,7 +12430,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (livestock) r9 = await seedKgLivestock();
       if (industry)  r10 = await seedKgIndustry();
       if (art)       r11 = await seedKgArt();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0);
+      if (ktpl)      r12 = await seedKgKtpl();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -12013,9 +12448,10 @@ ${plan.content || '<p>(Trống)</p>'}
         livestock: r9,
         industry: r10,
         art: r11,
+        ktpl: r12,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật (3 lớp) mở rộng',
+          all && '+ Toán + Hóa + Sinh + Sử + Địa + CN Chăn nuôi + CN Công nghiệp + Mĩ thuật + KT-Pháp luật (3 lớp) mở rộng',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -12025,6 +12461,7 @@ ${plan.content || '<p>(Trống)</p>'}
           livestock && !all && '+ Công nghệ Chăn nuôi 10/11/12',
           industry  && !all && '+ Công nghệ Công nghiệp 10/11/12',
           art       && !all && '+ Mĩ thuật 10/11/12',
+          ktpl      && !all && '+ Giáo dục Kinh tế & Pháp luật 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
