@@ -23,6 +23,8 @@ export interface CreateCoursePayload {
 
 export interface UploadVideoPayload {
   title: string
+  /** Mô tả ngắn cho bài học (1-2 đoạn, HS xem trước khi học) */
+  description?: string
   /** URL video (YouTube/Vimeo/MP4 trực tiếp/GCS public URL). BE accept cả 'url' lẫn legacy 'videoUrl'. */
   url?: string
   videoUrl?: string             // legacy alias, vẫn support

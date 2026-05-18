@@ -159,10 +159,14 @@ export interface CourseVideo {
   id: string
   courseId: string
   title: string
+  description?: string | null
   videoUrl: string
   position: number
   duration?: number
   isCompleted?: boolean
+  isPreview?: boolean
+  groupName?: string | null
+  thumbUrl?: string | null
   createdAt: string
 }
 

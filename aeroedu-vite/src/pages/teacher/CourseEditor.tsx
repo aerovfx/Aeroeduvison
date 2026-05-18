@@ -142,7 +142,14 @@ function BasicInfoStep({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<BasicForm>({ defaultValues })
+  } = useForm<BasicForm>({
+    // CRITICAL: `values` thay vì `defaultValues` — RHF sẽ AUTO RESET
+    // khi prop thay đổi (async load từ useQuery getCourse).
+    // Trước: `defaultValues` chỉ init lúc mount → form empty mặc dù
+    // course data đã có → user mở edit lại thấy chữ bị xoá sạch.
+    values: defaultValues as BasicForm | undefined,
+    resetOptions: { keepDirtyValues: true },  // giữ change của user nếu đang nhập
+  })
 
   const handleImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) { toast.error('Chỉ chấp nhận ảnh'); return }
@@ -291,7 +298,12 @@ function ContentStep({
   defaultValues?: Partial<ContentForm>
   isLoading: boolean
 }) {
-  const { control, handleSubmit } = useForm<ContentForm>({ defaultValues })
+  // CRITICAL: dùng `values` để form AUTO RESET khi defaultValues thay đổi
+  // (async load từ getCourse). Khắc phục bug "chữ bị xoá khi mở edit".
+  const { control, handleSubmit } = useForm<ContentForm>({
+    values: defaultValues as ContentForm | undefined,
+    resetOptions: { keepDirtyValues: true },
+  })
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
@@ -350,6 +362,7 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
 
   const [groupName, setGroupName] = useState('')
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')   // mô tả ngắn cho bài học
   const [videoUrl, setVideoUrl] = useState('')
   const [thumbUrl, setThumbUrl] = useState('')
   const [thumbPreview, setThumbPreview] = useState('')
@@ -372,6 +385,7 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
     mutationFn: () =>
       instructorService.uploadVideo(courseId, {
         title: title.trim(),
+        description: description.trim() || undefined,
         url: videoUrl.trim(),
         position: videos.length + 1,
         thumbUrl: thumbUrl || undefined,
@@ -396,7 +410,7 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
   })
 
   const resetForm = () => {
-    setGroupName(''); setTitle(''); setVideoUrl('')
+    setGroupName(''); setTitle(''); setDescription(''); setVideoUrl('')
     setThumbUrl(''); setThumbPreview(''); setSerialId(''); setIsPreview(false)
     setUploadFile(null); setUploadProgress(0); setUploadedGcsPath('')
     setShowForm(false)
@@ -436,12 +450,13 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
       // CourseVideo trong DB. Body dùng state hiện tại + finalTitle.
       try {
         await instructorService.uploadVideo(courseId, {
-          title:     finalTitle,
-          url:       publicUrl,
-          position:  videos.length + 1,
-          thumbUrl:  thumbUrl || undefined,
+          title:       finalTitle,
+          description: description.trim() || undefined,
+          url:         publicUrl,
+          position:    videos.length + 1,
+          thumbUrl:    thumbUrl || undefined,
           isPreview,
-          groupName: groupName.trim() || undefined,
+          groupName:   groupName.trim() || undefined,
           gcsPath,
         })
         qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
@@ -538,6 +553,27 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
                 placeholder="VD: Bài 1 — Giới thiệu định luật Newton"
                 className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
               />
+            </div>
+
+            {/* ── Mô tả ngắn cho bài học (NEW) — hiển thị cho HS trước khi học ── */}
+            <div className="sm:col-span-2">
+              <label className="label">
+                Mô tả bài học
+                <span className="text-gray-500 text-xs font-normal ml-1">
+                  (tùy chọn — HS sẽ thấy ở tab Tổng quan)
+                </span>
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="VD: Trong bài này, em sẽ học về 3 định luật Newton, hiểu được lực và phản lực qua các ví dụ thực tế..."
+                rows={3}
+                maxLength={5000}
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors resize-y"
+              />
+              <div className="text-[10px] text-gray-500 mt-1 text-right">
+                {description.length} / 5000 ký tự
+              </div>
             </div>
 
             {/* ── Tab nav: URL paste vs File upload ── */}

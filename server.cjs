@@ -2985,6 +2985,9 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
           "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      // Lazy ALTER cho tables đã tồn tại (idempotent)
+      await pool.query(`ALTER TABLE "CourseVideo"
+        ADD COLUMN IF NOT EXISTS "description" TEXT`);
       await pool.query(`CREATE INDEX IF NOT EXISTS "CourseVideo_course_idx"
         ON "CourseVideo"("courseId", position ASC)`);
       _vReady = true;
@@ -3057,10 +3060,13 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const position = Number(pRes.rows[0]?.p) || 1;
         await pool.query(
           `INSERT INTO "CourseVideo"
-             (id, "courseId", "userId", title, type, url, "thumbUrl", duration, position, "isPreview", "groupName", "gcsPath")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+             (id, "courseId", "userId", title, description, type, url, "thumbUrl",
+              duration, position, "isPreview", "groupName", "gcsPath")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
           [id, req.params.id, tid,
-           title.slice(0, 300), type, url.slice(0, 1000),
+           title.slice(0, 300),
+           b.description ? String(b.description).slice(0, 5000) : null,
+           type, url.slice(0, 1000),
            b.thumbUrl ? String(b.thumbUrl).slice(0, 1000) : null,
            b.duration != null ? Number(b.duration) : null,
            position,
