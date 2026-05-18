@@ -402,7 +402,12 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
     setShowForm(false)
   }
 
-  // Upload file → GCS qua signed URL với progress bar
+  // Upload file → GCS qua signed URL → AUTO-SAVE metadata vào DB.
+  //
+  // UX FIX (2026-05-18): Trước đây sau khi upload, user phải bấm tiếp
+  // "Thêm bài học" để lưu vào DB. Nhiều user upload xong tưởng đã xong
+  // → đóng tab → file mồ côi trên GCS (đã thấy 3 file orphan trong bucket
+  // user 223321a8). Giờ auto-save sau upload, user chỉ cần PICK FILE.
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('video/')) {
       toast.error('Chỉ chấp nhận file video (mp4, webm, mov)')
@@ -423,11 +428,30 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
       setVideoUrl(publicUrl)
       setUploadedGcsPath(gcsPath)
       // Auto-fill title từ filename nếu chưa nhập
-      if (!title.trim()) {
-        const baseName = file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
-        setTitle(baseName)
+      const finalTitle = title.trim() || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
+      if (!title.trim()) setTitle(finalTitle)
+      toast.success(`📤 Upload xong (${sizeMB.toFixed(1)}MB) — đang lưu...`, { duration: 2000 })
+
+      // AUTO-SAVE: thay vì bắt user bấm thêm 1 nút, gọi luôn API tạo
+      // CourseVideo trong DB. Body dùng state hiện tại + finalTitle.
+      try {
+        await instructorService.uploadVideo(courseId, {
+          title:     finalTitle,
+          url:       publicUrl,
+          position:  videos.length + 1,
+          thumbUrl:  thumbUrl || undefined,
+          isPreview,
+          groupName: groupName.trim() || undefined,
+          gcsPath,
+        })
+        qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
+        toast.success('✅ Đã thêm video vào khoá học!')
+        resetForm()
+      } catch (saveErr: unknown) {
+        const e = saveErr as { response?: { data?: { error?: string } }; message?: string }
+        toast.error(`Upload OK nhưng lưu DB thất bại: ${e.response?.data?.error || e.message}. File ở GCS, bạn có thể edit + bấm "Thêm bài học" thủ công.`)
+        // Không reset form → user vẫn thấy form đã fill, click thủ công được
       }
-      toast.success(`Upload xong (${sizeMB.toFixed(1)}MB)`)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } }; message?: string }
       toast.error(e.response?.data?.error || e.message || 'Upload thất bại')
