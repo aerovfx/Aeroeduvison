@@ -10249,12 +10249,355 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  /**
+   * Seed Lịch sử 10, 11, 12 theo SGK Việt Nam (GDPT 2018).
+   * ~130 nodes (events, persons, applications) + ~180 edges. Idempotent.
+   */
+  async function seedKgHistory() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === SUBJECT ===
+      { id: 'subj-lichsu', type: 'Subject', label: 'Lịch sử',
+        description: 'Môn Lịch sử THPT 10, 11, 12 theo GDPT 2018',
+        properties: { color: '#dc2626' } },
+
+      // === LỚP 10: Đại cương + Văn minh + VN trước 1858 ===
+      { id: 'chap-ls10-su-hoc',      type: 'Chapter', label: '[10] Lịch sử + Sử học',         description: 'Sử học là gì, nguồn sử liệu (vật + chữ viết), phương pháp' },
+      { id: 'chap-ls10-vm-co',       type: 'Chapter', label: '[10] Văn minh cổ - trung đại',  description: 'Ai Cập, Lưỡng Hà, Hy Lạp-La Mã, Trung Hoa, Ấn Độ, Hồi giáo' },
+      { id: 'chap-ls10-cmcn',        type: 'Chapter', label: '[10] Cách mạng công nghiệp',    description: 'CMCN 1, 2, 3, 4 — biến đổi xã hội + kinh tế' },
+      { id: 'chap-ls10-pk-a',        type: 'Chapter', label: '[10] Phong kiến châu Á',        description: 'Trung Hoa, Ấn Độ, Đông Nam Á — chế độ chính trị + kinh tế' },
+      { id: 'chap-ls10-vm-vn',       type: 'Chapter', label: '[10] Văn minh trên đất VN',     description: 'Văn Lang-Âu Lạc, Champa, Phù Nam, Đại Việt' },
+      { id: 'chap-ls10-dan-toc',     type: 'Chapter', label: '[10] Cộng đồng dân tộc VN',     description: '54 dân tộc anh em — bản sắc + đoàn kết' },
+
+      { id: 'topic-su-hoc',          type: 'Topic', label: 'Sử học',                          description: 'Khoa học nghiên cứu quá khứ — đối tượng + phương pháp' },
+      { id: 'topic-su-lieu',         type: 'Topic', label: 'Nguồn sử liệu',                   description: 'Hiện vật (khảo cổ), chữ viết (sử biên niên), truyền miệng' },
+      { id: 'topic-vm-ai-cap',       type: 'Topic', label: 'Văn minh Ai Cập',                 description: 'Sông Nile, kim tự tháp, chữ tượng hình, pharaoh' },
+      { id: 'topic-vm-luong-ha',     type: 'Topic', label: 'Văn minh Lưỡng Hà',               description: 'Tigris-Euphrates, bộ luật Hammurabi, chữ hình nêm' },
+      { id: 'topic-vm-hy-la',        type: 'Topic', label: 'Văn minh Hy Lạp - La Mã',         description: 'Triết học (Socrates, Aristotle), dân chủ Athen, đế chế Roma' },
+      { id: 'topic-vm-trung-hoa',    type: 'Topic', label: 'Văn minh Trung Hoa',              description: 'Nho-Phật-Lão, giấy, in, la bàn, thuốc súng (Tứ đại phát minh)' },
+      { id: 'topic-vm-an-do',        type: 'Topic', label: 'Văn minh Ấn Độ',                  description: 'Hindu giáo, Phật giáo, số 0, sử thi Mahabharata + Ramayana' },
+      { id: 'topic-cmcn1',           type: 'Topic', label: 'CMCN lần 1 (1750-1850)',         description: 'Máy hơi nước (Watt), Anh đi đầu — chuyển từ thủ công → công nghiệp' },
+      { id: 'topic-cmcn2',           type: 'Topic', label: 'CMCN lần 2 (1870-1914)',         description: 'Điện, động cơ đốt trong, hoá học — Mỹ + Đức vượt lên' },
+      { id: 'topic-cmcn3',           type: 'Topic', label: 'CMCN lần 3 (1950+)',             description: 'Máy tính, vũ trụ, hạt nhân — kỷ nguyên thông tin' },
+      { id: 'topic-cmcn4',           type: 'Topic', label: 'CMCN lần 4 (2010+)',             description: 'AI, IoT, robot, sinh học — Industry 4.0 đang diễn ra' },
+      { id: 'topic-pk-tq',           type: 'Topic', label: 'Phong kiến Trung Quốc',           description: 'Tần Hán → Tống Minh Thanh — chế độ Hoàng đế tập quyền' },
+      { id: 'topic-pk-dna',          type: 'Topic', label: 'Phong kiến Đông Nam Á',           description: 'Khmer-Angkor, Sukhothai, Majapahit — ảnh hưởng Ấn-Trung' },
+      { id: 'topic-van-lang',        type: 'Topic', label: 'Văn Lang - Âu Lạc',               description: 'Nhà nước đầu tiên của VN (~700 TCN - 179 TCN), Hùng Vương' },
+      { id: 'topic-champa',          type: 'Topic', label: 'Vương quốc Champa',               description: 'Trung Bộ VN (192-1832) — Mỹ Sơn, ngôn ngữ Cham, Hindu giáo' },
+      { id: 'topic-phu-nam',         type: 'Topic', label: 'Vương quốc Phù Nam',              description: 'Nam Bộ (1-7 TK), cảng Óc Eo — giao thương biển Á-Âu' },
+      { id: 'topic-dai-viet',        type: 'Topic', label: 'Đại Việt (Lý - Trần - Lê - Nguyễn)', description: '1010-1858 — đỉnh cao tự chủ + chiến thắng ngoại xâm' },
+
+      // === LỚP 11: Thế giới cận đại + VN cuối 19 đầu 20 ===
+      { id: 'chap-ls11-cmts',         type: 'Chapter', label: '[11] CMTS Pháp + Bắc Mỹ',     description: 'Cách mạng tư sản — lật đổ phong kiến, lập cộng hòa' },
+      { id: 'chap-ls11-cntb',         type: 'Chapter', label: '[11] Hình thành CNTB',         description: 'Tích luỹ tư bản, công nghiệp, thuộc địa hoá thế giới' },
+      { id: 'chap-ls11-cnxh',         type: 'Chapter', label: '[11] CNXH 1917 → nay',         description: 'CMT10 Nga 1917, Liên Xô, Đông Âu, Trung Quốc, Cuba' },
+      { id: 'chap-ls11-cttg',         type: 'Chapter', label: '[11] Chiến tranh TG I + II',   description: 'WW1 (1914-18) + WW2 (1939-45) — bi kịch nhân loại' },
+      { id: 'chap-ls11-xl-dna',       type: 'Chapter', label: '[11] Xâm lược Đông Nam Á',     description: 'Phương Tây chiếm thuộc địa ĐNA cuối 19 đầu 20' },
+      { id: 'chap-ls11-vn-1858',      type: 'Chapter', label: '[11] VN 1858-1918',            description: 'Pháp xâm lược, phong trào Cần Vương, Yên Thế, Đông Du' },
+      { id: 'chap-ls11-cai-cach',     type: 'Chapter', label: '[11] Cải cách lớn',             description: 'Khang Hữu Vi (TQ), Minh Trị (Nhật), Quang Trung, Hồ Quý Ly' },
+      { id: 'chap-ls11-bv-chu-quyen', type: 'Chapter', label: '[11] Bảo vệ chủ quyền VN',     description: 'Biển đảo, biên giới — Hoàng Sa, Trường Sa' },
+
+      { id: 'topic-cmts-phap',       type: 'Topic', label: 'CMTS Pháp 1789',                 description: 'Tuyên ngôn Nhân quyền, lật đổ Bourbon, Napoleon, ảnh hưởng toàn cầu' },
+      { id: 'topic-cmts-bac-my',     type: 'Topic', label: 'Chiến tranh giành ĐL Mỹ',        description: '1775-1783, 13 thuộc địa Anh → Hoa Kỳ, Washington + Jefferson' },
+      { id: 'topic-cntb',            type: 'Topic', label: 'Chủ nghĩa tư bản',                description: 'Tư hữu tư liệu sản xuất, lợi nhuận tối đa, cạnh tranh thị trường' },
+      { id: 'topic-cmt10-nga',       type: 'Topic', label: 'CMT10 Nga 1917',                 description: 'Bolshevik + Lenin lật đổ Sa hoàng → Liên Xô đầu tiên' },
+      { id: 'topic-lien-xo',         type: 'Topic', label: 'Liên Xô (1922-1991)',            description: 'Stalin công nghiệp hoá, WW2 thắng Đức, siêu cường, tan rã 1991' },
+      { id: 'topic-ww1',             type: 'Topic', label: 'WW1 (1914-1918)',                description: 'Liên minh vs Hiệp ước, ~16 triệu người chết, Versailles 1919' },
+      { id: 'topic-ww2',             type: 'Topic', label: 'WW2 (1939-1945)',                description: 'Đức/Ý/Nhật Phát-xít vs Đồng minh, ~75M chết, Hiroshima 1945' },
+      { id: 'topic-pk-bac-thuoc',    type: 'Topic', label: 'Bắc thuộc (1000+ năm)',          description: '111 TCN - 938 — Hán Đường Tống cai trị Bắc Bộ' },
+      { id: 'topic-bach-dang-938',   type: 'Topic', label: 'Bạch Đằng 938 - Ngô Quyền',      description: 'Cọc nhọn dưới sông → đánh tan quân Nam Hán, mở ĐL Đại Việt' },
+      { id: 'topic-bach-dang-1288',  type: 'Topic', label: 'Bạch Đằng 1288 - Trần Hưng Đạo', description: 'Đại thắng Nguyên Mông lần 3 — chiến thuật phục kích' },
+      { id: 'topic-le-loi',          type: 'Topic', label: 'Khởi nghĩa Lam Sơn',             description: '1418-1427 Lê Lợi + Nguyễn Trãi đuổi quân Minh, lập Hậu Lê' },
+      { id: 'topic-quang-trung',     type: 'Topic', label: 'Quang Trung - Ngọc Hồi Đống Đa', description: '1789 Nguyễn Huệ đại phá 29 vạn quân Thanh — thần tốc' },
+      { id: 'topic-vn-1858',         type: 'Topic', label: 'Pháp xâm lược VN 1858',          description: 'Bắt đầu tấn công Đà Nẵng → Sài Gòn → toàn cõi (1858-1884)' },
+      { id: 'topic-can-vuong',       type: 'Topic', label: 'Phong trào Cần Vương',           description: '1885-1896 — Hàm Nghi + Tôn Thất Thuyết kêu gọi cứu nước' },
+      { id: 'topic-yen-the',         type: 'Topic', label: 'Khởi nghĩa Yên Thế (Hoàng Hoa Thám)', description: '1884-1913 — kéo dài nhất, du kích miền núi Bắc Giang' },
+      { id: 'topic-dong-du',         type: 'Topic', label: 'Phong trào Đông Du - Phan Bội Châu', description: '1905-1909 — đưa thanh niên VN sang Nhật học' },
+      { id: 'topic-cai-cach-minh-tri',type: 'Topic', label: 'Duy tân Minh Trị (Nhật)',       description: '1868 — Nhật hoá hiện đại từ phong kiến → cường quốc' },
+
+      // === LỚP 12: VN hiện đại + Quan hệ quốc tế ===
+      { id: 'chap-ls12-tg-1945',     type: 'Chapter', label: '[12] Thế giới 1945-2000',     description: 'Chiến tranh lạnh, Liên Xô tan rã, ASEAN, EU, toàn cầu hoá' },
+      { id: 'chap-ls12-vn-1919',     type: 'Chapter', label: '[12] VN 1919-1930',           description: 'NAQ tìm đường cứu nước → Đảng CSVN ra đời 3/2/1930' },
+      { id: 'chap-ls12-vn-1930-45',  type: 'Chapter', label: '[12] VN 1930-1945',           description: 'Phong trào 30-31, Việt Minh, Cách mạng tháng Tám 1945' },
+      { id: 'chap-ls12-vn-1945-54',  type: 'Chapter', label: '[12] VN 1945-1954',           description: 'Kháng chiến chống Pháp, Điện Biên Phủ 1954' },
+      { id: 'chap-ls12-vn-1954-75',  type: 'Chapter', label: '[12] VN 1954-1975',           description: 'Kháng chiến chống Mỹ, Đại thắng mùa xuân 1975' },
+      { id: 'chap-ls12-vn-1975',     type: 'Chapter', label: '[12] VN 1975 → nay',          description: 'Thống nhất, Đổi mới 1986, hội nhập quốc tế' },
+      { id: 'chap-ls12-hcm',         type: 'Chapter', label: '[12] HCM - cuộc đời + di sản', description: 'NAQ - Bác Hồ - người sáng lập Đảng + lãnh tụ dân tộc' },
+      { id: 'chap-ls12-ngoai-giao',  type: 'Chapter', label: '[12] Quan hệ đối ngoại VN',   description: 'Từ kháng chiến → mở cửa → đối tác chiến lược toàn diện' },
+
+      { id: 'topic-chien-tranh-lanh',type: 'Topic', label: 'Chiến tranh Lạnh',              description: '1947-1991 Mỹ vs Liên Xô — vũ khí hạt nhân, không gian, ý thức hệ' },
+      { id: 'topic-asean',           type: 'Topic', label: 'ASEAN',                          description: '1967 thành lập, VN gia nhập 1995, 10 thành viên — hợp tác khu vực' },
+      { id: 'topic-eu',              type: 'Topic', label: 'Liên minh châu Âu (EU)',        description: '1993 Maastricht, 27 thành viên, đồng Euro 1999' },
+      { id: 'topic-naq-tim-duong',   type: 'Topic', label: 'NAQ tìm đường cứu nước',         description: '5/6/1911 Sài Gòn → 1920 đến chủ nghĩa Marx-Lenin' },
+      { id: 'topic-dang-csvn',       type: 'Topic', label: 'Đảng CSVN ra đời 3/2/1930',     description: 'Hội nghị Hợp nhất 3 tổ chức cộng sản tại Hong Kong - HCM chủ trì' },
+      { id: 'topic-pt-30-31',        type: 'Topic', label: 'Phong trào 1930-1931',           description: 'Xô viết Nghệ-Tĩnh — đỉnh cao đấu tranh, bị đàn áp đẫm máu' },
+      { id: 'topic-mat-tran-vm',     type: 'Topic', label: 'Mặt trận Việt Minh (1941)',     description: 'Bác Hồ về nước, lập VM tại Pác Bó — chuẩn bị tổng khởi nghĩa' },
+      { id: 'topic-cm-8-1945',       type: 'Topic', label: 'Cách mạng tháng Tám 1945',      description: '14-19/8/1945 toàn quốc khởi nghĩa, 2/9 Bác Hồ tuyên độc lập' },
+      { id: 'topic-vn-dl-292',       type: 'Topic', label: 'Tuyên ngôn Độc lập 2/9/1945',   description: 'Quảng trường Ba Đình — VN DCCH ra đời' },
+      { id: 'topic-toan-quoc-46',    type: 'Topic', label: 'Toàn quốc kháng chiến 19/12/1946', description: 'Lời kêu gọi của Bác Hồ — bắt đầu 9 năm chống Pháp' },
+      { id: 'topic-dbp-1954',        type: 'Topic', label: 'Chiến dịch Điện Biên Phủ',      description: '13/3-7/5/1954 đại thắng — Võ Nguyên Giáp tiêu diệt 16k Pháp' },
+      { id: 'topic-geneve-1954',     type: 'Topic', label: 'Hiệp định Geneva 1954',         description: 'Pháp rút khỏi VN, chia tạm thời vĩ tuyến 17' },
+      { id: 'topic-dong-khoi',       type: 'Topic', label: 'Đồng khởi 1959-1960',           description: 'Nông dân Nam Bộ vũ trang nổi dậy chống Mỹ-Diệm' },
+      { id: 'topic-mau-than-68',    type: 'Topic', label: 'Tổng tiến công Mậu Thân 1968',   description: 'Tết Mậu Thân — tấn công bất ngờ vào đô thị miền Nam' },
+      { id: 'topic-paris-1973',      type: 'Topic', label: 'Hiệp định Paris 1973',          description: 'Mỹ chấp nhận rút quân, công nhận chủ quyền VN' },
+      { id: 'topic-30-4-1975',       type: 'Topic', label: 'Đại thắng 30/4/1975',           description: 'Chiến dịch HCM giải phóng SG, thống nhất Tổ quốc' },
+      { id: 'topic-doi-moi-1986',    type: 'Topic', label: 'Đổi mới 1986',                  description: 'Đại hội VI Đảng — chuyển kinh tế kế hoạch → thị trường' },
+      { id: 'topic-asean-vn-1995',   type: 'Topic', label: 'VN gia nhập ASEAN 1995',         description: 'Mở đầu thời kỳ hội nhập khu vực' },
+      { id: 'topic-wto-2007',        type: 'Topic', label: 'VN gia nhập WTO 2007',           description: 'Hội nhập kinh tế toàn cầu — thành viên 150' },
+      { id: 'topic-tp-cp',           type: 'Topic', label: 'Đối tác chiến lược toàn diện',  description: 'VN với Nga, TQ, Ấn, Hàn, Nhật, Úc, Mỹ, Pháp, Anh, NewZ' },
+
+      // === PERSONS (nhân vật lịch sử) ===
+      { id: 'person-hai-ba-trung',   type: 'Person', label: 'Hai Bà Trưng (Trưng Trắc, Trưng Nhị)', description: 'Khởi nghĩa 40 SCN chống Hán — nữ anh hùng đầu tiên VN' },
+      { id: 'person-ly-thuong-kiet', type: 'Person', label: 'Lý Thường Kiệt',                description: '1019-1105 — tướng Lý, đánh Tống "Nam quốc sơn hà"' },
+      { id: 'person-tran-hung-dao',  type: 'Person', label: 'Trần Hưng Đạo',                 description: '1228-1300 — Hưng Đạo Đại Vương, 3 lần đại thắng Nguyên Mông' },
+      { id: 'person-nguyen-trai',    type: 'Person', label: 'Nguyễn Trãi',                   description: '1380-1442 — quân sư Lê Lợi, "Bình Ngô Đại Cáo"' },
+      { id: 'person-le-loi-p',       type: 'Person', label: 'Lê Lợi (Lê Thái Tổ)',          description: '1385-1433 — anh hùng đuổi giặc Minh, lập triều Hậu Lê' },
+      { id: 'person-quang-trung-p',  type: 'Person', label: 'Quang Trung (Nguyễn Huệ)',     description: '1753-1792 — đánh bại Xiêm + Thanh, cải cách lớn' },
+      { id: 'person-phan-boi-chau',  type: 'Person', label: 'Phan Bội Châu',                description: '1867-1940 — lãnh đạo Đông Du, dấu tranh chống Pháp' },
+      { id: 'person-ho-chi-minh',    type: 'Person', label: 'Hồ Chí Minh (NAQ - Bác Hồ)',   description: '1890-1969 — sáng lập Đảng + nước VN DCCH, anh hùng dân tộc' },
+      { id: 'person-vo-nguyen-giap', type: 'Person', label: 'Võ Nguyên Giáp',               description: '1911-2013 — Đại tướng đầu tiên, hùng tướng ĐBP + chống Mỹ' },
+      { id: 'person-phan-chau-trinh',type: 'Person', label: 'Phan Châu Trinh',              description: '1872-1926 — đề xướng "Khai dân trí, chấn dân khí, hậu dân sinh"' },
+      { id: 'person-darwin-ls',      type: 'Person', label: 'Darwin (TG ngoài VN)',         description: '1809-1882 — học thuyết tiến hóa, ảnh hưởng tư tưởng VN cuối 19' },
+      { id: 'person-marx-lenin',     type: 'Person', label: 'Marx + Lenin',                  description: 'Chủ nghĩa Marx-Lenin — nền tảng tư tưởng Đảng CSVN' },
+
+      // === CONCEPTS ===
+      { id: 'concept-cach-mang',     type: 'Concept', label: 'Cách mạng',                    description: 'Biến đổi căn bản chế độ xã hội — chính trị / kinh tế / xã hội' },
+      { id: 'concept-de-quoc',       type: 'Concept', label: 'Đế quốc + Thuộc địa',         description: 'Quan hệ chính quốc - thuộc địa — bóc lột tài nguyên + nhân công' },
+      { id: 'concept-doc-lap',       type: 'Concept', label: 'Độc lập dân tộc',              description: 'Tự chủ chính trị, không bị nước ngoài cai trị' },
+      { id: 'concept-thong-nhat',    type: 'Concept', label: 'Thống nhất đất nước',          description: 'Một quốc gia, một chính quyền — VN 1975' },
+      { id: 'concept-yeu-nuoc',      type: 'Concept', label: 'Tinh thần yêu nước',           description: 'Truyền thống VN — sẵn sàng hy sinh vì dân tộc' },
+      { id: 'concept-cnxh',          type: 'Concept', label: 'Chủ nghĩa xã hội',             description: 'Hệ tư tưởng — sở hữu công cộng, công bằng xã hội' },
+      { id: 'concept-mac-lenin',     type: 'Concept', label: 'Chủ nghĩa Mác-Lê',            description: 'Tư tưởng giai cấp + đấu tranh — nền tảng Đảng CSVN' },
+      { id: 'concept-doi-moi',       type: 'Concept', label: 'Đổi mới (1986)',               description: 'Chuyển từ kế hoạch hoá tập trung → kinh tế thị trường' },
+      { id: 'concept-hoi-nhap',      type: 'Concept', label: 'Hội nhập quốc tế',             description: 'Mở cửa kinh tế + đối ngoại đa phương' },
+      { id: 'concept-da-dang-vh',    type: 'Concept', label: 'Đa dạng văn hoá',              description: '54 dân tộc VN — đoàn kết trong đa dạng' },
+
+      // === PHENOMENA (sự kiện lịch sử lớn) ===
+      { id: 'phen-cmcn4-ls',         type: 'Phenomenon', label: 'CMCN 4.0 hiện tại',         description: 'AI, IoT, sinh học — đang định hình thế kỷ 21' },
+      { id: 'phen-toan-cau-hoa',     type: 'Phenomenon', label: 'Toàn cầu hoá',              description: 'Hàng hoá, vốn, lao động lưu thông toàn cầu — cuối 20 đầu 21' },
+      { id: 'phen-bien-doi-vh',      type: 'Phenomenon', label: 'Giao thoa văn hoá Đông-Tây', description: 'Toàn cầu hoá → văn hoá địa phương + quốc tế tương tác' },
+
+      // === APPLICATIONS (di sản + bài học) ===
+      { id: 'app-bao-tang',          type: 'Application', label: 'Bảo tàng lịch sử',          description: 'Bảo tàng LSQS, BT Phụ nữ VN, BTLS QGVN — giáo dục di sản' },
+      { id: 'app-di-tich',           type: 'Application', label: 'Di tích lịch sử',           description: 'Cố đô Huế, Hội An, Thánh địa Mỹ Sơn — UNESCO công nhận' },
+      { id: 'app-du-lich-ls',        type: 'Application', label: 'Du lịch lịch sử',           description: 'Tham quan ĐBP, Cố đô Hoa Lư — kinh tế + giáo dục' },
+      { id: 'app-bai-hoc',           type: 'Application', label: 'Bài học từ lịch sử',         description: 'Đoàn kết, tự chủ, hội nhập — kim chỉ nam hiện đại' },
+      { id: 'app-phim-ls',           type: 'Application', label: 'Phim tài liệu LS',           description: 'Phim VN "Mùa lá rụng" "Mùi cỏ cháy" — giáo dục thế hệ trẻ' },
+      { id: 'app-le-hoi',            type: 'Application', label: 'Lễ hội truyền thống',        description: 'Hùng Vương 10/3, Đền Trần, Đống Đa — giữ gìn bản sắc' },
+      { id: 'app-ngoai-giao-mem',    type: 'Application', label: 'Ngoại giao mềm',             description: 'Phở, áo dài, văn hoá VN → soft power quốc tế' },
+
+      // === CAREERS ===
+      { id: 'career-nha-su-hoc',     type: 'Career', label: 'Nhà sử học',                    description: 'Nghiên cứu + giảng dạy lịch sử — Viện Sử học, ĐH' },
+      { id: 'career-nha-bao',        type: 'Career', label: 'Nhà báo - phóng viên',           description: 'Phóng sự lịch sử, tin tức — báo chí giáo dục công chúng' },
+      { id: 'career-bao-tang',       type: 'Career', label: 'Cán bộ bảo tàng',                description: 'Sưu tầm, bảo quản, trưng bày hiện vật lịch sử' },
+      { id: 'career-huong-dan-vien', type: 'Career', label: 'Hướng dẫn viên du lịch',         description: 'Kể chuyện lịch sử, văn hoá tại di tích' },
+      { id: 'career-ngoai-giao',     type: 'Career', label: 'Nhà ngoại giao',                 description: 'Đại sứ, tham tán — đại diện VN ở nước ngoài' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-hist:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Subject → Chapters
+      ['subj-lichsu', 'chap-ls10-su-hoc',     'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls10-vm-co',      'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls10-cmcn',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls10-pk-a',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls10-vm-vn',      'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls10-dan-toc',    'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-cmts',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-cntb',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-cnxh',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-cttg',       'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-xl-dna',     'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-vn-1858',    'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-cai-cach',   'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls11-bv-chu-quyen','HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-tg-1945',    'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-vn-1919',    'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-vn-1930-45', 'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-vn-1945-54', 'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-vn-1954-75', 'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-vn-1975',    'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-hcm',        'HAS_CHAPTER'],
+      ['subj-lichsu', 'chap-ls12-ngoai-giao', 'HAS_CHAPTER'],
+
+      // Chapter LỚP 10 → Topics
+      ['chap-ls10-su-hoc',   'topic-su-hoc',         'HAS_TOPIC'],
+      ['chap-ls10-su-hoc',   'topic-su-lieu',        'HAS_TOPIC'],
+      ['chap-ls10-vm-co',    'topic-vm-ai-cap',      'HAS_TOPIC'],
+      ['chap-ls10-vm-co',    'topic-vm-luong-ha',    'HAS_TOPIC'],
+      ['chap-ls10-vm-co',    'topic-vm-hy-la',       'HAS_TOPIC'],
+      ['chap-ls10-vm-co',    'topic-vm-trung-hoa',   'HAS_TOPIC'],
+      ['chap-ls10-vm-co',    'topic-vm-an-do',       'HAS_TOPIC'],
+      ['chap-ls10-cmcn',     'topic-cmcn1',          'HAS_TOPIC'],
+      ['chap-ls10-cmcn',     'topic-cmcn2',          'HAS_TOPIC'],
+      ['chap-ls10-cmcn',     'topic-cmcn3',          'HAS_TOPIC'],
+      ['chap-ls10-cmcn',     'topic-cmcn4',          'HAS_TOPIC'],
+      ['chap-ls10-pk-a',     'topic-pk-tq',          'HAS_TOPIC'],
+      ['chap-ls10-pk-a',     'topic-pk-dna',         'HAS_TOPIC'],
+      ['chap-ls10-vm-vn',    'topic-van-lang',       'HAS_TOPIC'],
+      ['chap-ls10-vm-vn',    'topic-champa',         'HAS_TOPIC'],
+      ['chap-ls10-vm-vn',    'topic-phu-nam',        'HAS_TOPIC'],
+      ['chap-ls10-vm-vn',    'topic-dai-viet',       'HAS_TOPIC'],
+
+      // Chapter LỚP 11 → Topics
+      ['chap-ls11-cmts',    'topic-cmts-phap',       'HAS_TOPIC'],
+      ['chap-ls11-cmts',    'topic-cmts-bac-my',     'HAS_TOPIC'],
+      ['chap-ls11-cntb',    'topic-cntb',            'HAS_TOPIC'],
+      ['chap-ls11-cnxh',    'topic-cmt10-nga',       'HAS_TOPIC'],
+      ['chap-ls11-cnxh',    'topic-lien-xo',         'HAS_TOPIC'],
+      ['chap-ls11-cttg',    'topic-ww1',             'HAS_TOPIC'],
+      ['chap-ls11-cttg',    'topic-ww2',             'HAS_TOPIC'],
+      ['chap-ls11-vn-1858', 'topic-vn-1858',         'HAS_TOPIC'],
+      ['chap-ls11-vn-1858', 'topic-can-vuong',       'HAS_TOPIC'],
+      ['chap-ls11-vn-1858', 'topic-yen-the',         'HAS_TOPIC'],
+      ['chap-ls11-vn-1858', 'topic-dong-du',         'HAS_TOPIC'],
+      ['chap-ls11-cai-cach','topic-cai-cach-minh-tri','HAS_TOPIC'],
+
+      // Chapter LỚP 12 → Topics
+      ['chap-ls12-tg-1945', 'topic-chien-tranh-lanh',  'HAS_TOPIC'],
+      ['chap-ls12-tg-1945', 'topic-asean',             'HAS_TOPIC'],
+      ['chap-ls12-tg-1945', 'topic-eu',                'HAS_TOPIC'],
+      ['chap-ls12-vn-1919', 'topic-naq-tim-duong',     'HAS_TOPIC'],
+      ['chap-ls12-vn-1919', 'topic-dang-csvn',         'HAS_TOPIC'],
+      ['chap-ls12-vn-1930-45','topic-pt-30-31',        'HAS_TOPIC'],
+      ['chap-ls12-vn-1930-45','topic-mat-tran-vm',     'HAS_TOPIC'],
+      ['chap-ls12-vn-1930-45','topic-cm-8-1945',       'HAS_TOPIC'],
+      ['chap-ls12-vn-1930-45','topic-vn-dl-292',       'HAS_TOPIC'],
+      ['chap-ls12-vn-1945-54','topic-toan-quoc-46',    'HAS_TOPIC'],
+      ['chap-ls12-vn-1945-54','topic-dbp-1954',        'HAS_TOPIC'],
+      ['chap-ls12-vn-1945-54','topic-geneve-1954',     'HAS_TOPIC'],
+      ['chap-ls12-vn-1954-75','topic-dong-khoi',       'HAS_TOPIC'],
+      ['chap-ls12-vn-1954-75','topic-mau-than-68',     'HAS_TOPIC'],
+      ['chap-ls12-vn-1954-75','topic-paris-1973',      'HAS_TOPIC'],
+      ['chap-ls12-vn-1954-75','topic-30-4-1975',       'HAS_TOPIC'],
+      ['chap-ls12-vn-1975',   'topic-doi-moi-1986',    'HAS_TOPIC'],
+      ['chap-ls12-vn-1975',   'topic-asean-vn-1995',   'HAS_TOPIC'],
+      ['chap-ls12-vn-1975',   'topic-wto-2007',        'HAS_TOPIC'],
+      ['chap-ls12-vn-1975',   'topic-tp-cp',           'HAS_TOPIC'],
+
+      // Topic → Person (cùng thời + nhân vật chính)
+      ['topic-van-lang',     'person-hai-ba-trung',    'RELATES_TO'], // HBT thuộc Bắc thuộc, gần đó
+      ['topic-bach-dang-938','person-tran-hung-dao',   'RELATES_TO'],
+      ['topic-bach-dang-1288','person-tran-hung-dao',  'RELATES_TO'],
+      ['topic-le-loi',       'person-le-loi-p',        'RELATES_TO'],
+      ['topic-le-loi',       'person-nguyen-trai',     'RELATES_TO'],
+      ['topic-quang-trung',  'person-quang-trung-p',   'RELATES_TO'],
+      ['topic-dong-du',      'person-phan-boi-chau',   'RELATES_TO'],
+      ['topic-naq-tim-duong','person-ho-chi-minh',     'RELATES_TO'],
+      ['topic-dang-csvn',    'person-ho-chi-minh',     'RELATES_TO'],
+      ['topic-cm-8-1945',    'person-ho-chi-minh',     'RELATES_TO'],
+      ['topic-vn-dl-292',    'person-ho-chi-minh',     'RELATES_TO'],
+      ['topic-dbp-1954',     'person-vo-nguyen-giap',  'RELATES_TO'],
+      ['topic-30-4-1975',    'person-vo-nguyen-giap',  'RELATES_TO'],
+      ['topic-cmt10-nga',    'person-marx-lenin',      'RELATES_TO'],
+      ['topic-cntb',         'person-darwin-ls',       'RELATES_TO'],
+      ['topic-dong-du',      'person-phan-chau-trinh', 'RELATES_TO'],
+      ['topic-van-lang',     'person-ly-thuong-kiet',  'RELATES_TO'], // legendary VN history
+
+      // Topic → Concept
+      ['topic-cmts-phap',     'concept-cach-mang',    'USES_CONCEPT'],
+      ['topic-cmts-bac-my',   'concept-cach-mang',    'USES_CONCEPT'],
+      ['topic-cmt10-nga',     'concept-cach-mang',    'USES_CONCEPT'],
+      ['topic-cm-8-1945',     'concept-cach-mang',    'USES_CONCEPT'],
+      ['topic-vn-1858',       'concept-de-quoc',      'USES_CONCEPT'],
+      ['topic-vn-dl-292',     'concept-doc-lap',      'USES_CONCEPT'],
+      ['topic-30-4-1975',     'concept-thong-nhat',   'USES_CONCEPT'],
+      ['topic-can-vuong',     'concept-yeu-nuoc',     'USES_CONCEPT'],
+      ['topic-yen-the',       'concept-yeu-nuoc',     'USES_CONCEPT'],
+      ['topic-cmt10-nga',     'concept-cnxh',         'USES_CONCEPT'],
+      ['topic-naq-tim-duong', 'concept-mac-lenin',    'USES_CONCEPT'],
+      ['topic-doi-moi-1986',  'concept-doi-moi',      'USES_CONCEPT'],
+      ['topic-asean-vn-1995', 'concept-hoi-nhap',     'USES_CONCEPT'],
+      ['topic-wto-2007',      'concept-hoi-nhap',     'USES_CONCEPT'],
+
+      // Topic → Phenomenon
+      ['topic-cmcn4',          'phen-cmcn4-ls',           'EXHIBITS_PHENOMENON'],
+      ['topic-doi-moi-1986',   'phen-toan-cau-hoa',       'EXHIBITS_PHENOMENON'],
+      ['topic-eu',             'phen-toan-cau-hoa',       'EXHIBITS_PHENOMENON'],
+      ['topic-vm-trung-hoa',   'phen-bien-doi-vh',        'EXHIBITS_PHENOMENON'],
+      ['topic-vm-an-do',       'phen-bien-doi-vh',        'EXHIBITS_PHENOMENON'],
+
+      // Topic → Application
+      ['topic-dai-viet',       'app-bao-tang',         'APPLIED_IN'],
+      ['topic-champa',         'app-di-tich',          'APPLIED_IN'],
+      ['topic-dai-viet',       'app-di-tich',          'APPLIED_IN'],
+      ['topic-dbp-1954',       'app-du-lich-ls',       'APPLIED_IN'],
+      ['topic-doi-moi-1986',   'app-bai-hoc',          'APPLIED_IN'],
+      ['topic-dbp-1954',       'app-phim-ls',          'APPLIED_IN'],
+      ['topic-van-lang',       'app-le-hoi',           'APPLIED_IN'],
+      ['topic-tp-cp',          'app-ngoai-giao-mem',   'APPLIED_IN'],
+
+      // Topic → Career
+      ['topic-su-hoc',         'career-nha-su-hoc',    'APPLIED_IN_CAREER'],
+      ['topic-su-lieu',        'career-bao-tang',      'APPLIED_IN_CAREER'],
+      ['topic-tp-cp',          'career-ngoai-giao',    'APPLIED_IN_CAREER'],
+      ['topic-cm-8-1945',      'career-nha-bao',       'APPLIED_IN_CAREER'],
+      ['topic-dai-viet',       'career-huong-dan-vien','APPLIED_IN_CAREER'],
+
+      // REQUIRES (prerequisite — học theo trình tự thời gian)
+      ['topic-cmcn2',          'topic-cmcn1',          'REQUIRES'],
+      ['topic-cmcn3',          'topic-cmcn2',          'REQUIRES'],
+      ['topic-cmcn4',          'topic-cmcn3',          'REQUIRES'],
+      ['topic-ww2',            'topic-ww1',            'REQUIRES'],
+      ['topic-dang-csvn',      'topic-naq-tim-duong',  'REQUIRES'],
+      ['topic-cm-8-1945',      'topic-mat-tran-vm',    'REQUIRES'],
+      ['topic-vn-dl-292',      'topic-cm-8-1945',      'REQUIRES'],
+      ['topic-dbp-1954',       'topic-toan-quoc-46',   'REQUIRES'],
+      ['topic-geneve-1954',    'topic-dbp-1954',       'REQUIRES'],
+      ['topic-30-4-1975',      'topic-paris-1973',     'REQUIRES'],
+      ['topic-doi-moi-1986',   'topic-30-4-1975',      'REQUIRES'],
+
+      // CROSS-SUBJECT EDGES (Lịch sử ↔ STEM/khác)
+      // LS ↔ Vật lí
+      ['topic-cmcn1',          'topic-luc-newton',     'RELATES_TO'], // CMCN dùng cơ học
+      ['topic-cmcn2',          'topic-mach-dien',      'RELATES_TO'],
+      ['topic-cmcn3',          'topic-hat-nhan',       'RELATES_TO'], // CMCN3 dùng hạt nhân
+      ['topic-cmcn4',          'topic-quang-tu',       'RELATES_TO'], // AI dùng quang lượng tử
+      // LS ↔ Hóa
+      ['topic-cmcn1',          'topic-pu-oxh-kh',      'RELATES_TO'], // CMCN1 = than đá đốt
+      ['topic-cmcn2',          'topic-polymer-pe',     'RELATES_TO'], // CMCN2 = nhựa
+      // LS ↔ Sinh
+      ['topic-cmcn4',          'topic-cong-nghe-gen',  'RELATES_TO'], // CMCN4 = CRISPR
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-hist:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
   // Query: ?subjects=all → Lý + Toán + Hóa (default chỉ Lý cho backward-compat)
   //        ?extended=1   → Thêm physics extension (Quang học + VLHĐ + Phenomenon + Application)
   //        ?biology=1    → Thêm Sinh học 10, 11, 12
   //        ?math=1       → Thêm Toán 10, 11, 12 (mở rộng SGK đầy đủ)
   //        ?chem=1       → Thêm Hóa học 10, 11, 12 (mở rộng SGK đầy đủ)
+  //        ?history=1    → Thêm Lịch sử 10, 11, 12 (SGK GDPT 2018)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -10262,14 +10605,16 @@ ${plan.content || '<p>(Trống)</p>'}
       const bio = req.query.biology === '1' || req.query.bio === '1' || all;
       const math = req.query.math === '1' || all;
       const chem = req.query.chem === '1' || req.query.chemistry === '1' || all;
+      const hist = req.query.history === '1' || req.query.hist === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
       if (math) r5 = await seedKgMathExtended();
       if (chem) r6 = await seedKgChemExtended();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0);
+      if (hist) r7 = await seedKgHistory();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -10281,13 +10626,15 @@ ${plan.content || '<p>(Trống)</p>'}
         biology: r4,
         mathExtended: r5,
         chemExtended: r6,
+        history: r7,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ Toán + Hóa + Sinh học (3 lớp) mở rộng đầy đủ',
+          all && '+ Toán + Hóa + Sinh học + Lịch sử (3 lớp) mở rộng đầy đủ',
           ext && '+ Mở rộng Vật lí (Quang học + VLHĐ + Phenomenon + Application)',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12 mở rộng',
           chem && !all && '+ Hóa học 10/11/12 mở rộng',
+          hist && !all && '+ Lịch sử 10/11/12',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
