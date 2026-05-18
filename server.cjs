@@ -15001,8 +15001,642 @@ ${plan.content || '<p>(Trống)</p>'}
     return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // KG seed: Khối lớp 4 — Tiểu học (GDPT 2018)
+  // LƯU Ý: từ lớp 4, môn TNXH (lớp 1-3) tách thành 2 môn:
+  //   - Khoa học (KH): vật chất + sức khoẻ + thực vật/động vật chuyên sâu
+  //   - Lịch sử & Địa lí (LS-ĐL): hành trình dân tộc + vùng miền VN
+  // Tổng cộng lớp 4: 8 môn (thay vì 7 ở lớp 1-3)
+  // ════════════════════════════════════════════════════════════════
+  async function seedKgGrade4() {
+    await ensureKgReady();
+    const pool = getKcPool();
+
+    const nodes = [
+      // === META: Cụm khối lớp 4 ===
+      { id: 'meta-lop4', type: 'Subject', label: '🌟 Khối lớp 4 — Tiểu học',
+        description: 'Năm thứ 4 — TNXH tách Khoa học + LS-ĐL; phân số đầy đủ; văn miêu tả phong phú',
+        properties: { color: '#fbbf24', grade: 4 } },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 1: TOÁN 4 (175 tiết) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-toan4', type: 'Subject', label: 'Toán 4',
+        description: 'Số đến tỉ + 4 phép tính nhiều chữ số + phân số đầy đủ + hình tứ giác + biểu đồ',
+        properties: { color: '#3b82f6', grade: 4 } },
+
+      { id: 'chap-toan4-so-trieu', type: 'Chapter', label: '[T4] Số đến hàng triệu, tỉ',     description: 'Đọc/viết/so sánh số có 6-12 chữ số' },
+      { id: 'chap-toan4-4-pt-na',  type: 'Chapter', label: '[T4] 4 phép tính nhiều chữ số',  description: 'Cộng/trừ/nhân/chia số có nhiều chữ số' },
+      { id: 'chap-toan4-tc-pt',    type: 'Chapter', label: '[T4] Tính chất phép tính',       description: 'Giao hoán, kết hợp, phân phối' },
+      { id: 'chap-toan4-phan-so',  type: 'Chapter', label: '[T4] Phân số đầy đủ',            description: 'Rút gọn, quy đồng, cộng/trừ phân số (cùng + khác mẫu)' },
+      { id: 'chap-toan4-do-na',    type: 'Chapter', label: '[T4] Đo lường nâng cao',         description: 'm², dm², cm², tấn, tạ, yến' },
+      { id: 'chap-toan4-hh',       type: 'Chapter', label: '[T4] Hình học',                  description: 'Góc nhọn/tù/vuông/bẹt, song song/vuông góc, BH, thoi' },
+      { id: 'chap-toan4-tb-cong',  type: 'Chapter', label: '[T4] Trung bình cộng + Biểu đồ', description: 'TBC, biểu đồ cột, biểu đồ tranh' },
+
+      { id: 'topic-t4-trieu',     type: 'Topic', label: 'Số đến hàng triệu',                description: '1 triệu = 1 000 000; 9 chữ số: hàng trăm triệu' },
+      { id: 'topic-t4-ti',        type: 'Topic', label: 'Số đến hàng tỉ',                   description: '1 tỉ = 1 000 000 000; lớp tỉ-triệu-nghìn-đơn vị' },
+      { id: 'topic-t4-doc-trieu', type: 'Topic', label: 'Đọc số hàng triệu, tỉ',            description: '"hai trăm năm mươi tám triệu bốn trăm nghìn..."' },
+      { id: 'topic-t4-nhan-2cs',  type: 'Topic', label: 'Nhân với số có 2 CS',              description: '347 × 25 — đặt tính cột dọc + 2 dòng cộng' },
+      { id: 'topic-t4-chia-1cs',  type: 'Topic', label: 'Chia cho số có 1 CS',              description: '1245 ÷ 5 — chia từng hàng từ trái sang' },
+      { id: 'topic-t4-chia-2cs',  type: 'Topic', label: 'Chia cho số có 2 CS',              description: '4250 ÷ 25 — ước lượng thương; khó nhất lớp 4' },
+      { id: 'topic-t4-giao-hoan', type: 'Topic', label: 'Tính chất giao hoán',              description: 'a + b = b + a; a × b = b × a' },
+      { id: 'topic-t4-ket-hop',   type: 'Topic', label: 'Tính chất kết hợp',                description: '(a + b) + c = a + (b + c); (a × b) × c = a × (b × c)' },
+      { id: 'topic-t4-phan-phoi', type: 'Topic', label: 'Tính chất phân phối',              description: 'a × (b + c) = a × b + a × c — giúp tính nhanh' },
+      { id: 'topic-t4-ps-tu-mau', type: 'Topic', label: 'Phân số: tử + mẫu',                description: '3/4 — tử 3, mẫu 4; phân số = 1 phép chia' },
+      { id: 'topic-t4-ps-rut-gon',type: 'Topic', label: 'Rút gọn phân số',                  description: '4/8 = 2/4 = 1/2 — chia cả tử + mẫu cho UCLN' },
+      { id: 'topic-t4-ps-quy-dong',type:'Topic', label: 'Quy đồng mẫu số',                  description: '1/2 + 1/3 → quy về cùng mẫu 6: 3/6 + 2/6 = 5/6' },
+      { id: 'topic-t4-ps-cong-tru-cm',type:'Topic',label:'Cộng/trừ PS cùng mẫu',            description: '2/7 + 3/7 = 5/7; chỉ cộng tử, giữ mẫu' },
+      { id: 'topic-t4-ps-cong-tru-km',type:'Topic',label:'Cộng/trừ PS khác mẫu',            description: 'Quy đồng → cộng tử → rút gọn' },
+      { id: 'topic-t4-m2-dm2',    type: 'Topic', label: 'm², dm², cm²',                     description: '1 m² = 100 dm² = 10 000 cm² — đo diện tích' },
+      { id: 'topic-t4-tan',       type: 'Topic', label: 'Tấn - Tạ - Yến',                   description: '1 tấn = 10 tạ = 100 yến = 1000 kg' },
+      { id: 'topic-t4-goc',       type: 'Topic', label: '4 loại góc',                       description: 'Nhọn <90° · Vuông =90° · Tù >90° · Bẹt =180°' },
+      { id: 'topic-t4-song-song', type: 'Topic', label: '2 đường thẳng song song',          description: 'Không bao giờ cắt nhau; cách đều nhau (kí hiệu //)' },
+      { id: 'topic-t4-vuong-goc', type: 'Topic', label: '2 đường thẳng vuông góc',          description: 'Cắt nhau tạo 4 góc vuông (kí hiệu ⊥)' },
+      { id: 'topic-t4-binh-hanh', type: 'Topic', label: 'Hình bình hành',                   description: '4 cạnh: 2 cặp song song + bằng nhau; góc đối bằng' },
+      { id: 'topic-t4-thoi',      type: 'Topic', label: 'Hình thoi',                        description: '4 cạnh bằng nhau; 2 đường chéo vuông góc' },
+      { id: 'topic-t4-tb-cong',   type: 'Topic', label: 'Trung bình cộng',                  description: 'TBC = tổng ÷ số phần tử — VD: TBC(3,5,7) = 15÷3 = 5' },
+      { id: 'topic-t4-bd-cot',    type: 'Topic', label: 'Biểu đồ cột',                      description: 'Cột cao = số nhiều; trục dọc = số lượng, trục ngang = nhóm' },
+      { id: 'topic-t4-bd-tranh',  type: 'Topic', label: 'Biểu đồ tranh',                    description: '1 hình = N đơn vị — dễ đọc cho HS nhỏ' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 2: TIẾNG VIỆT 4 (245 tiết) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-tv4', type: 'Subject', label: 'Tiếng Việt 4',
+        description: 'Đọc 200-250 chữ + tả người/cảnh + kể chuyện sáng tạo + chủ ngữ-vị ngữ + biên bản',
+        properties: { color: '#ef4444', grade: 4 } },
+
+      { id: 'chap-tv4-tap-doc',   type: 'Chapter', label: '[TV4] Tập đọc nâng cao',         description: '200-250 chữ, đọc thầm nhanh, đọc diễn cảm sâu' },
+      { id: 'chap-tv4-doc-hieu',  type: 'Chapter', label: '[TV4] Đọc hiểu',                description: 'Tìm chi tiết + chủ đề + tác giả muốn nói gì' },
+      { id: 'chap-tv4-vong-tu',   type: 'Chapter', label: '[TV4] Mở rộng vốn từ',           description: 'Chủ điểm: thiên nhiên, GĐ, ước mơ, sức khoẻ' },
+      { id: 'chap-tv4-cau-cn-vn', type: 'Chapter', label: '[TV4] Chủ ngữ - Vị ngữ',         description: 'Phân tích câu: ai/cái gì? + làm gì/thế nào?' },
+      { id: 'chap-tv4-dau-cau',   type: 'Chapter', label: '[TV4] Dấu câu',                  description: 'Dấu ngoặc kép, dấu gạch ngang (mới)' },
+      { id: 'chap-tv4-ta-nguoi',  type: 'Chapter', label: '[TV4] Văn tả người',             description: 'Tả ông/bà/cha/mẹ/bạn/cô — đặc điểm + tính cách' },
+      { id: 'chap-tv4-ta-canh',   type: 'Chapter', label: '[TV4] Văn tả cảnh',              description: 'Tả cảnh trường, cánh đồng, biển, núi' },
+      { id: 'chap-tv4-ke-st',     type: 'Chapter', label: '[TV4] Kể chuyện sáng tạo',       description: 'Sáng tác chuyện ngắn: nhân vật + tình huống + kết' },
+      { id: 'chap-tv4-bien-ban',  type: 'Chapter', label: '[TV4] Viết biên bản đơn giản',   description: 'BB cuộc họp lớp, BB sự việc — đủ ý' },
+
+      { id: 'topic-tv4-doc-200',  type: 'Topic', label: 'Đọc 200-250 chữ/phút',             description: 'Tốc độ đọc thầm — chuẩn HS lớp 4 cuối năm' },
+      { id: 'topic-tv4-diem-y',   type: 'Topic', label: 'Đọc nhấn từ điểm + ngắt câu',      description: 'Hiểu chỗ nào quan trọng → nhấn giọng; ngắt theo dấu' },
+      { id: 'topic-tv4-tim-chi-tiet',type:'Topic',label: 'Tìm chi tiết bài đọc',             description: 'Trả lời "khi nào", "ở đâu", "vì sao" — bằng chứng từ bài' },
+      { id: 'topic-tv4-chu-de',   type: 'Topic', label: 'Tìm chủ đề bài',                   description: 'Bài này nói về điều gì sâu xa? Bài học rút ra?' },
+      { id: 'topic-tv4-tu-tn-na', type: 'Topic', label: 'Từ về thiên nhiên (mở rộng)',      description: 'Đại dương, sa mạc, rừng nhiệt đới, đầm lầy, thác nước' },
+      { id: 'topic-tv4-tu-uoc-mo',type: 'Topic', label: 'Từ về ước mơ',                     description: 'Khát vọng, hoài bão, mục tiêu, lý tưởng — từ trừu tượng' },
+      { id: 'topic-tv4-tu-sk',    type: 'Topic', label: 'Từ về sức khoẻ',                   description: 'Dinh dưỡng, vận động, nghỉ ngơi, phòng bệnh, khám chữa' },
+      { id: 'topic-tv4-cn',       type: 'Topic', label: 'Chủ ngữ',                          description: 'Bộ phận trả lời "Ai/Cái gì?" — thường đứng đầu câu' },
+      { id: 'topic-tv4-vn',       type: 'Topic', label: 'Vị ngữ',                           description: 'Bộ phận trả lời "Làm gì/Thế nào/Là gì?"' },
+      { id: 'topic-tv4-ngoac-kep',type: 'Topic', label: 'Dấu ngoặc kép ("")',               description: 'Dẫn lời nói nguyên văn, tên tác phẩm, từ đặc biệt' },
+      { id: 'topic-tv4-gach-ngang',type:'Topic', label: 'Dấu gạch ngang (—)',                description: 'Đầu dòng đối thoại, nối các bộ phận, chú thích' },
+      { id: 'topic-tv4-ta-nguoi-than',type:'Topic',label:'Tả người thân (cha/mẹ/anh chị)',   description: 'Ngoại hình + tính cách + kỉ niệm + tình cảm em' },
+      { id: 'topic-tv4-ta-ban-be',type: 'Topic', label: 'Tả bạn bè',                        description: 'Tên + ngoại hình + sở thích + tính cách' },
+      { id: 'topic-tv4-ta-truong',type: 'Topic', label: 'Tả cảnh trường em',                description: 'Cổng → sân → lớp → vườn — theo trình tự không gian' },
+      { id: 'topic-tv4-ta-canh-dong',type:'Topic',label: 'Tả cánh đồng quê',                description: 'Theo mùa (lúa xanh → vàng) + cảm xúc em' },
+      { id: 'topic-tv4-ta-bien',  type: 'Topic', label: 'Tả biển',                          description: 'Bãi cát, sóng, gió, mặt trời mọc/lặn — màu sắc' },
+      { id: 'topic-tv4-ke-co-tich',type:'Topic', label: 'Sáng tác truyện cổ tích',          description: 'Nhân vật chính + tình huống xung đột + giải quyết + bài học' },
+      { id: 'topic-tv4-bb-lop',   type: 'Topic', label: 'Biên bản họp lớp',                 description: 'Thời gian + thành phần + nội dung + quyết định + ký' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 3: KHOA HỌC 4 (mới — tách từ TNXH) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-khoahoc4', type: 'Subject', label: 'Khoa học 4',
+        description: 'Tách từ TNXH lớp 1-3: chuyên sâu vật chất + sức khoẻ + sinh học cơ bản',
+        properties: { color: '#10b981', grade: 4 } },
+
+      { id: 'chap-kh4-con-nguoi', type: 'Chapter', label: '[KH4] Con người + Sức khoẻ',     description: 'Dinh dưỡng, vitamin, nước, không khí, ngủ, vệ sinh' },
+      { id: 'chap-kh4-nuoc',      type: 'Chapter', label: '[KH4] Nước',                     description: '3 trạng thái: rắn-lỏng-khí; nước trong tự nhiên + sinh hoạt' },
+      { id: 'chap-kh4-kk',        type: 'Chapter', label: '[KH4] Không khí',                description: 'Đặc điểm, vai trò, gió' },
+      { id: 'chap-kh4-am-thanh',  type: 'Chapter', label: '[KH4] Âm thanh',                 description: 'Cách lan truyền, tai nghe, ô nhiễm tiếng ồn' },
+      { id: 'chap-kh4-anh-sang',  type: 'Chapter', label: '[KH4] Ánh sáng',                 description: 'Nguồn sáng, lan truyền, bóng tối, mắt nhìn' },
+      { id: 'chap-kh4-nhiet',     type: 'Chapter', label: '[KH4] Nhiệt',                    description: 'Nhiệt độ, vật dẫn nhiệt, vật cách nhiệt' },
+      { id: 'chap-kh4-tv-dv-na',  type: 'Chapter', label: '[KH4] Thực vật + Động vật',      description: 'Trao đổi chất, sinh sản, vòng đời' },
+
+      { id: 'topic-kh4-dinh-duong',type:'Topic', label: 'Dinh dưỡng 4 nhóm',                description: 'Tinh bột + Đạm + Béo + Vitamin/khoáng — ăn cân bằng' },
+      { id: 'topic-kh4-vitamin',  type: 'Topic', label: 'Vitamin + Khoáng chất',            description: 'A (mắt) · B (TK) · C (đề kháng) · D (xương) · Fe + Ca' },
+      { id: 'topic-kh4-uong-nuoc',type: 'Topic', label: 'Uống đủ nước',                     description: 'HS cần 1.5-2 lít/ngày; nước lọc tốt hơn nước ngọt' },
+      { id: 'topic-kh4-ngu-du',   type: 'Topic', label: 'Ngủ đủ giấc',                      description: 'HS lớp 4 cần 9-11 tiếng/đêm — quan trọng phát triển' },
+      { id: 'topic-kh4-ve-sinh-cn',type:'Topic', label: 'Vệ sinh cá nhân',                  description: 'Tắm rửa, đánh răng, cắt móng tay, gội đầu hàng tuần' },
+      { id: 'topic-kh4-nuoc-3tt', type: 'Topic', label: 'Nước có 3 trạng thái',             description: 'Rắn (đá) ↔ Lỏng (nước) ↔ Khí (hơi); 0°C/100°C' },
+      { id: 'topic-kh4-tinh-chat-nuoc',type:'Topic',label:'Tính chất nước',                 description: 'Không màu, không mùi, không vị, hoà tan nhiều chất' },
+      { id: 'topic-kh4-bo-loc',   type: 'Topic', label: 'Cách lọc nước',                    description: 'Cát + sỏi + than hoạt tính → loại bỏ tạp chất' },
+      { id: 'topic-kh4-kk-tp',    type: 'Topic', label: 'Thành phần không khí',             description: 'N₂ + O₂ + CO₂ + hơi nước; O₂ giúp cháy + thở' },
+      { id: 'topic-kh4-gio',      type: 'Topic', label: 'Gió',                              description: 'Không khí di chuyển; từ nơi áp suất cao → thấp' },
+      { id: 'topic-kh4-am-truyen',type: 'Topic', label: 'Âm thanh lan truyền',              description: 'Qua khí (chậm) + lỏng + rắn (nhanh) — không qua chân không' },
+      { id: 'topic-kh4-tai-nghe', type: 'Topic', label: 'Tai + Khả năng nghe',              description: 'Sóng âm → màng nhĩ → ốc tai → não' },
+      { id: 'topic-kh4-on-on',    type: 'Topic', label: 'Ô nhiễm tiếng ồn',                 description: '>85 dB hại tai — tránh nghe nhạc to qua tai nghe' },
+      { id: 'topic-kh4-nguon-sang',type:'Topic', label: 'Nguồn sáng',                       description: 'Tự phát (mặt trời, đèn) vs phản chiếu (mặt trăng, vật)' },
+      { id: 'topic-kh4-anh-truyen',type:'Topic', label: 'Ánh sáng truyền thẳng',            description: 'Đi theo đường thẳng — tạo bóng khi gặp vật cản' },
+      { id: 'topic-kh4-bong-toi', type: 'Topic', label: 'Bóng tối',                         description: 'Vùng vật cản chặn ánh sáng — di chuyển theo nguồn sáng' },
+      { id: 'topic-kh4-mat-nhin', type: 'Topic', label: 'Mắt nhìn',                         description: 'Ánh sáng từ vật → mắt → não → "nhìn thấy"' },
+      { id: 'topic-kh4-nhiet-do', type: 'Topic', label: 'Nhiệt độ',                         description: 'Đo bằng nhiệt kế °C; nước đá 0°C, sôi 100°C, BT 37°C' },
+      { id: 'topic-kh4-dan-nhiet',type: 'Topic', label: 'Vật dẫn nhiệt',                    description: 'Kim loại (đồng, sắt) dẫn nhiệt tốt; gỗ, nhựa kém' },
+      { id: 'topic-kh4-cach-nhiet',type:'Topic', label: 'Vật cách nhiệt',                   description: 'Bông, len, không khí — giữ ấm/lạnh; phích, nồi cách nhiệt' },
+      { id: 'topic-kh4-trao-doi-tv',type:'Topic',label: 'Cây trao đổi chất',                description: 'Hút nước + khoáng từ đất; CO₂ + ánh sáng → quang hợp' },
+      { id: 'topic-kh4-vong-doi-bb',type:'Topic',label:'Vòng đời bướm',                     description: 'Trứng → sâu → nhộng → bướm — biến thái hoàn toàn' },
+      { id: 'topic-kh4-trao-doi-dv',type:'Topic',label: 'Động vật trao đổi chất',           description: 'Ăn + uống → tiêu hoá → hấp thu → thải' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 4: LỊCH SỬ & ĐỊA LÍ 4 (mới — tách từ TNXH) ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-lsdl4', type: 'Subject', label: 'Lịch sử & Địa lí 4',
+        description: 'Tách từ TNXH lớp 1-3: hành trình dân tộc Văn Lang → Nguyễn + 8 vùng miền VN',
+        properties: { color: '#14b8a6', grade: 4 } },
+
+      { id: 'chap-lsdl4-vlal',    type: 'Chapter', label: '[LSĐL4] Buổi đầu dựng nước',    description: 'Văn Lang (Hùng Vương 18 đời) + Âu Lạc (An Dương Vương)' },
+      { id: 'chap-lsdl4-bac-thuoc',type:'Chapter', label: '[LSĐL4] Hơn ngàn năm Bắc thuộc',description: '111 TCN → 938: Trưng Trắc, Triệu Quang Phục, Ngô Quyền' },
+      { id: 'chap-lsdl4-dinh-le-ly',type:'Chapter',label: '[LSĐL4] Đinh - Lê - Lý',         description: 'Đinh Bộ Lĩnh thống nhất; Lê Hoàn; Lý Thái Tổ dời đô Thăng Long' },
+      { id: 'chap-lsdl4-tran-le-nguyen',type:'Chapter',label:'[LSĐL4] Trần - Lê - Nguyễn',  description: 'Trần đánh Mông Cổ; Lê Lợi diệt Minh; Nguyễn Huệ + Nguyễn Ánh' },
+      { id: 'chap-lsdl4-tbb',     type: 'Chapter', label: '[LSĐL4] Trung du Bắc Bộ',        description: 'Phú Thọ, Thái Nguyên — đồi chè, công nghiệp' },
+      { id: 'chap-lsdl4-tbb-mb',  type: 'Chapter', label: '[LSĐL4] Tây Bắc + Đông Bắc',     description: 'Sa Pa, Mộc Châu, Hạ Long — núi đá vôi, dân tộc' },
+      { id: 'chap-lsdl4-dbsh',    type: 'Chapter', label: '[LSĐL4] Đồng bằng Sông Hồng',    description: 'Hà Nội, Hải Phòng — vựa lúa Bắc Bộ, công nghiệp' },
+      { id: 'chap-lsdl4-tn',      type: 'Chapter', label: '[LSĐL4] Tây Nguyên',             description: 'Đắk Lắk, Lâm Đồng — cao nguyên, cà phê, voi, văn hoá cồng chiêng' },
+      { id: 'chap-lsdl4-dnb-dbscl',type:'Chapter', label: '[LSĐL4] Đông Nam Bộ + ĐBSCL',     description: 'TP.HCM, Cần Thơ — kinh tế lớn nhất + vựa lúa cả nước' },
+
+      { id: 'topic-lsdl4-van-lang',type:'Topic', label: 'Nước Văn Lang',                    description: '~2879 TCN, 18 đời Hùng Vương, kinh đô Phong Châu (Phú Thọ)' },
+      { id: 'topic-lsdl4-au-lac', type: 'Topic', label: 'Nước Âu Lạc',                      description: '~257 TCN, An Dương Vương, kinh đô Cổ Loa, chuyện nỏ thần' },
+      { id: 'topic-lsdl4-trung-trac',type:'Topic',label: 'Hai Bà Trưng (40-43 SCN)',        description: 'Trưng Trắc + Trưng Nhị khởi nghĩa chống Hán — anh thư VN' },
+      { id: 'topic-lsdl4-ngo-quyen',type:'Topic',label: 'Ngô Quyền + Bạch Đằng 938',        description: 'Cọc nhọn ngầm dòng sông → đánh tan quân Nam Hán → độc lập' },
+      { id: 'topic-lsdl4-dbl',    type: 'Topic', label: 'Đinh Bộ Lĩnh — 968',               description: 'Dẹp 12 sứ quân, thống nhất, lập nước Đại Cồ Việt' },
+      { id: 'topic-lsdl4-ly-thai-to',type:'Topic',label: 'Lý Thái Tổ dời đô — 1010',         description: 'Hoa Lư → Thăng Long (Hà Nội); Chiếu dời đô' },
+      { id: 'topic-lsdl4-tran-mong',type:'Topic',label:'Nhà Trần đánh Mông Cổ 3 lần',        description: '1258, 1285, 1288 — Trần Quốc Tuấn, Trần Quang Khải; Bạch Đằng lần 2' },
+      { id: 'topic-lsdl4-le-loi', type: 'Topic', label: 'Lê Lợi - Khởi nghĩa Lam Sơn',      description: '1418-1428 — 10 năm gian khổ → đánh đuổi quân Minh, lập triều Lê' },
+      { id: 'topic-lsdl4-quang-trung',type:'Topic',label:'Quang Trung Nguyễn Huệ',          description: '1789 Tết Kỉ Dậu — đại phá 29 vạn quân Thanh ở Ngọc Hồi - Đống Đa' },
+      { id: 'topic-lsdl4-gia-long',type:'Topic', label: 'Nhà Nguyễn (1802-1945)',           description: 'Gia Long, kinh đô Huế; mở rộng lãnh thổ; 1858 Pháp xâm lược' },
+      { id: 'topic-lsdl4-phu-tho',type: 'Topic', label: 'Phú Thọ — Đất Tổ',                 description: 'Giỗ Tổ Hùng Vương 10/3 Âm lịch; đồi chè, công nghiệp giấy' },
+      { id: 'topic-lsdl4-thai-nguyen',type:'Topic',label:'Thái Nguyên — Thủ phủ thép',      description: 'Khu công nghiệp gang thép lớn nhất miền Bắc' },
+      { id: 'topic-lsdl4-sapa',   type: 'Topic', label: 'Sa Pa (Lào Cai)',                  description: 'Du lịch núi cao, ruộng bậc thang dân tộc H\'Mông, Dao' },
+      { id: 'topic-lsdl4-moc-chau',type:'Topic', label: 'Mộc Châu (Sơn La)',                description: 'Cao nguyên chè + sữa bò + hoa cải trắng — đẹp 4 mùa' },
+      { id: 'topic-lsdl4-ha-long',type: 'Topic', label: 'Vịnh Hạ Long (Quảng Ninh)',        description: '~1969 hòn đảo đá vôi; Di sản TG UNESCO 1994' },
+      { id: 'topic-lsdl4-ha-noi', type: 'Topic', label: 'Hà Nội — Thủ đô',                  description: '1010 Thăng Long; trung tâm chính trị-văn hoá-giáo dục' },
+      { id: 'topic-lsdl4-hai-phong',type:'Topic',label: 'Hải Phòng',                        description: 'Thành phố cảng lớn nhất miền Bắc' },
+      { id: 'topic-lsdl4-tn-cafe',type: 'Topic', label: 'Cà phê Tây Nguyên',                description: 'VN xuất khẩu cà phê #2 thế giới — Buôn Ma Thuột thủ phủ' },
+      { id: 'topic-lsdl4-tn-voi', type: 'Topic', label: 'Voi Đắk Lắk',                      description: 'Buôn Đôn — voi nhà + voi hoang; bảo tồn quốc gia' },
+      { id: 'topic-lsdl4-cong-chieng',type:'Topic',label:'Cồng chiêng Tây Nguyên',          description: 'Di sản phi vật thể UNESCO 2005 — dân tộc Êđê, M\'Nông, Bana' },
+      { id: 'topic-lsdl4-hcm-city',type:'Topic', label: 'TP. Hồ Chí Minh',                  description: 'Trung tâm KT lớn nhất VN; >10 triệu dân; CN + DV' },
+      { id: 'topic-lsdl4-can-tho',type: 'Topic', label: 'Cần Thơ — ĐBSCL',                  description: 'Vựa lúa, vựa cá, vựa trái cây cả nước; chợ nổi Cái Răng' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 5: HOẠT ĐỘNG TRẢI NGHIỆM 4 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-hdtn4', type: 'Subject', label: 'Hoạt động trải nghiệm 4',
+        description: 'Phát triển bản thân + tự đánh giá + hợp tác + bảo vệ MT + tìm hiểu nghề',
+        properties: { color: '#f97316', grade: 4 } },
+
+      { id: 'chap-hdtn4-tu-danh-gia',type:'Chapter', label: '[HĐTN4] Tự đánh giá bản thân', description: 'Điểm mạnh - yếu, sở thích, mơ ước nghề' },
+      { id: 'chap-hdtn4-trach-nhiem',type:'Chapter', label: '[HĐTN4] Trách nhiệm bản thân',  description: 'Học tập, sức khoẻ, chi tiêu, đồ dùng cá nhân' },
+      { id: 'chap-hdtn4-gd-cd',     type:'Chapter', label: '[HĐTN4] Gia đình + Cộng đồng',  description: 'Yêu thương, hợp tác, chia sẻ' },
+      { id: 'chap-hdtn4-mt-rac',    type:'Chapter', label: '[HĐTN4] Bảo vệ môi trường',     description: 'Phân loại rác, tiết kiệm điện-nước-giấy' },
+      { id: 'chap-hdtn4-nghe',      type:'Chapter', label: '[HĐTN4] Hướng nghiệp đầu tiên', description: 'Tìm hiểu nghề trong cộng đồng — bố mẹ, hàng xóm' },
+
+      { id: 'topic-hdtn4-diem-manh',type:'Topic', label: 'Điểm mạnh của em',                description: 'Em giỏi gì? — học, hát, vẽ, chạy, kể chuyện, giúp đỡ' },
+      { id: 'topic-hdtn4-diem-yeu', type:'Topic', label: 'Điểm yếu cần cải thiện',           description: 'Em chưa giỏi gì? — kế hoạch luyện tập' },
+      { id: 'topic-hdtn4-so-thich-2',type:'Topic', label: 'Sở thích sâu hơn',               description: 'Đọc sách thể loại gì? Chơi thể thao nào? Vẽ chủ đề?' },
+      { id: 'topic-hdtn4-mo-uoc-nn',type:'Topic', label: 'Mơ ước nghề nghiệp',              description: 'Lớn lên em muốn làm gì? Vì sao? — chia sẻ với GĐ' },
+      { id: 'topic-hdtn4-th-tn-bt', type:'Topic', label: 'Trách nhiệm học tập',             description: 'Tự làm bài, không gian lận, hỏi khi không hiểu' },
+      { id: 'topic-hdtn4-th-tn-sk', type:'Topic', label: 'Trách nhiệm sức khoẻ',            description: 'Ăn uống đủ chất, vận động, ngủ đúng giờ' },
+      { id: 'topic-hdtn4-th-tn-ct', type:'Topic', label: 'Trách nhiệm chi tiêu',            description: 'Tiền lì xì, tiền ăn vặt — cân nhắc, ghi chép' },
+      { id: 'topic-hdtn4-hop-tac-gd',type:'Topic', label: 'Hợp tác trong GĐ',               description: 'Việc nhà cùng làm: nấu cơm, dọn nhà, mua đồ' },
+      { id: 'topic-hdtn4-hop-tac-cd',type:'Topic', label: 'Hợp tác cộng đồng',              description: 'Văn nghệ phố, dọn rác chung, trồng cây tập thể' },
+      { id: 'topic-hdtn4-phan-loai-rac',type:'Topic',label:'Phân loại rác tại nguồn',       description: 'Hữu cơ (xanh) + Tái chế (vàng) + Còn lại (xám)' },
+      { id: 'topic-hdtn4-tk-giay', type:'Topic', label: 'Tiết kiệm giấy',                   description: '1 cây gỗ = 8 333 tờ giấy A4; viết 2 mặt, tái chế' },
+      { id: 'topic-hdtn4-nghe-bm', type:'Topic', label: 'Nghề bố mẹ',                       description: 'Phỏng vấn bố mẹ: làm gì, vất vả/vui chỗ nào, cần học gì?' },
+      { id: 'topic-hdtn4-nghe-hx', type:'Topic', label: 'Nghề trong cộng đồng',             description: 'Bác sĩ phường, GV trường, công an khu phố, nông dân làng' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 6: ĐẠO ĐỨC 4 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-dd4', type: 'Subject', label: 'Đạo đức 4',
+        description: 'Yêu thương con người + trung thực + cảm thông + yêu LĐ + tôn trọng PL + nhân đạo',
+        properties: { color: '#8b5cf6', grade: 4 } },
+
+      { id: 'chap-dd4-yt-cn',     type: 'Chapter', label: '[ĐĐ4] Yêu thương con người',     description: 'GĐ + bạn bè + người xa lạ + người yếu thế' },
+      { id: 'chap-dd4-trung-thuc-na',type:'Chapter',label: '[ĐĐ4] Trung thực nâng cao',    description: 'Học tập + thi cử + sinh hoạt' },
+      { id: 'chap-dd4-cam-thong', type: 'Chapter', label: '[ĐĐ4] Cảm thông + Chia sẻ',     description: 'Hiểu cảm xúc người khác, giúp khi họ buồn/khó' },
+      { id: 'chap-dd4-vs-chung',  type: 'Chapter', label: '[ĐĐ4] Vệ sinh chung',           description: 'Trường, công viên, đường phố — không xả rác' },
+      { id: 'chap-dd4-ton-trong-ld',type:'Chapter', label: '[ĐĐ4] Tôn trọng người LĐ',     description: 'Lao công, công nhân, nông dân — nghề nào cũng quý' },
+      { id: 'chap-dd4-cuu-giup',  type: 'Chapter', label: '[ĐĐ4] Cứu giúp người gặp nạn',   description: 'Người ngã, người ốm, người bị tai nạn — báo người lớn' },
+      { id: 'chap-dd4-yeu-ld',    type: 'Chapter', label: '[ĐĐ4] Yêu lao động',            description: 'Lao động tự phục vụ + tập thể; lao động có giá trị' },
+      { id: 'chap-dd4-nhan-dao',  type: 'Chapter', label: '[ĐĐ4] HĐ nhân đạo',             description: 'Ủng hộ vùng thiên tai, đồng bào nghèo, trẻ mồ côi' },
+      { id: 'chap-dd4-pl-gt',     type: 'Chapter', label: '[ĐĐ4] Tôn trọng PL giao thông', description: 'Đèn báo, vạch kẻ, đi đúng làn, đội mũ bảo hiểm' },
+      { id: 'chap-dd4-cct-cc',    type: 'Chapter', label: '[ĐĐ4] Bảo vệ công trình CC',    description: 'Cầu, đường, công viên, đèn đường, bưu điện' },
+
+      { id: 'topic-dd4-yt-yt',    type: 'Topic', label: 'Yêu thương người yếu thế',         description: 'Trẻ mồ côi, người khuyết tật, người già đơn thân' },
+      { id: 'topic-dd4-tt-thi',   type: 'Topic', label: 'Trung thực trong thi cử',          description: 'Không quay cóp, không gian lận, không nhờ làm hộ' },
+      { id: 'topic-dd4-tt-bao-mat',type:'Topic', label: 'Không nói dối điểm với GĐ',        description: 'Báo điểm thật → bố mẹ tin tưởng + hiểu' },
+      { id: 'topic-dd4-cam-thong-bb',type:'Topic',label:'Cảm thông với bạn',                description: 'Bạn buồn → hỏi thăm; bạn ốm → thăm; bạn ngã → đỡ' },
+      { id: 'topic-dd4-chia-se',  type: 'Topic', label: 'Chia sẻ với bạn',                  description: 'Kẹo, đồ ăn vặt, sách, đồ chơi — không ích kỉ' },
+      { id: 'topic-dd4-vs-truong',type: 'Topic', label: 'Vệ sinh trường lớp',               description: 'Trực nhật, lau bảng, đổ rác, lau cửa kính' },
+      { id: 'topic-dd4-vs-cv',    type: 'Topic', label: 'Vệ sinh công viên',                description: 'Không vứt vỏ kem, vỏ bim bim — vào thùng rác' },
+      { id: 'topic-dd4-lao-cong', type: 'Topic', label: 'Tôn trọng lao công',               description: '"Cảm ơn cô/chú đã dọn dẹp"; không vứt rác bừa bãi' },
+      { id: 'topic-dd4-nong-dan-4',type:'Topic', label: 'Tôn trọng nông dân',               description: 'Họ làm ra cơm gạo — không lãng phí thức ăn' },
+      { id: 'topic-dd4-cuu-bao-nl',type:'Topic', label: 'Báo người lớn khi có nạn',         description: 'Ngất, tai nạn, hoả hoạn — gọi 113/114/115' },
+      { id: 'topic-dd4-tu-phuc-vu-na',type:'Topic',label:'Tự phục vụ nâng cao',             description: 'Nấu bữa sáng đơn giản (mì, trứng), giặt khăn, lau nhà' },
+      { id: 'topic-dd4-lao-dong-tt',type:'Topic', label: 'Lao động tập thể',                description: 'Tổng vệ sinh lớp/trường/phố — gắn kết tập thể' },
+      { id: 'topic-dd4-quy-tu-thien',type:'Topic',label:'Quỹ từ thiện',                     description: 'Trường tổ chức ủng hộ vùng lũ — góp sức cùng tham gia' },
+      { id: 'topic-dd4-chat-pl-gt',type:'Topic', label: 'Chấp hành luật giao thông',        description: 'Sang đường vạch trắng, đi đúng làn, đèn đỏ dừng' },
+      { id: 'topic-dd4-bv-cong-trinh',type:'Topic',label:'Bảo vệ công trình công cộng',     description: 'Không phá ghế công viên, không vẽ bậy lên tường' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 7: ÂM NHẠC 4 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-amnhac4', type: 'Subject', label: 'Âm nhạc 4',
+        description: '7 nốt + nhịp 3/4 + hát đuổi/đối + kèn melodion + nhạc lý cơ bản',
+        properties: { color: '#ec4899', grade: 4 } },
+
+      { id: 'chap-am4-hat',       type: 'Chapter', label: '[ÂN4] Hát',                     description: 'Bài hát thiếu nhi + dân ca các vùng + nước ngoài' },
+      { id: 'chap-am4-doc',       type: 'Chapter', label: '[ÂN4] Đọc nhạc 7 nốt',          description: 'Đô Rê Mi Fa Sol La Si — đủ thang âm cơ bản' },
+      { id: 'chap-am4-nhip-34',   type: 'Chapter', label: '[ÂN4] Nhịp 3/4',                description: '1-2-3 (vũ điệu waltz); phách 1 mạnh, 2-3 nhẹ' },
+      { id: 'chap-am4-hat-doi-duoi',type:'Chapter',label: '[ÂN4] Hát đuổi + Hát đối',       description: 'Chia 2 nhóm — hát đuổi theo / đối đáp' },
+      { id: 'chap-am4-nhac-cu-4', type: 'Chapter', label: '[ÂN4] Nhạc cụ',                 description: 'Kèn melodion (phím + thổi) + sáo trúc nâng cao' },
+      { id: 'chap-am4-nhac-ly',   type: 'Chapter', label: '[ÂN4] Nhạc lý cơ bản',          description: 'Trường độ (đen, móc), khoá Sol, khuông nhạc' },
+
+      { id: 'topic-am4-bai-1',    type: 'Topic', label: '"Bạn ơi lắng nghe" (dân ca Bana)', description: 'Dân ca dân tộc Bana — Tây Nguyên' },
+      { id: 'topic-am4-bai-2',    type: 'Topic', label: '"Khăn quàng thắm mãi vai em" (Ngô Ngọc Báu)',description: 'Bài hát Đội — màu khăn quàng đỏ' },
+      { id: 'topic-am4-bai-3',    type: 'Topic', label: '"Chú voi con ở Bản Đôn"',         description: 'Hát đuổi — chia nhóm' },
+      { id: 'topic-am4-bai-4',    type: 'Topic', label: '"Tiếng hát bạn bè mình" (Lê Hoàng Long)',description: 'Tình bạn quốc tế thiếu nhi' },
+      { id: 'topic-am4-bai-5',    type: 'Topic', label: '"Cò lả" (dân ca Bắc Bộ)',          description: 'Dân ca quan họ Bắc Bộ — tiếng cò bay' },
+      { id: 'topic-am4-bai-6',    type: 'Topic', label: '"Năm cánh sao vui" (Phong Nhã)',  description: 'Bài hát đội + ngôi sao 5 cánh' },
+      { id: 'topic-am4-7-not',    type: 'Topic', label: '7 nốt Đô-Si',                      description: 'Đô-Rê-Mi-Fa-Sol-La-Si — thang âm trưởng đầy đủ' },
+      { id: 'topic-am4-khuong-nhac',type:'Topic', label: 'Khuông nhạc + Khoá Sol',          description: '5 dòng + 4 khe; khoá Sol nằm dòng 2 — cố định nốt Sol' },
+      { id: 'topic-am4-not-den',  type: 'Topic', label: 'Nốt đen (1 phách)',                description: 'Hình tròn đen + đuôi; đơn vị thời gian cơ bản' },
+      { id: 'topic-am4-not-moc',  type: 'Topic', label: 'Nốt móc đơn (1/2 phách)',          description: 'Có 1 móc cờ; ngắn gấp đôi nốt đen' },
+      { id: 'topic-am4-nhip-34-1',type: 'Topic', label: 'Nhịp 3/4 = nhịp Waltz',            description: 'Mỗi ô 3 phách (1 mạnh + 2 nhẹ) — bài hát uyển chuyển' },
+      { id: 'topic-am4-hat-duoi', type: 'Topic', label: 'Hát đuổi (Canon)',                 description: 'Nhóm 1 hát trước, nhóm 2 vào sau 1-2 nhịp' },
+      { id: 'topic-am4-hat-doi',  type: 'Topic', label: 'Hát đối đáp',                      description: 'Nhóm hỏi - nhóm trả lời; dân ca quan họ' },
+      { id: 'topic-am4-melodion', type: 'Topic', label: 'Kèn melodion (kèn phím)',          description: 'Thổi + bấm phím như piano nhỏ — phổ biến lớp 4' },
+
+      // ═══════════════════════════════════════════
+      // === MÔN 8: MĨ THUẬT 4 ===
+      // ═══════════════════════════════════════════
+      { id: 'subj-mt4', type: 'Subject', label: 'Mĩ thuật 4',
+        description: 'Vẽ chân dung + tranh đề tài phức tạp + huy hiệu + vật liệu tái chế + Picasso',
+        properties: { color: '#eab308', grade: 4 } },
+
+      { id: 'chap-mt4-chan-dung', type: 'Chapter', label: '[MT4] Vẽ chân dung',            description: 'Tỉ lệ khuôn mặt + mắt + mũi + miệng + tóc' },
+      { id: 'chap-mt4-de-tai-pt', type: 'Chapter', label: '[MT4] Tranh đề tài phong phú',  description: 'Quê hương, an toàn GT, ngày Tết, bảo vệ MT, gia đình' },
+      { id: 'chap-mt4-trang-tri-pt',type:'Chapter', label: '[MT4] Trang trí phức tạp',     description: 'Huy hiệu, bìa lịch, đầu báo tường, áo phông' },
+      { id: 'chap-mt4-nan-cs-4',  type: 'Chapter', label: '[MT4] Nặn câu chuyện',          description: 'Nặn nhóm + bố cục câu chuyện 3D' },
+      { id: 'chap-mt4-tai-che',   type: 'Chapter', label: '[MT4] Tạo hình từ vật liệu tái chế',description: 'Chai nhựa + bìa cứng + lá cây + vải vụn' },
+      { id: 'chap-mt4-thuong-thuc-4',type:'Chapter',label:'[MT4] Thường thức',             description: 'Tranh dân gian VN sâu hơn + Picasso' },
+
+      { id: 'topic-mt4-ti-le-mat',type: 'Topic', label: 'Tỉ lệ khuôn mặt',                  description: 'Chia 3 phần bằng nhau: trán-mắt-mũi-cằm; mắt giữa đầu' },
+      { id: 'topic-mt4-mat-dung', type: 'Topic', label: 'Vẽ mắt đúng',                      description: '2 mắt cách nhau ≈ 1 mắt; lông mi cong lên trên' },
+      { id: 'topic-mt4-mui-mieng',type: 'Topic', label: 'Vẽ mũi + miệng',                   description: 'Mũi: 2 đường + 2 lỗ; miệng: 3 đường (môi trên-giữa-dưới)' },
+      { id: 'topic-mt4-toc',      type: 'Topic', label: 'Vẽ tóc',                          description: 'Đường viền + lọn tóc + đậm nhạt — không vẽ từng sợi' },
+      { id: 'topic-mt4-cd-em-vui',type: 'Topic', label: 'Chân dung em',                    description: 'Tự hoạ qua gương + vẽ' },
+      { id: 'topic-mt4-de-que',   type: 'Topic', label: 'Vẽ quê hương em',                 description: 'Cánh đồng + dòng sông + ngôi nhà + cây cối' },
+      { id: 'topic-mt4-de-gt',    type: 'Topic', label: 'Vẽ an toàn giao thông',           description: 'Đèn xanh-đỏ, vạch kẻ, mũ bảo hiểm, đi xe đạp đúng' },
+      { id: 'topic-mt4-de-gd-4',  type: 'Topic', label: 'Vẽ gia đình em',                  description: 'Cha-mẹ-anh-em-ông-bà — sum họp bữa cơm/ngày Tết' },
+      { id: 'topic-mt4-huy-hieu', type: 'Topic', label: 'Thiết kế huy hiệu',               description: 'Lớp/trường/CLB — hình tròn/khiên + biểu tượng + chữ' },
+      { id: 'topic-mt4-bia-lich', type: 'Topic', label: 'Trang trí bìa lịch',              description: '12 tháng — hình minh hoạ + tháng-năm rõ ràng' },
+      { id: 'topic-mt4-dau-bao',  type: 'Topic', label: 'Đầu báo tường',                   description: 'Tên báo to + chủ đề + hình minh hoạ + ngày' },
+      { id: 'topic-mt4-tai-che-chai',type:'Topic',label:'Tạo hình từ chai nhựa',           description: 'Cắt + sơn + lắp ráp → đèn ngủ, chậu hoa, ống bút' },
+      { id: 'topic-mt4-tai-che-bia',type:'Topic', label: 'Tạo hình từ bìa cứng',           description: 'Cắt + dán → robot, mô hình nhà, đồ chơi' },
+      { id: 'topic-mt4-tai-che-la',type:'Topic',  label: 'Tạo hình từ lá cây',             description: 'Lá ghép → con vật, tranh phong cảnh, mặt người' },
+      { id: 'topic-mt4-dh-na-4',  type: 'Topic', label: 'Tranh Đông Hồ sâu hơn',           description: 'Lợn âm dương, gà cô tử, mẹ con đàn cá — ý nghĩa biểu tượng' },
+      { id: 'topic-mt4-ht-na-4',  type: 'Topic', label: 'Tranh Hàng Trống sâu hơn',        description: 'Tứ bình (mai-lan-cúc-trúc), Ngũ Hổ — đại biểu phong thuỷ' },
+      { id: 'topic-mt4-picasso-4',type: 'Topic', label: 'Picasso (TBN, 1881-1973)',        description: 'Cha đẻ Lập thể; vẽ chân dung biến dạng độc đáo' },
+    ];
+
+    let insertedNodes = 0;
+    for (const n of nodes) {
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_nodes (id, type, label, description, properties)
+           VALUES ($1, $2, $3, $4, $5::jsonb)
+           ON CONFLICT (id) DO NOTHING`,
+          [n.id, n.type, n.label, n.description, JSON.stringify(n.properties || {})]
+        );
+        if (r.rowCount) insertedNodes++;
+      } catch (e) { console.warn('[kg:seed-g4:node]', n.id, e.message); }
+    }
+
+    const edges = [
+      // Meta → 8 môn (lớp 4 = TNXH tách thành 2 → tổng 8 môn)
+      ['meta-lop4', 'subj-toan4',    'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-tv4',      'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-khoahoc4', 'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-lsdl4',    'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-hdtn4',    'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-dd4',      'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-amnhac4',  'HAS_CHAPTER'],
+      ['meta-lop4', 'subj-mt4',      'HAS_CHAPTER'],
+
+      // === TOÁN 4 ===
+      ['subj-toan4', 'chap-toan4-so-trieu', 'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-4-pt-na',  'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-tc-pt',    'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-phan-so',  'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-do-na',    'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-hh',       'HAS_CHAPTER'],
+      ['subj-toan4', 'chap-toan4-tb-cong',  'HAS_CHAPTER'],
+      ['chap-toan4-so-trieu', 'topic-t4-trieu',     'HAS_TOPIC'],
+      ['chap-toan4-so-trieu', 'topic-t4-ti',        'HAS_TOPIC'],
+      ['chap-toan4-so-trieu', 'topic-t4-doc-trieu', 'HAS_TOPIC'],
+      ['chap-toan4-4-pt-na',  'topic-t4-nhan-2cs',  'HAS_TOPIC'],
+      ['chap-toan4-4-pt-na',  'topic-t4-chia-1cs',  'HAS_TOPIC'],
+      ['chap-toan4-4-pt-na',  'topic-t4-chia-2cs',  'HAS_TOPIC'],
+      ['chap-toan4-tc-pt',    'topic-t4-giao-hoan', 'HAS_TOPIC'],
+      ['chap-toan4-tc-pt',    'topic-t4-ket-hop',   'HAS_TOPIC'],
+      ['chap-toan4-tc-pt',    'topic-t4-phan-phoi', 'HAS_TOPIC'],
+      ['chap-toan4-phan-so',  'topic-t4-ps-tu-mau', 'HAS_TOPIC'],
+      ['chap-toan4-phan-so',  'topic-t4-ps-rut-gon','HAS_TOPIC'],
+      ['chap-toan4-phan-so',  'topic-t4-ps-quy-dong','HAS_TOPIC'],
+      ['chap-toan4-phan-so',  'topic-t4-ps-cong-tru-cm','HAS_TOPIC'],
+      ['chap-toan4-phan-so',  'topic-t4-ps-cong-tru-km','HAS_TOPIC'],
+      ['chap-toan4-do-na',    'topic-t4-m2-dm2',    'HAS_TOPIC'],
+      ['chap-toan4-do-na',    'topic-t4-tan',       'HAS_TOPIC'],
+      ['chap-toan4-hh',       'topic-t4-goc',       'HAS_TOPIC'],
+      ['chap-toan4-hh',       'topic-t4-song-song', 'HAS_TOPIC'],
+      ['chap-toan4-hh',       'topic-t4-vuong-goc', 'HAS_TOPIC'],
+      ['chap-toan4-hh',       'topic-t4-binh-hanh', 'HAS_TOPIC'],
+      ['chap-toan4-hh',       'topic-t4-thoi',      'HAS_TOPIC'],
+      ['chap-toan4-tb-cong',  'topic-t4-tb-cong',   'HAS_TOPIC'],
+      ['chap-toan4-tb-cong',  'topic-t4-bd-cot',    'HAS_TOPIC'],
+      ['chap-toan4-tb-cong',  'topic-t4-bd-tranh',  'HAS_TOPIC'],
+
+      // === TIẾNG VIỆT 4 ===
+      ['subj-tv4', 'chap-tv4-tap-doc',   'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-doc-hieu',  'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-vong-tu',   'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-cau-cn-vn', 'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-dau-cau',   'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-ta-nguoi',  'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-ta-canh',   'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-ke-st',     'HAS_CHAPTER'],
+      ['subj-tv4', 'chap-tv4-bien-ban',  'HAS_CHAPTER'],
+      ['chap-tv4-tap-doc',   'topic-tv4-doc-200',    'HAS_TOPIC'],
+      ['chap-tv4-tap-doc',   'topic-tv4-diem-y',     'HAS_TOPIC'],
+      ['chap-tv4-doc-hieu',  'topic-tv4-tim-chi-tiet','HAS_TOPIC'],
+      ['chap-tv4-doc-hieu',  'topic-tv4-chu-de',     'HAS_TOPIC'],
+      ['chap-tv4-vong-tu',   'topic-tv4-tu-tn-na',   'HAS_TOPIC'],
+      ['chap-tv4-vong-tu',   'topic-tv4-tu-uoc-mo',  'HAS_TOPIC'],
+      ['chap-tv4-vong-tu',   'topic-tv4-tu-sk',      'HAS_TOPIC'],
+      ['chap-tv4-cau-cn-vn', 'topic-tv4-cn',         'HAS_TOPIC'],
+      ['chap-tv4-cau-cn-vn', 'topic-tv4-vn',         'HAS_TOPIC'],
+      ['chap-tv4-dau-cau',   'topic-tv4-ngoac-kep',  'HAS_TOPIC'],
+      ['chap-tv4-dau-cau',   'topic-tv4-gach-ngang', 'HAS_TOPIC'],
+      ['chap-tv4-ta-nguoi',  'topic-tv4-ta-nguoi-than','HAS_TOPIC'],
+      ['chap-tv4-ta-nguoi',  'topic-tv4-ta-ban-be',  'HAS_TOPIC'],
+      ['chap-tv4-ta-canh',   'topic-tv4-ta-truong',  'HAS_TOPIC'],
+      ['chap-tv4-ta-canh',   'topic-tv4-ta-canh-dong','HAS_TOPIC'],
+      ['chap-tv4-ta-canh',   'topic-tv4-ta-bien',    'HAS_TOPIC'],
+      ['chap-tv4-ke-st',     'topic-tv4-ke-co-tich', 'HAS_TOPIC'],
+      ['chap-tv4-bien-ban',  'topic-tv4-bb-lop',     'HAS_TOPIC'],
+
+      // === KHOA HỌC 4 ===
+      ['subj-khoahoc4', 'chap-kh4-con-nguoi','HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-nuoc',     'HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-kk',       'HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-am-thanh', 'HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-anh-sang', 'HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-nhiet',    'HAS_CHAPTER'],
+      ['subj-khoahoc4', 'chap-kh4-tv-dv-na', 'HAS_CHAPTER'],
+      ['chap-kh4-con-nguoi','topic-kh4-dinh-duong','HAS_TOPIC'],
+      ['chap-kh4-con-nguoi','topic-kh4-vitamin',   'HAS_TOPIC'],
+      ['chap-kh4-con-nguoi','topic-kh4-uong-nuoc', 'HAS_TOPIC'],
+      ['chap-kh4-con-nguoi','topic-kh4-ngu-du',    'HAS_TOPIC'],
+      ['chap-kh4-con-nguoi','topic-kh4-ve-sinh-cn','HAS_TOPIC'],
+      ['chap-kh4-nuoc',     'topic-kh4-nuoc-3tt',  'HAS_TOPIC'],
+      ['chap-kh4-nuoc',     'topic-kh4-tinh-chat-nuoc','HAS_TOPIC'],
+      ['chap-kh4-nuoc',     'topic-kh4-bo-loc',    'HAS_TOPIC'],
+      ['chap-kh4-kk',       'topic-kh4-kk-tp',     'HAS_TOPIC'],
+      ['chap-kh4-kk',       'topic-kh4-gio',       'HAS_TOPIC'],
+      ['chap-kh4-am-thanh', 'topic-kh4-am-truyen', 'HAS_TOPIC'],
+      ['chap-kh4-am-thanh', 'topic-kh4-tai-nghe',  'HAS_TOPIC'],
+      ['chap-kh4-am-thanh', 'topic-kh4-on-on',     'HAS_TOPIC'],
+      ['chap-kh4-anh-sang', 'topic-kh4-nguon-sang','HAS_TOPIC'],
+      ['chap-kh4-anh-sang', 'topic-kh4-anh-truyen','HAS_TOPIC'],
+      ['chap-kh4-anh-sang', 'topic-kh4-bong-toi',  'HAS_TOPIC'],
+      ['chap-kh4-anh-sang', 'topic-kh4-mat-nhin',  'HAS_TOPIC'],
+      ['chap-kh4-nhiet',    'topic-kh4-nhiet-do',  'HAS_TOPIC'],
+      ['chap-kh4-nhiet',    'topic-kh4-dan-nhiet', 'HAS_TOPIC'],
+      ['chap-kh4-nhiet',    'topic-kh4-cach-nhiet','HAS_TOPIC'],
+      ['chap-kh4-tv-dv-na', 'topic-kh4-trao-doi-tv','HAS_TOPIC'],
+      ['chap-kh4-tv-dv-na', 'topic-kh4-vong-doi-bb','HAS_TOPIC'],
+      ['chap-kh4-tv-dv-na', 'topic-kh4-trao-doi-dv','HAS_TOPIC'],
+
+      // === LỊCH SỬ & ĐỊA LÍ 4 ===
+      ['subj-lsdl4', 'chap-lsdl4-vlal',         'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-bac-thuoc',    'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-dinh-le-ly',   'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-tran-le-nguyen','HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-tbb',          'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-tbb-mb',       'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-dbsh',         'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-tn',           'HAS_CHAPTER'],
+      ['subj-lsdl4', 'chap-lsdl4-dnb-dbscl',    'HAS_CHAPTER'],
+      ['chap-lsdl4-vlal',       'topic-lsdl4-van-lang','HAS_TOPIC'],
+      ['chap-lsdl4-vlal',       'topic-lsdl4-au-lac',  'HAS_TOPIC'],
+      ['chap-lsdl4-bac-thuoc',  'topic-lsdl4-trung-trac','HAS_TOPIC'],
+      ['chap-lsdl4-bac-thuoc',  'topic-lsdl4-ngo-quyen','HAS_TOPIC'],
+      ['chap-lsdl4-dinh-le-ly', 'topic-lsdl4-dbl',     'HAS_TOPIC'],
+      ['chap-lsdl4-dinh-le-ly', 'topic-lsdl4-ly-thai-to','HAS_TOPIC'],
+      ['chap-lsdl4-tran-le-nguyen','topic-lsdl4-tran-mong','HAS_TOPIC'],
+      ['chap-lsdl4-tran-le-nguyen','topic-lsdl4-le-loi','HAS_TOPIC'],
+      ['chap-lsdl4-tran-le-nguyen','topic-lsdl4-quang-trung','HAS_TOPIC'],
+      ['chap-lsdl4-tran-le-nguyen','topic-lsdl4-gia-long','HAS_TOPIC'],
+      ['chap-lsdl4-tbb',        'topic-lsdl4-phu-tho', 'HAS_TOPIC'],
+      ['chap-lsdl4-tbb',        'topic-lsdl4-thai-nguyen','HAS_TOPIC'],
+      ['chap-lsdl4-tbb-mb',     'topic-lsdl4-sapa',    'HAS_TOPIC'],
+      ['chap-lsdl4-tbb-mb',     'topic-lsdl4-moc-chau','HAS_TOPIC'],
+      ['chap-lsdl4-tbb-mb',     'topic-lsdl4-ha-long', 'HAS_TOPIC'],
+      ['chap-lsdl4-dbsh',       'topic-lsdl4-ha-noi',  'HAS_TOPIC'],
+      ['chap-lsdl4-dbsh',       'topic-lsdl4-hai-phong','HAS_TOPIC'],
+      ['chap-lsdl4-tn',         'topic-lsdl4-tn-cafe', 'HAS_TOPIC'],
+      ['chap-lsdl4-tn',         'topic-lsdl4-tn-voi',  'HAS_TOPIC'],
+      ['chap-lsdl4-tn',         'topic-lsdl4-cong-chieng','HAS_TOPIC'],
+      ['chap-lsdl4-dnb-dbscl',  'topic-lsdl4-hcm-city','HAS_TOPIC'],
+      ['chap-lsdl4-dnb-dbscl',  'topic-lsdl4-can-tho', 'HAS_TOPIC'],
+
+      // === HDTN 4 ===
+      ['subj-hdtn4', 'chap-hdtn4-tu-danh-gia','HAS_CHAPTER'],
+      ['subj-hdtn4', 'chap-hdtn4-trach-nhiem','HAS_CHAPTER'],
+      ['subj-hdtn4', 'chap-hdtn4-gd-cd',      'HAS_CHAPTER'],
+      ['subj-hdtn4', 'chap-hdtn4-mt-rac',     'HAS_CHAPTER'],
+      ['subj-hdtn4', 'chap-hdtn4-nghe',       'HAS_CHAPTER'],
+      ['chap-hdtn4-tu-danh-gia','topic-hdtn4-diem-manh','HAS_TOPIC'],
+      ['chap-hdtn4-tu-danh-gia','topic-hdtn4-diem-yeu', 'HAS_TOPIC'],
+      ['chap-hdtn4-tu-danh-gia','topic-hdtn4-so-thich-2','HAS_TOPIC'],
+      ['chap-hdtn4-tu-danh-gia','topic-hdtn4-mo-uoc-nn','HAS_TOPIC'],
+      ['chap-hdtn4-trach-nhiem','topic-hdtn4-th-tn-bt','HAS_TOPIC'],
+      ['chap-hdtn4-trach-nhiem','topic-hdtn4-th-tn-sk','HAS_TOPIC'],
+      ['chap-hdtn4-trach-nhiem','topic-hdtn4-th-tn-ct','HAS_TOPIC'],
+      ['chap-hdtn4-gd-cd',      'topic-hdtn4-hop-tac-gd','HAS_TOPIC'],
+      ['chap-hdtn4-gd-cd',      'topic-hdtn4-hop-tac-cd','HAS_TOPIC'],
+      ['chap-hdtn4-mt-rac',     'topic-hdtn4-phan-loai-rac','HAS_TOPIC'],
+      ['chap-hdtn4-mt-rac',     'topic-hdtn4-tk-giay',  'HAS_TOPIC'],
+      ['chap-hdtn4-nghe',       'topic-hdtn4-nghe-bm',  'HAS_TOPIC'],
+      ['chap-hdtn4-nghe',       'topic-hdtn4-nghe-hx',  'HAS_TOPIC'],
+
+      // === ĐẠO ĐỨC 4 ===
+      ['subj-dd4', 'chap-dd4-yt-cn',        'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-trung-thuc-na','HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-cam-thong',    'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-vs-chung',     'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-ton-trong-ld', 'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-cuu-giup',     'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-yeu-ld',       'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-nhan-dao',     'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-pl-gt',        'HAS_CHAPTER'],
+      ['subj-dd4', 'chap-dd4-cct-cc',       'HAS_CHAPTER'],
+      ['chap-dd4-yt-cn',        'topic-dd4-yt-yt',     'HAS_TOPIC'],
+      ['chap-dd4-trung-thuc-na','topic-dd4-tt-thi',    'HAS_TOPIC'],
+      ['chap-dd4-trung-thuc-na','topic-dd4-tt-bao-mat','HAS_TOPIC'],
+      ['chap-dd4-cam-thong',    'topic-dd4-cam-thong-bb','HAS_TOPIC'],
+      ['chap-dd4-cam-thong',    'topic-dd4-chia-se',   'HAS_TOPIC'],
+      ['chap-dd4-vs-chung',     'topic-dd4-vs-truong', 'HAS_TOPIC'],
+      ['chap-dd4-vs-chung',     'topic-dd4-vs-cv',     'HAS_TOPIC'],
+      ['chap-dd4-ton-trong-ld', 'topic-dd4-lao-cong',  'HAS_TOPIC'],
+      ['chap-dd4-ton-trong-ld', 'topic-dd4-nong-dan-4','HAS_TOPIC'],
+      ['chap-dd4-cuu-giup',     'topic-dd4-cuu-bao-nl','HAS_TOPIC'],
+      ['chap-dd4-yeu-ld',       'topic-dd4-tu-phuc-vu-na','HAS_TOPIC'],
+      ['chap-dd4-yeu-ld',       'topic-dd4-lao-dong-tt','HAS_TOPIC'],
+      ['chap-dd4-nhan-dao',     'topic-dd4-quy-tu-thien','HAS_TOPIC'],
+      ['chap-dd4-pl-gt',        'topic-dd4-chat-pl-gt','HAS_TOPIC'],
+      ['chap-dd4-cct-cc',       'topic-dd4-bv-cong-trinh','HAS_TOPIC'],
+
+      // === ÂM NHẠC 4 ===
+      ['subj-amnhac4', 'chap-am4-hat',         'HAS_CHAPTER'],
+      ['subj-amnhac4', 'chap-am4-doc',         'HAS_CHAPTER'],
+      ['subj-amnhac4', 'chap-am4-nhip-34',     'HAS_CHAPTER'],
+      ['subj-amnhac4', 'chap-am4-hat-doi-duoi','HAS_CHAPTER'],
+      ['subj-amnhac4', 'chap-am4-nhac-cu-4',   'HAS_CHAPTER'],
+      ['subj-amnhac4', 'chap-am4-nhac-ly',     'HAS_CHAPTER'],
+      ['chap-am4-hat',         'topic-am4-bai-1', 'HAS_TOPIC'],
+      ['chap-am4-hat',         'topic-am4-bai-2', 'HAS_TOPIC'],
+      ['chap-am4-hat',         'topic-am4-bai-3', 'HAS_TOPIC'],
+      ['chap-am4-hat',         'topic-am4-bai-4', 'HAS_TOPIC'],
+      ['chap-am4-hat',         'topic-am4-bai-5', 'HAS_TOPIC'],
+      ['chap-am4-hat',         'topic-am4-bai-6', 'HAS_TOPIC'],
+      ['chap-am4-doc',         'topic-am4-7-not', 'HAS_TOPIC'],
+      ['chap-am4-nhip-34',     'topic-am4-nhip-34-1','HAS_TOPIC'],
+      ['chap-am4-hat-doi-duoi','topic-am4-hat-duoi','HAS_TOPIC'],
+      ['chap-am4-hat-doi-duoi','topic-am4-hat-doi', 'HAS_TOPIC'],
+      ['chap-am4-nhac-cu-4',   'topic-am4-melodion','HAS_TOPIC'],
+      ['chap-am4-nhac-ly',     'topic-am4-khuong-nhac','HAS_TOPIC'],
+      ['chap-am4-nhac-ly',     'topic-am4-not-den',  'HAS_TOPIC'],
+      ['chap-am4-nhac-ly',     'topic-am4-not-moc',  'HAS_TOPIC'],
+
+      // === MĨ THUẬT 4 ===
+      ['subj-mt4', 'chap-mt4-chan-dung',    'HAS_CHAPTER'],
+      ['subj-mt4', 'chap-mt4-de-tai-pt',    'HAS_CHAPTER'],
+      ['subj-mt4', 'chap-mt4-trang-tri-pt', 'HAS_CHAPTER'],
+      ['subj-mt4', 'chap-mt4-nan-cs-4',     'HAS_CHAPTER'],
+      ['subj-mt4', 'chap-mt4-tai-che',      'HAS_CHAPTER'],
+      ['subj-mt4', 'chap-mt4-thuong-thuc-4','HAS_CHAPTER'],
+      ['chap-mt4-chan-dung',   'topic-mt4-ti-le-mat',  'HAS_TOPIC'],
+      ['chap-mt4-chan-dung',   'topic-mt4-mat-dung',   'HAS_TOPIC'],
+      ['chap-mt4-chan-dung',   'topic-mt4-mui-mieng',  'HAS_TOPIC'],
+      ['chap-mt4-chan-dung',   'topic-mt4-toc',        'HAS_TOPIC'],
+      ['chap-mt4-chan-dung',   'topic-mt4-cd-em-vui',  'HAS_TOPIC'],
+      ['chap-mt4-de-tai-pt',   'topic-mt4-de-que',     'HAS_TOPIC'],
+      ['chap-mt4-de-tai-pt',   'topic-mt4-de-gt',      'HAS_TOPIC'],
+      ['chap-mt4-de-tai-pt',   'topic-mt4-de-gd-4',    'HAS_TOPIC'],
+      ['chap-mt4-trang-tri-pt','topic-mt4-huy-hieu',   'HAS_TOPIC'],
+      ['chap-mt4-trang-tri-pt','topic-mt4-bia-lich',   'HAS_TOPIC'],
+      ['chap-mt4-trang-tri-pt','topic-mt4-dau-bao',    'HAS_TOPIC'],
+      ['chap-mt4-tai-che',     'topic-mt4-tai-che-chai','HAS_TOPIC'],
+      ['chap-mt4-tai-che',     'topic-mt4-tai-che-bia','HAS_TOPIC'],
+      ['chap-mt4-tai-che',     'topic-mt4-tai-che-la', 'HAS_TOPIC'],
+      ['chap-mt4-thuong-thuc-4','topic-mt4-dh-na-4',   'HAS_TOPIC'],
+      ['chap-mt4-thuong-thuc-4','topic-mt4-ht-na-4',   'HAS_TOPIC'],
+      ['chap-mt4-thuong-thuc-4','topic-mt4-picasso-4', 'HAS_TOPIC'],
+
+      // === REQUIRES (lớp 4 ← lớp 3) ===
+      // Toán
+      ['topic-t4-trieu',       'topic-t3-100k',          'REQUIRES'],
+      ['topic-t4-nhan-2cs',    'topic-t3-bang-8-9',      'REQUIRES'],
+      ['topic-t4-chia-2cs',    'topic-t4-chia-1cs',      'REQUIRES'],
+      ['topic-t4-ps-rut-gon',  'topic-t3-ps-1-2',        'REQUIRES'],
+      ['topic-t4-ps-quy-dong', 'topic-t3-ps-so-sanh',    'REQUIRES'],
+      ['topic-t4-ps-cong-tru-km','topic-t4-ps-quy-dong', 'REQUIRES'],
+      ['topic-t4-m2-dm2',      'topic-t3-dt-vuong',      'REQUIRES'],
+      ['topic-t4-tan',         'topic-t3-gam',           'REQUIRES'],
+      ['topic-t4-binh-hanh',   'topic-t2-tu-giac',       'REQUIRES'],
+      ['topic-t4-thoi',        'topic-t4-binh-hanh',     'REQUIRES'],
+      // TV
+      ['topic-tv4-doc-200',    'topic-tv3-doc-tham',     'REQUIRES'],
+      ['topic-tv4-chu-de',     'topic-tv3-suy-luan',     'REQUIRES'],
+      ['topic-tv4-cn',         'topic-tv3-ai-la-gi',     'REQUIRES'],
+      ['topic-tv4-vn',         'topic-tv3-ai-lam-gi',    'REQUIRES'],
+      ['topic-tv4-ta-nguoi-than','topic-tv3-ta-con-vat', 'REQUIRES'],
+      ['topic-tv4-ta-truong',  'topic-tv3-ta-cay',       'REQUIRES'],
+      ['topic-tv4-ke-co-tich', 'topic-tv3-ke-da-doc',    'REQUIRES'],
+      ['topic-tv4-bb-lop',     'topic-tv3-thu-3p',       'REQUIRES'],
+      // KH (← TNXH3 + TNXH2)
+      ['topic-kh4-trao-doi-tv','topic-tnxh3-quang-hop',  'REQUIRES'],
+      ['topic-kh4-nuoc-3tt',   'topic-tnxh3-vong-tuan-hoan-nuoc','REQUIRES'],
+      ['topic-kh4-kk-tp',      'topic-tnxh3-kk-tp',      'REQUIRES'],
+      ['topic-kh4-dinh-duong', 'topic-tnxh2-tieu-hoa',   'REQUIRES'],
+      // LS-ĐL (← TNXH3 cộng đồng + di tích)
+      ['topic-lsdl4-van-lang', 'topic-tnxh3-di-tich-dp', 'REQUIRES'],
+      ['topic-lsdl4-ha-noi',   'topic-tnxh2-phuong-xa',  'REQUIRES'],
+      // MT
+      ['topic-mt4-cd-em-vui',  'topic-mt3-tinh-vat',     'REQUIRES'],
+      ['topic-mt4-de-que',     'topic-mt3-de-tet',       'REQUIRES'],
+      ['topic-mt4-dh-na-4',    'topic-mt3-dinh-vn',      'REQUIRES'],
+      // ÂN
+      ['topic-am4-7-not',      'topic-am2-do-re-mi-fa-sol','REQUIRES'],
+      ['topic-am4-nhip-34-1',  'topic-am3-nhip-24',      'REQUIRES'],
+
+      // === CROSS-SUBJECT trong lớp 4 ===
+      ['topic-tv4-ta-nguoi-than','topic-kh4-dinh-duong', 'RELATES_TO'],
+      ['topic-tv4-ta-canh-dong','topic-lsdl4-can-tho',   'RELATES_TO'],
+      ['topic-tv4-ta-bien',    'topic-lsdl4-ha-long',    'RELATES_TO'],
+      ['topic-tv4-tu-sk',      'topic-kh4-dinh-duong',   'RELATES_TO'],
+      ['topic-kh4-am-truyen',  'topic-am4-7-not',        'RELATES_TO'],
+      ['topic-kh4-anh-truyen', 'topic-mt4-toc',          'RELATES_TO'], // light affects look
+      ['topic-lsdl4-cong-chieng','topic-am4-bai-1',      'RELATES_TO'], // dân ca Bana
+      ['topic-lsdl4-ha-noi',   'topic-tv4-ta-truong',    'RELATES_TO'],
+      ['topic-hdtn4-mo-uoc-nn','topic-lsdl4-tn-cafe',    'RELATES_TO'], // nghề trồng cà phê
+      ['topic-hdtn4-th-tn-ct', 'topic-t4-tb-cong',       'RELATES_TO'], // chi tiêu + TBC
+      ['topic-hdtn4-phan-loai-rac','topic-dd4-vs-truong','RELATES_TO'],
+      ['topic-dd4-yt-yt',      'topic-dd4-quy-tu-thien', 'RELATES_TO'],
+      ['topic-dd4-chat-pl-gt', 'topic-mt4-de-gt',        'RELATES_TO'],
+      ['topic-mt4-de-que',     'topic-lsdl4-phu-tho',    'RELATES_TO'],
+      ['topic-am4-bai-5',      'topic-lsdl4-dbsh',       'RELATES_TO'], // Cò lả Bắc Bộ
+
+      // === PROGRESSION lớp 3 → lớp 4 ===
+      ['subj-toan4',    'subj-toan3',    'REQUIRES'],
+      ['subj-tv4',      'subj-tv3',      'REQUIRES'],
+      ['subj-khoahoc4', 'subj-tnxh3',    'REQUIRES'], // KH4 nâng từ TNXH3
+      ['subj-lsdl4',    'subj-tnxh3',    'REQUIRES'], // LS-ĐL4 nâng từ TNXH3
+      ['subj-hdtn4',    'subj-hdtn3',    'REQUIRES'],
+      ['subj-dd4',      'subj-dd3',      'REQUIRES'],
+      ['subj-amnhac4',  'subj-amnhac3',  'REQUIRES'],
+      ['subj-mt4',      'subj-mt3',      'REQUIRES'],
+      ['meta-lop4',     'meta-lop3',     'REQUIRES'],
+
+      // === PROGRESSION lớp 4 → THPT ===
+      ['subj-toan',  'subj-toan4',     'REQUIRES'],
+      ['subj-mt',    'subj-mt4',       'REQUIRES'],
+      ['subj-hdtn',  'subj-hdtn4',     'REQUIRES'],
+      ['subj-ktpl',  'subj-dd4',       'REQUIRES'],
+      ['subj-sinh',  'subj-khoahoc4',  'REQUIRES'], // tách rõ Sinh ← Khoa học
+      ['subj-vatli', 'subj-khoahoc4',  'REQUIRES'], // Vật lí ← Khoa học (cũng nhánh KH)
+      ['subj-hoa',   'subj-khoahoc4',  'REQUIRES'],
+      ['subj-lichsu','subj-lsdl4',     'REQUIRES'], // tách rõ Sử ← LS-ĐL
+      ['subj-diali', 'subj-lsdl4',     'REQUIRES'],
+    ];
+
+    let insertedEdges = 0;
+    for (const [from, to, rel] of edges) {
+      const id = `${from}__${rel}__${to}`;
+      try {
+        const r = await pool.query(
+          `INSERT INTO kg_edges (id, from_id, to_id, rel_type)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (from_id, to_id, rel_type) DO NOTHING`,
+          [id.slice(0, 200), from, to, rel]
+        );
+        if (r.rowCount) insertedEdges++;
+      } catch (e) { console.warn('[kg:seed-g4:edge]', from, '→', to, e.message); }
+    }
+
+    return { nodeCount: nodes.length, edgeCount: edges.length, nodeInserted: insertedNodes, edgeInserted: insertedEdges };
+  }
+
   // GET /api/kg/seed — admin-only, idempotent
-  // Query: ?subjects=all → tất cả môn THPT (12 môn × 3 lớp) + Tiểu học 1+2+3
+  // Query: ?subjects=all → tất cả môn THPT (12 môn × 3 lớp) + Tiểu học 1-4
   //        ?extended=1   → Thêm physics extension
   //        ?biology=1    → Sinh học 10/11/12
   //        ?math=1       → Toán 10/11/12 mở rộng
@@ -15018,6 +15652,7 @@ ${plan.content || '<p>(Trống)</p>'}
   //        ?g1=1         → Khối lớp 1 — Tiểu học (7 môn GDPT 2018)
   //        ?g2=1         → Khối lớp 2 — Tiểu học (7 môn GDPT 2018)
   //        ?g3=1         → Khối lớp 3 — Tiểu học (7 môn GDPT 2018)
+  //        ?g4=1         → Khối lớp 4 — Tiểu học (8 môn: TNXH tách KH+LSĐL)
   app.get('/api/kg/seed', async (req, res) => {
     try {
       const all = req.query.subjects === 'all' || req.query.all === '1';
@@ -15036,8 +15671,9 @@ ${plan.content || '<p>(Trống)</p>'}
       const g1 = req.query.g1 === '1' || req.query.grade1 === '1' || req.query.lop1 === '1' || req.query.elementary === '1' || all;
       const g2 = req.query.g2 === '1' || req.query.grade2 === '1' || req.query.lop2 === '1' || all;
       const g3 = req.query.g3 === '1' || req.query.grade3 === '1' || req.query.lop3 === '1' || all;
+      const g4 = req.query.g4 === '1' || req.query.grade4 === '1' || req.query.lop4 === '1' || all;
       const r1 = await seedKgPhysics11();
-      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null, r15 = null, r16 = null, r17 = null;
+      let r2 = null, r3 = null, r4 = null, r5 = null, r6 = null, r7 = null, r8 = null, r9 = null, r10 = null, r11 = null, r12 = null, r13 = null, r14 = null, r15 = null, r16 = null, r17 = null, r18 = null;
       if (all) r2 = await seedKgMathChem11();
       if (ext) r3 = await seedKgPhysicsExtended();
       if (bio) r4 = await seedKgBiology();
@@ -15054,7 +15690,8 @@ ${plan.content || '<p>(Trống)</p>'}
       if (g1)        r15 = await seedKgGrade1();
       if (g2)        r16 = await seedKgGrade2();
       if (g3)        r17 = await seedKgGrade3();
-      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0) + (r15?.[k] || 0) + (r16?.[k] || 0) + (r17?.[k] || 0);
+      if (g4)        r18 = await seedKgGrade4();
+      const sum = (k) => r1[k] + (r2?.[k] || 0) + (r3?.[k] || 0) + (r4?.[k] || 0) + (r5?.[k] || 0) + (r6?.[k] || 0) + (r7?.[k] || 0) + (r8?.[k] || 0) + (r9?.[k] || 0) + (r10?.[k] || 0) + (r11?.[k] || 0) + (r12?.[k] || 0) + (r13?.[k] || 0) + (r14?.[k] || 0) + (r15?.[k] || 0) + (r16?.[k] || 0) + (r17?.[k] || 0) + (r18?.[k] || 0);
       return res.json({
         success: true,
         nodeCount:    sum('nodeCount'),
@@ -15077,9 +15714,10 @@ ${plan.content || '<p>(Trống)</p>'}
         grade1: r15,
         grade2: r16,
         grade3: r17,
+        grade4: r18,
         message: [
           'Đã seed Vật lí 11',
-          all && '+ THPT 12 môn (3 lớp) + Khối lớp 1+2+3 Tiểu học',
+          all && '+ THPT 12 môn (3 lớp) + Khối lớp 1-4 Tiểu học',
           ext && '+ Mở rộng Vật lí',
           bio && !all && '+ Sinh học 10/11/12',
           math && !all && '+ Toán 10/11/12',
@@ -15095,6 +15733,7 @@ ${plan.content || '<p>(Trống)</p>'}
           g1        && !all && '+ Khối lớp 1 — Tiểu học (7 môn)',
           g2        && !all && '+ Khối lớp 2 — Tiểu học (7 môn)',
           g3        && !all && '+ Khối lớp 3 — Tiểu học (7 môn)',
+          g4        && !all && '+ Khối lớp 4 — Tiểu học (8 môn: tách KH+LSĐL)',
         ].filter(Boolean).join(' '),
       });
     } catch (err) {
