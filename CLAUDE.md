@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `255d3b4` (revision pixiai-00318-xiz, 2026-05-18 — KG nhạc nền + bubble pop + SFX LIVE)
-- Commits since last deploy: `0/5` (reset sau feature audio + UX bubble pop)
+- Last deployed commit: `db7ee11` (revision pixiai-00320-yeg, 2026-05-18 — auto-save video sau upload + IAM signBlob granted)
+- Commits since last deploy: `0/5` (reset sau hotfix UX video upload)
+- Prev: `255d3b4` → pixiai-00318-xiz (KG nhạc nền + bubble pop + SFX)
 - Prev: `9fb9d5f` → pixiai-00316-cel (fix getVTeacher return string — sửa upload video 404)
 - Prev: `dc134f2` → pixiai-00315-num (NodeExplorer — phân nhóm liên môn highlight tím)
 - Prev: `52c1178` → pixiai-00314-div (KG 3D popup + labels readable)
