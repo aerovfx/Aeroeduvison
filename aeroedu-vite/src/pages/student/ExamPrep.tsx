@@ -1122,9 +1122,9 @@ export default function ExamPrepPage() {
           {activeTab === "teacher" && (
             <div className="space-y-4">
               {teacherExamsLoading ? (
-                <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-12 text-center">
-                  <Loader2 className="h-10 w-10 animate-spin text-white/30 mx-auto mb-3" />
-                  <p className="text-white/55 text-base">Đang tải danh sách đề thi…</p>
+                <div className="bg-card backdrop-blur-xl rounded-3xl border p-12 text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-muted-foreground mx-auto mb-3" />
+                  <p className="text-muted-foreground text-base">Đang tải danh sách đề thi…</p>
                 </div>
               ) : (
                 <>
@@ -1132,12 +1132,12 @@ export default function ExamPrepPage() {
                     <>
                       {/* Header với toggle hiển thị */}
                       <div className="flex items-center justify-between px-1">
-                        <h3 className="font-bold text-white text-lg sm:text-xl flex items-center gap-2">
+                        <h3 className="font-bold text-foreground text-lg sm:text-xl flex items-center gap-2">
                           <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-500" />
                           <span>{teacherExams.length} đề từ giáo viên</span>
                         </h3>
-                        <div className="text-xs text-white/40">
-                          Sắp xếp: <span className="text-white/70 font-medium">Mới nhất</span>
+                        <div className="text-xs text-muted-foreground">
+                          Sắp xếp: <span className="text-foreground/85 font-medium">Mới nhất</span>
                         </div>
                       </div>
 
@@ -1151,15 +1151,15 @@ export default function ExamPrepPage() {
                           return (
                             <div
                               key={ex.id}
-                              className="group rounded-2xl bg-white/[0.025] border border-white/[0.08] hover:border-white/[0.18] hover:bg-white/[0.04] transition-all p-4 sm:p-5"
+                              className="group rounded-2xl bg-card border hover:border-foreground/20 hover:bg-accent/30 transition-all p-4 sm:p-5"
                             >
                               {/* Top row: time pill (left) · counter chips (right) */}
                               <div className="flex items-center justify-between mb-2.5">
-                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] text-xs sm:text-sm text-white/65">
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border bg-muted text-xs sm:text-sm text-foreground/80">
                                   <Clock className="h-3.5 w-3.5" />
                                   <span className="font-medium">{ex.duration} phút</span>
                                 </div>
-                                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-white/55">
+                                <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                                   {/* Dev-only reco debug badge (?recoDebug=1) */}
                                   <RecoDebugBadge
                                     score={(ex as any).__score}
@@ -1184,7 +1184,7 @@ export default function ExamPrepPage() {
 
                               {/* Title big */}
                               <h4
-                                className="font-bold text-white text-base sm:text-lg leading-tight mb-3 line-clamp-2"
+                                className="font-bold text-foreground text-base sm:text-lg leading-tight mb-3 line-clamp-2"
                                 title={ex.title}
                               >
                                 {ex.title}
@@ -1199,7 +1199,7 @@ export default function ExamPrepPage() {
                                     return (
                                       <span
                                         key={r}
-                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-200 border border-amber-500/30"
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-200 border border-amber-500/30"
                                         title={`Gợi ý vì: ${label}`}
                                       >
                                         {label}
@@ -1213,25 +1213,29 @@ export default function ExamPrepPage() {
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                                   {isHot && (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-rose-500/30 bg-rose-500/12 text-xs font-bold text-rose-300">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-rose-500/30 bg-rose-500/12 text-xs font-bold text-rose-700 dark:text-rose-300">
                                       Mới
                                     </span>
                                   )}
                                   <span
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-semibold"
+                                    /* 2026-05-19: color dùng t.from thay vì 'white' hard-coded
+                                       → trên light mode tinted bg (${t.from}18 = 9% alpha)
+                                       white text invisible; full-saturation t.from readable
+                                       cả 2 themes (same-hue contrast). */
                                     style={{
                                       borderColor: `${t.from}50`,
                                       background: `${t.from}18`,
-                                      color: 'white',
+                                      color: t.from,
                                     }}
                                   >
                                     <span>{t.emoji}</span> {subject.tag === 'EXM' ? ex.examType : subject.tag}
                                   </span>
-                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-white/[0.12] bg-white/[0.03] text-xs text-white/70">
+                                  <span className="inline-flex items-center px-2.5 py-1 rounded-full border bg-muted text-xs text-foreground/85">
                                     {ex.totalScore} điểm
                                   </span>
                                   {ex.user?.name && (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border border-white/[0.1] bg-white/[0.03] text-xs text-white/55">
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full border bg-muted text-xs text-muted-foreground">
                                       GV: {ex.user.name}
                                     </span>
                                   )}
@@ -1269,14 +1273,14 @@ export default function ExamPrepPage() {
                   )}
 
                   {teacherExams.length === 0 && examMatrices.length === 0 && (
-                    <div className="bg-white/[0.02] backdrop-blur-xl rounded-3xl border border-white/[0.06] p-10 sm:p-12 text-center">
-                      <GraduationCap className="h-14 w-14 sm:h-16 sm:w-16 text-white/15 mx-auto mb-4" />
-                      <h3 className="text-white/85 text-lg sm:text-xl font-bold mb-1">
+                    <div className="bg-card backdrop-blur-xl rounded-3xl border p-10 sm:p-12 text-center">
+                      <GraduationCap className="h-14 w-14 sm:h-16 sm:w-16 text-muted-foreground/40 mx-auto mb-4" />
+                      <h3 className="text-foreground text-lg sm:text-xl font-bold mb-1">
                         Chưa có đề thi
                       </h3>
-                      <p className="text-white/45 text-sm sm:text-base max-w-sm mx-auto">
+                      <p className="text-muted-foreground text-sm sm:text-base max-w-sm mx-auto">
                         Khi giáo viên công bố đề mới, bạn sẽ thấy tại đây. Trong lúc đợi, thử
-                        {' '}<button onClick={() => setActiveTab("bank")} className="text-purple-300 underline font-medium">luyện tập từ ngân hàng câu hỏi</button>.
+                        {' '}<button onClick={() => setActiveTab("bank")} className="text-purple-600 dark:text-purple-300 underline font-medium">luyện tập từ ngân hàng câu hỏi</button>.
                       </p>
                     </div>
                   )}
@@ -1285,10 +1289,10 @@ export default function ExamPrepPage() {
                   {matricesDisplay.length > 0 && (
                     <div className="mt-6">
                       <div className="flex items-center gap-2 mb-3">
-                        <h3 className="text-white/85 text-base sm:text-lg font-bold flex items-center gap-2">
+                        <h3 className="text-foreground text-base sm:text-lg font-bold flex items-center gap-2">
                           📊 Đề từ ma trận ({matricesDisplay.length})
                         </h3>
-                        <span className="text-[10px] text-white/40">— random theo cấu trúc GV chọn</span>
+                        <span className="text-[10px] text-muted-foreground">— random theo cấu trúc GV chọn</span>
                       </div>
                       <div className="space-y-2.5 sm:space-y-3">
                         {matricesDisplay.slice(0, 8).map((mx, idx) => {
@@ -1296,13 +1300,13 @@ export default function ExamPrepPage() {
                           return (
                             <div
                               key={mx.id}
-                              className="group rounded-2xl bg-white/[0.025] border border-white/[0.08] hover:border-white/[0.18] hover:bg-white/[0.04] transition-all p-4 sm:p-5"
+                              className="group rounded-2xl bg-card border hover:border-foreground/20 hover:bg-accent/30 transition-all p-4 sm:p-5"
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/30 bg-purple-500/12 text-[11px] font-bold text-purple-300">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border border-purple-500/30 bg-purple-500/12 text-[11px] font-bold text-purple-700 dark:text-purple-300">
                                   Ma trận
                                 </div>
-                                <div className="flex items-center gap-3 text-xs text-white/55">
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                   <RecoDebugBadge
                                     score={(mx as any).__score}
                                     breakdown={(mx as any).__breakdown}
@@ -1326,7 +1330,7 @@ export default function ExamPrepPage() {
                                     return (
                                       <span
                                         key={r}
-                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-200 border border-amber-500/30"
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-200 border border-amber-500/30"
                                       >
                                         {label}
                                       </span>
@@ -1335,17 +1339,17 @@ export default function ExamPrepPage() {
                                 </div>
                               )}
 
-                              <h4 className="font-bold text-white text-base sm:text-lg leading-tight mb-2 line-clamp-2" title={mx.name}>
+                              <h4 className="font-bold text-foreground text-base sm:text-lg leading-tight mb-2 line-clamp-2" title={mx.name}>
                                 {mx.name}
                               </h4>
 
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-white/[0.12] bg-white/[0.03] text-[11px] text-white/70">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border bg-muted text-[11px] text-foreground/85">
                                     {mx.subject || 'Đa môn'}
                                   </span>
                                   {mx.user?.name && (
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border border-white/[0.1] bg-white/[0.03] text-[11px] text-white/55">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full border bg-muted text-[11px] text-muted-foreground">
                                       GV: {mx.user.name}
                                     </span>
                                   )}

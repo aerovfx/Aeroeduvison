@@ -806,15 +806,23 @@ main  { contain: layout; }
  * Lý do bất đối xứng: low-opacity DARK text + WHITE bg = very low
  * contrast (color blends fast với bg); low-opacity WHITE text + DARK
  * bg vẫn readable vì human eye nhạy với điểm sáng. */
+html:not(.dark) .text-white\/95  { color: hsl(var(--foreground) / 0.96) !important; }
 html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.95) !important; }
+html:not(.dark) .text-white\/85  { color: hsl(var(--foreground) / 0.92) !important; }
 html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-white\/75  { color: hsl(var(--foreground) / 0.85) !important; }
 html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.82) !important; }
+html:not(.dark) .text-white\/65  { color: hsl(var(--foreground) / 0.78) !important; }
 html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-white\/55  { color: hsl(var(--foreground) / 0.72) !important; }
 html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.68) !important; }
+html:not(.dark) .text-white\/45  { color: hsl(var(--foreground) / 0.65) !important; }
 html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.62) !important; }
+html:not(.dark) .text-white\/35  { color: hsl(var(--foreground) / 0.58) !important; }
 html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.55) !important; }
 html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.50) !important; }
 html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.45) !important; }
+html:not(.dark) .text-white\/15  { color: hsl(var(--foreground) / 0.38) !important; }
 html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.30) !important; }
 /* NOTE: plain .text-white is NOT overridden — it is widely used on colored
    backgrounds (buttons, badges, gradient CTAs) where dark text would be wrong.
