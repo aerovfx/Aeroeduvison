@@ -8,6 +8,7 @@ import {
   Plus, Trash2, BookOpen, ChevronDown, ChevronUp, GripVertical,
 } from "lucide-react"
 import ScanGrading, { type AnswerKey, type EssayQuestion } from "@/components/exam-grading/ScanGrading"
+import { PdfRefViewer } from "@/components/exam-grading/PdfRefViewer"
 
 // ── Dark palette ─────────────────────────────────────────────────────────────
 const D = {
@@ -536,8 +537,12 @@ export default function ExamGrading() {
         </div>
       </div>
 
-      {/* ── Main ── */}
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* ── Main ── (max-w wider khi activeTab=answerkey để có chỗ cho cột PDF) */}
+      <div style={{
+        maxWidth: activeTab === "answerkey" ? 1600 : 1280,
+        margin: "0 auto", padding: 24,
+        display: "flex", flexDirection: "column", gap: 20,
+      }}>
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -592,9 +597,17 @@ export default function ExamGrading() {
           )
         )}
 
-        {/* ── Tab: Nhập đáp án ── */}
+        {/* ── Tab: Nhập đáp án ── (2-col layout: PDF tham chiếu | Form nhập đáp án) */}
         {activeTab === "answerkey" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,_1fr)_minmax(520px,_1fr)] gap-5">
+
+            {/* ═══ CỘT TRÁI: PDF tham chiếu (sticky on desktop) ═══ */}
+            <div className="lg:sticky lg:top-24 lg:self-start" style={{ height: 'calc(100vh - 8rem)' }}>
+              <PdfRefViewer hint="đề thi gốc" />
+            </div>
+
+            {/* ═══ CỘT PHẢI: Form nhập đáp án ═══ */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* Thông tin đề */}
             <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 20 }}>
@@ -991,6 +1004,8 @@ export default function ExamGrading() {
                   </div>
                 </div>
               )}
+            </div>
+            {/* ═══ ĐÓNG CỘT PHẢI ═══ */}
             </div>
           </div>
         )}
