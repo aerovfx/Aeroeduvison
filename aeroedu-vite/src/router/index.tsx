@@ -49,6 +49,8 @@ const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
 // ── Public Pages (không cần đăng nhập) ───────────────────────
 const ScanAssignmentPage = lazy(() => import('@/pages/public/ScanAssignment'))
 const KeoCoJoinPage      = lazy(() => import('@/pages/public/KeoCoJoin'))
+// /join/:token — HS quét QR mời của GV vào lớp
+const JoinByTokenPage    = lazy(() => import('@/pages/join/JoinByToken'))
 const KeoCoChallengePage = lazy(() => import('@/pages/public/KeoCoChallenge'))
 const KeoCoLivePage      = lazy(() => import('@/pages/public/KeoCoLive'))
 
@@ -251,6 +253,7 @@ export function AppRouter() {
         <Route path="/activate"         element={<ActivatePage />} />
         <Route path="/a/:token"       element={<ScanAssignmentPage />} />
         <Route path="/k/:token"       element={<KeoCoJoinPage />} />
+        <Route path="/join/:token"    element={<JoinByTokenPage />} />{/* HS quét QR vào lớp */}
         <Route path="/kc/:token"      element={<KeoCoChallengePage />} />
         <Route path="/kl/:token"      element={<KeoCoLivePage />} />
         <Route path="/contact-sales"  element={<ContactSalesPage />} />

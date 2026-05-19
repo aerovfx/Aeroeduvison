@@ -6330,6 +6330,24 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
       ON "TeacherStudentLink"("teacherId", status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS "TSL_student_idx"
       ON "TeacherStudentLink"("studentId", status)`);
+
+    // 2026-05-19: Teacher invite-link cho HS quét QR / share link.
+    // 1 teacher có thể có nhiều token active (vd 1 link/lớp).
+    // Token đủ ngắn để QR scan nhanh (10 chữ alphanumeric).
+    await pool.query(`CREATE TABLE IF NOT EXISTS "TeacherInviteLink" (
+      "token"        TEXT PRIMARY KEY,
+      "teacherId"    TEXT NOT NULL,
+      "label"        TEXT,                  -- vd "Lớp 12A1 môn Vật lý"
+      "classId"      TEXT,                  -- optional auto-attach vào ClassStudent
+      "maxUses"      INT,                   -- NULL = không giới hạn
+      "usedCount"    INT NOT NULL DEFAULT 0,
+      "expiresAt"    TIMESTAMPTZ,           -- NULL = không hết hạn
+      "createdAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "revokedAt"    TIMESTAMPTZ            -- NULL = active
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS "TIL_teacher_idx"
+      ON "TeacherInviteLink"("teacherId", "createdAt" DESC)`);
+
     _tslReady = true;
   }
 
@@ -6552,6 +6570,237 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
     } catch (err) {
       console.error('[tsl:pending]', err.message);
       return res.json({ incoming: [], outgoing: [] });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // INVITE LINK — GV tạo link/QR cho HS quét + join
+  //
+  // Flow:
+  //   1. GV POST /invite-link/create → trả token + URL → render QR
+  //   2. HS quét QR / mở link → /join/:token (public landing)
+  //   3. FE call GET /invite-link/:token/info (public) → hiển thị teacher
+  //   4. HS đã login → POST /invite-link/:token/join → tạo TSL pending
+  //   5. GV thấy ở tab "Yêu cầu chờ duyệt" → Approve / Reject
+  // ══════════════════════════════════════════════════════════════
+
+  // Helper: sinh token 10 chữ alphanumeric (bỏ ký tự dễ nhầm I/O/0/1/l)
+  function genInviteToken() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghjkmnpqrstuvwxyz';
+    let s = '';
+    for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    return s;
+  }
+
+  // POST /api/teacher-student-link/invite-link/create
+  // Body: { label?, classId?, maxUses?, expiresInDays? }
+  app.post('/api/teacher-student-link/invite-link/create', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!/TEACHER|ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Chỉ giáo viên được tạo invite link' });
+      }
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const b = req.body || {};
+
+      // Sinh token unique (retry 5 lần nếu trùng)
+      let token = '';
+      for (let i = 0; i < 5; i++) {
+        const t = genInviteToken();
+        const dup = await pool.query(`SELECT 1 FROM "TeacherInviteLink" WHERE token=$1`, [t]);
+        if (!dup.rows.length) { token = t; break; }
+      }
+      if (!token) return res.status(500).json({ error: 'Không sinh được token unique' });
+
+      const label = b.label ? String(b.label).slice(0, 200) : null;
+      const classId = b.classId ? String(b.classId).slice(0, 100) : null;
+      const maxUses = (b.maxUses && Number(b.maxUses) > 0) ? Math.min(1000, Number(b.maxUses)) : null;
+      const expiresAt = b.expiresInDays
+        ? new Date(Date.now() + Math.min(365, Number(b.expiresInDays)) * 86_400_000)
+        : null;
+
+      await pool.query(
+        `INSERT INTO "TeacherInviteLink"
+           ("token", "teacherId", "label", "classId", "maxUses", "expiresAt")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [token, user.id, label, classId, maxUses, expiresAt]
+      );
+
+      const baseUrl = (process.env.PUBLIC_URL || `https://${req.headers.host || 'inphysic.com'}`).replace(/\/$/, '');
+      const url = `${baseUrl}/join/${token}`;
+      console.log(`[tsl:invite-link:create] ${user.id} → ${token} (${label || 'no label'})`);
+      res.status(201).json({ token, url, label, maxUses, expiresAt });
+    } catch (err) {
+      console.error('[tsl:invite-link:create]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/teacher-student-link/invite-link/list — GV xem các link đã tạo
+  app.get('/api/teacher-student-link/invite-link/list', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      const { rows } = await pool.query(
+        `SELECT "token", "label", "classId", "maxUses", "usedCount",
+                "expiresAt", "createdAt", "revokedAt"
+           FROM "TeacherInviteLink"
+          WHERE "teacherId" = $1
+          ORDER BY "createdAt" DESC LIMIT 50`,
+        [user.id]
+      );
+      const baseUrl = (process.env.PUBLIC_URL || `https://${req.headers.host || 'inphysic.com'}`).replace(/\/$/, '');
+      res.json({
+        links: rows.map(r => ({
+          ...r,
+          url: `${baseUrl}/join/${r.token}`,
+          isActive: !r.revokedAt
+            && (!r.expiresAt || new Date(r.expiresAt) > new Date())
+            && (!r.maxUses || r.usedCount < r.maxUses),
+        })),
+        count: rows.length,
+      });
+    } catch (err) {
+      console.error('[tsl:invite-link:list]', err.message);
+      res.json({ links: [], count: 0 });
+    }
+  });
+
+  // DELETE /api/teacher-student-link/invite-link/:token — revoke
+  app.delete('/api/teacher-student-link/invite-link/:token', async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      const pool = getAsgnPool();
+      const r = await pool.query(
+        `UPDATE "TeacherInviteLink" SET "revokedAt" = NOW()
+          WHERE "token" = $1 AND "teacherId" = $2 AND "revokedAt" IS NULL`,
+        [req.params.token, user.id]
+      );
+      if (!r.rowCount) return res.status(404).json({ error: 'Không tìm thấy hoặc đã revoke' });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[tsl:invite-link:revoke]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/teacher-student-link/invite-link/:token/info — PUBLIC, không cần auth
+  // HS quét QR → trang /join/:token → call endpoint này để hiển thị teacher info
+  app.get('/api/teacher-student-link/invite-link/:token/info', async (req, res) => {
+    try {
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      const { rows } = await pool.query(
+        `SELECT l."label", l."maxUses", l."usedCount", l."expiresAt", l."revokedAt",
+                u.id AS "teacherId", u.name AS "teacherName", u.email AS "teacherEmail",
+                u.image AS "teacherImage"
+           FROM "TeacherInviteLink" l
+           LEFT JOIN "User" u ON u.id = l."teacherId"
+          WHERE l."token" = $1 LIMIT 1`,
+        [req.params.token]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Link không tồn tại' });
+      const r = rows[0];
+      if (r.revokedAt) return res.status(410).json({ error: 'Link đã bị thu hồi' });
+      if (r.expiresAt && new Date(r.expiresAt) < new Date()) {
+        return res.status(410).json({ error: 'Link đã hết hạn' });
+      }
+      if (r.maxUses && r.usedCount >= r.maxUses) {
+        return res.status(410).json({ error: 'Link đã đạt giới hạn lượt dùng' });
+      }
+      res.json({
+        valid: true,
+        label: r.label,
+        teacher: {
+          id: r.teacherId,
+          name: r.teacherName,
+          email: r.teacherEmail,
+          image: r.teacherImage,
+        },
+        usedCount: r.usedCount,
+        maxUses: r.maxUses,
+        expiresAt: r.expiresAt,
+      });
+    } catch (err) {
+      console.error('[tsl:invite-link:info]', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/teacher-student-link/invite-link/:token/join
+  // HS (đã login) submit join request → tạo TSL pending, increment usedCount.
+  // Body: { message? }
+  app.post('/api/teacher-student-link/invite-link/:token/join', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const user = getUserAsgn(req);
+      if (!user?.id) return res.status(401).json({ error: 'Vui lòng đăng nhập trước' });
+      await ensureTSLTable();
+      const pool = getAsgnPool();
+
+      // Validate token + lấy teacherId
+      const linkR = await pool.query(
+        `SELECT "teacherId", "label", "maxUses", "usedCount", "expiresAt", "revokedAt"
+           FROM "TeacherInviteLink" WHERE "token" = $1 LIMIT 1`,
+        [req.params.token]
+      );
+      if (!linkR.rows.length) return res.status(404).json({ error: 'Link không tồn tại' });
+      const link = linkR.rows[0];
+      if (link.revokedAt) return res.status(410).json({ error: 'Link đã bị thu hồi' });
+      if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+        return res.status(410).json({ error: 'Link đã hết hạn' });
+      }
+      if (link.maxUses && link.usedCount >= link.maxUses) {
+        return res.status(410).json({ error: 'Link đã đạt giới hạn' });
+      }
+      if (link.teacherId === user.id) {
+        return res.status(400).json({ error: 'Bạn không thể tham gia lớp của chính mình' });
+      }
+
+      // Tạo TSL pending (initiatedBy = student) — GV vẫn cần Approve
+      const existing = await pool.query(
+        `SELECT id, status FROM "TeacherStudentLink"
+          WHERE "teacherId"=$1 AND "studentId"=$2 LIMIT 1`,
+        [link.teacherId, user.id]
+      );
+      if (existing.rows[0]) {
+        const e = existing.rows[0];
+        if (e.status === 'approved') return res.status(409).json({ error: 'Bạn đã ở trong lớp này rồi' });
+        if (e.status === 'pending')  return res.status(409).json({ error: 'Yêu cầu của bạn đang chờ GV duyệt' });
+        if (e.status === 'rejected') {
+          // Reset để cho phép join lại qua invite link
+          await pool.query(`DELETE FROM "TeacherStudentLink" WHERE id=$1`, [e.id]);
+        }
+      }
+
+      const id = newAsgnId('tsl_');
+      const message = req.body?.message ? String(req.body.message).slice(0, 500) : `Yêu cầu vào lớp qua mã mời${link.label ? ` "${link.label}"` : ''}`;
+      await pool.query(
+        `INSERT INTO "TeacherStudentLink"
+           (id, "teacherId", "studentId", status, "initiatedBy", message)
+         VALUES ($1, $2, $3, 'pending', 'student', $4)`,
+        [id, link.teacherId, user.id, message]
+      );
+      // Increment usedCount
+      await pool.query(
+        `UPDATE "TeacherInviteLink" SET "usedCount" = "usedCount" + 1 WHERE "token" = $1`,
+        [req.params.token]
+      );
+      // Notify GV
+      await sendNotif(pool, link.teacherId, user.id, 'link_request',
+        `${user.name || user.email} muốn vào lớp${link.label ? ` "${link.label}"` : ''}`,
+        message, '/teacher/student-requests',
+        { source: 'invite-link', token: req.params.token, label: link.label });
+      console.log(`[tsl:invite-link:join] student=${user.id} → teacher=${link.teacherId} via ${req.params.token}`);
+      res.status(201).json({ ok: true, status: 'pending', linkId: id, message: 'Đã gửi yêu cầu. Chờ GV duyệt.' });
+    } catch (err) {
+      console.error('[tsl:invite-link:join]', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 

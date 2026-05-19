@@ -4,16 +4,18 @@
  * 3 tab:
  *   - Yêu cầu chờ duyệt (incoming + outgoing pending)
  *   - HS đã kết nối (approved students)
- *   - Mời HS mới (search modal)
+ *   - Mời HS mới (modal: search email HOẶC QR/link share)
  *
- * Bonus: bulk approve nhiều HS cùng lúc.
+ * Bonus: bulk approve nhiều HS cùng lúc + QR/share link cho HS tự đăng ký.
  */
 import { useState, useEffect, useCallback } from 'react'
 import {
   Users, Search, UserPlus, Check, X, Clock, Mail,
   Loader2, ArrowRight, Trash2, MessageSquare, CheckCheck,
+  QrCode, Link2, Copy as CopyIcon, RefreshCw, Calendar, Hash,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   teacherStudentLinkService,
   type LinkedUser,
@@ -349,9 +351,14 @@ export default function StudentRequests() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// InviteStudentModal — search HS theo email + gửi invite
+// InviteStudentModal — 2 chế độ:
+//   1. Tìm HS theo email + gửi invite trực tiếp (HS phải có account)
+//   2. Tạo QR code / share link cho HS đăng ký + GV approve (KHUYÊN DÙNG)
 // ─────────────────────────────────────────────────────────────
+type InviteMode = 'email' | 'qr'
+
 function InviteStudentModal({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
+  const [mode, setMode] = useState<InviteMode>('qr')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchUser[]>([])
   const [loading, setLoading] = useState(false)
@@ -393,16 +400,45 @@ function InviteStudentModal({ onClose, onSent }: { onClose: () => void; onSent: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[hsl(260,30%,12%)] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
+      <div className="relative bg-[hsl(260,30%,12%)] border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg z-10 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between flex-shrink-0">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-emerald-400" />
-            Mời học sinh kết nối
+            Mời học sinh vào lớp
           </h2>
           <button onClick={onClose} className="text-white/40 hover:text-white"><X className="w-5 h-5" /></button>
         </div>
 
-        {!picked ? (
+        {/* Mode tabs */}
+        <div className="px-5 pt-3 flex gap-2 flex-shrink-0">
+          <button
+            onClick={() => setMode('qr')}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition ${
+              mode === 'qr'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-white/5 text-white/60 hover:bg-white/10'
+            }`}
+          >
+            <QrCode className="w-4 h-4" />
+            QR / Link share
+          </button>
+          <button
+            onClick={() => setMode('email')}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition ${
+              mode === 'email'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-white/5 text-white/60 hover:bg-white/10'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            Tìm theo email
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+        {mode === 'qr' ? (
+          <QrInviteSection onClose={onClose} />
+        ) : !picked ? (
           <div className="p-5 space-y-3">
             <input
               type="text"
@@ -499,7 +535,286 @@ function InviteStudentModal({ onClose, onSent }: { onClose: () => void; onSent: 
             </div>
           </div>
         )}
+        </div>{/* end overflow-y-auto */}
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// QrInviteSection — GV tạo link/QR mời HS đăng ký vào lớp
+// HS quét QR → /join/:token → bấm "Yêu cầu vào lớp" → GV approve.
+// ─────────────────────────────────────────────────────────────
+interface InviteLinkRow {
+  token: string
+  label: string | null
+  usedCount: number
+  maxUses: number | null
+  expiresAt: string | null
+  createdAt: string
+  revokedAt: string | null
+  url: string
+  isActive: boolean
+}
+
+function QrInviteSection({ onClose: _onClose }: { onClose: () => void }) {
+  const [links, setLinks] = useState<InviteLinkRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [label, setLabel] = useState('')
+  const [expiresInDays, setExpiresInDays] = useState<number | ''>(30)
+  const [maxUses, setMaxUses] = useState<number | ''>('')
+  const [selectedToken, setSelectedToken] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await teacherStudentLinkService.listInviteLinks()
+      setLinks(r.links)
+      // Auto-select first active link if none selected
+      if (!selectedToken && r.links.find(l => l.isActive)) {
+        setSelectedToken(r.links.find(l => l.isActive)!.token)
+      }
+    } catch {
+      setLinks([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedToken])
+
+  useEffect(() => { load() }, [load])
+
+  const createLink = async () => {
+    setCreating(true)
+    try {
+      const r = await teacherStudentLinkService.createInviteLink({
+        label: label.trim() || undefined,
+        expiresInDays: typeof expiresInDays === 'number' ? expiresInDays : undefined,
+        maxUses: typeof maxUses === 'number' ? maxUses : undefined,
+      })
+      toast.success('Đã tạo link mời mới')
+      setLabel('')
+      setSelectedToken(r.token)
+      load()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không tạo được link')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const revokeLink = async (token: string) => {
+    if (!confirm('Thu hồi link này? Các HS chưa join sẽ không vào được nữa.')) return
+    try {
+      await teacherStudentLinkService.revokeInviteLink(token)
+      toast.success('Đã thu hồi')
+      if (selectedToken === token) setSelectedToken(null)
+      load()
+    } catch {
+      toast.error('Lỗi')
+    }
+  }
+
+  const copyUrl = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Đã copy link — chia sẻ cho HS')
+    } catch {
+      toast.error('Không copy được')
+    }
+  }
+
+  const downloadQr = (token: string, url: string) => {
+    // Lấy SVG element của QR rồi convert sang PNG để download
+    const svg = document.getElementById(`qr-svg-${token}`) as SVGSVGElement | null
+    if (!svg) return
+    const xml = new XMLSerializer().serializeToString(svg)
+    const img = new Image()
+    const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' })
+    const blobUrl = URL.createObjectURL(blob)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      canvas.width = 600; canvas.height = 600
+      const ctx = canvas.getContext('2d')!
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, 600, 600)
+      ctx.drawImage(img, 0, 0, 600, 600)
+      canvas.toBlob(b => {
+        if (!b) return
+        const dlUrl = URL.createObjectURL(b)
+        const a = document.createElement('a')
+        a.href = dlUrl
+        a.download = `qr-invite-${token}.png`
+        a.click()
+        URL.revokeObjectURL(dlUrl)
+      }, 'image/png')
+      URL.revokeObjectURL(blobUrl)
+    }
+    img.src = blobUrl
+  }
+
+  const selected = selectedToken ? links.find(l => l.token === selectedToken) : null
+
+  return (
+    <div className="p-5 space-y-4">
+      {/* Create form */}
+      <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/20 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-xs font-bold text-emerald-300 uppercase tracking-wider">
+          <UserPlus className="w-3.5 h-3.5" />
+          Tạo link mời mới
+        </div>
+        <input
+          type="text"
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          placeholder='Nhãn (VD: "Lớp 12A1 môn Vật lý")'
+          maxLength={200}
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-white/50 uppercase font-bold mb-1 block flex items-center gap-1">
+              <Calendar className="w-3 h-3" /> Hết hạn (ngày)
+            </label>
+            <input
+              type="number"
+              value={expiresInDays}
+              onChange={e => setExpiresInDays(e.target.value === '' ? '' : Math.max(1, Math.min(365, Number(e.target.value))))}
+              placeholder="30"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] text-white/50 uppercase font-bold mb-1 block flex items-center gap-1">
+              <Hash className="w-3 h-3" /> Giới hạn lượt
+            </label>
+            <input
+              type="number"
+              value={maxUses}
+              onChange={e => setMaxUses(e.target.value === '' ? '' : Math.max(1, Math.min(1000, Number(e.target.value))))}
+              placeholder="(bỏ trống = ∞)"
+              className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+        </div>
+        <button
+          onClick={createLink}
+          disabled={creating}
+          className="w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-bold flex items-center justify-center gap-2"
+        >
+          {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+          Tạo link + QR
+        </button>
+      </div>
+
+      {/* Existing links */}
+      {loading ? (
+        <div className="py-6 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white/40" />
+        </div>
+      ) : links.length === 0 ? (
+        <p className="text-xs text-white/50 text-center py-4 italic">
+          Chưa có link nào — tạo link đầu tiên ở trên
+        </p>
+      ) : (
+        <>
+          <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+            Link đã tạo ({links.length})
+          </div>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {links.map(l => (
+              <button
+                key={l.token}
+                onClick={() => setSelectedToken(l.token)}
+                className={`w-full text-left p-2 rounded-lg flex items-center gap-2 transition border ${
+                  selectedToken === l.token
+                    ? 'bg-emerald-500/15 border-emerald-500/40'
+                    : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/5'
+                } ${!l.isActive ? 'opacity-50' : ''}`}
+              >
+                <div className={`w-2 h-2 rounded-full ${l.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-white truncate">
+                    {l.label || `Link ${l.token}`}
+                  </div>
+                  <div className="text-[10px] text-white/40">
+                    {l.usedCount}{l.maxUses ? `/${l.maxUses}` : ''} lượt
+                    {l.expiresAt && ` · HH ${new Date(l.expiresAt).toLocaleDateString('vi-VN')}`}
+                    {l.revokedAt && ' · (đã thu hồi)'}
+                  </div>
+                </div>
+                {l.isActive && (
+                  <button
+                    onClick={e => { e.stopPropagation(); revokeLink(l.token) }}
+                    title="Thu hồi link"
+                    className="p-1 rounded text-white/40 hover:bg-rose-500/20 hover:text-rose-400"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* QR display cho link đang chọn */}
+      {selected && selected.isActive && (
+        <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white/80 uppercase tracking-wider flex items-center gap-1.5">
+              <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+              QR cho HS quét
+            </span>
+            <span className="text-[10px] text-white/50">
+              {selected.usedCount}{selected.maxUses ? `/${selected.maxUses}` : ''} lượt dùng
+            </span>
+          </div>
+
+          {/* QR code — white background để contrast cao khi HS quét */}
+          <div className="flex justify-center bg-white p-4 rounded-lg">
+            <QRCodeSVG
+              id={`qr-svg-${selected.token}`}
+              value={selected.url}
+              size={200}
+              level="M"
+              includeMargin={false}
+            />
+          </div>
+
+          {/* URL row + copy */}
+          <div className="flex gap-1.5">
+            <input
+              type="text"
+              value={selected.url}
+              readOnly
+              onFocus={e => e.target.select()}
+              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none"
+            />
+            <button
+              onClick={() => copyUrl(selected.url)}
+              className="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"
+              title="Copy link"
+            >
+              <CopyIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => downloadQr(selected.token, selected.url)}
+              className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+              title="Tải QR (PNG)"
+            >
+              <ArrowRight className="w-4 h-4 rotate-90" />
+            </button>
+          </div>
+
+          <p className="text-[10px] text-white/50 leading-relaxed">
+            📲 <strong className="text-white/70">HS quét QR</strong> hoặc <strong className="text-white/70">mở link</strong> →
+            đăng nhập → bấm <strong className="text-emerald-300">"Yêu cầu vào lớp"</strong>.
+            Bạn sẽ thấy yêu cầu ở tab <strong className="text-yellow-300">"Yêu cầu chờ duyệt"</strong> để xác thực.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

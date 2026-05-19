@@ -105,4 +105,62 @@ export const teacherStudentLinkService = {
     const r = await api.get<{ users: SearchUser[] }>('/users/search', { params })
     return r.data?.users || []
   },
+
+  // ── Invite link / QR ───────────────────────────────────────
+  /** GV tạo link mời HS (HS quét QR / mở link → trang /join/:token) */
+  async createInviteLink(payload: { label?: string; classId?: string; maxUses?: number; expiresInDays?: number }) {
+    const r = await api.post<{ token: string; url: string; label: string | null; maxUses: number | null; expiresAt: string | null }>(
+      '/teacher-student-link/invite-link/create',
+      payload
+    )
+    return r.data
+  },
+
+  /** GV list các link đã tạo (active + revoked) */
+  async listInviteLinks() {
+    const r = await api.get<{
+      links: Array<{
+        token: string
+        label: string | null
+        classId: string | null
+        maxUses: number | null
+        usedCount: number
+        expiresAt: string | null
+        createdAt: string
+        revokedAt: string | null
+        url: string
+        isActive: boolean
+      }>
+      count: number
+    }>('/teacher-student-link/invite-link/list')
+    return r.data
+  },
+
+  /** GV revoke 1 link */
+  async revokeInviteLink(token: string) {
+    const r = await api.delete<{ ok: boolean }>(`/teacher-student-link/invite-link/${token}`)
+    return r.data
+  },
+
+  /** PUBLIC — HS mở link xem teacher info trước khi join */
+  async getInviteLinkInfo(token: string) {
+    const r = await api.get<{
+      valid: boolean
+      label: string | null
+      teacher: { id: string; name: string | null; email: string; image: string | null }
+      usedCount: number
+      maxUses: number | null
+      expiresAt: string | null
+    }>(`/teacher-student-link/invite-link/${token}/info`)
+    return r.data
+  },
+
+  /** HS (đã login) submit join request qua invite link */
+  async joinViaInviteLink(token: string, message?: string) {
+    const r = await api.post<{ ok: boolean; status: string; linkId: string; message: string }>(
+      `/teacher-student-link/invite-link/${token}/join`,
+      message ? { message } : {}
+    )
+    return r.data
+  },
 }
