@@ -27,8 +27,10 @@
   --secondary:            210 40% 96%;
   --secondary-foreground: 222 47% 8%;
   --muted:                210 40% 96%;
-  /* Phụ đề: đậm hơn (trước ~47% L → ~36%) so với nền trắng/card */
-  --muted-foreground:     222 14% 36%;
+  /* Phụ đề: đậm hơn nữa (2026-05-19: 36% → 26% L) — user phản hồi
+     "chữ ban ngày chưa rõ". Mục tiêu contrast ≥ 7:1 (WCAG AAA) trên
+     nền trắng cho text 14px+. */
+  --muted-foreground:     222 16% 26%;
   --accent:               210 40% 96%;
   --accent-foreground:    222 47% 8%;
   --destructive:          0 84% 60%;
@@ -65,7 +67,7 @@
   --ai-accent:            #7c3aed;
   --ai-accent-hover:      #6d28d9;
   --ai-divider:           #e2e8f0;
-  --ai-muted-text:        #52525b;
+  --ai-muted-text:        #3f3f46;  /* 2026-05-19: zinc-600 → zinc-700 — contrast cao hơn cho light mode */
 
   /* Light-mode glass & gradient for .neu-container / glass-panel (override neumorphic dark-first) */
   --glass-bg:             rgba(0,0,0,0.03);
@@ -845,19 +847,61 @@ html:not(.dark) circle[stroke="rgba(255,255,255,0.04)"] { stroke: rgba(0,0,0,0.0
 /* ── Loader border overrides ───────────────────────────────── */
 html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.08) !important; }
 
-/* ── Light gray/slate text → dark foreground ─────────────────
- * These are used across 110+ files as dark-theme text. In light
- * mode they become invisible on white backgrounds.             */
-html:not(.dark) .text-gray-50   { color: hsl(var(--foreground) / 0.92) !important; }
-html:not(.dark) .text-gray-100  { color: hsl(var(--foreground) / 0.88) !important; }
-html:not(.dark) .text-gray-200  { color: hsl(var(--foreground) / 0.75) !important; }
-html:not(.dark) .text-gray-300  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-gray-400  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-slate-50  { color: hsl(var(--foreground) / 0.92) !important; }
-html:not(.dark) .text-slate-100 { color: hsl(var(--foreground) / 0.88) !important; }
-html:not(.dark) .text-slate-200 { color: hsl(var(--foreground) / 0.75) !important; }
-html:not(.dark) .text-slate-300 { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-slate-400 { color: hsl(var(--foreground) / 0.50) !important; }
+/* ── Light gray/slate/zinc/neutral text → dark foreground ─────
+ * 2026-05-19 RETUNED — user reported "chữ ban ngày chưa rõ".
+ * Previous opacities (0.50, 0.60) gave low contrast on white.
+ * New scale: 50→0.95, 100→0.92, 200→0.85, 300→0.78, 400→0.72,
+ * 500→0.62 (matches darker --muted-foreground). All ≥ 4.5:1 WCAG AA.
+ * Apply to gray + slate + zinc + neutral (Tailwind's 4 gray scales). */
+html:not(.dark) .text-gray-50,
+html:not(.dark) .text-slate-50,
+html:not(.dark) .text-zinc-50,
+html:not(.dark) .text-neutral-50   { color: hsl(var(--foreground) / 0.95) !important; }
+
+html:not(.dark) .text-gray-100,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-zinc-100,
+html:not(.dark) .text-neutral-100  { color: hsl(var(--foreground) / 0.92) !important; }
+
+html:not(.dark) .text-gray-200,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-zinc-200,
+html:not(.dark) .text-neutral-200  { color: hsl(var(--foreground) / 0.85) !important; }
+
+html:not(.dark) .text-gray-300,
+html:not(.dark) .text-slate-300,
+html:not(.dark) .text-zinc-300,
+html:not(.dark) .text-neutral-300  { color: hsl(var(--foreground) / 0.78) !important; }
+
+html:not(.dark) .text-gray-400,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-neutral-400  { color: hsl(var(--foreground) / 0.72) !important; }
+
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-zinc-500,
+html:not(.dark) .text-neutral-500  { color: hsl(var(--foreground) / 0.62) !important; }
+
+html:not(.dark) .text-gray-600,
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-zinc-600,
+html:not(.dark) .text-neutral-600  { color: hsl(var(--foreground) / 0.78) !important; }
+
+html:not(.dark) .text-gray-700,
+html:not(.dark) .text-slate-700,
+html:not(.dark) .text-zinc-700,
+html:not(.dark) .text-neutral-700  { color: hsl(var(--foreground) / 0.85) !important; }
+
+html:not(.dark) .text-gray-800,
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-zinc-800,
+html:not(.dark) .text-neutral-800  { color: hsl(var(--foreground) / 0.92) !important; }
+
+html:not(.dark) .text-gray-900,
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-zinc-900,
+html:not(.dark) .text-neutral-900  { color: hsl(var(--foreground)) !important; }
 
 /* ── Placeholder text ────────────────────────────────────────── */
 html:not(.dark) .placeholder-gray-400::placeholder  { color: hsl(var(--foreground) / 0.40) !important; }
@@ -928,10 +972,64 @@ html:not(.dark) .hover\:bg-slate-700:hover  { background-color: rgba(0,0,0,0.06)
 html:not(.dark) .hover\:bg-slate-800:hover  { background-color: rgba(0,0,0,0.06) !important; }
 html:not(.dark) .hover\:bg-slate-300:hover  { background-color: rgba(0,0,0,0.05) !important; }
 
-/* ── text-zinc variants → dark foreground ────────────────────── */
-html:not(.dark) .text-zinc-300  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-zinc-400  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-zinc-500  { color: hsl(var(--muted-foreground)) !important; }
+/* text-zinc-* đã được handle ở rule kết hợp gray/slate/zinc/neutral ở trên.
+ * Block này giữ trống để tránh conflict khi rebuild — sẽ xoá ở dọn dẹp sau. */
+
+/* ── Faded colored text (designed cho dark bg) → đậm hơn trong light mode ─
+ * 2026-05-19: text-amber-200/300, text-rose-300/400, text-cyan-300/400 etc.
+ * Khi page dùng dark-first design rồi switch sang light mode, các màu nhạt
+ * này biến mất trên nền trắng. Override sang shade đậm hơn của cùng hue. */
+html:not(.dark) .text-amber-200,
+html:not(.dark) .text-amber-300       { color: hsl(38 92% 38%) !important; }
+html:not(.dark) .text-amber-400       { color: hsl(38 92% 42%) !important; }
+html:not(.dark) .text-yellow-200,
+html:not(.dark) .text-yellow-300      { color: hsl(43 96% 38%) !important; }
+html:not(.dark) .text-yellow-400      { color: hsl(43 96% 42%) !important; }
+html:not(.dark) .text-rose-200,
+html:not(.dark) .text-rose-300        { color: hsl(347 77% 48%) !important; }
+html:not(.dark) .text-rose-400        { color: hsl(347 77% 52%) !important; }
+html:not(.dark) .text-red-200,
+html:not(.dark) .text-red-300         { color: hsl(0 70% 48%) !important; }
+html:not(.dark) .text-red-400         { color: hsl(0 70% 52%) !important; }
+html:not(.dark) .text-cyan-200,
+html:not(.dark) .text-cyan-300        { color: hsl(189 88% 32%) !important; }
+html:not(.dark) .text-cyan-400        { color: hsl(189 88% 36%) !important; }
+html:not(.dark) .text-emerald-200,
+html:not(.dark) .text-emerald-300     { color: hsl(160 78% 32%) !important; }
+html:not(.dark) .text-emerald-400     { color: hsl(160 78% 36%) !important; }
+html:not(.dark) .text-green-200,
+html:not(.dark) .text-green-300       { color: hsl(142 70% 32%) !important; }
+html:not(.dark) .text-green-400       { color: hsl(142 70% 36%) !important; }
+html:not(.dark) .text-blue-200,
+html:not(.dark) .text-blue-300        { color: hsl(217 88% 48%) !important; }
+html:not(.dark) .text-blue-400        { color: hsl(217 88% 52%) !important; }
+html:not(.dark) .text-indigo-200,
+html:not(.dark) .text-indigo-300      { color: hsl(238 75% 52%) !important; }
+html:not(.dark) .text-indigo-400      { color: hsl(238 75% 56%) !important; }
+html:not(.dark) .text-violet-200,
+html:not(.dark) .text-violet-300      { color: hsl(258 85% 52%) !important; }
+html:not(.dark) .text-violet-400      { color: hsl(258 85% 56%) !important; }
+html:not(.dark) .text-purple-200,
+html:not(.dark) .text-purple-300      { color: hsl(270 80% 48%) !important; }
+html:not(.dark) .text-purple-400      { color: hsl(270 80% 52%) !important; }
+html:not(.dark) .text-fuchsia-200,
+html:not(.dark) .text-fuchsia-300     { color: hsl(290 80% 48%) !important; }
+html:not(.dark) .text-fuchsia-400     { color: hsl(290 80% 52%) !important; }
+html:not(.dark) .text-pink-200,
+html:not(.dark) .text-pink-300        { color: hsl(330 75% 48%) !important; }
+html:not(.dark) .text-pink-400        { color: hsl(330 75% 52%) !important; }
+html:not(.dark) .text-teal-200,
+html:not(.dark) .text-teal-300        { color: hsl(174 75% 32%) !important; }
+html:not(.dark) .text-teal-400        { color: hsl(174 75% 36%) !important; }
+html:not(.dark) .text-sky-200,
+html:not(.dark) .text-sky-300         { color: hsl(199 88% 42%) !important; }
+html:not(.dark) .text-sky-400         { color: hsl(199 88% 46%) !important; }
+html:not(.dark) .text-orange-200,
+html:not(.dark) .text-orange-300      { color: hsl(20 88% 42%) !important; }
+html:not(.dark) .text-orange-400      { color: hsl(20 88% 46%) !important; }
+html:not(.dark) .text-lime-200,
+html:not(.dark) .text-lime-300        { color: hsl(83 75% 32%) !important; }
+html:not(.dark) .text-lime-400        { color: hsl(83 75% 36%) !important; }
 
 /* ── hover:text overrides for dark-first hover text ──────────── */
 html:not(.dark) .hover\:text-white:hover  { color: hsl(var(--foreground)) !important; }
