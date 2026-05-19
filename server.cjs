@@ -3915,6 +3915,9 @@ if (USE_NODEJS_QUESTIONS) {
       const botId = process.env.ARK_BOT_ID || 'bot-202505141114-mfrvj-procode-preset';
       // BytePlus Ark region ap-southeast-1
       const apiBase = process.env.ARK_API_BASE || 'https://ark.ap-southeast.bytepluses.com';
+      // Path: bots path cho Bot products, plain chat path cho LLM endpoints
+      // Mặc định thử /bots first, fallback unified /chat/completions
+      const apiPath = process.env.ARK_API_PATH || '/api/v3/bots/chat/completions';
 
       const b = req.body || {};
       const messages = Array.isArray(b.messages) ? b.messages : [];
@@ -3958,7 +3961,7 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
         },
       };
 
-      const arkResp = await fetch(`${apiBase}/api/v3/bots/chat/completions`, {
+      const arkResp = await fetch(`${apiBase}${apiPath}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -3969,10 +3972,29 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
 
       if (!arkResp.ok) {
         const errText = await arkResp.text().catch(() => '');
-        console.error(`[ark-bot] HTTP ${arkResp.status}: ${errText.slice(0, 200)}`);
+        console.error(`[ark-bot] HTTP ${arkResp.status} on ${apiPath}: ${errText.slice(0, 300)}`);
+        // Parse Ark error for useful hint
+        let arkError = null;
+        try { arkError = JSON.parse(errText)?.error; } catch { /* ignore */ }
+        const hints = [];
+        if (arkError?.code === 'InvalidEndpointOrModel.NotFound' || /not found|not exist/i.test(errText)) {
+          hints.push('1. Bot có thể chưa được PUBLISH trong BytePlus console — vào console.byteplus.com/ark → mở Bot → bấm "Publish"');
+          hints.push(`2. ARK_API_KEY có thể không cùng workspace với bot. Tạo key tại workspace chứa bot ${botId.slice(0, 30)}...`);
+          hints.push('3. Bot ID có thể format khác — vào Bot details → copy "Endpoint ID" (dạng ep-xxx) → set ARK_BOT_ID env');
+        }
+        if (arkError?.code === 'AuthenticationError' || arkResp.status === 401) {
+          hints.push('API key sai hoặc hết hạn — tạo key mới tại console.byteplus.com/ark → API Keys');
+        }
         return res.status(arkResp.status).json({
-          error: `Ark API trả ${arkResp.status}`,
-          detail: errText.slice(0, 500),
+          error: arkError?.message || `Ark API trả ${arkResp.status}`,
+          code: arkError?.code,
+          hints,
+          debug: {
+            apiBase,
+            apiPath,
+            botId: botId.slice(0, 30) + '...',
+            requestId: arkError?.message?.match(/Request id: ([a-f0-9]+)/i)?.[1],
+          },
         });
       }
 
