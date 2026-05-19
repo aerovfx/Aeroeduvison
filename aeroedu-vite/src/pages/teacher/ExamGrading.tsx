@@ -9,6 +9,8 @@ import {
 } from "lucide-react"
 import ScanGrading, { type AnswerKey, type EssayQuestion } from "@/components/exam-grading/ScanGrading"
 import { PdfRefViewer } from "@/components/exam-grading/PdfRefViewer"
+import { BulkGrading } from "@/components/exam-grading/BulkGrading"
+import { Layers } from "lucide-react"
 
 // ── Dark palette ─────────────────────────────────────────────────────────────
 const D = {
@@ -399,9 +401,9 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ExamGrading() {
-  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "graded" | "library">("answerkey")
+  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "bulk" | "graded" | "library">("answerkey")
   const [gradedRefreshKey, setGradedRefreshKey] = useState(0)
-  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "graded" | "library") => {
+  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "bulk" | "graded" | "library") => {
     setActiveTab_(tab)
     if (tab === "graded") setGradedRefreshKey(k => k + 1)
   }, [])
@@ -493,10 +495,11 @@ export default function ExamGrading() {
   }, [savedKeys, selectedKeyIdx])
 
   const TABS = [
-    { key: "answerkey" as const, label: "① Nhập đáp án", Icon: ListChecks },
-    { key: "scan"      as const, label: "② Quét & Chấm", Icon: ScanLine   },
-    { key: "graded"    as const, label: "③ Đã chấm",     Icon: Clock      },
-    { key: "library"   as const, label: "④ Thư viện",    Icon: FileText   },
+    { key: "answerkey" as const, label: "① Nhập đáp án",    Icon: ListChecks },
+    { key: "scan"      as const, label: "② Quét 1 phiếu",   Icon: ScanLine   },
+    { key: "bulk"      as const, label: "③ Chấm hàng loạt", Icon: Layers     },
+    { key: "graded"    as const, label: "④ Đã chấm",        Icon: Clock      },
+    { key: "library"   as const, label: "⑤ Thư viện",       Icon: FileText   },
   ]
 
   return (
@@ -595,6 +598,16 @@ export default function ExamGrading() {
               onSwitchToAnswerKey={() => setActiveTab("answerkey")}
             />
           )
+        )}
+
+        {/* ── Tab: Chấm hàng loạt (≤ 100 phiếu cùng lúc) ── */}
+        {activeTab === "bulk" && (
+          <BulkGrading
+            savedKeys={savedKeys}
+            selectedKeyIdx={selectedKeyIdx}
+            setSelectedKeyIdx={setSelectedKeyIdx}
+            onSwitchToAnswerKey={() => setActiveTab("answerkey")}
+          />
         )}
 
         {/* ── Tab: Nhập đáp án ── (2-col layout: PDF tham chiếu | Form nhập đáp án) */}

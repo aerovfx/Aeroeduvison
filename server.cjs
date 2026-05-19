@@ -28013,6 +28013,247 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
   });
 
   // ════════════════════════════════════════════════════════════════
+  // POST /api/grading/batch-grade — CHẤM HÀNG LOẠT (≤ 100 phiếu)
+  // ────────────────────────────────────────────────────────────────
+  // Body: {
+  //   answerKeyId: string  (UUID của AnswerKey đã lưu),
+  //   sheets: [
+  //     { filename: 'phieu_01.jpg', image: '<base64>', mimeType: 'image/jpeg' }
+  //   ]
+  // }
+  // Flow:
+  //   1. Load AnswerKey từ DB → có part1/2/3 + essayQuestions
+  //   2. Với mỗi sheet (concurrency 5 để tránh fal rate-limit):
+  //      a. Vision AI extract student_info + bubble answers (part1/2/3)
+  //      b. So sánh với key → score
+  //      c. Insert vào "GradedSheet" với payload đầy đủ
+  //   3. Trả: { results: [...], summary: { total, success, failed, avgScore } }
+  // Giới hạn: ≤ 100 sheets/request, total payload ≤ 60MB (~600KB per JPG).
+  // ════════════════════════════════════════════════════════════════
+  app.post('/api/grading/batch-grade',
+    express.json({ limit: '60mb' }),
+    async (req, res) => {
+      const user = getGrTeacher(req);
+      if (!user) return res.status(401).json({ success: false, error: 'Unauthorized' });
+
+      // Gating: cùng feature ocr_pdf với single-sheet endpoint
+      try {
+        const gating = require('./lib/gating.cjs');
+        const gate = await gating.checkEntitlement(req, 'ocr_pdf');
+        if (!gate.ok) return res.status(gate.status).json(gate.body);
+      } catch (e) { /* gating optional in dev */ }
+
+      const pool = getGrPool();
+      if (!pool) return res.status(503).json({ success: false, error: 'DB unavailable' });
+
+      try {
+        await ensureGradingTables();
+        const { answerKeyId, sheets } = req.body || {};
+        if (!answerKeyId || !Array.isArray(sheets) || sheets.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Body cần { answerKeyId, sheets: [{ filename, image, mimeType }] }',
+          });
+        }
+        if (sheets.length > 100) {
+          return res.status(400).json({
+            success: false,
+            error: `Tối đa 100 phiếu/lần. Đã gửi ${sheets.length}.`,
+          });
+        }
+
+        // Load answer key
+        const { rows: akRows } = await pool.query(
+          `SELECT * FROM "AnswerKey" WHERE id = $1 AND "teacherId" = $2`,
+          [String(answerKeyId), user.id]
+        );
+        if (!akRows.length) {
+          return res.status(404).json({ success: false, error: 'Không tìm thấy đáp án (hoặc không phải của bạn)' });
+        }
+        const akRow = akRows[0];
+        const keyPayload = akRow.payload || {};
+        const part1Key = keyPayload.part1 || {};  // { 1:'A', 2:'B' ... }
+        const part2Key = keyPayload.part2 || {};  // { 1: { a:'T', b:'F', ... } }
+        const part3Key = keyPayload.part3 || {};  // { 1: '0.5', ... }
+
+        const { completeWithVision } = require('./lib/fal-client.cjs');
+        const { randomUUID } = require('crypto');
+
+        // ─── Vision prompt: extract header + bubble answers ───
+        const PROMPT = [
+          'Đây là Phiếu Trả Lời Trắc Nghiệm Việt Nam chuẩn Bộ GD&ĐT 2025.',
+          'Hãy đọc TOÀN BỘ phiếu và trả JSON sau (KHÔNG markdown, KHÔNG giải thích):',
+          '',
+          '{',
+          '  "student_name": "<Họ tên thí sinh>",',
+          '  "student_id":   "<SBD — chuỗi số 6-8 chữ số, đọc theo bubble đã tô>",',
+          '  "exam_code":    "<Mã đề — chuỗi 3 chữ số như 132/209/357/485>",',
+          '  "class_name":   "<Lớp — vd 12A1, 11B3>",',
+          '  "part1": { "1":"A","2":"B","3":"C","4":"D", ... },   // Phần I: 40 câu MCQ A/B/C/D',
+          '  "part2": { "1": {"a":"T","b":"F","c":"T","d":"F"}, ... }, // Phần II: 8 câu Đúng-Sai',
+          '  "part3": { "1":"0.5","2":"2","3":"100", ... }       // Phần III: 6 câu trả lời ngắn',
+          '}',
+          '',
+          'Quy tắc đọc bubble:',
+          '- Ô được tô đậm/đen rõ ràng = đáp án thí sinh chọn.',
+          '- Nếu nhiều ô tô cùng câu → chọn ô đậm NHẤT.',
+          '- Nếu không câu nào tô → để chuỗi rỗng "" hoặc bỏ key đó.',
+          '- Phần II: mỗi mệnh đề a/b/c/d có 2 ô T (Đúng) / F (Sai).',
+          '- Phần III: đọc bubble số (0-9 mỗi cột) → ráp thành chuỗi số.',
+          '- Tên/Lớp: giữ nguyên dấu tiếng Việt.',
+          '- KHÔNG suy đoán, chỉ ghi những gì thấy rõ.',
+          '',
+          'Trả JSON ngay:',
+        ].join('\n');
+
+        // ─── Process 1 sheet: Vision → parse → grade ───
+        async function processSheet(sheet, idx) {
+          const t0 = Date.now();
+          const filename = String(sheet.filename || `sheet-${idx + 1}.jpg`);
+          try {
+            if (!sheet.image || typeof sheet.image !== 'string') {
+              throw new Error('Thiếu trường image (base64)');
+            }
+            const base64 = sheet.image.replace(/^data:[^,]+,/, '');
+            const resp = await completeWithVision({
+              system: 'Bạn là OCR engine chuyên đọc phiếu trắc nghiệm Việt Nam. CHỈ trả JSON.',
+              messages: [{ role: 'user', content: PROMPT }],
+              images: [{ data: base64, mimeType: sheet.mimeType || 'image/jpeg' }],
+            });
+            const raw = String(resp.content || '').trim();
+            const m = raw.match(/\{[\s\S]*\}/);
+            if (!m) throw new Error('AI không trả JSON hợp lệ');
+            const parsed = JSON.parse(m[0]);
+
+            // ─── So với key → tính điểm ───
+            const studentPart1 = parsed.part1 || {};
+            const studentPart2 = parsed.part2 || {};
+            const studentPart3 = parsed.part3 || {};
+
+            let correct = 0, total = 0;
+            const part1Detail = {};
+            for (const [q, keyAns] of Object.entries(part1Key)) {
+              if (!keyAns) continue;
+              total++;
+              const studAns = String(studentPart1[q] || '').toUpperCase().trim();
+              const isCorrect = studAns === String(keyAns).toUpperCase().trim();
+              if (isCorrect) correct++;
+              part1Detail[q] = { key: keyAns, student: studAns, correct: isCorrect };
+            }
+
+            const part2Detail = {};
+            for (const [q, keyMap] of Object.entries(part2Key)) {
+              if (!keyMap || typeof keyMap !== 'object') continue;
+              const studMap = studentPart2[q] || {};
+              const subDetail = {};
+              for (const sub of ['a', 'b', 'c', 'd']) {
+                if (!keyMap[sub]) continue;
+                total++;
+                const k = String(keyMap[sub] || '').toUpperCase().trim();
+                const s = String(studMap[sub] || '').toUpperCase().trim();
+                const isCorrect = (k === 'T' || k === 'Đ') === (s === 'T' || s === 'Đ');
+                if (isCorrect && s) correct++;
+                subDetail[sub] = { key: k, student: s, correct: isCorrect };
+              }
+              part2Detail[q] = subDetail;
+            }
+
+            const part3Detail = {};
+            for (const [q, keyAns] of Object.entries(part3Key)) {
+              if (!keyAns) continue;
+              total++;
+              const studAns = String(studentPart3[q] || '').trim();
+              const isCorrect = studAns === String(keyAns).trim();
+              if (isCorrect) correct++;
+              part3Detail[q] = { key: keyAns, student: studAns, correct: isCorrect };
+            }
+
+            const score = total > 0 ? Math.round((correct / total) * 10 * 10) / 10 : 0;
+            const tookMs = Date.now() - t0;
+
+            // Insert vào GradedSheet
+            const sheetId = randomUUID();
+            const fullPayload = {
+              filename,
+              studentInfo: {
+                name: parsed.student_name || '',
+                id: parsed.student_id || '',
+                class: parsed.class_name || '',
+              },
+              examCode: parsed.exam_code || '',
+              answers: {
+                part1: studentPart1,
+                part2: studentPart2,
+                part3: studentPart3,
+              },
+              detail: { part1: part1Detail, part2: part2Detail, part3: part3Detail },
+              tookMs,
+            };
+            await pool.query(
+              `INSERT INTO "GradedSheet"
+                 (id, "teacherId", "answerKeyId", "studentName", "studentId",
+                  "examCode", "className", score, "maxScore", payload)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+              [
+                sheetId, user.id, akRow.id,
+                String(parsed.student_name || '').slice(0, 200),
+                String(parsed.student_id || '').slice(0, 50),
+                String(parsed.exam_code || '').slice(0, 50),
+                String(parsed.class_name || '').slice(0, 50),
+                score, 10, // điểm thang 10
+                JSON.stringify(fullPayload),
+              ]
+            );
+
+            return {
+              ok: true,
+              filename,
+              sheetId,
+              studentName: parsed.student_name || '',
+              studentId: parsed.student_id || '',
+              examCode: parsed.exam_code || '',
+              className: parsed.class_name || '',
+              correct, total, score, maxScore: 10,
+              tookMs,
+            };
+          } catch (err) {
+            console.warn(`[grading:batch:${idx}] ❌ ${filename}: ${err.message}`);
+            return { ok: false, filename, error: err.message, tookMs: Date.now() - t0 };
+          }
+        }
+
+        // ─── Concurrency limit 5 (fal rate-limit safe) ───
+        const CONCURRENCY = 5;
+        const results = new Array(sheets.length);
+        let cursor = 0;
+        async function worker() {
+          while (cursor < sheets.length) {
+            const idx = cursor++;
+            results[idx] = await processSheet(sheets[idx], idx);
+          }
+        }
+        const workers = Array.from({ length: Math.min(CONCURRENCY, sheets.length) }, worker);
+        await Promise.all(workers);
+
+        const okList = results.filter(r => r.ok);
+        const summary = {
+          total: results.length,
+          success: okList.length,
+          failed: results.length - okList.length,
+          avgScore: okList.length > 0
+            ? Math.round((okList.reduce((s, r) => s + r.score, 0) / okList.length) * 10) / 10
+            : 0,
+        };
+        console.log(`[grading:batch-grade] ✅ teacher=${user.id} ${summary.success}/${summary.total} sheets avg=${summary.avgScore}`);
+        return res.json({ success: true, results, summary });
+      } catch (err) {
+        console.error('[grading:batch-grade] ❌', err.message);
+        return res.status(500).json({ success: false, error: err.message });
+      }
+    }
+  );
+
+  // ════════════════════════════════════════════════════════════════
   // PAGE VIEW ANALYTICS — YouTube-style tracking cho admin
   // ────────────────────────────────────────────────────────────────
   // Track lượt truy cập + thời gian xem từng route để admin biết:
