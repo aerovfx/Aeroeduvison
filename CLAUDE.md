@@ -15,8 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `0b3989f` (revision pixiai-00330-lak, 2026-05-19 — Transcript đa ngôn ngữ + Claude API auto-translate 6 ngôn ngữ)
-- Commits since last deploy: `0/5` (reset sau feature transcript)
+- Last deployed commit: `641d846` (revision pixiai-00337-boj, 2026-05-19 — QR/Link invite HS vào lớp + GV xác thực)
+- Commits since last deploy: `0/5` (reset sau batch 5 commits KG/UI/camera/invite)
+- Prev: `4dc4572` → pixiai-00337-boj (Camera permission + webcam HS làm bài — included in same deploy)
+- Prev: `55091b9` → pixiai-00337-boj (Light mode contrast — included in same deploy)
+- Prev: `9bab5c1` → pixiai-00337-boj (Learning Path: nút Tạo Module lên top — included in same deploy)
+- Prev: `1891997` → pixiai-00337-boj (KG role-aware v2: HS learn/GV monitor/Admin recorder — included in same deploy)
+- Prev: `0b3989f` → pixiai-00330-lak (Transcript đa ngôn ngữ + Claude API auto-translate 6 ngôn ngữ)
 - Prev: `15eadcf` → pixiai-00329-yec (Course player Udemy-style: section grouping + collapsible + progress badge)
 - Prev: `8dded66` → pixiai-00328-pux (AI Dashboard: cards lớp tôi quản lí + filter theo lớp)
 - Prev: `2e22a01` → pixiai-00327-xos (KG role-aware: HS/GV/Admin bộ não cá nhân + class mastery + workflow snapshots)

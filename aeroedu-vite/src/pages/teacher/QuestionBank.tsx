@@ -371,9 +371,9 @@ export default function QuestionBank() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0d0e17' }}>
+    <div className="min-h-screen" style={{ background: 'var(--td-bg)' }}>
       {/* Top Bar */}
-      <div className="sticky top-0 z-10" style={{ background: '#10111e', borderBottom: '1px solid #1e2033' }}>
+      <div className="sticky top-0 z-10" style={{ background: 'var(--td-card)', borderBottom: '1px solid #1e2033' }}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -895,7 +895,7 @@ export default function QuestionBank() {
         </div>
 
         {/* Questions List */}
-        <div className="rounded-xl overflow-hidden" style={{ background: '#10111e', border: '1px solid #1e2033' }}>
+        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--td-card)', border: '1px solid #1e2033' }}>
           <div className="space-y-2 p-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">

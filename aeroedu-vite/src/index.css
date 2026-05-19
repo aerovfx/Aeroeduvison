@@ -847,6 +847,95 @@ html:not(.dark) circle[stroke="rgba(255,255,255,0.04)"] { stroke: rgba(0,0,0,0.0
 /* ── Loader border overrides ───────────────────────────────── */
 html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.08) !important; }
 
+/* ──────────────────────────────────────────────────────────────
+ * TEACHER DASHBOARD PALETTE (--td-*)
+ * Auto-flip light/dark cho 14 teacher pages dùng module-level
+ * `const D = { bg: 'var(--td-bg)', ... }`. Toàn bộ inline styles
+ * như `<div style={{ background: D.bg }}>` tự đổi màu khi user
+ * toggle theme — KHÔNG cần React re-render hay JS state.
+ *
+ * Alpha helpers (D.white, D.purpleA, ...) dùng modern syntax:
+ *   `rgba(var(--td-overlay-rgb), 0.5)` với --td-overlay-rgb là
+ *   "255, 255, 255" (dark) hoặc "0, 0, 0" (light).
+ *
+ * Pages: Dashboard, EmotionMap, ExamMatrix, Exams, OnlineExamRoom,
+ *        ExamGrading, ExamReports, DocumentDigitization, LaTeXEditor,
+ *        Transcript, LearningPathBuilder, CameraManagement,
+ *        EnvironmentMonitoring, Assignments
+ * ────────────────────────────────────────────────────────────── */
+
+/* LIGHT mode (default) */
+:root {
+  --td-bg:           #f8fafc;       /* slate-50 — page bg */
+  --td-card:         #ffffff;       /* white card */
+  --td-card2:        #f1f5f9;       /* slate-100 — elevated */
+  --td-wall:         #e2e8f0;       /* slate-200 — camera wall */
+  --td-topbar:       #ffffff;
+  --td-border:       rgba(0,0,0,0.08);
+  --td-border2:      rgba(0,0,0,0.14);
+  --td-divider:      rgba(0,0,0,0.08);
+  --td-grid:         #e2e8f0;       /* recharts grid */
+
+  --td-text:         #0f172a;       /* slate-900 — AAA */
+  --td-muted:        #475569;       /* slate-600 — AA+ */
+  --td-muted2:       #64748b;       /* slate-500 */
+
+  /* Accents — đậm hơn cho contrast trên trắng */
+  --td-purple:       #7c3aed;
+  --td-purple-l:     #9333ea;
+  --td-purple-hover: #6d28d9;
+  --td-cyan:         #0891b2;       /* cyan-600 */
+  --td-green:        #059669;       /* emerald-600 */
+  --td-amber:        #d97706;       /* amber-600 */
+  --td-red:          #dc2626;       /* red-600 */
+  --td-rose:         #e11d48;       /* rose-600 */
+  --td-blue:         #2563eb;       /* blue-600 */
+  --td-pink:         #db2777;       /* pink-600 */
+
+  /* RGB tuples cho rgba(var(--td-X-rgb), alpha) */
+  --td-overlay-rgb:  0, 0, 0;       /* D.white(a) → trên light = đen overlay */
+  --td-purple-rgb:   124, 58, 237;
+  --td-green-rgb:    5, 150, 105;
+  --td-red-rgb:      220, 38, 38;
+  --td-cyan-rgb:     8, 145, 178;
+  --td-blue-rgb:     37, 99, 235;
+}
+
+/* DARK mode override */
+.dark {
+  --td-bg:           #0d0e17;
+  --td-card:         #10111e;
+  --td-card2:        #161728;
+  --td-wall:         #0a0a0a;
+  --td-topbar:       #111118;
+  --td-border:       rgba(255,255,255,0.07);
+  --td-border2:      rgba(255,255,255,0.12);
+  --td-divider:      rgba(255,255,255,0.08);
+  --td-grid:         #1e2033;
+
+  --td-text:         #f1f5f9;
+  --td-muted:        #94a3b8;
+  --td-muted2:       #64748b;
+
+  --td-purple:       #7c3aed;
+  --td-purple-l:     #a78bfa;
+  --td-purple-hover: #6d28d9;
+  --td-cyan:         #22d3ee;
+  --td-green:        #10b981;
+  --td-amber:        #f59e0b;
+  --td-red:          #ef4444;
+  --td-rose:         #f43f5e;
+  --td-blue:         #3b82f6;
+  --td-pink:         #e879f9;
+
+  --td-overlay-rgb:  255, 255, 255; /* D.white(a) → trên dark = trắng overlay */
+  --td-purple-rgb:   124, 58, 237;
+  --td-green-rgb:    16, 185, 129;
+  --td-red-rgb:      239, 68, 68;
+  --td-cyan-rgb:     34, 211, 238;
+  --td-blue-rgb:     59, 130, 246;
+}
+
 /* ── Light gray/slate/zinc/neutral text → dark foreground ─────
  * 2026-05-19 RETUNED — user reported "chữ ban ngày chưa rõ".
  * Previous opacities (0.50, 0.60) gave low contrast on white.

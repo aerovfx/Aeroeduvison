@@ -119,7 +119,7 @@ export default function LessonPlans() {
   }, [plans, search])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0d0e17', color: '#f1f5f9' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--td-bg)', color: 'var(--td-text)' }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 20px' }}>
 
         {/* Header */}
@@ -137,7 +137,7 @@ export default function LessonPlans() {
             </div>
             <div>
               <h1 style={{ fontSize: 22, fontWeight: 800, margin: 0 }}>📚 Giáo án của tôi</h1>
-              <p style={{ color: '#94a3b8', fontSize: 13, margin: '4px 0 0' }}>
+              <p style={{ color: 'var(--td-muted)', fontSize: 13, margin: '4px 0 0' }}>
                 Soạn giáo án WYSIWYG (Google Docs-like) — auto-save vào DB, optional snapshot lên Drive
               </p>
             </div>
@@ -186,8 +186,8 @@ export default function LessonPlans() {
               disabled={creating}
               style={{
                 padding: '10px 18px',
-                background: '#161728',
-                color: '#f1f5f9',
+                background: 'var(--td-card2)',
+                color: 'var(--td-text)',
                 border: '1px solid #2a2b3d',
                 borderRadius: 10, fontSize: 14, fontWeight: 700,
                 cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1,
@@ -203,7 +203,7 @@ export default function LessonPlans() {
         {/* Tabs */}
         <div style={{
           display: 'flex', gap: 4, marginBottom: 20,
-          background: '#10111e', border: '1px solid #1e2033',
+          background: 'var(--td-card)', border: '1px solid #1e2033',
           borderRadius: 10, padding: 4, width: 'fit-content',
         }}>
           {[
@@ -215,7 +215,7 @@ export default function LessonPlans() {
               style={{
                 padding: '7px 14px', borderRadius: 7, fontSize: 13, fontWeight: 700,
                 background: tab === t.key ? '#7c3aed' : 'transparent',
-                color: tab === t.key ? '#fff' : '#94a3b8',
+                color: tab === t.key ? '#fff' : 'var(--td-muted)',
                 border: 'none', cursor: 'pointer', transition: 'all 0.15s',
               }}>
               {t.label} {t.count > 0 && `(${t.count})`}
@@ -229,14 +229,14 @@ export default function LessonPlans() {
             <div style={{ position: 'relative', marginBottom: 20 }}>
               <Search size={15} style={{
                 position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-                color: '#94a3b8',
+                color: 'var(--td-muted)',
               }} />
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Tìm giáo án theo tiêu đề, nội dung, môn, khối..."
                 style={{
                   width: '100%', padding: '10px 14px 10px 38px', boxSizing: 'border-box',
-                  background: '#10111e', border: '1px solid #1e2033', borderRadius: 10,
-                  color: '#f1f5f9', fontSize: 14, outline: 'none',
+                  background: 'var(--td-card)', border: '1px solid #1e2033', borderRadius: 10,
+                  color: 'var(--td-text)', fontSize: 14, outline: 'none',
                 }}
               />
             </div>
@@ -258,7 +258,7 @@ export default function LessonPlans() {
                   <p style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700, margin: 0 }}>
                     Snapshots HTML đã sao lưu lên Google Cloud Storage
                   </p>
-                  <p style={{ color: '#94a3b8', fontSize: 11, margin: '2px 0 0' }}>
+                  <p style={{ color: 'var(--td-muted)', fontSize: 11, margin: '2px 0 0' }}>
                     Bucket: aeroedu-media · Folder: lesson-plans/{'{userId}'}/ · Public read
                   </p>
                 </div>
@@ -287,20 +287,20 @@ export default function LessonPlans() {
                 <p style={{ color: '#fca5a5', fontSize: 13, fontWeight: 700, margin: '0 0 6px' }}>
                   ⚠ {snapshotsError}
                 </p>
-                <p style={{ color: '#94a3b8', fontSize: 11, margin: 0 }}>
+                <p style={{ color: 'var(--td-muted)', fontSize: 11, margin: 0 }}>
                   Backup snapshot bằng cách mở 1 giáo án → bấm "Lưu vào Drive" trong header.
                 </p>
               </div>
             ) : snapshots.length === 0 ? (
               <div style={{
-                background: '#10111e', border: '1px solid #1e2033', borderRadius: 12,
+                background: 'var(--td-card)', border: '1px solid #1e2033', borderRadius: 12,
                 padding: 40, textAlign: 'center',
               }}>
                 <CloudOff size={36} style={{ color: '#475569', margin: '0 auto 10px' }} />
                 <p style={{ color: '#cbd5e1', fontWeight: 600, margin: '0 0 4px' }}>
                   Chưa có snapshot nào trên Drive
                 </p>
-                <p style={{ color: '#64748b', fontSize: 12 }}>
+                <p style={{ color: 'var(--td-muted2)', fontSize: 12 }}>
                   Mở 1 giáo án bất kỳ → bấm "Lưu vào Drive" trong header editor để sao lưu.
                 </p>
               </div>
@@ -308,12 +308,12 @@ export default function LessonPlans() {
               <div style={{ display: 'grid', gap: 8 }}>
                 {snapshots.map(snap => (
                   <div key={snap.fullPath} style={{
-                    background: '#10111e', border: '1px solid #1e2033', borderRadius: 10,
+                    background: 'var(--td-card)', border: '1px solid #1e2033', borderRadius: 10,
                     padding: 12, display: 'flex', alignItems: 'center', gap: 12,
                     transition: 'border-color 0.15s',
                   }}
                     onMouseEnter={e => e.currentTarget.style.borderColor = '#a78bfa'}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = '#1e2033'}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--td-border)'}
                   >
                     <div style={{
                       width: 38, height: 38, borderRadius: 8,
@@ -324,12 +324,12 @@ export default function LessonPlans() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
-                        fontSize: 13, fontWeight: 700, color: '#f1f5f9',
+                        fontSize: 13, fontWeight: 700, color: 'var(--td-text)',
                         margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {snap.name}
                       </p>
-                      <p style={{ color: '#64748b', fontSize: 11, margin: '2px 0 0', display: 'flex', gap: 10 }}>
+                      <p style={{ color: 'var(--td-muted2)', fontSize: 11, margin: '2px 0 0', display: 'flex', gap: 10 }}>
                         <span>📦 {formatBytes(snap.size)}</span>
                         {snap.updated && (
                           <span>📅 {new Date(snap.updated).toLocaleString('vi-VN', {
@@ -384,14 +384,14 @@ export default function LessonPlans() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{
-            textAlign: 'center', padding: 60, background: '#10111e',
+            textAlign: 'center', padding: 60, background: 'var(--td-card)',
             border: '1px solid #1e2033', borderRadius: 14,
           }}>
             <FileText size={40} style={{ color: '#475569', margin: '0 auto 12px' }} />
             <p style={{ color: '#cbd5e1', fontWeight: 600, margin: '0 0 6px' }}>
               {search ? 'Không tìm thấy giáo án nào' : 'Chưa có giáo án nào'}
             </p>
-            <p style={{ color: '#64748b', fontSize: 13, margin: '0 0 20px' }}>
+            <p style={{ color: 'var(--td-muted2)', fontSize: 13, margin: '0 0 20px' }}>
               {search ? 'Thử từ khoá khác' : 'Bấm "Tạo giáo án mới" để bắt đầu soạn bài'}
             </p>
             {!search && (
@@ -417,14 +417,14 @@ export default function LessonPlans() {
                 : `/teacher/lesson-plans/${plan.id}`
               return (
               <div key={plan.id} style={{
-                background: '#10111e',
-                border: `1px solid ${isLatex ? 'rgba(34,197,94,0.25)' : '#1e2033'}`,
+                background: 'var(--td-card)',
+                border: `1px solid ${isLatex ? 'rgba(34,197,94,0.25)' : 'var(--td-border)'}`,
                 borderRadius: 12,
                 padding: 16, display: 'flex', gap: 14, alignItems: 'center',
                 transition: 'all 0.15s',
               }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = isLatex ? '#22c55e' : 'rgba(124,58,237,0.4)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = isLatex ? 'rgba(34,197,94,0.25)' : '#1e2033'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = isLatex ? 'rgba(34,197,94,0.25)' : 'var(--td-border)'}
               >
                 <div style={{
                   width: 44, height: 44, borderRadius: 10,
@@ -440,7 +440,7 @@ export default function LessonPlans() {
                   }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <h3 style={{
-                      fontSize: 15, fontWeight: 700, color: '#f1f5f9', margin: 0,
+                      fontSize: 15, fontWeight: 700, color: 'var(--td-text)', margin: 0,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {plan.title}
@@ -455,13 +455,13 @@ export default function LessonPlans() {
                   </div>
                   {plan.contentPreview && (
                     <p style={{
-                      color: '#94a3b8', fontSize: 12, margin: '0 0 6px',
+                      color: 'var(--td-muted)', fontSize: 12, margin: '0 0 6px',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {plan.contentPreview}
                     </p>
                   )}
-                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#64748b', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 12, fontSize: 11, color: 'var(--td-muted2)', flexWrap: 'wrap' }}>
                     {plan.subject && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <BookOpen size={10} /> {plan.subject}
@@ -487,7 +487,7 @@ export default function LessonPlans() {
                         <Cloud size={10} /> Đã sao lưu Drive
                       </span>
                     ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#64748b' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--td-muted2)' }}>
                         <CloudOff size={10} /> Chưa sao lưu
                       </span>
                     )}
@@ -529,7 +529,7 @@ export default function LessonPlans() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20,
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            background: '#10111e', border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--td-card)', border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '85vh',
             display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
           }}>
@@ -539,15 +539,15 @@ export default function LessonPlans() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <div>
-                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9', margin: 0 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--td-text)', margin: 0 }}>
                   📋 Chọn mẫu giáo án
                 </h2>
-                <p style={{ color: '#94a3b8', fontSize: 12, margin: '4px 0 0' }}>
+                <p style={{ color: 'var(--td-muted)', fontSize: 12, margin: '4px 0 0' }}>
                   Click 1 mẫu để tạo giáo án có sẵn cấu trúc, GV chỉ điền nội dung
                 </p>
               </div>
               <button onClick={() => setTplPickerOpen(false)} style={{
-                background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 6,
+                background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--td-muted)', padding: 6,
               }}><X size={20} /></button>
             </div>
 
@@ -558,7 +558,7 @@ export default function LessonPlans() {
                   <button key={tpl.id} onClick={() => handleCreate(tpl)} disabled={creating}
                     style={{
                       width: '100%', textAlign: 'left', cursor: creating ? 'not-allowed' : 'pointer',
-                      background: '#161728', border: '1px solid #2a2b3d', borderRadius: 12,
+                      background: 'var(--td-card2)', border: '1px solid #2a2b3d', borderRadius: 12,
                       padding: 16, transition: 'all 0.15s',
                       opacity: creating ? 0.5 : 1,
                     }}
@@ -567,8 +567,8 @@ export default function LessonPlans() {
                       e.currentTarget.style.background = 'rgba(124,58,237,0.08)'
                     }}}
                     onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = '#2a2b3d'
-                      e.currentTarget.style.background = '#161728'
+                      e.currentTarget.style.borderColor = 'var(--td-border2)'
+                      e.currentTarget.style.background = 'var(--td-card2)'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -582,7 +582,7 @@ export default function LessonPlans() {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', margin: 0 }}>
+                          <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--td-text)', margin: 0 }}>
                             {tpl.name}
                           </h3>
                           {tpl.id.startsWith('cv2345') && (
@@ -600,7 +600,7 @@ export default function LessonPlans() {
                             }}>MỌI MÔN</span>
                           )}
                         </div>
-                        <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, lineHeight: 1.5 }}>
+                        <p style={{ fontSize: 12, color: 'var(--td-muted)', margin: 0, lineHeight: 1.5 }}>
                           {tpl.description}
                         </p>
                       </div>
@@ -616,7 +616,7 @@ export default function LessonPlans() {
             {/* Footer */}
             <div style={{
               padding: '12px 24px', borderTop: '1px solid rgba(255,255,255,0.06)',
-              fontSize: 11, color: '#64748b',
+              fontSize: 11, color: 'var(--td-muted2)',
             }}>
               💡 Mẫu CV2345 theo Công văn 2345/BGDĐT-GDTH (2021) — chuẩn của Bộ GD&ĐT cho khung kế hoạch bài dạy.
             </div>
