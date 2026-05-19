@@ -19,7 +19,9 @@ import {
   type CreateAssignmentInput,
   type AssignmentSubmission,
   type AssignmentStats,
+  type AssignmentAttachment,
 } from '@/services/assignments.service'
+import { AttachmentDropzone } from '@/components/assignments/AttachmentDropzone'
 
 /* ─── Dark palette ─────────────────────────────────────────────────── */
 const D = {
@@ -753,6 +755,8 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
     dueDate: null,
     status: 'published',
     generateQr: true,
+    /* 2026-05-20: file đính kèm Word/Excel/PPT/PDF/ảnh/video */
+    attachments: [],
   })
   const [err, setErr] = useState<string | null>(null)
 
@@ -810,6 +814,17 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               placeholder="Đề chi tiết — học sinh sẽ thấy khi scan QR"
               rows={5}
               style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+            />
+          </Field>
+
+          {/* 📎 File đính kèm — drag-drop multi-file (Word/Excel/PPT/PDF/ảnh/video) */}
+          <Field label="📎 File đính kèm (tùy chọn)">
+            <AttachmentDropzone
+              value={form.attachments ?? []}
+              onChange={(next: AssignmentAttachment[]) =>
+                setForm({ ...form, attachments: next })
+              }
+              maxFiles={20}
             />
           </Field>
 

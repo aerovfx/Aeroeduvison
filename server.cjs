@@ -5864,6 +5864,9 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
       `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS max_score DOUBLE PRECISION DEFAULT 10`,
       `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ`,
       `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS content TEXT`,
+      /* 2026-05-20: cột attachments JSONB — array of { url, filename, size, mimeType, uploadedAt }
+         GV upload file Word/Excel/PPT/PDF/ảnh/video kèm bài tập cho HS download. */
+      `ALTER TABLE assignments ADD COLUMN IF NOT EXISTS attachments JSONB DEFAULT '[]'::jsonb`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_assignments_qr_token ON assignments(qr_token) WHERE qr_token IS NOT NULL`,
       `CREATE INDEX IF NOT EXISTS idx_assignments_user_id ON assignments(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_assignments_teacher_id ON assignments(teacher_id)`,
@@ -5924,6 +5927,9 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
       maxScore: r.max_score == null ? 10 : Number(r.max_score),
       dueDate: r.due_date ? new Date(r.due_date).toISOString() : null,
       content: r.content || '',
+      /* 2026-05-20: attachments[] cho file đính kèm GV upload */
+      attachments: Array.isArray(r.attachments) ? r.attachments
+                 : (r.attachments ? (typeof r.attachments === 'string' ? JSON.parse(r.attachments) : r.attachments) : []),
     };
     return extras ? { ...base, ...extras } : base;
   }
@@ -6054,6 +6060,93 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
     }
   });
 
+  // ── POST /api/assignments/upload-attachment ──────────────────────
+  //   Upload 1 file đính kèm (Word/Excel/PPT/PDF/ảnh/video/audio).
+  //   Multipart form: { file }
+  //   Returns: { url, filename, size, mimeType, uploadedAt }
+  //   Path GCS: assignments/<teacher-id>/<timestamp>-<safe-name>
+  //   FE upload từng file lẻ → ráp thành attachments[] khi tạo assignment.
+  {
+    const multerAsgn = require('multer');
+    const attachmentUpload = multerAsgn({
+      storage: multerAsgn.memoryStorage(),
+      /* 100MB cho video/PPT phức tạp. Cao hơn courseAsset (50MB) vì
+         assignment thường gửi tài liệu nặng hơn. */
+      limits: { fileSize: 100 * 1024 * 1024 },
+    });
+    /* Whitelist mimeType chấp nhận — tránh user upload .exe / .sh
+       lậu rồi share qua link assignments.
+       PDF / Office / image / video / audio / text. */
+    const ALLOWED_MIME = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic',
+      'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska',
+      'audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/x-m4a', 'audio/mp4',
+      'text/plain', 'text/csv', 'text/markdown',
+      'application/zip', 'application/x-zip-compressed',
+    ]);
+    const ASGN_BUCKET = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+
+    app.post('/api/assignments/upload-attachment',
+      attachmentUpload.single('file'),
+      async (req, res) => {
+        try {
+          const user = getUserAsgn(req);
+          if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
+          const f = req.file;
+          if (!f) return res.status(400).json({ success: false, error: 'Thiếu file' });
+
+          // Validate mimeType (best-effort — extension fallback)
+          if (!ALLOWED_MIME.has(f.mimetype)) {
+            // Fall back check by extension (some browsers gửi mime sai)
+            const ext = (f.originalname.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+            const okExt = /\.(pdf|docx?|xlsx?|pptx?|jpe?g|png|webp|gif|heic|mp4|mov|webm|mkv|mp3|wav|ogg|m4a|txt|csv|md|zip)$/i.test(ext);
+            if (!okExt) {
+              return res.status(415).json({
+                success: false,
+                error: `Loại file không hỗ trợ: ${f.mimetype || ext}. Cho phép: PDF/Word/Excel/PPT/ảnh/video/audio/zip.`,
+              });
+            }
+          }
+
+          // Upload tới GCS
+          const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+          const gcsPath = `assignments/${user.id}/${Date.now()}-${safeName}`;
+          const { Storage } = require('@google-cloud/storage');
+          const storage = new Storage();
+          const gcsFile = storage.bucket(ASGN_BUCKET).file(gcsPath);
+          await gcsFile.save(f.buffer, {
+            contentType: f.mimetype || 'application/octet-stream',
+            metadata: { cacheControl: 'public, max-age=86400' },
+          });
+          const url = `https://storage.googleapis.com/${ASGN_BUCKET}/${gcsPath}`;
+
+          const entry = {
+            url,
+            filename: f.originalname,
+            size: f.size,
+            mimeType: f.mimetype,
+            uploadedAt: new Date().toISOString(),
+          };
+          console.log(`[assignments:upload] ✅ teacher=${user.id.slice(0,8)} "${entry.filename}" ${(entry.size/1024).toFixed(1)}KB`);
+          return res.status(201).json({ success: true, attachment: entry });
+        } catch (err) {
+          console.error('[assignments:upload] ❌', err.message);
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({ success: false, error: 'File vượt 100MB' });
+          }
+          return res.status(500).json({ success: false, error: err.message });
+        }
+      }
+    );
+  }
+
   // ── POST /api/assignments ────────────────────────────────────────
   //   Teacher creates a QR-scannable assignment
   app.post('/api/assignments', async (req, res) => {
@@ -6084,14 +6177,16 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
         tags: Array.isArray(b.tags) ? b.tags : [],
         dueDate: b.dueDate ? new Date(b.dueDate) : null,
         status: b.status || 'published',
+        /* attachments[] = [{ url, filename, size, mimeType, uploadedAt }] */
+        attachments: Array.isArray(b.attachments) ? b.attachments.slice(0, 20) : [],
       };
 
       await pool.query(
         `INSERT INTO assignments
            (id, title, description, subject, assignment_type, status, difficulty,
             duration, xp_reward, user_id, teacher_id, qr_token, max_score, due_date,
-            content, tags, ai_generated)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11,$12,$13,$14,$15,false)`,
+            content, tags, ai_generated, attachments)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$11,$12,$13,$14,$15,false,$16)`,
         [
           row.id, row.title, row.description, row.subject, row.type, row.status,
           row.difficulty, row.duration, row.xpReward,
@@ -6101,6 +6196,7 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
           row.dueDate,                    // $13
           row.content,                    // $14
           JSON.stringify(row.tags),       // $15
+          JSON.stringify(row.attachments),// $16
         ]
       );
 

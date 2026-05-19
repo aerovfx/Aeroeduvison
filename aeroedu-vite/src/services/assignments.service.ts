@@ -76,6 +76,15 @@ export interface PublicAssignmentView {
   qrToken: string
 }
 
+/* Attachment GV upload kèm bài tập (2026-05-20) */
+export interface AssignmentAttachment {
+  url: string
+  filename: string
+  size: number
+  mimeType: string
+  uploadedAt: string
+}
+
 export interface CreateAssignmentInput {
   title: string
   description?: string
@@ -90,6 +99,7 @@ export interface CreateAssignmentInput {
   dueDate?: string | null
   status?: AssignmentStatus
   generateQr?: boolean
+  attachments?: AssignmentAttachment[]
 }
 
 export const assignmentsService = {
