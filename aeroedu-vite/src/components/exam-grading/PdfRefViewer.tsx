@@ -4,21 +4,30 @@
  * Dùng trong /teacher/exam-grading tab "① Nhập đáp án":
  *   - GV upload file PDF đề thi
  *   - Display ở bên trái (sticky) để vừa xem đề vừa điền đáp án bên phải
- *   - Hỗ trợ zoom (in/out + preset levels + fit), fullscreen, đổi file
- *   - 🆕 PERSIST QUA F5: lưu Blob vào IndexedDB, auto-restore khi reload
+ *   - Hỗ trợ zoom THỰC SỰ (CSS transform), fullscreen, đổi file
+ *   - PERSIST QUA F5: lưu Blob vào IndexedDB, auto-restore khi reload
  *
  * Stack: native iframe (browser PDF viewer) — không cần PDF.js dep.
- *   Pros: zero deps, hoạt động trên Chrome/Edge/Safari/Firefox
- *   Cons: không tùy biến UI nhiều (browser quản render)
  *
- * Zoom mechanism: dùng URL fragment `#zoom=NNN` mà PDFium (Chrome/Edge)
- * + PDF.js (Firefox) hỗ trợ. Mỗi lần đổi zoom sẽ reload iframe.
+ * Zoom mechanism (2026-05-20 REDESIGN v2):
+ *   - URL fragment `#zoom=NNN` cũ KHÔNG đảm bảo visible cross-browser
+ *     (Chrome PDFium tự reset khi load, Firefox chỉ apply 1 lần, Safari
+ *     hoàn toàn ignore) → user phản hồi "phóng to không đạt yêu cầu".
+ *   - GIẢI PHÁP: CSS transform: scale() trên iframe wrapper
+ *     → zoom THẬT, hoạt động đồng nhất Chrome/Firefox/Safari/Edge
+ *     → wrapper overflow:auto cho phép scroll khi zoom > 100%
+ *     → calc(100% / scale) giữ tỷ lệ iframe đúng container
+ *   - UX cho GV lớn tuổi:
+ *     · Buttons 40px (gần touch target)
+ *     · Label tiếng Việt rõ ràng "Phóng to", "Thu nhỏ", "Đặt lại"
+ *     · Display % zoom hiện tại ở giữa, font cỡ to
+ *     · Ctrl/Cmd + scroll wheel để zoom (PWA pattern)
+ *     · Ctrl/Cmd + / - keyboard shortcut
  *
- * Persistence (2026-05-20):
+ * Persistence:
  *   - savePdf(storageKey, file) ngay khi user upload
  *   - loadPdf(storageKey) on mount → restore Blob → tạo lại Object URL
  *   - deletePdf(storageKey) khi user bấm ✕
- *   IndexedDB quota multi-GB, an toàn cho PDF tới 50MB.
  */
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
@@ -41,15 +50,13 @@ interface Props {
   storageKey?: string | null
 }
 
-// Preset zoom levels — discrete steps để [+] [-] step qua dễ
-// 'page-width' / 'page-fit' là keyword PDFium/PDF.js hiểu trực tiếp
-// 2026-05-20: mở rộng lên 1000% (x10) — GV cần zoom rất gần để
-// đọc chữ nhỏ + công thức Toán/Vật lí trên đề thi scan độ phân giải thấp.
-type ZoomLevel = number | 'page-width' | 'page-fit'
-const ZOOM_PRESETS: ZoomLevel[] = [
-  50, 75, 100, 125, 150, 200, 300,
-  400, 500, 600, 700, 800, 900, 1000,
-]
+/* 2026-05-20 v2: zoom giờ là số nguyên 50..1000 (% scale).
+   CSS transform: scale() hoạt động tốt với mọi giá trị,
+   không còn dùng URL fragment hay 'page-width' keywords. */
+const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 300, 400, 500, 600, 800, 1000] as const
+const ZOOM_MIN = 25
+const ZOOM_MAX = 1000
+const ZOOM_DEFAULT = 100
 
 export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageKey = null }: Props) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
@@ -58,7 +65,8 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
   const [fullscreen, setFullscreen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)  // bump để force reload iframe
-  const [zoom, setZoom] = useState<ZoomLevel>('page-width')
+  const [zoom, setZoom] = useState<number>(ZOOM_DEFAULT)
+  const scrollRef = useRef<HTMLDivElement>(null)
   /* 2026-05-20: trạng thái restoring để show spinner khi đọc IndexedDB */
   const [restoring, setRestoring] = useState<boolean>(!!storageKey)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -147,41 +155,60 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
 
   const reloadPdf = () => setIframeKey(k => k + 1)
 
-  /* Zoom helpers — dùng để map [+] / [-] qua preset numeric levels.
-     Chỉ áp dụng khi zoom hiện tại là số; nếu đang là 'page-width' /
-     'page-fit' thì step vào preset gần 100% nhất. */
-  const zoomIn = () => {
+  /* Zoom step: tìm preset kế tiếp/trước đó. Giữ trong [25..1000]. */
+  const zoomIn = useCallback(() => {
     setZoom(prev => {
-      const current = typeof prev === 'number' ? prev : 100
-      const next = ZOOM_PRESETS.find(z => typeof z === 'number' && z > current) as number | undefined
-      return next ?? ZOOM_PRESETS[ZOOM_PRESETS.length - 1] // max 1000% (x10)
+      const next = ZOOM_PRESETS.find(z => z > prev)
+      return Math.min(ZOOM_MAX, next ?? prev + 25)
     })
-  }
-  const zoomOut = () => {
+  }, [])
+  const zoomOut = useCallback(() => {
     setZoom(prev => {
-      const current = typeof prev === 'number' ? prev : 100
-      // Find largest preset < current
-      const numericPresets = ZOOM_PRESETS.filter((z): z is number => typeof z === 'number')
-      const candidates = numericPresets.filter(z => z < current)
-      return candidates.length > 0 ? candidates[candidates.length - 1] : numericPresets[0] // min 50%
+      const candidates = ZOOM_PRESETS.filter(z => z < prev)
+      const next = candidates[candidates.length - 1]
+      return Math.max(ZOOM_MIN, next ?? prev - 25)
     })
-  }
+  }, [])
+  const resetZoom = useCallback(() => setZoom(ZOOM_DEFAULT), [])
 
-  /* Build iframe src với fragment `#zoom=` — Chrome/Edge dùng PDFium,
-     Firefox dùng PDF.js, cả 2 đều hiểu syntax này. Safari có thể
-     không support — sẽ degrade về default zoom. */
-  const iframeSrc = useMemo(() => {
-    if (!pdfUrl) return ''
-    const zoomStr = typeof zoom === 'number' ? String(zoom) : zoom
-    return `${pdfUrl}#zoom=${zoomStr}`
-  }, [pdfUrl, zoom])
+  /* iframe src — KHÔNG còn dùng URL fragment, zoom xử lý bằng CSS transform.
+     Giữ Object URL nguyên xi để browser cache PDF. */
+  const iframeSrc = pdfUrl ?? ''
 
-  /* Khi zoom thay đổi, force reload iframe để fragment được áp dụng
-     (một số browser không re-render khi chỉ hash đổi). */
+  /* Ctrl/Cmd + scroll wheel = zoom (standard zoom UX).
+     Pattern phổ biến trong PWA + native apps.
+     Preventdefault để ngăn browser zoom toàn trang. */
   useEffect(() => {
-    if (pdfUrl) setIframeKey(k => k + 1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom])
+    if (!pdfUrl) return
+    const el = scrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return  // chỉ zoom khi nhấn Ctrl/Cmd
+      e.preventDefault()
+      // Wheel up = zoom in, down = zoom out
+      if (e.deltaY < 0) zoomIn()
+      else zoomOut()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [pdfUrl, zoomIn, zoomOut])
+
+  /* Ctrl/Cmd + (+/=/-/0) keyboard shortcuts khi PDF được focus.
+     Apple HIG + Microsoft Fluent conventions. */
+  useEffect(() => {
+    if (!pdfUrl) return
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn() }
+      else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut() }
+      else if (e.key === '0') { e.preventDefault(); resetZoom() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [pdfUrl, zoomIn, zoomOut, resetZoom])
+
+  /* Scale factor for CSS transform — clamped to [0.25, 10] */
+  const scaleFactor = Math.max(0.25, Math.min(10, zoom / 100))
 
   // Esc đóng fullscreen
   useEffect(() => {
@@ -220,40 +247,51 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
         </div>
         {pdfUrl && (
           <>
-            {/* ── Zoom controls ───────────────────────────────────── */}
-            <div className="flex items-center gap-0.5 rounded-md border bg-background px-0.5">
+            {/* ── Zoom controls — large + label cho GV lớn tuổi ───── */}
+            <div className="flex items-center gap-1 rounded-lg border-2 bg-background p-0.5 shadow-sm">
               <button
                 onClick={zoomOut}
-                title="Thu nhỏ (zoom out)"
-                disabled={typeof zoom === 'number' && zoom <= 50}
-                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Thu nhỏ (Ctrl + Trừ)"
+                disabled={zoom <= ZOOM_MIN}
+                className="inline-flex items-center gap-1 px-2.5 h-9 rounded-md hover:bg-accent text-foreground disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm transition"
               >
-                <ZoomOut className="w-3.5 h-3.5" />
+                <ZoomOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Thu nhỏ</span>
               </button>
+              {/* Current % — clickable to pick preset */}
               <select
                 value={String(zoom)}
-                onChange={e => {
-                  const v = e.target.value
-                  setZoom(v === 'page-width' || v === 'page-fit' ? v : Number(v))
-                }}
-                title="Mức phóng to"
-                className="text-[11px] font-semibold bg-transparent border-none focus:outline-none cursor-pointer text-foreground px-1 py-0.5"
-                style={{ minWidth: 72 }}
+                onChange={e => setZoom(Number(e.target.value))}
+                title="Chọn mức phóng to"
+                className="h-9 px-2 text-sm font-bold bg-transparent border-none focus:outline-none cursor-pointer text-foreground tabular-nums text-center"
+                style={{ minWidth: 76 }}
               >
-                <option value="page-width">Vừa rộng</option>
-                <option value="page-fit">Vừa trang</option>
-                {ZOOM_PRESETS.filter(z => typeof z === 'number').map(z => (
+                {/* Show current value first if not in presets */}
+                {!ZOOM_PRESETS.includes(zoom as any) && (
+                  <option value={zoom}>{zoom}%</option>
+                )}
+                {ZOOM_PRESETS.map(z => (
                   <option key={z} value={z}>{z}%</option>
                 ))}
               </select>
               <button
                 onClick={zoomIn}
-                title="Phóng to (zoom in)"
-                disabled={typeof zoom === 'number' && zoom >= 1000}
-                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Phóng to (Ctrl + Cộng)"
+                disabled={zoom >= ZOOM_MAX}
+                className="inline-flex items-center gap-1 px-2.5 h-9 rounded-md hover:bg-accent text-foreground disabled:opacity-40 disabled:cursor-not-allowed font-semibold text-sm transition"
               >
-                <ZoomIn className="w-3.5 h-3.5" />
+                <ZoomIn className="w-4 h-4" />
+                <span className="hidden sm:inline">Phóng to</span>
               </button>
+              {zoom !== ZOOM_DEFAULT && (
+                <button
+                  onClick={resetZoom}
+                  title="Đặt lại 100% (Ctrl + 0)"
+                  className="inline-flex items-center gap-1 px-2.5 h-9 rounded-md hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-semibold text-xs transition border-l"
+                >
+                  100%
+                </button>
+              )}
             </div>
 
             <button
@@ -320,13 +358,43 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
             </p>
           </div>
         ) : pdfUrl ? (
-          <iframe
-            key={iframeKey}
-            src={iframeSrc}
-            title="Đề thi PDF"
-            className="w-full h-full"
-            style={{ border: 'none', minHeight: compact ? 400 : 600 }}
-          />
+          /* 🔍 ZOOM CONTAINER — CSS transform: scale() trên iframe wrapper.
+             Strategy:
+             - scrollRef: overflow:auto cho phép scroll khi zoom > 100%
+             - Inner div: width/height = 100% / scale (làm wrapper bự lên
+               sao cho sau khi scale × scaleFactor = 100% × 100% × scale)
+             - iframe: width/height = 100% (unscaled), transform: scale
+               → visual size = scaleFactor × 100% (đủ rộng để scrollbar
+               xuất hiện và user thấy nội dung lớn hơn)
+             - Cursor: chỉ dẫn user dùng Ctrl+scroll để zoom */
+          <div
+            ref={scrollRef}
+            className="w-full h-full overflow-auto"
+            style={{ minHeight: compact ? 400 : 600 }}
+          >
+            <div
+              style={{
+                width: `${100 * scaleFactor}%`,
+                height: `${100 * scaleFactor}%`,
+                minHeight: (compact ? 400 : 600) * scaleFactor,
+              }}
+            >
+              <iframe
+                key={iframeKey}
+                src={iframeSrc}
+                title="Đề thi PDF"
+                style={{
+                  border: 'none',
+                  display: 'block',
+                  width: `${100 / scaleFactor}%`,
+                  height: `${100 / scaleFactor}%`,
+                  minHeight: compact ? 400 : 600,
+                  transform: `scale(${scaleFactor})`,
+                  transformOrigin: 'top left',
+                }}
+              />
+            </div>
+          </div>
         ) : (
           // Drop zone
           <div
@@ -361,6 +429,24 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
           </div>
         )}
       </div>
+
+      {/* Footer hướng dẫn zoom — chỉ hiện khi có PDF mở */}
+      {pdfUrl && !fullscreen && (
+        <div className="px-3 py-1.5 border-t bg-muted/30 text-[11px] text-muted-foreground flex items-center justify-center gap-4 shrink-0 flex-wrap">
+          <span>
+            💡 <strong>Mẹo:</strong> Giữ <kbd className="px-1.5 py-0.5 rounded bg-card border font-mono text-[10px]">Ctrl</kbd> + lăn chuột để phóng to/thu nhỏ
+          </span>
+          <span className="hidden md:inline">
+            <kbd className="px-1.5 py-0.5 rounded bg-card border font-mono text-[10px]">Ctrl</kbd>
+            +
+            <kbd className="px-1.5 py-0.5 rounded bg-card border font-mono text-[10px]">+</kbd>
+            /
+            <kbd className="px-1.5 py-0.5 rounded bg-card border font-mono text-[10px]">−</kbd>
+            /
+            <kbd className="px-1.5 py-0.5 rounded bg-card border font-mono text-[10px]">0</kbd>
+          </span>
+        </div>
+      )}
 
       {/* Footer khi fullscreen — nút Esc */}
       {fullscreen && (
