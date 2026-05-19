@@ -709,18 +709,21 @@ export default function KnowledgeGraph() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0a0612] text-white flex flex-col">
+    /* 2026-05-19: Page bg + text theme-aware. Cosmic dark giữ trong .dark
+       qua tailwind variant. Light mode: white bg + dark text. SVG canvas
+       riêng bên trong giữ dark cosmic luôn (visual exploration). */
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0612] dark:text-white flex flex-col">
       {/* Top bar */}
-      <header className="border-b border-white/10 bg-black/40 backdrop-blur sticky top-0 z-30">
+      <header className="border-b bg-card/80 dark:bg-black/40 backdrop-blur sticky top-0 z-30">
         {/* ── ROW 1: Back · Title · Search · Reset (responsive) ── */}
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center gap-2 sm:gap-3">
-          <Link to="/dashboard" className="text-slate-400 hover:text-white shrink-0 p-1.5 -ml-1.5 rounded hover:bg-white/5">
+          <Link to="/dashboard" className="text-muted-foreground hover:text-foreground shrink-0 p-1.5 -ml-1.5 rounded hover:bg-accent">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <Network className="w-5 h-5 text-cyan-400 shrink-0 hidden sm:block" />
+          <Network className="w-5 h-5 text-cyan-600 dark:text-cyan-400 shrink-0 hidden sm:block" />
           <div className="min-w-0 flex-1 sm:flex-none">
-            <h1 className="font-bold text-sm sm:text-base truncate">🌳 Cây Sự Sống Tri Thức</h1>
-            <p className="text-[10px] text-cyan-300/80 truncate hidden sm:block">
+            <h1 className="font-bold text-sm sm:text-base truncate text-foreground">🌳 Cây Sự Sống Tri Thức</h1>
+            <p className="text-[10px] text-cyan-700 dark:text-cyan-300/80 truncate hidden sm:block">
               Mọi khái niệm sinh sôi · kết nối · cùng phát triển
             </p>
           </div>
@@ -735,12 +738,12 @@ export default function KnowledgeGraph() {
               onChange={e => { setSearchQ(e.target.value); setSearchOpen(true) }}
               onFocus={() => setSearchOpen(true)}
               placeholder="Tìm khái niệm…"
-              className="w-full sm:w-64 pl-9 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-cyan-400/50"
+              className="w-full sm:w-64 pl-9 pr-3 py-1.5 rounded-lg bg-muted dark:bg-white/5 border text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:border-cyan-500/60"
             />
             {searchOpen && (searchResults.length > 0 || searching) && (
-              <div className="absolute top-full mt-1 right-0 left-0 sm:left-auto sm:w-80 bg-background border border-white/15 rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
+              <div className="absolute top-full mt-1 right-0 left-0 sm:left-auto sm:w-80 bg-popover text-popover-foreground border rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
                 {searching && (
-                  <div className="px-3 py-2 text-xs text-slate-400 flex items-center gap-2">
+                  <div className="px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> Đang tìm…
                   </div>
                 )}
@@ -750,16 +753,16 @@ export default function KnowledgeGraph() {
                     <button
                       key={n.id}
                       onClick={() => onPickSearchResult(n)}
-                      className="w-full text-left px-3 py-2 hover:bg-white/5 border-b border-white/5 flex items-start gap-2"
+                      className="w-full text-left px-3 py-2 hover:bg-accent border-b last:border-b-0 flex items-start gap-2"
                     >
                       <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: c.stroke }} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-white">{n.label}</div>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider">
+                        <div className="text-sm font-medium text-foreground">{n.label}</div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
                           {NODE_TYPE_LABELS[n.type] || n.type}
                         </div>
                         {n.description && (
-                          <div className="text-xs text-slate-400 mt-0.5 line-clamp-1">{n.description}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{n.description}</div>
                         )}
                       </div>
                     </button>
@@ -772,7 +775,7 @@ export default function KnowledgeGraph() {
           {/* Mobile menu toggle (⋯) — hidden on desktop */}
           <button
             onClick={() => setMobileMenuOpen(v => !v)}
-            className="lg:hidden p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 shrink-0"
+            className="lg:hidden p-1.5 rounded-lg bg-muted dark:bg-white/5 border hover:bg-accent shrink-0"
             aria-label="Menu"
           >
             <span className="text-base leading-none">⋯</span>
@@ -783,16 +786,16 @@ export default function KnowledgeGraph() {
         <div className="max-w-[1600px] mx-auto px-3 sm:px-4 pb-2 sm:pb-3 flex items-center gap-2 overflow-x-auto scrollbar-hide">
           {/* Zoom controls (desktop only — mobile uses pinch) */}
           <div className="hidden lg:flex items-center gap-1 shrink-0">
-            <button onClick={resetView} title="Reset zoom/pan" className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+            <button onClick={resetView} title="Reset zoom/pan" className="p-1.5 rounded-lg bg-muted dark:bg-white/5 border hover:bg-accent">
               <Maximize2 className="w-4 h-4" />
             </button>
-            <button onClick={() => setZoom(z => Math.min(3, z * 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+            <button onClick={() => setZoom(z => Math.min(3, z * 1.2))} className="p-1.5 rounded-lg bg-muted dark:bg-white/5 border hover:bg-accent">
               <ZoomIn className="w-4 h-4" />
             </button>
-            <button onClick={() => setZoom(z => Math.max(0.3, z / 1.2))} className="p-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10">
+            <button onClick={() => setZoom(z => Math.max(0.3, z / 1.2))} className="p-1.5 rounded-lg bg-muted dark:bg-white/5 border hover:bg-accent">
               <ZoomOut className="w-4 h-4" />
             </button>
-            <div className="h-6 w-px bg-white/10 mx-1" />
+            <div className="h-6 w-px bg-border mx-1" />
           </div>
 
           {/* Mastery toggle — always visible (key feature) */}
@@ -801,8 +804,8 @@ export default function KnowledgeGraph() {
             title={masteryOn ? 'Tắt overlay mastery' : 'Bật overlay mastery'}
             className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition whitespace-nowrap ${
               masteryOn
-                ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
-                : 'bg-white/5 border border-white/10 text-foreground/80 hover:bg-white/10'
+                ? 'bg-emerald-500/15 dark:bg-emerald-500/25 border border-emerald-500/50 text-emerald-700 dark:text-emerald-200'
+                : 'bg-muted dark:bg-white/5 border text-foreground/85 hover:bg-accent'
             }`}
           >
             <Target className="w-3.5 h-3.5" />
@@ -1020,8 +1023,8 @@ export default function KnowledgeGraph() {
 
       {/* Mastery legend overlay khi bật mastery mode */}
       {masteryOn && (
-        <div className="absolute top-20 left-3 md:left-72 right-3 md:right-auto z-20 bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-2.5 py-1.5 md:px-3 md:py-2 flex items-center gap-2 md:gap-3 text-[10px] md:text-[11px] overflow-x-auto scrollbar-hide">
-          <span className="text-emerald-300 font-bold inline-flex items-center gap-1 shrink-0">
+        <div className="absolute top-20 left-3 md:left-72 right-3 md:right-auto z-20 bg-card/95 dark:bg-zinc-900/95 backdrop-blur border border-emerald-500/30 rounded-lg shadow-lg px-2.5 py-1.5 md:px-3 md:py-2 flex items-center gap-2 md:gap-3 text-[10px] md:text-[11px] overflow-x-auto scrollbar-hide">
+          <span className="text-emerald-700 dark:text-emerald-300 font-bold inline-flex items-center gap-1 shrink-0">
             <Target className="w-3.5 h-3.5" /> Mastery overlay
           </span>
           <div className="flex items-center gap-1.5">
@@ -1056,15 +1059,15 @@ export default function KnowledgeGraph() {
           />
         )}
         <aside className={`
-          bg-black/95 backdrop-blur md:bg-black/30 md:backdrop-blur-none
-          md:relative md:flex md:flex-col md:w-72 md:border-r md:border-white/10 md:flex-shrink-0
+          bg-card/95 dark:bg-black/95 backdrop-blur md:bg-card/60 md:dark:bg-black/30 md:backdrop-blur-none
+          md:relative md:flex md:flex-col md:w-72 md:border-r md:flex-shrink-0
           ${mobileSheetOpen
-            ? 'fixed bottom-0 left-0 right-0 z-40 max-h-[70vh] flex flex-col rounded-t-2xl border-t border-white/15 shadow-2xl'
+            ? 'fixed bottom-0 left-0 right-0 z-40 max-h-[70vh] flex flex-col rounded-t-2xl border-t shadow-2xl'
             : 'hidden md:flex'
           }
         `}>
           {/* Tab nav */}
-          <div className="flex border-b border-white/10 bg-black/50">
+          <div className="flex border-b bg-muted/50 dark:bg-black/50">
             {([
               { id: 'filter',  icon: '🎨', label: 'Lọc',     badge: enabledTypes.size },
               { id: 'mastery', icon: '🎯', label: 'Mastery', badge: masteryStats?.stats.total ?? null },
@@ -1076,14 +1079,14 @@ export default function KnowledgeGraph() {
                 onClick={() => setActiveTab(t.id as SidebarTab)}
                 className={`flex-1 flex flex-col items-center justify-center py-2 px-1 text-[10px] font-bold transition-colors relative ${
                   activeTab === t.id
-                    ? 'text-cyan-300 bg-cyan-500/10 border-b-2 border-cyan-400'
-                    : 'text-zinc-400 hover:text-foreground hover:bg-white/5 border-b-2 border-transparent'
+                    ? 'text-cyan-700 dark:text-cyan-300 bg-cyan-500/10 border-b-2 border-cyan-500'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent border-b-2 border-transparent'
                 }`}
               >
                 <span className="text-base mb-0.5">{t.icon}</span>
                 <span className="leading-none">{t.label}</span>
                 {t.badge !== null && t.badge !== undefined && t.badge > 0 && (
-                  <span className="absolute top-1 right-1 text-[8px] px-1 rounded bg-cyan-500/30 text-cyan-200">
+                  <span className="absolute top-1 right-1 text-[8px] px-1 rounded bg-cyan-500/20 dark:bg-cyan-500/30 text-cyan-800 dark:text-cyan-200">
                     {t.badge}
                   </span>
                 )}
@@ -1116,7 +1119,7 @@ export default function KnowledgeGraph() {
             {/* ── FILTER tab ── */}
             {activeTab === 'filter' && (
               <>
-                <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Loại node</h3>
+                <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Loại node</h3>
                 <div className="space-y-1 mb-4">
                   {Object.entries(NODE_TYPE_LABELS).map(([type, label]) => {
                     const c = NODE_TYPE_COLORS[type]
@@ -1132,17 +1135,17 @@ export default function KnowledgeGraph() {
                           })
                         }}
                         className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
-                          active ? 'bg-white/[0.06]' : 'opacity-40 hover:opacity-70'
+                          active ? 'bg-muted dark:bg-white/[0.06]' : 'opacity-40 hover:opacity-70'
                         }`}
                       >
                         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.stroke }} />
-                        <span className="text-xs text-white/80">{label}</span>
+                        <span className="text-xs text-foreground/85">{label}</span>
                       </button>
                     )
                   })}
                 </div>
-                <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Thống kê</h3>
-                <div className="text-xs space-y-1 text-white/70">
+                <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Thống kê</h3>
+                <div className="text-xs space-y-1 text-foreground/85">
                   <div>Nodes: <strong className="text-white">{visibleNodes.length}</strong></div>
                   <div>Edges: <strong className="text-white">{visibleEdges.length}</strong></div>
                   <div>Zoom: <strong className="text-white">{(zoom * 100).toFixed(0)}%</strong></div>
@@ -1337,17 +1340,16 @@ export default function KnowledgeGraph() {
           </div>
         </aside>
 
-        {/* Canvas */}
-        <main ref={mainRef} className="flex-1 relative overflow-hidden bg-[#06030f] pb-14 md:pb-0">
+        {/* Canvas — cosmic dark trong dark, slate-100 trong light cho graph viz */}
+        <main ref={mainRef} className="flex-1 relative overflow-hidden bg-slate-100 dark:bg-[#06030f] pb-14 md:pb-0">
           {/* Toolbar floating top-right — Fullscreen + View mode toggle */}
           <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
             {/* Fullscreen button */}
             <button
               onClick={toggleFullscreen}
               title={isFullscreen ? 'Thoát toàn màn hình (ESC)' : 'Mở rộng toàn màn hình'}
-              className="p-1.5 rounded-lg bg-zinc-900/95 backdrop-blur border border-border
-                         hover:bg-secondary hover:border-zinc-600 text-foreground transition
-                         hover:scale-105"
+              className="p-1.5 rounded-lg bg-card/95 dark:bg-zinc-900/95 backdrop-blur border
+                         hover:bg-accent text-foreground transition hover:scale-105"
             >
               {isFullscreen
                 ? <Minimize2 className="w-4 h-4" />
@@ -1356,12 +1358,12 @@ export default function KnowledgeGraph() {
             </button>
 
             {/* View mode toggle */}
-            <div className="flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-border p-1">
+            <div className="flex gap-1 bg-card/95 dark:bg-zinc-900/95 backdrop-blur rounded-lg border p-1">
               <button
                 onClick={() => setViewMode('2d')}
                 title="Xem dạng 2D (SVG, mặc định)"
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                  viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-foreground'
+                  viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 2D
@@ -1370,7 +1372,7 @@ export default function KnowledgeGraph() {
                 onClick={() => setViewMode('3d')}
                 title="Xem dạng 3D Neural Network"
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                  viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-foreground'
+                  viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 🧠 3D
@@ -1629,14 +1631,14 @@ export default function KnowledgeGraph() {
           {/* Empty state */}
           {!loading && visibleNodes.length === 0 && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center max-w-md">
-                <Network className="w-16 h-16 mx-auto mb-3 text-cyan-400/40" />
-                <h3 className="text-lg font-bold mb-2">Chưa có dữ liệu</h3>
-                <p className="text-sm text-white/60 mb-4">Bấm "Seed" trên thanh trên để khởi tạo dữ liệu Vật lí 11.</p>
+              <div className="text-center max-w-md px-4">
+                <Network className="w-16 h-16 mx-auto mb-3 text-cyan-600/50 dark:text-cyan-400/40" />
+                <h3 className="text-lg font-bold mb-2 text-foreground">Chưa có dữ liệu</h3>
+                <p className="text-sm text-muted-foreground mb-4">Bấm "Seed" trên thanh trên để khởi tạo dữ liệu Vật lí 11.</p>
                 <button
                   onClick={seed}
                   disabled={seeding}
-                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-sm font-bold inline-flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-bold inline-flex items-center gap-2"
                 >
                   {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                   Seed Vật lí 11
@@ -1663,7 +1665,7 @@ export default function KnowledgeGraph() {
             />
             <aside
               className="
-                bg-background border-white/10 overflow-y-auto
+                bg-card text-foreground overflow-y-auto
                 md:relative md:w-80 md:border-l md:flex-shrink-0 md:p-4 md:max-h-none
                 fixed bottom-14 left-0 right-0 z-40 max-h-[80vh] p-4 rounded-t-2xl border-t shadow-2xl md:rounded-none md:shadow-none
               "
@@ -1671,32 +1673,32 @@ export default function KnowledgeGraph() {
             >
             <div className="flex items-start justify-between mb-3">
               <div>
-                <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-1">
+                <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-1">
                   {NODE_TYPE_LABELS[selectedNode.node.type] || selectedNode.node.type}
                 </div>
-                <h2 className="text-lg font-bold leading-tight" style={{ color: getNodeColor(selectedNode.node.type).text }}>
+                <h2 className="text-lg font-bold leading-tight text-foreground" style={{ color: getNodeColor(selectedNode.node.type).text }}>
                   {selectedNode.node.label}
                 </h2>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="text-slate-400 hover:text-white p-1">
+              <button onClick={() => setSelectedNode(null)} className="text-muted-foreground hover:text-foreground p-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {selectedNode.node.description && (
-              <p className="text-sm text-white/75 leading-relaxed mb-4 p-3 rounded-lg bg-white/[0.03] border border-white/10">
+              <p className="text-sm text-foreground/85 leading-relaxed mb-4 p-3 rounded-lg bg-muted border">
                 {selectedNode.node.description}
               </p>
             )}
 
             {selectedNode.node.properties && Object.keys(selectedNode.node.properties).length > 0 && (
               <div className="mb-4">
-                <h3 className="text-[10px] uppercase font-bold text-white/40 tracking-wider mb-2">Thuộc tính</h3>
-                <div className="space-y-1 text-xs bg-white/[0.03] rounded-lg p-3 border border-white/10">
+                <h3 className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-2">Thuộc tính</h3>
+                <div className="space-y-1 text-xs bg-muted rounded-lg p-3 border">
                   {Object.entries(selectedNode.node.properties).map(([k, v]) => (
                     <div key={k} className="flex justify-between">
-                      <span className="text-white/50">{k}</span>
-                      <span className="text-white font-mono">{String(v)}</span>
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="text-foreground font-mono">{String(v)}</span>
                     </div>
                   ))}
                 </div>
