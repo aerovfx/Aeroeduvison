@@ -176,7 +176,7 @@ export default function QuestionBankDrawer({
       {/* Drawer panel */}
       <div className="fixed top-0 right-0 z-50 h-full w-full sm:w-[440px] bg-card border-l border-border shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-card2">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between bg-secondary">
           <div className="flex items-center gap-2">
             <Library className="w-5 h-5 text-primary" />
             <div>
@@ -360,7 +360,7 @@ export default function QuestionBankDrawer({
 
         {/* Footer: bulk add button */}
         {selectedCount > 0 && (
-          <div className="border-t border-border p-3 bg-card2">
+          <div className="border-t border-border p-3 bg-secondary">
             <button
               onClick={() => handleAttach(Array.from(selected))}
               disabled={attaching}
@@ -377,7 +377,7 @@ export default function QuestionBankDrawer({
 
         {/* Hint when no selection */}
         {selectedCount === 0 && !loading && questions.length > 0 && (
-          <div className="border-t border-border p-3 bg-card2 text-center">
+          <div className="border-t border-border p-3 bg-secondary text-center">
             <p className="text-[11px] text-muted-foreground">
               <Filter className="w-3 h-3 inline mr-1" />
               Tick chọn nhiều câu HOẶC <GripVertical className="w-3 h-3 inline mx-0.5" />kéo câu sang đề

@@ -99,7 +99,7 @@ export default function ForYouPage() {
   )
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-20">
+    <div className="min-h-screen bg-background text-foreground pb-20">
       {/* RS-Phase 10: cold-start onboarding modal */}
       {showOnboarding && (
         <OnboardingModal
@@ -109,14 +109,14 @@ export default function ForYouPage() {
       )}
       {/* Header — iOS safe-area aware (notch + dynamic island) */}
       <header
-        className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border"
         style={{ paddingTop: 'env(safe-area-inset-top, 0)' }}
       >
         <div className="px-4 py-3 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-cyan-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold leading-tight truncate">Gợi ý cho bạn</h1>
-            <p className="text-[10px] text-zinc-500 leading-tight">
+            <p className="text-[10px] text-muted-foreground leading-tight">
               Cá nhân hoá từ điểm yếu, GV của bạn, và xu hướng
             </p>
           </div>
@@ -172,20 +172,20 @@ export default function ForYouPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 rounded-lg bg-zinc-800 active:bg-zinc-700 text-zinc-300 disabled:opacity-50"
+            className="p-2 rounded-lg bg-secondary active:bg-accent text-foreground/80 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
         {/* Tab nav: Feed | Activity */}
-        <div className="flex border-t border-zinc-800">
+        <div className="flex border-t border-border">
           <button
             onClick={() => setTab('feed')}
             className={`flex-1 py-2.5 text-xs font-bold inline-flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
               tab === 'feed'
                 ? 'border-cyan-400 text-cyan-300 bg-cyan-500/5'
-                : 'border-transparent text-zinc-500'
+                : 'border-transparent text-muted-foreground'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -196,7 +196,7 @@ export default function ForYouPage() {
             className={`flex-1 py-2.5 text-xs font-bold inline-flex items-center justify-center gap-1.5 border-b-2 transition-colors ${
               tab === 'activity'
                 ? 'border-purple-400 text-purple-300 bg-purple-500/5'
-                : 'border-transparent text-zinc-500'
+                : 'border-transparent text-muted-foreground'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
@@ -208,7 +208,7 @@ export default function ForYouPage() {
         {tab === 'feed' && feed && feed.sources.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto px-4 py-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
             {feed.sources.map(s => (
-              <span key={s} className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">
+              <span key={s} className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-secondary text-foreground/80 border border-border">
                 {{
                   'kg-mastery':      '🎯 Điểm yếu',
                   'teacher-network': '👩‍🏫 GV',
@@ -232,7 +232,7 @@ export default function ForYouPage() {
         {/* ── ACTIVITY TAB ── */}
         {tab === 'activity' && (
           <div className="space-y-2 pb-8">
-            <p className="text-[11px] text-zinc-500 mb-3">
+            <p className="text-[11px] text-muted-foreground mb-3">
               Lịch sử {history?.length ?? 0} hoạt động gần đây của bạn. AI dùng dữ liệu này để cá nhân hoá gợi ý — mỗi lần bạn click / hoàn thành / pass quiz, recsys ghi nhận và cải thiện feed.
             </p>
             {!history && (
@@ -241,7 +241,7 @@ export default function ForYouPage() {
               </div>
             )}
             {history && history.length === 0 && (
-              <div className="text-center py-12 text-zinc-500 text-sm">
+              <div className="text-center py-12 text-muted-foreground text-sm">
                 Chưa có hoạt động nào.<br />
                 Bắt đầu khám phá → AI sẽ học sở thích của bạn.
               </div>
@@ -273,7 +273,7 @@ export default function ForYouPage() {
               return (
                 <div
                   key={h.id}
-                  className="flex items-start gap-3 p-2.5 rounded-lg bg-zinc-900 border border-zinc-800"
+                  className="flex items-start gap-3 p-2.5 rounded-lg bg-card border border-border"
                   style={{ borderLeftWidth: 3, borderLeftColor: m.color }}
                 >
                   <span className="text-base shrink-0">{m.emoji}</span>
@@ -283,13 +283,13 @@ export default function ForYouPage() {
                         {m.label}
                       </span>
                       <span className="text-[10px] text-zinc-600">·</span>
-                      <span className="text-[10px] text-zinc-500">{h.targetType}</span>
+                      <span className="text-[10px] text-muted-foreground">{h.targetType}</span>
                       <span className="text-[10px] text-zinc-600">·</span>
-                      <span className="text-[10px] text-zinc-500">weight {h.weight > 0 ? '+' : ''}{h.weight}</span>
+                      <span className="text-[10px] text-muted-foreground">weight {h.weight > 0 ? '+' : ''}{h.weight}</span>
                     </div>
-                    <p className="text-xs text-zinc-200 truncate mt-0.5">{String(targetLabel)}</p>
+                    <p className="text-xs text-foreground truncate mt-0.5">{String(targetLabel)}</p>
                     {h.metadata?.percentage !== undefined && (
-                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
                         Kết quả: <span className="font-mono">{h.metadata.percentage}%</span>
                       </p>
                     )}
@@ -305,15 +305,15 @@ export default function ForYouPage() {
         {tab === 'feed' && isLoading && (
           <div className="text-center py-16">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-cyan-400 mb-3" />
-            <p className="text-sm text-zinc-500">Đang tính gợi ý cá nhân hoá…</p>
+            <p className="text-sm text-muted-foreground">Đang tính gợi ý cá nhân hoá…</p>
           </div>
         )}
 
         {tab === 'feed' && !isLoading && visibleItems.length === 0 && (
           <div className="text-center py-16 px-4">
             <Compass className="w-12 h-12 mx-auto text-zinc-600 mb-3" />
-            <p className="text-sm font-semibold text-zinc-300 mb-1">Chưa có gợi ý nào</p>
-            <p className="text-xs text-zinc-500 mb-6">
+            <p className="text-sm font-semibold text-foreground/80 mb-1">Chưa có gợi ý nào</p>
+            <p className="text-xs text-muted-foreground mb-6">
               Làm 1 vài bài thi / kết nối GV để hệ thống có data
               cá nhân hoá feed.
             </p>
@@ -321,7 +321,7 @@ export default function ForYouPage() {
               <button onClick={() => navigate('/student/teachers')} className="w-full py-2.5 rounded-lg bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 text-sm font-bold">
                 Kết nối GV
               </button>
-              <button onClick={() => navigate('/dashboard/knowledge-graph')} className="w-full py-2.5 rounded-lg bg-zinc-800 text-zinc-300 border border-zinc-700 text-sm font-bold">
+              <button onClick={() => navigate('/dashboard/knowledge-graph')} className="w-full py-2.5 rounded-lg bg-secondary text-foreground/80 border border-border text-sm font-bold">
                 Vào Knowledge Graph
               </button>
             </div>
@@ -358,7 +358,7 @@ export default function ForYouPage() {
               return (
                 <article
                   key={`${item.type}-${item.id}`}
-                  className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden active:bg-zinc-800/60 transition-colors"
+                  className="rounded-2xl bg-card border border-border overflow-hidden active:bg-secondary/60 transition-colors"
                   style={{ borderLeftWidth: 3, borderLeftColor: meta.accent }}
                 >
                   <button
@@ -381,16 +381,16 @@ export default function ForYouPage() {
                         </span>
                         <span className="text-[10px] text-zinc-600">#{idx + 1}</span>
                       </div>
-                      <h3 className="text-sm font-bold text-zinc-100 leading-tight mb-1 line-clamp-2">
+                      <h3 className="text-sm font-bold text-foreground leading-tight mb-1 line-clamp-2">
                         {item.title}
                       </h3>
                       {item.subtitle && (
-                        <p className="text-xs text-zinc-400 leading-snug mb-1.5 line-clamp-1">
+                        <p className="text-xs text-muted-foreground leading-snug mb-1.5 line-clamp-1">
                           {item.subtitle}
                         </p>
                       )}
                       {item.description && (
-                        <p className="text-xs text-zinc-500 leading-snug line-clamp-2">
+                        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
                           {item.description}
                         </p>
                       )}
@@ -399,17 +399,17 @@ export default function ForYouPage() {
                       {item.meta && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {item.meta.duration && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                               <Clock className="w-3 h-3" /> {item.meta.duration}p
                             </span>
                           )}
                           {item.meta.teacherName && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                               <Users className="w-3 h-3" /> {item.meta.teacherName}
                             </span>
                           )}
                           {item.meta.takerCount > 0 && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500">
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                               <Users className="w-3 h-3" /> {item.meta.takerCount} HS
                             </span>
                           )}
@@ -433,7 +433,7 @@ export default function ForYouPage() {
                           {item.reasons?.slice(0, 3).map((r, ri) => (
                             <span
                               key={ri}
-                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-800/80 text-zinc-300 border border-zinc-700"
+                              className="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary/80 text-foreground/80 border border-border"
                             >
                               {r}
                             </span>
@@ -453,7 +453,7 @@ export default function ForYouPage() {
                       {/* RS-Phase 5: AI Predictions bar (transparency Grok-style) */}
                       {item.predictions && (
                         <details className="mt-2 group">
-                          <summary className="cursor-pointer text-[10px] text-zinc-500 hover:text-zinc-300 inline-flex items-center gap-1">
+                          <summary className="cursor-pointer text-[10px] text-muted-foreground hover:text-foreground/80 inline-flex items-center gap-1">
                             🤖 AI dự đoán
                             <span className="text-[9px] text-cyan-400 font-mono">
                               {item.predictions.mlSignal > 0 ? '+' : ''}{item.predictions.mlSignal}
@@ -474,12 +474,12 @@ export default function ForYouPage() {
                               const isNeg = key === 'skip' || key === 'not_interested'
                               return (
                                 <div key={key} className="flex items-center gap-1.5">
-                                  <span className="text-zinc-400 shrink-0" style={{ width: 70 }}>{label}</span>
-                                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                  <span className="text-muted-foreground shrink-0" style={{ width: 70 }}>{label}</span>
+                                  <div className="flex-1 h-1 bg-secondary rounded-full overflow-hidden">
                                     <div className="h-full rounded-full transition-all"
                                       style={{ width: `${v}%`, background: color, opacity: isNeg && v < 30 ? 0.4 : 1 }} />
                                   </div>
-                                  <span className="font-mono shrink-0 text-zinc-500" style={{ width: 24 }}>{v}%</span>
+                                  <span className="font-mono shrink-0 text-muted-foreground" style={{ width: 24 }}>{v}%</span>
                                 </div>
                               )
                             })}
@@ -506,7 +506,7 @@ export default function ForYouPage() {
                     </button>
                     <button
                       onClick={() => handleDismiss(item)}
-                      className="p-2 rounded-lg bg-zinc-800 active:bg-zinc-700 text-zinc-500"
+                      className="p-2 rounded-lg bg-secondary active:bg-accent text-muted-foreground"
                       aria-label="Không quan tâm"
                       title="Không quan tâm"
                     >

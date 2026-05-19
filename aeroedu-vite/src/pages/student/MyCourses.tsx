@@ -396,7 +396,7 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
               </div>
 
               {last ? (
-                <div className="rounded-lg border border-border bg-card2/60 p-2.5 space-y-1">
+                <div className="rounded-lg border border-border bg-secondary/60 p-2.5 space-y-1">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
                     <span className="flex items-center gap-1">
                       <History className="w-3 h-3" />
@@ -415,7 +415,7 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-border bg-card2/30 p-2.5 text-[11px] text-muted-foreground italic">
+                <div className="rounded-lg border border-dashed border-border bg-secondary/30 p-2.5 text-[11px] text-muted-foreground italic">
                   Chưa bắt đầu học khoá này.
                 </div>
               )}

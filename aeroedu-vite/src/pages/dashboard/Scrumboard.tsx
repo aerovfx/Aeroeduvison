@@ -137,7 +137,7 @@ function TaskCard({
       draggable
       onDragStart={e => onDragStart(e, task.id, colKey)}
       onDragEnd={onDragEnd}
-      className={`rounded-xl border bg-card border-white/[0.08] p-3.5 cursor-grab active:cursor-grabbing transition-all ${dragging ? 'opacity-40 scale-95' : 'hover:border-white/15 hover:bg-card2'}`}
+      className={`rounded-xl border bg-card border-white/[0.08] p-3.5 cursor-grab active:cursor-grabbing transition-all ${dragging ? 'opacity-40 scale-95' : 'hover:border-white/15 hover:bg-secondary'}`}
     >
       {/* Top row */}
       <div className="flex items-start gap-2 mb-2">
@@ -151,7 +151,7 @@ function TaskCard({
             <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
           {menu && (
-            <div className="absolute right-0 top-6 z-20 w-40 bg-card2 border border-white/10 rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute right-0 top-6 z-20 w-40 bg-secondary border border-white/10 rounded-xl shadow-xl overflow-hidden">
               <button onClick={() => { onEdit(task); setMenu(false) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors">
                 <Edit3 className="w-3.5 h-3.5" /> Chỉnh sửa
               </button>

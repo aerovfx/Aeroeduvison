@@ -202,7 +202,7 @@ export default function StudentDailyPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 rounded-lg bg-card2 hover:bg-zinc-700 text-foreground/80 disabled:opacity-50"
+            className="p-2 rounded-lg bg-secondary hover:bg-zinc-700 text-foreground/80 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
@@ -266,7 +266,7 @@ export default function StudentDailyPage() {
               </button>
               <button
                 onClick={() => navigate('/student/for-you')}
-                className="px-4 py-2 rounded-lg bg-card2 text-zinc-200 border border-border text-sm font-bold"
+                className="px-4 py-2 rounded-lg bg-secondary text-zinc-200 border border-border text-sm font-bold"
               >
                 Khám phá thêm
               </button>
@@ -469,7 +469,7 @@ export default function StudentDailyPage() {
                     </div>
                   </div>
                   <div className="flex-1 max-w-[140px]">
-                    <div className="h-2 rounded-full bg-card2 overflow-hidden">
+                    <div className="h-2 rounded-full bg-secondary overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-500"
                         style={{ width: `${Math.round((doneCount / (doneCount + totalItems)) * 100)}%` }}
