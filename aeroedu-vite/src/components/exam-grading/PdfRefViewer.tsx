@@ -43,8 +43,13 @@ interface Props {
 
 // Preset zoom levels — discrete steps để [+] [-] step qua dễ
 // 'page-width' / 'page-fit' là keyword PDFium/PDF.js hiểu trực tiếp
+// 2026-05-20: mở rộng lên 1000% (x10) — GV cần zoom rất gần để
+// đọc chữ nhỏ + công thức Toán/Vật lí trên đề thi scan độ phân giải thấp.
 type ZoomLevel = number | 'page-width' | 'page-fit'
-const ZOOM_PRESETS: ZoomLevel[] = [50, 75, 100, 125, 150, 200, 300]
+const ZOOM_PRESETS: ZoomLevel[] = [
+  50, 75, 100, 125, 150, 200, 300,
+  400, 500, 600, 700, 800, 900, 1000,
+]
 
 export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageKey = null }: Props) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
@@ -149,7 +154,7 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
     setZoom(prev => {
       const current = typeof prev === 'number' ? prev : 100
       const next = ZOOM_PRESETS.find(z => typeof z === 'number' && z > current) as number | undefined
-      return next ?? ZOOM_PRESETS[ZOOM_PRESETS.length - 1] // max 300%
+      return next ?? ZOOM_PRESETS[ZOOM_PRESETS.length - 1] // max 1000% (x10)
     })
   }
   const zoomOut = () => {
@@ -233,7 +238,7 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
                 }}
                 title="Mức phóng to"
                 className="text-[11px] font-semibold bg-transparent border-none focus:outline-none cursor-pointer text-foreground px-1 py-0.5"
-                style={{ minWidth: 60 }}
+                style={{ minWidth: 72 }}
               >
                 <option value="page-width">Vừa rộng</option>
                 <option value="page-fit">Vừa trang</option>
@@ -244,7 +249,7 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false, storageK
               <button
                 onClick={zoomIn}
                 title="Phóng to (zoom in)"
-                disabled={typeof zoom === 'number' && zoom >= 300}
+                disabled={typeof zoom === 'number' && zoom >= 1000}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ZoomIn className="w-3.5 h-3.5" />
