@@ -110,30 +110,41 @@ html:not(.dark) body {
  *    Tailwind text-gray-400/500 contrast quá thấp với white.
  *    Bump đậm hơn để đạt 4.5:1 WCAG AA.
  * ───────────────────────────────────────────────────────── */
-html:not(.dark) .text-gray-300  { color: hsl(215 14% 50%) !important; }  /* slate-500-ish */
-html:not(.dark) .text-gray-400  { color: hsl(215 18% 40%) !important; }  /* slate-600 */
-html:not(.dark) .text-gray-500  { color: hsl(215 22% 32%) !important; }  /* slate-700 */
-html:not(.dark) .text-gray-600  { color: hsl(217 22% 24%) !important; }  /* slate-800 */
-html:not(.dark) .text-gray-700  { color: hsl(217 25% 18%) !important; }  /* slate-900 */
+/* 2026-05-19 v3: BUMP MẠNH (-15% L) — user vẫn report "chữ ban ngày
+ * cần đậm hơn" sau v2. Tất cả text-gray/zinc/slate/neutral-300..700
+ * giờ map sang slate-800/900 range để contrast ≥ 9:1 trên white. */
+html:not(.dark) .text-gray-300  { color: hsl(215 18% 30%) !important; }  /* slate-700 (đậm hơn nhiều so với gray-300 origin) */
+html:not(.dark) .text-gray-400  { color: hsl(215 22% 22%) !important; }  /* slate-800 */
+html:not(.dark) .text-gray-500  { color: hsl(217 25% 16%) !important; }  /* slate-900 */
+html:not(.dark) .text-gray-600  { color: hsl(222 28% 12%) !important; }  /* slate-950 */
+html:not(.dark) .text-gray-700  { color: hsl(222 30% 10%) !important; }  /* near-black */
 
-html:not(.dark) .text-zinc-300  { color: hsl(240 5% 50%) !important; }
-html:not(.dark) .text-zinc-400  { color: hsl(240 5% 38%) !important; }
-html:not(.dark) .text-zinc-500  { color: hsl(240 6% 30%) !important; }
-html:not(.dark) .text-zinc-600  { color: hsl(240 6% 22%) !important; }
+html:not(.dark) .text-zinc-300  { color: hsl(240 6% 30%) !important; }
+html:not(.dark) .text-zinc-400  { color: hsl(240 6% 22%) !important; }
+html:not(.dark) .text-zinc-500  { color: hsl(240 8% 16%) !important; }
+html:not(.dark) .text-zinc-600  { color: hsl(240 8% 12%) !important; }
 
-html:not(.dark) .text-slate-300 { color: hsl(215 19% 50%) !important; }
-html:not(.dark) .text-slate-400 { color: hsl(215 16% 40%) !important; }
-html:not(.dark) .text-slate-500 { color: hsl(215 19% 32%) !important; }
-html:not(.dark) .text-slate-600 { color: hsl(217 19% 24%) !important; }
+html:not(.dark) .text-slate-300 { color: hsl(215 22% 30%) !important; }
+html:not(.dark) .text-slate-400 { color: hsl(215 22% 22%) !important; }
+html:not(.dark) .text-slate-500 { color: hsl(217 25% 16%) !important; }
+html:not(.dark) .text-slate-600 { color: hsl(222 28% 12%) !important; }
 
-html:not(.dark) .text-neutral-300 { color: hsl(0 0% 50%) !important; }
-html:not(.dark) .text-neutral-400 { color: hsl(0 0% 38%) !important; }
-html:not(.dark) .text-neutral-500 { color: hsl(0 0% 30%) !important; }
+html:not(.dark) .text-neutral-300 { color: hsl(0 0% 30%) !important; }
+html:not(.dark) .text-neutral-400 { color: hsl(0 0% 22%) !important; }
+html:not(.dark) .text-neutral-500 { color: hsl(0 0% 16%) !important; }
 
-/* Muted-foreground hard-coded contrast */
+/* Muted-foreground — slate-800 ≥ 10:1 contrast */
 html:not(.dark) .text-muted-foreground {
-  color: hsl(215 22% 28%) !important;   /* slate-700 ≥ 7:1 contrast */
+  color: hsl(222 28% 14%) !important;
 }
+
+/* Tailwind text-foreground/X opacity helpers — đảm bảo opacity cao */
+html:not(.dark) .text-foreground\/85 { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-foreground\/80 { color: hsl(var(--foreground) / 0.96) !important; }
+html:not(.dark) .text-foreground\/75 { color: hsl(var(--foreground) / 0.94) !important; }
+html:not(.dark) .text-foreground\/70 { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-foreground\/60 { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-foreground\/50 { color: hsl(var(--foreground) / 0.82) !important; }
 
 /* ─────────────────────────────────────────────────────────
  * 6. FOCUS RING — Visible cho keyboard navigation

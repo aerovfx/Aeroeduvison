@@ -22,22 +22,22 @@
 :root {
   /* Nền sáng + chữ đậm hơn để đạt tương phản tốt (WCAG) */
   --background:           210 40% 98%;
-  --foreground:           222 47% 8%;
+  --foreground:           222 47% 4%;
   --card:                 0 0% 100%;
-  --card-foreground:      222 47% 8%;
+  --card-foreground:      222 47% 4%;
   --popover:              0 0% 100%;
-  --popover-foreground:   222 47% 8%;
+  --popover-foreground:   222 47% 4%;
   --primary:              262 83% 58%;
   --primary-foreground:   210 40% 98%;
   --secondary:            210 40% 96%;
-  --secondary-foreground: 222 47% 8%;
+  --secondary-foreground: 222 47% 4%;
   --muted:                210 40% 96%;
-  /* Phụ đề: đậm hơn nữa (2026-05-19: 36% → 26% L) — user phản hồi
-     "chữ ban ngày chưa rõ". Mục tiêu contrast ≥ 7:1 (WCAG AAA) trên
-     nền trắng cho text 14px+. */
-  --muted-foreground:     222 16% 26%;
+  /* Phụ đề: đậm hơn nữa (2026-05-19 v3: 26% → 18% L = slate-800) —
+     user vẫn report "chữ ban ngày chưa rõ" lần 2. Mục tiêu contrast
+     ≥ 10:1 (well above WCAG AAA 7:1) trên nền trắng cho ALL text. */
+  --muted-foreground:     222 18% 18%;
   --accent:               210 40% 96%;
-  --accent-foreground:    222 47% 8%;
+  --accent-foreground:    222 47% 4%;
   --destructive:          0 84% 60%;
   --destructive-foreground: 210 40% 98%;
   --success:              142 76% 36%;
@@ -72,7 +72,7 @@
   --ai-accent:            #7c3aed;
   --ai-accent-hover:      #6d28d9;
   --ai-divider:           #e2e8f0;
-  --ai-muted-text:        #3f3f46;  /* 2026-05-19: zinc-600 → zinc-700 — contrast cao hơn cho light mode */
+  --ai-muted-text:        #1f2937;  /* 2026-05-19 v3: zinc-700 → slate-800 — chữ ban ngày cần đậm hơn */
 
   /* Light-mode glass & gradient for .neu-container / glass-panel (override neumorphic dark-first) */
   --glass-bg:             rgba(0,0,0,0.03);
@@ -811,24 +811,28 @@ main  { contain: layout; }
  * Lý do bất đối xứng: low-opacity DARK text + WHITE bg = very low
  * contrast (color blends fast với bg); low-opacity WHITE text + DARK
  * bg vẫn readable vì human eye nhạy với điểm sáng. */
-html:not(.dark) .text-white\/95  { color: hsl(var(--foreground) / 0.96) !important; }
-html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.95) !important; }
-html:not(.dark) .text-white\/85  { color: hsl(var(--foreground) / 0.92) !important; }
-html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.88) !important; }
-html:not(.dark) .text-white\/75  { color: hsl(var(--foreground) / 0.85) !important; }
-html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.82) !important; }
-html:not(.dark) .text-white\/65  { color: hsl(var(--foreground) / 0.78) !important; }
-html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.75) !important; }
-html:not(.dark) .text-white\/55  { color: hsl(var(--foreground) / 0.72) !important; }
-html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.68) !important; }
-html:not(.dark) .text-white\/45  { color: hsl(var(--foreground) / 0.65) !important; }
-html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.62) !important; }
-html:not(.dark) .text-white\/35  { color: hsl(var(--foreground) / 0.58) !important; }
-html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.55) !important; }
-html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.45) !important; }
-html:not(.dark) .text-white\/15  { color: hsl(var(--foreground) / 0.38) !important; }
-html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.30) !important; }
+/* 2026-05-19 v3: BUMP MẠNH thêm 1 lượt — user vẫn report "chữ ban
+ * ngày cần đậm hơn" sau v2. Strategy: high-end opacity = SOLID (1.0)
+ * vì text-white/70..95 đáng lẽ là body text; mid 50-60 = 0.95..0.92;
+ * low 10-40 = 0.85..0.70 (meta text vẫn cần readable, không faint). */
+html:not(.dark) .text-white\/95  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/90  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/85  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/80  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/75  { color: hsl(var(--foreground) / 0.98) !important; }
+html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.96) !important; }
+html:not(.dark) .text-white\/65  { color: hsl(var(--foreground) / 0.94) !important; }
+html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-white\/55  { color: hsl(var(--foreground) / 0.90) !important; }
+html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-white\/45  { color: hsl(var(--foreground) / 0.85) !important; }
+html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.82) !important; }
+html:not(.dark) .text-white\/35  { color: hsl(var(--foreground) / 0.78) !important; }
+html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.72) !important; }
+html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.68) !important; }
+html:not(.dark) .text-white\/15  { color: hsl(var(--foreground) / 0.62) !important; }
+html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.55) !important; }
 /* NOTE: plain .text-white is NOT overridden — it is widely used on colored
    backgrounds (buttons, badges, gradient CTAs) where dark text would be wrong.
    Only text-white/XX opacity variants (common in dark-first glass panels)
