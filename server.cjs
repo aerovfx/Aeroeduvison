@@ -3869,6 +3869,150 @@ if (USE_NODEJS_QUESTIONS) {
   // Conversation history — not persisted yet. Return [] so the frontend
   // sidebar renders cleanly. (Persistence can be added later via Prisma.)
   app.get('/api/ai-tutor/conversations', (_req, res) => res.json([]));
+
+  // ════════════════════════════════════════════════════════════════
+  // ARK BOT CHAT — ByteDance/BytePlus Volcengine Ark BotChat integration
+  // Bot ID: bot-202505141114-mfrvj-procode-preset (ap-southeast-1)
+  // Tham khảo customer_support_chat code mẫu Python user gửi.
+  //
+  // Khác AI Tutor (Claude direct): Ark Bot có:
+  //   - Knowledge base built-in (RAG)
+  //   - Function calling preset
+  //   - Role-aware metadata injection
+  //
+  // Endpoint: POST /api/ark-bot/chat
+  // Body: { messages: [{role, content}], stream?: true, metadata?: {} }
+  // Auto-inject role context vào system message theo JWT.
+  // ════════════════════════════════════════════════════════════════
+  app.post('/api/ark-bot/chat', express.json({ limit: '60kb' }), async (req, res) => {
+    try {
+      // Extract user + role from JWT (cùng helper với KG role-aware endpoints)
+      let user = null;
+      try {
+        const auth = req.headers.authorization || '';
+        if (auth.startsWith('Bearer ')) {
+          const jwt = require('jsonwebtoken');
+          const SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+          const d = jwt.verify(auth.slice(7), SECRET, { ignoreExpiration: true });
+          user = {
+            id: d.sub || d.userId || d.id || null,
+            role: d.role || 'STUDENT',
+            name: d.name || null,
+            email: d.email || null,
+          };
+        }
+      } catch { /* anonymous OK — sẽ default STUDENT */ }
+      if (!user) user = { id: 'anonymous', role: 'STUDENT', name: 'Khách', email: null };
+
+      const apiKey = process.env.ARK_API_KEY;
+      if (!apiKey) {
+        return res.status(503).json({
+          error: 'ARK_API_KEY chưa cấu hình. Set env var trong Cloud Run.',
+          hint: 'Lấy key tại https://console.byteplus.com/ark → API Keys',
+        });
+      }
+
+      const botId = process.env.ARK_BOT_ID || 'bot-202505141114-mfrvj-procode-preset';
+      // BytePlus Ark region ap-southeast-1
+      const apiBase = process.env.ARK_API_BASE || 'https://ark.ap-southeast.bytepluses.com';
+
+      const b = req.body || {};
+      const messages = Array.isArray(b.messages) ? b.messages : [];
+      if (messages.length === 0) {
+        return res.status(400).json({ error: 'Thiếu messages' });
+      }
+
+      // Role-aware system prompt — inject context HS/GV/Admin
+      const roleContext = {
+        STUDENT: 'Bạn đang trò chuyện với HỌC SINH AeroEdu. Giải thích từng bước rõ ràng, dùng ví dụ thực tế gần gũi, khuyến khích học sinh đặt câu hỏi. Không dùng thuật ngữ phức tạp khi chưa giải thích.',
+        TEACHER: 'Bạn đang trò chuyện với GIÁO VIÊN AeroEdu. Có thể dùng thuật ngữ chuyên môn, đề xuất phương pháp dạy phù hợp với chuẩn GDPT 2018 + CV 5512, gợi ý kiểm tra đánh giá.',
+        ADMIN:   'Bạn đang trò chuyện với QUẢN TRỊ AeroEdu. Hỗ trợ vận hành hệ thống, quản lý khoá học/giáo viên/học sinh, phân tích báo cáo + workflow.',
+      };
+      const sysContent = `Bạn là Trợ lý AI AeroEduVision (inphysic.com) — nói tiếng Việt tự nhiên, thân thiện, đúng văn hoá Việt Nam. \
+${roleContext[user.role] || roleContext.STUDENT} \
+Người dùng hiện tại: ${user.name || user.email || 'người dùng'} (vai trò: ${user.role}). \
+Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dashboard/knowledge-graph.`;
+
+      // Build final messages array — prepend system message
+      const finalMessages = [
+        { role: 'system', content: sysContent },
+        ...messages.filter(m => m && typeof m.content === 'string').map(m => ({
+          role: ['user', 'assistant', 'system'].includes(m.role) ? m.role : 'user',
+          content: String(m.content).slice(0, 8000),
+        })),
+      ];
+
+      const stream = b.stream !== false;  // default true
+
+      // Call Ark Bot API
+      const arkBody = {
+        model: botId,
+        messages: finalMessages,
+        stream,
+        // metadata theo customer_support_chat pattern
+        metadata: {
+          account_id: user.id,
+          user_role: user.role,
+          user_name: user.name,
+          ...(b.metadata || {}),
+        },
+      };
+
+      const arkResp = await fetch(`${apiBase}/api/v3/bots/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(arkBody),
+      });
+
+      if (!arkResp.ok) {
+        const errText = await arkResp.text().catch(() => '');
+        console.error(`[ark-bot] HTTP ${arkResp.status}: ${errText.slice(0, 200)}`);
+        return res.status(arkResp.status).json({
+          error: `Ark API trả ${arkResp.status}`,
+          detail: errText.slice(0, 500),
+        });
+      }
+
+      if (stream) {
+        // SSE passthrough — Ark trả `data: {...}\n\n` chunks
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        // Pipe stream
+        if (arkResp.body) {
+          const reader = arkResp.body.getReader();
+          const decoder = new TextDecoder();
+          (async () => {
+            try {
+              while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                res.write(decoder.decode(value, { stream: true }));
+              }
+              res.end();
+            } catch (e) {
+              console.error('[ark-bot] stream error:', e.message);
+              try { res.end(); } catch { /* ignore */ }
+            }
+          })();
+        } else {
+          res.end();
+        }
+        console.log(`[ark-bot] ✅ stream user=${user.id.slice(0,8)} role=${user.role} msgs=${messages.length}`);
+      } else {
+        const data = await arkResp.json();
+        console.log(`[ark-bot] ✅ user=${user.id.slice(0,8)} role=${user.role} msgs=${messages.length}`);
+        res.json(data);
+      }
+    } catch (err) {
+      console.error('[ark-bot]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -23800,8 +23944,10 @@ if (!USE_NODEJS_QUESTIONS) {
   // POST /api/lesson-plans/notebook-source-extract
   // Body multipart: file (PDF/txt) HOẶC { url } HOẶC { text }
   // Returns: { title, content (plain text), source: 'pdf'|'url'|'text', meta }
-  const notebookUpload = multer({
-    storage: multer.memoryStorage(),
+  // multer được declare lại scope local — asset block khác scope
+  const nbMulter = require('multer');
+  const notebookUpload = nbMulter({
+    storage: nbMulter.memoryStorage(),
     limits: { fileSize: 15 * 1024 * 1024 },  // 15MB max
   });
   app.post('/api/lesson-plans/notebook-source-extract',
