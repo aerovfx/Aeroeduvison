@@ -28,6 +28,8 @@ import { HostSessionModal } from '@/components/exam/HostSessionModal'
 
 // Lazy load drawer — only fetch chunk khi GV bấm "Mở Ngân hàng"
 const QuestionBankDrawer = lazy(() => import('@/components/exam/QuestionBankDrawer'))
+// Word-like editor cho biên tập câu hỏi (toolbar đầy đủ + LaTeX)
+import QuestionRichEditor, { QuestionContentView } from '@/components/exam/QuestionRichEditor'
 
 interface Question {
   id: string
@@ -554,7 +556,11 @@ function QuestionRow({
   const cancel = () => setEditing(false)
 
   const save = async () => {
-    if (!content.trim()) {
+    /* Helper: trip HTML tags + entities → check thật sự có text không.
+       Editor có thể trả '<p></p>' khi GV xoá hết → trim() không bắt được. */
+    const stripHtml = (html: string) =>
+      html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&amp;|&lt;|&gt;/g, ' ').trim()
+    if (!stripHtml(content)) {
       toast.error('Nội dung câu hỏi không được rỗng')
       return
     }
@@ -565,6 +571,7 @@ function QuestionRow({
     setSaving(true)
     try {
       // 1. Update question content/options/correctAnswer/explanation
+      //    content giờ là HTML từ RichTextEditor — backend lưu nguyên HTML
       await api.put(`/questions/${q.id}`, {
         content: content.trim(),
         options: options.map(o => o.trim()).filter(Boolean),
@@ -597,13 +604,17 @@ function QuestionRow({
           <span style={{ fontSize: 11, color: 'var(--ai-muted-text)' }}>{q.questionType.replace('_', ' ')}</span>
         </div>
 
-        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Nội dung câu hỏi</label>
-        <textarea value={content} onChange={e => setContent(e.target.value)} rows={3}
-          style={{
-            width: '100%', padding: 8, fontSize: 13, fontFamily: 'inherit',
-            background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
-            borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
-          }} />
+        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>
+          Nội dung câu hỏi <span style={{ color: '#7c3aed' }}>(Word-like editor + LaTeX)</span>
+        </label>
+        <div style={{ marginBottom: 10 }}>
+          <QuestionRichEditor
+            value={content}
+            onChange={setContent}
+            placeholder="Vd: Cho mạch điện $R = 100\Omega$ nối tiếp $L = 0.5H$..."
+            minHeight={200}
+          />
+        </div>
 
         {q.options?.length > 0 && (
           <>
@@ -674,14 +685,17 @@ function QuestionRow({
           </span>
         </div>
 
-        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>Giải thích (không bắt buộc)</label>
-        <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2}
-          placeholder="Giải thích cách giải, công thức áp dụng…"
-          style={{
-            width: '100%', padding: 8, fontSize: 12, fontFamily: 'inherit',
-            background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
-            borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
-          }} />
+        <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>
+          Giải thích (không bắt buộc) <span style={{ color: '#7c3aed' }}>(Word-like + LaTeX)</span>
+        </label>
+        <div style={{ marginBottom: 10 }}>
+          <QuestionRichEditor
+            value={explanation}
+            onChange={setExplanation}
+            placeholder="Giải thích cách giải. VD: $F = ma = 5 \times 2 = 10$ (N)"
+            minHeight={140}
+          />
+        </div>
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button onClick={cancel} disabled={saving}
@@ -768,7 +782,7 @@ function QuestionRow({
         </div>
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: q.options?.length ? 10 : 4, lineHeight: 1.55 }}>
-        <MathText as="span">{q.content}</MathText>
+        <QuestionContentView content={q.content} as="div" />
       </div>
       {q.options?.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
@@ -832,7 +846,10 @@ function NewQuestionEditor({
   const [saving, setSaving] = useState(false)
 
   const save = async () => {
-    if (!content.trim()) { toast.error('Nội dung không được rỗng'); return }
+    // Content giờ là HTML từ RichTextEditor — strip tags trước khi check rỗng
+    const stripHtml = (html: string) =>
+      html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&amp;|&lt;|&gt;/g, ' ').trim()
+    if (!stripHtml(content)) { toast.error('Nội dung không được rỗng'); return }
     setSaving(true)
     try {
       await api.post(`/teacher/exams/${examId}/questions`, {
@@ -876,19 +893,16 @@ function NewQuestionEditor({
       </div>
 
       <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>
-        Nội dung câu hỏi
+        Nội dung câu hỏi <span style={{ color: '#7c3aed' }}>(Word-like editor + LaTeX)</span>
       </label>
-      <textarea
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        rows={3}
-        placeholder="Vd: Cho mạch điện gồm R, L, C nối tiếp..."
-        style={{
-          width: '100%', padding: 8, fontSize: 13, fontFamily: 'inherit',
-          background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
-          borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
-        }}
-      />
+      <div style={{ marginBottom: 10 }}>
+        <QuestionRichEditor
+          value={content}
+          onChange={setContent}
+          placeholder="Vd: Cho mạch RLC nối tiếp với $R=100\Omega, L=0.5H, C=10\mu F$..."
+          minHeight={200}
+        />
+      </div>
 
       {qType === 'MULTIPLE_CHOICE' && (
         <>
@@ -991,19 +1005,16 @@ function NewQuestionEditor({
       />
 
       <label style={{ fontSize: 11, color: 'var(--ai-muted-text)', display: 'block', marginBottom: 4 }}>
-        Giải thích (không bắt buộc)
+        Giải thích (không bắt buộc) <span style={{ color: '#7c3aed' }}>(Word-like + LaTeX)</span>
       </label>
-      <textarea
-        value={explanation}
-        onChange={e => setExplanation(e.target.value)}
-        rows={2}
-        placeholder="Giải thích cách giải…"
-        style={{
-          width: '100%', padding: 8, fontSize: 12, fontFamily: 'inherit',
-          background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
-          borderRadius: 6, color: 'inherit', resize: 'vertical', marginBottom: 10,
-        }}
-      />
+      <div style={{ marginBottom: 10 }}>
+        <QuestionRichEditor
+          value={explanation}
+          onChange={setExplanation}
+          placeholder="Giải thích cách giải. VD: Áp dụng định luật Newton 2: $F = ma$"
+          minHeight={140}
+        />
+      </div>
 
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button
