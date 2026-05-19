@@ -29795,6 +29795,370 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     console.log('[init] Camera management endpoints (CRUD + ONVIF + permissions + student-cam) ready');
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // TEACHER MODULES — GV tạo module (giáo án mini) share cho HS/GV khác
+  //
+  // Endpoints:
+  //   GET    /api/teacher/modules            — list mine + public
+  //   GET    /api/teacher/modules/public     — chỉ module công khai (library)
+  //   GET    /api/teacher/modules/:id        — detail
+  //   POST   /api/teacher/modules            — create
+  //   PATCH  /api/teacher/modules/:id        — update (chỉ owner)
+  //   DELETE /api/teacher/modules/:id        — delete (chỉ owner/admin)
+  //
+  // Visibility model:
+  //   - public:  ai cũng xem được (GV khác/HS có thể clone/dùng)
+  //   - private: chỉ owner xem (chia sẻ qua direct link sau)
+  //
+  // Audience: 'students' | 'teachers' | 'both' — UI filter library.
+  // ══════════════════════════════════════════════════════════════
+  {
+    const { Pool: TMPool } = require('pg');
+    const tmJwt = require('jsonwebtoken');
+    const TM_JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
+      || 'dev-secret-fallback-change-in-production!!';
+    let _tmPool = null;
+    function getTMPool() {
+      if (!_tmPool && process.env.DATABASE_URL) {
+        _tmPool = new TMPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _tmPool;
+    }
+    function getTMUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = tmJwt.verify(auth.slice(7), TM_JWT_SECRET, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id, role: (d.role || '').toUpperCase(), name: d.name, email: d.email };
+      } catch { return null; }
+    }
+
+    let _tmReady = false;
+    async function ensureTMTable() {
+      if (_tmReady) return;
+      const pool = getTMPool();
+      if (!pool) return;
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS "TeacherModule" (
+          "id"            TEXT PRIMARY KEY,
+          "teacherId"     TEXT NOT NULL,
+          "teacherName"   TEXT,
+          "title"         TEXT NOT NULL,
+          "description"   TEXT,
+          "subject"       TEXT,
+          "grade"         TEXT,
+          "duration"      INT NOT NULL DEFAULT 0,   -- giờ (hours, có thể decimal)
+          "audience"      TEXT NOT NULL DEFAULT 'students',  -- 'students' | 'teachers' | 'both'
+          "visibility"    TEXT NOT NULL DEFAULT 'private',   -- 'public' | 'private'
+          "chapters"      JSONB NOT NULL DEFAULT '[]'::jsonb,
+                          -- [{ id, title, content, videoUrl, duration?, attachments? }]
+          "tags"          TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+          "thumbnailUrl"  TEXT,
+          "allowFreePreview" BOOLEAN NOT NULL DEFAULT true,
+          "isPublished"   BOOLEAN NOT NULL DEFAULT false,
+          "viewCount"     INT NOT NULL DEFAULT 0,
+          "cloneCount"    INT NOT NULL DEFAULT 0,
+          "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "TM_teacher_idx" ON "TeacherModule"("teacherId", "updatedAt" DESC)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "TM_public_idx" ON "TeacherModule"("visibility", "audience", "isPublished") WHERE "visibility" = 'public'`);
+        _tmReady = true;
+      } catch (e) {
+        console.error('[teacher-modules:ensureTable]', e.message);
+      }
+    }
+
+    function mapModule(row, includeFullChapters = true) {
+      return {
+        id: row.id, teacherId: row.teacherId, teacherName: row.teacherName,
+        title: row.title, description: row.description || '',
+        subject: row.subject || '', grade: row.grade || '',
+        duration: Number(row.duration) || 0,
+        audience: row.audience || 'students',
+        visibility: row.visibility || 'private',
+        chapters: includeFullChapters ? (Array.isArray(row.chapters) ? row.chapters : []) : undefined,
+        chapterCount: Array.isArray(row.chapters) ? row.chapters.length : 0,
+        tags: row.tags || [],
+        thumbnailUrl: row.thumbnailUrl || null,
+        allowFreePreview: !!row.allowFreePreview,
+        isPublished: !!row.isPublished,
+        viewCount: Number(row.viewCount) || 0,
+        cloneCount: Number(row.cloneCount) || 0,
+        createdAt: row.createdAt, updatedAt: row.updatedAt,
+      };
+    }
+
+    // Sanitize chapters array từ user input
+    function sanitizeChapters(input) {
+      if (!Array.isArray(input)) return [];
+      return input.slice(0, 100).map((c, i) => ({
+        id: typeof c?.id === 'number' ? c.id : i + 1,
+        title: String(c?.title || `Chương ${i + 1}`).slice(0, 200),
+        content: String(c?.content || '').slice(0, 5000),
+        videoUrl: String(c?.videoUrl || '').slice(0, 500),
+        duration: c?.duration ? Math.max(0, Math.min(600, Number(c.duration))) : undefined,
+      }));
+    }
+
+    // GET /api/teacher/modules — list của tôi + public từ GV khác
+    app.get('/api/teacher/modules', async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        if (!pool) return res.json({ mine: [], public: [] });
+        const [mine, publicMods] = await Promise.all([
+          pool.query(
+            `SELECT * FROM "TeacherModule" WHERE "teacherId" = $1 ORDER BY "updatedAt" DESC LIMIT 100`,
+            [user.id]
+          ),
+          pool.query(
+            `SELECT * FROM "TeacherModule"
+              WHERE "visibility" = 'public' AND "isPublished" = true AND "teacherId" <> $1
+              ORDER BY "viewCount" DESC, "updatedAt" DESC LIMIT 50`,
+            [user.id]
+          ),
+        ]);
+        res.json({
+          mine: mine.rows.map(r => mapModule(r, false)),
+          public: publicMods.rows.map(r => mapModule(r, false)),
+        });
+      } catch (e) {
+        console.error('[teacher-modules:list]', e.message);
+        res.json({ mine: [], public: [] });
+      }
+    });
+
+    // GET /api/teacher/modules/public?audience=students&q= — library filter
+    app.get('/api/teacher/modules/public', async (req, res) => {
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        if (!pool) return res.json({ items: [], count: 0 });
+        const audience = String(req.query.audience || '').toLowerCase();
+        const q = String(req.query.q || '').trim().toLowerCase();
+        const params = [];
+        const wheres = [`"visibility" = 'public'`, `"isPublished" = true`];
+        if (['students','teachers','both'].includes(audience)) {
+          params.push(audience);
+          wheres.push(`("audience" = $${params.length} OR "audience" = 'both')`);
+        }
+        if (q) {
+          params.push(`%${q}%`);
+          wheres.push(`(LOWER("title") LIKE $${params.length} OR LOWER("description") LIKE $${params.length})`);
+        }
+        const { rows } = await pool.query(
+          `SELECT * FROM "TeacherModule"
+            WHERE ${wheres.join(' AND ')}
+            ORDER BY "viewCount" DESC, "cloneCount" DESC, "updatedAt" DESC LIMIT 60`,
+          params
+        );
+        res.json({ items: rows.map(r => mapModule(r, false)), count: rows.length });
+      } catch (e) {
+        console.error('[teacher-modules:public]', e.message);
+        res.json({ items: [], count: 0 });
+      }
+    });
+
+    // GET /api/teacher/modules/:id — detail
+    app.get('/api/teacher/modules/:id', async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        const { rows } = await pool.query(`SELECT * FROM "TeacherModule" WHERE "id" = $1 LIMIT 1`, [req.params.id]);
+        if (!rows.length) return res.status(404).json({ error: 'Module không tồn tại' });
+        const m = rows[0];
+        // Check access: owner | public published | admin
+        const isOwner = m.teacherId === user.id;
+        const isPublic = m.visibility === 'public' && m.isPublished;
+        const isAdmin = user.role === 'ADMIN';
+        if (!isOwner && !isPublic && !isAdmin) {
+          return res.status(403).json({ error: 'Module này là riêng tư' });
+        }
+        // Increment view count if not owner
+        if (!isOwner) {
+          await pool.query(`UPDATE "TeacherModule" SET "viewCount" = "viewCount" + 1 WHERE "id" = $1`, [req.params.id])
+            .catch(() => {});
+        }
+        res.json({ module: mapModule(m), isOwner, canEdit: isOwner || isAdmin });
+      } catch (e) {
+        console.error('[teacher-modules:get]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/teacher/modules — create
+    app.post('/api/teacher/modules', express.json({ limit: '256kb' }), async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!/TEACHER|ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Chỉ giáo viên được tạo module' });
+      }
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        const b = req.body || {};
+        const title = String(b.title || '').trim();
+        if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề' });
+        const audience = ['students','teachers','both'].includes(b.audience) ? b.audience : 'students';
+        const visibility = ['public','private'].includes(b.visibility) ? b.visibility : 'private';
+        const { randomUUID } = require('crypto');
+        const id = `mod-${randomUUID().slice(0, 12)}`;
+        await pool.query(
+          `INSERT INTO "TeacherModule"
+             ("id","teacherId","teacherName","title","description","subject","grade",
+              "duration","audience","visibility","chapters","tags","thumbnailUrl",
+              "allowFreePreview","isPublished")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15)`,
+          [
+            id, user.id, user.name || user.email || null,
+            title.slice(0, 200),
+            b.description ? String(b.description).slice(0, 3000) : null,
+            b.subject ? String(b.subject).slice(0, 100) : null,
+            b.grade ? String(b.grade).slice(0, 50) : null,
+            Math.max(0, Math.min(999, Number(b.duration) || 0)),
+            audience, visibility,
+            JSON.stringify(sanitizeChapters(b.chapters)),
+            Array.isArray(b.tags) ? b.tags.slice(0, 10).map(t => String(t).slice(0, 50)) : [],
+            b.thumbnailUrl ? String(b.thumbnailUrl).slice(0, 500) : null,
+            b.allowFreePreview !== false,
+            !!b.isPublished,
+          ]
+        );
+        console.log(`[teacher-modules:create] ${user.id} → ${id} (${visibility}, ${audience})`);
+        res.status(201).json({ ok: true, id });
+      } catch (e) {
+        console.error('[teacher-modules:create]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // PATCH /api/teacher/modules/:id — update (owner only)
+    app.patch('/api/teacher/modules/:id', express.json({ limit: '256kb' }), async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        // Verify ownership
+        const own = await pool.query(`SELECT "teacherId" FROM "TeacherModule" WHERE "id" = $1`, [req.params.id]);
+        if (!own.rows.length) return res.status(404).json({ error: 'Module không tồn tại' });
+        const isAdmin = user.role === 'ADMIN';
+        if (own.rows[0].teacherId !== user.id && !isAdmin) {
+          return res.status(403).json({ error: 'Không có quyền sửa module này' });
+        }
+        const b = req.body || {};
+        const sets = [];
+        const vals = [req.params.id];
+        let i = 2;
+        const setField = (col, val) => { sets.push(`"${col}" = $${i++}`); vals.push(val); };
+        if (b.title !== undefined)        setField('title', String(b.title).slice(0, 200));
+        if (b.description !== undefined)  setField('description', String(b.description || '').slice(0, 3000));
+        if (b.subject !== undefined)      setField('subject', b.subject ? String(b.subject).slice(0, 100) : null);
+        if (b.grade !== undefined)        setField('grade', b.grade ? String(b.grade).slice(0, 50) : null);
+        if (b.duration !== undefined)     setField('duration', Math.max(0, Math.min(999, Number(b.duration) || 0)));
+        if (b.audience !== undefined && ['students','teachers','both'].includes(b.audience))
+          setField('audience', b.audience);
+        if (b.visibility !== undefined && ['public','private'].includes(b.visibility))
+          setField('visibility', b.visibility);
+        if (b.chapters !== undefined) {
+          sets.push(`"chapters" = $${i++}::jsonb`);
+          vals.push(JSON.stringify(sanitizeChapters(b.chapters)));
+        }
+        if (b.tags !== undefined && Array.isArray(b.tags))
+          setField('tags', b.tags.slice(0, 10).map(t => String(t).slice(0, 50)));
+        if (b.thumbnailUrl !== undefined)
+          setField('thumbnailUrl', b.thumbnailUrl ? String(b.thumbnailUrl).slice(0, 500) : null);
+        if (b.allowFreePreview !== undefined) setField('allowFreePreview', !!b.allowFreePreview);
+        if (b.isPublished !== undefined)      setField('isPublished', !!b.isPublished);
+        if (!sets.length) return res.status(400).json({ error: 'Không có trường nào để update' });
+        sets.push(`"updatedAt" = NOW()`);
+        await pool.query(
+          `UPDATE "TeacherModule" SET ${sets.join(', ')} WHERE "id" = $1`,
+          vals
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[teacher-modules:update]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/teacher/modules/:id
+    app.delete('/api/teacher/modules/:id', async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        const pool = getTMPool();
+        const own = await pool.query(`SELECT "teacherId" FROM "TeacherModule" WHERE "id" = $1`, [req.params.id]);
+        if (!own.rows.length) return res.status(404).json({ error: 'Module không tồn tại' });
+        const isAdmin = user.role === 'ADMIN';
+        if (own.rows[0].teacherId !== user.id && !isAdmin) {
+          return res.status(403).json({ error: 'Không có quyền xoá' });
+        }
+        await pool.query(`DELETE FROM "TeacherModule" WHERE "id" = $1`, [req.params.id]);
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[teacher-modules:delete]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/teacher/modules/:id/clone — clone public module → owner mới
+    app.post('/api/teacher/modules/:id/clone', async (req, res) => {
+      const user = getTMUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!/TEACHER|ADMIN/i.test(user.role || '')) {
+        return res.status(403).json({ error: 'Chỉ giáo viên clone module' });
+      }
+      try {
+        await ensureTMTable();
+        const pool = getTMPool();
+        const src = await pool.query(`SELECT * FROM "TeacherModule" WHERE "id" = $1 LIMIT 1`, [req.params.id]);
+        if (!src.rows.length) return res.status(404).json({ error: 'Module gốc không tồn tại' });
+        const m = src.rows[0];
+        const isOwner = m.teacherId === user.id;
+        const isPublic = m.visibility === 'public' && m.isPublished;
+        if (!isOwner && !isPublic) {
+          return res.status(403).json({ error: 'Module này riêng tư — không clone được' });
+        }
+        const { randomUUID } = require('crypto');
+        const newId = `mod-${randomUUID().slice(0, 12)}`;
+        await pool.query(
+          `INSERT INTO "TeacherModule"
+             ("id","teacherId","teacherName","title","description","subject","grade",
+              "duration","audience","visibility","chapters","tags","thumbnailUrl",
+              "allowFreePreview","isPublished")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'private',$10::jsonb,$11,$12,$13,false)`,
+          [
+            newId, user.id, user.name || user.email || null,
+            `${m.title} (Bản sao)`.slice(0, 200),
+            m.description, m.subject, m.grade, m.duration, m.audience,
+            JSON.stringify(m.chapters || []),
+            m.tags || [], m.thumbnailUrl,
+            !!m.allowFreePreview,
+          ]
+        );
+        await pool.query(`UPDATE "TeacherModule" SET "cloneCount" = "cloneCount" + 1 WHERE "id" = $1`, [req.params.id])
+          .catch(() => {});
+        console.log(`[teacher-modules:clone] ${req.params.id} → ${newId} by ${user.id}`);
+        res.status(201).json({ ok: true, id: newId });
+      } catch (e) {
+        console.error('[teacher-modules:clone]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    console.log('[init] Teacher modules endpoints (CRUD + public library + clone) ready');
+  }
+
   // ─ Agents / Settings ─────────────────────────────────────
   app.get('/api/student/agent-settings', emptyObj);
   app.put('/api/student/agent-settings', okMsg);
