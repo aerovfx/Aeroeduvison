@@ -66,6 +66,35 @@ export default function NotebookGenerator({ open, onClose }: Props) {
   const [result, setResult] = useState<{ content: string; citations: string[]; meta: any } | null>(null)
   const [saving, setSaving] = useState(false)
 
+  /* ── STEP 3 Generate (useCallback PHẢI declare TRƯỚC early return)
+   *
+   * Bug fix 2026-05-19: React error #310 — "Rendered more hooks during
+   * this update than the previous render". useCallback ở line 128 cũ
+   * nằm SAU `if (!open) return null` ở line 69 → khi modal close, hook
+   * không chạy; khi mở, hook chạy → thay đổi số hook → crash.
+   *
+   * Hooks RULES: phải gọi cùng số lượng + cùng thứ tự ở MỌI render.
+   * → Move useCallback lên đây, trước early return. */
+  const handleGenerate = useCallback(async () => {
+    if (sources.length === 0) { toast.error('Cần ít nhất 1 nguồn'); return }
+    if (!topic.trim()) { toast.error('Nhập chủ đề'); return }
+    setGenerating(true)
+    setResult(null)
+    try {
+      const r = await api.post('/lesson-plans/notebook-generate', {
+        topic: topic.trim(),
+        subject, grade, lessonCount,
+        outputFormat,
+        extraInstructions: extraInstructions.trim() || undefined,
+        sources: sources.map(s => ({ title: s.title, content: s.content })),
+      })
+      setResult(r.data as any)
+      toast.success('✨ Giáo án đã tạo!')
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Generate thất bại')
+    } finally { setGenerating(false) }
+  }, [sources, topic, subject, grade, lessonCount, outputFormat, extraInstructions])
+
   if (!open) return null
 
   /* ── STEP 1 handlers ── */
@@ -123,27 +152,7 @@ export default function NotebookGenerator({ open, onClose }: Props) {
     toast.success('Đã thêm đoạn văn')
   }
 
-  /* ── STEP 3: Generate ── */
-
-  const handleGenerate = useCallback(async () => {
-    if (sources.length === 0) { toast.error('Cần ít nhất 1 nguồn'); return }
-    if (!topic.trim()) { toast.error('Nhập chủ đề'); return }
-    setGenerating(true)
-    setResult(null)
-    try {
-      const r = await api.post('/lesson-plans/notebook-generate', {
-        topic: topic.trim(),
-        subject, grade, lessonCount,
-        outputFormat,
-        extraInstructions: extraInstructions.trim() || undefined,
-        sources: sources.map(s => ({ title: s.title, content: s.content })),
-      })
-      setResult(r.data as any)
-      toast.success('✨ Giáo án đã tạo!')
-    } catch (e: any) {
-      toast.error(e?.response?.data?.error || 'Generate thất bại')
-    } finally { setGenerating(false) }
-  }, [sources, topic, subject, grade, lessonCount, outputFormat, extraInstructions])
+  /* ── STEP 3: handleGenerate đã được declare TRƯỚC early return (line 76+) ── */
 
   const handleSaveProject = async () => {
     if (!result) return

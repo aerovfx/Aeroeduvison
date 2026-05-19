@@ -381,8 +381,8 @@ export default function QuestionBank() {
                 <Database className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-100">Ngân Hàng Câu Hỏi</h1>
-                <p className="text-sm text-slate-400">{totalQuestions} câu hỏi</p>
+                <h1 className="text-xl font-bold text-foreground">Ngân Hàng Câu Hỏi</h1>
+                <p className="text-sm text-muted-foreground">{totalQuestions} câu hỏi</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -391,7 +391,7 @@ export default function QuestionBank() {
                 className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
                   showCreateForm
                     ? "bg-purple-950/40 text-purple-300 border border-purple-700"
-                    : "border border-[#2a2b3d] text-slate-300 hover:bg-[#161728]"
+                    : "border border-border text-foreground/80 hover:bg-secondary"
                 }`}
               >
                 <PenLine className="w-4 h-4" />
@@ -399,7 +399,7 @@ export default function QuestionBank() {
               </button>
               <button
                 onClick={() => setImportOpen(true)}
-                className="px-4 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg hover:bg-[#161728] transition-colors flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 border border-border text-foreground/80 rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 text-sm font-medium"
               >
                 <Upload className="w-4 h-4" />
                 Import
@@ -421,7 +421,7 @@ export default function QuestionBank() {
         {/* Subject Categories */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-100">Chọn môn học</h2>
+            <h2 className="text-lg font-bold text-foreground">Chọn môn học</h2>
             {selectedSubject && (
               <button
                 onClick={() => setSelectedSubject(null)}
@@ -438,15 +438,15 @@ export default function QuestionBank() {
                 onClick={() =>
                   setSelectedSubject(selectedSubject === subject.id ? null : subject.id)
                 }
-                className={`bg-[#10111e] rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
+                className={`bg-card rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
                   selectedSubject === subject.id
                     ? "ring-2 ring-purple-500 border-purple-700 bg-purple-950/40"
-                    : "border-[#1e2033]"
+                    : "border-border"
                 }`}
               >
                 <div className="text-center">
-                  <h3 className="font-bold text-slate-100 text-sm">{subject.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1 truncate">{subject.description}</p>
+                  <h3 className="font-bold text-foreground text-sm">{subject.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{subject.description}</p>
                 </div>
               </div>
             ))}
@@ -455,29 +455,29 @@ export default function QuestionBank() {
 
         {/* Manual Create Form */}
         {showCreateForm && (
-          <div className="mb-6 bg-[#10111e] rounded-xl shadow-sm border border-purple-700 overflow-hidden">
-            <div className="px-6 py-4 bg-[#161728] border-b border-[#1e2033] flex items-center justify-between">
+          <div className="mb-6 bg-card rounded-xl shadow-sm border border-purple-700 overflow-hidden">
+            <div className="px-6 py-4 bg-secondary border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-600 flex items-center justify-center">
                   <PlusCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-100">Tạo câu hỏi thủ công</h3>
-                  <p className="text-xs text-slate-500">Chọn loại câu hỏi, nhập nội dung và đáp án</p>
+                  <h3 className="font-bold text-foreground">Tạo câu hỏi thủ công</h3>
+                  <p className="text-xs text-muted-foreground">Chọn loại câu hỏi, nhập nội dung và đáp án</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="p-2 hover:bg-[#2a2b3d] rounded-lg transition-colors"
+                className="p-2 hover:bg-accent rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Step 1: Question Type */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-3">
+                <label className="block text-sm font-semibold text-foreground/80 mb-3">
                   1. Chọn loại câu hỏi *
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -499,13 +499,13 @@ export default function QuestionBank() {
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
                         form.questionType === qt.value
                           ? "border-purple-500 bg-purple-950/40 shadow-sm"
-                          : "border-[#1e2033] hover:border-[#2a2b3d] bg-[#10111e]"
+                          : "border-border hover:border-border bg-card"
                       }`}
                     >
                       <span className="text-2xl block mb-1">{qt.icon}</span>
                       <span
                         className={`text-sm font-semibold ${
-                          form.questionType === qt.value ? "text-purple-700" : "text-slate-300"
+                          form.questionType === qt.value ? "text-purple-700" : "text-foreground/80"
                         }`}
                       >
                         {qt.label}
@@ -517,16 +517,16 @@ export default function QuestionBank() {
 
               {/* Step 2: Classification */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-3">
+                <label className="block text-sm font-semibold text-foreground/80 mb-3">
                   2. Thông tin phân loại
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Môn học *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Môn học *</label>
                     <select
                       value={form.subject}
                       onChange={(e) => updateForm("subject", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       <option value="">Chọn môn</option>
                       {SUBJECT_CATEGORIES.map((s) => (
@@ -535,11 +535,11 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Khối *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Khối *</label>
                     <select
                       value={form.grade}
                       onChange={(e) => updateForm("grade", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       <option value="">Chọn khối</option>
                       {GRADE_OPTIONS.map((g) => (
@@ -548,11 +548,11 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Độ khó</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Độ khó</label>
                     <select
                       value={form.difficulty}
                       onChange={(e) => updateForm("difficulty", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       {DIFFICULTY_OPTIONS.map((d) => (
                         <option key={d.value} value={d.value}>{d.label}</option>
@@ -560,12 +560,12 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Chủ đề</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Chủ đề</label>
                     <input
                       value={form.topic}
                       onChange={(e) => updateForm("topic", e.target.value)}
                       placeholder="VD: Dao động cơ"
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground"
                     />
                   </div>
                 </div>
@@ -573,7 +573,7 @@ export default function QuestionBank() {
 
               {/* Step 3: Content */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
                   3. Nội dung câu hỏi *
                 </label>
                 <textarea
@@ -581,14 +581,14 @@ export default function QuestionBank() {
                   onChange={(e) => updateForm("content", e.target.value)}
                   placeholder="Nhập nội dung câu hỏi..."
                   rows={3}
-                  className="w-full px-4 py-3 border border-[#2a2b3d] rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-[#161728] text-slate-200 placeholder-slate-500"
+                  className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-secondary text-foreground placeholder-muted-foreground"
                 />
               </div>
 
               {/* Step 4: Answers */}
               {form.questionType && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-3">4. Đáp án</label>
+                  <label className="block text-sm font-semibold text-foreground/80 mb-3">4. Đáp án</label>
 
                   {/* MCQ */}
                   {form.questionType === "MCQ" && (
@@ -604,7 +604,7 @@ export default function QuestionBank() {
                               className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
                                 isCorrect
                                   ? "bg-green-600 text-white shadow-sm"
-                                  : "bg-[#1e2033] text-slate-300 hover:bg-[#2a2b3d]"
+                                  : "bg-border text-foreground/80 hover:bg-accent"
                               }`}
                               title={isCorrect ? "Đáp án đúng" : "Chọn làm đáp án đúng"}
                             >
@@ -614,14 +614,14 @@ export default function QuestionBank() {
                               value={opt}
                               onChange={(e) => updateOption(idx, e.target.value)}
                               placeholder={`Phương án ${letter}`}
-                              className={`flex-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 ${
-                                isCorrect ? "border-green-600 bg-green-900/20" : "border-[#2a2b3d]"
+                              className={`flex-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground ${
+                                isCorrect ? "border-green-600 bg-green-900/20" : "border-border"
                               }`}
                             />
                             {form.options.length > 2 && (
                               <button
                                 onClick={() => removeOption(idx)}
-                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -631,7 +631,7 @@ export default function QuestionBank() {
                       })}
                       <button
                         onClick={addOption}
-                        className="w-full py-2.5 border-2 border-dashed border-[#2a2b3d] rounded-lg text-sm text-slate-500 hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
                         Thêm phương án
@@ -656,7 +656,7 @@ export default function QuestionBank() {
                               ? val === "Đúng"
                                 ? "border-green-500 bg-green-900/30 text-green-400"
                                 : "border-red-500 bg-red-900/30 text-red-400"
-                              : "border-[#1e2033] text-slate-400 hover:border-[#2a2b3d]"
+                              : "border-border text-muted-foreground hover:border-border"
                           }`}
                         >
                           {val === "Đúng" ? "✓ " : "✗ "}
@@ -669,18 +669,18 @@ export default function QuestionBank() {
                   {/* Multiple True/False */}
                   {form.questionType === "MULTIPLE_TF" && (
                     <div className="space-y-3">
-                      <p className="text-xs text-slate-500">Nhập từng phát biểu và chọn Đúng / Sai cho mỗi ý</p>
+                      <p className="text-xs text-muted-foreground">Nhập từng phát biểu và chọn Đúng / Sai cho mỗi ý</p>
                       {form.options.map((opt, idx) => {
                         const label = String.fromCharCode(97 + idx) // a, b, c, d
                         const isTrue = form.mtfAnswers[idx] === "Đúng"
                         return (
                           <div key={idx} className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-slate-400 w-5 shrink-0">{label})</span>
+                            <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">{label})</span>
                             <input
                               value={opt}
                               onChange={(e) => updateOption(idx, e.target.value)}
                               placeholder={`Phát biểu ${label}...`}
-                              className="flex-1 px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="flex-1 px-3 py-2.5 border border-border rounded-lg text-sm bg-secondary text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                             />
                             <button
                               type="button"
@@ -696,7 +696,7 @@ export default function QuestionBank() {
                             {form.options.length > 2 && (
                               <button
                                 onClick={() => removeOption(idx)}
-                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -707,7 +707,7 @@ export default function QuestionBank() {
                       {form.options.length < 6 && (
                         <button
                           onClick={addOption}
-                          className="w-full py-2.5 border-2 border-dashed border-[#2a2b3d] rounded-lg text-sm text-slate-500 hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           Thêm phát biểu
@@ -735,7 +735,7 @@ export default function QuestionBank() {
 
               {/* Explanation */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
                   Giải thích{" "}
                   <span className="text-slate-600 font-normal">(tùy chọn)</span>
                 </label>
@@ -744,15 +744,15 @@ export default function QuestionBank() {
                   onChange={(e) => updateForm("explanation", e.target.value)}
                   placeholder="Giải thích chi tiết cho đáp án..."
                   rows={2}
-                  className="w-full px-4 py-3 border border-[#2a2b3d] rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-[#161728] text-slate-200 placeholder-slate-500"
+                  className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-secondary text-foreground placeholder-muted-foreground"
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-[#1e2033]">
+              <div className="flex items-center justify-between pt-4 border-t border-border">
                 <button
                   onClick={resetForm}
-                  className="px-4 py-2.5 text-sm text-slate-400 hover:text-slate-100 hover:bg-[#1e2033] rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-border rounded-lg transition-colors"
                 >
                   Hủy
                 </button>
@@ -787,7 +787,7 @@ export default function QuestionBank() {
         {!loading && questions.length > 0 && (
           <div className="mb-4 flex items-center gap-3 flex-wrap">
             {[
-              { label: "Tổng", count: questions.length, cls: "text-slate-300 bg-white/[0.05] border-white/[0.08]" },
+              { label: "Tổng", count: questions.length, cls: "text-foreground/80 bg-white/[0.05] border-white/[0.08]" },
               { label: "Dễ",   count: questions.filter(q => q.difficulty === "EASY").length,   cls: "text-green-400 bg-green-900/20 border-green-700/30" },
               { label: "TB",   count: questions.filter(q => q.difficulty === "MEDIUM").length, cls: "text-yellow-400 bg-yellow-900/20 border-yellow-700/30" },
               { label: "Khó",  count: questions.filter(q => q.difficulty === "HARD").length,   cls: "text-red-400 bg-red-900/20 border-red-700/30" },
@@ -803,8 +803,8 @@ export default function QuestionBank() {
               const cnt = questions.filter(q => q.questionType === type).length
               if (cnt === 0) return null
               return (
-                <div key={type} className="text-xs text-slate-500 bg-[#161728] border border-[#2a2b3d] px-2 py-1 rounded">
-                  {label}: <span className="text-slate-300 font-semibold">{cnt}</span>
+                <div key={type} className="text-xs text-muted-foreground bg-secondary border border-border px-2 py-1 rounded">
+                  {label}: <span className="text-foreground/80 font-semibold">{cnt}</span>
                 </div>
               )
             })}
@@ -820,21 +820,21 @@ export default function QuestionBank() {
               placeholder="Tìm kiếm câu hỏi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-[#2a2b3d] rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500"
+              className="w-full pl-12 pr-4 py-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground"
             />
           </div>
           {questions.length > 0 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={expandAll}
-                className="px-3 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-1"
+                className="px-3 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-1"
               >
                 <ChevronDown className="w-4 h-4" />
                 Mở tất cả
               </button>
               <button
                 onClick={collapseAll}
-                className="px-3 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-1"
+                className="px-3 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-1"
               >
                 <ChevronUp className="w-4 h-4" />
                 Thu gọn
@@ -848,7 +848,7 @@ export default function QuestionBank() {
           <select
             value={filterDifficulty}
             onChange={(e) => setFilterDifficulty(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Độ khó</option>
             {DIFFICULTY_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
@@ -856,7 +856,7 @@ export default function QuestionBank() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Loại câu hỏi</option>
             {QUESTION_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -864,7 +864,7 @@ export default function QuestionBank() {
           <select
             value={filterGrade}
             onChange={(e) => setFilterGrade(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Khối lớp</option>
             {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
@@ -872,7 +872,7 @@ export default function QuestionBank() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="newest">Mới nhất</option>
             <option value="oldest">Cũ nhất</option>
@@ -888,7 +888,7 @@ export default function QuestionBank() {
             </button>
           )}
           {filteredQuestions.length !== questions.length && (
-            <span className="text-xs text-slate-500 ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               Hiển thị {filteredQuestions.length} / {questions.length} câu hỏi
             </span>
           )}
@@ -904,7 +904,7 @@ export default function QuestionBank() {
             ) : filteredQuestions.length === 0 ? (
               <div className="text-center py-12">
                 <Database className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-                <p className="text-slate-400 font-medium">Chưa có câu hỏi nào</p>
+                <p className="text-muted-foreground font-medium">Chưa có câu hỏi nào</p>
                 <p className="text-slate-600 text-sm mt-1">
                   {activeFilterCount > 0 ? "Thử thay đổi bộ lọc để xem thêm câu hỏi" : "Tạo câu hỏi thủ công, import file hoặc sinh AI"}
                 </p>
@@ -939,7 +939,7 @@ export default function QuestionBank() {
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="px-6 py-3 border border-[#2a2b3d] text-slate-300 rounded-xl hover:bg-[#161728] transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+              className="px-6 py-3 border border-border text-foreground/80 rounded-xl hover:bg-secondary transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
             >
               {loadingMore ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Đang tải...</>
@@ -1013,7 +1013,7 @@ function QuestionCard({
       className={`border rounded-xl transition-all ${
         isExpanded
           ? "border-purple-700 bg-purple-950/30 shadow-md"
-          : "border-[#1e2033] bg-[#10111e] hover:border-[#2a2b3d]"
+          : "border-border bg-card hover:border-border"
       }`}
     >
       {/* Collapsed View */}
@@ -1021,12 +1021,12 @@ function QuestionCard({
         <div className="flex items-start gap-4">
           <button
             onClick={onToggle}
-            className="mt-1 p-1 hover:bg-[#2a2b3d] rounded transition-colors"
+            className="mt-1 p-1 hover:bg-accent rounded transition-colors"
           >
             {isExpanded ? (
-              <ChevronUp className="w-5 h-5 text-slate-400" />
+              <ChevronUp className="w-5 h-5 text-muted-foreground" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
             )}
           </button>
 
@@ -1035,10 +1035,10 @@ function QuestionCard({
               <span className="text-xs font-bold text-purple-400 bg-purple-900/30 px-2 py-1 rounded">
                 Câu {index + 1}
               </span>
-              <span className="text-xs text-slate-400 bg-[#1e2033] px-2 py-1 rounded">
+              <span className="text-xs text-muted-foreground bg-border px-2 py-1 rounded">
                 {question.subject}
               </span>
-              <span className="text-xs text-slate-400 bg-[#1e2033] px-2 py-1 rounded">
+              <span className="text-xs text-muted-foreground bg-border px-2 py-1 rounded">
                 {question.grade}
               </span>
               <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded">
@@ -1057,7 +1057,7 @@ function QuestionCard({
               </span>
             </div>
 
-            <p className="text-slate-200 font-medium line-clamp-2">{question.content}</p>
+            <p className="text-foreground font-medium line-clamp-2">{question.content}</p>
 
             {question.options.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-3 max-w-2xl">
@@ -1067,7 +1067,7 @@ function QuestionCard({
                     className={`px-3 py-2 rounded-lg text-sm border ${
                       String.fromCharCode(65 + idx) === question.correctAnswer
                         ? "bg-green-900/20 border-green-700 text-green-400 font-semibold"
-                        : "bg-[#161728] border-[#1e2033] text-slate-300"
+                        : "bg-secondary border-border text-foreground/80"
                     }`}
                   >
                     <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span>
@@ -1080,7 +1080,7 @@ function QuestionCard({
             <div className="flex items-center gap-2 mt-3">
               <button
                 onClick={() => { setIsEditing(true); onToggle() }}
-                className="px-3 py-1.5 border border-[#2a2b3d] text-slate-300 rounded-lg text-xs hover:bg-[#161728] flex items-center gap-1"
+                className="px-3 py-1.5 border border-border text-foreground/80 rounded-lg text-xs hover:bg-secondary flex items-center gap-1"
               >
                 <Edit2 className="w-3 h-3" />
                 Sửa nhanh
@@ -1103,20 +1103,20 @@ function QuestionCard({
           {isEditing ? (
             <>
               <div>
-                <label className="text-sm font-semibold text-slate-300 mb-2 block">
+                <label className="text-sm font-semibold text-foreground/80 mb-2 block">
                   Nội dung câu hỏi
                 </label>
                 <textarea
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-[#161728] text-slate-200"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
                   rows={3}
                 />
               </div>
 
               {editedOptions.length > 0 && (
                 <div>
-                  <label className="text-sm font-semibold text-slate-300 mb-2 block">
+                  <label className="text-sm font-semibold text-foreground/80 mb-2 block">
                     Phương án trả lời
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -1127,7 +1127,7 @@ function QuestionCard({
                           className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
                             String.fromCharCode(65 + idx) === editedCorrectAnswer
                               ? "bg-green-500 text-white"
-                              : "bg-[#2a2b3d] text-slate-300 hover:bg-[#2a2b3d]"
+                              : "bg-accent text-foreground/80 hover:bg-accent"
                           }`}
                           title="Chọn làm đáp án đúng"
                         >
@@ -1140,10 +1140,10 @@ function QuestionCard({
                         <input
                           value={option}
                           onChange={(e) => handleOptionChange(idx, e.target.value)}
-                          className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-[#161728] text-slate-200 ${
+                          className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-secondary text-foreground ${
                             String.fromCharCode(65 + idx) === editedCorrectAnswer
                               ? "border-green-600 bg-green-900/20"
-                              : "border-[#2a2b3d]"
+                              : "border-border"
                           }`}
                         />
                       </div>
@@ -1153,11 +1153,11 @@ function QuestionCard({
               )}
 
               <div>
-                <label className="text-sm font-semibold text-slate-300 mb-2 block">Giải thích</label>
+                <label className="text-sm font-semibold text-foreground/80 mb-2 block">Giải thích</label>
                 <textarea
                   value={editedExplanation}
                   onChange={(e) => setEditedExplanation(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-[#161728] text-slate-200"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
                   rows={2}
                   placeholder="Giải thích chi tiết (tùy chọn)..."
                 />
@@ -1166,7 +1166,7 @@ function QuestionCard({
               <div className="flex items-center justify-end gap-2 pt-4 border-t">
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-2"
+                  className="px-4 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Hủy
@@ -1188,8 +1188,8 @@ function QuestionCard({
             <div className="space-y-4">
               {/* Full question content */}
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Nội dung đầy đủ</p>
-                <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{question.content}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Nội dung đầy đủ</p>
+                <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">{question.content}</p>
               </div>
 
               {/* MULTIPLE_TF display */}
@@ -1197,7 +1197,7 @@ function QuestionCard({
                 const answers = question.correctAnswer.split(",")
                 return (
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Các phát biểu</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Các phát biểu</p>
                     <div className="space-y-2">
                       {question.options.map((opt, idx) => {
                         const ans = answers[idx] || "?"
@@ -1206,7 +1206,7 @@ function QuestionCard({
                             ans === "Đúng" ? "border-green-700/40 bg-green-900/15 text-green-300" : "border-red-700/40 bg-red-900/15 text-red-300"
                           }`}>
                             <span className="font-bold shrink-0 text-xs mt-0.5">{String.fromCharCode(97 + idx)})</span>
-                            <span className="flex-1 text-slate-200">{opt}</span>
+                            <span className="flex-1 text-foreground">{opt}</span>
                             <span className={`text-xs font-bold shrink-0 px-2 py-0.5 rounded ${ans === "Đúng" ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
                               {ans === "Đúng" ? "✓ Đúng" : "✗ Sai"}
                             </span>
@@ -1222,7 +1222,7 @@ function QuestionCard({
               {question.explanation && (
                 <div className="bg-amber-900/15 border border-amber-700/30 rounded-lg p-3">
                   <p className="text-xs font-semibold text-amber-400 mb-1">💡 Giải thích</p>
-                  <p className="text-sm text-slate-300 leading-relaxed">{question.explanation}</p>
+                  <p className="text-sm text-foreground/80 leading-relaxed">{question.explanation}</p>
                 </div>
               )}
 
