@@ -193,14 +193,14 @@ function CameraSlot({
       style={{
         position: 'relative', aspectRatio: '16/9', display: 'flex', flexDirection: 'column',
         border: `2px solid ${isSelected ? D.purple : 'transparent'}`,
-        background: '#1a1a1a', cursor: 'pointer', borderRadius: 2,
+        background: 'var(--td-wall)', cursor: 'pointer', borderRadius: 2,
         overflow: 'hidden', boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
         transition: 'border-color 0.15s',
       }}
     >
       {camera ? (
         <>
-          <div style={{ position: 'absolute', inset: 0, background: '#0f0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'var(--td-wall)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             {camera.id === 'cam_demo' ? (
               <video
                 ref={videoRef} src={camera.rtspUrl}
@@ -870,7 +870,7 @@ export default function CameraManagement() {
           })}
         </div>
 
-        <div style={{ padding: 24, borderTop: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(13,14,23,0.5)', backdropFilter: 'blur(8px)' }}>
+        <div style={{ padding: 24, borderTop: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, background: 'rgba(var(--td-overlay-rgb), 0.04)', backdropFilter: 'blur(8px)' }}>
           <h3 style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: D.muted, textAlign: 'center', margin: 0 }}>Điều khiển PTZ</h3>
           <PTZJoystick />
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -885,10 +885,10 @@ export default function CameraManagement() {
       </div>
 
       {/* ── Main: Top Bar + Wall + Right Panel ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#0a0a0a', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: D.wall, overflow: 'hidden' }}>
 
         {/* Top bar */}
-        <div style={{ height: 56, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', background: '#111118', flexShrink: 0 }}>
+        <div style={{ height: 56, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', background: D.topbar, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} style={{ padding: 8, color: D.muted, background: 'transparent', border: 'none', cursor: 'pointer' }}>
               <SidebarIcon style={{ width: 20, height: 20 }} />
@@ -917,7 +917,7 @@ export default function CameraManagement() {
 
           {/* Wall col */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <div className={`flex-1 grid ${gridCols[gridSize]} ${gridRows[gridSize]}`} style={{ flex: 1, gap: 4, padding: 4, background: '#000', overflow: 'hidden' }}>
+            <div className={`flex-1 grid ${gridCols[gridSize]} ${gridRows[gridSize]}`} style={{ flex: 1, gap: 4, padding: 4, background: D.wall, overflow: 'hidden' }}>
               {new Array(gridSize).fill(null).map((_, i) => (
                 <CameraSlot
                   key={i} index={i}
@@ -951,7 +951,7 @@ export default function CameraManagement() {
             </div>
 
             {/* Bottom control bar */}
-            <div style={{ height: 80, background: '#111118', borderTop: `1px solid ${D.border}`, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ height: 80, background: D.topbar, borderTop: `1px solid ${D.border}`, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div style={{ display: 'flex', background: D.card2, borderRadius: 12, padding: 6, border: `1px solid ${D.border}`, gap: 8 }}>
                   <ControlBtn icon={Play}    label="Phát"    active />
@@ -983,7 +983,7 @@ export default function CameraManagement() {
           </div>
 
           {/* Right panel: AI analytics */}
-          <div style={{ width: 304, borderLeft: `1px solid ${D.border}`, background: '#0f1016', padding: 16, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
+          <div style={{ width: 304, borderLeft: `1px solid ${D.border}`, background: D.card, padding: 16, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
             <VisionAnalyticsDashboard
               data={gridAssignments[selectedSlot] ? (analysisData[gridAssignments[selectedSlot]!.id] ?? null) : null}
               cameraName={gridAssignments[selectedSlot]?.name || 'Chưa chọn kênh'}
@@ -1000,7 +1000,7 @@ export default function CameraManagement() {
       </div>
 
       {/* ── Status Bar (fixed bottom) ── */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 24, background: '#050508', borderTop: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 100 }}>
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 24, background: D.bg, borderTop: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', zIndex: 100 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 6, height: 6, background: '#22c55e', borderRadius: '50%' }} />
@@ -1024,7 +1024,7 @@ export default function CameraManagement() {
           onClick={() => setShowRecordingsModal(false)}
         >
           <div
-            style={{ background: '#111118', borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '85vh', overflow: 'hidden', border: `1px solid ${D.border}`, boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }}
+            style={{ background: D.topbar, borderRadius: 16, width: '100%', maxWidth: 900, maxHeight: '85vh', overflow: 'hidden', border: `1px solid ${D.border}`, boxShadow: '0 25px 60px rgba(0,0,0,0.7)' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ height: 64, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', background: D.card2 }}>
