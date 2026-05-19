@@ -15,8 +15,12 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `eaebddd` (revision pixiai-00345-som, 2026-05-19 — ExamReports báo cáo trên cùng, list dưới)
+- Last deployed commit: `6b0b2bd` (revision pixiai-00347-ced, 2026-05-19 — Light mode batch 10 pages: IoTLab/GraphLab/KnowledgeGraph/CareerGames + 6 khác)
 - Commits since last deploy: `0/5`
+- Prev: `981743f` → pixiai-00346-not (ForYou 48 patterns + revert bg-card2 → bg-secondary)
+- Prev: `f36f333` → pixiai-00346-not (GalaxyHero description visible trên light)
+- Prev: `0e72ab5` → pixiai-00346-not (14 student/dashboard pages light mode)
+- Prev: `eaebddd` → pixiai-00345-som (ExamReports báo cáo trên cùng, list dưới)
 - Prev: `1e4415c` → pixiai-00344-xum (ExamReports card list view)
 - Prev: `d8e8038` → pixiai-00344-xum (Question Bank taxonomy + Fix LaTeX — same deploy)
 - Prev: `59568d6` → pixiai-00343-wef (ExamDetail drag-drop ngân hàng đề + AiExamDialog light mode)

@@ -34,10 +34,10 @@ const achievements = [
 function getRarityStyle(rarity: string) {
   switch (rarity) {
     case 'common':    return { border: 'border-white/[0.08]',                  glow: '' }
-    case 'uncommon':  return { border: 'border-[hsl(175,80%,50%)]/20',         glow: 'shadow-[0_0_12px_rgba(0,210,180,0.06)]' }
-    case 'rare':      return { border: 'border-[hsl(210,90%,60%)]/20',         glow: 'shadow-[0_0_12px_rgba(60,130,255,0.06)]' }
-    case 'epic':      return { border: 'border-[hsl(280,75%,60%)]/20',         glow: 'shadow-[0_0_12px_rgba(160,80,255,0.06)]' }
-    case 'legendary': return { border: 'border-[hsl(35,90%,55%)]/25',          glow: 'shadow-[0_0_16px_rgba(230,160,50,0.08)]' }
+    case 'uncommon':  return { border: 'border-cyan-500/30',         glow: 'shadow-[0_0_12px_rgba(0,210,180,0.06)]' }
+    case 'rare':      return { border: 'border-blue-500/30',         glow: 'shadow-[0_0_12px_rgba(60,130,255,0.06)]' }
+    case 'epic':      return { border: 'border-purple-500/30',         glow: 'shadow-[0_0_12px_rgba(160,80,255,0.06)]' }
+    case 'legendary': return { border: 'border-amber-500/30',          glow: 'shadow-[0_0_16px_rgba(230,160,50,0.08)]' }
     default:          return { border: 'border-white/[0.08]',                  glow: '' }
   }
 }
@@ -45,10 +45,10 @@ function getRarityStyle(rarity: string) {
 function getRarityBadge(rarity: string) {
   switch (rarity) {
     case 'common':    return 'bg-white/[0.06] text-white/40'
-    case 'uncommon':  return 'bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)]'
-    case 'rare':      return 'bg-[hsl(210,90%,60%)]/10 text-[hsl(210,90%,65%)]'
-    case 'epic':      return 'bg-[hsl(280,75%,60%)]/10 text-[hsl(280,75%,65%)]'
-    case 'legendary': return 'bg-[hsl(35,90%,55%)]/10 text-[hsl(35,90%,60%)]'
+    case 'uncommon':  return 'bg-cyan-500/10 text-cyan-300'
+    case 'rare':      return 'bg-blue-500/10 text-blue-300'
+    case 'epic':      return 'bg-purple-500/10 text-purple-300'
+    case 'legendary': return 'bg-amber-500/10 text-amber-400'
     default:          return 'bg-white/[0.06] text-white/40'
   }
 }
@@ -80,16 +80,16 @@ export default function AchievementsPage() {
       <div className="max-w-6xl mx-auto space-y-5">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-[hsl(35,90%,50%)]/15 to-[hsl(25,85%,50%)]/15 backdrop-blur-xl rounded-2xl border border-[hsl(35,90%,55%)]/20 p-6">
+        <div className="bg-gradient-to-r from-amber-500/15 to-orange-500/15 backdrop-blur-xl rounded-2xl border border-amber-500/30 p-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white/90 mb-1">Achievements &amp; Gamification</h1>
               <p className="text-sm text-white/40">Thành tích, huy hiệu và milestone của bạn</p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-[hsl(245,85%,75%)]">{earnedCount}/{totalCount}</div>
+              <div className="text-2xl font-bold text-indigo-300">{earnedCount}/{totalCount}</div>
               <div className="text-xs text-white/40">Achievements</div>
-              <div className="text-[0.65rem] text-[hsl(175,80%,55%)]">{completionRate}% Complete</div>
+              <div className="text-[0.65rem] text-cyan-300">{completionRate}% Complete</div>
             </div>
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function AchievementsPage() {
         {/* Category Filter */}
         <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
           <h3 className="text-sm font-semibold text-white/70 mb-3 flex items-center gap-2">
-            <Target className="w-4 h-4 text-[hsl(245,85%,65%)]" />
+            <Target className="w-4 h-4 text-indigo-400" />
             Filter by Category
           </h3>
           <div className="flex flex-wrap gap-2">
@@ -173,12 +173,12 @@ export default function AchievementsPage() {
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <Zap className="w-3.5 h-3.5 text-[hsl(35,90%,55%)]" />
+                    <Zap className="w-3.5 h-3.5 text-amber-300" />
                     <span className="text-xs font-medium text-white/50">{achievement.xp} XP</span>
                   </div>
 
                   {achievement.earned ? (
-                    <div className="flex items-center gap-1 text-[hsl(175,80%,55%)]">
+                    <div className="flex items-center gap-1 text-cyan-300">
                       <Star className="w-3.5 h-3.5 fill-current" />
                       <span className="text-[0.65rem] font-medium">Earned</span>
                     </div>
@@ -214,7 +214,7 @@ export default function AchievementsPage() {
         </div>
 
         {/* AI Motivation */}
-        <div className="bg-gradient-to-r from-[hsl(245,85%,55%)]/15 to-[hsl(280,75%,55%)]/15 backdrop-blur-xl rounded-2xl border border-[hsl(245,85%,65%)]/20 p-6">
+        <div className="bg-gradient-to-r from-indigo-500/15 to-purple-500/15 backdrop-blur-xl rounded-2xl border border-indigo-500/30 p-6">
           <div className="flex items-start gap-4">
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(280,75%,60%)] flex items-center justify-center flex-shrink-0 shadow-[0_0_16px_rgba(120,100,255,0.25)]">
               <Brain className="w-5 h-5 text-white" />
@@ -225,9 +225,9 @@ export default function AchievementsPage() {
                 Bạn đang làm rất tốt! Với {earnedCount} achievements đã đạt được, bạn đang trên con đường trở thành một học sinh xuất sắc.
               </p>
               <div className="space-y-1 text-xs text-white/40">
-                <p><strong className="text-[hsl(35,90%,55%)]">Next Goal:</strong> Hoàn thành &ldquo;Chemistry Wizard&rdquo; (75% done)</p>
-                <p><strong className="text-[hsl(175,80%,55%)]">Tip:</strong> Học đều đặn mỗi ngày để duy trì streak!</p>
-                <p><strong className="text-[hsl(245,85%,75%)]">Challenge:</strong> Thử đạt &ldquo;Perfectionist&rdquo; bằng cách làm chính xác 100%</p>
+                <p><strong className="text-amber-300">Next Goal:</strong> Hoàn thành &ldquo;Chemistry Wizard&rdquo; (75% done)</p>
+                <p><strong className="text-cyan-300">Tip:</strong> Học đều đặn mỗi ngày để duy trì streak!</p>
+                <p><strong className="text-indigo-300">Challenge:</strong> Thử đạt &ldquo;Perfectionist&rdquo; bằng cách làm chính xác 100%</p>
               </div>
             </div>
           </div>
