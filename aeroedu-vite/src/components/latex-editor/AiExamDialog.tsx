@@ -41,19 +41,19 @@ const FORMATS: Array<{ value: ExamFormat; label: string; desc: string; badge?: s
 
 const GRADES = Array.from({ length: 7 }, (_, i) => i + 6) // Khối 6..12
 
-/* ── Dark palette giống LaTeX editor ── */
+/* ── Theme-aware palette (CSS vars auto-flip light/dark) ── */
 const D = {
-  overlay: 'rgba(0,0,0,0.72)',
-  bg: '#10111e',
-  bg2: '#161728',
-  border: '#1e2033',
-  border2: '#2a2b3d',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
-  purpleL: '#a78bfa',
-  green: '#16a34a',
-  greenL: '#4ade80',
+  overlay: 'rgba(0,0,0,0.72)',           // backdrop giữ luôn semi-transparent đen
+  bg:      'var(--td-card)',             // modal body bg
+  bg2:     'var(--td-card2)',            // input/option bg
+  border:  'var(--td-border)',
+  border2: 'var(--td-border2)',
+  text:    'var(--td-text)',
+  muted:   'var(--td-muted)',
+  purple:  'var(--td-purple)',
+  purpleL: 'var(--td-purple-l)',
+  green:   '#16a34a',                    // accent giữ
+  greenL:  '#4ade80',
 } as const
 
 interface AiExamDialogProps {
