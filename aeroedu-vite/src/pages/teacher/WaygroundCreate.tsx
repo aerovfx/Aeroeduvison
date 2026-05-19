@@ -24,6 +24,8 @@ import {
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import BuffaloRunner from '@/components/games/BuffaloRunner'
+import { TeacherHelpDrawer } from '@/components/help/TeacherHelpDrawer'
+import { HelpTooltip } from '@/components/help/HelpTooltip'
 
 // ── Theme tokens ──────────────────────────────────────────────
 // Dùng CSS variable từ design system AI Native (xem index.css) để page
@@ -213,6 +215,9 @@ export default function WaygroundCreatePage() {
   // ─────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: D.bg, color: D.text }}>
+
+      {/* Help drawer + FAB tự động hiển thị nút "Hướng dẫn" góc dưới phải */}
+      <TeacherHelpDrawer moduleKey="taodethi" />
 
       {/* Header */}
       <div style={{
@@ -443,11 +448,11 @@ export default function WaygroundCreatePage() {
                 <NativeSelect value={grade} onChange={setGrade}
                   options={['6','7','8','9','10','11','12']} suffix=" — Khối" />
               </Row>
-              <Row label="Ngôn ngữ đầu ra">
+              <Row label="Ngôn ngữ đầu ra" tipKey="language">
                 <NativeSelect value={language} onChange={setLanguage}
                   options={['Vietnamese', 'English']} />
               </Row>
-              <Row label="Thời gian (phút)">
+              <Row label="Thời gian (phút)" tipKey="duration">
                 <NativeSelect value={String(duration)} onChange={v => setDuration(Number(v))}
                   options={['15','30','45','60','90','120']} suffix=" phút" />
               </Row>
@@ -578,13 +583,20 @@ const inputCss: React.CSSProperties = {
   color: D.text, fontSize: 14, padding: '10px 12px',
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children, tipKey }: {
+  label: string
+  children: React.ReactNode
+  tipKey?: string
+}) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 16,
       borderBottom: `1px solid ${D.border}`, padding: '4px 14px', minHeight: 48,
     }}>
-      <span style={{ width: 160, color: D.muted, fontSize: 13 }}>{label}</span>
+      <span style={{ width: 160, color: D.muted, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {label}
+        {tipKey && <HelpTooltip moduleKey="taodethi" tipKey={tipKey} iconSize={13} />}
+      </span>
       {children}
     </div>
   )

@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
+import { TeacherHelpDrawer } from '@/components/help/TeacherHelpDrawer'
 
 // ── Dark palette ──────────────────────────────────────────────
 const D = {
@@ -217,6 +218,8 @@ export default function ExamsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg }}>
+      {/* Floating help button — opens drawer với hướng dẫn module này */}
+      <TeacherHelpDrawer moduleKey="exams-list" />
 
       {/* ── Top bar ─────────────────────────────────────────── */}
       <div style={{ background: D.card, borderBottom: `1px solid ${D.border}` }} className="sticky top-0 z-10">
