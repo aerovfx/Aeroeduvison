@@ -614,9 +614,10 @@ export default function ExamGrading() {
         {activeTab === "answerkey" && (
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,_1fr)_minmax(520px,_1fr)] gap-5">
 
-            {/* ═══ CỘT TRÁI: PDF tham chiếu (sticky on desktop) ═══ */}
+            {/* ═══ CỘT TRÁI: PDF tham chiếu (sticky on desktop) ═══
+                storageKey="exam-grading-ref" → PDF persist qua F5 trong IndexedDB */}
             <div className="lg:sticky lg:top-24 lg:self-start" style={{ height: 'calc(100vh - 8rem)' }}>
-              <PdfRefViewer hint="đề thi gốc" />
+              <PdfRefViewer hint="đề thi gốc" storageKey="exam-grading-ref" />
             </div>
 
             {/* ═══ CỘT PHẢI: Form nhập đáp án ═══ */}
