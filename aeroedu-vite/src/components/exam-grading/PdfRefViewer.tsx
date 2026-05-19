@@ -4,17 +4,21 @@
  * Dùng trong /teacher/exam-grading tab "① Nhập đáp án":
  *   - GV upload file PDF đề thi
  *   - Display ở bên trái (sticky) để vừa xem đề vừa điền đáp án bên phải
- *   - Hỗ trợ zoom, fullscreen, đổi file
+ *   - Hỗ trợ zoom (in/out + preset levels + fit), fullscreen, đổi file
  *
  * Stack: native iframe (browser PDF viewer) — không cần PDF.js dep.
  *   Pros: zero deps, hoạt động trên Chrome/Edge/Safari/Firefox
  *   Cons: không tùy biến UI nhiều (browser quản render)
  *
+ * Zoom mechanism: dùng URL fragment `#zoom=NNN` mà PDFium (Chrome/Edge)
+ * + PDF.js (Firefox) hỗ trợ. Mỗi lần đổi zoom sẽ reload iframe.
+ *
  * State: lưu Blob URL trong useState. Cleanup URL khi unmount.
  */
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   Upload, X, Maximize2, Minimize2, FileText, ExternalLink, RotateCw,
+  ZoomIn, ZoomOut,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -25,6 +29,11 @@ interface Props {
   compact?: boolean
 }
 
+// Preset zoom levels — discrete steps để [+] [-] step qua dễ
+// 'page-width' / 'page-fit' là keyword PDFium/PDF.js hiểu trực tiếp
+type ZoomLevel = number | 'page-width' | 'page-fit'
+const ZOOM_PRESETS: ZoomLevel[] = [50, 75, 100, 125, 150, 200, 300]
+
 export function PdfRefViewer({ hint = 'đề thi PDF', compact = false }: Props) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string>('')
@@ -32,6 +41,7 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false }: Props)
   const [fullscreen, setFullscreen] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)  // bump để force reload iframe
+  const [zoom, setZoom] = useState<ZoomLevel>('page-width')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Cleanup blob URL khi unmount hoặc đổi file
@@ -73,6 +83,42 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false }: Props)
 
   const reloadPdf = () => setIframeKey(k => k + 1)
 
+  /* Zoom helpers — dùng để map [+] / [-] qua preset numeric levels.
+     Chỉ áp dụng khi zoom hiện tại là số; nếu đang là 'page-width' /
+     'page-fit' thì step vào preset gần 100% nhất. */
+  const zoomIn = () => {
+    setZoom(prev => {
+      const current = typeof prev === 'number' ? prev : 100
+      const next = ZOOM_PRESETS.find(z => typeof z === 'number' && z > current) as number | undefined
+      return next ?? ZOOM_PRESETS[ZOOM_PRESETS.length - 1] // max 300%
+    })
+  }
+  const zoomOut = () => {
+    setZoom(prev => {
+      const current = typeof prev === 'number' ? prev : 100
+      // Find largest preset < current
+      const numericPresets = ZOOM_PRESETS.filter((z): z is number => typeof z === 'number')
+      const candidates = numericPresets.filter(z => z < current)
+      return candidates.length > 0 ? candidates[candidates.length - 1] : numericPresets[0] // min 50%
+    })
+  }
+
+  /* Build iframe src với fragment `#zoom=` — Chrome/Edge dùng PDFium,
+     Firefox dùng PDF.js, cả 2 đều hiểu syntax này. Safari có thể
+     không support — sẽ degrade về default zoom. */
+  const iframeSrc = useMemo(() => {
+    if (!pdfUrl) return ''
+    const zoomStr = typeof zoom === 'number' ? String(zoom) : zoom
+    return `${pdfUrl}#zoom=${zoomStr}`
+  }, [pdfUrl, zoom])
+
+  /* Khi zoom thay đổi, force reload iframe để fragment được áp dụng
+     (một số browser không re-render khi chỉ hash đổi). */
+  useEffect(() => {
+    if (pdfUrl) setIframeKey(k => k + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom])
+
   // Esc đóng fullscreen
   useEffect(() => {
     if (!fullscreen) return
@@ -110,6 +156,42 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false }: Props)
         </div>
         {pdfUrl && (
           <>
+            {/* ── Zoom controls ───────────────────────────────────── */}
+            <div className="flex items-center gap-0.5 rounded-md border bg-background px-0.5">
+              <button
+                onClick={zoomOut}
+                title="Thu nhỏ (zoom out)"
+                disabled={typeof zoom === 'number' && zoom <= 50}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <select
+                value={String(zoom)}
+                onChange={e => {
+                  const v = e.target.value
+                  setZoom(v === 'page-width' || v === 'page-fit' ? v : Number(v))
+                }}
+                title="Mức phóng to"
+                className="text-[11px] font-semibold bg-transparent border-none focus:outline-none cursor-pointer text-foreground px-1 py-0.5"
+                style={{ minWidth: 60 }}
+              >
+                <option value="page-width">Vừa rộng</option>
+                <option value="page-fit">Vừa trang</option>
+                {ZOOM_PRESETS.filter(z => typeof z === 'number').map(z => (
+                  <option key={z} value={z}>{z}%</option>
+                ))}
+              </select>
+              <button
+                onClick={zoomIn}
+                title="Phóng to (zoom in)"
+                disabled={typeof zoom === 'number' && zoom >= 300}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <button
               onClick={reloadPdf}
               title="Tải lại"
@@ -165,7 +247,7 @@ export function PdfRefViewer({ hint = 'đề thi PDF', compact = false }: Props)
         {pdfUrl ? (
           <iframe
             key={iframeKey}
-            src={pdfUrl}
+            src={iframeSrc}
             title="Đề thi PDF"
             className="w-full h-full"
             style={{ border: 'none', minHeight: compact ? 400 : 600 }}
