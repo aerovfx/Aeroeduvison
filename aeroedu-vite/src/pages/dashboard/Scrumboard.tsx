@@ -137,7 +137,7 @@ function TaskCard({
       draggable
       onDragStart={e => onDragStart(e, task.id, colKey)}
       onDragEnd={onDragEnd}
-      className={`rounded-xl border bg-[hsl(225,15%,12%)] border-white/[0.08] p-3.5 cursor-grab active:cursor-grabbing transition-all ${dragging ? 'opacity-40 scale-95' : 'hover:border-white/15 hover:bg-[hsl(225,15%,13%)]'}`}
+      className={`rounded-xl border bg-card border-white/[0.08] p-3.5 cursor-grab active:cursor-grabbing transition-all ${dragging ? 'opacity-40 scale-95' : 'hover:border-white/15 hover:bg-card2'}`}
     >
       {/* Top row */}
       <div className="flex items-start gap-2 mb-2">
@@ -151,7 +151,7 @@ function TaskCard({
             <MoreHorizontal className="w-3.5 h-3.5" />
           </button>
           {menu && (
-            <div className="absolute right-0 top-6 z-20 w-40 bg-[hsl(225,15%,13%)] border border-white/10 rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute right-0 top-6 z-20 w-40 bg-card2 border border-white/10 rounded-xl shadow-xl overflow-hidden">
               <button onClick={() => { onEdit(task); setMenu(false) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] transition-colors">
                 <Edit3 className="w-3.5 h-3.5" /> Chỉnh sửa
               </button>
@@ -240,7 +240,7 @@ function TaskModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[hsl(225,15%,11%)] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-card border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
           <h2 className="font-bold text-white/90">{initial ? 'Chỉnh sửa task' : 'Tạo task mới'}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/[0.06] text-white/40 hover:text-white/70 transition-colors"><X className="w-4 h-4" /></button>
@@ -400,7 +400,7 @@ export default function ScrumboardPage() {
   }, [columns])
 
   return (
-    <div className="min-h-screen bg-[hsl(225,15%,8%)] text-white">
+    <div className="min-h-screen bg-background text-white">
       <div className="px-4 py-6 max-w-screen-xl mx-auto">
 
         {/* ── Header ─────────────────────────────────────────────── */}
@@ -442,7 +442,7 @@ export default function ScrumboardPage() {
                 onDragOver={e => { e.preventDefault(); setDragOver(colDef.key) }}
                 onDragLeave={() => setDragOver(null)}
                 onDrop={() => handleDrop(colDef.key)}
-                className={`rounded-2xl border bg-[hsl(225,15%,10%)] border-white/[0.07] border-t-2 ${colDef.color} transition-all ${isOver ? 'ring-1 ring-violet-500/40 bg-[hsl(225,15%,12%)]' : ''}`}
+                className={`rounded-2xl border bg-card border-white/[0.07] border-t-2 ${colDef.color} transition-all ${isOver ? 'ring-1 ring-violet-500/40 bg-card' : ''}`}
               >
                 {/* Col header */}
                 <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.05]">
@@ -495,7 +495,7 @@ export default function ScrumboardPage() {
 
         {/* ── Progress bar ────────────────────────────────────────── */}
         {stats.total > 0 && (
-          <div className="mt-6 p-4 rounded-2xl border border-white/[0.06] bg-[hsl(225,15%,10%)]">
+          <div className="mt-6 p-4 rounded-2xl border border-white/[0.06] bg-card">
             <div className="flex items-center justify-between mb-2 text-xs">
               <span className="text-white/40">Tiến độ tổng thể</span>
               <span className="text-emerald-400 font-semibold">{Math.round(stats.done / stats.total * 100)}%</span>

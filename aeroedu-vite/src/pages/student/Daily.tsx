@@ -171,7 +171,7 @@ export default function StudentDailyPage() {
   const hasOnboardedSubject = !!onboardingPrefs?.subject
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 pb-12">
+    <div className="min-h-screen bg-background text-foreground pb-12">
       {/* RS-Phase 10: cold-start onboarding modal */}
       {showOnboarding && (
         <OnboardingModal
@@ -181,17 +181,17 @@ export default function StudentDailyPage() {
       )}
       {/* Header */}
       <header
-        className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"
+        className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border"
         style={{ paddingTop: 'env(safe-area-inset-top, 0)' }}
       >
         <div className="px-4 py-3 flex items-center gap-3 max-w-5xl mx-auto">
-          <Link to="/student/dashboard" className="text-zinc-400 hover:text-zinc-100 p-1">
+          <Link to="/student/dashboard" className="text-muted-foreground hover:text-foreground p-1">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <Clock className="w-5 h-5 text-cyan-400 shrink-0" />
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold leading-tight">Kế hoạch hôm nay</h1>
-            <p className="text-[10px] text-zinc-500 leading-tight">
+            <p className="text-[10px] text-muted-foreground leading-tight">
               {totalItems} việc cần làm
               {doneCount > 0 && (
                 <span className="text-emerald-400"> · ✓ {doneCount} đã xong</span>
@@ -202,7 +202,7 @@ export default function StudentDailyPage() {
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 disabled:opacity-50"
+            className="p-2 rounded-lg bg-card2 hover:bg-zinc-700 text-foreground/80 disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
@@ -212,7 +212,7 @@ export default function StudentDailyPage() {
       <main className="max-w-5xl mx-auto px-4 py-4 space-y-5">
         {/* Greeting theo giờ — UX cá nhân hoá nhẹ */}
         {!isLoading && totalItems > 0 && (
-          <div className="flex items-center gap-2 text-zinc-300 text-sm font-medium px-1">
+          <div className="flex items-center gap-2 text-foreground/80 text-sm font-medium px-1">
             <span className="text-xl">{greeting.emoji}</span>
             <span>{greeting.text}.</span>
           </div>
@@ -229,7 +229,7 @@ export default function StudentDailyPage() {
                     ? `Gợi ý cá nhân hoá cho môn ${onboardingPrefs?.subject}`
                     : 'Chào mừng bạn đến với inphysic!'}
                 </p>
-                <p className="text-xs text-zinc-400 leading-snug">
+                <p className="text-xs text-muted-foreground leading-snug">
                   {hasOnboardedSubject
                     ? <>AI đã filter gợi ý theo sở thích bạn đã chọn. Làm vài bài để hệ thống học thêm về bạn. <button onClick={() => setShowOnboarding(true)} className="text-amber-300 underline">Đổi sở thích</button></>
                     : <>Bạn còn mới — dưới đây là những gợi ý khởi đầu. Làm vài bài để hệ thống hiểu sở thích và đưa gợi ý chính xác hơn. <button onClick={() => setShowOnboarding(true)} className="text-amber-300 underline">Cá nhân hoá ngay →</button></>}
@@ -242,7 +242,7 @@ export default function StudentDailyPage() {
         {isLoading && (
           <div className="text-center py-16">
             <Loader2 className="w-8 h-8 animate-spin mx-auto text-cyan-400" />
-            <p className="text-sm text-zinc-500 mt-3">Đang lên kế hoạch cho bạn…</p>
+            <p className="text-sm text-muted-foreground mt-3">Đang lên kế hoạch cho bạn…</p>
           </div>
         )}
 
@@ -253,7 +253,7 @@ export default function StudentDailyPage() {
             <p className="text-base font-bold text-emerald-300 mb-1">
               Hoàn thành kế hoạch hôm nay!
             </p>
-            <p className="text-xs text-zinc-400 mb-5">
+            <p className="text-xs text-muted-foreground mb-5">
               Bạn vừa làm xong {doneCount} việc. Quay lại mai để có gợi ý mới
               từ AI dựa trên tiến độ của bạn nhé ✨
             </p>
@@ -266,7 +266,7 @@ export default function StudentDailyPage() {
               </button>
               <button
                 onClick={() => navigate('/student/for-you')}
-                className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 border border-zinc-700 text-sm font-bold"
+                className="px-4 py-2 rounded-lg bg-card2 text-zinc-200 border border-border text-sm font-bold"
               >
                 Khám phá thêm
               </button>
@@ -278,7 +278,7 @@ export default function StudentDailyPage() {
           <div className="text-center py-16 px-4">
             <Sparkles className="w-12 h-12 mx-auto text-zinc-600 mb-3" />
             <p className="text-sm font-semibold mb-1">Chưa có gợi ý nào</p>
-            <p className="text-xs text-zinc-500 mb-6">
+            <p className="text-xs text-muted-foreground mb-6">
               Sau khi bạn làm vài bài hoặc tự khảo sát Knowledge Graph, hệ thống
               sẽ phân tích và đưa kế hoạch học cá nhân hoá.
             </p>
@@ -302,7 +302,7 @@ export default function StudentDailyPage() {
                   <a
                     key={sec.id}
                     href={`#${sec.id}`}
-                    className="block p-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition"
+                    className="block p-3 rounded-xl bg-card border border-border hover:border-border transition"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <Icon className="w-4 h-4 shrink-0" style={{ color: sec.accent }} />
@@ -325,17 +325,17 @@ export default function StudentDailyPage() {
                 <section
                   key={sec.id}
                   id={sec.id}
-                  className="rounded-2xl bg-zinc-900 border border-zinc-800 overflow-hidden"
+                  className="rounded-2xl bg-card border border-border overflow-hidden"
                   style={{ borderLeftWidth: 3, borderLeftColor: sec.accent }}
                 >
-                  <div className="px-4 py-3 border-b border-zinc-800 flex items-center gap-2">
+                  <div className="px-4 py-3 border-b border-border flex items-center gap-2">
                     <Icon className="w-5 h-5 shrink-0" style={{ color: sec.accent }} />
                     <div className="flex-1 min-w-0">
                       <h2 className="font-bold text-sm" style={{ color: sec.accent }}>
                         {sec.title}
-                        <span className="ml-2 text-[10px] text-zinc-500 font-normal">{items.length}</span>
+                        <span className="ml-2 text-[10px] text-muted-foreground font-normal">{items.length}</span>
                       </h2>
-                      <p className="text-[11px] text-zinc-500 leading-tight">{sec.description}</p>
+                      <p className="text-[11px] text-muted-foreground leading-tight">{sec.description}</p>
                     </div>
                   </div>
                   <div className="divide-y divide-zinc-800/60">
@@ -364,16 +364,16 @@ export default function StudentDailyPage() {
                             {meta.emoji}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-zinc-100 leading-tight line-clamp-1">
+                            <p className="text-sm font-semibold text-foreground leading-tight line-clamp-1">
                               {item.title}
                             </p>
                             {item.subtitle && (
-                              <p className="text-xs text-zinc-400 leading-snug line-clamp-1 mt-0.5">
+                              <p className="text-xs text-muted-foreground leading-snug line-clamp-1 mt-0.5">
                                 {item.subtitle}
                               </p>
                             )}
                             {item.description && (
-                              <p className="text-[11px] text-zinc-500 leading-snug line-clamp-2 mt-1">
+                              <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2 mt-1">
                                 {item.description}
                               </p>
                             )}
@@ -386,7 +386,7 @@ export default function StudentDailyPage() {
                                   </span>
                                 )}
                                 {item.hydration.estimatedMinutes && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500">
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
                                     <Clock className="w-3 h-3" /> ~{item.hydration.estimatedMinutes}p
                                   </span>
                                 )}
@@ -408,7 +408,7 @@ export default function StudentDailyPage() {
                                 {item.reasons?.slice(0, 2).map((r, i) => (
                                   <span
                                     key={i}
-                                    className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/60 text-zinc-400"
+                                    className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/60 text-muted-foreground"
                                   >
                                     {r}
                                   </span>
@@ -428,7 +428,7 @@ export default function StudentDailyPage() {
                               onClick={(e) => handleDone(item, e)}
                               title="Đánh dấu đã làm xong"
                               aria-label="Đánh dấu hoàn thành"
-                              className="p-1.5 rounded-md text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition"
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-emerald-400 hover:bg-emerald-500/10 transition"
                             >
                               <CheckCircle2 className="w-4 h-4" />
                             </button>
@@ -463,13 +463,13 @@ export default function StudentDailyPage() {
                       <p className="text-xs font-bold text-emerald-300">
                         {doneCount}/{doneCount + totalItems} hoàn thành
                       </p>
-                      <p className="text-[10px] text-zinc-500">
+                      <p className="text-[10px] text-muted-foreground">
                         {Math.round((doneCount / (doneCount + totalItems)) * 100)}% kế hoạch hôm nay
                       </p>
                     </div>
                   </div>
                   <div className="flex-1 max-w-[140px]">
-                    <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
+                    <div className="h-2 rounded-full bg-card2 overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 transition-all duration-500"
                         style={{ width: `${Math.round((doneCount / (doneCount + totalItems)) * 100)}%` }}

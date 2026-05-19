@@ -15,8 +15,18 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `641d846` (revision pixiai-00337-boj, 2026-05-19 — QR/Link invite HS vào lớp + GV xác thực)
-- Commits since last deploy: `0/5` (reset sau batch 5 commits KG/UI/camera/invite)
+- Last deployed commit: `eaebddd` (revision pixiai-00345-som, 2026-05-19 — ExamReports báo cáo trên cùng, list dưới)
+- Commits since last deploy: `0/5`
+- Prev: `1e4415c` → pixiai-00344-xum (ExamReports card list view)
+- Prev: `d8e8038` → pixiai-00344-xum (Question Bank taxonomy + Fix LaTeX — same deploy)
+- Prev: `59568d6` → pixiai-00343-wef (ExamDetail drag-drop ngân hàng đề + AiExamDialog light mode)
+- Prev: `2853256` → pixiai-00343-wef (ExamDetail: kéo-thả + multi-select add câu từ ngân hàng — included in same deploy)
+- Prev: `785afda` → pixiai-00342-yat (StudentRequests light mode aware)
+- Prev: `1d2a269` → pixiai-00341-lor (CreateExam light mode)
+- Prev: `67f72a7` → pixiai-00340-jep (Camera wall/topbar/right-panel theme-aware)
+- Prev: `5c176c7` → pixiai-00339-cay (React #310 crash fix + QuestionBank dark cards)
+- Prev: `406b884` → pixiai-00338-xek (16 teacher pages light-mode aware qua CSS variables --td-*)
+- Prev: `641d846` → pixiai-00337-boj (QR/Link invite HS vào lớp + GV xác thực)
 - Prev: `4dc4572` → pixiai-00337-boj (Camera permission + webcam HS làm bài — included in same deploy)
 - Prev: `55091b9` → pixiai-00337-boj (Light mode contrast — included in same deploy)
 - Prev: `9bab5c1` → pixiai-00337-boj (Learning Path: nút Tạo Module lên top — included in same deploy)

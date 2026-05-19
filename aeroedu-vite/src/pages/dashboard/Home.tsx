@@ -322,7 +322,7 @@ function SkillDetailModal({ skill, onClose }: { skill: SkillDetail; onClose: () 
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-[hsl(225,15%,9%)] shadow-[0_0_60px_rgba(120,100,255,0.1)] custom-scrollbar"
+        className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl border border-white/[0.08] bg-background shadow-[0_0_60px_rgba(120,100,255,0.1)] custom-scrollbar"
         onClick={e => e.stopPropagation()}
       >
         <div className="p-6">

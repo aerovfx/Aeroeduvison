@@ -396,7 +396,7 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
               </div>
 
               {last ? (
-                <div className="rounded-lg border border-slate-800/80 bg-slate-900/40 p-2.5 space-y-1">
+                <div className="rounded-lg border border-border bg-card2/60 p-2.5 space-y-1">
                   <div className="flex items-center justify-between text-[11px] text-slate-400">
                     <span className="flex items-center gap-1">
                       <History className="w-3 h-3" />
@@ -409,13 +409,13 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
                   <p className="text-sm text-slate-200 line-clamp-1">
                     {last.title || actionLabel(last.action)}
                   </p>
-                  <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
                     {completedCount > 0 && <span>✓ {completedCount} bài đã xong</span>}
                     {quizCount > 0 && <span>📝 {quizCount} lần làm quiz</span>}
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-slate-800/70 bg-slate-900/20 p-2.5 text-[11px] text-slate-500 italic">
+                <div className="rounded-lg border border-dashed border-border bg-card2/30 p-2.5 text-[11px] text-muted-foreground italic">
                   Chưa bắt đầu học khoá này.
                 </div>
               )}
@@ -444,7 +444,7 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
               </button>
 
               {isExpanded && (
-                <div className="rounded-lg bg-slate-950/60 border border-slate-800 p-3 max-h-64 overflow-y-auto">
+                <div className="rounded-lg bg-background/80 border border-border p-3 max-h-64 overflow-y-auto">
                   <CourseHistoryTimeline courseId={course.id} compact limit={20} />
                 </div>
               )}
@@ -598,9 +598,9 @@ function EnrollmentsTab({ enrollments }: { enrollments: Enrollment[] }) {
                 </Link>
                 <p className="text-xs text-slate-400 mt-0.5">
                   Giảng viên: {course.user?.name || '—'} ·{' '}
-                  <span className="text-slate-500">{course.lessons ?? '—'} bài</span>
+                  <span className="text-muted-foreground">{course.lessons ?? '—'} bài</span>
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-[11px] text-muted-foreground mt-0.5">
                   Đăng ký lúc: {fmtDateTime(createdAt)}
                 </p>
               </div>
@@ -611,12 +611,12 @@ function EnrollmentsTab({ enrollments }: { enrollments: Enrollment[] }) {
                 )}>
                   {price > 0 ? `${price.toLocaleString('vi-VN')} đ` : 'Miễn phí'}
                 </span>
-                <span className="text-[11px] text-slate-500">{fmtDate(createdAt)}</span>
+                <span className="text-[11px] text-muted-foreground">{fmtDate(createdAt)}</span>
               </div>
             </div>
           ))}
           {sorted.length === 0 && (
-            <div className="p-10 text-center text-sm text-slate-500">
+            <div className="p-10 text-center text-sm text-muted-foreground">
               Chưa có lịch sử đăng ký nào.
             </div>
           )}
@@ -720,9 +720,9 @@ function StatsTab({ enrollments }: { enrollments: Enrollment[] }) {
 
       {agg.coursesWithData === 0 && (
         <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-8 text-center">
-          <BarChart3 className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+          <BarChart3 className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
           <p className="text-slate-300 font-medium">Chưa có dữ liệu bài tập</p>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Hãy làm các bài kiểm tra trong khoá học — thống kê sẽ xuất hiện tại đây.
           </p>
         </div>
@@ -759,44 +759,44 @@ function CourseStatsCard({
           >
             {course.title}
           </Link>
-          <p className="text-[11px] text-slate-500 truncate">
+          <p className="text-[11px] text-muted-foreground truncate">
             {course.user?.name || 'AeroEduVision'}
           </p>
         </div>
       </div>
 
       {!hasData ? (
-        <div className="p-4 text-center text-xs text-slate-500 italic">
+        <div className="p-4 text-center text-xs text-muted-foreground italic">
           Chưa có bài tập nào được làm trong khoá này.
         </div>
       ) : (
         <div className="p-4 space-y-3">
           {/* KPI row */}
           <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="rounded-lg bg-slate-900/60 border border-slate-800 py-2">
+            <div className="rounded-lg bg-slate-900/60 border border-border py-2">
               <div className="text-sm font-bold text-cyan-300">{stats.totalAttempts}</div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Lần làm</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Lần làm</div>
             </div>
-            <div className="rounded-lg bg-slate-900/60 border border-slate-800 py-2">
+            <div className="rounded-lg bg-slate-900/60 border border-border py-2">
               <div className="text-sm font-bold text-emerald-300">
-                {stats.averageScore}<span className="text-slate-500 text-xs">/100</span>
+                {stats.averageScore}<span className="text-muted-foreground text-xs">/100</span>
               </div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Điểm TB</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Điểm TB</div>
             </div>
-            <div className="rounded-lg bg-slate-900/60 border border-slate-800 py-2">
+            <div className="rounded-lg bg-slate-900/60 border border-border py-2">
               <div className="text-sm font-bold text-amber-300">
-                {stats.bestScore}<span className="text-slate-500 text-xs">/100</span>
+                {stats.bestScore}<span className="text-muted-foreground text-xs">/100</span>
               </div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Cao nhất</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Cao nhất</div>
             </div>
-            <div className="rounded-lg bg-slate-900/60 border border-slate-800 py-2">
+            <div className="rounded-lg bg-slate-900/60 border border-border py-2">
               <div className={cn(
                 'text-sm font-bold',
                 passPct >= 70 ? 'text-emerald-300' : passPct >= 50 ? 'text-amber-300' : 'text-rose-300',
               )}>
                 {passPct}%
               </div>
-              <div className="text-[10px] text-slate-500 uppercase tracking-wider">Tỉ lệ đạt</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Tỉ lệ đạt</div>
             </div>
           </div>
 
@@ -813,7 +813,7 @@ function CourseStatsCard({
                       style={{ height: `${Math.max(h, v > 0 ? 6 : 2)}%` }}
                       title={`${v} lần`}
                     />
-                    <span className="text-[9px] text-slate-500 font-mono">
+                    <span className="text-[9px] text-muted-foreground font-mono">
                       {i * 20}-{(i + 1) * 20}
                     </span>
                   </div>
@@ -823,7 +823,7 @@ function CourseStatsCard({
           </div>
 
           {stats.lastAttemptAt && (
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-muted-foreground">
               Lần làm gần nhất: <span className="text-slate-300">{formatRelativeTime(stats.lastAttemptAt)}</span>
             </p>
           )}
@@ -962,11 +962,11 @@ function ReviewCard({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Chia sẻ cảm nhận của bạn về khoá học (tối thiểu 5 ký tự)…"
         rows={3}
-        className="w-full rounded-lg bg-slate-900/60 border border-slate-800 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-purple-500/60"
+        className="w-full rounded-lg bg-slate-900/60 border border-border px-3 py-2 text-sm text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60"
       />
 
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[11px] text-slate-500">
+        <div className="text-[11px] text-muted-foreground">
           {comment.length} ký tự
           {comment.trim().length < 5 && comment.length > 0 && (
             <span className="ml-2 text-rose-400">Cần ≥5 ký tự</span>

@@ -28,18 +28,24 @@ import { QuickScanQr } from '@/components/common/QuickScanQr'
 import usePageTitle from '@/hooks/usePageTitle'
 import { recommendationService as rs } from '@/services/recommendation.service'
 
+// Theme-aware palette via CSS vars (auto light/dark switching)
 const D = {
-  bg: '#0d0e17',
-  card: '#10111e',
-  card2: '#161728',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
-  purpleL: '#a78bfa',
-  indigo: '#818cf8',
-  cyan: '#22d3ee',
-}
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  purple:      'var(--td-purple)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  blue:        'var(--td-blue)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+} as const
 
 // ── Types khớp với /api/student/exam-rooms response ───────────
 interface LeaderboardEntry {
@@ -80,7 +86,7 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string; label: string }> = {
     draft:     { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6', label: '📅 Sắp tới' },
     active:    { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: '🟢 Đang mở' },
-    completed: { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', label: '✅ Kết thúc' },
+    completed: { bg: 'rgba(148,163,184,0.12)', color: 'var(--td-muted)', label: '✅ Kết thúc' },
     cancelled: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: '❌ Huỷ' },
   }
   const s = map[status] || { bg: 'rgba(148,163,184,0.1)', color: D.muted, label: status }

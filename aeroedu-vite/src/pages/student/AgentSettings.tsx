@@ -3,16 +3,24 @@ import { Settings, Brain, Calendar, Save, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
 
+// Theme-aware palette via CSS vars (auto light/dark switching)
 const D = {
-  bg: '#0d0e17',
-  card: '#10111e',
-  card2: '#161728',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
-  purpleL: '#a78bfa',
-}
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  purple:      'var(--td-purple)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  blue:        'var(--td-blue)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+} as const
 
 const DEFAULT_AI_TUTOR = {
   explanationDepth: 'medium',

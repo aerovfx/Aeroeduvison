@@ -738,7 +738,7 @@ export default function KnowledgeGraph() {
               className="w-full sm:w-64 pl-9 pr-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-cyan-400/50"
             />
             {searchOpen && (searchResults.length > 0 || searching) && (
-              <div className="absolute top-full mt-1 right-0 left-0 sm:left-auto sm:w-80 bg-[#0d0e17] border border-white/15 rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
+              <div className="absolute top-full mt-1 right-0 left-0 sm:left-auto sm:w-80 bg-background border border-white/15 rounded-lg shadow-xl overflow-hidden max-h-80 overflow-y-auto z-50">
                 {searching && (
                   <div className="px-3 py-2 text-xs text-slate-400 flex items-center gap-2">
                     <Loader2 className="w-3 h-3 animate-spin" /> Đang tìm…

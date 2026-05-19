@@ -581,7 +581,7 @@ function MiniDeckShowcase({ onUseTemplate }: { onUseTemplate: (t: Template) => v
           <ChevronRight className={`w-4 h-4 transition-transform ${codeOpen ? 'rotate-90' : ''}`} />
         </button>
         {codeOpen && (
-          <pre className="bg-[#0d0d1a] border border-white/10 rounded-lg p-4 text-[11px] text-white/80 font-mono overflow-x-auto mb-3 leading-relaxed">
+          <pre className="bg-background border border-white/10 rounded-lg p-4 text-[11px] text-white/80 font-mono overflow-x-auto mb-3 leading-relaxed">
             <code>{MINIDECK_CODE_SAMPLE}</code>
           </pre>
         )}
@@ -674,7 +674,7 @@ function ProjectMenu({ project, onDelete }: { project: STEMProject; onDelete: ()
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 w-44 rounded-xl border border-white/[0.08] bg-[hsl(260,30%,10%)] shadow-xl z-20 py-1">
+          <div className="absolute right-0 top-8 w-44 rounded-xl border border-white/[0.08] bg-card shadow-xl z-20 py-1">
             <p className="px-3 py-1.5 text-[0.65rem] uppercase tracking-wider text-white/25 font-semibold">Hành động</p>
             <Link to={`/dashboard/stem/${project.id}`} onClick={() => setOpen(false)}
               className="flex items-center gap-2 px-3 py-2 text-sm text-white/60 hover:text-white/90 hover:bg-white/[0.05] transition-colors">
@@ -1855,7 +1855,7 @@ export default function StemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[hsl(260,30%,8%)] p-6">
+    <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto">
 
         {/* Header */}

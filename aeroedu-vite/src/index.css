@@ -1041,8 +1041,19 @@ html:not(.dark) .bg-slate-200\/20  { background-color: rgba(0,0,0,0.04) !importa
 html:not(.dark) .bg-zinc-800\/90   { background-color: rgba(255,255,255,0.90) !important; }
 html:not(.dark) .bg-zinc-900\/30   { background-color: rgba(255,255,255,0.70) !important; }
 html:not(.dark) .bg-zinc-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-zinc-950\/95   { background-color: rgba(255,255,255,0.95) !important; }
 html:not(.dark) .bg-gray-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
 html:not(.dark) .bg-gray-800\/50   { background-color: rgba(255,255,255,0.75) !important; }
+
+/* 2026-05-19: Student pages (Daily, MyCourses, Career, ForYou) thường
+ * dùng slate-900/40, slate-900/20 — bổ sung overrides cho 4 variants
+ * còn thiếu. */
+html:not(.dark) .bg-slate-900\/40  { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-slate-900\/20  { background-color: rgba(255,255,255,0.50) !important; }
+html:not(.dark) .bg-slate-900\/30  { background-color: rgba(255,255,255,0.60) !important; }
+html:not(.dark) .bg-slate-900\/10  { background-color: rgba(0,0,0,0.03) !important; }
+html:not(.dark) .bg-zinc-800\/40   { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-zinc-800\/60   { background-color: rgba(255,255,255,0.80) !important; }
 
 /* ── Additional border dark shades (500-600, 900) ────────────── */
 html:not(.dark) .border-slate-600  { border-color: hsl(var(--border)) !important; }

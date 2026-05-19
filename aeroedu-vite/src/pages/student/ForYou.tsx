@@ -257,17 +257,17 @@ export default function ForYouPage() {
                 return `${Math.floor(hr / 24)}d trước`
               })()
               const actionMeta: Record<string, { emoji: string; color: string; label: string }> = {
-                'view':         { emoji: '👀', color: '#94a3b8', label: 'Xem' },
+                'view':         { emoji: '👀', color: 'var(--td-muted)', label: 'Xem' },
                 'click':        { emoji: '👆', color: '#22d3ee', label: 'Click' },
                 'complete':     { emoji: '✅', color: '#10b981', label: 'Hoàn thành' },
                 'pass_quiz':    { emoji: '🏆', color: '#fbbf24', label: 'Đạt' },
                 'fail_quiz':    { emoji: '😕', color: '#f43f5e', label: 'Chưa đạt' },
-                'not_interested':{ emoji: '🚫', color: '#94a3b8', label: 'Không quan tâm' },
+                'not_interested':{ emoji: '🚫', color: 'var(--td-muted)', label: 'Không quan tâm' },
                 'dwell_30s':    { emoji: '⏱', color: '#a855f7', label: 'Đọc lâu' },
                 'like':         { emoji: '❤️', color: '#ec4899', label: 'Thích' },
                 'save':         { emoji: '🔖', color: '#3b82f6', label: 'Lưu' },
               }
-              const m = actionMeta[h.action] || { emoji: '📌', color: '#94a3b8', label: h.action }
+              const m = actionMeta[h.action] || { emoji: '📌', color: 'var(--td-muted)', label: h.action }
               const targetLabel = h.metadata?.title || h.metadata?.label
                 || h.metadata?.subject || h.targetId
               return (
