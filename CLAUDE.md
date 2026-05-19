@@ -15,8 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `8dded66` (revision pixiai-00328-pux, 2026-05-19 — AI Dashboard: cards lớp tôi quản lí + filter theo lớp)
-- Commits since last deploy: `0/5` (reset sau feature class filter)
+- Last deployed commit: `0b3989f` (revision pixiai-00330-lak, 2026-05-19 — Transcript đa ngôn ngữ + Claude API auto-translate 6 ngôn ngữ)
+- Commits since last deploy: `0/5` (reset sau feature transcript)
+- Prev: `15eadcf` → pixiai-00329-yec (Course player Udemy-style: section grouping + collapsible + progress badge)
+- Prev: `8dded66` → pixiai-00328-pux (AI Dashboard: cards lớp tôi quản lí + filter theo lớp)
 - Prev: `2e22a01` → pixiai-00327-xos (KG role-aware: HS/GV/Admin bộ não cá nhân + class mastery + workflow snapshots)
 - Prev: `f345a32` → pixiai-00326-qaj (Mobile LMS fix: overlay false-positive + drawer sidebar + 44px touch)
 - Prev: `2f4c3a4` → pixiai-00325-luy (RHF values: form không bị xoá + description video)
