@@ -80,13 +80,13 @@ export default function CareerGamesPage() {
   }, [searchQuery])
 
   return (
-    <div id="career-games-scroll" className="min-h-screen bg-zinc-950 text-zinc-100 pb-12 overflow-auto">
+    <div id="career-games-scroll" className="min-h-screen bg-background text-foreground pb-12 overflow-auto">
       <ScrollToTopButton containerSelector="#career-games-scroll" />
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur border-b border-zinc-800"
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border"
         style={{ paddingTop: 'env(safe-area-inset-top, 0)' }}>
         <div className="px-4 py-3 flex items-center gap-3 max-w-5xl mx-auto">
-          <Link to="/student/career" className="text-zinc-400 hover:text-zinc-100 p-1">
+          <Link to="/student/career" className="text-zinc-400 hover:text-foreground p-1">
             <ChevronLeft className="w-4 h-4" />
           </Link>
           <Gamepad2 className="w-5 h-5 text-amber-300 shrink-0" />
@@ -108,7 +108,7 @@ export default function CareerGamesPage() {
         {/* Pixel Agent — career picker + sim */}
         <section className="space-y-3">
           <div className="px-1">
-            <h2 className="text-sm font-bold text-zinc-100 mb-1">🤖 Pixel Agent — Mô phỏng 1 ngày</h2>
+            <h2 className="text-sm font-bold text-foreground mb-1">🤖 Pixel Agent — Mô phỏng 1 ngày</h2>
             <p className="text-[11px] text-zinc-500">
               Chọn 1 nghề để xem character làm 1 ngày làm việc điển hình.
             </p>
@@ -123,8 +123,8 @@ export default function CareerGamesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Tìm nghề (vd: bác sĩ, IT, sáng tạo)..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-zinc-800/60 border border-zinc-700
-                           text-xs text-zinc-100 placeholder:text-zinc-500
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-zinc-800/60 border border-border
+                           text-xs text-foreground placeholder:text-zinc-500
                            focus:outline-none focus:border-cyan-400/50"
               />
             </div>
@@ -144,7 +144,7 @@ export default function CareerGamesPage() {
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold border transition ${
                     c.id === selectedCareerId
                       ? 'bg-cyan-500/25 border-cyan-400 text-cyan-100'
-                      : 'bg-zinc-800/50 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                      : 'bg-zinc-800/50 border-border text-foreground/80 hover:border-zinc-600'
                   }`}
                 >
                   {c.icon} {c.name}
@@ -166,10 +166,10 @@ export default function CareerGamesPage() {
 
           {/* Daily life text list — pair với sim, time tách thành badge */}
           {selected.dailyLife && selected.dailyLife.length > 0 && (
-            <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
+            <div className="rounded-xl bg-card border border-border p-3">
               <div className="flex items-center gap-2 mb-2">
                 <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                <h4 className="text-xs font-bold text-zinc-200">Chi tiết lịch trình 1 ngày</h4>
+                <h4 className="text-xs font-bold text-foreground">Chi tiết lịch trình 1 ngày</h4>
               </div>
               <ol className="space-y-1.5">
                 {selected.dailyLife.map((item, i) => {
@@ -198,11 +198,11 @@ export default function CareerGamesPage() {
           )}
 
           {/* Selected career info quick view */}
-          <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-3">
+          <div className="rounded-xl bg-card border border-border p-3">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">{selected.icon}</span>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-zinc-100">{selected.name}</h3>
+                <h3 className="text-sm font-bold text-foreground">{selected.name}</h3>
                 <p className="text-[10px] text-zinc-500">{selected.category}</p>
               </div>
               <button
@@ -218,7 +218,7 @@ export default function CareerGamesPage() {
                   } catch (_) { /* user cancel — ignore */ }
                 }}
                 title="Chia sẻ link tới nghề này"
-                className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-300 shrink-0"
+                className="p-1.5 rounded-lg bg-secondary hover:bg-accent text-zinc-400 hover:text-cyan-300 shrink-0"
               >
                 <Share2 className="w-3.5 h-3.5" />
               </button>

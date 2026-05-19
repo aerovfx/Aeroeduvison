@@ -802,7 +802,7 @@ export default function KnowledgeGraph() {
             className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition whitespace-nowrap ${
               masteryOn
                 ? 'bg-emerald-500/25 border border-emerald-500/50 text-emerald-200'
-                : 'bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10'
+                : 'bg-white/5 border border-white/10 text-foreground/80 hover:bg-white/10'
             }`}
           >
             <Target className="w-3.5 h-3.5" />
@@ -829,7 +829,7 @@ export default function KnowledgeGraph() {
             <button
               onClick={handleSuggestNode}
               title="Đề xuất khái niệm/relation mới"
-              className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/15 hover:bg-white/10 text-zinc-300 inline-flex items-center gap-1"
+              className="px-2 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/15 hover:bg-white/10 text-foreground/80 inline-flex items-center gap-1"
             >
               💡 Đề xuất
             </button>
@@ -855,7 +855,7 @@ export default function KnowledgeGraph() {
 
         {/* Mobile actions menu (⋯ dropdown) */}
         {mobileMenuOpen && (
-          <div className="lg:hidden border-t border-white/10 bg-zinc-950/95 backdrop-blur p-3 grid grid-cols-2 gap-2">
+          <div className="lg:hidden border-t border-white/10 bg-background/95 backdrop-blur p-3 grid grid-cols-2 gap-2">
             <button
               onClick={() => { setExtractOpen(true); setMobileMenuOpen(false) }}
               className="px-3 py-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-500 text-white inline-flex items-center justify-center gap-1.5"
@@ -864,7 +864,7 @@ export default function KnowledgeGraph() {
             </button>
             <button
               onClick={() => { handleSuggestNode(); setMobileMenuOpen(false) }}
-              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-zinc-200 inline-flex items-center justify-center gap-1.5"
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-foreground inline-flex items-center justify-center gap-1.5"
             >
               💡 Đề xuất
             </button>
@@ -878,7 +878,7 @@ export default function KnowledgeGraph() {
             </button>
             <button
               onClick={() => { resetView(); setMobileMenuOpen(false) }}
-              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-zinc-200 inline-flex items-center justify-center gap-1.5"
+              className="px-3 py-2.5 rounded-lg text-xs font-bold bg-white/10 border border-white/20 text-foreground inline-flex items-center justify-center gap-1.5"
             >
               <Maximize2 className="w-3.5 h-3.5" /> Reset zoom
             </button>
@@ -893,7 +893,7 @@ export default function KnowledgeGraph() {
           onClick={() => setSmartOpen(false)}
         >
           <div
-            className="bg-zinc-900 border border-purple-500/30 rounded-2xl shadow-2xl max-w-2xl w-full p-4 sm:p-5 space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto"
+            className="bg-card border border-purple-500/30 rounded-2xl shadow-2xl max-w-2xl w-full p-4 sm:p-5 space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -917,7 +917,7 @@ export default function KnowledgeGraph() {
                 rows={2}
                 autoFocus
                 placeholder="Bạn muốn học/hỏi gì?"
-                className="w-full px-3 py-2 bg-zinc-950 border-2 border-zinc-700 focus:border-purple-500/60 rounded-md text-sm text-zinc-100 focus:outline-none resize-none"
+                className="w-full px-3 py-2 bg-background border-2 border-border focus:border-purple-500/60 rounded-md text-sm text-foreground focus:outline-none resize-none"
                 onKeyDown={(e) => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSmartQuery()
                 }}
@@ -928,7 +928,7 @@ export default function KnowledgeGraph() {
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => { setSmartQuery(''); setSmartResult(null) }}
-                className="text-xs px-3 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
+                className="text-xs px-3 py-2 rounded-md bg-secondary hover:bg-accent text-foreground/80 border border-border"
               >
                 Xóa
               </button>
@@ -943,12 +943,12 @@ export default function KnowledgeGraph() {
             </div>
 
             {smartResult && (
-              <div className="space-y-3 pt-3 border-t border-zinc-800">
+              <div className="space-y-3 pt-3 border-t border-border">
                 <div className="bg-purple-500/10 border border-purple-500/30 rounded-md p-2.5 text-xs">
                   <div className="font-bold text-purple-300 mb-1">
                     Ý định: <span className="font-mono">{smartResult.intent}</span>
                   </div>
-                  <div className="text-zinc-200">{smartResult.explanation}</div>
+                  <div className="text-foreground">{smartResult.explanation}</div>
                 </div>
 
                 {smartResult.suggestedNodes.length > 0 && (
@@ -966,13 +966,13 @@ export default function KnowledgeGraph() {
                               loadFromNode(n.id, 2)
                               setSmartOpen(false)
                             }}
-                            className="w-full text-left p-2.5 rounded-md bg-zinc-950 border border-zinc-800 hover:border-purple-500/40 transition flex items-start gap-2.5"
+                            className="w-full text-left p-2.5 rounded-md bg-background border border-border hover:border-purple-500/40 transition flex items-start gap-2.5"
                           >
                             <span className="shrink-0 w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: c.fill, color: c.stroke, border: `1px solid ${c.stroke}` }}>
                               {idx + 1}
                             </span>
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-semibold text-zinc-100 truncate">{n.label}</div>
+                              <div className="text-sm font-semibold text-foreground truncate">{n.label}</div>
                               <div className="text-[10px] text-zinc-500">
                                 {NODE_TYPE_LABELS[n.type] || n.type}
                                 {n.description && ` · ${n.description.slice(0, 80)}${n.description.length > 80 ? '…' : ''}`}
@@ -1026,17 +1026,17 @@ export default function KnowledgeGraph() {
           </span>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(244,63,94,0.3)', border: '1px solid #f43f5e' }} />
-            <span className="text-zinc-300">&lt;30%</span>
+            <span className="text-foreground/80">&lt;30%</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(251,191,36,0.3)', border: '1px solid #fbbf24' }} />
-            <span className="text-zinc-300">30-70%</span>
+            <span className="text-foreground/80">30-70%</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(16,185,129,0.3)', border: '1px solid #10b981' }} />
-            <span className="text-zinc-300">≥70%</span>
+            <span className="text-foreground/80">≥70%</span>
           </div>
-          <div className="flex items-center gap-1.5 border-l border-zinc-700 pl-3 ml-1">
+          <div className="flex items-center gap-1.5 border-l border-border pl-3 ml-1">
             <span className="w-3 h-3 rounded-full" style={{ background: 'rgba(148,163,184,0.15)', border: '1px solid #475569' }} />
             <span className="text-zinc-500">chưa có data</span>
           </div>
@@ -1077,7 +1077,7 @@ export default function KnowledgeGraph() {
                 className={`flex-1 flex flex-col items-center justify-center py-2 px-1 text-[10px] font-bold transition-colors relative ${
                   activeTab === t.id
                     ? 'text-cyan-300 bg-cyan-500/10 border-b-2 border-cyan-400'
-                    : 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5 border-b-2 border-transparent'
+                    : 'text-zinc-400 hover:text-foreground hover:bg-white/5 border-b-2 border-transparent'
                 }`}
               >
                 <span className="text-base mb-0.5">{t.icon}</span>
@@ -1201,9 +1201,9 @@ export default function KnowledgeGraph() {
                     <div>
                       <div className="flex items-center justify-between text-[10px] mb-1">
                         <span className="text-zinc-400">Điểm TB</span>
-                        <span className="font-mono text-zinc-100">{masteryStats.stats.avgScore}/100</span>
+                        <span className="font-mono text-foreground">{masteryStats.stats.avgScore}/100</span>
                       </div>
-                      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                      <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
                         <div className="h-full rounded-full transition-all" style={{ width: `${masteryStats.stats.avgScore}%`, background: 'linear-gradient(90deg,#f43f5e,#fbbf24,#10b981)' }} />
                       </div>
                     </div>
@@ -1213,17 +1213,17 @@ export default function KnowledgeGraph() {
                           <AlertTriangle className="w-3 h-3" /> Top yếu nhất
                         </div>
                         {masteryStats.weakTopics.slice(0, 5).map(t => (
-                          <button key={t.nodeId} onClick={() => { loadFromNode(t.nodeId, 2); toast(`Focus: ${t.label}`, { icon: '🎯' }) }} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-zinc-800 hover:border-rose-500/40 group">
+                          <button key={t.nodeId} onClick={() => { loadFromNode(t.nodeId, 2); toast(`Focus: ${t.label}`, { icon: '🎯' }) }} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-border hover:border-rose-500/40 group">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="text-[11px] font-semibold text-zinc-100 truncate group-hover:text-rose-200">{t.label}</span>
+                              <span className="text-[11px] font-semibold text-foreground truncate group-hover:text-rose-200">{t.label}</span>
                               <span className="shrink-0 text-[9px] px-1 rounded bg-rose-500/15 text-rose-300 font-mono">{t.score}%</span>
                             </div>
                           </button>
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-800">
-                      <button onClick={fetchMastery} disabled={masteryLoading} className="flex-1 px-2 py-1 rounded text-[10px] bg-zinc-800 hover:bg-zinc-700 text-zinc-300 inline-flex items-center justify-center gap-1 disabled:opacity-50">
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-border">
+                      <button onClick={fetchMastery} disabled={masteryLoading} className="flex-1 px-2 py-1 rounded text-[10px] bg-secondary hover:bg-accent text-foreground/80 inline-flex items-center justify-center gap-1 disabled:opacity-50">
                         <RefreshCw className={`w-3 h-3 ${masteryLoading ? 'animate-spin' : ''}`} /> Làm mới
                       </button>
                       <Link to="/student/exam-prep" className="flex-1 px-2 py-1 rounded text-[10px] font-bold bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 inline-flex items-center justify-center gap-1">
@@ -1279,13 +1279,13 @@ export default function KnowledgeGraph() {
                         return (
                           <div key={step.nodeId} className="relative">
                             {!isLast && <div className="absolute left-3 top-7 bottom-0 w-px bg-amber-500/30" style={{ height: 'calc(100% - 1rem)' }} />}
-                            <button onClick={() => onNodeClick(step.nodeId)} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-zinc-800 hover:border-amber-500/60 flex items-start gap-2">
+                            <button onClick={() => onNodeClick(step.nodeId)} className="w-full text-left p-1.5 rounded bg-zinc-950/60 border border-border hover:border-amber-500/60 flex items-start gap-2">
                               <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black border-2" style={{ background: isFirst ? '#f43f5e' : isLast ? '#10b981' : '#fbbf24', color: '#0a0f1e', borderColor: '#0a0f1e' }}>
                                 {isFirst ? 'S' : isLast ? 'E' : step.order}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1">
-                                  <span className="text-[11px] font-semibold text-zinc-100 truncate">{step.label}</span>
+                                  <span className="text-[11px] font-semibold text-foreground truncate">{step.label}</span>
                                   {score !== null && <span className="text-[9px] px-1 rounded font-mono shrink-0" style={{ background: `${scoreColor}25`, color: scoreColor }}>{score}%</span>}
                                 </div>
                                 <div className="text-[9px] text-zinc-500 truncate">
@@ -1345,8 +1345,8 @@ export default function KnowledgeGraph() {
             <button
               onClick={toggleFullscreen}
               title={isFullscreen ? 'Thoát toàn màn hình (ESC)' : 'Mở rộng toàn màn hình'}
-              className="p-1.5 rounded-lg bg-zinc-900/95 backdrop-blur border border-zinc-700
-                         hover:bg-zinc-800 hover:border-zinc-600 text-zinc-200 transition
+              className="p-1.5 rounded-lg bg-zinc-900/95 backdrop-blur border border-border
+                         hover:bg-secondary hover:border-zinc-600 text-foreground transition
                          hover:scale-105"
             >
               {isFullscreen
@@ -1356,12 +1356,12 @@ export default function KnowledgeGraph() {
             </button>
 
             {/* View mode toggle */}
-            <div className="flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-zinc-700 p-1">
+            <div className="flex gap-1 bg-zinc-900/95 backdrop-blur rounded-lg border border-border p-1">
               <button
                 onClick={() => setViewMode('2d')}
                 title="Xem dạng 2D (SVG, mặc định)"
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                  viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+                  viewMode === '2d' ? 'bg-cyan-500 text-white' : 'text-zinc-400 hover:text-foreground'
                 }`}
               >
                 2D
@@ -1370,7 +1370,7 @@ export default function KnowledgeGraph() {
                 onClick={() => setViewMode('3d')}
                 title="Xem dạng 3D Neural Network"
                 className={`px-2.5 py-1 rounded text-[10px] font-bold transition ${
-                  viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-zinc-200'
+                  viewMode === '3d' ? 'bg-purple-500 text-white' : 'text-zinc-400 hover:text-foreground'
                 }`}
               >
                 🧠 3D
@@ -1663,7 +1663,7 @@ export default function KnowledgeGraph() {
             />
             <aside
               className="
-                bg-zinc-950 border-white/10 overflow-y-auto
+                bg-background border-white/10 overflow-y-auto
                 md:relative md:w-80 md:border-l md:flex-shrink-0 md:p-4 md:max-h-none
                 fixed bottom-14 left-0 right-0 z-40 max-h-[80vh] p-4 rounded-t-2xl border-t shadow-2xl md:rounded-none md:shadow-none
               "

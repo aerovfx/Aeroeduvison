@@ -1454,7 +1454,7 @@ function CommunityStatsPanel({
 }) {
   const medalColor = (rank: number) =>
     rank === 0 ? "text-yellow-300"
-      : rank === 1 ? "text-slate-300"
+      : rank === 1 ? "text-foreground/80"
       : rank === 2 ? "text-amber-500"
       : "text-white/30"
 

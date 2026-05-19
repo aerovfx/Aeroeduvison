@@ -98,7 +98,7 @@ export default function MyTeachers() {
   const totalPending = pending.incoming.length + pending.outgoing.length
 
   return (
-    <div className="min-h-screen bg-[hsl(260,30%,8%)] p-6 text-white">
+    <div className="min-h-screen bg-background p-6 text-white">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -337,7 +337,7 @@ function FindTeacherModal({ onClose, onSent }: { onClose: () => void; onSent: ()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[hsl(260,30%,12%)] border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+      <div className="relative bg-card border border-white/10 rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
         <div className="p-5 border-b border-white/10 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Search className="w-5 h-5 text-purple-400" />

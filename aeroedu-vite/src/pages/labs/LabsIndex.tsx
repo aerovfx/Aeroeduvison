@@ -305,7 +305,7 @@ export default function LabsIndexPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[hsl(260,30%,8%)]">
+    <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         {/* ── Header ── */}
@@ -644,16 +644,16 @@ export default function LabsIndexPage() {
                   </div>
                 </Link>
 
-                <div className="relative rounded-2xl border-2 border-dashed border-slate-700/60 bg-slate-900/40 overflow-hidden opacity-70">
+                <div className="relative rounded-2xl border-2 border-dashed border-border/60 bg-slate-900/40 overflow-hidden opacity-70">
                   <div className="p-5 flex flex-col h-full">
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="p-2.5 rounded-xl bg-slate-800 ring-1 ring-slate-700">
+                      <div className="p-2.5 rounded-xl bg-secondary ring-1 ring-slate-700">
                         <Wrench className="h-7 w-7 text-slate-500" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-bold text-2xl text-slate-300">Đổi đơn vị</h3>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider">
+                          <h3 className="font-bold text-2xl text-foreground/80">Đổi đơn vị</h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-secondary text-slate-400 border border-border uppercase tracking-wider">
                             Sắp ra
                           </span>
                         </div>
@@ -666,7 +666,7 @@ export default function LabsIndexPage() {
                     <div className="flex-1" />
                     <button
                       disabled
-                      className="w-full py-2.5 px-3 bg-slate-800 text-slate-500 text-sm font-semibold rounded-xl cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full py-2.5 px-3 bg-secondary text-slate-500 text-sm font-semibold rounded-xl cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       Đang phát triển
                     </button>

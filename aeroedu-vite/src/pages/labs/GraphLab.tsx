@@ -447,7 +447,7 @@ function Plot({
   }
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-slate-700 bg-[#0a0f1a]">
+    <div className="relative rounded-2xl overflow-hidden border border-border bg-[#0a0f1a]">
       <svg
         ref={ref}
         viewBox={`0 0 ${w} ${h}`}
@@ -480,10 +480,10 @@ function Plot({
         ))}
         {/* Axes */}
         {yMin <= 0 && yMax >= 0 && (
-          <line x1={0} y1={yS(0)} x2={w} y2={yS(0)} stroke="#94a3b8" strokeWidth={1.3} />
+          <line x1={0} y1={yS(0)} x2={w} y2={yS(0)} stroke='var(--td-muted)' strokeWidth={1.3} />
         )}
         {xMin <= 0 && xMax >= 0 && (
-          <line x1={xS(0)} y1={0} x2={xS(0)} y2={h} stroke="#94a3b8" strokeWidth={1.3} />
+          <line x1={xS(0)} y1={0} x2={xS(0)} y2={h} stroke='var(--td-muted)' strokeWidth={1.3} />
         )}
 
         {/* Tick labels */}
@@ -548,15 +548,15 @@ function Plot({
 
         {/* Axis labels */}
         <text x={w - 8} y={yMin <= 0 && yMax >= 0 ? yS(0) - 6 : h - 20}
-              fill="#94a3b8" fontSize={11}
+              fill='var(--td-muted)' fontSize={11}
               textAnchor="end" fontFamily="monospace" fontStyle="italic">x</text>
         <text x={xMin <= 0 && xMax >= 0 ? xS(0) + 8 : 14} y={14}
-              fill="#94a3b8" fontSize={11} fontFamily="monospace" fontStyle="italic">y</text>
+              fill='var(--td-muted)' fontSize={11} fontFamily="monospace" fontStyle="italic">y</text>
       </svg>
 
       {/* Cursor readout */}
       {cursor && (
-        <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-slate-900/85 border border-slate-700 px-2.5 py-1.5 text-[10.5px] font-mono text-slate-200">
+        <div className="pointer-events-none absolute right-2 top-2 rounded-lg bg-slate-900/85 border border-border px-2.5 py-1.5 text-[10.5px] font-mono text-foreground">
           <div>x = <span className="text-cyan-300">{cursor.x.toFixed(3)}</span></div>
           <div>y = <span className="text-amber-300">{cursor.y.toFixed(3)}</span></div>
           {compiled.filter((c) => c.row.visible && !c.err).slice(0, 4).map((c) => {
@@ -630,7 +630,7 @@ function VirtualKeyboard({
     typeof k === 'string' ? k : k.label
 
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-2">
+    <div className="rounded-2xl border border-border bg-slate-900/60 p-2">
       {/* Mode tabs */}
       <div className="mb-2 flex gap-1 text-[11px]">
         {([
@@ -647,7 +647,7 @@ function VirtualKeyboard({
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-mono ${
                 active
                   ? 'bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-400/50'
-                  : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800'
+                  : 'bg-slate-800/60 text-slate-400 hover:bg-secondary'
               }`}
             >
               <Icon size={12} />
@@ -677,7 +677,7 @@ function VirtualKeyboard({
                       ? 'bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-400/50 hover:bg-emerald-500/30'
                       : isBksp
                       ? 'bg-rose-500/15 text-rose-300 ring-1 ring-rose-400/40 hover:bg-rose-500/25'
-                      : 'bg-slate-800/70 text-slate-100 ring-1 ring-slate-700 hover:bg-slate-700'
+                      : 'bg-slate-800/70 text-foreground ring-1 ring-slate-700 hover:bg-slate-700'
                   }`}
                 >
                   {label(k)}
@@ -794,11 +794,11 @@ export default function GraphLab() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 text-foreground">
       <div className="max-w-[1400px] mx-auto space-y-3">
         {/* Header */}
-        <div className="rounded-2xl border border-slate-700 bg-gradient-to-r from-indigo-900/40 via-slate-900/80 to-fuchsia-900/30 px-4 py-3 flex items-center gap-3">
-          <div className="rounded-xl bg-slate-900 p-2 ring-1 ring-cyan-400/50">
+        <div className="rounded-2xl border border-border bg-gradient-to-r from-indigo-900/40 via-slate-900/80 to-fuchsia-900/30 px-4 py-3 flex items-center gap-3">
+          <div className="rounded-xl bg-card p-2 ring-1 ring-cyan-400/50">
             <FunctionSquare size={22} className="text-cyan-300" />
           </div>
           <div className="flex-1 min-w-0">
@@ -830,7 +830,7 @@ export default function GraphLab() {
         <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-3">
           {/* Left sidebar: equation list */}
           <aside className="space-y-3">
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-3">
+            <div className="rounded-2xl border border-border bg-slate-900/60 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   Đại số
@@ -851,8 +851,8 @@ export default function GraphLab() {
                       onClick={() => setActiveId(row.id)}
                       className={`rounded-xl border p-2 transition cursor-text ${
                         isActive
-                          ? 'border-transparent bg-slate-800 ring-1 ring-cyan-400/50'
-                          : 'border-slate-700 bg-slate-900/40 hover:border-slate-500'
+                          ? 'border-transparent bg-secondary ring-1 ring-cyan-400/50'
+                          : 'border-border bg-slate-900/40 hover:border-slate-500'
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -867,7 +867,7 @@ export default function GraphLab() {
                         </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleVisible(row.id) }}
-                          className="ml-auto text-slate-400 hover:text-slate-200"
+                          className="ml-auto text-slate-400 hover:text-foreground"
                           title={row.visible ? 'Ẩn' : 'Hiện'}
                         >
                           {row.visible ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -888,7 +888,7 @@ export default function GraphLab() {
                         placeholder="ví dụ: x^2 + 3x - 2"
                         spellCheck={false}
                         className={`mt-1.5 w-full bg-transparent px-1 py-1 font-mono text-sm outline-none ${
-                          comp?.err ? 'text-rose-300' : 'text-slate-100'
+                          comp?.err ? 'text-rose-300' : 'text-foreground'
                         }`}
                         style={{ borderBottom: `1.5px solid ${row.color}40` }}
                       />
@@ -900,7 +900,7 @@ export default function GraphLab() {
                 })}
 
                 {rows.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-700 p-4 text-center text-[11px] text-slate-500">
+                  <div className="rounded-xl border border-dashed border-border p-4 text-center text-[11px] text-slate-500">
                     Chưa có phương trình. Nhấn "Thêm" hoặc chọn preset bên dưới.
                   </div>
                 )}
@@ -908,7 +908,7 @@ export default function GraphLab() {
             </div>
 
             {/* Presets */}
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-3">
+            <div className="rounded-2xl border border-border bg-slate-900/60 p-3">
               <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                 Mẫu nhanh
               </div>
@@ -917,7 +917,7 @@ export default function GraphLab() {
                   <button
                     key={p.src}
                     onClick={() => addRow(p.src)}
-                    className="rounded-lg bg-slate-800/70 px-2 py-1.5 text-[11px] font-mono text-slate-200 ring-1 ring-slate-700 hover:bg-slate-700 hover:text-cyan-200"
+                    className="rounded-lg bg-slate-800/70 px-2 py-1.5 text-[11px] font-mono text-foreground ring-1 ring-slate-700 hover:bg-slate-700 hover:text-cyan-200"
                   >
                     {p.label}
                   </button>
@@ -928,7 +928,7 @@ export default function GraphLab() {
             {/* Keyboard toggle */}
             <button
               onClick={() => setKbOpen((o) => !o)}
-              className="w-full rounded-2xl border border-slate-700 bg-slate-900/40 p-3 text-[11px] font-semibold text-slate-300 hover:bg-slate-900"
+              className="w-full rounded-2xl border border-border bg-slate-900/40 p-3 text-[11px] font-semibold text-foreground/80 hover:bg-card"
             >
               {kbOpen ? '↓ Ẩn bàn phím toán học' : '↑ Hiện bàn phím toán học'}
             </button>
@@ -944,7 +944,7 @@ export default function GraphLab() {
             />
 
             {/* Viewport info + legend */}
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/50 px-3 py-2 text-[11px] font-mono">
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-slate-900/50 px-3 py-2 text-[11px] font-mono">
               <span className="text-slate-400">
                 x ∈ [<span className="text-cyan-300">{viewport.xMin.toFixed(2)}</span>, <span className="text-cyan-300">{viewport.xMax.toFixed(2)}</span>]
               </span>
@@ -955,7 +955,7 @@ export default function GraphLab() {
               {compiled.filter((c) => c.row.visible && !c.err).map((c, i) => (
                 <span key={c.row.id} className="flex items-center gap-1.5">
                   <span className="inline-block w-3 h-3 rounded-sm" style={{ background: c.row.color }} />
-                  <span className="text-slate-300">f{i + 1}: {c.row.src}</span>
+                  <span className="text-foreground/80">f{i + 1}: {c.row.src}</span>
                 </span>
               ))}
             </div>
@@ -971,8 +971,8 @@ export default function GraphLab() {
               />
             )}
 
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/40 p-3 text-[11px] text-slate-400 leading-relaxed">
-              <div className="mb-1 font-semibold text-slate-200">Cú pháp</div>
+            <div className="rounded-2xl border border-border bg-slate-900/40 p-3 text-[11px] text-slate-400 leading-relaxed">
+              <div className="mb-1 font-semibold text-foreground">Cú pháp</div>
               <div className="font-mono">
                 <span className="text-cyan-300">Toán tử:</span> + − * / ^ · | a |{'  '}
                 <span className="text-cyan-300">Hàm:</span> sin cos tan asin acos atan sinh cosh tanh exp ln log log2 sqrt cbrt abs sign floor ceil round min max pow{'  '}

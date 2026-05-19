@@ -171,7 +171,7 @@ const DIFF_LABEL: Record<GameEntry['difficulty'], { label: string; color: string
 const STATUS_LABEL: Record<GameEntry['status'], { label: string; color: string }> = {
   live:    { label: '🟢 Live',    color: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/30' },
   beta:    { label: '🟡 Beta',    color: 'text-amber-300 bg-amber-500/15 border-amber-500/30' },
-  preview: { label: '⚪ Preview', color: 'text-slate-300 bg-slate-500/15 border-slate-500/30' },
+  preview: { label: '⚪ Preview', color: 'text-foreground/80 bg-slate-500/15 border-slate-500/30' },
 }
 
 export default function GamesIndex() {

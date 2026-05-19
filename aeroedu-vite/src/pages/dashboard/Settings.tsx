@@ -1128,7 +1128,7 @@ export default function SettingsPage() {
   ])
 
   return (
-    <div className="min-h-screen bg-[hsl(225,15%,8%)] text-white">
+    <div className="min-h-screen bg-background text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {/* Header */}
