@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Camera, RefreshCw,
@@ -10,6 +10,7 @@ import {
   Sidebar as SidebarIcon,
   MousePointer2, Gamepad2, Info, Database, Download, Sparkles, Brain, Scan,
   Copy as CopyIcon,
+  Laptop, Lock, ShieldCheck, GraduationCap, AlertTriangle,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { AIVisionOverlay, type AnalysisResult } from '@/components/camera/AIVisionOverlay'
@@ -18,6 +19,7 @@ import {
   EmotionType
 } from '@/lib/advanced-emotion-recognition'
 import { cameraService } from '@/services/camera.service'
+import { api } from '@/services/api'
 
 // ── Dark colour palette ──
 const D = {
@@ -43,6 +45,31 @@ interface CameraItem {
   status: 'online' | 'offline' | 'error' | 'testing'
   hlsUrl?: string; streamId?: string; lastChecked?: string
   studentCount?: number
+  /** 2026-05-19: kind phân biệt camera vật lý vs webcam HS */
+  kind?: 'hardware' | 'student-webcam'
+  /** Permission info từ backend khi user là TEACHER (admin grant) */
+  permissionInfo?: { scope: string; grantedBy: string; expiresAt?: string | null; note?: string | null }
+  /** Student webcam fields */
+  studentSession?: StudentWebcamSession
+}
+
+interface StudentWebcamSession {
+  id: string
+  studentId: string
+  studentName: string | null
+  examId: string | null
+  examTitle: string | null
+  classId: string | null
+  roomCode: string | null
+  deviceInfo: string | null
+  startedAt: string
+  lastHeartbeatAt: string
+  endedAt: string | null
+  status: 'active' | 'ended' | 'dropped'
+  snapshotMime: string | null
+  frameCount: number
+  flagCount: number
+  lastFlagReason: string | null
 }
 
 interface Recording {
@@ -431,12 +458,15 @@ function PTZJoystick() {
 // ── Main Component ──
 export default function CameraManagement() {
   const [cameras, setCameras]                   = useState<CameraItem[]>([])
+  const [studentWebcams, setStudentWebcams]     = useState<CameraItem[]>([])
+  const [permissionState, setPermissionState]   = useState<{ hasAny: boolean; isAdmin: boolean }>({ hasAny: true, isAdmin: false })
   const [loading, setLoading]                   = useState(true)
   const [gridSize, setGridSize]                 = useState<1 | 4 | 9>(4)
   const [selectedSlot, setSelectedSlot]         = useState<number>(0)
   const [gridAssignments, setGridAssignments]   = useState<(CameraItem | null)[]>(new Array(16).fill(null))
   const [isSidebarOpen, setIsSidebarOpen]       = useState(true)
   const [searchQuery, setSearchQuery]           = useState('')
+  const [sidebarTab, setSidebarTab]             = useState<'hardware' | 'student'>('hardware')
   const [aiVisionActive, setAiVisionActive]     = useState<Record<string, boolean>>({})
   const [analysisData, setAnalysisData]         = useState<Record<string, AnalysisResult>>({})
   const [activeRecordings, setActiveRecordings] = useState<Record<string, boolean>>({})
@@ -444,8 +474,16 @@ export default function CameraManagement() {
   const [showRecordingsModal, setShowRecordingsModal] = useState(false)
   const [recordingLoading, setRecordingLoading] = useState(false)
 
-  // Load data on mount
-  useState(() => { fetchData(); loadRecordings() })
+  // Load data on mount (proper useEffect — useState(callback) chỉ chạy 1 lần init,
+  // nhưng KHÔNG đảm bảo gọi async đúng cách)
+  useEffect(() => {
+    fetchData()
+    loadRecordings()
+    loadStudentWebcams()
+    // Poll student webcam mỗi 10s — heartbeat 60s window
+    const t = setInterval(loadStudentWebcams, 10_000)
+    return () => clearInterval(t)
+  }, [])
 
   async function fetchData() {
     try {
@@ -464,10 +502,12 @@ export default function CameraManagement() {
         rtspUrl: '/api/camera/file/20260316003128604.MP4',
         brand: 'AeroAI', location: 'Lab 101', locationType: 'lab',
         className: 'Lớp 11A2', status: 'online', studentCount: 40,
+        kind: 'hardware',
       }
-      // Real cameras from /api/cameras (admin đã setup ONVIF)
-      const r = await cameraService.list()
-      const fetched: CameraItem[] = (r.cameras || []).map(c => ({
+      // Real cameras from /api/cameras — backend đã filter theo CameraPermission
+      // cho TEACHER, ADMIN thấy tất cả.
+      const r = await api.get<{ cameras: any[]; count: number; hasAnyPermission: boolean; isAdmin: boolean }>('/cameras')
+      const fetched: CameraItem[] = (r.data.cameras || []).map((c: any) => ({
         id: c.id, name: c.name, brand: c.brand,
         rtspUrl: c.rtspUrl || '',
         location: c.location, locationType: c.locationType,
@@ -475,7 +515,13 @@ export default function CameraManagement() {
         className: c.classId ? classMap[c.classId] : undefined,
         status: c.status === 'online' ? 'online' : c.status === 'offline' ? 'offline' : 'online',
         hlsUrl: c.hlsUrl || undefined,
+        kind: 'hardware',
+        permissionInfo: c.permissionInfo,
       }))
+      setPermissionState({
+        hasAny: r.data.hasAnyPermission ?? true,
+        isAdmin: r.data.isAdmin ?? false,
+      })
       const combined = [demoCamera, ...fetched.filter(c => c.id !== 'cam_demo')]
       setCameras(combined)
       const grid = new Array(16).fill(null)
@@ -485,6 +531,31 @@ export default function CameraManagement() {
       console.warn('[teacher:cameras] fallback mock', e)
       loadMockData()
     } finally { setLoading(false) }
+  }
+
+  /** Load student webcam sessions (HS đang làm bài) — refresh mỗi 10s qua interval */
+  async function loadStudentWebcams() {
+    try {
+      const r = await api.get<{ sessions: StudentWebcamSession[]; count: number }>(
+        '/teacher/student-cams?activeOnly=true&withSnapshot=false'
+      )
+      const items: CameraItem[] = (r.data.sessions || []).map(s => ({
+        id: `swc-${s.id}`,
+        name: s.studentName || `HS ${s.studentId.slice(0, 6)}`,
+        rtspUrl: '',
+        brand: 'Webcam HS',
+        location: s.examTitle || s.roomCode || 'Đang làm bài',
+        locationType: 'student-exam',
+        classId: s.classId || undefined,
+        className: s.examTitle || undefined,
+        status: s.status === 'active' ? 'online' : 'offline',
+        kind: 'student-webcam',
+        studentSession: s,
+      }))
+      setStudentWebcams(items)
+    } catch (e) {
+      // Silently fail — endpoint có thể chưa deploy
+    }
   }
 
   /** Copy RTSP URL của camera vào clipboard — gọi backend để lấy URL có cred.
@@ -567,9 +638,12 @@ export default function CameraManagement() {
     const g = [...gridAssignments]; g[selectedSlot] = camera; setGridAssignments(g)
   }
 
-  const filteredCameras = cameras.filter(c =>
+  /** Camera list theo tab hiện tại (hardware vs student webcam) + search filter */
+  const activeList: CameraItem[] = sidebarTab === 'hardware' ? cameras : studentWebcams
+  const filteredCameras = activeList.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.className?.toLowerCase().includes(searchQuery.toLowerCase()))
+    (c.className?.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (c.location?.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const gridCols: Record<number, string> = { 1: 'grid-cols-1', 4: 'grid-cols-2', 9: 'grid-cols-3' }
@@ -596,22 +670,67 @@ export default function CameraManagement() {
         overflow: 'hidden', display: 'flex', flexDirection: 'column',
         width: isSidebarOpen ? 288 : 0, background: D.bg,
       }}>
-        <div style={{ padding: 16, borderBottom: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ padding: 16, borderBottom: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h2 style={{ fontSize: 12, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.15em', color: D.muted, display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
               <SidebarIcon style={{ width: 16, height: 16 }} /> Thiết bị
+              {permissionState.isAdmin && (
+                <span style={{ fontSize: 8, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', letterSpacing: 0 }}>
+                  ADMIN
+                </span>
+              )}
             </h2>
             <button
-              onClick={fetchData}
+              onClick={() => { fetchData(); loadStudentWebcams() }}
               style={{ padding: 6, borderRadius: 8, background: D.white(0.04), border: `1px solid ${D.border}`, cursor: 'pointer', color: D.muted }}
             >
               <RefreshCw style={{ width: 14, height: 14 }} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
+
+          {/* Tab switcher: Hardware cameras vs Student webcams */}
+          <div style={{ display: 'flex', gap: 4, background: D.white(0.03), padding: 3, borderRadius: 10, border: `1px solid ${D.border}` }}>
+            <button
+              onClick={() => setSidebarTab('hardware')}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: 7,
+                background: sidebarTab === 'hardware' ? D.purpleA(0.20) : 'transparent',
+                color: sidebarTab === 'hardware' ? D.text : D.muted,
+                border: 'none', cursor: 'pointer',
+                fontSize: 10, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              }}
+            >
+              <Camera style={{ width: 12, height: 12 }} />
+              Camera ({cameras.length})
+            </button>
+            <button
+              onClick={() => setSidebarTab('student')}
+              style={{
+                flex: 1, padding: '6px 8px', borderRadius: 7,
+                background: sidebarTab === 'student' ? D.purpleA(0.20) : 'transparent',
+                color: sidebarTab === 'student' ? D.text : D.muted,
+                border: 'none', cursor: 'pointer',
+                fontSize: 10, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                position: 'relative',
+              }}
+            >
+              <Laptop style={{ width: 12, height: 12 }} />
+              HS làm bài ({studentWebcams.length})
+              {studentWebcams.length > 0 && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 6,
+                  width: 6, height: 6, borderRadius: '50%', background: '#22c55e',
+                }} className="animate-pulse" />
+              )}
+            </button>
+          </div>
+
           <div style={{ position: 'relative' }}>
             <Search style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, color: D.muted }} />
             <input
-              type="text" placeholder="Tìm camera..." value={searchQuery}
+              type="text" placeholder={sidebarTab === 'hardware' ? 'Tìm camera...' : 'Tìm học sinh...'} value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ width: '100%', paddingLeft: 40, paddingRight: 16, paddingTop: 8, paddingBottom: 8, background: D.white(0.03), border: `1px solid ${D.border}`, borderRadius: 10, fontSize: 12, color: D.text, outline: 'none', boxSizing: 'border-box' }}
             />
@@ -619,8 +738,48 @@ export default function CameraManagement() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 8 }} className="custom-scrollbar">
+          {/* Empty state: TEACHER chưa được admin grant camera nào */}
+          {sidebarTab === 'hardware' && !permissionState.isAdmin && !permissionState.hasAny && cameras.length <= 1 && (
+            <div style={{
+              padding: 16, margin: 8, borderRadius: 10,
+              background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.25)',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Lock style={{ width: 14, height: 14, color: '#fbbf24' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>Chưa có quyền xem camera</span>
+              </div>
+              <p style={{ fontSize: 10, color: D.muted, lineHeight: 1.5, margin: 0 }}>
+                Vui lòng liên hệ <strong style={{ color: D.text }}>Admin nhà trường</strong> để
+                được cấp quyền xem camera lớp học. Bạn vẫn có thể xem webcam HS đang làm bài
+                ở tab kế bên.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state: Không có HS nào đang làm bài */}
+          {sidebarTab === 'student' && studentWebcams.length === 0 && (
+            <div style={{
+              padding: 16, margin: 8, borderRadius: 10,
+              background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.25)',
+              display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'center',
+            }}>
+              <GraduationCap style={{ width: 24, height: 24, color: '#818cf8', margin: '0 auto' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#a5b4fc' }}>Không có HS nào đang làm bài</span>
+              <p style={{ fontSize: 10, color: D.muted, lineHeight: 1.5, margin: 0 }}>
+                Khi HS bắt đầu làm bài thi online + cho phép webcam, sẽ tự động xuất hiện ở đây.
+                Snapshot 30s/lần, tự đánh dấu bất thường.
+              </p>
+            </div>
+          )}
+
           {filteredCameras.map(cam => {
             const active = gridAssignments.some(a => a?.id === cam.id)
+            const isStudentCam = cam.kind === 'student-webcam'
+            const session = cam.studentSession
+            const heartbeatSec = session ? Math.floor((Date.now() - new Date(session.lastHeartbeatAt).getTime()) / 1000) : 0
+            const isStale = isStudentCam && heartbeatSec > 30
+
             return (
               <div
                 key={cam.id}
@@ -632,25 +791,63 @@ export default function CameraManagement() {
                   border: `1px solid ${active ? D.purpleA(0.2) : 'transparent'}`,
                 }}
               >
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: cam.status === 'online' ? '#22c55e' : '#64748b', flexShrink: 0 }} className={cam.status === 'online' ? 'animate-pulse' : ''} />
+                {/* Status dot */}
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: cam.status === 'online' && !isStale ? '#22c55e' : isStale ? '#fbbf24' : '#64748b',
+                  flexShrink: 0,
+                }} className={cam.status === 'online' && !isStale ? 'animate-pulse' : ''} />
+
                 <div onClick={() => handleCameraSelect(cam)} style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 700, color: D.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{cam.name}</p>
-                  <p style={{ fontSize: 10, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
-                    {cam.brand} • {cam.className || cam.location}
+                  <p style={{
+                    fontSize: 12, fontWeight: 700, color: D.text,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    margin: 0, display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    {isStudentCam && <Laptop style={{ width: 11, height: 11, color: '#818cf8', flexShrink: 0 }} />}
+                    {cam.name}
                   </p>
+                  <p style={{ fontSize: 10, color: D.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
+                    {isStudentCam
+                      ? `${cam.location} · ${heartbeatSec}s trước`
+                      : `${cam.brand} • ${cam.className || cam.location}`}
+                  </p>
+                  {/* Permission badge cho hardware cam (TEACHER mode) */}
+                  {!isStudentCam && cam.permissionInfo && !permissionState.isAdmin && (
+                    <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <ShieldCheck style={{ width: 9, height: 9, color: '#22d3ee' }} />
+                      <span style={{ fontSize: 9, color: '#67e8f9', fontWeight: 600 }}>
+                        {cam.permissionInfo.scope === 'view+ptz' ? 'View + PTZ' :
+                         cam.permissionInfo.scope === 'view+record' ? 'View + Record' : 'View only'}
+                        {cam.permissionInfo.grantedBy !== 'self' && ` · ${cam.permissionInfo.grantedBy}`}
+                      </span>
+                    </div>
+                  )}
+                  {/* Flag badge cho student webcam */}
+                  {isStudentCam && session && session.flagCount > 0 && (
+                    <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <AlertTriangle style={{ width: 9, height: 9, color: '#f87171' }} />
+                      <span style={{ fontSize: 9, color: '#fca5a5', fontWeight: 600 }}>
+                        {session.flagCount} cảnh báo
+                      </span>
+                    </div>
+                  )}
                 </div>
-                {/* Copy RTSP URL — hover to reveal */}
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCopyRtspUrl(cam) }}
-                  title={`Copy RTSP URL của ${cam.name} (paste vào VLC để xem live)`}
-                  style={{
-                    padding: 6, borderRadius: 6, background: 'transparent', border: 'none',
-                    cursor: 'pointer', color: D.muted, opacity: 0.6,
-                  }}
-                  className="hover:!opacity-100 hover:!bg-cyan-500/20 hover:!text-cyan-400"
-                >
-                  <CopyIcon style={{ width: 13, height: 13 }} />
-                </button>
+
+                {/* Hardware cam: Copy RTSP URL */}
+                {!isStudentCam && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleCopyRtspUrl(cam) }}
+                    title={`Copy RTSP URL của ${cam.name} (paste vào VLC để xem live)`}
+                    style={{
+                      padding: 6, borderRadius: 6, background: 'transparent', border: 'none',
+                      cursor: 'pointer', color: D.muted, opacity: 0.6,
+                    }}
+                    className="hover:!opacity-100 hover:!bg-cyan-500/20 hover:!text-cyan-400"
+                  >
+                    <CopyIcon style={{ width: 13, height: 13 }} />
+                  </button>
+                )}
               </div>
             )
           })}

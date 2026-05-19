@@ -28854,6 +28854,50 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_school ON "Camera"(schoolId)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_class  ON "Camera"(classId)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_enabled ON "Camera"(enabled, status)`);
+
+        // ── CameraPermission: admin grant per-teacher access ──────
+        // 2026-05-19: trước đây GET /api/cameras trả ALL enabled cameras cho
+        // mọi teacher. Giờ filter theo permission table. Admin tự thấy tất cả.
+        await pool.query(`CREATE TABLE IF NOT EXISTS "CameraPermission" (
+          "id"          TEXT PRIMARY KEY,
+          "cameraId"    TEXT NOT NULL,
+          "teacherId"   TEXT NOT NULL,
+          "grantedById" TEXT NOT NULL,
+          "scope"       TEXT NOT NULL DEFAULT 'view',  -- view | view+ptz | view+record
+          "expiresAt"   TIMESTAMPTZ,                   -- NULL = vĩnh viễn
+          "note"        TEXT,
+          "createdAt"   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE ("cameraId", "teacherId")
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_campermit_teacher ON "CameraPermission"("teacherId")`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_campermit_camera  ON "CameraPermission"("cameraId")`);
+
+        // ── StudentExamWebcam: theo dõi HS làm bài qua webcam laptop ──
+        // Mỗi lần HS bắt đầu 1 exam attempt → tạo 1 session. Heartbeat đều đặn
+        // để teacher biết HS còn online. Snapshot lưu base64 thumbnail (~50KB).
+        await pool.query(`CREATE TABLE IF NOT EXISTS "StudentExamWebcam" (
+          "id"             TEXT PRIMARY KEY,
+          "studentId"      TEXT NOT NULL,
+          "studentName"    TEXT,
+          "examId"         TEXT,
+          "examTitle"      TEXT,
+          "classId"        TEXT,
+          "roomCode"       TEXT,
+          "deviceInfo"     TEXT,
+          "startedAt"      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "lastHeartbeatAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "endedAt"        TIMESTAMPTZ,
+          "status"         TEXT NOT NULL DEFAULT 'active',  -- active | ended | dropped
+          "snapshotData"   TEXT,                            -- base64 thumbnail mới nhất
+          "snapshotMime"   TEXT DEFAULT 'image/jpeg',
+          "frameCount"     INT NOT NULL DEFAULT 0,
+          "flagCount"      INT NOT NULL DEFAULT 0,          -- số lần phát hiện bất thường
+          "lastFlagReason" TEXT
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_sewcam_exam ON "StudentExamWebcam"("examId", "status")`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_sewcam_class ON "StudentExamWebcam"("classId", "status")`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_sewcam_student ON "StudentExamWebcam"("studentId", "startedAt" DESC)`);
+
         _camTablesEnsured = true;
       } catch (e) {
         console.error('[camera:ensureTables]', e.message);
@@ -28937,22 +28981,64 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     }
 
     // ── GET /api/cameras ──────────────────────────────────────
-    // Teacher view: list cameras enabled + thuộc class teacher dạy hoặc
-    // toàn trường (school cameras). Tạm thời: trả tất cả enabled = true.
+    // 2026-05-19: ADMIN xem tất cả. TEACHER chỉ xem camera được grant qua
+    // CameraPermission. STUDENT 403. Trả thêm permissionInfo (note, scope,
+    // expiresAt) cho mỗi camera để UI hiển thị badge "Được cấp bởi Admin X".
+    //
+    // Response shape:
+    //   {
+    //     cameras: [...],           // mảng cameras teacher có quyền xem
+    //     count: number,
+    //     hasAnyPermission: bool,   // true nếu teacher có ≥1 camera
+    //     isAdmin: bool,
+    //   }
     app.get('/api/cameras', async (req, res) => {
       const user = getCamUser(req);
       if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
       try {
         await ensureCameraTables();
         const pool = getCMPool();
-        if (!pool) return res.json({ cameras: [] });
-        const { rows } = await pool.query(
-          `SELECT * FROM "Camera" WHERE enabled = true ORDER BY name ASC`
-        );
-        res.json({ cameras: rows.map(mapCameraTeacher), count: rows.length });
+        if (!pool) return res.json({ cameras: [], count: 0, hasAnyPermission: false });
+        const admin = isAdminRole(user);
+        let rows;
+        if (admin) {
+          const r = await pool.query(
+            `SELECT * FROM "Camera" WHERE enabled = true ORDER BY name ASC`
+          );
+          rows = r.rows.map(c => ({ ...mapCameraTeacher(c), permissionInfo: { scope: 'admin', grantedBy: 'self' } }));
+        } else {
+          // Filter qua CameraPermission, JOIN để lấy note/scope/expiresAt
+          const r = await pool.query(
+            `SELECT c.*, p."scope", p.note AS "permitNote", p."expiresAt" AS "permitExpires",
+                    p."grantedById", u.name AS "grantedByName"
+               FROM "Camera" c
+               JOIN "CameraPermission" p ON p."cameraId" = c.id
+               LEFT JOIN "User" u ON u.id = p."grantedById"
+              WHERE c.enabled = true
+                AND p."teacherId" = $1
+                AND (p."expiresAt" IS NULL OR p."expiresAt" > NOW())
+              ORDER BY c.name ASC`,
+            [user.id]
+          );
+          rows = r.rows.map(c => ({
+            ...mapCameraTeacher(c),
+            permissionInfo: {
+              scope: c.scope || 'view',
+              grantedBy: c.grantedByName || 'Admin',
+              expiresAt: c.permitExpires,
+              note: c.permitNote,
+            },
+          }));
+        }
+        res.json({
+          cameras: rows,
+          count: rows.length,
+          hasAnyPermission: rows.length > 0,
+          isAdmin: admin,
+        });
       } catch (e) {
         console.error('[cameras:list]', e.message);
-        res.json({ cameras: [], count: 0 });
+        res.json({ cameras: [], count: 0, hasAnyPermission: false });
       }
     });
 
@@ -29191,7 +29277,273 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       });
     });
 
-    console.log('[init] Camera management endpoints (Camera CRUD + ONVIF) ready');
+    // ══════════════════════════════════════════════════════════
+    // CAMERA PERMISSION — Admin grant/revoke per-teacher access
+    // ══════════════════════════════════════════════════════════
+
+    // GET /api/admin/cameras/:id/grants — list teachers có quyền xem camera này
+    app.get('/api/admin/cameras/:id/grants', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.json({ grants: [] });
+        const { rows } = await pool.query(
+          `SELECT p."id", p."teacherId", p."scope", p."note", p."expiresAt", p."createdAt",
+                  u.name AS "teacherName", u.email AS "teacherEmail", u.image AS "teacherImage",
+                  g.name AS "grantedByName"
+             FROM "CameraPermission" p
+             LEFT JOIN "User" u ON u.id = p."teacherId"
+             LEFT JOIN "User" g ON g.id = p."grantedById"
+            WHERE p."cameraId" = $1
+            ORDER BY p."createdAt" DESC`,
+          [req.params.id]
+        );
+        res.json({ grants: rows, count: rows.length });
+      } catch (e) {
+        console.error('[admin:cam:grants:list]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/admin/cameras/:id/grants — grant access cho 1 teacher
+    // Body: { teacherId, scope?, note?, expiresAt? }
+    app.post('/api/admin/cameras/:id/grants', express.json({ limit: '4kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        const teacherId = String(req.body?.teacherId || '').trim();
+        if (!teacherId) return res.status(400).json({ error: 'Thiếu teacherId' });
+        // Verify camera tồn tại
+        const cam = await pool.query(`SELECT id FROM "Camera" WHERE id = $1 LIMIT 1`, [req.params.id]);
+        if (!cam.rows.length) return res.status(404).json({ error: 'Camera không tồn tại' });
+        const { randomUUID } = require('crypto');
+        const id = `grant-${randomUUID().slice(0, 12)}`;
+        const scope = ['view', 'view+ptz', 'view+record'].includes(req.body?.scope)
+          ? req.body.scope : 'view';
+        const note = req.body?.note ? String(req.body.note).slice(0, 200) : null;
+        const expiresAt = req.body?.expiresAt ? new Date(req.body.expiresAt) : null;
+        await pool.query(
+          `INSERT INTO "CameraPermission"
+             ("id", "cameraId", "teacherId", "grantedById", "scope", "note", "expiresAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           ON CONFLICT ("cameraId", "teacherId") DO UPDATE SET
+             "scope" = EXCLUDED."scope",
+             "note" = EXCLUDED."note",
+             "expiresAt" = EXCLUDED."expiresAt",
+             "grantedById" = EXCLUDED."grantedById"`,
+          [id, req.params.id, teacherId, user.id, scope, note, expiresAt]
+        );
+        console.log(`[admin:cam:grant] cam=${req.params.id} → teacher=${teacherId} scope=${scope}`);
+        res.status(201).json({ ok: true, id });
+      } catch (e) {
+        console.error('[admin:cam:grant]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // DELETE /api/admin/cameras/:id/grants/:teacherId — revoke
+    app.delete('/api/admin/cameras/:id/grants/:teacherId', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      if (!isAdminRole(user)) return res.status(403).json({ error: 'forbidden — chỉ ADMIN' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        const r = await pool.query(
+          `DELETE FROM "CameraPermission" WHERE "cameraId" = $1 AND "teacherId" = $2`,
+          [req.params.id, req.params.teacherId]
+        );
+        if (!r.rowCount) return res.status(404).json({ error: 'Không tìm thấy grant' });
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[admin:cam:revoke]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // ══════════════════════════════════════════════════════════
+    // STUDENT EXAM WEBCAM — theo dõi HS làm bài qua webcam laptop
+    // ══════════════════════════════════════════════════════════
+
+    // POST /api/student-cam/start — HS bắt đầu webcam session
+    // Body: { examId?, examTitle?, classId?, roomCode?, deviceInfo? }
+    // Auth: bất kỳ JWT user nào (HS không có role).
+    app.post('/api/student-cam/start', express.json({ limit: '4kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        const { randomUUID } = require('crypto');
+        const id = `sewcam-${randomUUID().slice(0, 12)}`;
+        const b = req.body || {};
+        await pool.query(
+          `INSERT INTO "StudentExamWebcam"
+             ("id", "studentId", "studentName", "examId", "examTitle",
+              "classId", "roomCode", "deviceInfo")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, user.id, user.name || user.email || null,
+           b.examId ? String(b.examId).slice(0, 200) : null,
+           b.examTitle ? String(b.examTitle).slice(0, 300) : null,
+           b.classId ? String(b.classId).slice(0, 100) : null,
+           b.roomCode ? String(b.roomCode).slice(0, 50) : null,
+           b.deviceInfo ? String(b.deviceInfo).slice(0, 500) : null]
+        );
+        console.log(`[student-cam:start] student=${user.id} → ${id} exam=${b.examId || 'none'}`);
+        res.status(201).json({ ok: true, sessionId: id });
+      } catch (e) {
+        console.error('[student-cam:start]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/student-cam/:sessionId/heartbeat — periodic ping + optional snapshot
+    // Body: { snapshot?: base64String, flag?: { reason: string } }
+    app.post('/api/student-cam/:sessionId/heartbeat', express.json({ limit: '512kb' }), async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        const pool = getCMPool();
+        const b = req.body || {};
+        const updates = [`"lastHeartbeatAt" = NOW()`, `"frameCount" = "frameCount" + 1`];
+        const params = [req.params.sessionId, user.id];
+        let i = 3;
+        if (b.snapshot && typeof b.snapshot === 'string' && b.snapshot.length < 400_000) {
+          // Strip data:URI prefix nếu có
+          const clean = b.snapshot.replace(/^data:[^,]+,/, '');
+          updates.push(`"snapshotData" = $${i++}`);
+          params.push(clean);
+          if (b.snapshotMime) {
+            updates.push(`"snapshotMime" = $${i++}`);
+            params.push(String(b.snapshotMime).slice(0, 50));
+          }
+        }
+        if (b.flag?.reason) {
+          updates.push(`"flagCount" = "flagCount" + 1`);
+          updates.push(`"lastFlagReason" = $${i++}`);
+          params.push(String(b.flag.reason).slice(0, 300));
+        }
+        const r = await pool.query(
+          `UPDATE "StudentExamWebcam" SET ${updates.join(', ')}
+            WHERE "id" = $1 AND "studentId" = $2 AND "status" = 'active'
+           RETURNING "id"`,
+          params
+        );
+        if (!r.rowCount) return res.status(404).json({ error: 'Session không tồn tại hoặc đã kết thúc' });
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[student-cam:heartbeat]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // POST /api/student-cam/:sessionId/stop — HS submit bài hoặc tắt
+    app.post('/api/student-cam/:sessionId/stop', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      try {
+        const pool = getCMPool();
+        await pool.query(
+          `UPDATE "StudentExamWebcam"
+              SET "status" = 'ended', "endedAt" = NOW()
+            WHERE "id" = $1 AND "studentId" = $2`,
+          [req.params.sessionId, user.id]
+        );
+        res.json({ ok: true });
+      } catch (e) {
+        console.error('[student-cam:stop]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/teacher/student-cams — Teacher xem webcam HS đang làm bài
+    // Filter:
+    //   ?examId=… → chỉ HS làm exam này
+    //   ?classId=… → chỉ HS lớp này
+    //   ?activeOnly=true (default) → chỉ session active + heartbeat < 60s
+    app.get('/api/teacher/student-cams', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      const role = (user.role || '').toUpperCase();
+      if (role !== 'TEACHER' && role !== 'ADMIN') {
+        return res.status(403).json({ error: 'forbidden — chỉ TEACHER/ADMIN' });
+      }
+      try {
+        await ensureCameraTables();
+        const pool = getCMPool();
+        if (!pool) return res.json({ sessions: [], count: 0 });
+        const examId = String(req.query.examId || '').trim();
+        const classId = String(req.query.classId || '').trim();
+        const activeOnly = String(req.query.activeOnly || 'true') !== 'false';
+        const params = [];
+        const wheres = [];
+        if (examId)  { params.push(examId);  wheres.push(`"examId" = $${params.length}`); }
+        if (classId) { params.push(classId); wheres.push(`"classId" = $${params.length}`); }
+        if (activeOnly) {
+          wheres.push(`"status" = 'active'`);
+          wheres.push(`"lastHeartbeatAt" > NOW() - INTERVAL '60 seconds'`);
+        }
+        const where = wheres.length ? `WHERE ${wheres.join(' AND ')}` : '';
+        // Mark dropped sessions (heartbeat > 60s nhưng status vẫn active) — auto cleanup
+        await pool.query(
+          `UPDATE "StudentExamWebcam" SET "status" = 'dropped', "endedAt" = "lastHeartbeatAt"
+            WHERE "status" = 'active' AND "lastHeartbeatAt" < NOW() - INTERVAL '90 seconds'`
+        ).catch(() => {});
+        const { rows } = await pool.query(
+          `SELECT "id", "studentId", "studentName", "examId", "examTitle",
+                  "classId", "roomCode", "deviceInfo", "startedAt", "lastHeartbeatAt",
+                  "endedAt", "status", "snapshotMime", "frameCount", "flagCount",
+                  "lastFlagReason",
+                  -- Trả snapshot data riêng (large) chỉ khi explicit ?withSnapshot=true
+                  CASE WHEN $${params.length + 1}::bool THEN "snapshotData" ELSE NULL END AS "snapshotData"
+             FROM "StudentExamWebcam"
+            ${where}
+            ORDER BY "lastHeartbeatAt" DESC NULLS LAST, "startedAt" DESC
+            LIMIT 100`,
+          [...params, String(req.query.withSnapshot || 'true') !== 'false']
+        );
+        res.json({ sessions: rows, count: rows.length });
+      } catch (e) {
+        console.error('[teacher:student-cams]', e.message);
+        res.json({ sessions: [], count: 0 });
+      }
+    });
+
+    // GET /api/teacher/student-cams/:id/snapshot — lấy snapshot rời (cho zoom-in view)
+    app.get('/api/teacher/student-cams/:id/snapshot', async (req, res) => {
+      const user = getCamUser(req);
+      if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+      const role = (user.role || '').toUpperCase();
+      if (role !== 'TEACHER' && role !== 'ADMIN') return res.status(403).json({ error: 'forbidden' });
+      try {
+        const pool = getCMPool();
+        const { rows } = await pool.query(
+          `SELECT "snapshotData", "snapshotMime", "lastHeartbeatAt"
+             FROM "StudentExamWebcam" WHERE "id" = $1 LIMIT 1`,
+          [req.params.id]
+        );
+        if (!rows.length || !rows[0].snapshotData) {
+          return res.status(404).json({ error: 'Chưa có snapshot' });
+        }
+        const buf = Buffer.from(rows[0].snapshotData, 'base64');
+        res.setHeader('Content-Type', rows[0].snapshotMime || 'image/jpeg');
+        res.setHeader('Cache-Control', 'private, max-age=10');
+        res.send(buf);
+      } catch (e) {
+        console.error('[student-cam:snapshot]', e.message);
+        res.status(500).json({ error: e.message });
+      }
+    });
+
+    console.log('[init] Camera management endpoints (CRUD + ONVIF + permissions + student-cam) ready');
   }
 
   // ─ Agents / Settings ─────────────────────────────────────
