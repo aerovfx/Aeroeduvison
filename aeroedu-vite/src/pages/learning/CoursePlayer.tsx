@@ -8,12 +8,13 @@
  *   - RESUMED   khi quay lại bài đã mở trước đó
  *   - COMPLETED khi nhấn "Đánh dấu hoàn thành"
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   CheckCircle2,
   Circle,
   Play,
@@ -25,6 +26,7 @@ import {
   Menu,
   X,
   History,
+  Award,
 } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
 import { cn } from '@/lib/utils'
@@ -101,6 +103,16 @@ function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
 }
 
 // ── Sidebar Video List ───────────────────────────────────────
+/**
+ * VideoSidebar — Udemy-style course content sidebar.
+ *  - Group videos theo `groupName` (Section)
+ *  - Số thứ tự liên tục (1, 2, 3, ...) khắp courses
+ *  - Section header collapsible với progress N/M | total min
+ *  - Active video highlighted purple
+ *  - Completed video: tick xanh; Current: play icon; Other: hollow circle
+ *  - Duration badge dưới title
+ *  - Mobile-friendly 56px touch target
+ */
 function VideoSidebar({
   videos,
   currentVideoId,
@@ -117,65 +129,143 @@ function VideoSidebar({
     ? Math.round((completedCount / videos.length) * 100)
     : 0
 
+  // Format duration: 7min, 1h 23min
+  const fmtDur = (sec?: number | null): string => {
+    if (!sec || sec < 1) return ''
+    const m = Math.floor(sec / 60)
+    if (m < 60) return `${m}min`
+    const h = Math.floor(m / 60)
+    const rm = m % 60
+    return rm > 0 ? `${h}h ${rm}min` : `${h}h`
+  }
+
+  // Group videos theo groupName (Section), giữ thứ tự gốc của API
+  const sections = useMemo(() => {
+    const map = new Map<string, { name: string; videos: Array<CourseVideo & { _idx: number }> }>()
+    videos.forEach((v, i) => {
+      const sName = v.groupName?.trim() || 'Nội dung khoá học'
+      if (!map.has(sName)) map.set(sName, { name: sName, videos: [] })
+      map.get(sName)!.videos.push({ ...v, _idx: i + 1 })  // _idx = số thứ tự continuous
+    })
+    return Array.from(map.values())
+  }, [videos])
+
+  // State: collapsed sections (default tất cả expanded)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const toggleSection = (name: string) => {
+    setCollapsed(s => {
+      const next = new Set(s)
+      if (next.has(name)) next.delete(name); else next.add(name)
+      return next
+    })
+  }
+
   return (
     <div className="flex flex-col h-full">
-      {/* Progress bar */}
-      <div className="p-4 border-b border-white/10 space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-300 font-medium">Tiến độ</span>
-          <span className="text-purple-300">{progress}%</span>
+      {/* Header với progress bar mảnh trên đầu */}
+      <div className="px-4 py-3 border-b border-white/10 bg-zinc-950/50">
+        <div className="flex items-center justify-between mb-1.5">
+          <h3 className="text-sm font-bold text-white">Course content</h3>
+          <span className="text-xs text-purple-300 font-bold">{progress}%</span>
         </div>
-        <div className="h-2 rounded-full bg-white/10">
+        <div className="h-1 rounded-full bg-white/10 overflow-hidden">
           <div
-            className="h-full rounded-full bg-purple-500 transition-all"
+            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-[10px] text-gray-500 mt-1">
           {completedCount}/{videos.length} bài đã hoàn thành
         </p>
       </div>
 
-      {/* Video list — touch-action manipulation để bỏ 300ms tap delay trên mobile */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1" style={{ WebkitOverflowScrolling: 'touch' }}>
-        {videos.map((video, idx) => (
-          <button
-            key={video.id}
-            onClick={() => onSelect(video)}
-            type="button"
-            style={{ touchAction: 'manipulation' }}
-            className={cn(
-              'w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors',
-              'min-h-[56px] active:scale-[0.98]',  // 56px Apple HIG touch target + tactile feedback
-              video.id === currentVideoId
-                ? 'bg-purple-600/30 border border-purple-500/50'
-                : 'hover:bg-white/5 active:bg-white/10'
-            )}
-          >
-            {video.isCompleted ? (
-              <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-            ) : video.id === currentVideoId ? (
-              <Play className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
-            ) : (
-              <Circle className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
-            )}
-            <div className="min-w-0">
-              <p
-                className={cn(
-                  'text-sm font-medium truncate',
-                  video.id === currentVideoId ? 'text-purple-300' : 'text-gray-300'
-                )}
+      {/* Section + Video list */}
+      <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        {sections.map((section, sIdx) => {
+          const isCollapsed = collapsed.has(section.name)
+          const sCompleted = section.videos.filter(v => v.isCompleted).length
+          const sTotal     = section.videos.length
+          const sDuration  = section.videos.reduce((s, v) => s + (v.duration || 0), 0)
+
+          return (
+            <div key={section.name} className="border-b border-white/5">
+              {/* Section header — collapsible */}
+              <button
+                onClick={() => toggleSection(section.name)}
+                type="button"
+                style={{ touchAction: 'manipulation' }}
+                className="w-full px-4 py-3 flex items-center gap-2 bg-zinc-900/50 hover:bg-zinc-800/60
+                           active:bg-zinc-800 transition text-left min-h-[56px]"
               >
-                {idx + 1}. {video.title}
-              </p>
-              {video.duration && (
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {Math.floor(video.duration / 60)}:{String(video.duration % 60).padStart(2, '0')}
-                </p>
-              )}
+                <ChevronDown
+                  className={cn('w-4 h-4 text-gray-400 flex-shrink-0 transition-transform',
+                    isCollapsed && '-rotate-90')}
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-white truncate">
+                    Section {sIdx + 1}: {section.name}
+                  </h4>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    {sCompleted} / {sTotal}
+                    {sDuration > 0 && <> | {fmtDur(sDuration)}</>}
+                  </p>
+                </div>
+              </button>
+
+              {/* Videos in section */}
+              {!isCollapsed && section.videos.map(video => {
+                const isCurrent = video.id === currentVideoId
+                const isDone    = video.isCompleted
+                return (
+                  <button
+                    key={video.id}
+                    onClick={() => onSelect(video)}
+                    type="button"
+                    style={{ touchAction: 'manipulation' }}
+                    className={cn(
+                      'w-full flex items-start gap-3 px-4 py-3 text-left transition border-l-4',
+                      'min-h-[64px] active:bg-zinc-800',
+                      isCurrent
+                        ? 'bg-purple-600/15 border-l-purple-500'
+                        : 'border-l-transparent hover:bg-white/5'
+                    )}
+                  >
+                    {/* Custom checkbox — filled khi completed */}
+                    <div className={cn(
+                      'mt-0.5 w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0 transition',
+                      isDone
+                        ? 'bg-purple-500'
+                        : 'border-2 border-gray-600 bg-transparent'
+                    )}>
+                      {isDone && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />}
+                      {!isDone && isCurrent && <Play className="w-2.5 h-2.5 text-purple-400 fill-purple-400" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={cn(
+                        'text-sm font-medium leading-snug line-clamp-2',
+                        isCurrent ? 'text-purple-300 font-bold' : 'text-gray-200'
+                      )}>
+                        {video._idx}. {video.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Play className="w-3 h-3 text-gray-500" />
+                        <span className="text-[11px] text-gray-500">
+                          {fmtDur(video.duration) || '—'}
+                        </span>
+                        {video.isPreview && (
+                          <span className="text-[9px] px-1 py-0.5 rounded
+                                          bg-emerald-500/20 text-emerald-300 font-bold uppercase">
+                            Preview
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
-          </button>
-        ))}
+          )
+        })}
       </div>
 
       {/* Certificate button */}
@@ -440,17 +530,31 @@ export default function CoursePlayer() {
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-y-auto">
-        {/* Top nav */}
+        {/* Top nav — Udemy style với progress badge */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-gray-900/50 flex-shrink-0">
           <Link
             to="/student/my-courses"
-            className="text-gray-400 hover:text-white transition-colors"
+            className="text-gray-400 hover:text-white transition-colors p-2 -m-2 rounded-lg hover:bg-white/10
+                       min-w-[44px] min-h-[44px] flex items-center justify-center"
+            style={{ touchAction: 'manipulation' }}
           >
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-sm font-medium text-white truncate flex-1">
             {currentVideo?.title || 'Đang tải...'}
           </h1>
+
+          {/* Your progress badge (chuẩn Udemy) */}
+          {videos.length > 0 && (
+            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                            bg-purple-500/15 border border-purple-400/30
+                            text-purple-200 text-xs font-bold">
+              <Award className="w-3.5 h-3.5" />
+              <span>{Math.round((videos.filter(v => v.isCompleted).length / videos.length) * 100)}%</span>
+              <span className="text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
+            </div>
+          )}
+
           <button
             onClick={() => setSidebarOpen((v) => !v)}
             type="button"
