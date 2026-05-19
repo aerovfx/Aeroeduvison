@@ -21,6 +21,7 @@ import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { compressImage } from '@/lib/imageCompression'
 import type { AnswerKey } from './ScanGrading'
+import { BulkGradingReport } from './BulkGradingReport'
 
 interface SavedKey {
   id?: string
@@ -487,6 +488,23 @@ export function BulkGrading({
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── Báo cáo phân tích sau khi chấm xong (auto-render khi có ≥ 1 OK) ── */}
+      {sumOK > 0 && (
+        <BulkGradingReport
+          results={queue.map(item => ({
+            studentName: item.result?.studentName,
+            studentId: item.result?.studentId,
+            className: item.result?.className,
+            examCode: item.result?.examCode,
+            score: item.result?.score,
+            maxScore: item.result?.maxScore,
+            correct: item.result?.correct,
+            total: item.result?.total,
+            ok: item.result?.ok ?? false,
+          }))}
+        />
       )}
     </div>
   )
