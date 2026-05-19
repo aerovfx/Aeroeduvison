@@ -23792,6 +23792,217 @@ if (!USE_NODEJS_QUESTIONS) {
     res.status(501).json({ error: 'Tính năng đang phát triển' });
   });
 
+  // ════════════════════════════════════════════════════════════════
+  // NOTEBOOK-STYLE LESSON PLAN GENERATOR (inspired by NotebookLM)
+  // Flow: GV upload nhiều source (PDF/text/URL) → AI tổng hợp → giáo án
+  // ════════════════════════════════════════════════════════════════
+
+  // POST /api/lesson-plans/notebook-source-extract
+  // Body multipart: file (PDF/txt) HOẶC { url } HOẶC { text }
+  // Returns: { title, content (plain text), source: 'pdf'|'url'|'text', meta }
+  const notebookUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 15 * 1024 * 1024 },  // 15MB max
+  });
+  app.post('/api/lesson-plans/notebook-source-extract',
+    notebookUpload.single('file'),
+    async (req, res) => {
+      try {
+        const userId = getLatexUserId(req);
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+        const f = req.file;
+        const body = req.body || {};
+        const url = String(body.url || '').trim();
+        const text = String(body.text || '').trim();
+        const titleHint = String(body.title || '').trim();
+
+        // CASE 1: File upload (PDF / TXT)
+        if (f) {
+          const mime = f.mimetype || '';
+          if (mime.includes('pdf') || f.originalname.toLowerCase().endsWith('.pdf')) {
+            try {
+              const pdfParse = require('pdf-parse');
+              const data = await pdfParse(f.buffer);
+              const content = String(data.text || '').replace(/\s+\n/g, '\n').slice(0, 200_000);
+              return res.json({
+                title: titleHint || f.originalname.replace(/\.[^.]+$/, ''),
+                content,
+                source: 'pdf',
+                meta: { pages: data.numpages, size: f.size, charCount: content.length },
+              });
+            } catch (err) {
+              return res.status(400).json({ error: `Không đọc được PDF: ${err.message}` });
+            }
+          }
+          // TXT / fallback
+          const content = f.buffer.toString('utf-8').slice(0, 200_000);
+          return res.json({
+            title: titleHint || f.originalname.replace(/\.[^.]+$/, ''),
+            content,
+            source: 'text',
+            meta: { size: f.size, charCount: content.length },
+          });
+        }
+
+        // CASE 2: URL fetch + extract text
+        if (url) {
+          if (!/^https?:\/\//i.test(url)) {
+            return res.status(400).json({ error: 'URL phải bắt đầu http(s)://' });
+          }
+          try {
+            const resp = await fetch(url, {
+              headers: { 'User-Agent': 'Mozilla/5.0 AeroEdu Notebook-Source-Bot' },
+              signal: AbortSignal.timeout(10000),
+            });
+            if (!resp.ok) return res.status(400).json({ error: `Fetch URL fail: HTTP ${resp.status}` });
+            const ctype = resp.headers.get('content-type') || '';
+            const html = await resp.text();
+            // Strip HTML tags simple — không dùng cheerio để giảm deps
+            let content = html
+              .replace(/<script[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[\s\S]*?<\/style>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/&nbsp;/g, ' ')
+              .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 200_000);
+            // Extract title from HTML
+            const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+            const title = titleHint || titleMatch?.[1]?.trim() || url;
+            return res.json({
+              title,
+              content,
+              source: 'url',
+              meta: { url, contentType: ctype, charCount: content.length },
+            });
+          } catch (err) {
+            return res.status(400).json({ error: `Fetch URL fail: ${err.message}` });
+          }
+        }
+
+        // CASE 3: Raw text
+        if (text) {
+          return res.json({
+            title: titleHint || 'Đoạn văn bản dán',
+            content: text.slice(0, 200_000),
+            source: 'text',
+            meta: { charCount: text.length },
+          });
+        }
+
+        return res.status(400).json({ error: 'Thiếu file, url hoặc text' });
+      } catch (err) {
+        console.error('[notebook:extract]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+  // POST /api/lesson-plans/notebook-generate
+  // Body: {
+  //   topic, subject, grade, lessonCount, outputFormat ('latex'|'markdown'),
+  //   sources: [{ title, content }],  // tối đa 10 nguồn
+  //   extraInstructions?  // GV nhập hướng dẫn thêm
+  // }
+  // Returns: { content, citations: ['#1: <title>', ...], tokensUsed, meta }
+  app.post('/api/lesson-plans/notebook-generate',
+    express.json({ limit: '2mb' }),
+    async (req, res) => {
+      const t0 = Date.now();
+      try {
+        const userId = getLatexUserId(req);
+        if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+        const b = req.body || {};
+        const topic = String(b.topic || '').trim();
+        if (!topic) return res.status(400).json({ error: 'Thiếu topic' });
+        const subject = String(b.subject || '').trim() || 'Khoa học';
+        const grade = String(b.grade || '').trim() || '10';
+        const lessonCount = Math.min(8, Math.max(1, Number(b.lessonCount) || 2));
+        const outputFormat = b.outputFormat === 'latex' ? 'latex' : 'markdown';
+        const extraInstructions = String(b.extraInstructions || '').trim();
+        const sources = Array.isArray(b.sources) ? b.sources.slice(0, 10) : [];
+        if (sources.length === 0) {
+          return res.status(400).json({ error: 'Cần ít nhất 1 nguồn tư liệu' });
+        }
+
+        // Build sources context (truncate mỗi nguồn còn 20k chars để total <= 200k)
+        const maxCharsPerSource = Math.floor(180_000 / sources.length);
+        const sourcesContext = sources.map((s, i) => {
+          const title = String(s?.title || `Nguồn ${i + 1}`).slice(0, 200);
+          const content = String(s?.content || '').slice(0, maxCharsPerSource);
+          return `═══ [Nguồn #${i + 1}] ${title} ═══\n${content}\n`;
+        }).join('\n');
+
+        // Call Claude
+        let client;
+        try { client = getAnthropic(); }
+        catch (e) { return res.status(503).json({ error: `Claude API: ${e.message}` }); }
+
+        const systemPrompt = `Bạn là chuyên gia soạn giáo án THPT/Tiểu học theo chuẩn GDPT 2018 + Thông tư 32/2018 + Công văn 5512/BGDĐT-GDTrH 2020. \
+Nhiệm vụ: tổng hợp các nguồn tư liệu GV cung cấp → soạn giáo án ${outputFormat === 'latex' ? 'định dạng LaTeX' : 'Markdown'} \
+chi tiết cho chủ đề được yêu cầu.
+
+NGUYÊN TẮC:
+1. CHỈ dùng thông tin từ các nguồn được cung cấp (giống NotebookLM — grounded generation)
+2. Khi trích thông tin từ nguồn, ghi citation [Nguồn #N] ngay sau câu
+3. Cấu trúc giáo án đầy đủ 4 hoạt động (CV 5512):
+   - Mở đầu (warm-up, 5-10 phút) — tạo tình huống mở
+   - Hình thành kiến thức mới — chia thành các đơn vị KT rõ ràng
+   - Luyện tập — bài tập + ví dụ
+   - Vận dụng + Mở rộng — bài tập nâng cao, ứng dụng thực tế
+4. Mỗi hoạt động có: Mục tiêu · Nội dung · Sản phẩm · Tổ chức thực hiện
+5. Có mục tiêu (kiến thức + kỹ năng + năng lực + phẩm chất) ở đầu
+6. Có chuẩn bị (GV/HS) — tham khảo từ nguồn
+7. ${outputFormat === 'latex' ? 'Output LaTeX thuần — KHÔNG markdown backticks. Dùng \\section, \\subsection, itemize, enumerate.' : 'Output Markdown — dùng ## headings, bullet lists, tables.'}`;
+
+        const userPrompt = `Soạn giáo án cho:
+- Chủ đề: ${topic}
+- Môn: ${subject}
+- Lớp: ${grade}
+- Số tiết: ${lessonCount}
+${extraInstructions ? `- Hướng dẫn thêm từ GV: ${extraInstructions}\n` : ''}
+═══════════════════════════════════════════
+NGUỒN TƯ LIỆU (${sources.length} nguồn):
+═══════════════════════════════════════════
+${sourcesContext}
+═══════════════════════════════════════════
+
+Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu trích, định dạng ${outputFormat}.`;
+
+        const model = process.env.ANTHROPIC_MODEL || 'claude-opus-4-6';
+        const resp = await client.messages.create({
+          model,
+          max_tokens: 16000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+        const content = resp.content?.[0]?.text || '';
+        if (!content) return res.status(500).json({ error: 'Claude trả về rỗng' });
+
+        // Extract citations [Nguồn #N] để FE highlight
+        const citationMatches = content.match(/\[Nguồn #\d+\]/g) || [];
+        const uniqueCitations = Array.from(new Set(citationMatches));
+
+        console.log(`[notebook:generate] ✅ user=${userId} sources=${sources.length} topic="${topic.slice(0,40)}" outLen=${content.length} took=${Date.now() - t0}ms`);
+
+        return res.json({
+          content,
+          citations: uniqueCitations,
+          meta: {
+            sourceCount: sources.length,
+            outputLength: content.length,
+            outputFormat,
+            tookMs: Date.now() - t0,
+            model,
+          },
+        });
+      } catch (err) {
+        console.error('[notebook:generate] ❌', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
   // GET /api/latex-projects/:id/versions → lịch sử lưu (auto-save snapshots).
   // Bảng "LatexProjectVersion" tự create lazy nếu chưa có.
   app.get('/api/latex-projects/:id/versions', async (req, res) => {

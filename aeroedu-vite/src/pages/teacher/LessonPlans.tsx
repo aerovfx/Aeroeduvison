@@ -14,6 +14,7 @@ import { toast } from 'react-hot-toast'
 import { lessonPlanService, type LessonPlanSummary, type GcsSnapshot } from '@/services/lessonPlan.service'
 import { LESSON_PLAN_TEMPLATES, type LessonPlanTemplate } from '@/lib/lesson-plan-templates'
 import AiGenerateLatexLessonPlanModal from '@/components/lesson-plan/AiGenerateLatexLessonPlanModal'
+import NotebookGenerator from '@/components/lesson-plan/NotebookGenerator'
 
 type TabKey = 'plans' | 'gcs'
 
@@ -31,6 +32,7 @@ export default function LessonPlans() {
   const [creating, setCreating] = useState(false)
   const [tplPickerOpen, setTplPickerOpen] = useState(false)
   const [aiModalOpen, setAiModalOpen] = useState(false)
+  const [notebookOpen, setNotebookOpen] = useState(false)   // NotebookLM-style generator
 
   // ── Tabs: Plans (DB) vs GCS Snapshots ──
   const [tab, setTab] = useState<TabKey>('plans')
@@ -140,7 +142,28 @@ export default function LessonPlans() {
               </p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {/* 🌟 NEW: NotebookLM-style workflow - upload sources trước rồi AI tổng hợp */}
+            <button
+              onClick={() => setNotebookOpen(true)}
+              disabled={creating}
+              style={{
+                padding: '10px 18px',
+                background: 'linear-gradient(90deg, #06b6d4, #8b5cf6, #ec4899)',
+                color: '#fff',
+                border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 700,
+                cursor: creating ? 'not-allowed' : 'pointer', opacity: creating ? 0.6 : 1,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 4px 14px rgba(139,92,246,0.5)',
+              }}
+              title="Soạn giáo án theo workflow NotebookLM — nạp tư liệu trước, AI tổng hợp sau (citations chính xác)"
+            >
+              🧠 Notebook AI
+              <span style={{
+                fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                background: 'rgba(0,0,0,0.3)', fontWeight: 800,
+              }}>MỚI</span>
+            </button>
             <button
               onClick={() => setAiModalOpen(true)}
               disabled={creating}
@@ -153,10 +176,10 @@ export default function LessonPlans() {
                 display: 'inline-flex', alignItems: 'center', gap: 8,
                 boxShadow: '0 4px 14px rgba(124,58,237,0.4)',
               }}
-              title="AI điền nội dung vào template LaTeX (giống Gemini Canvas)"
+              title="AI điền nội dung vào template LaTeX (giống Gemini Canvas) — không cần nguồn"
             >
               <Wand2 size={15} />
-              Tạo bằng AI
+              Tạo bằng AI (nhanh)
             </button>
             <button
               onClick={() => setTplPickerOpen(true)}
@@ -601,10 +624,16 @@ export default function LessonPlans() {
         </div>
       )}
 
-      {/* ── AI Generate LaTeX Lesson Plan Modal ── */}
+      {/* ── AI Generate LaTeX Lesson Plan Modal (cũ — quick generate) ── */}
       <AiGenerateLatexLessonPlanModal
         open={aiModalOpen}
         onClose={() => setAiModalOpen(false)}
+      />
+
+      {/* ── 🧠 NotebookLM-style Generator (NEW — grounded với sources) ── */}
+      <NotebookGenerator
+        open={notebookOpen}
+        onClose={() => setNotebookOpen(false)}
       />
     </div>
   )
