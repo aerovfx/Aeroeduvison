@@ -125,16 +125,16 @@ export default function KgRolePanel({ onNodeClick, courseId, currentNodeId }: Pr
 
   if (loading) {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-4 text-center">
-        <Loader2 className="w-5 h-5 animate-spin mx-auto text-zinc-400" />
-        <p className="text-[10px] text-zinc-500 mt-2">Đang tải bộ não…</p>
+      <div className="bg-card/60 dark:bg-zinc-900/60 rounded-xl border border p-4 text-center">
+        <Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" />
+        <p className="text-[10px] text-muted-foreground mt-2">Đang tải bộ não…</p>
       </div>
     )
   }
   if (!ctx) {
     return (
-      <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 p-3 text-center">
-        <p className="text-[11px] text-zinc-500">Cần đăng nhập để xem bộ não của bạn</p>
+      <div className="bg-card/60 dark:bg-zinc-900/60 rounded-xl border border p-3 text-center">
+        <p className="text-[11px] text-muted-foreground">Cần đăng nhập để xem bộ não của bạn</p>
       </div>
     )
   }
@@ -151,23 +151,23 @@ export default function KgRolePanel({ onNodeClick, courseId, currentNodeId }: Pr
   if (ctx.capabilities.canManageWorkflows) tabs.push({ id: 'workflows', label: 'Quy trình', icon: Workflow })
 
   return (
-    <div className="bg-zinc-900/60 rounded-xl border border-zinc-800 overflow-hidden">
+    <div className="bg-card/60 dark:bg-zinc-900/60 rounded-xl border border overflow-hidden">
       {/* Header: role badge */}
-      <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-2"
+      <div className="px-3 py-2 border-b border flex items-center gap-2"
            style={{ background: `linear-gradient(90deg, ${cfg.accent}15, transparent)` }}>
         <div className="p-1.5 rounded-md" style={{ background: `${cfg.accent}25` }}>
           <RoleIcon className="w-4 h-4" style={{ color: cfg.accent }} />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-xs font-bold text-zinc-100 truncate">
+          <h3 className="text-xs font-bold text-foreground truncate">
             {cfg.label} · {ctx.name || ctx.email}
           </h3>
-          <p className="text-[9px] text-zinc-500 leading-tight">{cfg.tagline}</p>
+          <p className="text-[9px] text-muted-foreground leading-tight">{cfg.tagline}</p>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
           title="Thêm node vào bộ não tôi"
-          className="p-1 rounded text-zinc-400 hover:text-zinc-200 hover:bg-white/10"
+          className="p-1 rounded text-muted-foreground hover:text-foreground/90 hover:bg-white/10"
           style={{ touchAction: 'manipulation' }}
         >
           <Plus className="w-4 h-4" />
@@ -175,14 +175,14 @@ export default function KgRolePanel({ onNodeClick, courseId, currentNodeId }: Pr
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-px bg-zinc-800/50 text-center">
+      <div className="grid grid-cols-3 gap-px bg-muted/80 dark:bg-zinc-800/50 text-center">
         <Stat label="Đã thăm" value={ctx.stats.visited} accent={cfg.accent} />
         <Stat label="Note tôi" value={ctx.stats.customNodes} accent={cfg.accent} />
         <Stat label="Quy trình" value={ctx.stats.workflows} accent={cfg.accent} />
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-zinc-800 overflow-x-auto">
+      <div className="flex border-b border overflow-x-auto">
         {tabs.map(t => {
           const Icon = t.icon
           const active = activeTab === t.id
@@ -193,7 +193,7 @@ export default function KgRolePanel({ onNodeClick, courseId, currentNodeId }: Pr
               style={{ touchAction: 'manipulation', minHeight: 44,
                 ...(active ? { borderColor: cfg.accent, color: cfg.accent } : {}) }}
               className={`flex-1 min-w-fit px-2 py-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1 transition relative ${
-                active ? 'bg-zinc-900/80 border-b-2' : 'text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent'
+                active ? 'bg-card/80 dark:bg-zinc-900/80 border-b-2' : 'text-muted-foreground hover:text-foreground/90 border-b-2 border-transparent'
               }`}
             >
               <Icon className="w-3 h-3" /> {t.label}
@@ -253,9 +253,9 @@ export default function KgRolePanel({ onNodeClick, courseId, currentNodeId }: Pr
 
 function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="bg-zinc-950/60 py-1.5 px-1">
+    <div className="bg-muted dark:bg-zinc-950/60 py-1.5 px-1">
       <div className="text-sm font-bold" style={{ color: accent }}>{value}</div>
-      <div className="text-[9px] text-zinc-500 uppercase tracking-wider">{label}</div>
+      <div className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</div>
     </div>
   )
 }
@@ -306,7 +306,7 @@ function MineTab({ role, onNodeClick, accent, onAck }: {
     })
   }
 
-  if (loading) return <div className="p-3 text-center text-[10px] text-zinc-500">Đang tải…</div>
+  if (loading) return <div className="p-3 text-center text-[10px] text-muted-foreground">Đang tải…</div>
 
   return (
     <div className="max-h-72 overflow-y-auto">
@@ -329,9 +329,9 @@ function MineTab({ role, onNodeClick, accent, onAck }: {
             >
               {r.status === 'pending' && <Circle className="w-2 h-2 fill-cyan-400 text-cyan-400 mt-0.5 shrink-0" />}
               <div className="flex-1 min-w-0">
-                <div className="font-semibold text-zinc-100 truncate">{r.nodeLabel || r.nodeId}</div>
-                {r.note && <p className="text-zinc-400 line-clamp-2 mt-0.5 italic">"{r.note}"</p>}
-                <p className="text-zinc-500 text-[9px] mt-0.5">— {r.teacherName || 'GV'}</p>
+                <div className="font-semibold text-foreground truncate">{r.nodeLabel || r.nodeId}</div>
+                {r.note && <p className="text-muted-foreground line-clamp-2 mt-0.5 italic">"{r.note}"</p>}
+                <p className="text-muted-foreground text-[9px] mt-0.5">— {r.teacherName || 'GV'}</p>
               </div>
             </button>
           ))}
@@ -340,26 +340,26 @@ function MineTab({ role, onNodeClick, accent, onAck }: {
 
       {/* Custom nodes của user */}
       {items.length === 0 ? (
-        <p className="px-3 py-4 text-center text-[10px] text-zinc-500 italic">
+        <p className="px-3 py-4 text-center text-[10px] text-muted-foreground italic">
           Chưa có node cá nhân nào — bấm <Plus className="inline w-3 h-3" /> để thêm
         </p>
       ) : (
-        <div className="divide-y divide-zinc-800/60">
+        <div className="divide-y divide-border">
           {items.map(item => (
-            <div key={item.id} className="px-3 py-2 hover:bg-zinc-800/40 group flex items-start gap-2">
+            <div key={item.id} className="px-3 py-2 hover:bg-muted/70 dark:bg-zinc-800/40 group flex items-start gap-2">
               <span className="text-[9px] mt-0.5 font-mono shrink-0" style={{ color: accent }}>
                 {item.type.slice(0, 4).toUpperCase()}
               </span>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-zinc-100 truncate">{item.label}</div>
+                <div className="text-xs font-semibold text-foreground truncate">{item.label}</div>
                 {item.description && (
-                  <p className="text-[10px] text-zinc-400 line-clamp-2 mt-0.5">{item.description}</p>
+                  <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{item.description}</p>
                 )}
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${
                     item.visibility === 'public' ? 'bg-emerald-500/20 text-emerald-300'
                     : item.visibility === 'class' ? 'bg-cyan-500/20 text-cyan-300'
-                    : 'bg-zinc-700/40 text-zinc-400'
+                    : 'bg-zinc-700/40 text-muted-foreground'
                   }`}>
                     {item.visibility === 'public' ? '🌍 Công khai'
                       : item.visibility === 'class' ? '👥 Lớp'
@@ -372,7 +372,7 @@ function MineTab({ role, onNodeClick, accent, onAck }: {
               </div>
               <button
                 onClick={() => handleDelete(item.id)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition"
                 title="Xoá"
               >
                 <Trash2 className="w-3 h-3" />
@@ -416,26 +416,26 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
 
   if (!currentNodeId) {
     return (
-      <p className="px-3 py-6 text-center text-[10px] text-zinc-500 italic">
+      <p className="px-3 py-6 text-center text-[10px] text-muted-foreground italic">
         Click vào 1 node trong cây tri thức để xem gợi ý học tập
       </p>
     )
   }
-  if (loading) return <div className="p-3 text-center text-[10px] text-zinc-500">Đang phân tích…</div>
-  if (!data) return <div className="p-3 text-center text-[10px] text-zinc-500">Không có dữ liệu</div>
+  if (loading) return <div className="p-3 text-center text-[10px] text-muted-foreground">Đang phân tích…</div>
+  if (!data) return <div className="p-3 text-center text-[10px] text-muted-foreground">Không có dữ liệu</div>
 
   return (
     <div className="max-h-80 overflow-y-auto text-[11px]">
       {/* Header: node + mastery */}
-      <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950/50">
+      <div className="px-3 py-2 border-b border bg-muted dark:bg-zinc-950/50">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-bold text-zinc-100">{data.node.label}</div>
-            <div className="text-[9px] text-zinc-500 mt-0.5">{data.node.type}</div>
+            <div className="text-xs font-bold text-foreground">{data.node.label}</div>
+            <div className="text-[9px] text-muted-foreground mt-0.5">{data.node.type}</div>
           </div>
           <div className="text-right">
             <div className="text-sm font-bold" style={{ color: accent }}>{data.mastery.score}%</div>
-            <div className="text-[8px] text-zinc-500 uppercase">{data.mastery.level}</div>
+            <div className="text-[8px] text-muted-foreground uppercase">{data.mastery.level}</div>
           </div>
         </div>
         <div className="mt-2 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[10px] flex items-start gap-1">
@@ -454,8 +454,8 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
             <button key={n.id} onClick={() => onNodeClick?.(n.id)}
               className="w-full text-left p-1 rounded hover:bg-white/5 flex items-center gap-2">
               <span className="text-rose-400 font-bold text-[10px]">{n.masteryScore}%</span>
-              <span className="text-zinc-300 truncate flex-1">{n.label}</span>
-              <ChevronRight className="w-3 h-3 text-zinc-500" />
+              <span className="text-foreground/85 truncate flex-1">{n.label}</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground" />
             </button>
           ))}
         </div>
@@ -463,15 +463,15 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
 
       {/* Chapters */}
       {data.chapters.length > 0 && (
-        <div className="px-3 py-2 border-b border-zinc-800/50">
+        <div className="px-3 py-2 border-b border/50">
           <div className="text-[10px] font-bold uppercase text-emerald-300 mb-1">
             📚 Bài học liên quan ({data.chapters.length})
           </div>
           {data.chapters.slice(0, 4).map(c => (
             <a key={c.id} href={`/learning/course/${c.courseId}/chapter/${c.id}`}
               className="block p-1 rounded hover:bg-white/5">
-              <div className="text-zinc-200 truncate font-medium">{c.title}</div>
-              <div className="text-[9px] text-zinc-500">
+              <div className="text-foreground/90 truncate font-medium">{c.title}</div>
+              <div className="text-[9px] text-muted-foreground">
                 {c.courseTitle || 'Khoá học'} · {c.duration || '—'} phút
               </div>
             </a>
@@ -481,7 +481,7 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
 
       {/* Questions */}
       {data.questions.length > 0 && (
-        <div className="px-3 py-2 border-b border-zinc-800/50">
+        <div className="px-3 py-2 border-b border/50">
           <div className="text-[10px] font-bold uppercase text-cyan-300 mb-1">
             ❓ Câu hỏi luyện tập ({data.questions.length})
           </div>
@@ -489,11 +489,11 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
             <div key={q.id} className="p-1 rounded hover:bg-white/5">
               <div className="flex items-center gap-1 mb-0.5">
                 <FileQuestion className="w-2.5 h-2.5 text-cyan-400" />
-                <span className="text-[9px] uppercase font-bold text-zinc-500">
+                <span className="text-[9px] uppercase font-bold text-muted-foreground">
                   {q.difficulty} · {q.questionType}
                 </span>
               </div>
-              <p className="text-zinc-300 line-clamp-2">{q.content}</p>
+              <p className="text-foreground/85 line-clamp-2">{q.content}</p>
             </div>
           ))}
         </div>
@@ -508,8 +508,8 @@ function LearnTab({ currentNodeId, onNodeClick, accent }: {
           {data.nextNodes.slice(0, 5).map(n => (
             <button key={n.id} onClick={() => onNodeClick?.(n.id)}
               className="w-full text-left p-1 rounded hover:bg-white/5 flex items-center gap-2">
-              <span className="text-zinc-300 truncate flex-1">{n.label}</span>
-              <ChevronRight className="w-3 h-3 text-zinc-500" />
+              <span className="text-foreground/85 truncate flex-1">{n.label}</span>
+              <ChevronRight className="w-3 h-3 text-muted-foreground" />
             </button>
           ))}
         </div>
@@ -544,10 +544,10 @@ function ClassTab({ onNodeClick, accent, currentNodeId }: {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="p-3 text-center text-[10px] text-zinc-500">Đang tải…</div>
+  if (loading) return <div className="p-3 text-center text-[10px] text-muted-foreground">Đang tải…</div>
   if (!data || data.items.length === 0) {
     return (
-      <p className="px-3 py-4 text-center text-[10px] text-zinc-500 italic">
+      <p className="px-3 py-4 text-center text-[10px] text-muted-foreground italic">
         Chưa có dữ liệu mastery của lớp — học sinh chưa tương tác với KG
       </p>
     )
@@ -568,27 +568,27 @@ function ClassTab({ onNodeClick, accent, currentNodeId }: {
               <button key={n.id} onClick={() => onNodeClick?.(n.id)}
                 className="w-full text-left text-[10px] py-1 px-1 rounded hover:bg-white/5 flex items-center gap-2">
                 <span className="font-bold text-rose-400">{n.avgScore}%</span>
-                <span className="truncate text-zinc-300 flex-1">{n.label}</span>
-                <span className="text-zinc-500">{n.weakCount}/{n.studentCount} HS</span>
+                <span className="truncate text-foreground/85 flex-1">{n.label}</span>
+                <span className="text-muted-foreground">{n.weakCount}/{n.studentCount} HS</span>
               </button>
             ))}
           </div>
         )}
 
-        <div className="divide-y divide-zinc-800/60">
+        <div className="divide-y divide-border">
           {data.items.slice(0, 30).map(n => {
             const avg = n.avgScore || 0
             const color = avg >= 70 ? '#34d399' : avg >= 50 ? '#fbbf24' : '#f87171'
             return (
               <button key={n.id} onClick={() => onNodeClick?.(n.id)}
                 style={{ touchAction: 'manipulation' }}
-                className="w-full px-3 py-1.5 hover:bg-zinc-800/40 text-left flex items-center gap-2">
+                className="w-full px-3 py-1.5 hover:bg-muted/70 dark:bg-zinc-800/40 text-left flex items-center gap-2">
                 <div className="w-10 text-right">
                   <span className="text-xs font-mono font-bold" style={{ color }}>{avg}%</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-zinc-100 truncate">{n.label}</p>
-                  <p className="text-[9px] text-zinc-500">{n.studentCount} HS · {n.type}</p>
+                  <p className="text-xs text-foreground truncate">{n.label}</p>
+                  <p className="text-[9px] text-muted-foreground">{n.studentCount} HS · {n.type}</p>
                 </div>
               </button>
             )
@@ -597,7 +597,7 @@ function ClassTab({ onNodeClick, accent, currentNodeId }: {
       </div>
 
       {/* Drill-down modal — placeholder, GV nhập studentId */}
-      <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-950/50">
+      <div className="px-3 py-2 border-t border bg-muted dark:bg-zinc-950/50">
         <DrillDownLauncher onOpen={setDrillStudentId} accent={accent} />
       </div>
 
@@ -621,7 +621,7 @@ function DrillDownLauncher({ onOpen, accent }: { onOpen: (id: string) => void; a
         value={sid}
         onChange={e => setSid(e.target.value)}
         placeholder="ID học sinh để xem chi tiết..."
-        className="flex-1 px-2 py-1 text-[10px] rounded bg-zinc-800 border border-zinc-700 text-white"
+        className="flex-1 px-2 py-1 text-[10px] rounded bg-muted dark:bg-zinc-800 border border text-white"
       />
       <button
         onClick={() => { if (sid.trim()) onOpen(sid.trim()) }}
@@ -671,20 +671,20 @@ function StudentDetailModal({ studentId, currentNodeId, onClose, onNodeClick }: 
       <div className="max-w-lg w-full bg-zinc-950 border-2 border-purple-500/40 rounded-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-white">📊 Chi tiết học sinh</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} className="text-muted-foreground hover:text-white p-1"><X className="w-4 h-4" /></button>
         </div>
 
         {loading ? (
-          <div className="py-6 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-zinc-400" /></div>
+          <div className="py-6 text-center"><Loader2 className="w-5 h-5 animate-spin mx-auto text-muted-foreground" /></div>
         ) : !data ? (
-          <p className="text-sm text-zinc-400">Không tìm thấy dữ liệu</p>
+          <p className="text-sm text-muted-foreground">Không tìm thấy dữ liệu</p>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
+            <div className="flex items-center gap-3 pb-2 border-b border">
               {data.student.image ? <img src={data.student.image} className="w-10 h-10 rounded-full" /> : <div className="w-10 h-10 rounded-full bg-purple-500/30" />}
               <div>
                 <div className="text-sm font-bold text-white">{data.student.name}</div>
-                <div className="text-[10px] text-zinc-500">{data.student.email || data.student.id}</div>
+                <div className="text-[10px] text-muted-foreground">{data.student.email || data.student.id}</div>
               </div>
             </div>
 
@@ -703,7 +703,7 @@ function StudentDetailModal({ studentId, currentNodeId, onClose, onNodeClick }: 
                     <button key={n.nodeId} onClick={() => onNodeClick(n.nodeId)}
                       className="w-full text-left p-1 rounded hover:bg-white/5 flex items-center gap-2 text-[11px]">
                       <span className="text-rose-400 font-bold w-10 text-right">{n.score}%</span>
-                      <span className="text-zinc-200 flex-1 truncate">{n.label}</span>
+                      <span className="text-foreground/90 flex-1 truncate">{n.label}</span>
                     </button>
                   ))}
                 </div>
@@ -711,7 +711,7 @@ function StudentDetailModal({ studentId, currentNodeId, onClose, onNodeClick }: 
             )}
 
             {/* Send recommendation */}
-            <div className="pt-2 border-t border-zinc-800">
+            <div className="pt-2 border-t border">
               <div className="text-[10px] font-bold uppercase text-cyan-300 mb-1">
                 ✉️ Gửi gợi ý {currentNodeId ? `về "${currentNodeId.slice(0, 30)}…"` : '(chọn 1 node trước)'}
               </div>
@@ -721,7 +721,7 @@ function StudentDetailModal({ studentId, currentNodeId, onClose, onNodeClick }: 
                 placeholder="Ghi chú cho HS (tùy chọn)..."
                 rows={2} maxLength={500}
                 disabled={!currentNodeId}
-                className="w-full px-2 py-1.5 rounded bg-zinc-900 border border-zinc-700 text-sm text-white disabled:opacity-40"
+                className="w-full px-2 py-1.5 rounded bg-zinc-900 border border text-sm text-white disabled:opacity-40"
               />
               <button
                 onClick={sendRec}
@@ -835,12 +835,12 @@ function WorkflowsTab({ accent, onReplay, onChange }: {
     <div>
       {/* Recorder controls */}
       {rec.recording ? (
-        <div className="border-b border-zinc-800 bg-rose-500/10">
+        <div className="border-b border bg-rose-500/10">
           <div className="px-3 py-2 flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             <div className="flex-1 min-w-0">
               <div className="text-[10px] font-bold text-rose-300 uppercase">Đang ghi</div>
-              <div className="text-[10px] text-zinc-300 truncate">{rec.title} · {rec.stepCount} bước</div>
+              <div className="text-[10px] text-foreground/85 truncate">{rec.title} · {rec.stepCount} bước</div>
             </div>
             <button
               onClick={stopRec}
@@ -855,26 +855,26 @@ function WorkflowsTab({ accent, onReplay, onChange }: {
         <button
           onClick={startRec}
           style={{ touchAction: 'manipulation', minHeight: 44, background: `linear-gradient(90deg, ${accent}99, ${accent}77)` }}
-          className="w-full px-3 py-2 text-[11px] font-bold text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 border-b border-zinc-800"
+          className="w-full px-3 py-2 text-[11px] font-bold text-white hover:opacity-90 inline-flex items-center justify-center gap-1.5 border-b border"
         >
           <Circle className="w-3 h-3 fill-current" /> ⏺️ Bắt đầu ghi quy trình
         </button>
       )}
 
       {loading ? (
-        <div className="p-3 text-center text-[10px] text-zinc-500">Đang tải…</div>
+        <div className="p-3 text-center text-[10px] text-muted-foreground">Đang tải…</div>
       ) : items.length === 0 ? (
-        <p className="px-3 py-4 text-center text-[10px] text-zinc-500 italic">
+        <p className="px-3 py-4 text-center text-[10px] text-muted-foreground italic">
           Chưa có quy trình nào — bấm ⏺️ để bắt đầu ghi navigation
         </p>
       ) : (
-        <div className="divide-y divide-zinc-800/60 max-h-60 overflow-y-auto">
+        <div className="divide-y divide-border max-h-60 overflow-y-auto">
           {items.map(wf => (
-            <div key={wf.id} className="px-3 py-1.5 hover:bg-zinc-800/40 group">
+            <div key={wf.id} className="px-3 py-1.5 hover:bg-muted/70 dark:bg-zinc-800/40 group">
               <div className="flex items-start gap-1.5">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-zinc-100 truncate">{wf.title}</div>
-                  {wf.description && <p className="text-[10px] text-zinc-500 line-clamp-1">{wf.description}</p>}
+                  <div className="text-xs font-semibold text-foreground truncate">{wf.title}</div>
+                  {wf.description && <p className="text-[10px] text-muted-foreground line-clamp-1">{wf.description}</p>}
                   <div className="text-[9px] text-zinc-600 mt-0.5">
                     {wf.steps.length} bước · {new Date(wf.createdAt).toLocaleDateString('vi-VN')}
                   </div>
@@ -882,13 +882,13 @@ function WorkflowsTab({ accent, onReplay, onChange }: {
                 <button
                   onClick={() => replayWf(wf.id)}
                   title="Replay" disabled={!wf.steps.length}
-                  className="p-1 rounded hover:bg-emerald-500/20 text-zinc-500 hover:text-emerald-400 disabled:opacity-30 transition"
+                  className="p-1 rounded hover:bg-emerald-500/20 text-muted-foreground hover:text-emerald-400 disabled:opacity-30 transition"
                 >
                   <Play className="w-3 h-3" />
                 </button>
                 <button
                   onClick={() => deleteWf(wf.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/20 text-zinc-500 hover:text-rose-400 transition"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-rose-500/20 text-muted-foreground hover:text-rose-400 transition"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -942,7 +942,7 @@ function AddNodeModal({ role, courseId, parentNodeId, onClose, onCreated }: {
       <div className="max-w-md w-full bg-zinc-950 border-2 border-cyan-500/40 rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-bold text-white">➕ Thêm node vào bộ não</h3>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white p-1">
+          <button onClick={onClose} className="text-muted-foreground hover:text-white p-1">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -955,14 +955,14 @@ function AddNodeModal({ role, courseId, parentNodeId, onClose, onCreated }: {
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Loại</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Loại</label>
             <div className="flex gap-1.5">
               {(['Note', 'Concept', 'Topic', 'Workflow'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
                   className={`flex-1 px-2 py-1.5 text-[10px] font-bold rounded ${
-                    type === t ? 'bg-cyan-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    type === t ? 'bg-cyan-500 text-white' : 'bg-muted dark:bg-zinc-800 text-muted-foreground hover:bg-zinc-700'
                   }`}
                 >
                   {t === 'Note' ? '📝 Ghi chú' : t === 'Concept' ? '💡 Khái niệm' : t === 'Topic' ? '📚 Chủ đề' : '🔄 Quy trình'}
@@ -972,30 +972,30 @@ function AddNodeModal({ role, courseId, parentNodeId, onClose, onCreated }: {
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Tên / Tiêu đề <span className="text-red-400">*</span></label>
+            <label className="text-xs text-muted-foreground mb-1 block">Tên / Tiêu đề <span className="text-red-400">*</span></label>
             <input
               value={label}
               onChange={e => setLabel(e.target.value)}
               placeholder="VD: Mẹo nhớ định luật Newton 3..."
               maxLength={300}
-              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-white"
+              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border text-sm text-white"
             />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Mô tả (tùy chọn)</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Mô tả (tùy chọn)</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Mô tả chi tiết, ghi chú, ý tưởng..."
               rows={3}
               maxLength={2000}
-              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-sm text-white resize-y"
+              className="w-full px-3 py-2 rounded-lg bg-zinc-900 border border text-sm text-white resize-y"
             />
           </div>
 
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Chia sẻ</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Chia sẻ</label>
             <div className="flex gap-1.5">
               <VisOpt active={visibility==='private'} onClick={() => setVisibility('private')} emoji="🔒" label="Riêng tôi" />
               {courseId && (
@@ -1010,7 +1010,7 @@ function AddNodeModal({ role, courseId, parentNodeId, onClose, onCreated }: {
           <div className="flex gap-2 pt-2">
             <button
               onClick={onClose}
-              className="flex-1 px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300 hover:bg-zinc-700 text-sm font-bold"
+              className="flex-1 px-3 py-2 rounded-lg bg-muted dark:bg-zinc-800 text-foreground/85 hover:bg-zinc-700 text-sm font-bold"
             >
               Huỷ
             </button>
@@ -1034,7 +1034,7 @@ function VisOpt({ active, onClick, emoji, label }: { active: boolean; onClick: (
     <button
       onClick={onClick}
       className={`flex-1 px-2 py-1.5 text-[10px] font-bold rounded ${
-        active ? 'bg-purple-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+        active ? 'bg-purple-500 text-white' : 'bg-muted dark:bg-zinc-800 text-muted-foreground hover:bg-zinc-700'
       }`}
     >
       {emoji} {label}

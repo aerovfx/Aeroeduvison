@@ -91,14 +91,14 @@ export default function KgHistoryTrail({ history, currentId, onJump, onClear, on
   if (history.length === 0) return null
 
   return (
-    <div className="bg-zinc-900/60 border border-zinc-800 rounded-lg overflow-hidden">
+    <div className="bg-card/60 dark:bg-zinc-900/60 border border rounded-lg overflow-hidden">
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300/90 hover:bg-zinc-800/50"
+        className="w-full px-3 py-1.5 flex items-center gap-2 text-[11px] font-bold text-emerald-300/90 hover:bg-muted/80 dark:bg-zinc-800/50"
       >
         <History className="w-3.5 h-3.5" />
         <span>🌿 Đường mòn tri thức</span>
-        <span className="text-zinc-500 font-normal">{history.length} node</span>
+        <span className="text-muted-foreground font-normal">{history.length} node</span>
         <ChevronRight className={`w-3 h-3 ml-auto transition-transform ${collapsed ? '' : 'rotate-90'}`} />
       </button>
 
@@ -118,22 +118,22 @@ export default function KgHistoryTrail({ history, currentId, onJump, onClear, on
                   className={`group inline-flex items-center text-[10px] rounded-md border transition ${
                     isCurrent
                       ? 'bg-emerald-500/20 border-emerald-400'
-                      : 'bg-zinc-800/60 border-zinc-700 hover:border-zinc-500'
+                      : 'bg-muted dark:bg-zinc-800/60 border hover:border-zinc-500'
                   }`}
                   style={{ borderLeftColor: color.stroke, borderLeftWidth: 2 }}
                 >
                   <button
                     onClick={() => onJump(n.id)}
-                    className="px-1.5 py-0.5 text-zinc-200 font-medium max-w-[140px] truncate"
+                    className="px-1.5 py-0.5 text-foreground/90 font-medium max-w-[140px] truncate"
                     title={`${n.label} (${timeAgo})`}
                   >
                     {n.label}
                   </button>
-                  <span className="text-zinc-500 text-[9px] px-1">{timeAgo}</span>
+                  <span className="text-muted-foreground text-[9px] px-1">{timeAgo}</span>
                   {onRemove && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onRemove(n.id) }}
-                      className="opacity-0 group-hover:opacity-100 px-1 text-zinc-500 hover:text-rose-400"
+                      className="opacity-0 group-hover:opacity-100 px-1 text-muted-foreground hover:text-rose-400"
                       title="Xoá khỏi đường mòn"
                     >
                       <X className="w-2.5 h-2.5" />
@@ -146,7 +146,7 @@ export default function KgHistoryTrail({ history, currentId, onJump, onClear, on
           {history.length >= 3 && (
             <button
               onClick={onClear}
-              className="text-[10px] text-zinc-500 hover:text-rose-400 underline"
+              className="text-[10px] text-muted-foreground hover:text-rose-400 underline"
             >
               Xoá tất cả lịch sử
             </button>
