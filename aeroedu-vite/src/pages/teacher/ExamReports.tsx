@@ -523,8 +523,20 @@ export default function ExamReports() {
       {/* ── Main ── */}
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
-        {/* ── Exam list ── (replace dropdown 2026-05-19) */}
-        <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 16 }}>
+        {/* ── Exam list ── (replace dropdown 2026-05-19)
+            order=2 → khi có analytics hiển thị, list nằm DƯỚI để user thấy
+            báo cáo ngay (UX request 2026-05-19). Khi chưa chọn đề, list
+            vẫn là item đầu visible (analytics block không render). */}
+        <div style={{ order: 2, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 16 }}>
+          {/* Section title — chỉ hiện khi đang xem báo cáo (để user biết list để switch) */}
+          {selectedExamId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 12, borderBottom: `1px dashed ${D.border}` }}>
+              <FileText style={{ width: 16, height: 16, color: '#a78bfa' }} />
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: D.text }}>
+                Đề thi khác — click để xem báo cáo
+              </h3>
+            </div>
+          )}
           {/* Search + filter row */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             <div style={{ flex: 1, minWidth: 240, position: "relative" }}>
@@ -680,16 +692,16 @@ export default function ExamReports() {
           )}
         </div>
 
-        {/* ── Analytics panel ── */}
+        {/* ── Analytics panel ── (order=1 → hiển thị TRÊN cùng khi đã chọn đề) */}
         {selectedExamId && (
           analyticsLoading ? (
-            <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
+            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
               <Loader2 style={{ width: 32, height: 32, color: "#60a5fa", margin: "0 auto 12px", animation: "spin 1s linear infinite" }} />
               <p style={{ fontSize: 13, color: D.muted }}>Đang tải phân tích…</p>
               <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
             </div>
           ) : analytics ? (
-            <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, overflow: "hidden" }}>
+            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, overflow: "hidden" }}>
               {/* Tab bar */}
               <div style={{ display: "flex", borderBottom: `1px solid ${D.border}`, background: D.card2 }}>
                 {TABS.map(({ key, label }) => (
@@ -1063,7 +1075,7 @@ export default function ExamReports() {
               </div>
             </div>
           ) : (
-            <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
+            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
               <div style={{
                 width: 64, height: 64, borderRadius: "50%",
                 background: "rgba(251,146,60,0.15)", border: "1px solid rgba(251,146,60,0.3)",
@@ -1077,9 +1089,9 @@ export default function ExamReports() {
           )
         )}
 
-        {/* ── Empty state ── */}
+        {/* ── Empty state ── (order=3, hiện cuối — chỉ khi chưa chọn đề) */}
         {!selectedExamId && (
-          <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
+          <div style={{ order: 3, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
             <div style={{
               width: 72, height: 72, borderRadius: "50%",
               background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)",
@@ -1095,7 +1107,7 @@ export default function ExamReports() {
             ) : (
               <>
                 <h3 style={{ fontSize: 16, fontWeight: 600, color: D.text, marginBottom: 8 }}>Chưa chọn đề thi</h3>
-                <p style={{ fontSize: 13, color: D.muted }}>Vui lòng chọn một đề thi từ danh sách ở trên để xem phân tích</p>
+                <p style={{ fontSize: 13, color: D.muted }}>Vui lòng chọn một đề thi từ danh sách phía dưới để xem phân tích</p>
               </>
             )}
           </div>
