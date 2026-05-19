@@ -18062,6 +18062,43 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     )`);
     await pool.query(`CREATE INDEX IF NOT EXISTS kg_workflow_user_idx
       ON kg_workflows("userId", "createdAt" DESC)`);
+
+    // Node visit log — đếm "đã thăm" cho stats + auto-add vào bộ não cá nhân
+    await pool.query(`CREATE TABLE IF NOT EXISTS kg_visits (
+      "userId"    TEXT NOT NULL,
+      "nodeId"    TEXT NOT NULL,
+      "visitCount" INTEGER NOT NULL DEFAULT 1,
+      "lastAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY ("userId", "nodeId")
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_visits_user_idx
+      ON kg_visits("userId", "lastAt" DESC)`);
+
+    // Recording session state — Admin/GV bật ghi → mọi click append vào workflow
+    // đang dở. 1 user chỉ có 1 active recording at a time.
+    await pool.query(`CREATE TABLE IF NOT EXISTS kg_workflow_recording (
+      "userId"    TEXT PRIMARY KEY,
+      "workflowId" TEXT NOT NULL,
+      "startedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+    // Teacher → Student recommendations (gửi node KG kèm note)
+    await pool.query(`CREATE TABLE IF NOT EXISTS kg_recommendations (
+      id          TEXT PRIMARY KEY,
+      "teacherId" TEXT NOT NULL,
+      "studentId" TEXT NOT NULL,
+      "nodeId"    TEXT NOT NULL,
+      note        TEXT,
+      "courseId"  TEXT,
+      status      TEXT NOT NULL DEFAULT 'pending',  -- pending | acknowledged | dismissed
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "readAt"    TIMESTAMPTZ
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_recs_student_idx
+      ON kg_recommendations("studentId", "createdAt" DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_recs_teacher_idx
+      ON kg_recommendations("teacherId", "createdAt" DESC)`);
+
     _kgRoleReady = true;
   }
 
@@ -18093,11 +18130,13 @@ CHỈ TRẢ JSON, không bọc markdown.`;
           workflows:    Number(workflows.rows[0]?.n) || 0,
         },
         capabilities: {
-          canAddCustomNode:   true,                          // tất cả role đều add được
+          canAddCustomNode:   true,                          // mọi role
           canEditPublicNodes: u.role === 'ADMIN',
           canViewAllUsers:    u.role === 'ADMIN' || u.role === 'TEACHER',
-          canManageWorkflows: u.role === 'ADMIN',
+          canManageWorkflows: true,                          // HS lưu path học, GV lưu giáo án, Admin lưu quy trình
           canSeeClassMastery: u.role === 'TEACHER' || u.role === 'ADMIN',
+          canRecommendNodes:  u.role === 'TEACHER' || u.role === 'ADMIN',  // gửi node cho HS
+          canSeeLearnPanel:   u.role === 'STUDENT',          // HS thấy "Học từ KG" panel
         },
       });
     } catch (err) {
@@ -18206,21 +18245,23 @@ CHỈ TRẢ JSON, không bọc markdown.`;
         return res.status(403).json({ error: 'Chỉ Giáo viên/Admin được xem' });
       }
       const pool = getKcPool();
-      // Top nodes by average mastery (DESC) + identify weak topics
-      // Note: kg_mastery có thể không tồn tại trên prod nếu chưa init.
+      // Top nodes by average mastery (DESC) + identify weak topics.
+      // Bug fix 2026-05-19: kg_mastery columns là snake_case (user_id, node_id),
+      // không phải camelCase ("userId", "nodeId"). Query cũ silently fail → trả
+      // empty array vì .catch swallow lỗi.
       const { rows } = await pool.query(`
         SELECT
           n.id, n.type, n.label,
-          COUNT(DISTINCT m."userId") AS "studentCount",
-          AVG(m.score)::int AS "avgScore",
-          COUNT(CASE WHEN m.score < 50 THEN 1 END) AS "weakCount"
+          COUNT(DISTINCT m.user_id)::int             AS "studentCount",
+          AVG(m.score)::int                          AS "avgScore",
+          COUNT(CASE WHEN m.score < 50 THEN 1 END)::int AS "weakCount"
         FROM kg_nodes n
-        LEFT JOIN kg_mastery m ON m."nodeId" = n.id
+        LEFT JOIN kg_mastery m ON m.node_id = n.id
         GROUP BY n.id, n.type, n.label
-        HAVING COUNT(DISTINCT m."userId") > 0
+        HAVING COUNT(DISTINCT m.user_id) > 0
         ORDER BY "avgScore" ASC NULLS LAST, "studentCount" DESC
         LIMIT 50
-      `).catch(() => ({ rows: [] }));
+      `).catch(e => { console.warn('[kg:class-mastery]', e.message); return { rows: [] }; });
       return res.json({
         items: rows,
         weakTopics: rows.filter(r => r.avgScore != null && r.avgScore < 50).slice(0, 10),
@@ -18238,9 +18279,8 @@ CHỈ TRẢ JSON, không bọc markdown.`;
     try {
       const u = getKgRoleUser(req);
       if (!u) return res.status(401).json({ error: 'Unauthorized' });
-      if (u.role !== 'ADMIN' && u.role !== 'TEACHER') {
-        return res.status(403).json({ error: 'Chỉ Admin/GV được lưu workflow' });
-      }
+      // Tất cả role đều lưu workflow (HS lưu path học, GV lưu giáo án, Admin lưu quy trình).
+      // Visibility/scope tách bằng userId trong listing endpoint.
       const pool = getKcPool();
       await ensureKgRoleTables();
       const b = req.body || {};
@@ -18269,16 +18309,526 @@ CHỈ TRẢ JSON, không bọc markdown.`;
       if (!u) return res.status(401).json({ error: 'Unauthorized' });
       const pool = getKcPool();
       await ensureKgRoleTables();
-      // Admin xem tất cả, GV chỉ xem của mình
-      const where = u.role === 'ADMIN' ? '' : `WHERE "userId" = '${u.id.replace(/'/g, "''")}'`;
-      const { rows } = await pool.query(
-        `SELECT id, "userId", title, description, steps, tags, "createdAt"
-           FROM kg_workflows ${where}
-          ORDER BY "createdAt" DESC LIMIT 100`
-      );
+      // Admin xem tất cả, GV/HS chỉ xem của mình. Bug fix 2026-05-19:
+      // dùng parameterized query thay vì string interpolation (defense-in-depth).
+      const isAdmin = u.role === 'ADMIN';
+      const sql = isAdmin
+        ? `SELECT id, "userId", title, description, steps, tags, "createdAt"
+             FROM kg_workflows ORDER BY "createdAt" DESC LIMIT 100`
+        : `SELECT id, "userId", title, description, steps, tags, "createdAt"
+             FROM kg_workflows WHERE "userId" = $1
+             ORDER BY "createdAt" DESC LIMIT 100`;
+      const { rows } = await pool.query(sql, isAdmin ? [] : [u.id]);
       return res.json({ items: rows });
     } catch (err) {
       console.error('[kg:workflow:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // POST /api/kg/visits — track user visited a node (cho stats + analytics)
+  // Idempotent UPSERT, increment visitCount.
+  // ──────────────────────────────────────────────
+  app.post('/api/kg/visits', express.json({ limit: '2kb' }), async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const nodeId = String(req.body?.nodeId || '').trim();
+      if (!nodeId) return res.status(400).json({ error: 'Thiếu nodeId' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      await pool.query(
+        `INSERT INTO kg_visits ("userId", "nodeId", "visitCount", "lastAt")
+         VALUES ($1, $2, 1, NOW())
+         ON CONFLICT ("userId", "nodeId") DO UPDATE SET
+           "visitCount" = kg_visits."visitCount" + 1,
+           "lastAt" = NOW()`,
+        [u.id, nodeId]
+      );
+
+      // Nếu user đang ghi workflow, auto-append "visit-node" step.
+      const rec = await pool.query(
+        `SELECT "workflowId" FROM kg_workflow_recording WHERE "userId"=$1`,
+        [u.id]
+      );
+      if (rec.rows.length) {
+        const wfId = rec.rows[0].workflowId;
+        // Append step (lấy steps hiện tại, push, update)
+        const wf = await pool.query(`SELECT steps FROM kg_workflows WHERE id=$1`, [wfId]);
+        if (wf.rows.length) {
+          const steps = Array.isArray(wf.rows[0].steps) ? wf.rows[0].steps : [];
+          if (steps.length < 200) {  // cap để không bloat
+            steps.push({
+              step: steps.length + 1,
+              action: 'visit-node',
+              nodeId,
+              timestamp: new Date().toISOString(),
+            });
+            await pool.query(
+              `UPDATE kg_workflows SET steps=$2::jsonb WHERE id=$1`,
+              [wfId, JSON.stringify(steps)]
+            );
+          }
+        }
+      }
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[kg:visits]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // STUDENT — GET /api/kg/student/learn/:nodeId
+  // Trả: { node, chapters[], questions[], prereqNodes[], nextNodes[], mastery }
+  // HS click 1 node → biết NGAY: học chương nào, làm câu hỏi nào,
+  // cần ôn lại gì trước, và sau khi nắm thì học tiếp gì.
+  // ──────────────────────────────────────────────
+  app.get('/api/kg/student/learn/:nodeId', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      const nodeId = String(req.params.nodeId || '').trim();
+      if (!nodeId) return res.status(400).json({ error: 'Thiếu nodeId' });
+
+      // 1. Node info
+      const nodeRes = await pool.query(
+        `SELECT id, type, label, description, subject, grade, properties
+           FROM kg_nodes WHERE id=$1 LIMIT 1`,
+        [nodeId]
+      );
+      if (!nodeRes.rows.length) return res.status(404).json({ error: 'Node không tồn tại' });
+      const node = nodeRes.rows[0];
+
+      // 2. Mastery của HS với node này
+      const masteryRes = await pool.query(
+        `SELECT score, attempts, updated_at FROM kg_mastery
+          WHERE user_id=$1 AND node_id=$2 LIMIT 1`,
+        [u.id, nodeId]
+      ).catch(() => ({ rows: [] }));
+      const mastery = masteryRes.rows[0] || { score: 0, attempts: 0, updated_at: null };
+
+      // 3. Chapters liên quan (match topic theo label keyword)
+      let chapters = [];
+      try {
+        const keywords = String(node.label || '').toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        if (keywords.length > 0) {
+          const likeTerms = keywords.slice(0, 3).map((_, i) => `LOWER(c.title) LIKE $${i + 1}`).join(' OR ');
+          const params = keywords.slice(0, 3).map(k => `%${k}%`);
+          const r = await pool.query(
+            `SELECT c.id, c.title, c.description, c.duration, c."courseId",
+                    co.title AS "courseTitle"
+               FROM "Chapter" c
+               LEFT JOIN "Course" co ON co.id = c."courseId"
+              WHERE c."isPublished" = true AND (${likeTerms})
+              ORDER BY c.duration ASC NULLS LAST
+              LIMIT 5`,
+            params
+          ).catch(() => ({ rows: [] }));
+          chapters = r.rows;
+        }
+      } catch (e) { console.warn('[kg:learn:chapters]', e.message); }
+
+      // 4. Exam questions liên quan (match topic của Question)
+      let questions = [];
+      try {
+        const r = await pool.query(
+          `SELECT id, topic, "questionType", difficulty, content
+             FROM "Question"
+            WHERE LOWER(topic) LIKE $1 OR LOWER(content) LIKE $1
+              AND status = 'Hoạt động'
+            ORDER BY "qualityScore" DESC NULLS LAST
+            LIMIT 8`,
+          [`%${String(node.label || '').toLowerCase().slice(0, 30)}%`]
+        ).catch(() => ({ rows: [] }));
+        questions = r.rows;
+      } catch (e) { console.warn('[kg:learn:questions]', e.message); }
+
+      // 5. Prereq nodes (REQUIRES) + Next nodes (LEADS_TO/RELATES_TO outgoing)
+      const prereqRes = await pool.query(
+        `SELECT n.id, n.type, n.label
+           FROM kg_edges e JOIN kg_nodes n ON n.id = e.from_id
+          WHERE e.to_id = $1 AND e.rel_type IN ('REQUIRES','PREREQUISITE')
+          LIMIT 8`,
+        [nodeId]
+      ).catch(() => ({ rows: [] }));
+      const nextRes = await pool.query(
+        `SELECT n.id, n.type, n.label
+           FROM kg_edges e JOIN kg_nodes n ON n.id = e.to_id
+          WHERE e.from_id = $1 AND e.rel_type IN ('LEADS_TO','RELATES_TO','APPLIES_TO')
+          LIMIT 8`,
+        [nodeId]
+      ).catch(() => ({ rows: [] }));
+
+      // 6. Mastery của các prereq → flag những cái HS chưa nắm
+      const prereqIds = prereqRes.rows.map(r => r.id);
+      let prereqMasteryMap = {};
+      if (prereqIds.length > 0) {
+        const pm = await pool.query(
+          `SELECT node_id, score FROM kg_mastery
+            WHERE user_id=$1 AND node_id = ANY($2::text[])`,
+          [u.id, prereqIds]
+        ).catch(() => ({ rows: [] }));
+        prereqMasteryMap = Object.fromEntries(pm.rows.map(r => [r.node_id, r.score]));
+      }
+
+      return res.json({
+        node: {
+          id: node.id, type: node.type, label: node.label,
+          description: node.description, subject: node.subject, grade: node.grade,
+        },
+        mastery: {
+          score: Math.round(mastery.score || 0),
+          attempts: mastery.attempts || 0,
+          lastAt: mastery.updated_at,
+          level: mastery.score >= 80 ? 'Thành thạo' : mastery.score >= 50 ? 'Đang học' : 'Mới bắt đầu',
+        },
+        chapters,
+        questions,
+        prereqNodes: prereqRes.rows.map(r => ({
+          ...r,
+          masteryScore: Math.round(prereqMasteryMap[r.id] || 0),
+          isWeak: (prereqMasteryMap[r.id] || 0) < 50,
+        })),
+        nextNodes: nextRes.rows,
+        recommendation: prereqRes.rows.some(r => (prereqMasteryMap[r.id] || 0) < 50)
+          ? 'Ôn lại các nội dung tiên quyết trước khi học node này'
+          : mastery.score < 50
+            ? 'Bắt đầu với chương đầu tiên'
+            : mastery.score < 80
+              ? 'Luyện thêm câu hỏi để nâng mastery'
+              : 'Học sang các node tiếp theo',
+      });
+    } catch (err) {
+      console.error('[kg:student:learn]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // TEACHER — GET /api/kg/teacher/student/:studentId/mastery
+  // Per-student drill-down: HS này yếu/giỏi node nào, thăm gần đây gì.
+  // ──────────────────────────────────────────────
+  app.get('/api/kg/teacher/student/:studentId/mastery', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Chỉ Giáo viên/Admin' });
+      }
+      const studentId = String(req.params.studentId || '').trim();
+      if (!studentId) return res.status(400).json({ error: 'Thiếu studentId' });
+      const pool = getKcPool();
+
+      // Student info
+      const stu = await pool.query(
+        `SELECT id, name, email, image, role FROM "User" WHERE id=$1 LIMIT 1`,
+        [studentId]
+      ).catch(() => ({ rows: [] }));
+
+      // Mastery breakdown
+      const masteryRows = await pool.query(
+        `SELECT m.node_id, m.score, m.attempts, m.updated_at,
+                n.label, n.type, n.subject, n.grade
+           FROM kg_mastery m
+           JOIN kg_nodes n ON n.id = m.node_id
+          WHERE m.user_id = $1
+          ORDER BY m.score ASC, m.updated_at DESC
+          LIMIT 100`,
+        [studentId]
+      ).catch(() => ({ rows: [] }));
+
+      // Recent visits
+      const visits = await pool.query(
+        `SELECT v."nodeId", v."visitCount", v."lastAt", n.label, n.type
+           FROM kg_visits v
+           LEFT JOIN kg_nodes n ON n.id = v."nodeId"
+          WHERE v."userId" = $1
+          ORDER BY v."lastAt" DESC
+          LIMIT 20`,
+        [studentId]
+      ).catch(() => ({ rows: [] }));
+
+      // Recommendations đã gửi (cho audit)
+      const recsSent = await pool.query(
+        `SELECT id, "nodeId", note, status, "createdAt"
+           FROM kg_recommendations
+          WHERE "teacherId" = $1 AND "studentId" = $2
+          ORDER BY "createdAt" DESC LIMIT 20`,
+        [u.id, studentId]
+      ).catch(() => ({ rows: [] }));
+
+      const all = masteryRows.rows.map(r => ({
+        nodeId: r.node_id, label: r.label, type: r.type,
+        subject: r.subject, grade: r.grade,
+        score: Math.round(r.score || 0),
+        attempts: r.attempts, lastAt: r.updated_at,
+      }));
+      const avgScore = all.length ? Math.round(all.reduce((s, r) => s + r.score, 0) / all.length) : 0;
+
+      return res.json({
+        student: stu.rows[0] || { id: studentId, name: 'Không rõ', email: null, image: null },
+        summary: {
+          totalNodes: all.length,
+          avgScore,
+          weakCount: all.filter(r => r.score < 50).length,
+          strongCount: all.filter(r => r.score >= 80).length,
+        },
+        weakNodes: all.filter(r => r.score < 50).slice(0, 15),
+        strongNodes: all.filter(r => r.score >= 80).slice(0, 10),
+        recentVisits: visits.rows,
+        recommendationsSent: recsSent.rows,
+      });
+    } catch (err) {
+      console.error('[kg:teacher:student-detail]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // TEACHER — POST /api/kg/teacher/recommend
+  // Gửi 1 node KG kèm note tới 1 học sinh. HS sẽ thấy trong KG panel.
+  // Body: { studentId, nodeId, note?, courseId? }
+  // ──────────────────────────────────────────────
+  app.post('/api/kg/teacher/recommend', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Chỉ Giáo viên/Admin' });
+      }
+      const b = req.body || {};
+      const studentId = String(b.studentId || '').trim();
+      const nodeId = String(b.nodeId || '').trim();
+      if (!studentId || !nodeId) return res.status(400).json({ error: 'Thiếu studentId hoặc nodeId' });
+
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const { randomUUID } = require('crypto');
+      const id = `rec-${randomUUID().slice(0, 12)}`;
+      await pool.query(
+        `INSERT INTO kg_recommendations
+           (id, "teacherId", "studentId", "nodeId", note, "courseId")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, u.id, studentId, nodeId,
+         b.note ? String(b.note).slice(0, 500) : null,
+         b.courseId ? String(b.courseId).slice(0, 200) : null]
+      );
+      return res.status(201).json({ ok: true, id });
+    } catch (err) {
+      console.error('[kg:teacher:recommend]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/kg/student/recommendations — HS xem các node mà GV gợi ý
+  app.get('/api/kg/student/recommendations', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const { rows } = await pool.query(
+        `SELECT r.id, r."nodeId", r.note, r.status, r."createdAt",
+                r."readAt", n.label AS "nodeLabel", n.type AS "nodeType",
+                u.name AS "teacherName", u.image AS "teacherImage"
+           FROM kg_recommendations r
+           LEFT JOIN kg_nodes n ON n.id = r."nodeId"
+           LEFT JOIN "User" u ON u.id = r."teacherId"
+          WHERE r."studentId" = $1
+          ORDER BY r."createdAt" DESC
+          LIMIT 30`,
+        [u.id]
+      ).catch(() => ({ rows: [] }));
+      const unreadCount = rows.filter(r => r.status === 'pending').length;
+      return res.json({ items: rows, unreadCount });
+    } catch (err) {
+      console.error('[kg:student:recommendations]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/kg/student/recommendations/:id/ack — HS đánh dấu đã đọc
+  app.post('/api/kg/student/recommendations/:id/ack', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      const { rowCount } = await pool.query(
+        `UPDATE kg_recommendations
+            SET status='acknowledged', "readAt"=NOW()
+          WHERE id=$1 AND "studentId"=$2 AND status='pending'`,
+        [req.params.id, u.id]
+      );
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy hoặc đã đọc' });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[kg:student:rec:ack]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // WORKFLOW RECORDER — Start/Stop ghi navigation
+  // Áp dụng cho mọi role: HS ghi path học, GV ghi giáo án, Admin ghi quy trình.
+  // ──────────────────────────────────────────────
+
+  // POST /api/kg/workflows/recording/start — bắt đầu ghi
+  // Body: { title?, description? } — tự tạo workflow rỗng + đánh dấu active
+  app.post('/api/kg/workflows/recording/start', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const { randomUUID } = require('crypto');
+      const wfId = `wf-${randomUUID().slice(0, 12)}`;
+      const title = String(req.body?.title || `Quy trình ${new Date().toLocaleString('vi-VN')}`).slice(0, 200);
+      const description = req.body?.description ? String(req.body.description).slice(0, 2000) : null;
+
+      // Tạo workflow rỗng
+      await pool.query(
+        `INSERT INTO kg_workflows (id, "userId", title, description, steps, tags)
+         VALUES ($1, $2, $3, $4, '[]'::jsonb, $5)`,
+        [wfId, u.id, title, description, ['recorded', u.role.toLowerCase()]]
+      );
+
+      // Đánh dấu đang ghi (1 user = 1 active recording)
+      await pool.query(
+        `INSERT INTO kg_workflow_recording ("userId", "workflowId", "startedAt")
+         VALUES ($1, $2, NOW())
+         ON CONFLICT ("userId") DO UPDATE SET
+           "workflowId" = EXCLUDED."workflowId",
+           "startedAt" = NOW()`,
+        [u.id, wfId]
+      );
+      console.log(`[kg:wf:rec:start] ${u.id} → ${wfId}`);
+      return res.status(201).json({ ok: true, workflowId: wfId, title });
+    } catch (err) {
+      console.error('[kg:wf:rec:start]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/kg/workflows/recording/stop — dừng ghi
+  app.post('/api/kg/workflows/recording/stop', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      const r = await pool.query(
+        `DELETE FROM kg_workflow_recording WHERE "userId"=$1 RETURNING "workflowId"`,
+        [u.id]
+      );
+      if (!r.rows.length) return res.status(404).json({ error: 'Không có recording đang chạy' });
+      const wfId = r.rows[0].workflowId;
+      const wf = await pool.query(
+        `SELECT id, title, steps FROM kg_workflows WHERE id=$1`,
+        [wfId]
+      );
+      const stepCount = wf.rows[0]?.steps?.length || 0;
+      console.log(`[kg:wf:rec:stop] ${u.id} → ${wfId} (${stepCount} steps)`);
+      return res.json({ ok: true, workflowId: wfId, stepCount, title: wf.rows[0]?.title });
+    } catch (err) {
+      console.error('[kg:wf:rec:stop]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/kg/workflows/recording/status — đang ghi workflow nào?
+  app.get('/api/kg/workflows/recording/status', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const r = await pool.query(
+        `SELECT r."workflowId", r."startedAt", w.title,
+                jsonb_array_length(w.steps) AS "stepCount"
+           FROM kg_workflow_recording r
+           LEFT JOIN kg_workflows w ON w.id = r."workflowId"
+          WHERE r."userId" = $1`,
+        [u.id]
+      );
+      if (!r.rows.length) return res.json({ recording: false });
+      return res.json({
+        recording: true,
+        workflowId: r.rows[0].workflowId,
+        title: r.rows[0].title,
+        stepCount: Number(r.rows[0].stepCount) || 0,
+        startedAt: r.rows[0].startedAt,
+      });
+    } catch (err) {
+      console.error('[kg:wf:rec:status]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // GET /api/kg/workflows/:id/replay — trả ordered steps cho UI replay
+  app.get('/api/kg/workflows/:id/replay', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      const { rows } = await pool.query(
+        `SELECT w.id, w."userId", w.title, w.description, w.steps, w.tags, w."createdAt"
+           FROM kg_workflows w
+          WHERE w.id = $1
+            AND (w."userId" = $2 OR $3 = 'ADMIN')
+          LIMIT 1`,
+        [req.params.id, u.id, u.role]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy hoặc không có quyền' });
+      const wf = rows[0];
+      const steps = Array.isArray(wf.steps) ? wf.steps : [];
+
+      // Enrich step nodeIds với label
+      const nodeIds = [...new Set(steps.filter(s => s.nodeId).map(s => s.nodeId))];
+      let nodeMap = {};
+      if (nodeIds.length > 0) {
+        const ns = await pool.query(
+          `SELECT id, label, type FROM kg_nodes WHERE id = ANY($1::text[])`,
+          [nodeIds]
+        ).catch(() => ({ rows: [] }));
+        nodeMap = Object.fromEntries(ns.rows.map(n => [n.id, n]));
+      }
+
+      return res.json({
+        workflow: {
+          id: wf.id, title: wf.title, description: wf.description,
+          tags: wf.tags, createdAt: wf.createdAt,
+        },
+        steps: steps.map(s => ({
+          ...s,
+          node: s.nodeId ? nodeMap[s.nodeId] || null : null,
+        })),
+        stepCount: steps.length,
+      });
+    } catch (err) {
+      console.error('[kg:wf:replay]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/kg/workflows/:id — owner xoá workflow
+  app.delete('/api/kg/workflows/:id', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      const own = await pool.query(`SELECT "userId" FROM kg_workflows WHERE id=$1`, [req.params.id]);
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      if (own.rows[0].userId !== u.id && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Không có quyền xoá' });
+      }
+      await pool.query(`DELETE FROM kg_workflows WHERE id=$1`, [req.params.id]);
+      // Nếu workflow này đang được ghi → stop luôn
+      await pool.query(`DELETE FROM kg_workflow_recording WHERE "workflowId"=$1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[kg:wf:delete]', err.message);
       return res.status(500).json({ error: err.message });
     }
   });

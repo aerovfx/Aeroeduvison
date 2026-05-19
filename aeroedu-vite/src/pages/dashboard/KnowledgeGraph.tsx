@@ -41,6 +41,7 @@ import KgRolePanel from '@/components/kg/KgRolePanel'
 import NodeExplorer from '@/components/kg/NodeExplorer'
 import KgAudioPlayer from '@/components/kg/KgAudioPlayer'
 import { sfxBubblePop, sfxChime } from '@/lib/kgAudio'
+import { api } from '@/services/api'
 
 // ─── Physics simulation ───────────────────────────────────────────
 interface SimNode extends KgNode {
@@ -567,6 +568,9 @@ export default function KnowledgeGraph() {
           neighborCount: r.neighbors.length,
         },
       })
+      // KG role-aware: track visit cho stats + auto-append vào workflow recording.
+      // Fire-and-forget — silently ignore if endpoint unavailable.
+      api.post('/kg/visits', { nodeId: id }).catch(() => {})
     } catch (e: any) {
       toast.error(e?.response?.data?.error || 'Lỗi tải node')
     }
@@ -1093,9 +1097,11 @@ export default function KnowledgeGraph() {
             {/* Sidebar click = navigate (mở detail + load làm tâm) — UX rõ hơn */}
             <BrainSuggestions onNodeClick={onNavigateNode} />
 
-            {/* 🧠 Bộ não cá nhân theo role — HS/GV/Admin đều có */}
+            {/* 🧠 Bộ não cá nhân theo role — HS/GV/Admin đều có.
+                currentNodeId truyền vào để HS thấy "Học từ KG" gợi ý chapters/questions
+                + GV gửi recommendation đúng node đang xem. */}
             <div className="mt-3">
-              <KgRolePanel onNodeClick={onNavigateNode} />
+              <KgRolePanel onNodeClick={onNavigateNode} currentNodeId={selectedNode?.node.id || null} />
             </div>
 
             {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
