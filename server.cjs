@@ -1038,6 +1038,98 @@ function makeProxy(target, label, pathFilter) {
     }
   });
 
+  // ── POST /api/teacher/exams/:examId/questions/attach ────────
+  // Bulk attach EXISTING questions từ ngân hàng đề vào đề thi.
+  // Body: { questionIds: ['q-uuid1', 'q-uuid2', ...], points?: number }
+  // - Skip questionId đã có trong đề (ON CONFLICT DO NOTHING)
+  // - Auto-append vào cuối (order tăng dần)
+  // - Tự recalc Exam.totalScore + totalQuestions
+  // - Trả {ok, attached, skipped, totalQuestions, totalScore}
+  app.post('/api/teacher/exams/:examId/questions/attach', async (req, res) => {
+    try {
+      const userId = getExamUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { examId } = req.params;
+      const pool = getEPool();
+      const own = await pool.query(
+        `SELECT 1 FROM "Exam" WHERE id=$1 AND "userId"=$2 LIMIT 1`,
+        [examId, userId]
+      );
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+
+      const ids = Array.isArray(req.body?.questionIds)
+        ? req.body.questionIds.map(x => String(x).trim()).filter(Boolean).slice(0, 200)
+        : [];
+      if (ids.length === 0) return res.status(400).json({ error: 'Thiếu questionIds' });
+      const pointsPerQ = Math.max(0, Math.min(10, Number(req.body?.points) || 1));
+
+      // Validate questions exist
+      const valid = await pool.query(
+        `SELECT id FROM "Question" WHERE id = ANY($1::text[]) AND status = 'Hoạt động'`,
+        [ids]
+      );
+      const validIds = valid.rows.map(r => r.id);
+      if (validIds.length === 0) {
+        return res.status(400).json({ error: 'Không có câu hỏi hợp lệ trong ngân hàng' });
+      }
+
+      // Get current max order
+      const ord = await pool.query(
+        `SELECT COALESCE(MAX("order"), 0) AS max FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      let nextOrder = Number(ord.rows[0]?.max) || 0;
+
+      const { randomUUID } = require('crypto');
+      let attached = 0;
+      let skipped = 0;
+      for (const qid of validIds) {
+        nextOrder += 1;
+        // ON CONFLICT skip nếu (examId, questionId) đã tồn tại
+        const r = await pool.query(
+          `INSERT INTO "ExamQuestion" (id, "examId", "questionId", "order", points)
+           VALUES ($1,$2,$3,$4,$5)
+           ON CONFLICT ("examId", "questionId") DO NOTHING
+           RETURNING id`,
+          [randomUUID(), examId, qid, nextOrder, pointsPerQ]
+        ).catch(() => ({ rows: [] }));
+        if (r.rows.length) {
+          attached += 1;
+          // Increment usageCount trong Question table
+          await pool.query(
+            `UPDATE "Question" SET "usageCount" = "usageCount" + 1 WHERE id = $1`,
+            [qid]
+          ).catch(() => {});
+        } else {
+          skipped += 1;
+          nextOrder -= 1;  // rollback nếu skip
+        }
+      }
+
+      // Recalc
+      const sums = await pool.query(
+        `SELECT COUNT(*)::int AS cnt, COALESCE(SUM(points), 0)::float AS total
+           FROM "ExamQuestion" WHERE "examId"=$1`,
+        [examId]
+      );
+      const cnt = Number(sums.rows[0]?.cnt || 0);
+      const totalScore = Number(sums.rows[0]?.total || 0);
+      await pool.query(
+        `UPDATE "Exam" SET "totalQuestions"=$2, "totalScore"=$3, "updatedAt"=NOW()
+          WHERE id=$1`,
+        [examId, cnt, totalScore]
+      );
+      console.log(`[exam-attach] exam=${examId.slice(0,8)} attached=${attached} skipped=${skipped}`);
+      return res.status(201).json({
+        ok: true, attached, skipped,
+        totalQuestions: cnt, totalScore,
+      });
+    } catch (err) {
+      console.error('[teacher:exam-question:attach] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── DELETE /api/teacher/exams/:examId/questions/:questionId ──
   // Xoá ExamQuestion (link) — KHÔNG xoá Question gốc (có thể dùng ở đề khác).
   // Tự recalc + reorder.

@@ -15,16 +15,19 @@
  *   POST /api/teacher/exams/:id/publish → đổi status + isPublic
  *   DELETE /api/teacher/exams/:id      → xoá
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft, Loader2, Edit3, Save, Trash2, Eye, EyeOff, Play,
-  CheckCircle2, Clock, FileText, ChevronDown,
+  CheckCircle2, Clock, FileText, ChevronDown, Library,
 } from 'lucide-react'
 import { MathText } from '@/components/common/MathText'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { HostSessionModal } from '@/components/exam/HostSessionModal'
+
+// Lazy load drawer — only fetch chunk khi GV bấm "Mở Ngân hàng"
+const QuestionBankDrawer = lazy(() => import('@/components/exam/QuestionBankDrawer'))
 
 interface Question {
   id: string
@@ -69,6 +72,15 @@ export default function ExamDetailPage() {
   const [draftDuration, setDraftDuration] = useState(45)
   const [hostModalOpen, setHostModalOpen] = useState(false)
   const [addingQuestion, setAddingQuestion] = useState(false)
+  const [bankOpen, setBankOpen] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
+  const [dropping, setDropping] = useState(false)
+
+  // Set of questionId đã có trong đề — để disable chọn lại trong drawer
+  const alreadyInExam = useMemo(
+    () => new Set(questions.map(q => q.id)),
+    [questions]
+  )
 
   // ── Load ────────────────────────────────────────────────────
   useEffect(() => {
@@ -91,6 +103,48 @@ export default function ExamDetailPage() {
     const r = await api.get(`/teacher/exams/${id}`)
     setExam(r.data.exam)
     setQuestions(r.data.questions || [])
+  }
+
+  // ── Drag-drop: nhận câu hỏi từ QuestionBankDrawer thả vào đề ──
+  const onDragOver = (e: React.DragEvent) => {
+    // Chỉ accept khi data có format của question card
+    if (e.dataTransfer.types.includes('application/x-question-id')) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+      setDropActive(true)
+    }
+  }
+  const onDragLeave = (e: React.DragEvent) => {
+    // Chỉ reset khi leave khỏi root container, không phải child
+    if (e.currentTarget === e.target) setDropActive(false)
+  }
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDropActive(false)
+    const qid = e.dataTransfer.getData('application/x-question-id') || e.dataTransfer.getData('text/plain')
+    if (!qid || !exam) return
+    if (alreadyInExam.has(qid)) {
+      toast('Câu này đã có trong đề', { icon: '⚠️' })
+      return
+    }
+    setDropping(true)
+    try {
+      const r = await api.post(`/teacher/exams/${exam.id}/questions/attach`, {
+        questionIds: [qid],
+        points: 1,
+      })
+      const data = r.data as { attached: number }
+      if (data.attached > 0) {
+        toast.success('✅ Đã thêm câu vào đề')
+        await refetch()
+      } else {
+        toast('Không thêm được', { icon: '⚠️' })
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Lỗi thêm câu')
+    } finally {
+      setDropping(false)
+    }
   }
 
   // ── Actions ────────────────────────────────────────────────
@@ -302,31 +356,84 @@ export default function ExamDetailPage() {
           </div>
         </div>
 
-        {/* Questions */}
-        <div style={{
-          background: 'var(--ai-card-bg)', border: '1px solid var(--ai-card-border)',
-          borderRadius: 14, padding: 20,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        {/* Questions — drop zone for QuestionBankDrawer drag-drop */}
+        <div
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          onDrop={onDrop}
+          style={{
+            background: 'var(--ai-card-bg)',
+            border: dropActive
+              ? '2px dashed hsl(var(--primary))'
+              : '1px solid var(--ai-card-border)',
+            borderRadius: 14, padding: 20,
+            transition: 'border-color 0.15s, background 0.15s',
+            boxShadow: dropActive ? '0 0 0 4px hsl(var(--primary) / 0.15)' : 'none',
+            position: 'relative',
+          }}
+        >
+          {/* Drop overlay khi đang kéo qua */}
+          {dropActive && (
+            <div style={{
+              position: 'absolute', inset: 0, borderRadius: 14,
+              background: 'hsl(var(--primary) / 0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              pointerEvents: 'none', zIndex: 10,
+            }}>
+              <div style={{
+                padding: '12px 24px', borderRadius: 8,
+                background: 'hsl(var(--primary))', color: 'white',
+                fontSize: 14, fontWeight: 700,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+              }}>
+                📥 Thả vào đây để thêm câu hỏi
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
               <FileText size={18} style={{ color: 'hsl(var(--primary))' }} />
               Danh sách câu hỏi ({questions.length})
+              {dropping && <Loader2 size={14} className="animate-spin" style={{ color: 'hsl(var(--primary))' }} />}
             </h2>
-            <button
-              onClick={() => setAddingQuestion(true)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                background: 'hsl(var(--primary))', border: 'none',
-                borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700,
-                cursor: 'pointer', color: 'white',
-              }}
-            >
-              + Thêm câu hỏi
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setBankOpen(true)}
+                title="Mở ngân hàng đề — tick chọn hoặc kéo-thả câu vào đề thi"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  background: 'transparent',
+                  border: '1px solid hsl(var(--primary))',
+                  color: 'hsl(var(--primary))',
+                  borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <Library size={14} /> Mở Ngân hàng đề
+              </button>
+              <button
+                onClick={() => setAddingQuestion(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  background: 'hsl(var(--primary))', border: 'none',
+                  borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', color: 'white',
+                }}
+              >
+                + Tạo câu mới
+              </button>
+            </div>
           </div>
+
           {questions.length === 0 && !addingQuestion ? (
             <div style={{ textAlign: 'center', padding: 40, color: 'var(--ai-muted-text)' }}>
-              Chưa có câu hỏi nào. Bấm <strong>+ Thêm câu hỏi</strong> để bắt đầu.
+              <FileText size={40} style={{ opacity: 0.3, margin: '0 auto 12px' }} />
+              <p style={{ margin: '0 0 4px', fontWeight: 600 }}>Đề thi chưa có câu hỏi nào</p>
+              <p style={{ margin: 0, fontSize: 13 }}>
+                Bấm <strong>📚 Mở Ngân hàng đề</strong> để chọn câu có sẵn (tick + add hoặc kéo-thả),
+                <br />hoặc <strong>+ Tạo câu mới</strong> để soạn thủ công.
+              </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -357,6 +464,20 @@ export default function ExamDetailPage() {
         examId={exam.id}
         examTitle={exam.title}
       />
+
+      {/* Drawer: Question Bank — multi-select + drag-drop add */}
+      {bankOpen && (
+        <Suspense fallback={null}>
+          <QuestionBankDrawer
+            examId={exam.id}
+            examSubject={exam.subject}
+            examGrade={exam.grade}
+            alreadyInExam={alreadyInExam}
+            onAttached={() => { refetch() }}
+            onClose={() => setBankOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
