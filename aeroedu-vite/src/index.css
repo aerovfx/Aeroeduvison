@@ -4,6 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🌞 LIGHT MODE GLOBAL — mobile-first, high contrast, large text.
+ * Import SAU @tailwind utilities để có thể override với specificity
+ * `html:not(.dark) .xxx`. Xem file để biết 20 rule sets. */
+@import './styles/light-mode.css';
+
 /* ============================================================
  * AI NATIVE DESIGN SYSTEM — globals.css
  * Light: flat white cards, bg-slate-50, pill tabs, purple accent
