@@ -9,6 +9,8 @@ import { toast } from "react-hot-toast"
 import { BulkGenerateModal } from "@/components/question-bank/BulkGenerateModal"
 import { ImportModal } from "@/components/question-bank/ImportModal"
 import { api } from "@/services/api"
+import { MathText } from "@/components/common/MathText"
+import QuestionRichEditor, { QuestionContentView } from "@/components/exam/QuestionRichEditor"
 
 interface Question {
   id: string
@@ -360,7 +362,11 @@ export default function QuestionBank() {
   }
 
   const handleCreateQuestion = async (keepFormOpen = false): Promise<boolean> => {
-    if (!form.content.trim()) { toast.error("Vui lòng nhập nội dung câu hỏi"); return false }
+    /* Content giờ là HTML từ RichTextEditor — strip tags trước khi check empty.
+       Editor trả '<p></p>' khi user xoá hết → trim() không bắt được. */
+    const stripHtml = (html: string) =>
+      html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&amp;|&lt;|&gt;/g, ' ').trim()
+    if (!stripHtml(form.content)) { toast.error("Vui lòng nhập nội dung câu hỏi"); return false }
     if (!form.questionType) { toast.error("Vui lòng chọn loại câu hỏi"); return false }
     if (!form.subject) { toast.error("Vui lòng chọn môn học"); return false }
     if (!form.grade) { toast.error("Vui lòng chọn khối"); return false }
@@ -649,17 +655,16 @@ export default function QuestionBank() {
                 </div>
               </div>
 
-              {/* Step 3: Content */}
+              {/* Step 3: Content — Word-like editor + LaTeX */}
               <div>
                 <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                  3. Nội dung câu hỏi *
+                  3. Nội dung câu hỏi * <span className="text-purple-600 dark:text-purple-400 text-xs font-normal">(Word-like editor + LaTeX: $x^2$, $$\\int...$$ )</span>
                 </label>
-                <textarea
+                <QuestionRichEditor
                   value={form.content}
-                  onChange={(e) => updateForm("content", e.target.value)}
-                  placeholder="Nhập nội dung câu hỏi..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-secondary text-foreground placeholder-muted-foreground"
+                  onChange={(html) => updateForm("content", html)}
+                  placeholder="VD: Cho hàm số $f(x) = \\left(\\dfrac{1}{\\pi}\\right)^{-x} + \\pi x + 1$. Xét tính đúng sai..."
+                  minHeight={200}
                 />
               </div>
 
@@ -744,40 +749,55 @@ export default function QuestionBank() {
                     </div>
                   )}
 
-                  {/* Multiple True/False */}
+                  {/* Multiple True/False — như câu Đúng/Sai 4 mệnh đề Bộ GD&ĐT */}
                   {form.questionType === "MULTIPLE_TF" && (
                     <div className="space-y-3">
-                      <p className="text-xs text-muted-foreground">Nhập từng phát biểu và chọn Đúng / Sai cho mỗi ý</p>
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/15 border border-purple-300 dark:border-purple-700/40">
+                        <span className="text-base">💡</span>
+                        <div className="text-xs text-foreground/85 leading-relaxed">
+                          <strong>Đúng/Sai nhiều ý</strong> — nhập 4 phát biểu (a, b, c, d), chọn <span className="text-green-700 dark:text-green-400 font-bold">Đúng</span> hoặc <span className="text-red-700 dark:text-red-400 font-bold">Sai</span> cho mỗi ý.
+                          <br />Hỗ trợ LaTeX trong phát biểu: <code className="px-1 rounded bg-muted">$y = f(x)$</code> render công thức inline.
+                        </div>
+                      </div>
                       {form.options.map((opt, idx) => {
                         const label = String.fromCharCode(97 + idx) // a, b, c, d
                         const isTrue = form.mtfAnswers[idx] === "Đúng"
                         return (
-                          <div key={idx} className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-muted-foreground w-5 shrink-0">{label})</span>
-                            <input
-                              value={opt}
-                              onChange={(e) => updateOption(idx, e.target.value)}
-                              placeholder={`Phát biểu ${label}...`}
-                              className="flex-1 px-3 py-2.5 border border-border rounded-lg text-sm bg-secondary text-foreground placeholder-muted-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleMtfAnswer(idx)}
-                              className={`px-4 py-2.5 rounded-lg text-sm font-semibold shrink-0 border-2 transition-all ${
-                                isTrue
-                                  ? "border-green-500 bg-green-900/30 text-green-400"
-                                  : "border-red-500 bg-red-900/30 text-red-400"
-                              }`}
-                            >
-                              {isTrue ? "✓ Đúng" : "✗ Sai"}
-                            </button>
-                            {form.options.length > 2 && (
+                          <div key={idx} className="space-y-1.5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-bold text-foreground w-6 shrink-0">{label})</span>
+                              <input
+                                value={opt}
+                                onChange={(e) => updateOption(idx, e.target.value)}
+                                placeholder={`Phát biểu ${label} (gõ $x^2$ cho LaTeX)`}
+                                className="flex-1 px-3 py-2.5 border border-border rounded-lg text-sm bg-card text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
                               <button
-                                onClick={() => removeOption(idx)}
-                                className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                type="button"
+                                onClick={() => toggleMtfAnswer(idx)}
+                                className={`px-4 py-2.5 rounded-lg text-sm font-semibold shrink-0 border-2 transition-all ${
+                                  isTrue
+                                    ? "border-green-500 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                    : "border-red-500 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                                }`}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                {isTrue ? "✓ Đúng" : "✗ Sai"}
                               </button>
+                              {form.options.length > 2 && (
+                                <button
+                                  onClick={() => removeOption(idx)}
+                                  className="p-2 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {/* LaTeX preview cho phát biểu có $...$ */}
+                            {opt.includes('$') && (
+                              <div className="ml-9 px-3 py-1.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
+                                <span className="font-semibold mr-2">Preview:</span>
+                                <MathText as="span">{opt}</MathText>
+                              </div>
                             )}
                           </div>
                         )
@@ -785,7 +805,7 @@ export default function QuestionBank() {
                       {form.options.length < 6 && (
                         <button
                           onClick={addOption}
-                          className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           Thêm phát biểu
@@ -811,18 +831,17 @@ export default function QuestionBank() {
                 </div>
               )}
 
-              {/* Explanation */}
+              {/* Explanation — Word-like editor + LaTeX */}
               <div>
                 <label className="block text-sm font-semibold text-foreground/80 mb-2">
-                  Giải thích{" "}
-                  <span className="text-slate-600 font-normal">(tùy chọn)</span>
+                  Giải thích <span className="text-muted-foreground font-normal">(tùy chọn)</span>{" "}
+                  <span className="text-purple-600 dark:text-purple-400 text-xs font-normal">(LaTeX hỗ trợ)</span>
                 </label>
-                <textarea
+                <QuestionRichEditor
                   value={form.explanation}
-                  onChange={(e) => updateForm("explanation", e.target.value)}
-                  placeholder="Giải thích chi tiết cho đáp án..."
-                  rows={2}
-                  className="w-full px-4 py-3 border border-border rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-secondary text-foreground placeholder-muted-foreground"
+                  onChange={(html) => updateForm("explanation", html)}
+                  placeholder="Giải thích cách giải. VD: TXĐ là $\\mathbb{R}$ vì $\\dfrac{1}{\\pi} > 0$..."
+                  minHeight={140}
                 />
               </div>
 
@@ -1190,7 +1209,13 @@ function QuestionCard({
               </span>
             </div>
 
-            <p className="text-foreground font-medium line-clamp-2">{question.content}</p>
+            {/* Preview: strip HTML để line-clamp-2 hoạt động đúng + LaTeX render */}
+            <div className="text-foreground font-medium line-clamp-2">
+              {(() => {
+                const txt = question.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+                return <MathText as="span">{txt}</MathText>
+              })()}
+            </div>
 
             {question.options.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-3 max-w-2xl">
@@ -1319,29 +1344,45 @@ function QuestionCard({
             </>
           ) : (
             <div className="space-y-4">
-              {/* Full question content */}
+              {/* Full question content — render HTML/LaTeX */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Nội dung đầy đủ</p>
-                <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">{question.content}</p>
+                <div className="text-foreground text-sm leading-relaxed">
+                  <QuestionContentView content={question.content} />
+                </div>
               </div>
 
-              {/* MULTIPLE_TF display */}
+              {/* MULTIPLE_TF display — table-style như đề Bộ GD&ĐT */}
               {question.questionType === "MULTIPLE_TF" && question.options.length > 0 && (() => {
                 const answers = question.correctAnswer.split(",")
                 return (
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Các phát biểu</p>
-                    <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Các phát biểu (Đúng/Sai)</p>
+                    <div className="rounded-lg border overflow-hidden">
                       {question.options.map((opt, idx) => {
                         const ans = answers[idx] || "?"
+                        const isTrue = ans === "Đúng"
                         return (
-                          <div key={idx} className={`flex items-start gap-3 px-3 py-2 rounded-lg border text-sm ${
-                            ans === "Đúng" ? "border-green-700/40 bg-green-900/15 text-green-300" : "border-red-700/40 bg-red-900/15 text-red-300"
-                          }`}>
-                            <span className="font-bold shrink-0 text-xs mt-0.5">{String.fromCharCode(97 + idx)})</span>
-                            <span className="flex-1 text-foreground">{opt}</span>
-                            <span className={`text-xs font-bold shrink-0 px-2 py-0.5 rounded ${ans === "Đúng" ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
-                              {ans === "Đúng" ? "✓ Đúng" : "✗ Sai"}
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-3 px-3 py-2.5 text-sm border-b last:border-b-0 ${
+                              isTrue
+                                ? "bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-700/40"
+                                : "bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-700/40"
+                            }`}
+                          >
+                            <span className="font-bold shrink-0 text-foreground mt-0.5">{String.fromCharCode(97 + idx)})</span>
+                            <div className="flex-1 text-foreground leading-relaxed">
+                              <QuestionContentView content={opt} as="span" />
+                            </div>
+                            <span
+                              className={`text-xs font-bold shrink-0 px-2.5 py-1 rounded ${
+                                isTrue
+                                  ? "bg-green-200 dark:bg-green-900/40 text-green-800 dark:text-green-300"
+                                  : "bg-red-200 dark:bg-red-900/40 text-red-800 dark:text-red-300"
+                              }`}
+                            >
+                              {isTrue ? "✓ Đúng" : "✗ Sai"}
                             </span>
                           </div>
                         )
@@ -1351,11 +1392,13 @@ function QuestionCard({
                 )
               })()}
 
-              {/* Explanation */}
+              {/* Explanation — render HTML/LaTeX */}
               {question.explanation && (
-                <div className="bg-amber-900/15 border border-amber-700/30 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-amber-400 mb-1">💡 Giải thích</p>
-                  <p className="text-sm text-foreground/80 leading-relaxed">{question.explanation}</p>
+                <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">💡 Giải thích</p>
+                  <div className="text-sm text-foreground/85 leading-relaxed">
+                    <QuestionContentView content={question.explanation} />
+                  </div>
                 </div>
               )}
 
