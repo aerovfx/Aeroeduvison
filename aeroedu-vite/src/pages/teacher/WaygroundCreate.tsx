@@ -263,13 +263,16 @@ export default function WaygroundCreatePage() {
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
               maxWidth: 640, margin: '0 auto 36px',
             }}>
-              {[
-                { icon: Edit3,  label: 'Tạo mới',     sub: 'tài liệu đánh giá', active: true },
-                { icon: Search, label: 'Tìm kiếm',    sub: 'tài liệu có sẵn' },
-                { icon: Upload, label: 'Tải lên',     sub: 'tài liệu của bạn' },
-              ].map((t) => (
+              {([
+                { icon: Edit3,  label: 'Tạo mới',     sub: 'tài liệu đánh giá', active: true,
+                  onClick: () => { setResource('assessment'); setStep('customize') } },
+                { icon: Search, label: 'Tìm kiếm',    sub: 'tài liệu có sẵn', active: false,
+                  onClick: () => navigate('/teacher/question-bank') },
+                { icon: Upload, label: 'Tải lên',     sub: 'tài liệu của bạn', active: false,
+                  onClick: () => { setResource('assessment'); setStep('customize'); setTimeout(() => fileRef.current?.click(), 100) } },
+              ] as const).map((t) => (
                 <button key={t.label}
-                  onClick={() => { /* all lead into chooser below */ }}
+                  onClick={t.onClick}
                   style={{
                     background: D.card, border: `2px solid ${t.active ? D.accent : D.border}`,
                     borderRadius: 12, padding: '20px 16px', cursor: 'pointer',
@@ -406,9 +409,12 @@ export default function WaygroundCreatePage() {
                     }}>{opt.icon}</div>
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{opt.label}</span>
                     {active && (
+                      /* 2026-05-19: fill/stroke hardcoded '#000'/'#fff' invisible
+                         trên dark mode (D.card cũng dark). Dùng accent color cho
+                         filled state — readable cả 2 themes. */
                       <CheckCircle2 size={18} style={{
                         position: 'absolute', top: 12, right: 12,
-                        color: D.text, fill: '#000', stroke: '#fff',
+                        color: D.accent, fill: 'none',
                       }} />
                     )}
                   </button>
@@ -625,7 +631,7 @@ function QuestionCard({ q, idx, showAnswers, onChange }: {
         }}>
           {String(idx + 1).padStart(2, '0')}
         </span>
-        <span>{q.questionType.replace('_', ' ')}</span>
+        <span>{(q.questionType ?? 'UNKNOWN').replace('_', ' ')}</span>
         <span>· 30 sec · 1 Pt</span>
         <button onClick={() => setEditing(v => !v)} style={{
           marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer',
@@ -647,11 +653,13 @@ function QuestionCard({ q, idx, showAnswers, onChange }: {
         </div>
       )}
 
-      {showAnswers && q.options.length > 0 && (
+      {showAnswers && (q.options?.length ?? 0) > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
-          {q.options.map((opt, oi) => {
+          {(q.options ?? []).map((opt, oi) => {
             const letter = String.fromCharCode(65 + oi)
-            const isCorrect = q.correctAnswer.toUpperCase().startsWith(letter)
+            /* 2026-05-19: defensive ?? '' — backend đôi khi trả correctAnswer=null
+               cho SHORT_ANSWER hoặc khi extract miss → toUpperCase crash. */
+            const isCorrect = (q.correctAnswer ?? '').toUpperCase().startsWith(letter)
             return (
               <button key={oi}
                 onClick={() => onChange({ correctAnswer: letter })}
