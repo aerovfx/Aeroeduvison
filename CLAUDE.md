@@ -15,8 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `6b0b2bd` (revision pixiai-00347-ced, 2026-05-19 — Light mode batch 10 pages: IoTLab/GraphLab/KnowledgeGraph/CareerGames + 6 khác)
+- Last deployed commit: `72b50cf` (revision pixiai-00348-taf, 2026-05-19 — Comprehensive light mode 7 student/dashboard pages +275, smart HSL→Tailwind mapper)
 - Commits since last deploy: `0/5`
+- Prev: `43ce43e` → pixiai-00348-taf (Achievements 26 HSL accents — same deploy)
+- Prev: `6b0b2bd` → pixiai-00347-ced (Light mode batch 10 pages: IoTLab/GraphLab/KnowledgeGraph + 6 khác)
 - Prev: `981743f` → pixiai-00346-not (ForYou 48 patterns + revert bg-card2 → bg-secondary)
 - Prev: `f36f333` → pixiai-00346-not (GalaxyHero description visible trên light)
 - Prev: `0e72ab5` → pixiai-00346-not (14 student/dashboard pages light mode)

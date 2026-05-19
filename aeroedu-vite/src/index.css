@@ -796,17 +796,26 @@ main  { contain: layout; }
  * as a dark-first design. These overrides flip them for light.
  * ============================================================ */
 
-/* ── Text: white opacity → foreground opacity ──────────────── */
-html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.90) !important; }
-html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.80) !important; }
-html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.70) !important; }
-html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.40) !important; }
-html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.35) !important; }
-html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.30) !important; }
-html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.25) !important; }
-html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.15) !important; }
+/* ── Text: white opacity → foreground opacity ────────────────
+ * 2026-05-19 RETUNED v2 — pages dùng text-white/40, /30, /25 cho meta
+ * text (xs, font-weight 500). Trên dark bg, opacity 30-40% white vẫn
+ * readable. Nhưng trên light bg, opacity 30-40% dark text = nearly
+ * invisible (light gray on white). Bump opacity của low-end variants
+ * để duy trì contrast ≥ 4.5:1 WCAG AA.
+ *
+ * Lý do bất đối xứng: low-opacity DARK text + WHITE bg = very low
+ * contrast (color blends fast với bg); low-opacity WHITE text + DARK
+ * bg vẫn readable vì human eye nhạy với điểm sáng. */
+html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.95) !important; }
+html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.82) !important; }
+html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.68) !important; }
+html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.62) !important; }
+html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.55) !important; }
+html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.50) !important; }
+html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.45) !important; }
+html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.30) !important; }
 /* NOTE: plain .text-white is NOT overridden — it is widely used on colored
    backgrounds (buttons, badges, gradient CTAs) where dark text would be wrong.
    Only text-white/XX opacity variants (common in dark-first glass panels)
