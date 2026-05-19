@@ -9,7 +9,7 @@ import {
 import {
   BarChart, Users, Target, Award,
   Download, FileText, CheckCircle2, AlertCircle,
-  Loader2, Activity, User as UserIcon, Clock, Trophy, Hash,
+  Loader2, Activity, User as UserIcon, Clock, Trophy, Hash, Search,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
@@ -54,6 +54,14 @@ interface Exam {
   examType: string
   status: string
   createdAt: string
+  // Enriched metadata từ mapExam() backend
+  subject?: string | null
+  grade?: string | null
+  notes?: string | null
+  duration?: number
+  totalScore?: number
+  totalQuestions?: number
+  isPublic?: boolean
 }
 
 interface ExamAnalytics {
@@ -197,6 +205,8 @@ export default function ExamReports() {
   const [loading, setLoading]           = useState(true)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
   const [searchQuery, setSearchQuery]   = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("")
+  const [sortMode, setSortMode]         = useState<'date' | 'title' | 'submissions'>('date')
   const [activeTab, setActiveTab]       = useState<"overview" | "students" | "questions" | "distribution" | "time">("overview")
 
   // Load exams list
@@ -384,9 +394,33 @@ export default function ExamReports() {
     }
   }
 
-  const filteredExams = exams.filter(e =>
-    !searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const filteredExams = exams
+    .filter(e => {
+      const q = searchQuery.trim().toLowerCase()
+      if (q) {
+        const inTitle = e.title.toLowerCase().includes(q)
+        const inSubj  = (e.subject || '').toLowerCase().includes(q)
+        const inGrade = (e.grade   || '').toLowerCase().includes(q)
+        if (!inTitle && !inSubj && !inGrade) return false
+      }
+      if (statusFilter && e.status !== statusFilter) return false
+      return true
+    })
+    .sort((a, b) => {
+      if (sortMode === 'title') return a.title.localeCompare(b.title, 'vi')
+      // submissions/date: backend không trả submissions count, fallback date
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+
+  // Set distinct statuses để build filter chips
+  const allStatuses = [...new Set(exams.map(e => e.status).filter(Boolean))]
+
+  // Map cho status badge color
+  const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
+    'Nháp':         { bg: 'rgba(148,163,184,0.15)',  fg: '#94a3b8' },
+    'Đang diễn ra': { bg: 'rgba(52,211,153,0.15)',   fg: '#10b981' },
+    'Đã kết thúc':  { bg: 'rgba(148,163,184,0.15)',  fg: '#94a3b8' },
+  }
 
   const TABS = [
     { key: "overview"      as const, label: "Tổng quan" },
@@ -489,49 +523,161 @@ export default function ExamReports() {
       {/* ── Main ── */}
       <div style={{ maxWidth: 1280, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
 
-        {/* ── Exam selector ── */}
+        {/* ── Exam list ── (replace dropdown 2026-05-19) */}
         <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Search */}
-            <div style={{ flex: 1, position: "relative" }}>
+          {/* Search + filter row */}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ flex: 1, minWidth: 240, position: "relative" }}>
+              <Search style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, color: D.muted }} />
               <input
                 type="text"
-                placeholder="Tìm kiếm đề thi..."
+                placeholder="Tìm theo tiêu đề / môn / khối..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 style={{
                   width: "100%", boxSizing: "border-box",
-                  padding: "9px 12px", border: `1px solid ${D.border2}`,
+                  padding: "9px 12px 9px 32px", border: `1px solid ${D.border2}`,
                   borderRadius: 8, background: D.card2, color: D.text,
                   fontSize: 13, outline: "none",
                 }}
               />
             </div>
-            {/* Exam dropdown */}
             <select
-              value={selectedExamId}
-              onChange={e => { setSelectedExamId(e.target.value); setActiveTab("overview") }}
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
               style={{
-                width: 340, padding: "9px 12px",
-                border: `1px solid ${D.border2}`, borderRadius: 8,
-                background: D.card2, color: selectedExamId ? D.text : D.muted,
-                fontSize: 13, outline: "none", cursor: "pointer",
+                padding: "9px 12px", border: `1px solid ${D.border2}`,
+                borderRadius: 8, background: D.card2, color: D.text,
+                fontSize: 12, outline: "none", cursor: "pointer",
               }}
             >
-              <option value="">Chọn đề thi để phân tích…</option>
-              {loading ? (
-                <option disabled>Đang tải…</option>
-              ) : filteredExams.length === 0 ? (
-                <option disabled>Chưa có đề thi nào</option>
-              ) : (
-                filteredExams.map(exam => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.title} ({exam.examType})
-                  </option>
-                ))
-              )}
+              <option value="">Tất cả trạng thái</option>
+              {allStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+            <select
+              value={sortMode}
+              onChange={e => setSortMode(e.target.value as typeof sortMode)}
+              style={{
+                padding: "9px 12px", border: `1px solid ${D.border2}`,
+                borderRadius: 8, background: D.card2, color: D.text,
+                fontSize: 12, outline: "none", cursor: "pointer",
+              }}
+            >
+              <option value="date">📅 Mới nhất</option>
+              <option value="title">🔤 Tên A-Z</option>
+            </select>
+            <span style={{ fontSize: 12, color: D.muted, marginLeft: 'auto' }}>
+              {filteredExams.length}/{exams.length} đề thi
+            </span>
           </div>
+
+          {/* Card list — grid 2-3 columns responsive */}
+          {loading ? (
+            <div style={{ padding: 48, textAlign: "center", color: D.muted }}>
+              <Loader2 style={{ width: 28, height: 28, margin: "0 auto 8px", animation: "spin 1s linear infinite" }} />
+              <p style={{ fontSize: 13 }}>Đang tải danh sách đề thi…</p>
+            </div>
+          ) : filteredExams.length === 0 ? (
+            <div style={{ padding: 48, textAlign: "center", color: D.muted }}>
+              <FileText style={{ width: 32, height: 32, margin: "0 auto 8px", opacity: 0.4 }} />
+              <p style={{ fontSize: 13 }}>
+                {exams.length === 0 ? 'Chưa có đề thi nào' : 'Không khớp bộ lọc — thử bỏ filter'}
+              </p>
+            </div>
+          ) : (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 10,
+              maxHeight: 360,
+              overflowY: 'auto',
+              paddingRight: 4,
+            }}>
+              {filteredExams.map(exam => {
+                const isSelected = selectedExamId === exam.id
+                const statusCfg = STATUS_COLORS[exam.status] || { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' }
+                return (
+                  <button
+                    key={exam.id}
+                    onClick={() => { setSelectedExamId(exam.id); setActiveTab("overview") }}
+                    style={{
+                      textAlign: 'left',
+                      padding: 12,
+                      background: isSelected ? D.purpleA(0.10) : D.card2,
+                      border: `2px solid ${isSelected ? '#a78bfa' : D.border2}`,
+                      borderRadius: 10,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                    onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = D.purple }}
+                    onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = D.border2 }}
+                  >
+                    {/* Header: title + status badge */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <h3 style={{
+                        margin: 0, fontSize: 13, fontWeight: 700,
+                        color: isSelected ? '#a78bfa' : D.text,
+                        lineHeight: 1.35,
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      }}>
+                        {exam.title}
+                      </h3>
+                      <span style={{
+                        flexShrink: 0,
+                        padding: '2px 8px', borderRadius: 4,
+                        background: statusCfg.bg, color: statusCfg.fg,
+                        fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                      }}>
+                        {exam.status}
+                      </span>
+                    </div>
+
+                    {/* Meta badges */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 10 }}>
+                      {exam.subject && (
+                        <span style={{ padding: '2px 6px', borderRadius: 3, background: D.purpleA(0.12), color: '#a78bfa', fontWeight: 600 }}>
+                          {exam.subject}
+                        </span>
+                      )}
+                      {exam.grade && (
+                        <span style={{ padding: '2px 6px', borderRadius: 3, background: D.blueA(0.12), color: '#60a5fa', fontWeight: 600 }}>
+                          {exam.grade}
+                        </span>
+                      )}
+                      <span style={{ padding: '2px 6px', borderRadius: 3, background: D.card, color: D.muted, fontWeight: 500 }}>
+                        {exam.examType}
+                      </span>
+                    </div>
+
+                    {/* Footer stats */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 10, color: D.muted, paddingTop: 4, borderTop: `1px dashed ${D.border}` }}>
+                      <span title="Số câu hỏi">📝 {exam.totalQuestions ?? '—'} câu</span>
+                      {exam.duration ? <span title="Thời gian">⏱ {exam.duration}p</span> : null}
+                      {exam.totalScore ? <span title="Điểm tối đa">🎯 {exam.totalScore}đ</span> : null}
+                      <span style={{ marginLeft: 'auto', fontSize: 9 }}>
+                        {new Date(exam.createdAt).toLocaleDateString('vi-VN')}
+                      </span>
+                    </div>
+
+                    {isSelected && (
+                      <div style={{
+                        marginTop: 4, padding: '4px 8px',
+                        background: D.purpleA(0.15),
+                        borderRadius: 6, fontSize: 10, fontWeight: 700,
+                        color: '#a78bfa', textAlign: 'center',
+                      }}>
+                        ✓ Đang xem báo cáo
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── Analytics panel ── */}
