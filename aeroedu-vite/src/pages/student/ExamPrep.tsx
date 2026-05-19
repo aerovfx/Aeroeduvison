@@ -60,8 +60,8 @@ const REASON_LABELS: Record<string, string> = {
   'difficulty-match':  '⚖ Vừa sức',
 }
 
-const selectClass = "w-full rounded-xl bg-black/25 backdrop-blur-sm border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 focus:outline-none focus:border-[hsl(245,85%,65%)]/40 focus:shadow-[0_0_15px_rgba(120,100,255,0.1)]"
-const inputClass = "w-full rounded-xl bg-black/25 border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 placeholder-white/30 focus:outline-none focus:border-[hsl(245,85%,65%)]/40"
+const selectClass = "w-full rounded-xl bg-black/25 backdrop-blur-sm border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 focus:outline-none focus:border-indigo-400/40 focus:shadow-[0_0_15px_rgba(120,100,255,0.1)]"
+const inputClass = "w-full rounded-xl bg-black/25 border border-white/[0.06] px-3 py-2.5 text-sm text-white/85 placeholder-white/30 focus:outline-none focus:border-indigo-400/40"
 
 /* ─── Inline replacements ────────────────────────────── */
 function PageHeader({ title, description, docSlug, docAnchor }: { title: string; description: string; docSlug?: string; docAnchor?: string }) {
@@ -488,7 +488,7 @@ export default function ExamPrepPage() {
             <h1 className="text-lg font-bold text-white/90">{practice.subject} - {practice.grade}</h1>
             <p className="text-xs text-white/40">{practice.examType} | Câu {currentQ + 1}/{totalQ} | Đã trả lời: {answeredCount}/{totalQ}</p>
           </div>
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${isUrgent ? "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse" : "bg-[hsl(245,85%,65%)]/10 text-[hsl(245,85%,75%)] border border-[hsl(245,85%,65%)]/20"}`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${isUrgent ? "bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse" : "bg-indigo-400/10 text-indigo-300 border border-indigo-400/20"}`}>
             <Clock className="h-4 w-4" />
             <span className="text-lg font-bold font-mono">{formatTime(timeLeft)}</span>
           </div>
@@ -513,7 +513,7 @@ export default function ExamPrepPage() {
                     i === currentQ
                       ? "bg-[hsl(245,85%,60%)] text-white shadow-lg"
                       : answers[practice.questions[i].questionId]
-                      ? "bg-[hsl(175,80%,40%)]/20 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,40%)]/30"
+                      ? "bg-cyan-600/20 text-cyan-500 border border-cyan-600/30"
                       : "bg-white/[0.04] text-white/40 border border-white/[0.06] hover:bg-white/[0.08]"
                   }`}
                 >
@@ -526,7 +526,7 @@ export default function ExamPrepPage() {
             {q && (
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-8">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2 py-0.5 rounded-md bg-[hsl(245,85%,65%)]/10 text-[hsl(245,85%,75%)] text-xs font-medium">
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-400/10 text-indigo-300 text-xs font-medium">
                     Câu {q.position}
                   </span>
                   <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
@@ -554,7 +554,7 @@ export default function ExamPrepPage() {
                           key={idx}
                           className={`p-4 rounded-xl border cursor-pointer transition-all ${
                             isSelected
-                              ? "border-[hsl(245,85%,65%)]/50 bg-[hsl(245,85%,65%)]/10"
+                              ? "border-indigo-400/50 bg-indigo-400/10"
                               : "border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]"
                           }`}
                           onClick={() => setAnswers({ ...answers, [q.questionId]: opt })}
@@ -581,7 +581,7 @@ export default function ExamPrepPage() {
                       onChange={(e) => setAnswers({ ...answers, [q.questionId]: e.target.value })}
                       placeholder="Nhập câu trả lời..."
                       rows={4}
-                      className="w-full rounded-xl bg-black/25 border border-white/[0.06] px-4 py-3 text-white/85 placeholder-white/30 focus:outline-none focus:border-[hsl(245,85%,65%)]/40 resize-y"
+                      className="w-full rounded-xl bg-black/25 border border-white/[0.06] px-4 py-3 text-white/85 placeholder-white/30 focus:outline-none focus:border-indigo-400/40 resize-y"
                     />
                   </div>
                 )}
@@ -673,11 +673,11 @@ export default function ExamPrepPage() {
             {/* Stats cards */}
             <div className="grid grid-cols-3 gap-4">
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center">
-                <div className="text-3xl font-bold text-[hsl(175,80%,55%)]">{result.breakdown.correct}</div>
+                <div className="text-3xl font-bold text-cyan-500">{result.breakdown.correct}</div>
                 <div className="text-xs text-white/40 mt-1">Đúng</div>
               </div>
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center">
-                <div className="text-3xl font-bold text-[hsl(0,80%,65%)]">{result.breakdown.incorrect}</div>
+                <div className="text-3xl font-bold text-red-400">{result.breakdown.incorrect}</div>
                 <div className="text-xs text-white/40 mt-1">Sai</div>
               </div>
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 text-center">
@@ -690,7 +690,7 @@ export default function ExamPrepPage() {
             {Object.keys(result.breakdown.byTopic).length > 0 && (
               <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
                 <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-[hsl(210,90%,60%)]" />
+                  <BarChart3 className="h-5 w-5 text-sky-400" />
                   Phân tích theo chủ đề
                 </h3>
                 <div className="space-y-3">
@@ -735,7 +735,7 @@ export default function ExamPrepPage() {
             {/* Recommendations */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-[hsl(175,80%,55%)]" />
+                <TrendingUp className="h-5 w-5 text-cyan-500" />
                 Đề Xuất Ôn Tập
               </h3>
               <ul className="space-y-2">
@@ -799,8 +799,8 @@ export default function ExamPrepPage() {
                     </p>
                   )}
                   {d.explanation && (
-                    <div className="mt-3 p-3 rounded-lg bg-[hsl(210,90%,60%)]/5 border border-[hsl(210,90%,60%)]/10">
-                      <p className="text-xs text-[hsl(210,90%,70%)]">💡 {d.explanation}</p>
+                    <div className="mt-3 p-3 rounded-lg bg-sky-400/5 border border-sky-400/10">
+                      <p className="text-xs text-sky-400">💡 {d.explanation}</p>
                     </div>
                   )}
                 </div>
@@ -1033,7 +1033,7 @@ export default function ExamPrepPage() {
                     <select
                       value={formData.topic}
                       onChange={(e) => setFormData({ ...formData, topic: e.target.value })}
-                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-medium focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-medium focus:outline-none focus:border-indigo-400/60 focus:bg-black/40"
                       disabled={topicsLoading}
                     >
                       <option value="__all__">
@@ -1084,7 +1084,7 @@ export default function ExamPrepPage() {
                       onChange={(e) => setFormData({ ...formData, questionCount: parseInt(e.target.value) || 10 })}
                       min={5}
                       max={100}
-                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-indigo-400/60 focus:bg-black/40"
                     />
                   </FieldBig>
                   <FieldBig label="Phút">
@@ -1094,7 +1094,7 @@ export default function ExamPrepPage() {
                       onChange={(e) => setFormData({ ...formData, timeLimit: parseInt(e.target.value) || 15 })}
                       min={5}
                       max={180}
-                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-[hsl(245,85%,65%)]/60 focus:bg-black/40"
+                      className="w-full rounded-xl bg-black/30 border border-white/[0.08] px-4 h-12 sm:h-14 text-base text-white font-bold tabular-nums focus:outline-none focus:border-indigo-400/60 focus:bg-black/40"
                     />
                   </FieldBig>
                 </div>
@@ -1133,7 +1133,7 @@ export default function ExamPrepPage() {
                       {/* Header với toggle hiển thị */}
                       <div className="flex items-center justify-between px-1">
                         <h3 className="font-bold text-white text-lg sm:text-xl flex items-center gap-2">
-                          <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-[hsl(175,80%,55%)]" />
+                          <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-cyan-500" />
                           <span>{teacherExams.length} đề từ giáo viên</span>
                         </h3>
                         <div className="text-xs text-white/40">
@@ -1468,7 +1468,7 @@ function CommunityStatsPanel({
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="font-semibold text-white/90 flex items-center gap-2">
-            <Users className="h-5 w-5 text-[hsl(245,85%,70%)]" />
+            <Users className="h-5 w-5 text-indigo-400" />
             Thống Kê Cộng Đồng
           </h3>
           <p className="text-xs text-white/40 mt-0.5">

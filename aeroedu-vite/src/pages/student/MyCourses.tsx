@@ -406,7 +406,7 @@ function CoursesGridTab({ enrollments }: { enrollments: Enrollment[] }) {
                       {formatRelativeTime(last.occurredAt)}
                     </span>
                   </div>
-                  <p className="text-sm text-slate-200 line-clamp-1">
+                  <p className="text-sm text-foreground line-clamp-1">
                     {last.title || actionLabel(last.action)}
                   </p>
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
@@ -962,7 +962,7 @@ function ReviewCard({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Chia sẻ cảm nhận của bạn về khoá học (tối thiểu 5 ký tự)…"
         rows={3}
-        className="w-full rounded-lg bg-slate-900/60 border border-border px-3 py-2 text-sm text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60"
+        className="w-full rounded-lg bg-slate-900/60 border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/60"
       />
 
       <div className="flex items-center justify-between gap-2">

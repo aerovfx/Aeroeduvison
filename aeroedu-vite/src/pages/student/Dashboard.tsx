@@ -350,7 +350,7 @@ function StudentRecoPreview() {
               key={`${item.type}-${item.id}`}
               to={item.link}
               onClick={() => rs.track({ action: 'click', targetType: item.type, targetId: item.id, metadata: { source: 'dashboard-preview' } })}
-              className="block rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
+              className="block rounded-lg border border-zinc-200 dark:border-border bg-zinc-50/50 dark:bg-zinc-900/40 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
               style={{ borderLeftWidth: 3, borderLeftColor: meta.accent }}
             >
               <div className="flex items-center gap-1.5 mb-1">

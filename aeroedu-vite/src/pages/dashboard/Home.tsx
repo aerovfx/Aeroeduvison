@@ -78,7 +78,7 @@ const StatsSection = React.memo(({
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-4 h-4 text-[hsl(245,85%,65%)]" />
+        <TrendingUp className="w-4 h-4 text-indigo-400" />
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Tổng quan &amp; Tiến độ học tập</h2>
       </div>
 
@@ -222,7 +222,7 @@ function CompetenciesSection({ onSkillClick }: { onSkillClick: (skill: SkillDeta
   return (
     <section>
       <div className="flex items-center gap-2 mb-4">
-        <Cpu className="w-4 h-4 text-[hsl(175,80%,50%)]" />
+        <Cpu className="w-4 h-4 text-cyan-500" />
         <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Năng lực &amp; Cảm xúc học tập</h2>
       </div>
 
@@ -267,9 +267,9 @@ function CompetenciesSection({ onSkillClick }: { onSkillClick: (skill: SkillDeta
           </div>
 
           {/* AI Insight */}
-          <div className="mt-6 p-3 rounded-lg border border-[hsl(245,85%,65%)]/10 bg-[hsl(245,85%,65%)]/[0.04]">
+          <div className="mt-6 p-3 rounded-lg border border-indigo-400/10 bg-[hsl(245,85%,65%)]/[0.04]">
             <div className="flex items-start gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-[hsl(245,85%,65%)] flex-shrink-0 mt-0.5" />
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs text-white/50 leading-relaxed">
                   AI phát hiện: Curiosity cao (92%) - thời điểm lý tưởng để khám phá chủ đề mới. Focus hơi thấp (69%) - nên chia nhỏ bài học.

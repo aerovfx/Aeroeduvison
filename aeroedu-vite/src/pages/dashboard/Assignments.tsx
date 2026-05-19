@@ -90,9 +90,9 @@ const SUBJECT_ICON: Record<string, string> = {
 const getSubjectIcon = (s: string) => SUBJECT_ICON[s] ?? '📚'
 
 const DIFFICULTY_STYLE: Record<string, string> = {
-  easy:   'bg-[hsl(142,76%,36%)]/10 text-[hsl(142,76%,50%)] border border-[hsl(142,76%,36%)]/15',
-  medium: 'bg-[hsl(38,92%,50%)]/10  text-[hsl(38,92%,60%)]  border border-[hsl(38,92%,50%)]/15',
-  hard:   'bg-[hsl(0,84%,60%)]/10   text-[hsl(0,84%,65%)]   border border-[hsl(0,84%,60%)]/15',
+  easy:   'bg-emerald-600/10 text-emerald-500 border border-emerald-600/15',
+  medium: 'bg-amber-500/10  text-amber-400  border border-amber-500/15',
+  hard:   'bg-red-400/10   text-red-400   border border-red-400/15',
 }
 const DIFFICULTY_LABEL: Record<string, string> = { easy: 'Dễ', medium: 'Trung bình', hard: 'Khó' }
 
@@ -103,10 +103,10 @@ const STATUS_ICON: Record<string, React.ComponentType<{ className?: string }>> =
   recommended:  Brain,
 }
 const STATUS_COLOR: Record<string, string> = {
-  completed:    'bg-[hsl(142,76%,36%)]/10 text-[hsl(142,76%,50%)]',
-  'in-progress': 'bg-[hsl(210,90%,60%)]/10 text-[hsl(210,90%,65%)]',
-  pending:       'bg-[hsl(38,92%,50%)]/10  text-[hsl(38,92%,60%)]',
-  recommended:   'bg-[hsl(262,83%,58%)]/10 text-[hsl(262,83%,70%)]',
+  completed:    'bg-emerald-600/10 text-emerald-500',
+  'in-progress': 'bg-sky-400/10 text-sky-400',
+  pending:       'bg-amber-500/10  text-amber-400',
+  recommended:   'bg-indigo-500/10 text-indigo-400',
 }
 const STATUS_LABEL: Record<string, string> = {
   completed: 'Hoàn thành', 'in-progress': 'Đang học', pending: 'Chờ học', recommended: 'AI đề xuất',
@@ -121,25 +121,25 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
   return (
     <div className={`group bg-white/[0.02] backdrop-blur-xl rounded-2xl border transition-all duration-200 p-5 hover:bg-white/[0.04] cursor-default ${
       isRecommended
-        ? 'border-[hsl(262,83%,58%)]/25 hover:border-[hsl(262,83%,58%)]/40'
+        ? 'border-indigo-500/25 hover:border-indigo-500/40'
         : isComplete
-        ? 'border-[hsl(142,76%,36%)]/20 hover:border-[hsl(142,76%,36%)]/35'
+        ? 'border-emerald-600/20 hover:border-emerald-600/35'
         : 'border-white/[0.06] hover:border-white/[0.10]'
     }`}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="flex items-start gap-3 min-w-0">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg ${
-            isComplete ? 'bg-[hsl(142,76%,36%)]/10' :
-            a.status === 'in-progress' ? 'bg-[hsl(210,90%,60%)]/10' :
-            isRecommended ? 'bg-[hsl(262,83%,58%)]/10' : 'bg-white/[0.04]'
+            isComplete ? 'bg-emerald-600/10' :
+            a.status === 'in-progress' ? 'bg-sky-400/10' :
+            isRecommended ? 'bg-indigo-500/10' : 'bg-white/[0.04]'
           }`}>
             {getSubjectIcon(a.subject)}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 mb-1 flex-wrap">
               {a.aiGenerated && (
-                <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-[hsl(262,83%,58%)]/10 text-[hsl(262,83%,70%)] border border-[hsl(262,83%,58%)]/15 font-semibold">
+                <span className="text-[0.6rem] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/15 font-semibold">
                   🤖 AI
                 </span>
               )}
@@ -152,14 +152,14 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
           </div>
         </div>
         <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${
-          isComplete ? 'bg-[hsl(142,76%,36%)]/10' :
-          a.status === 'in-progress' ? 'bg-[hsl(210,90%,60%)]/10' :
-          isRecommended ? 'bg-[hsl(262,83%,58%)]/10' : 'bg-white/[0.04]'
+          isComplete ? 'bg-emerald-600/10' :
+          a.status === 'in-progress' ? 'bg-sky-400/10' :
+          isRecommended ? 'bg-indigo-500/10' : 'bg-white/[0.04]'
         }`}>
           <Icon className={`w-4 h-4 ${
-            isComplete ? 'text-[hsl(142,76%,50%)]' :
-            a.status === 'in-progress' ? 'text-[hsl(210,90%,65%)]' :
-            isRecommended ? 'text-[hsl(262,83%,70%)]' : 'text-white/25'
+            isComplete ? 'text-emerald-500' :
+            a.status === 'in-progress' ? 'text-sky-400' :
+            isRecommended ? 'text-indigo-400' : 'text-white/25'
           }`} />
         </div>
       </div>
@@ -196,9 +196,9 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
       <div className="flex items-center justify-between pt-2 border-t border-white/[0.04]">
         <div className="flex items-center gap-3 text-[0.65rem] text-white/30">
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{a.duration}m</span>
-          <span className="flex items-center gap-1 text-[hsl(38,92%,60%)]"><Zap className="w-3 h-3" />+{a.xpReward} XP</span>
+          <span className="flex items-center gap-1 text-amber-400"><Zap className="w-3 h-3" />+{a.xpReward} XP</span>
           {a.accuracy && (
-            <span className="flex items-center gap-1 text-[hsl(142,76%,50%)]"><Star className="w-3 h-3" />{a.accuracy}%</span>
+            <span className="flex items-center gap-1 text-emerald-500"><Star className="w-3 h-3" />{a.accuracy}%</span>
           )}
         </div>
         {!isComplete && (
@@ -206,9 +206,9 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
             onClick={() => onStart(a.id)}
             className={`text-[0.72rem] px-3 py-1.5 rounded-lg font-semibold transition-all ${
               isRecommended
-                ? 'bg-[hsl(262,83%,58%)]/20 text-[hsl(262,83%,70%)] border border-[hsl(262,83%,58%)]/25 hover:bg-[hsl(262,83%,58%)]/30'
+                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/25 hover:bg-indigo-500/30'
                 : a.status === 'in-progress'
-                ? 'bg-[hsl(210,90%,60%)]/15 text-[hsl(210,90%,65%)] border border-[hsl(210,90%,60%)]/20 hover:bg-[hsl(210,90%,60%)]/25'
+                ? 'bg-sky-400/15 text-sky-400 border border-sky-400/20 hover:bg-sky-400/25'
                 : 'bg-white/[0.06] text-white/60 border border-white/[0.08] hover:bg-white/[0.10]'
             }`}
           >
@@ -216,7 +216,7 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
           </button>
         )}
         {isComplete && (
-          <div className="flex items-center gap-1 text-[0.6rem] text-[hsl(142,76%,50%)]">
+          <div className="flex items-center gap-1 text-[0.6rem] text-emerald-500">
             <Trophy className="w-3 h-3" />
             <span>Hoàn thành</span>
           </div>
@@ -299,7 +299,7 @@ export default function AssignmentsPage() {
           <button
             onClick={() => refreshMut.mutate()}
             disabled={refreshMut.isPending}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[hsl(262,83%,58%)]/10 border border-[hsl(262,83%,58%)]/20 text-[hsl(262,83%,70%)] text-xs font-medium hover:bg-[hsl(262,83%,58%)]/20 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium hover:bg-indigo-500/20 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshMut.isPending ? 'animate-spin' : ''}`} />
             Refresh AI
@@ -322,11 +322,11 @@ export default function AssignmentsPage() {
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {[
               { label: 'Tổng bài',   value: stats.total,       color: 'text-white/70',            bg: 'bg-white/[0.03]',              border: 'border-white/[0.06]' },
-              { label: 'Hoàn thành', value: stats.completed,   color: 'text-[hsl(142,76%,50%)]',  bg: 'bg-[hsl(142,76%,36%)]/[0.06]', border: 'border-[hsl(142,76%,36%)]/15' },
-              { label: 'Đang học',   value: stats.inProgress,  color: 'text-[hsl(210,90%,65%)]',  bg: 'bg-[hsl(210,90%,60%)]/[0.06]', border: 'border-[hsl(210,90%,60%)]/15' },
-              { label: 'Chờ học',    value: stats.pending,     color: 'text-[hsl(38,92%,60%)]',   bg: 'bg-[hsl(38,92%,50%)]/[0.06]',  border: 'border-[hsl(38,92%,50%)]/15' },
-              { label: 'AI đề xuất', value: stats.recommended, color: 'text-[hsl(262,83%,70%)]',  bg: 'bg-[hsl(262,83%,58%)]/[0.06]', border: 'border-[hsl(262,83%,58%)]/15' },
-              { label: 'XP kiếm được', value: `${stats.totalXP} ⚡`, color: 'text-[hsl(38,92%,60%)]', bg: 'bg-[hsl(38,92%,50%)]/[0.04]', border: 'border-[hsl(38,92%,50%)]/10' },
+              { label: 'Hoàn thành', value: stats.completed,   color: 'text-emerald-500',  bg: 'bg-[hsl(142,76%,36%)]/[0.06]', border: 'border-emerald-600/15' },
+              { label: 'Đang học',   value: stats.inProgress,  color: 'text-sky-400',  bg: 'bg-[hsl(210,90%,60%)]/[0.06]', border: 'border-sky-400/15' },
+              { label: 'Chờ học',    value: stats.pending,     color: 'text-amber-400',   bg: 'bg-[hsl(38,92%,50%)]/[0.06]',  border: 'border-amber-500/15' },
+              { label: 'AI đề xuất', value: stats.recommended, color: 'text-indigo-400',  bg: 'bg-[hsl(262,83%,58%)]/[0.06]', border: 'border-indigo-500/15' },
+              { label: 'XP kiếm được', value: `${stats.totalXP} ⚡`, color: 'text-amber-400', bg: 'bg-[hsl(38,92%,50%)]/[0.04]', border: 'border-amber-500/10' },
             ].map((s) => (
               <div key={s.label} className={`rounded-xl p-3 text-center border ${s.bg} ${s.border}`}>
                 <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -344,7 +344,7 @@ export default function AssignmentsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Tìm bài tập, môn học, thẻ tag..."
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/25 outline-none focus:border-[hsl(245,85%,65%)]/40 focus:bg-white/[0.06] transition-all"
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/25 outline-none focus:border-indigo-400/40 focus:bg-white/[0.06] transition-all"
               />
             </div>
 
@@ -352,7 +352,7 @@ export default function AssignmentsPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white/60 outline-none focus:border-[hsl(245,85%,65%)]/40 transition-all"
+              className="px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/[0.08] text-sm text-white/60 outline-none focus:border-indigo-400/40 transition-all"
             >
               <option value="date">Theo ngày</option>
               <option value="xp">Theo XP</option>
@@ -369,7 +369,7 @@ export default function AssignmentsPage() {
                 onClick={() => setFilter(f.value)}
                 className={`px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
                   filter === f.value
-                    ? 'bg-[hsl(262,83%,58%)]/20 text-[hsl(262,83%,70%)] border border-[hsl(262,83%,58%)]/30'
+                    ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     : 'bg-white/[0.03] border border-white/[0.06] text-white/40 hover:text-white/70 hover:bg-white/[0.06]'
                 }`}
               >

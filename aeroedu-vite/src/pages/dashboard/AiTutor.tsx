@@ -204,7 +204,7 @@ function AiTutorPageInner() {
               </div>
               {msg.type === 'bot' && !msg.isStreaming && msg.content && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-                  <button className="text-muted-foreground hover:text-[hsl(142,76%,36%)] transition">
+                  <button className="text-muted-foreground hover:text-emerald-600 transition">
                     <ThumbsUp className="w-3.5 h-3.5" />
                   </button>
                   <button className="text-muted-foreground hover:text-destructive transition">
@@ -225,7 +225,7 @@ function AiTutorPageInner() {
             <button
               key={prompt}
               onClick={() => sendMessage(prompt)}
-              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-full px-3 py-1.5 hover:border-[hsl(262,83%,58%)]/50 hover:text-[hsl(262,83%,58%)] transition"
+              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-full px-3 py-1.5 hover:border-indigo-500/50 hover:text-indigo-500 transition"
             >
               <Lightbulb className="w-3 h-3" />
               {prompt}
