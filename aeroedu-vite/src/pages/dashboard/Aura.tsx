@@ -504,9 +504,9 @@ function UserSandboxEditor({
   saved: boolean
 }) {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
       {/* Top bar */}
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-4 py-3 border-b flex items-center justify-between">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
@@ -522,14 +522,14 @@ function UserSandboxEditor({
           )}
           <button
             onClick={onDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 bg-muted dark:bg-white/[0.04] hover:bg-accent border transition-all"
           >
             <Download className="h-3 w-3" />
             Export
           </button>
           <button
             onClick={onSave}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/80 bg-cyan-600/80 hover:bg-cyan-500 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/80 bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-600/80 dark:hover:bg-cyan-500 transition-all"
           >
             <Save className="h-3 w-3" />
             Save
@@ -657,8 +657,8 @@ export default function AuraPage() {
     if (currentSim) {
       const SimComponent = ALL_SIMS[activeSim]
       return (
-        <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
-          <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 flex items-center gap-4">
+        <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white flex flex-col">
+          <div className="px-4 py-3 border-b shrink-0 flex items-center gap-4">
             <button
               onClick={() => setActiveSim(null)}
               className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
@@ -700,7 +700,7 @@ export default function AuraPage() {
 
   // ── CATALOG VIEW ──
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
       {/* Header */}
       <div className="px-6 pt-8 pb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -718,7 +718,7 @@ export default function AuraPage() {
 
       {/* ── ⭐ FEATURED — FPV Drone Sandbox + VR (hero card) ── */}
       <div className="px-6 pb-6">
-        <h2 className="text-sm font-semibold text-pink-400/80 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <h2 className="text-sm font-semibold text-pink-700 dark:text-pink-400/80 uppercase tracking-wider mb-3 flex items-center gap-2">
           <span>★</span> Featured Sandbox
         </h2>
         <button
