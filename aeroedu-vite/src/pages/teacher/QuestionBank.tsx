@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Plus, Upload, Sparkles, Database,
   Search, CheckCircle2, ChevronDown, ChevronUp, Edit2,
   Save, X, Loader2, Trash2, PenLine, PlusCircle, Check,
+  Wand2, BookOpen, Hash, Tag,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { BulkGenerateModal } from "@/components/question-bank/BulkGenerateModal"
 import { ImportModal } from "@/components/question-bank/ImportModal"
+import { api } from "@/services/api"
 
 interface Question {
   id: string
@@ -20,6 +22,20 @@ interface Question {
   explanation: string
   status: string
   aiGenerated: boolean
+  // Taxonomy fields (2026-05-19)
+  topic?: string
+  chapter?: string | null
+  lesson?: string | null
+  keywords?: string[]
+  tags?: string[]
+}
+
+interface TaxonomyResp {
+  subjects: Array<{ name: string; count: number }>
+  grades: Array<{ name: string; count: number }>
+  chapters: Array<{ name: string; count: number }>
+  lessons: Array<{ name: string; count: number }>
+  topKeywords: Array<{ name: string; count: number }>
 }
 
 interface SubjectCategory {
@@ -102,6 +118,9 @@ const INITIAL_FORM = {
   grade: "",
   difficulty: "MEDIUM",
   topic: "",
+  chapter: "",
+  lesson: "",
+  keywords: [] as string[],
   explanation: "",
   options: ["", "", "", ""],
   correctAnswer: "",
@@ -122,6 +141,12 @@ export default function QuestionBank() {
   const [filterDifficulty, setFilterDifficulty] = useState<string>("")
   const [filterType, setFilterType] = useState<string>("")
   const [filterGrade, setFilterGrade] = useState<string>("")
+  // 2026-05-19: chuẩn hoá danh mục — thêm Chương/Bài/Từ khoá filter
+  const [filterChapter, setFilterChapter] = useState<string>("")
+  const [filterLesson, setFilterLesson] = useState<string>("")
+  const [filterKeyword, setFilterKeyword] = useState<string>("")
+  const [taxonomy, setTaxonomy] = useState<TaxonomyResp | null>(null)
+  const [fixingLatex, setFixingLatex] = useState(false)
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "difficulty">("newest")
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
@@ -223,13 +248,66 @@ export default function QuestionBank() {
   const expandAll = () => setExpandedRows(new Set(questions.map((q) => q.id)))
   const collapseAll = () => setExpandedRows(new Set())
 
+  // Load taxonomy (subjects, chapters, lessons, top keywords) — auto refresh khi đổi môn
+  const loadTaxonomy = useCallback(async () => {
+    try {
+      const subjectDb = selectedSubject ? getSubjectDbValue(selectedSubject) : ''
+      const params: Record<string, string> = {}
+      if (subjectDb) params.subject = subjectDb
+      const r = await api.get<{ data: TaxonomyResp }>('/questions/taxonomy', { params })
+      setTaxonomy(r.data?.data || null)
+    } catch {
+      setTaxonomy(null)
+    }
+  }, [selectedSubject])
+  useEffect(() => { loadTaxonomy() }, [loadTaxonomy])
+
+  // Reset chapter/lesson khi đổi môn (vì chapter list khác)
+  useEffect(() => {
+    setFilterChapter('')
+    setFilterLesson('')
+  }, [selectedSubject])
+
+  // Handler: 1-click fix LaTeX errors
+  const handleFixLatex = async () => {
+    if (!confirm('Quét + sửa lỗi LaTeX phổ biến (smart quotes, unicode minus, typos \\fra→\\frac, ...) trên toàn bộ ngân hàng đề?\n\nThao tác này KHÔNG thể hoàn tác.')) return
+    setFixingLatex(true)
+    try {
+      const r = await api.post<{ data: { scanned: number; fixed: number } }>('/questions/fix-latex', {
+        limit: 1000,
+        subject: selectedSubject ? getSubjectDbValue(selectedSubject) : undefined,
+      })
+      const { scanned, fixed } = r.data?.data || { scanned: 0, fixed: 0 }
+      toast.success(`Đã quét ${scanned} câu, sửa ${fixed} câu có lỗi LaTeX`)
+      if (fixed > 0) {
+        // Reload danh sách để xem kết quả
+        setPage(1)
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Lỗi fix LaTeX')
+    } finally {
+      setFixingLatex(false)
+    }
+  }
+
   const filteredQuestions = questions
     .filter((q) => {
-      if (searchQuery && !q.content.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !q.subject.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      const sq = searchQuery.trim().toLowerCase()
+      if (sq) {
+        const inContent = q.content.toLowerCase().includes(sq)
+        const inSubject = q.subject.toLowerCase().includes(sq)
+        const inChapter = (q.chapter || '').toLowerCase().includes(sq)
+        const inLesson  = (q.lesson  || '').toLowerCase().includes(sq)
+        const inTopic   = (q.topic   || '').toLowerCase().includes(sq)
+        const inKw      = (q.keywords || []).some(k => k.toLowerCase().includes(sq))
+        if (!inContent && !inSubject && !inChapter && !inLesson && !inTopic && !inKw) return false
+      }
       if (filterDifficulty && q.difficulty !== filterDifficulty) return false
       if (filterType && q.questionType !== filterType) return false
       if (filterGrade && q.grade !== filterGrade) return false
+      if (filterChapter && (q.chapter || '').toLowerCase() !== filterChapter.toLowerCase()) return false
+      if (filterLesson && (q.lesson || '').toLowerCase() !== filterLesson.toLowerCase()) return false
+      if (filterKeyword && !(q.keywords || []).some(k => k.toLowerCase() === filterKeyword.toLowerCase())) return false
       return true
     })
     .sort((a, b) => {
@@ -240,7 +318,7 @@ export default function QuestionBank() {
       return 0 // newest/oldest depend on API ordering
     })
 
-  const activeFilterCount = [filterDifficulty, filterType, filterGrade].filter(Boolean).length
+  const activeFilterCount = [filterDifficulty, filterType, filterGrade, filterChapter, filterLesson, filterKeyword].filter(Boolean).length
 
   // Manual creation handlers
   const updateForm = (field: string, value: unknown) =>
@@ -869,6 +947,48 @@ export default function QuestionBank() {
             <option value="">Khối lớp</option>
             {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+          {/* Chương dropdown — auto populate từ taxonomy theo môn */}
+          {taxonomy && taxonomy.chapters.length > 0 && (
+            <select
+              value={filterChapter}
+              onChange={(e) => setFilterChapter(e.target.value)}
+              title="Lọc theo Chương"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">📖 Chương</option>
+              {taxonomy.chapters.slice(0, 50).map(c => (
+                <option key={c.name} value={c.name}>{c.name} ({c.count})</option>
+              ))}
+            </select>
+          )}
+          {/* Bài dropdown — depend chương */}
+          {taxonomy && taxonomy.lessons.length > 0 && (
+            <select
+              value={filterLesson}
+              onChange={(e) => setFilterLesson(e.target.value)}
+              title="Lọc theo Bài"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">📝 Bài</option>
+              {taxonomy.lessons.slice(0, 80).map(l => (
+                <option key={l.name} value={l.name}>{l.name} ({l.count})</option>
+              ))}
+            </select>
+          )}
+          {/* Từ khoá dropdown — chỉ show nếu có data */}
+          {taxonomy && taxonomy.topKeywords.length > 0 && (
+            <select
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              title="Lọc theo Từ khoá"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">🏷️ Từ khoá</option>
+              {taxonomy.topKeywords.slice(0, 50).map(k => (
+                <option key={k.name} value={k.name}>{k.name} ({k.count})</option>
+              ))}
+            </select>
+          )}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
@@ -880,13 +1000,26 @@ export default function QuestionBank() {
           </select>
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterDifficulty(""); setFilterType(""); setFilterGrade("") }}
+              onClick={() => {
+                setFilterDifficulty(""); setFilterType(""); setFilterGrade("")
+                setFilterChapter(""); setFilterLesson(""); setFilterKeyword("")
+              }}
               className="px-3 py-2 text-sm text-purple-400 hover:text-purple-300 border border-purple-700/50 rounded-lg hover:bg-purple-900/20 flex items-center gap-1.5 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               Xóa bộ lọc ({activeFilterCount})
             </button>
           )}
+          {/* Fix LaTeX errors button */}
+          <button
+            onClick={handleFixLatex}
+            disabled={fixingLatex}
+            title="Quét + sửa lỗi LaTeX phổ biến trong toàn bộ ngân hàng (smart quotes, unicode minus, typos \\fra→\\frac, ...)"
+            className="px-3 py-2 text-sm text-amber-400 hover:text-amber-300 border border-amber-700/50 rounded-lg hover:bg-amber-900/20 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+          >
+            {fixingLatex ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+            {fixingLatex ? 'Đang fix...' : 'Fix LaTeX'}
+          </button>
           {filteredQuestions.length !== questions.length && (
             <span className="text-xs text-muted-foreground ml-auto">
               Hiển thị {filteredQuestions.length} / {questions.length} câu hỏi

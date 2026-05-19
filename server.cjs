@@ -3537,16 +3537,44 @@ if (USE_NODEJS_QUESTIONS) {
     return _qpool;
   }
 
+  // ── Lazy migration: thêm cột chapter + lesson cho taxonomy ────
+  // Chuẩn hoá danh mục câu hỏi: Môn (subject) → Chương (chapter)
+  // → Bài (lesson) → Từ khoá (keywords) → Topic (subtopic free-form).
+  // ALTER IF NOT EXISTS — safe re-run mỗi lần boot, chỉ run 1 lần thật.
+  let _qMigrateReady = false;
+  async function ensureQuestionTaxonomy() {
+    if (_qMigrateReady) return;
+    const pool = getQPool();
+    try {
+      await pool.query(`ALTER TABLE "Question" ADD COLUMN IF NOT EXISTS chapter TEXT`);
+      await pool.query(`ALTER TABLE "Question" ADD COLUMN IF NOT EXISTS lesson TEXT`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Question_chapter_idx" ON "Question"(chapter)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Question_lesson_idx"  ON "Question"(lesson)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Question_keywords_gin_idx"
+                          ON "Question" USING GIN (keywords)`);
+      _qMigrateReady = true;
+      console.log('[questions] ✅ taxonomy migration (chapter/lesson/keywords idx)');
+    } catch (e) {
+      console.error('[questions:taxonomy:migrate]', e.message);
+    }
+  }
+  // Fire-and-forget khi module load (Cloud Run cold start)
+  ensureQuestionTaxonomy().catch(() => {});
+
   // ── GET /api/questions  (also /api/question-bank alias) ────
   async function handleListQuestions(req, res) {
     try {
       const pool = getQPool();
+      await ensureQuestionTaxonomy();
       const limit  = Math.min(parseInt(req.query.limit  || '20', 10), 200);
       const offset = parseInt(req.query.offset || '0', 10);
       const subject    = req.query.subject    || '';
       const grade      = req.query.grade      || '';
       const difficulty = req.query.difficulty || '';
       const topic      = req.query.topic      || '';
+      const chapter    = req.query.chapter    || '';
+      const lesson     = req.query.lesson     || '';
+      const keyword    = req.query.keyword    || '';
       const search     = req.query.search     || '';
       const status     = req.query.status     || '';
 
@@ -3556,10 +3584,20 @@ if (USE_NODEJS_QUESTIONS) {
 
       if (subject)    { conditions.push(`subject = $${idx++}`);               values.push(subject); }
       if (grade)      { conditions.push(`grade = $${idx++}`);                 values.push(grade); }
-      if (difficulty) { conditions.push(`difficulty = $${idx++}`);            values.push(difficulty); }
+      if (difficulty) { conditions.push(`UPPER(difficulty) = UPPER($${idx++})`); values.push(difficulty); }
       if (topic)      { conditions.push(`topic ILIKE $${idx++}`);             values.push(`%${topic}%`); }
+      if (chapter)    { conditions.push(`chapter ILIKE $${idx++}`);           values.push(`%${chapter}%`); }
+      if (lesson)     { conditions.push(`lesson ILIKE $${idx++}`);            values.push(`%${lesson}%`); }
+      if (keyword)    { conditions.push(`$${idx++} = ANY(keywords)`);         values.push(keyword); }
       if (status)     { conditions.push(`status = $${idx++}`);                values.push(status); }
-      if (search)     { conditions.push(`content ILIKE $${idx++}`);           values.push(`%${search}%`); }
+      if (search) {
+        // Full-text search: content + topic + chapter + lesson + keywords array
+        conditions.push(
+          `(content ILIKE $${idx} OR topic ILIKE $${idx} OR chapter ILIKE $${idx} OR lesson ILIKE $${idx} OR EXISTS (SELECT 1 FROM unnest(keywords) k WHERE k ILIKE $${idx}))`
+        );
+        values.push(`%${search}%`);
+        idx++;
+      }
 
       const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
 
@@ -3567,8 +3605,8 @@ if (USE_NODEJS_QUESTIONS) {
       const total    = parseInt(countRes.rows[0].count, 10);
 
       const dataRes  = await pool.query(
-        `SELECT id, topic, subject, grade, "questionType", difficulty, content,
-                options, "correctAnswer", explanation, tags, status,
+        `SELECT id, topic, chapter, lesson, subject, grade, "questionType", difficulty, content,
+                options, "correctAnswer", explanation, tags, keywords, status,
                 "aiGenerated", "humanReviewed", "usageCount",
                 "createdBy", "createdAt", "updatedAt"
          FROM "Question" ${where}
@@ -3594,9 +3632,12 @@ if (USE_NODEJS_QUESTIONS) {
   app.post('/api/questions', async (req, res) => {
     try {
       const pool = getQPool();
+      await ensureQuestionTaxonomy();
       const {
         content, questionType = 'MCQ', subject = 'Vật lý', grade = 'Khối 12',
-        difficulty = 'MEDIUM', topic = '', explanation = '',
+        difficulty = 'MEDIUM', topic = '',
+        chapter = '', lesson = '',
+        explanation = '',
         options = [], correctAnswer = '',
         learningObjectives = [], keywords = [], tags = [],
         status = 'Hoạt động',
@@ -3606,17 +3647,27 @@ if (USE_NODEJS_QUESTIONS) {
 
       const id  = randomUUID();
       const now = new Date();
-      const allTags = [...new Set([...tags, ...(keywords || []), topic].filter(Boolean))];
+      // Tags = union(tags + keywords + topic + chapter + lesson) — dùng cho search legacy
+      const allTags = [...new Set([
+        ...tags, ...(keywords || []),
+        topic, chapter, lesson,
+      ].filter(Boolean))];
+      const cleanKeywords = Array.isArray(keywords)
+        ? [...new Set(keywords.map(k => String(k).trim()).filter(Boolean))].slice(0, 20)
+        : [];
 
       const { rows } = await pool.query(
         `INSERT INTO "Question"
-           (id, topic, subject, grade, "questionType", difficulty, content, options,
-            "correctAnswer", explanation, "learningObjectives", tags,
+           (id, topic, chapter, lesson, subject, grade, "questionType", difficulty, content, options,
+            "correctAnswer", explanation, "learningObjectives", keywords, tags,
             "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt", "usageCount")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,false,$13,$14,$15,$16,0)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,false,$16,$17,$18,$19,0)
          RETURNING *`,
-        [id, topic || subject, subject, grade, questionType, difficulty, content,
-         options, correctAnswer, explanation, learningObjectives, allTags,
+        [id, topic || subject,
+         chapter ? String(chapter).trim().slice(0, 200) : null,
+         lesson ? String(lesson).trim().slice(0, 200) : null,
+         subject, grade, questionType, difficulty, content,
+         options, correctAnswer, explanation, learningObjectives, cleanKeywords, allTags,
          status, 'teacher', now, now]
       );
 
@@ -3637,23 +3688,30 @@ if (USE_NODEJS_QUESTIONS) {
         return res.status(400).json({ success: false, error: 'questions array required' });
       }
 
+      await ensureQuestionTaxonomy();
       const now = new Date();
       let inserted = 0;
       for (const q of questions) {
         if (!q.content) continue;
         const id = randomUUID();
-        const tags = [...new Set([q.topic, q.subject, ...(q.tags || [])].filter(Boolean))];
+        const tags = [...new Set([q.topic, q.subject, q.chapter, q.lesson, ...(q.tags || [])].filter(Boolean))];
+        const kwds = Array.isArray(q.keywords)
+          ? [...new Set(q.keywords.map(k => String(k).trim()).filter(Boolean))].slice(0, 20)
+          : [];
         await pool.query(
           `INSERT INTO "Question"
-             (id, topic, subject, grade, "questionType", difficulty, content, options,
-              "correctAnswer", explanation, "learningObjectives", tags,
+             (id, topic, chapter, lesson, subject, grade, "questionType", difficulty, content, options,
+              "correctAnswer", explanation, "learningObjectives", keywords, tags,
               "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt", "usageCount")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,false,$13,$14,$15,$16,0)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false,false,$16,$17,$18,$19,0)
            ON CONFLICT (id) DO NOTHING`,
-          [id, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
+          [id, q.topic || q.subject || 'Chung',
+           q.chapter ? String(q.chapter).slice(0, 200) : null,
+           q.lesson ? String(q.lesson).slice(0, 200) : null,
+           q.subject || 'Vật lý',
            q.grade || 'Khối 12', q.questionType || 'MCQ', q.difficulty || 'MEDIUM',
            q.content, q.options || [], q.correctAnswer || '', q.explanation || '',
-           q.learningObjectives || [], tags, q.status || 'Hoạt động',
+           q.learningObjectives || [], kwds, tags, q.status || 'Hoạt động',
            'teacher', now, now]
         ).catch(() => {});
         inserted++;
@@ -3671,9 +3729,11 @@ if (USE_NODEJS_QUESTIONS) {
   app.put('/api/questions/:id', async (req, res) => {
     try {
       const pool = getQPool();
+      await ensureQuestionTaxonomy();
       const { id } = req.params;
       const {
         content, questionType, subject, grade, difficulty, topic,
+        chapter, lesson, keywords,
         explanation, options, correctAnswer, tags, status,
       } = req.body || {};
 
@@ -3684,6 +3744,14 @@ if (USE_NODEJS_QUESTIONS) {
       if (grade        != null) { sets.push(`grade=$${i++}`);            vals.push(grade); }
       if (difficulty   != null) { sets.push(`difficulty=$${i++}`);       vals.push(difficulty); }
       if (topic        != null) { sets.push(`topic=$${i++}`);            vals.push(topic); }
+      if (chapter      !== undefined) { sets.push(`chapter=$${i++}`);    vals.push(chapter ? String(chapter).slice(0, 200) : null); }
+      if (lesson       !== undefined) { sets.push(`lesson=$${i++}`);     vals.push(lesson ? String(lesson).slice(0, 200) : null); }
+      if (keywords     != null) {
+        const cleanKw = Array.isArray(keywords)
+          ? [...new Set(keywords.map(k => String(k).trim()).filter(Boolean))].slice(0, 20)
+          : [];
+        sets.push(`keywords=$${i++}`); vals.push(cleanKw);
+      }
       if (explanation  != null) { sets.push(`explanation=$${i++}`);      vals.push(explanation); }
       if (options      != null) { sets.push(`options=$${i++}`);          vals.push(options); }
       if (correctAnswer!= null) { sets.push(`"correctAnswer"=$${i++}`);  vals.push(correctAnswer); }
@@ -3701,6 +3769,146 @@ if (USE_NODEJS_QUESTIONS) {
     } catch (err) {
       console.error('[questions:update] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── GET /api/questions/taxonomy ─────────────────────────────
+  // Trả distinct values cho filter dropdowns:
+  //   { subjects: [{name, count}], grades: [...], chapters: [...],
+  //     lessons: [...], topKeywords: [...] }
+  // Optional ?subject= để giới hạn chapter/lesson theo môn.
+  app.get('/api/questions/taxonomy', async (req, res) => {
+    try {
+      const pool = getQPool();
+      await ensureQuestionTaxonomy();
+      const subjectFilter = req.query.subject || '';
+      const subjWhere = subjectFilter ? `WHERE subject = $1` : '';
+      const subjParams = subjectFilter ? [subjectFilter] : [];
+
+      const [subjects, grades, chapters, lessons, keywords] = await Promise.all([
+        pool.query(`SELECT subject AS name, COUNT(*)::int AS count
+                      FROM "Question" WHERE subject IS NOT NULL AND subject <> ''
+                      GROUP BY subject ORDER BY count DESC LIMIT 50`),
+        pool.query(`SELECT grade AS name, COUNT(*)::int AS count
+                      FROM "Question" ${subjWhere}
+                      ${subjectFilter ? 'AND' : 'WHERE'} grade IS NOT NULL AND grade <> ''
+                      GROUP BY grade ORDER BY count DESC LIMIT 30`, subjParams),
+        pool.query(`SELECT chapter AS name, COUNT(*)::int AS count
+                      FROM "Question" ${subjWhere}
+                      ${subjectFilter ? 'AND' : 'WHERE'} chapter IS NOT NULL AND chapter <> ''
+                      GROUP BY chapter ORDER BY count DESC LIMIT 200`, subjParams),
+        pool.query(`SELECT lesson AS name, COUNT(*)::int AS count
+                      FROM "Question" ${subjWhere}
+                      ${subjectFilter ? 'AND' : 'WHERE'} lesson IS NOT NULL AND lesson <> ''
+                      GROUP BY lesson ORDER BY count DESC LIMIT 500`, subjParams),
+        pool.query(`SELECT k AS name, COUNT(*)::int AS count
+                      FROM "Question" ${subjWhere ? 'q' : ''}, unnest(keywords) k
+                      ${subjWhere ? subjWhere.replace('subject', 'q.subject') : ''}
+                      GROUP BY k ORDER BY count DESC LIMIT 100`, subjParams).catch(() => ({ rows: [] })),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          subjects:    subjects.rows,
+          grades:      grades.rows,
+          chapters:    chapters.rows,
+          lessons:     lessons.rows,
+          topKeywords: keywords.rows,
+        },
+      });
+    } catch (err) {
+      console.error('[questions:taxonomy]', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // ── POST /api/questions/fix-latex ───────────────────────────
+  // Quét + sửa lỗi LaTeX phổ biến trong content + explanation + options.
+  // Body: { dryRun?: boolean, subject?, limit? }
+  // Trả: { scanned, fixed, samples: [{id, before, after}] }
+  app.post('/api/questions/fix-latex', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const pool = getQPool();
+      await ensureQuestionTaxonomy();
+      const dryRun = !!req.body?.dryRun;
+      const limit = Math.min(Number(req.body?.limit) || 100, 1000);
+      const subjectFilter = req.body?.subject || '';
+
+      // Common LaTeX errors + auto-fix
+      // Áp dụng cho TẤT CẢ text fields: content, explanation, options[]
+      function fixLatex(text) {
+        if (!text || typeof text !== 'string') return text
+        let s = text
+        // 1. Smart quotes → straight (cản trở math parsing)
+        s = s.replace(/['']/g, "'").replace(/[""]/g, '"')
+        // 2. Unicode minus (−) → ASCII minus (-)
+        s = s.replace(/−/g, '-')
+        // 3. Unicode multiplication (×) → \times (trong $...$)
+        s = s.replace(/\$([^$]*?)×([^$]*?)\$/g, (_, a, b) => `$${a}\\times ${b}$`)
+        // 4. Double-escaped backslash từ JSON: \\\\ → \\
+        s = s.replace(/\\\\\\\\/g, '\\\\')
+        // 5. Lone \frac without braces → ignore (sai cú pháp người dùng)
+        // 6. Common typos: \fra → \frac, \sqr → \sqrt
+        s = s.replace(/\\fra(?![a-z])/g, '\\frac')
+        s = s.replace(/\\sqr(?![a-z])/g, '\\sqrt')
+        s = s.replace(/\\fact(?![a-z])/g, '\\frac')
+        // 7. Unmatched $ count — không tự sửa, log warning
+        // 8. Vietnamese diacritics inside $...$ → escape ngoài math
+        //    (vd $E_đ$ → $E_{\text{đ}}$) — phức tạp, skip
+        // 9. \mathrm{R}^2 nhưng quên đóng } — chỉ count, không fix
+        // 10. Trim space inside \frac{ } — \frac{ 1 }{ 2 } → \frac{1}{2}
+        s = s.replace(/\\frac\{\s+([^}]+?)\s+\}\{\s+([^}]+?)\s+\}/g, '\\frac{$1}{$2}')
+        // 11. Double-space → single space
+        s = s.replace(/  +/g, ' ')
+        return s
+      }
+
+      const where = subjectFilter ? `WHERE subject = $1` : '';
+      const params = subjectFilter ? [subjectFilter] : [];
+      const { rows } = await pool.query(
+        `SELECT id, content, explanation, options FROM "Question"
+         ${where} ORDER BY "createdAt" DESC LIMIT ${limit}`,
+        params
+      );
+
+      let fixedCount = 0;
+      const samples = [];
+      for (const q of rows) {
+        const newContent = fixLatex(q.content);
+        const newExpl    = fixLatex(q.explanation || '');
+        const newOptions = Array.isArray(q.options) ? q.options.map(fixLatex) : [];
+
+        const changed =
+          newContent !== q.content ||
+          newExpl !== (q.explanation || '') ||
+          JSON.stringify(newOptions) !== JSON.stringify(q.options || []);
+
+        if (!changed) continue;
+        fixedCount += 1;
+        if (samples.length < 10) {
+          samples.push({
+            id: q.id,
+            before: { content: q.content?.slice(0, 200), explanation: q.explanation?.slice(0, 100) },
+            after:  { content: newContent.slice(0, 200), explanation: newExpl.slice(0, 100) },
+          });
+        }
+        if (!dryRun) {
+          await pool.query(
+            `UPDATE "Question" SET content=$1, explanation=$2, options=$3, "updatedAt"=NOW() WHERE id=$4`,
+            [newContent, newExpl, newOptions, q.id]
+          ).catch(() => {});
+        }
+      }
+
+      console.log(`[questions:fix-latex] scanned=${rows.length} fixed=${fixedCount} dryRun=${dryRun}`);
+      res.json({
+        success: true,
+        data: { scanned: rows.length, fixed: fixedCount, dryRun, samples },
+      });
+    } catch (err) {
+      console.error('[questions:fix-latex]', err.message);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
