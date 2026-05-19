@@ -42,11 +42,11 @@ function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
   // → render placeholder thay vì crash ".includes of undefined".
   if (!videoUrl) {
     return (
-      <div className="relative w-full aspect-video bg-zinc-900 rounded-xl overflow-hidden
-                      flex flex-col items-center justify-center text-gray-400 gap-2">
+      <div className="relative w-full aspect-video bg-muted rounded-xl overflow-hidden
+                      flex flex-col items-center justify-center text-muted-foreground gap-2">
         <Play className="w-12 h-12 opacity-40" />
         <p className="text-sm">Video chưa có URL hợp lệ</p>
-        <p className="text-[10px] text-gray-600">Liên hệ giáo viên để cập nhật</p>
+        <p className="text-[10px] text-muted-foreground/70">Liên hệ giáo viên để cập nhật</p>
       </div>
     )
   }
@@ -164,18 +164,18 @@ function VideoSidebar({
   return (
     <div className="flex flex-col h-full">
       {/* Header với progress bar mảnh trên đầu */}
-      <div className="px-4 py-3 border-b border-white/10 bg-zinc-950/50">
+      <div className="px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center justify-between mb-1.5">
-          <h3 className="text-sm font-bold text-white">Course content</h3>
-          <span className="text-xs text-purple-300 font-bold">{progress}%</span>
+          <h3 className="text-sm font-bold text-foreground">Course content</h3>
+          <span className="text-xs text-purple-600 dark:text-purple-300 font-bold">{progress}%</span>
         </div>
-        <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+        <div className="h-1 rounded-full bg-muted overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-[10px] text-gray-500 mt-1">
+        <p className="text-[10px] text-muted-foreground mt-1">
           {completedCount}/{videos.length} bài đã hoàn thành
         </p>
       </div>
@@ -189,24 +189,24 @@ function VideoSidebar({
           const sDuration  = section.videos.reduce((s, v) => s + (v.duration || 0), 0)
 
           return (
-            <div key={section.name} className="border-b border-white/5">
+            <div key={section.name} className="border-b">
               {/* Section header — collapsible */}
               <button
                 onClick={() => toggleSection(section.name)}
                 type="button"
                 style={{ touchAction: 'manipulation' }}
-                className="w-full px-4 py-3 flex items-center gap-2 bg-zinc-900/50 hover:bg-zinc-800/60
-                           active:bg-zinc-800 transition text-left min-h-[56px]"
+                className="w-full px-4 py-3 flex items-center gap-2 bg-muted/50 hover:bg-muted
+                           active:bg-accent transition text-left min-h-[56px]"
               >
                 <ChevronDown
-                  className={cn('w-4 h-4 text-gray-400 flex-shrink-0 transition-transform',
+                  className={cn('w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform',
                     isCollapsed && '-rotate-90')}
                 />
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm font-bold text-white truncate">
+                  <h4 className="text-sm font-bold text-foreground truncate">
                     Section {sIdx + 1}: {section.name}
                   </h4>
-                  <p className="text-[11px] text-gray-400 mt-0.5">
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
                     {sCompleted} / {sTotal}
                     {sDuration > 0 && <> | {fmtDur(sDuration)}</>}
                   </p>
@@ -225,10 +225,10 @@ function VideoSidebar({
                     style={{ touchAction: 'manipulation' }}
                     className={cn(
                       'w-full flex items-start gap-3 px-4 py-3 text-left transition border-l-4',
-                      'min-h-[64px] active:bg-zinc-800',
+                      'min-h-[64px] active:bg-accent',
                       isCurrent
-                        ? 'bg-purple-600/15 border-l-purple-500'
-                        : 'border-l-transparent hover:bg-white/5'
+                        ? 'bg-purple-500/10 dark:bg-purple-600/15 border-l-purple-500'
+                        : 'border-l-transparent hover:bg-accent/50'
                     )}
                   >
                     {/* Custom checkbox — filled khi completed */}
@@ -236,26 +236,26 @@ function VideoSidebar({
                       'mt-0.5 w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0 transition',
                       isDone
                         ? 'bg-purple-500'
-                        : 'border-2 border-gray-600 bg-transparent'
+                        : 'border-2 border-muted-foreground/50 bg-transparent'
                     )}>
                       {isDone && <CheckCircle2 className="w-3 h-3 text-white" strokeWidth={3} />}
-                      {!isDone && isCurrent && <Play className="w-2.5 h-2.5 text-purple-400 fill-purple-400" />}
+                      {!isDone && isCurrent && <Play className="w-2.5 h-2.5 text-purple-500 fill-purple-500" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className={cn(
                         'text-sm font-medium leading-snug line-clamp-2',
-                        isCurrent ? 'text-purple-300 font-bold' : 'text-gray-200'
+                        isCurrent ? 'text-purple-700 dark:text-purple-300 font-bold' : 'text-foreground/85'
                       )}>
                         {video._idx}. {video.title}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Play className="w-3 h-3 text-gray-500" />
-                        <span className="text-[11px] text-gray-500">
+                        <Play className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-[11px] text-muted-foreground">
                           {fmtDur(video.duration) || '—'}
                         </span>
                         {video.isPreview && (
                           <span className="text-[9px] px-1 py-0.5 rounded
-                                          bg-emerald-500/20 text-emerald-300 font-bold uppercase">
+                                          bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold uppercase">
                             Preview
                           </span>
                         )}
@@ -271,10 +271,10 @@ function VideoSidebar({
 
       {/* Certificate button */}
       {progress >= 100 && (
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t">
           <Link
             to={`/student/certificate/${courseId}`}
-            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 font-medium text-sm transition-colors border border-yellow-500/30"
+            className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-700 dark:text-yellow-400 font-medium text-sm transition-colors border border-yellow-500/30"
           >
             <Trophy className="w-4 h-4" />
             Nhận chứng chỉ
@@ -291,7 +291,7 @@ type Tab = 'overview' | 'assets' | 'feedback' | 'history'
 function OverviewTab({ overview }: { overview: string | null }) {
   return (
     <div
-      className="tiptap-display text-gray-300 text-sm leading-relaxed"
+      className="tiptap-display text-foreground/85 text-sm leading-relaxed"
       dangerouslySetInnerHTML={{ __html: overview || '<p>Chưa có mô tả.</p>' }}
     />
   )
@@ -303,10 +303,10 @@ function AssetsTab({ courseId }: { courseId: string }) {
     queryFn: () => learningService.getCourseAssets(courseId),
   })
 
-  if (isLoading) return <div className="text-gray-400 text-sm">Đang tải...</div>
+  if (isLoading) return <div className="text-muted-foreground text-sm">Đang tải...</div>
 
   if (assets.length === 0)
-    return <div className="text-gray-500 text-sm">Khoá học chưa có tài liệu đính kèm.</div>
+    return <div className="text-muted-foreground text-sm">Khoá học chưa có tài liệu đính kèm.</div>
 
   return (
     <div className="space-y-2">
@@ -316,16 +316,16 @@ function AssetsTab({ courseId }: { courseId: string }) {
           href={asset.fileUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-colors group"
+          className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted border transition-colors group"
         >
           <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-            <FileText className="w-5 h-5 text-blue-400" />
+            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-white font-medium truncate">{asset.title}</p>
-            <p className="text-xs text-gray-500 uppercase">{asset.fileType}</p>
+            <p className="text-sm text-foreground font-medium truncate">{asset.title}</p>
+            <p className="text-xs text-muted-foreground uppercase">{asset.fileType}</p>
           </div>
-          <Download className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
+          <Download className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         </a>
       ))}
     </div>
@@ -355,8 +355,8 @@ function FeedbackTab({ courseId }: { courseId: string }) {
   return (
     <div className="space-y-6">
       {/* Submit review */}
-      <div className="rounded-xl bg-white/5 border border-white/10 p-5 space-y-4">
-        <h4 className="font-semibold text-white text-sm">Đánh giá khoá học</h4>
+      <div className="rounded-xl bg-card border p-5 space-y-4">
+        <h4 className="font-semibold text-foreground text-sm">Đánh giá khoá học</h4>
 
         {/* Star rating */}
         <div className="flex gap-1">
@@ -364,7 +364,7 @@ function FeedbackTab({ courseId }: { courseId: string }) {
             <button
               key={s}
               onClick={() => setRating(s)}
-              className={cn('w-7 h-7', s <= rating ? 'text-yellow-400' : 'text-gray-600')}
+              className={cn('w-7 h-7', s <= rating ? 'text-yellow-500 dark:text-yellow-400' : 'text-muted-foreground/50')}
             >
               <Star className="w-full h-full fill-current" />
             </button>
@@ -376,7 +376,7 @@ function FeedbackTab({ courseId }: { courseId: string }) {
           onChange={(e) => setComment(e.target.value)}
           placeholder="Chia sẻ trải nghiệm học tập của bạn..."
           rows={3}
-          className="w-full rounded-lg bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-gray-500 resize-none focus:outline-none focus:border-purple-500 transition-colors"
+          className="w-full rounded-lg bg-background border px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-purple-500 transition-colors"
         />
 
         <button
@@ -390,9 +390,9 @@ function FeedbackTab({ courseId }: { courseId: string }) {
 
       {/* Review list */}
       {isLoading ? (
-        <div className="text-gray-400 text-sm">Đang tải...</div>
+        <div className="text-muted-foreground text-sm">Đang tải...</div>
       ) : reviews.length === 0 ? (
-        <p className="text-gray-500 text-sm">Chưa có đánh giá nào.</p>
+        <p className="text-muted-foreground text-sm">Chưa có đánh giá nào.</p>
       ) : (
         <div className="space-y-4">
           {reviews.map((r) => (
@@ -404,21 +404,21 @@ function FeedbackTab({ courseId }: { courseId: string }) {
               />
               <div className="flex-1 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white">{r.user.name}</span>
+                  <span className="text-sm font-medium text-foreground">{r.user.name}</span>
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((s) => (
                       <Star
                         key={s}
                         className={cn(
                           'w-3 h-3',
-                          s <= r.rating ? 'text-yellow-400 fill-current' : 'text-gray-600'
+                          s <= r.rating ? 'text-yellow-500 dark:text-yellow-400 fill-current' : 'text-muted-foreground/50'
                         )}
                       />
                     ))}
                   </div>
                 </div>
-                <p className="text-sm text-gray-300">{r.comment}</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-foreground/85">{r.comment}</p>
+                <p className="text-xs text-muted-foreground">
                   {new Date(r.createdAt).toLocaleDateString('vi-VN')}
                 </p>
               </div>
@@ -518,9 +518,9 @@ export default function CoursePlayer() {
   if (videos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
-        <Play className="w-16 h-16 text-gray-600" />
-        <h2 className="text-xl font-bold text-white">Khoá học chưa có video</h2>
-        <Link to="/student/my-courses" className="text-purple-400 hover:text-purple-300">
+        <Play className="w-16 h-16 text-muted-foreground/50" />
+        <h2 className="text-xl font-bold text-foreground">Khoá học chưa có video</h2>
+        <Link to="/student/my-courses" className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
           ← Quay lại khoá học
         </Link>
       </div>
@@ -528,20 +528,20 @@ export default function CoursePlayer() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Top nav — Udemy style với progress badge */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10 bg-gray-900/50 flex-shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 border-b bg-card/50 flex-shrink-0">
           <Link
             to="/student/my-courses"
-            className="text-gray-400 hover:text-white transition-colors p-2 -m-2 rounded-lg hover:bg-white/10
+            className="text-muted-foreground hover:text-foreground transition-colors p-2 -m-2 rounded-lg hover:bg-accent
                        min-w-[44px] min-h-[44px] flex items-center justify-center"
             style={{ touchAction: 'manipulation' }}
           >
             <ChevronLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-sm font-medium text-white truncate flex-1">
+          <h1 className="text-sm font-medium text-foreground truncate flex-1">
             {currentVideo?.title || 'Đang tải...'}
           </h1>
 
@@ -549,10 +549,10 @@ export default function CoursePlayer() {
           {videos.length > 0 && (
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full
                             bg-purple-500/15 border border-purple-400/30
-                            text-purple-200 text-xs font-bold">
+                            text-purple-700 dark:text-purple-200 text-xs font-bold">
               <Award className="w-3.5 h-3.5" />
               <span>{Math.round((videos.filter(v => v.isCompleted).length / videos.length) * 100)}%</span>
-              <span className="text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
+              <span className="text-purple-600/70 dark:text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
             </div>
           )}
 
@@ -561,8 +561,8 @@ export default function CoursePlayer() {
             type="button"
             style={{ touchAction: 'manipulation' }}
             aria-label={sidebarOpen ? 'Đóng menu' : 'Mở menu khoá học'}
-            className="text-gray-400 hover:text-white transition-colors
-                       p-2 -m-2 rounded-lg hover:bg-white/10 active:bg-white/20
+            className="text-muted-foreground hover:text-foreground transition-colors
+                       p-2 -m-2 rounded-lg hover:bg-accent active:bg-accent/80
                        min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -576,8 +576,8 @@ export default function CoursePlayer() {
               <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as any).url} />
             </VideoSecurityOverlay>
           ) : (
-            <div className="aspect-video bg-gray-800 rounded-xl flex items-center justify-center">
-              <Play className="w-16 h-16 text-gray-600" />
+            <div className="aspect-video bg-muted rounded-xl flex items-center justify-center">
+              <Play className="w-16 h-16 text-muted-foreground/50" />
             </div>
           )}
 
@@ -586,7 +586,7 @@ export default function CoursePlayer() {
             <button
               onClick={() => prevVideo && setCurrentVideo(prevVideo)}
               disabled={!prevVideo}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 hover:border-white/40 text-sm text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-accent text-sm text-foreground/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Trước
             </button>
@@ -595,14 +595,14 @@ export default function CoursePlayer() {
               <button
                 onClick={() => markComplete.mutate(currentVideo.id)}
                 disabled={markComplete.isPending}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/20 hover:bg-green-600/30 text-green-400 text-sm border border-green-500/30 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/15 hover:bg-green-500/25 text-green-700 dark:text-green-400 text-sm border border-green-500/30 transition-colors"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 Đánh dấu hoàn thành
               </button>
             )}
             {currentVideo?.isCompleted && (
-              <span className="flex items-center gap-1 text-green-400 text-sm">
+              <span className="flex items-center gap-1 text-green-700 dark:text-green-400 text-sm">
                 <CheckCircle2 className="w-4 h-4" /> Đã hoàn thành
               </span>
             )}
@@ -610,7 +610,7 @@ export default function CoursePlayer() {
             <button
               onClick={() => nextVideo && setCurrentVideo(nextVideo)}
               disabled={!nextVideo}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 hover:border-white/40 text-sm text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-accent text-sm text-foreground/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Tiếp <ChevronRight className="w-4 h-4" />
             </button>
@@ -627,7 +627,7 @@ export default function CoursePlayer() {
 
         {/* Tabs */}
         <div className="px-4 lg:px-6 pb-8">
-          <div className="flex gap-1 border-b border-white/10 mb-6">
+          <div className="flex gap-1 border-b mb-6">
             {([
               { key: 'overview', label: 'Tổng quan', icon: FileText },
               { key: 'assets', label: 'Tài liệu', icon: Download },
@@ -641,10 +641,10 @@ export default function CoursePlayer() {
                 style={{ touchAction: 'manipulation' }}
                 className={cn(
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-                  'min-h-[44px] active:bg-white/5',  // touch target + tactile
+                  'min-h-[44px] active:bg-accent/50',  // touch target + tactile
                   activeTab === key
-                    ? 'border-purple-500 text-purple-300'
-                    : 'border-transparent text-gray-400 hover:text-white'
+                    ? 'border-purple-500 text-purple-700 dark:text-purple-300'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -677,17 +677,17 @@ export default function CoursePlayer() {
             onClick={() => setSidebarOpen(false)}
           />
           <aside
-            className="lg:w-80 lg:flex-shrink-0 lg:static lg:border-l lg:border-white/10
+            className="lg:w-80 lg:flex-shrink-0 lg:static lg:border-l
                        fixed top-0 right-0 z-50 h-full w-[85vw] max-w-sm
-                       bg-gray-900/95 backdrop-blur-md
+                       bg-card/95 backdrop-blur-md border-l
                        overflow-hidden flex flex-col
                        shadow-2xl lg:shadow-none"
           >
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <h3 className="font-semibold text-white text-sm">Nội dung khoá học</h3>
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-foreground text-sm">Nội dung khoá học</h3>
               <button
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1.5 rounded-md hover:bg-white/10 text-gray-400 hover:text-white"
+                className="lg:hidden p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
                 aria-label="Đóng menu"
               >
                 <X className="w-5 h-5" />
