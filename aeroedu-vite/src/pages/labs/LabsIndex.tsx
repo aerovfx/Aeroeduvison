@@ -126,23 +126,25 @@ const CATEGORY_ICON: Record<string, string> = {
   'Điện tử':               '🔌',
 }
 
-// Dark-first card gradient per category
+/* Card gradient per category — light first, dark variant cho dark mode.
+   Light: tailwind palette nhạt (100 shade) cho readable text overlay.
+   Dark: HSL cosmic dark như cũ — giữ visual identity. */
 const CATEGORY_GRADIENT: Record<string, string> = {
-  'Cơ học':                'from-[hsl(280,60%,15%)] to-[hsl(300,55%,18%)]',
-  'Quang học':             'from-[hsl(38,80%,14%)] to-[hsl(50,80%,17%)]',
-  'Điện từ':               'from-[hsl(210,80%,14%)] to-[hsl(225,80%,17%)]',
-  'Sóng':                  'from-[hsl(185,75%,13%)] to-[hsl(200,70%,16%)]',
-  'Nhiệt học':             'from-[hsl(20,80%,14%)] to-[hsl(35,80%,17%)]',
-  'Thị giác máy tính':     'from-[hsl(175,65%,13%)] to-[hsl(185,60%,16%)]',
-  'Computer Vision':       'from-[hsl(145,60%,13%)] to-[hsl(160,55%,16%)]',
-  'Procedural Generation': 'from-[hsl(245,70%,14%)] to-[hsl(260,65%,17%)]',
-  'Machine Learning':      'from-[hsl(262,65%,14%)] to-[hsl(280,60%,17%)]',
-  'Hóa học':               'from-[hsl(160,60%,13%)] to-[hsl(175,55%,16%)]',
-  'Sinh học':              'from-[hsl(130,60%,13%)] to-[hsl(145,55%,16%)]',
-  'Học qua trò chơi':      'from-[hsl(80,55%,13%)] to-[hsl(95,50%,16%)]',
-  'Điện tử':               'from-[hsl(225,70%,14%)] to-[hsl(240,65%,17%)]',
+  'Cơ học':                'from-purple-100 to-fuchsia-100 dark:from-[hsl(280,60%,15%)] dark:to-[hsl(300,55%,18%)]',
+  'Quang học':             'from-amber-100 to-yellow-100 dark:from-[hsl(38,80%,14%)] dark:to-[hsl(50,80%,17%)]',
+  'Điện từ':               'from-blue-100 to-indigo-100 dark:from-[hsl(210,80%,14%)] dark:to-[hsl(225,80%,17%)]',
+  'Sóng':                  'from-cyan-100 to-sky-100 dark:from-[hsl(185,75%,13%)] dark:to-[hsl(200,70%,16%)]',
+  'Nhiệt học':             'from-orange-100 to-amber-100 dark:from-[hsl(20,80%,14%)] dark:to-[hsl(35,80%,17%)]',
+  'Thị giác máy tính':     'from-teal-100 to-cyan-100 dark:from-[hsl(175,65%,13%)] dark:to-[hsl(185,60%,16%)]',
+  'Computer Vision':       'from-emerald-100 to-teal-100 dark:from-[hsl(145,60%,13%)] dark:to-[hsl(160,55%,16%)]',
+  'Procedural Generation': 'from-indigo-100 to-violet-100 dark:from-[hsl(245,70%,14%)] dark:to-[hsl(260,65%,17%)]',
+  'Machine Learning':      'from-violet-100 to-purple-100 dark:from-[hsl(262,65%,14%)] dark:to-[hsl(280,60%,17%)]',
+  'Hóa học':               'from-emerald-100 to-teal-100 dark:from-[hsl(160,60%,13%)] dark:to-[hsl(175,55%,16%)]',
+  'Sinh học':              'from-green-100 to-emerald-100 dark:from-[hsl(130,60%,13%)] dark:to-[hsl(145,55%,16%)]',
+  'Học qua trò chơi':      'from-lime-100 to-green-100 dark:from-[hsl(80,55%,13%)] dark:to-[hsl(95,50%,16%)]',
+  'Điện tử':               'from-blue-100 to-indigo-100 dark:from-[hsl(225,70%,14%)] dark:to-[hsl(240,65%,17%)]',
 }
-const DEFAULT_GRADIENT = 'from-[hsl(220,30%,12%)] to-[hsl(230,25%,15%)]'
+const DEFAULT_GRADIENT = 'from-slate-100 to-gray-100 dark:from-[hsl(220,30%,12%)] dark:to-[hsl(230,25%,15%)]'
 
 const CATEGORY_BORDER: Record<string, string> = {
   'Cơ học':                'border-[hsl(280,60%,35%)]/25',
@@ -335,10 +337,10 @@ export default function LabsIndexPage() {
           {/* ── Quick Stats ── */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[
-              { emoji: '🎯', value: totalExperiments, label: 'Thí nghiệm', border: 'border-purple-500/20', bg: 'bg-purple-500/10', text: 'text-purple-400', sub: 'text-purple-300/60' },
-              { emoji: '✅', value: 0,                label: 'Hoàn thành', border: 'border-green-500/20',  bg: 'bg-green-500/10',  text: 'text-green-400',  sub: 'text-green-300/60' },
-              { emoji: '⭐', value: '0/1000',         label: 'XP Points',  border: 'border-yellow-500/20', bg: 'bg-yellow-500/10', text: 'text-yellow-400', sub: 'text-yellow-300/60' },
-              { emoji: '📊', value: '0%',             label: 'Tiến độ',    border: 'border-pink-500/20',   bg: 'bg-pink-500/10',   text: 'text-pink-400',   sub: 'text-pink-300/60' },
+              { emoji: '🎯', value: totalExperiments, label: 'Thí nghiệm', border: 'border-purple-500/20', bg: 'bg-purple-500/10', text: 'text-purple-400', sub: 'text-purple-700/80 dark:text-purple-300/60' },
+              { emoji: '✅', value: 0,                label: 'Hoàn thành', border: 'border-green-500/20',  bg: 'bg-green-500/10',  text: 'text-green-400',  sub: 'text-green-700/80 dark:text-green-300/60' },
+              { emoji: '⭐', value: '0/1000',         label: 'XP Points',  border: 'border-yellow-500/20', bg: 'bg-yellow-500/10', text: 'text-yellow-400', sub: 'text-yellow-700/80 dark:text-yellow-300/60' },
+              { emoji: '📊', value: '0%',             label: 'Tiến độ',    border: 'border-pink-500/20',   bg: 'bg-pink-500/10',   text: 'text-pink-400',   sub: 'text-pink-700/80 dark:text-pink-300/60' },
             ].map((s) => (
               <div
                 key={s.label}
@@ -362,8 +364,10 @@ export default function LabsIndexPage() {
             />
           </div>
 
-          {/* ── Python Simulations — All Categories ── */}
-          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-[hsl(245,50%,10%)] via-[hsl(270,45%,9%)] to-[hsl(290,45%,10%)] overflow-hidden relative">
+          {/* ── Python Simulations — All Categories ──
+              2026-05-20: light mode dùng gradient nhạt indigo→purple→pink,
+              dark mode giữ cosmic deep HSL như cũ. */}
+          <div className="mb-8 rounded-2xl border-2 border-indigo-500/25 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-[hsl(245,50%,10%)] dark:via-[hsl(270,45%,9%)] dark:to-[hsl(290,45%,10%)] overflow-hidden relative">
             <div className="absolute top-0 right-0 text-[9rem] opacity-[0.06] select-none pointer-events-none leading-none">🐍</div>
 
             {/* Header */}
@@ -483,7 +487,8 @@ export default function LabsIndexPage() {
           </div>
 
           {/* ── Labs & Công cụ ── */}
-          <div className="mb-8 rounded-2xl border-2 border-cyan-500/25 bg-gradient-to-br from-[hsl(200,50%,9%)] via-[hsl(220,45%,10%)] to-[hsl(260,40%,11%)] overflow-hidden relative">
+          {/* CFD/Graph section — light gradient cyan→blue→purple, dark giữ cosmic */}
+          <div className="mb-8 rounded-2xl border-2 border-cyan-500/25 bg-gradient-to-br from-cyan-50 via-blue-50 to-purple-50 dark:from-[hsl(200,50%,9%)] dark:via-[hsl(220,45%,10%)] dark:to-[hsl(260,40%,11%)] overflow-hidden relative">
             <div className="absolute top-0 right-0 text-[9rem] opacity-[0.06] select-none pointer-events-none leading-none">🧰</div>
 
             {/* Header */}
@@ -507,7 +512,7 @@ export default function LabsIndexPage() {
                 {/* Graph — featured */}
                 <Link
                   to="/dashboard/labtwin/labs/graph-lab"
-                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-[hsl(190,70%,12%)] to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  className="group relative rounded-2xl border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-100 to-blue-100 dark:from-[hsl(190,70%,12%)] dark:to-[hsl(220,65%,14%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
                 >
                   <div className="absolute inset-0 opacity-[0.12] pointer-events-none">
                     <svg viewBox="0 0 200 120" preserveAspectRatio="none" className="w-full h-full">
@@ -552,7 +557,7 @@ export default function LabsIndexPage() {
                             Mới
                           </span>
                         </div>
-                        <p className="text-xs text-cyan-200/70 mt-0.5 font-mono">y = f(x) • nhiều đồ thị</p>
+                        <p className="text-xs text-cyan-700/80 dark:text-cyan-200/70 mt-0.5 font-mono">y = f(x) • nhiều đồ thị</p>
                       </div>
                     </div>
 
@@ -564,7 +569,7 @@ export default function LabsIndexPage() {
                       {['Đại số', 'Hàm số', 'Lượng giác', 'Mũ & log'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-100/80 border border-cyan-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-cyan-800 dark:text-cyan-100/80 border border-cyan-400/20"
                         >
                           {tag}
                         </span>
@@ -581,7 +586,7 @@ export default function LabsIndexPage() {
                 {/* AirflowCFD — featured (R3F airflow simulator) */}
                 <Link
                   to="/dashboard/labtwin/labs/airflow-cfd"
-                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-[hsl(280,55%,12%)] to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
+                  className="group relative rounded-2xl border-2 border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-[hsl(280,55%,12%)] dark:to-[hsl(220,60%,12%)] overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all"
                 >
                   {/* Decorative streamlines */}
                   <div className="absolute inset-0 opacity-[0.18] pointer-events-none">
@@ -618,7 +623,7 @@ export default function LabsIndexPage() {
                             R3F
                           </span>
                         </div>
-                        <p className="text-xs text-fuchsia-200/70 mt-0.5 font-mono">streamlines · pressure · CFD</p>
+                        <p className="text-xs text-fuchsia-700/80 dark:text-fuchsia-200/70 mt-0.5 font-mono">streamlines · pressure · CFD</p>
                       </div>
                     </div>
 
@@ -630,7 +635,7 @@ export default function LabsIndexPage() {
                       {['Reynolds', 'CL/CD', 'AoA', 'Streamlines'].map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-100/80 border border-fuchsia-400/20"
+                          className="px-2 py-0.5 rounded-md text-[10.5px] bg-white/[0.06] text-fuchsia-800 dark:text-fuchsia-100/80 border border-fuchsia-400/20"
                         >
                           {tag}
                         </span>
@@ -737,7 +742,7 @@ export default function LabsIndexPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-blue-200">Hoàn thành 2 thí nghiệm</span>
-                    <span className="text-sm text-blue-300/60">0/2</span>
+                    <span className="text-sm text-blue-700/80 dark:text-blue-300/60">0/2</span>
                   </div>
                   <div className="h-3 bg-white/[0.05] rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-blue-500 to-blue-400 w-0 rounded-full" />
@@ -746,7 +751,7 @@ export default function LabsIndexPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-blue-200">Kiếm 200 XP</span>
-                    <span className="text-sm text-blue-300/60">0/200</span>
+                    <span className="text-sm text-blue-700/80 dark:text-blue-300/60">0/200</span>
                   </div>
                   <div className="h-3 bg-white/[0.05] rounded-full overflow-hidden">
                     <div className="h-full bg-gradient-to-r from-yellow-400 to-orange-400 w-0 rounded-full" />
