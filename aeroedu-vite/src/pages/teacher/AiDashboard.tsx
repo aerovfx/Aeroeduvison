@@ -272,6 +272,7 @@ export default function AiDashboard() {
   const [timeRange,     setTimeRange]     = useState<'today' | 'week' | 'month'>('week')
   const [searchQuery,   setSearchQuery]   = useState('')
   const [filterStatus,  setFilterStatus]  = useState<'all' | 'at-risk' | 'excelling' | 'no-attempts'>('all')
+  const [filterClass,   setFilterClass]   = useState<string>('')   // '' = tất cả lớp
 
   useEffect(() => { loadStudents() }, [])
 
@@ -326,10 +327,49 @@ export default function AiDashboard() {
     if (filterStatus === 'at-risk'     && !student.xpSignal.trends?.atRisk) return false
     if (filterStatus === 'excelling'   && !(student.xpSignal.trends?.overall === 'improving' && (student.xpSignal.capability?.overallScore || 0) >= 80)) return false
     if (filterStatus === 'no-attempts' && student.hasAttempts) return false
+    // Filter theo lớp: '' = tất cả; có giá trị → chỉ HS trong lớp đó
+    if (filterClass && !student.classNames.includes(filterClass)) return false
     return true
-  }), [students, searchQuery, filterStatus])
+  }), [students, searchQuery, filterStatus, filterClass])
 
   const studentsNoAttempts = students.filter(s => !s.hasAttempts).length
+
+  /**
+   * Aggregate students theo lớp (classNames có thể nhiều — 1 HS ở nhiều lớp).
+   * Mỗi class card: tổng HS + avg score + at-risk count + excelling count.
+   * Sort theo studentCount DESC để lớp đông hiện trước.
+   */
+  const classGroups = useMemo(() => {
+    const map = new Map<string, {
+      name: string
+      students: StudentWithAnalytics[]
+      atRiskCount: number
+      excellingCount: number
+      avgScore: number
+      noAttemptsCount: number
+    }>()
+    for (const s of students) {
+      // HS có thể thuộc nhiều class (Toán + Lý 11A1)
+      const names = s.classNames.length ? s.classNames : ['(Chưa phân lớp)']
+      for (const cn of names) {
+        if (!map.has(cn)) {
+          map.set(cn, { name: cn, students: [], atRiskCount: 0, excellingCount: 0, avgScore: 0, noAttemptsCount: 0 })
+        }
+        const g = map.get(cn)!
+        g.students.push(s)
+        if (s.xpSignal.trends?.atRisk) g.atRiskCount++
+        if (s.xpSignal.trends?.overall === 'improving' && (s.xpSignal.capability?.overallScore || 0) >= 80) g.excellingCount++
+        if (!s.hasAttempts) g.noAttemptsCount++
+      }
+    }
+    // Tính avg score sau khi đã tích lũy
+    for (const g of map.values()) {
+      g.avgScore = Math.round(
+        g.students.reduce((s, st) => s + (st.xpSignal.capability?.overallScore || 0), 0) / (g.students.length || 1)
+      )
+    }
+    return Array.from(map.values()).sort((a, b) => b.students.length - a.students.length)
+  }, [students])
 
   // ── Loading state ──────────────────────────────────────────
   if (loading) {
@@ -457,6 +497,81 @@ export default function AiDashboard() {
               {studentsNoAttempts > 0 && <> · <b>{studentsNoAttempts}</b> HS chưa làm bài kiểm tra nào</>}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* ── LỚP HỌC tôi quản lí ─────────────────────────────────
+          Cards mô tả từng lớp: tổng HS + avg score + at-risk + excelling.
+          Click 1 card → filter danh sách HS theo lớp đó. */}
+      {classGroups.length > 0 && (
+        <div className="max-w-7xl mx-auto px-6 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-gray-800 inline-flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              Lớp tôi quản lí ({classGroups.length})
+            </h2>
+            {filterClass && (
+              <button
+                onClick={() => setFilterClass('')}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+              >
+                ✕ Bỏ lọc lớp
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+            {classGroups.map(cls => {
+              const active = filterClass === cls.name
+              const avgColor = cls.avgScore >= 70 ? 'text-emerald-600' : cls.avgScore >= 50 ? 'text-amber-600' : 'text-rose-600'
+              return (
+                <button
+                  key={cls.name}
+                  onClick={() => setFilterClass(active ? '' : cls.name)}
+                  style={{ touchAction: 'manipulation' }}
+                  className={`text-left p-3 rounded-xl border-2 transition-all hover:scale-[1.02] ${
+                    active
+                      ? 'bg-purple-50 border-purple-500 shadow-md ring-2 ring-purple-200'
+                      : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow'
+                  }`}
+                >
+                  <div className="flex items-start gap-1.5 mb-1.5">
+                    <span className="text-base">📚</span>
+                    <h3 className="text-xs font-bold text-gray-800 leading-tight line-clamp-2 flex-1">
+                      {cls.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className={`text-2xl font-bold ${avgColor}`}>{cls.avgScore}</span>
+                    <span className="text-[10px] text-gray-500">điểm TB</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    <div className="text-gray-600">
+                      <div className="font-bold text-gray-800">{cls.students.length}</div>
+                      <div>HS</div>
+                    </div>
+                    {cls.atRiskCount > 0 && (
+                      <div className="text-rose-600">
+                        <div className="font-bold">{cls.atRiskCount}</div>
+                        <div>cảnh báo</div>
+                      </div>
+                    )}
+                    {cls.excellingCount > 0 && (
+                      <div className="text-emerald-600">
+                        <div className="font-bold">{cls.excellingCount}</div>
+                        <div>xuất sắc</div>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          {filterClass && (
+            <div className="mt-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-800 inline-flex items-center gap-1.5">
+              🎯 Đang xem: <strong>{filterClass}</strong>
+              <span className="text-purple-600">— {filteredStudents.length} HS</span>
+            </div>
+          )}
         </div>
       )}
 
