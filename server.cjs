@@ -3176,6 +3176,250 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
   // compress + data URL). Giữ stub để không vỡ extension cũ nào còn gọi.
   // Nếu cần real upload sau này → setup GCS bucket + multer.
   app.post('/api/upload/image', _501('Upload ảnh đã chuyển sang client-side data URL (xem instructor.service.ts:uploadImage). Endpoint này deprecated.'));
+
+  // ════════════════════════════════════════════════════════════════
+  // COURSE VIDEO TRANSCRIPTS — multilingual transcript per video.
+  // - GV nhập transcript tiếng Việt (manual MVP — Whisper integration sau)
+  // - Auto-translate sang 5 ngôn ngữ qua Claude API (en/zh/ja/ko/fr)
+  // - HS bật transcript panel trong player, switch language
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: TPool } = require('pg');
+    const tJwt = require('jsonwebtoken');
+    let _tPool = null;
+    function getTPool() {
+      if (!_tPool && process.env.DATABASE_URL) {
+        _tPool = new TPool({ connectionString: process.env.DATABASE_URL, max: 3 });
+      }
+      return _tPool;
+    }
+    const T_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getTUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = tJwt.verify(auth.slice(7), T_SECRET, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id || null, role: d.role || 'STUDENT' };
+      } catch { return null; }
+    }
+    let _tReady = false;
+    async function ensureTranscriptTable() {
+      if (_tReady) return;
+      const pool = getTPool();
+      if (!pool) return;
+      await pool.query(`CREATE TABLE IF NOT EXISTS "CourseVideoTranscript" (
+        id              TEXT PRIMARY KEY,
+        "videoId"       TEXT NOT NULL,
+        language        TEXT NOT NULL,             -- ISO 639-1: vi/en/zh/ja/ko/fr/...
+        "languageName"  TEXT NOT NULL,             -- 'Tiếng Việt', 'English', ...
+        content         TEXT NOT NULL,             -- full text plain
+        segments        JSONB,                     -- [{start: 0, end: 10, text: "..."}]
+        source          TEXT NOT NULL DEFAULT 'manual', -- manual|whisper|translation
+        "translatedFrom" TEXT,                     -- source language nếu là translation
+        "createdBy"     TEXT NOT NULL,
+        "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE("videoId", language)
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "CourseVideoTranscript_video_idx"
+        ON "CourseVideoTranscript"("videoId")`);
+      _tReady = true;
+    }
+
+    // Language presets
+    const LANGS = {
+      vi: 'Tiếng Việt',
+      en: 'English',
+      zh: '中文',
+      ja: '日本語',
+      ko: '한국어',
+      fr: 'Français',
+    };
+
+    // ── PUBLIC: GET /api/learning/videos/:vid/transcripts ──────
+    // Trả list languages available + full content
+    app.get('/api/learning/videos/:vid/transcripts', async (req, res) => {
+      try {
+        const pool = getTPool();
+        if (!pool) return res.json({ items: [] });
+        await ensureTranscriptTable();
+        const { rows } = await pool.query(
+          `SELECT id, "videoId", language, "languageName", content, segments,
+                  source, "translatedFrom", "createdAt"
+             FROM "CourseVideoTranscript"
+            WHERE "videoId"=$1
+            ORDER BY language ASC`,
+          [req.params.vid]
+        );
+        return res.json({ items: rows });
+      } catch (err) {
+        console.error('[transcript:list]', err.message);
+        return res.json({ items: [] });
+      }
+    });
+
+    // ── TEACHER: POST /api/instructor/videos/:vid/transcripts ──
+    // Body: { language, content, segments? }
+    app.post('/api/instructor/videos/:vid/transcripts',
+      express.json({ limit: '500kb' }),
+      async (req, res) => {
+        try {
+          const u = getTUser(req);
+          if (!u) return res.status(401).json({ error: 'Unauthorized' });
+          if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Chỉ GV/Admin được tạo transcript' });
+          }
+          const pool = getTPool();
+          if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+          await ensureTranscriptTable();
+          const b = req.body || {};
+          const language = String(b.language || 'vi').toLowerCase().slice(0, 5);
+          const languageName = LANGS[language] || language.toUpperCase();
+          const content = String(b.content || '').trim();
+          if (!content) return res.status(400).json({ error: 'Thiếu content' });
+          // Verify ownership: video phải thuộc course do GV tạo
+          const own = await pool.query(
+            `SELECT 1 FROM "CourseVideo" v
+               JOIN "Course" c ON c.id = v."courseId"
+              WHERE v.id=$1 AND c."userId"=$2 LIMIT 1`,
+            [req.params.vid, u.id]
+          );
+          if (!own.rows.length && u.role !== 'ADMIN') {
+            return res.status(404).json({ error: 'Không tìm thấy video' });
+          }
+          const { randomUUID } = require('crypto');
+          const id = `tr-${randomUUID().slice(0, 16)}`;
+          // Upsert (PK videoId+language unique)
+          await pool.query(
+            `INSERT INTO "CourseVideoTranscript"
+               (id, "videoId", language, "languageName", content, segments, source, "createdBy", "updatedAt")
+             VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, NOW())
+             ON CONFLICT ("videoId", language) DO UPDATE SET
+               content = EXCLUDED.content,
+               segments = EXCLUDED.segments,
+               "updatedAt" = NOW()
+             RETURNING id`,
+            [id, req.params.vid, language, languageName,
+             content.slice(0, 200000),
+             b.segments ? JSON.stringify(b.segments) : null,
+             b.source || 'manual', u.id]
+          );
+          return res.status(201).json({ ok: true, id, language });
+        } catch (err) {
+          console.error('[transcript:create]', err.message);
+          return res.status(500).json({ error: err.message });
+        }
+      });
+
+    // ── TEACHER: POST /api/instructor/videos/:vid/transcripts/translate ──
+    // Body: { sourceLanguage: 'vi', targetLanguage: 'en' }
+    // Dùng Claude API dịch transcript đã có sang ngôn ngữ khác.
+    app.post('/api/instructor/videos/:vid/transcripts/translate',
+      express.json({ limit: '4kb' }),
+      async (req, res) => {
+        try {
+          const u = getTUser(req);
+          if (!u) return res.status(401).json({ error: 'Unauthorized' });
+          if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+            return res.status(403).json({ error: 'Chỉ GV/Admin được dịch' });
+          }
+          const pool = getTPool();
+          if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+          await ensureTranscriptTable();
+          const b = req.body || {};
+          const sourceLanguage = String(b.sourceLanguage || 'vi').toLowerCase().slice(0, 5);
+          const targetLanguage = String(b.targetLanguage || 'en').toLowerCase().slice(0, 5);
+          if (sourceLanguage === targetLanguage) {
+            return res.status(400).json({ error: 'Ngôn ngữ nguồn + đích trùng nhau' });
+          }
+          if (!LANGS[targetLanguage]) {
+            return res.status(400).json({ error: `Ngôn ngữ ${targetLanguage} chưa hỗ trợ. Hỗ trợ: ${Object.keys(LANGS).join(', ')}` });
+          }
+          // Get source transcript
+          const sr = await pool.query(
+            `SELECT content FROM "CourseVideoTranscript" WHERE "videoId"=$1 AND language=$2`,
+            [req.params.vid, sourceLanguage]
+          );
+          if (!sr.rows.length) {
+            return res.status(404).json({ error: `Chưa có transcript ${sourceLanguage} để dịch` });
+          }
+          const sourceContent = sr.rows[0].content;
+          if (sourceContent.length > 100000) {
+            return res.status(400).json({ error: 'Transcript quá dài (>100k ký tự). Chia nhỏ.' });
+          }
+          // Call Claude API
+          let client;
+          try { client = getAnthropic(); }
+          catch (e) { return res.status(503).json({ error: `Claude API chưa cấu hình: ${e.message}` }); }
+          const targetName = LANGS[targetLanguage];
+          const sourceName = LANGS[sourceLanguage] || sourceLanguage;
+          const resp = await client.messages.create({
+            model: process.env.ANTHROPIC_MODEL || 'claude-opus-4-6',
+            max_tokens: 8000,
+            system: `Bạn là chuyên gia dịch thuật transcript bài giảng giáo dục từ ${sourceName} sang ${targetName}. Dịch tự nhiên, giữ thuật ngữ chuyên môn, KHÔNG thêm chú thích — chỉ trả về bản dịch.`,
+            messages: [{ role: 'user', content: `Dịch transcript sau từ ${sourceName} sang ${targetName}:\n\n${sourceContent}` }],
+          });
+          const translated = resp.content?.[0]?.text || '';
+          if (!translated) {
+            return res.status(500).json({ error: 'Claude trả về rỗng' });
+          }
+          // Save translation
+          const { randomUUID } = require('crypto');
+          const id = `tr-${randomUUID().slice(0, 16)}`;
+          await pool.query(
+            `INSERT INTO "CourseVideoTranscript"
+               (id, "videoId", language, "languageName", content, source, "translatedFrom", "createdBy", "updatedAt")
+             VALUES ($1, $2, $3, $4, $5, 'translation', $6, $7, NOW())
+             ON CONFLICT ("videoId", language) DO UPDATE SET
+               content = EXCLUDED.content,
+               source = 'translation',
+               "translatedFrom" = EXCLUDED."translatedFrom",
+               "updatedAt" = NOW()
+             RETURNING id`,
+            [id, req.params.vid, targetLanguage, targetName, translated, sourceLanguage, u.id]
+          );
+          console.log(`[transcript:translate] ✅ vid=${req.params.vid.slice(0,8)} ${sourceLanguage}→${targetLanguage} (${translated.length} chars)`);
+          return res.status(201).json({
+            ok: true, id, language: targetLanguage,
+            languageName: targetName, content: translated,
+          });
+        } catch (err) {
+          console.error('[transcript:translate]', err.message);
+          return res.status(500).json({ error: err.message });
+        }
+      });
+
+    // ── TEACHER: DELETE /api/instructor/videos/:vid/transcripts/:lang ──
+    app.delete('/api/instructor/videos/:vid/transcripts/:lang', async (req, res) => {
+      try {
+        const u = getTUser(req);
+        if (!u) return res.status(401).json({ error: 'Unauthorized' });
+        if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+          return res.status(403).json({ error: 'Chỉ GV/Admin được xoá' });
+        }
+        const pool = getTPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        // Ownership check via video → course
+        if (u.role !== 'ADMIN') {
+          const own = await pool.query(
+            `SELECT 1 FROM "CourseVideo" v
+               JOIN "Course" c ON c.id = v."courseId"
+              WHERE v.id=$1 AND c."userId"=$2 LIMIT 1`,
+            [req.params.vid, u.id]
+          );
+          if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy video' });
+        }
+        await pool.query(
+          `DELETE FROM "CourseVideoTranscript" WHERE "videoId"=$1 AND language=$2`,
+          [req.params.vid, String(req.params.lang).toLowerCase()]
+        );
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[transcript:delete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
 }
 
 // ══════════════════════════════════════════════════════════════

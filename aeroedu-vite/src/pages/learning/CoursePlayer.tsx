@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
 import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
+import TranscriptPanel from '@/components/learning/TranscriptPanel'
 import type { CourseVideo } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
@@ -613,6 +614,14 @@ export default function CoursePlayer() {
             >
               Tiếp <ChevronRight className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* 📄 TRANSCRIPT đa ngôn ngữ — hiện ngay dưới video player */}
+          <div className="mt-4">
+            <TranscriptPanel
+              videoId={currentVideo?.id || null}
+              videoTitle={currentVideo?.title}
+            />
           </div>
         </div>
 

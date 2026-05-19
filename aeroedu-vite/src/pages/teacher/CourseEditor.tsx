@@ -19,12 +19,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BookOpen, Image as ImageIcon, DollarSign, Clock,
   Tag, ChevronRight, ChevronLeft, Check,
-  Play, Upload, FileText, Plus, Trash2, GripVertical,
+  Play, Upload, FileText, Plus, Trash2, GripVertical, Languages,
   Link as LinkIcon, Eye, EyeOff, ToggleLeft, ToggleRight,
   Download, File, Save, Rocket, ArrowLeft, X,
 } from 'lucide-react'
 import { instructorService, type CreateCoursePayload } from '@/services/instructor.service'
 import { RichTextEditor } from '@/components/teacher/RichTextEditor'
+import TranscriptEditor from '@/components/teacher/TranscriptEditor'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
 import type { CourseVideo, CourseAsset } from '@/types'
@@ -375,6 +376,8 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadedGcsPath, setUploadedGcsPath] = useState<string>('')
+  // Transcript editor modal — videoId đang được sửa transcript
+  const [transcriptVideoId, setTranscriptVideoId] = useState<string | null>(null)
 
   const { data: videos = [], isLoading } = useQuery({
     queryKey: ['instructor-videos', courseId],
@@ -824,6 +827,15 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
                       </span>
                     )}
 
+                    {/* Transcript button — open editor cho ngôn ngữ đa quốc gia */}
+                    <button
+                      onClick={() => setTranscriptVideoId(v.id)}
+                      title="Quản lý transcript đa ngôn ngữ"
+                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 flex items-center justify-center text-cyan-400 transition-all flex-shrink-0"
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                    </button>
+
                     <button
                       onClick={() => {
                         if (window.confirm(`Xoá bài "${v.title}"?`)) del.mutate(v.id)
@@ -856,6 +868,18 @@ function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () 
           Tiếp theo → <ChevronRight className="w-4 h-4" />
         </button>
       </div>
+
+      {/* TRANSCRIPT EDITOR MODAL — open khi click Languages icon trên video card */}
+      {transcriptVideoId && (() => {
+        const v = videos.find(vv => vv.id === transcriptVideoId)
+        return v ? (
+          <TranscriptEditor
+            videoId={v.id}
+            videoTitle={v.title}
+            onClose={() => setTranscriptVideoId(null)}
+          />
+        ) : null
+      })()}
     </div>
   )
 }
