@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `f345a32` (revision pixiai-00326-qaj, 2026-05-19 — Mobile LMS fix: overlay false-positive + drawer sidebar + 44px touch targets)
-- Commits since last deploy: `0/5` (reset sau mobile UX fix)
+- Last deployed commit: `2e22a01` (revision pixiai-00327-xos, 2026-05-19 — KG role-aware: HS/GV/Admin bộ não cá nhân + class mastery + workflow snapshots)
+- Commits since last deploy: `0/5` (reset sau feature KG cho 3 role)
+- Prev: `f345a32` → pixiai-00326-qaj (Mobile LMS fix: overlay false-positive + drawer sidebar + 44px touch)
 - Prev: `2f4c3a4` → pixiai-00325-luy (RHF values: form không bị xoá + description video)
 - Prev: `fc11caf` → pixiai-00324-run (LMS anti-copy: watermark + chống OBS/QuickTime)
 - Prev: `d1d4c5d` → pixiai-00323-giw (Player crash fix: alias url→videoUrl + defensive guard)
