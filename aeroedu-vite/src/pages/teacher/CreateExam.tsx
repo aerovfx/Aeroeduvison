@@ -16,16 +16,16 @@ import {
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 
-// ── Dark palette ───────────────────────────────────────────────
+// ── Theme-aware palette (CSS variables auto-flip light/dark) ───
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  purple:  '#7c3aed',
+  bg:      'var(--td-bg)',
+  card:    'var(--td-card)',
+  card2:   'var(--td-card2)',
+  border:  'var(--td-border)',
+  border2: 'var(--td-border2)',
+  text:    'var(--td-text)',
+  muted:   'var(--td-muted)',
+  purple:  'var(--td-purple)',
 } as const
 
 // ─────────────────────────────────────────────────────────────
@@ -574,7 +574,7 @@ function PdfImportTab({
                 />
                 <div style={{
                   position: 'absolute', bottom: 12, right: 12,
-                  background: 'rgba(0,0,0,0.6)', borderRadius: 8,
+                  background: 'rgba(var(--td-overlay-rgb), 0.6)', borderRadius: 8,
                   padding: '4px 10px', color: '#fff', fontSize: 12,
                   display: 'flex', alignItems: 'center', gap: 5,
                 }}>
