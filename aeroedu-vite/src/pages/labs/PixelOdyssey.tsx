@@ -1116,9 +1116,9 @@ export default function PixelOdyssey() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-[#0a0612] text-white">
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0612] dark:text-white">
       {/* Top bar */}
-      <header className="border-b border-white/10 bg-black/40 backdrop-blur sticky top-0 z-40">
+      <header className="border-b bg-card/80 dark:bg-black/40 backdrop-blur sticky top-0 z-40">
         <div className="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-3 flex-wrap">
           <Link to="/dashboard/labtwin" className="text-slate-400 hover:text-white inline-flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Labs
@@ -1132,7 +1132,7 @@ export default function PixelOdyssey() {
           <div className="flex-1" />
           <button
             onClick={() => setStoryOpen(true)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-muted dark:bg-white/5 border text-foreground/85 hover:bg-white/10 inline-flex items-center gap-1.5"
           >
             <Book className="w-3.5 h-3.5" /> Nhật ký cốt truyện
           </button>
@@ -1141,7 +1141,7 @@ export default function PixelOdyssey() {
             title={muted ? 'Bật nhạc nền' : 'Tắt nhạc nền'}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold border inline-flex items-center gap-1.5 ${
               muted
-                ? 'bg-white/5 border-white/10 text-white/40 hover:bg-white/10'
+                ? 'bg-muted dark:bg-white/5 border text-muted-foreground hover:bg-white/10'
                 : 'bg-purple-500/15 border-purple-500/30 text-purple-300 hover:bg-purple-500/25'
             }`}
           >
@@ -1149,7 +1149,7 @@ export default function PixelOdyssey() {
           </button>
           <button
             onClick={() => setPaused(p => !p)}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-muted dark:bg-white/5 border text-foreground/85 hover:bg-white/10 inline-flex items-center gap-1.5"
           >
             {paused ? <><Play className="w-3.5 h-3.5" /> Tiếp tục</> : <><Pause className="w-3.5 h-3.5" /> Tạm dừng</>}
           </button>
@@ -1184,7 +1184,7 @@ export default function PixelOdyssey() {
             />
 
             {/* Map title overlay */}
-            <div className="absolute top-3 left-3 px-3 py-1.5 bg-black/70 backdrop-blur rounded-lg border border-white/10">
+            <div className="absolute top-3 left-3 px-3 py-1.5 bg-card/90 dark:bg-black/70 backdrop-blur rounded-lg border">
               <div className="text-[10px] text-purple-300 uppercase font-bold tracking-wider">
                 📍 {hud.mapName}
               </div>
@@ -1222,8 +1222,8 @@ export default function PixelOdyssey() {
             {/* Help overlay (chỉ hiện lần đầu) */}
             {showHelp && !dialogue && !paused && !gameOver && (
               <div onClick={() => setShowHelp(false)}
-                className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center cursor-pointer p-6">
-                <div className="bg-[#1a0a2e] border border-purple-500/40 rounded-2xl p-6 max-w-md">
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center cursor-pointer p-6">
+                <div className="bg-card dark:bg-[#1a0a2e] border border-purple-500/40 rounded-2xl p-6 max-w-md">
                   <h2 className="text-xl font-bold mb-3 text-purple-200">🌟 Chào mừng đến Aetheria</h2>
                   <p className="text-sm text-white/70 mb-4 leading-relaxed">
                     Bạn là <strong>Kai</strong>, 16 tuổi, sống ở làng Luneria. Đêm qua,
@@ -1247,7 +1247,7 @@ export default function PixelOdyssey() {
             {/* Dialogue box */}
             {dialogue && (
               <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="bg-black/90 border-2 border-purple-400/60 rounded-xl p-4 backdrop-blur"
+                <div className="bg-card dark:bg-black/90 border-2 border-purple-400/60 rounded-xl p-4 backdrop-blur"
                   style={{ boxShadow: '0 0 30px rgba(168, 85, 247, 0.3)' }}>
                   <div className="flex items-center gap-2 mb-2">
                     <Sparkles className="w-4 h-4 text-purple-300" />
@@ -1292,7 +1292,7 @@ export default function PixelOdyssey() {
                 <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-rose-400" /> HP</span>
                 <span className="text-rose-300 font-mono">{Math.round(hud.hp)}/100</span>
               </div>
-              <div className="h-2 bg-black/50 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted dark:bg-black/50 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-rose-500 to-rose-400 transition-all"
                   style={{ width: `${Math.max(0, hud.hp)}%` }} />
               </div>
@@ -1303,7 +1303,7 @@ export default function PixelOdyssey() {
                 <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-cyan-400" /> MP</span>
                 <span className="text-cyan-300 font-mono">{Math.round(hud.mp)}/{Math.round(hud.mp >= 50 ? hud.mp : 50)}</span>
               </div>
-              <div className="h-2 bg-black/50 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted dark:bg-black/50 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-cyan-500 to-cyan-400 transition-all"
                   style={{ width: `${Math.max(0, (hud.mp / 50) * 100)}%` }} />
               </div>
@@ -1314,7 +1314,7 @@ export default function PixelOdyssey() {
                 <span className="flex items-center gap-1"><Star className="w-3 h-3 text-yellow-400" /> XP</span>
                 <span className="text-yellow-300 font-mono">{hud.xp}/{hud.level * 100}</span>
               </div>
-              <div className="h-2 bg-black/50 rounded-full overflow-hidden">
+              <div className="h-2 bg-muted dark:bg-black/50 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all"
                   style={{ width: `${(hud.xp / (hud.level * 100)) * 100}%` }} />
               </div>
@@ -1338,7 +1338,7 @@ export default function PixelOdyssey() {
                     <span>{e.emoji} {e.label}</span>
                     <span className="font-mono">{Math.round(hud.emotion[e.key])}%</span>
                   </div>
-                  <div className="h-1 bg-black/50 rounded-full overflow-hidden">
+                  <div className="h-1 bg-muted dark:bg-black/50 rounded-full overflow-hidden">
                     <div
                       className="h-full transition-all"
                       style={{
