@@ -17593,6 +17593,287 @@ CHỈ TRẢ JSON, không bọc markdown.`;
   });
 
   // ════════════════════════════════════════════════
+  // KG ROLE-AWARE ENDPOINTS — Student/Teacher/Admin views
+  // Mỗi role xây "bộ não" riêng + đóng góp cho KG chung.
+  // ════════════════════════════════════════════════
+
+  // Helper: extract userId + role from JWT (role-aware variant)
+  function getKgRoleUser(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const jwt = require('jsonwebtoken');
+      const SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+      const d = jwt.verify(auth.slice(7), SECRET, { ignoreExpiration: true });
+      return {
+        id:   d.sub || d.userId || d.id || null,
+        role: d.role || 'STUDENT',
+        name: d.name || null,
+        email: d.email || null,
+      };
+    } catch { return null; }
+  }
+
+  // Lazy ensure custom node + workflow tables
+  let _kgRoleReady = false;
+  async function ensureKgRoleTables() {
+    if (_kgRoleReady) return;
+    const pool = getKcPool();
+    if (!pool) return;
+    // Custom nodes — user-created brain extensions
+    await pool.query(`CREATE TABLE IF NOT EXISTS kg_custom_nodes (
+      id          TEXT PRIMARY KEY,
+      "userId"    TEXT NOT NULL,
+      "userRole"  TEXT NOT NULL,                 -- STUDENT/TEACHER/ADMIN
+      type        TEXT NOT NULL,                 -- Concept/Topic/Note/Workflow
+      label       TEXT NOT NULL,
+      description TEXT,
+      "parentNodeId" TEXT,                       -- link tới node có sẵn (optional)
+      visibility  TEXT NOT NULL DEFAULT 'private', -- private/class/public
+      "courseId"  TEXT,                          -- nếu visibility=class
+      properties  JSONB DEFAULT '{}'::jsonb,
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_custom_user_idx
+      ON kg_custom_nodes("userId", "createdAt" DESC)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_custom_visibility_idx
+      ON kg_custom_nodes(visibility, "courseId")`);
+
+    // Admin workflow snapshots — quy trình làm việc
+    await pool.query(`CREATE TABLE IF NOT EXISTS kg_workflows (
+      id          TEXT PRIMARY KEY,
+      "userId"    TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      description TEXT,
+      steps       JSONB NOT NULL DEFAULT '[]'::jsonb,  -- [{step, action, target, timestamp}]
+      tags        TEXT[],
+      "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS kg_workflow_user_idx
+      ON kg_workflows("userId", "createdAt" DESC)`);
+    _kgRoleReady = true;
+  }
+
+  // ──────────────────────────────────────────────
+  // STUDENT/TEACHER/ADMIN — GET /api/kg/role-context
+  // Trả role + summary các node user đã tương tác
+  // ──────────────────────────────────────────────
+  app.get('/api/kg/role-context', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      // Đếm node tương tác (visits) + custom nodes + workflows
+      const [visits, custom, workflows] = await Promise.all([
+        pool.query(`SELECT COUNT(*) AS n FROM kg_visits WHERE "userId"=$1`, [u.id])
+          .catch(() => ({ rows: [{ n: 0 }] })),
+        pool.query(`SELECT COUNT(*) AS n FROM kg_custom_nodes WHERE "userId"=$1`, [u.id]),
+        pool.query(`SELECT COUNT(*) AS n FROM kg_workflows WHERE "userId"=$1`, [u.id]),
+      ]);
+      return res.json({
+        role: u.role,
+        userId: u.id,
+        name: u.name,
+        email: u.email,
+        stats: {
+          visited:      Number(visits.rows[0]?.n) || 0,
+          customNodes:  Number(custom.rows[0]?.n) || 0,
+          workflows:    Number(workflows.rows[0]?.n) || 0,
+        },
+        capabilities: {
+          canAddCustomNode:   true,                          // tất cả role đều add được
+          canEditPublicNodes: u.role === 'ADMIN',
+          canViewAllUsers:    u.role === 'ADMIN' || u.role === 'TEACHER',
+          canManageWorkflows: u.role === 'ADMIN',
+          canSeeClassMastery: u.role === 'TEACHER' || u.role === 'ADMIN',
+        },
+      });
+    } catch (err) {
+      console.error('[kg:role-context]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // ALL ROLES — POST/GET/DELETE custom nodes (bộ não cá nhân)
+  // ──────────────────────────────────────────────
+  app.post('/api/kg/custom-nodes', express.json({ limit: '10kb' }), async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const b = req.body || {};
+      const label = String(b.label || '').trim();
+      if (!label) return res.status(400).json({ error: 'Thiếu label' });
+      const type = ['Concept', 'Topic', 'Note', 'Workflow'].includes(b.type) ? b.type : 'Note';
+      const visibility = ['private', 'class', 'public'].includes(b.visibility) ? b.visibility : 'private';
+      if (visibility === 'public' && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Chỉ Admin được tạo node public' });
+      }
+      const { randomUUID } = require('crypto');
+      const id = `custom-${u.role.toLowerCase()}-${randomUUID().slice(0, 12)}`;
+      await pool.query(
+        `INSERT INTO kg_custom_nodes
+           (id, "userId", "userRole", type, label, description, "parentNodeId",
+            visibility, "courseId", properties)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,
+        [id, u.id, u.role, type, label.slice(0, 300),
+         b.description ? String(b.description).slice(0, 2000) : null,
+         b.parentNodeId ? String(b.parentNodeId).slice(0, 200) : null,
+         visibility,
+         b.courseId ? String(b.courseId).slice(0, 200) : null,
+         JSON.stringify(b.properties || {})]
+      );
+      return res.status(201).json({ ok: true, id });
+    } catch (err) {
+      console.error('[kg:custom-node:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/kg/custom-nodes', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      // Filter: của user + public (ai cũng thấy) + class (nếu trùng courseId)
+      const courseId = String(req.query.courseId || '').trim();
+      const params = [u.id];
+      let where = `"userId" = $1 OR visibility = 'public'`;
+      if (courseId) {
+        params.push(courseId);
+        where += ` OR (visibility = 'class' AND "courseId" = $${params.length})`;
+      }
+      const { rows } = await pool.query(
+        `SELECT id, "userId", "userRole", type, label, description,
+                "parentNodeId", visibility, "courseId", properties, "createdAt"
+           FROM kg_custom_nodes
+          WHERE ${where}
+          ORDER BY "createdAt" DESC
+          LIMIT 200`,
+        params
+      );
+      return res.json({ items: rows });
+    } catch (err) {
+      console.error('[kg:custom-node:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/kg/custom-nodes/:id', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      // Chỉ owner hoặc admin được xoá
+      const own = await pool.query(`SELECT "userId" FROM kg_custom_nodes WHERE id=$1`, [req.params.id]);
+      if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      if (own.rows[0].userId !== u.id && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Không có quyền xoá node này' });
+      }
+      await pool.query(`DELETE FROM kg_custom_nodes WHERE id=$1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error('[kg:custom-node:delete]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // TEACHER — GET /api/kg/teacher/class-mastery?courseId=
+  // Aggregate mastery của HS trong lớp/course theo từng node
+  // ──────────────────────────────────────────────
+  app.get('/api/kg/teacher/class-mastery', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Chỉ Giáo viên/Admin được xem' });
+      }
+      const pool = getKcPool();
+      // Top nodes by average mastery (DESC) + identify weak topics
+      // Note: kg_mastery có thể không tồn tại trên prod nếu chưa init.
+      const { rows } = await pool.query(`
+        SELECT
+          n.id, n.type, n.label,
+          COUNT(DISTINCT m."userId") AS "studentCount",
+          AVG(m.score)::int AS "avgScore",
+          COUNT(CASE WHEN m.score < 50 THEN 1 END) AS "weakCount"
+        FROM kg_nodes n
+        LEFT JOIN kg_mastery m ON m."nodeId" = n.id
+        GROUP BY n.id, n.type, n.label
+        HAVING COUNT(DISTINCT m."userId") > 0
+        ORDER BY "avgScore" ASC NULLS LAST, "studentCount" DESC
+        LIMIT 50
+      `).catch(() => ({ rows: [] }));
+      return res.json({
+        items: rows,
+        weakTopics: rows.filter(r => r.avgScore != null && r.avgScore < 50).slice(0, 10),
+      });
+    } catch (err) {
+      console.error('[kg:teacher:class-mastery]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ──────────────────────────────────────────────
+  // ADMIN — POST/GET workflow snapshots (quy trình làm việc)
+  // ──────────────────────────────────────────────
+  app.post('/api/kg/workflows', express.json({ limit: '40kb' }), async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      if (u.role !== 'ADMIN' && u.role !== 'TEACHER') {
+        return res.status(403).json({ error: 'Chỉ Admin/GV được lưu workflow' });
+      }
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      const b = req.body || {};
+      const title = String(b.title || '').trim();
+      if (!title) return res.status(400).json({ error: 'Thiếu title' });
+      const { randomUUID } = require('crypto');
+      const id = `wf-${randomUUID().slice(0, 12)}`;
+      await pool.query(
+        `INSERT INTO kg_workflows (id, "userId", title, description, steps, tags)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+        [id, u.id, title.slice(0, 200),
+         b.description ? String(b.description).slice(0, 2000) : null,
+         JSON.stringify(Array.isArray(b.steps) ? b.steps.slice(0, 50) : []),
+         Array.isArray(b.tags) ? b.tags.slice(0, 10).map(t => String(t).slice(0, 50)) : []]
+      );
+      return res.status(201).json({ ok: true, id });
+    } catch (err) {
+      console.error('[kg:workflow:create]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/kg/workflows', async (req, res) => {
+    try {
+      const u = getKgRoleUser(req);
+      if (!u) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getKcPool();
+      await ensureKgRoleTables();
+      // Admin xem tất cả, GV chỉ xem của mình
+      const where = u.role === 'ADMIN' ? '' : `WHERE "userId" = '${u.id.replace(/'/g, "''")}'`;
+      const { rows } = await pool.query(
+        `SELECT id, "userId", title, description, steps, tags, "createdAt"
+           FROM kg_workflows ${where}
+          ORDER BY "createdAt" DESC LIMIT 100`
+      );
+      return res.json({ items: rows });
+    } catch (err) {
+      console.error('[kg:workflow:list]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ════════════════════════════════════════════════
   // KG — PHASE 7: Collaborative Editing (suggestions)
   // GV/HS đề xuất khái niệm/relation mới → admin duyệt.
   // ════════════════════════════════════════════════

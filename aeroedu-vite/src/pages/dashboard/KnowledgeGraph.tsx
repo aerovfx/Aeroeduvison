@@ -37,6 +37,7 @@ const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 import BrainSuggestions from '@/components/kg/BrainSuggestions'
+import KgRolePanel from '@/components/kg/KgRolePanel'
 import NodeExplorer from '@/components/kg/NodeExplorer'
 import KgAudioPlayer from '@/components/kg/KgAudioPlayer'
 import { sfxBubblePop, sfxChime } from '@/lib/kgAudio'
@@ -1091,6 +1092,11 @@ export default function KnowledgeGraph() {
             {/* 🧠 Brain v2 — Phoenix-style smart suggestions */}
             {/* Sidebar click = navigate (mở detail + load làm tâm) — UX rõ hơn */}
             <BrainSuggestions onNodeClick={onNavigateNode} />
+
+            {/* 🧠 Bộ não cá nhân theo role — HS/GV/Admin đều có */}
+            <div className="mt-3">
+              <KgRolePanel onNodeClick={onNavigateNode} />
+            </div>
 
             {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
             <KgHistoryTrail
