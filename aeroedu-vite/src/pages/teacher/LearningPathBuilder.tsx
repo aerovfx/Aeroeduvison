@@ -600,9 +600,27 @@ export default function LearningPathBuilder() {
 
           {/* ── Left: Available Modules ── */}
           <Card style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            <h3 style={{ color: D.text, fontSize: 15, fontWeight: 700, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <h3 style={{ color: D.text, fontSize: 15, fontWeight: 700, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
               <BookOpen size={16} style={{ color: '#a78bfa' }} /> Modules có sẵn
             </h3>
+
+            {/* Nút "Tạo Module Mới" — đặt NGAY DƯỚI header để GV thấy ngay,
+                không cần scroll xuống cuối list dài (user request 2026-05-19). */}
+            <button
+              onClick={() => setCreateModuleOpen(true)}
+              style={{
+                marginBottom: 12, width: '100%',
+                background: 'linear-gradient(90deg, #7c3aed, #6d28d9)',
+                border: '1px solid rgba(124,58,237,0.5)', borderRadius: 10,
+                color: '#fff', cursor: 'pointer', padding: '10px 0',
+                fontSize: 13, fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                boxShadow: '0 3px 10px rgba(124,58,237,0.25)',
+              }}
+              title="Mở wizard tạo module với 9 loại: bài giảng, video, trắc nghiệm, khảo sát, kiểm tra cuối khoá, kĩ năng STEM, thách đấu HS..."
+            >
+              <Plus size={14} /> Tạo Module Mới
+            </button>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
               {customModules.length > 0 && (
@@ -694,22 +712,6 @@ export default function LearningPathBuilder() {
                 </div>
               ))}
             </div>
-
-            <button
-              onClick={() => setCreateModuleOpen(true)}
-              style={{
-                marginTop: 12, width: '100%',
-                background: 'linear-gradient(90deg, #7c3aed, #6d28d9)',
-                border: '1px solid rgba(124,58,237,0.5)', borderRadius: 10,
-                color: '#fff', cursor: 'pointer', padding: '10px 0',
-                fontSize: 13, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                boxShadow: '0 3px 10px rgba(124,58,237,0.25)',
-              }}
-              title="Mở wizard tạo module với 9 loại: bài giảng, video, trắc nghiệm, khảo sát, kiểm tra cuối khoá, kĩ năng STEM, thách đấu HS..."
-            >
-              <Plus size={14} /> Tạo Module Mới
-            </button>
           </Card>
 
           {/* ── Center: Path Canvas ── */}
