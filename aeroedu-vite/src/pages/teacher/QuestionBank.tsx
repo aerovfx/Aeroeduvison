@@ -11,6 +11,8 @@ import { ImportModal } from "@/components/question-bank/ImportModal"
 import { api } from "@/services/api"
 import { MathText } from "@/components/common/MathText"
 import QuestionRichEditor, { QuestionContentView } from "@/components/exam/QuestionRichEditor"
+import { KnowledgeUnitPicker } from "@/components/question-bank/KnowledgeUnitPicker"
+import { getCatalogStats } from "@/lib/knowledge-units-catalog"
 
 interface Question {
   id: string
@@ -122,6 +124,8 @@ const INITIAL_FORM = {
   topic: "",
   chapter: "",
   lesson: "",
+  /* 2026-05-19: thêm unitCode để link với danh mục đơn vị KT chuẩn */
+  unitCode: "",
   keywords: [] as string[],
   explanation: "",
   options: ["", "", "", ""],
@@ -417,11 +421,17 @@ export default function QuestionBank() {
           grade: form.grade,
           difficulty: form.difficulty,
           topic: form.topic.trim() || form.subject,
+          /* 2026-05-19: gửi đủ taxonomy 4 cấp về backend cho phân loại */
+          chapter: form.chapter || null,        // code chương VD "VL-G11-CH1"
+          lesson: form.lesson || null,          // code bài VD "VL-G11-CH1-B1"
+          unitCode: form.unitCode || null,      // code đơn vị KT VD "VL-G11-CH1-B1-DV1"
           explanation: form.explanation.trim(),
           options,
           correctAnswer,
           learningObjectives: [form.topic.trim() || form.subject],
-          keywords: [form.topic.trim() || form.subject, form.subject],
+          keywords: [form.topic.trim() || form.subject, form.subject].concat(
+            form.unitCode ? [form.unitCode] : []
+          ),
         }),
       })
 
@@ -466,7 +476,13 @@ export default function QuestionBank() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground">Ngân Hàng Câu Hỏi</h1>
-                <p className="text-sm text-muted-foreground">{totalQuestions} câu hỏi</p>
+                <p className="text-sm text-muted-foreground">
+                  {totalQuestions} câu hỏi
+                  {(() => {
+                    const s = getCatalogStats()
+                    return ` · Danh mục: ${s.subjects} môn · ${s.chapters} chương · ${s.lessons} bài · ${s.units} đơn vị KT`
+                  })()}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -644,15 +660,40 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1">Chủ đề</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Chủ đề (text-free)</label>
                     <input
                       value={form.topic}
                       onChange={(e) => updateForm("topic", e.target.value)}
-                      placeholder="VD: Dao động cơ"
+                      placeholder="VD: Dao động cơ — tự fill khi chọn đơn vị KT bên dưới"
                       className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground"
                     />
                   </div>
                 </div>
+
+                {/* 🌳 Danh mục đơn vị KT — cascade Chương → Bài → Đơn vị
+                    Tự fill chapter/lesson/topic về form, đảm bảo metadata
+                    thống nhất với chuẩn Bộ GD&ĐT 2018. */}
+                {form.subject && form.grade && (
+                  <div className="mt-3">
+                    <KnowledgeUnitPicker
+                      subject={form.subject}
+                      grade={form.grade}
+                      chapter={form.chapter}
+                      lesson={form.lesson}
+                      unitCode={form.unitCode}
+                      onChange={(v) => {
+                        setForm(prev => ({
+                          ...prev,
+                          chapter: v.chapter,
+                          lesson: v.lesson,
+                          unitCode: v.unitCode || '',
+                          // Auto-fill topic nếu chưa nhập, hoặc nếu match label cũ (avoid overwrite custom)
+                          topic: (!prev.topic || prev.topic === '') ? v.topic : prev.topic,
+                        }))
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Step 3: Content — Word-like editor + LaTeX */}
