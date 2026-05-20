@@ -2510,6 +2510,10 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       ['what_you_will_learn', 'TEXT'],
       ['who_is_this_course_for', 'TEXT'],
       ['pdf_book_url',           'TEXT'],
+      // ── extras: JSONB chứa các tài nguyên LIÊN KẾT (không duplicate)
+      //   { exams: [...], assignments: [...], labs: [...],
+      //     auraSimulations: [...], games: [...] }
+      ['extras',                 `JSONB DEFAULT '{}'::jsonb`],
     ];
     for (const [col, kind] of adds) {
       try { await pool.query(`ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); }
@@ -2554,6 +2558,15 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       whatYouWillLearn:   row.what_you_will_learn || null,           // ✅ now persisted
       whoIsThisCourseFor: row.who_is_this_course_for || null,        // ✅ now persisted
       pdfBookUrl:         row.pdf_book_url || null,                  // ✅ sách PDF giáo trình
+      // extras — tài nguyên liên kết (exams/assignments/labs/aura/games).
+      // PG có thể trả về object đã parse (JSONB) hoặc string (legacy/text fallback);
+      // try parse string for safety, default empty object if null/invalid.
+      extras: (() => {
+        const raw = row.extras;
+        if (!raw) return {};
+        if (typeof raw === 'object') return raw;
+        try { return JSON.parse(raw); } catch { return {}; }
+      })(),
       isPublished:        row.isPublished,
       categoryId:         row.categoryId || null,
       category:           category || null,
@@ -2819,19 +2832,28 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         whatYouWillLearn:     'what_you_will_learn',
         whoIsThisCourseFor:   'who_is_this_course_for',
         pdfBookUrl:           'pdf_book_url',
+        // extras: JSONB — pg driver tự stringify object thành JSON khi cast ::jsonb
+        extras:               'extras',
       };
       const sets = []; const vals = [req.params.id, userId]; let i = 3;
       for (const [feKey, dbCol] of Object.entries(fieldMap)) {
         if (req.body && req.body[feKey] !== undefined) {
           // Avoid duplicate set when both `image` and `imageUrl` are provided
           if (sets.some(s => s.startsWith(dbCol + ' '))) continue;
-          sets.push(`${dbCol} = $${i++}`);
           let v = req.body[feKey];
           if (feKey === 'price' || feKey === 'regularPrice' || feKey === 'beforePrice') {
             v = v === '' || v == null ? null : Number(v);
           } else if (feKey === 'lessons') {
             v = v === '' || v == null ? null : Number(v);
+          } else if (feKey === 'extras') {
+            // JSONB column — explicit cast để pg gửi đúng kiểu, accept object/null
+            if (v == null) v = {};
+            const jsonStr = typeof v === 'string' ? v : JSON.stringify(v);
+            sets.push(`${dbCol} = $${i++}::jsonb`);
+            vals.push(jsonStr);
+            continue;
           }
+          sets.push(`${dbCol} = $${i++}`);
           vals.push(v);
         }
       }
@@ -27666,6 +27688,347 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     app.put('/api/profile', updateProfileHandler);
   }
 
+  // ─ UserProfile (trang cá nhân tùy biến) ─────────────────
+  // GET   /api/users/:userId/profile  → public, ai cũng xem được (yêu cầu login)
+  // GET   /api/users/me/profile       → own profile, đầy đủ field
+  // PATCH /api/users/me/profile       → upsert decoration cho user hiện tại
+  //
+  // Trang /u/:userId hiển thị: hero banner, avatar + frame, bio markdown,
+  // stats (XP/level cho HS, courses/students cho GV), skills, social links,
+  // achievements, showcase items, theme color.
+  {
+    const { Pool: UPPool } = require('pg');
+    let _uppool = null;
+    function getUPPool() {
+      if (!_uppool && process.env.DATABASE_URL) {
+        _uppool = new UPPool({
+          connectionString: process.env.DATABASE_URL,
+          max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000,
+        });
+      }
+      return _uppool;
+    }
+    const _upjwt = require('jsonwebtoken');
+    const _upSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getUPUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const tok = auth.slice(7);
+        const d = _upjwt.verify(tok, _upSecret, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id, email: d.email };
+      } catch { return null; }
+    }
+
+    // Lazy migration — tạo bảng UserProfile lần đầu request
+    let _upTableReady = false;
+    async function ensureUserProfileTable() {
+      if (_upTableReady) return;
+      const pool = getUPPool();
+      if (!pool) return;
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "UserProfile" (
+            id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            "userId" TEXT UNIQUE NOT NULL,
+            bio TEXT,
+            "bannerStyle" TEXT DEFAULT 'gradient-purple',
+            "bannerImageUrl" TEXT,
+            "avatarFrame" TEXT DEFAULT 'none',
+            "themeColor" TEXT DEFAULT 'purple',
+            skills JSONB DEFAULT '[]'::jsonb,
+            socials JSONB DEFAULT '{}'::jsonb,
+            showcase JSONB DEFAULT '[]'::jsonb,
+            visibility JSONB DEFAULT '{}'::jsonb,
+            "createdAt" TIMESTAMP DEFAULT NOW(),
+            "updatedAt" TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "UserProfile_userId_idx" ON "UserProfile"("userId")`);
+      } catch (e) { console.warn('[user-profile] migrate:', e.message); }
+      _upTableReady = true;
+    }
+
+    // Whitelist enum để chống insert giá trị bậy
+    const ALLOWED_BANNER = new Set([
+      'gradient-purple','gradient-blue','gradient-sunset','gradient-aurora',
+      'gradient-ocean','gradient-forest','gradient-mono','custom-image'
+    ]);
+    const ALLOWED_FRAME = new Set(['none','gold','neon','polaroid','hexagon','animated']);
+    const ALLOWED_THEME = new Set(['purple','blue','green','red','pink','amber','cyan','slate']);
+
+    function sanitizeSkills(input) {
+      if (!Array.isArray(input)) return [];
+      return input
+        .map(s => String(s || '').trim().slice(0, 24))
+        .filter(Boolean)
+        .slice(0, 20);
+    }
+    function sanitizeSocials(input) {
+      if (!input || typeof input !== 'object') return {};
+      const out = {};
+      for (const k of ['facebook','youtube','github','website']) {
+        if (typeof input[k] === 'string' && input[k].trim()) {
+          let v = input[k].trim().slice(0, 200);
+          if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+          out[k] = v;
+        }
+      }
+      return out;
+    }
+    function sanitizeShowcase(input) {
+      if (!Array.isArray(input)) return [];
+      return input
+        .filter(item => item && typeof item === 'object' && item.title)
+        .map(item => ({
+          title:       String(item.title).trim().slice(0, 100),
+          description: item.description ? String(item.description).trim().slice(0, 300) : undefined,
+          url:         item.url ? String(item.url).trim().slice(0, 300) : undefined,
+          image:       item.image ? String(item.image).trim().slice(0, 500) : undefined,
+        }))
+        .slice(0, 12);
+    }
+    function sanitizeVisibility(input) {
+      if (!input || typeof input !== 'object') return {};
+      const out = {};
+      for (const k of ['bio','stats','skills','socials','achievements','showcase']) {
+        if (typeof input[k] === 'boolean') out[k] = input[k];
+      }
+      return out;
+    }
+
+    async function fetchUserStats(pool, userId, role) {
+      try {
+        if (role === 'TEACHER') {
+          const r1 = await pool.query(
+            `SELECT COUNT(*)::int AS n FROM "Course" WHERE "userId" = $1`, [userId]
+          ).catch(() => ({ rows: [{ n: 0 }] }));
+          const r2 = await pool.query(
+            `SELECT COUNT(DISTINCT e."userId")::int AS n
+               FROM "Enrollment" e
+               JOIN "Course" c ON c.id = e."courseId"
+              WHERE c."userId" = $1`, [userId]
+          ).catch(() => ({ rows: [{ n: 0 }] }));
+          const r3 = await pool.query(
+            `SELECT "createdAt" FROM "User" WHERE id = $1`, [userId]
+          ).catch(() => ({ rows: [] }));
+          const createdAt = r3.rows[0]?.createdAt ? new Date(r3.rows[0].createdAt) : null;
+          const years = createdAt
+            ? Math.max(1, Math.floor((Date.now() - createdAt.getTime()) / (365.25 * 24 * 3600 * 1000)))
+            : 1;
+          return {
+            coursesTaught:   r1.rows[0]?.n || 0,
+            studentsCount:   r2.rows[0]?.n || 0,
+            yearsExperience: years,
+          };
+        }
+        const r1 = await pool.query(
+          `SELECT COUNT(*)::int AS n FROM "Enrollment" WHERE "userId" = $1`, [userId]
+        ).catch(() => ({ rows: [{ n: 0 }] }));
+        let xp = 0;
+        try {
+          const rx = await pool.query(
+            `SELECT COALESCE(SUM("xp"), 0)::int AS x FROM "UserXp" WHERE "userId" = $1`, [userId]
+          );
+          xp = rx.rows[0]?.x || 0;
+        } catch { /* bảng không tồn tại → bỏ qua */ }
+        const level = Math.floor(Math.sqrt(xp / 100)) + 1;
+        return {
+          xp,
+          level,
+          completedCourses: r1.rows[0]?.n || 0,
+        };
+      } catch (e) {
+        console.warn('[user-profile] stats:', e.message);
+        return null;
+      }
+    }
+
+    async function fetchAchievements(pool, userId) {
+      try {
+        const r = await pool.query(
+          `SELECT id, title, description, icon, "earnedAt", tier
+             FROM "Achievement"
+            WHERE "userId" = $1
+            ORDER BY "earnedAt" DESC
+            LIMIT 24`, [userId]
+        );
+        return r.rows || [];
+      } catch { return []; }
+    }
+
+    function defaultProfile(userId) {
+      return {
+        userId,
+        bio: null,
+        bannerStyle: 'gradient-purple',
+        bannerImageUrl: null,
+        avatarFrame: 'none',
+        themeColor: 'purple',
+        skills: [],
+        socials: {},
+        showcase: [],
+        visibility: {},
+      };
+    }
+
+    // ── GET /api/users/:userId/profile — public view ────────
+    app.get('/api/users/:userId/profile', async (req, res) => {
+      // /me/profile được handler riêng phía dưới — nhưng vì express
+      // route order, ta vẫn check ở đây để an toàn nếu register thứ tự đảo
+      if (req.params.userId === 'me') {
+        return res.status(307).redirect('/api/users/me/profile');
+      }
+      const pool = getUPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      const { userId } = req.params;
+      try {
+        await ensureUserProfileTable();
+        const viewer = getUPUser(req);
+        if (!viewer) return res.status(401).json({ error: 'Unauthorized' });
+
+        const ur = await pool.query(
+          `SELECT id, name, image, role, "createdAt"
+             FROM "User" WHERE id = $1 LIMIT 1`, [userId]
+        );
+        if (!ur.rows.length) return res.status(404).json({ error: 'User not found' });
+        const userRow = ur.rows[0];
+
+        const pr = await pool.query(
+          `SELECT id, "userId", bio, "bannerStyle", "bannerImageUrl",
+                  "avatarFrame", "themeColor", skills, socials, showcase,
+                  visibility, "updatedAt"
+             FROM "UserProfile" WHERE "userId" = $1 LIMIT 1`, [userId]
+        );
+        let profile = pr.rows[0] || defaultProfile(userId);
+
+        // Visibility — ẩn section nếu viewer không phải chủ
+        const isOwner = viewer.id === userId;
+        if (!isOwner && profile.visibility) {
+          const v = profile.visibility || {};
+          if (v.bio === false) profile.bio = null;
+          if (v.socials === false) profile.socials = {};
+          if (v.skills === false) profile.skills = [];
+          if (v.showcase === false) profile.showcase = [];
+        }
+
+        const stats = await fetchUserStats(pool, userId, userRow.role);
+        const visibleStats = (!isOwner && profile.visibility?.stats === false) ? null : stats;
+        const achievements = (!isOwner && profile.visibility?.achievements === false)
+          ? [] : await fetchAchievements(pool, userId);
+
+        res.json({
+          user: userRow,
+          profile,
+          stats: visibleStats,
+          achievements,
+        });
+      } catch (err) {
+        console.error('[user-profile:get]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/users/me/profile — own profile (full) ──────
+    app.get('/api/users/me/profile', async (req, res) => {
+      const user = getUPUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getUPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureUserProfileTable();
+        const ur = await pool.query(
+          `SELECT id, name, image, role, "createdAt"
+             FROM "User" WHERE id = $1 LIMIT 1`, [user.id]
+        );
+        if (!ur.rows.length) return res.status(404).json({ error: 'User not found' });
+
+        const pr = await pool.query(
+          `SELECT id, "userId", bio, "bannerStyle", "bannerImageUrl",
+                  "avatarFrame", "themeColor", skills, socials, showcase,
+                  visibility, "updatedAt"
+             FROM "UserProfile" WHERE "userId" = $1 LIMIT 1`, [user.id]
+        );
+        const profile = pr.rows[0] || defaultProfile(user.id);
+
+        const stats = await fetchUserStats(pool, user.id, ur.rows[0].role);
+        const achievements = await fetchAchievements(pool, user.id);
+        res.json({
+          user: ur.rows[0],
+          profile,
+          stats,
+          achievements,
+        });
+      } catch (err) {
+        console.error('[user-profile:me]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── PATCH /api/users/me/profile — upsert decoration ─────
+    app.patch('/api/users/me/profile', async (req, res) => {
+      const user = getUPUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getUPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureUserProfileTable();
+        const body = req.body || {};
+        const fields = {};
+        if (body.bio !== undefined) fields.bio = String(body.bio || '').slice(0, 500);
+        if (body.bannerStyle !== undefined) {
+          const v = String(body.bannerStyle || '');
+          if (!ALLOWED_BANNER.has(v)) return res.status(400).json({ error: 'Invalid bannerStyle' });
+          fields.bannerStyle = v;
+        }
+        if (body.bannerImageUrl !== undefined) {
+          fields.bannerImageUrl = String(body.bannerImageUrl || '').slice(0, 500) || null;
+        }
+        if (body.avatarFrame !== undefined) {
+          const v = String(body.avatarFrame || '');
+          if (!ALLOWED_FRAME.has(v)) return res.status(400).json({ error: 'Invalid avatarFrame' });
+          fields.avatarFrame = v;
+        }
+        if (body.themeColor !== undefined) {
+          const v = String(body.themeColor || '');
+          if (!ALLOWED_THEME.has(v)) return res.status(400).json({ error: 'Invalid themeColor' });
+          fields.themeColor = v;
+        }
+        if (body.skills !== undefined) fields.skills = sanitizeSkills(body.skills);
+        if (body.socials !== undefined) fields.socials = sanitizeSocials(body.socials);
+        if (body.showcase !== undefined) fields.showcase = sanitizeShowcase(body.showcase);
+        if (body.visibility !== undefined) fields.visibility = sanitizeVisibility(body.visibility);
+
+        if (Object.keys(fields).length === 0) {
+          return res.status(400).json({ error: 'Không có field nào để update' });
+        }
+
+        const cols = ['"userId"', ...Object.keys(fields).map(k => `"${k}"`)];
+        const vals = [user.id, ...Object.values(fields).map(v =>
+          (v !== null && typeof v === 'object') ? JSON.stringify(v) : v
+        )];
+        const placeholders = vals.map((_, i) => `$${i + 1}`).join(', ');
+        const updates = Object.keys(fields).map((k, i) => `"${k}" = $${i + 2}`).join(', ');
+
+        const sql = `
+          INSERT INTO "UserProfile" (${cols.join(', ')})
+          VALUES (${placeholders})
+          ON CONFLICT ("userId") DO UPDATE
+            SET ${updates}, "updatedAt" = NOW()
+          RETURNING id, "userId", bio, "bannerStyle", "bannerImageUrl",
+                    "avatarFrame", "themeColor", skills, socials, showcase,
+                    visibility, "updatedAt"
+        `;
+        const { rows } = await pool.query(sql, vals);
+        console.log(`[user-profile:update] ✅ ${user.id} fields=${Object.keys(fields).length}`);
+        res.json({ ok: true, profile: rows[0] });
+      } catch (err) {
+        console.error('[user-profile:update]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+  }
+
   // ─ Emotion ────────────────────────────────────────────────
   app.get('/api/emotion', (_req, res) => res.json({ records: [] }));
   app.get('/api/emotion/stats', (_req, res) => res.json({ stats: [], total: 0 }));
@@ -31089,7 +31452,7 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     return _lrnPool;
   }
 
-  // ── GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl…) ──
+  // ── GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl, extras…) ──
   app.get('/api/learning/course/:courseId', async (req, res) => {
     try {
       const pool = getLearnPool();
@@ -31097,12 +31460,19 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       await ensureCourseColumns().catch(() => {});
       const { rows } = await pool.query(
         `SELECT id, title, description, "imageUrl", pdf_book_url AS "pdfBookUrl",
-                "isPublished", "createdAt", "updatedAt"
+                extras, "isPublished", "createdAt", "updatedAt"
            FROM "Course" WHERE id=$1 LIMIT 1`,
         [req.params.courseId]
       );
       if (!rows.length) return res.status(404).json({ error: 'Not found' });
-      return res.json(rows[0]);
+      // Normalize extras để FE luôn nhận object (PG có thể trả về string khi JSONB cũ là text)
+      const r = rows[0];
+      if (r.extras && typeof r.extras === 'string') {
+        try { r.extras = JSON.parse(r.extras); } catch { r.extras = {}; }
+      } else if (!r.extras) {
+        r.extras = {};
+      }
+      return res.json(r);
     } catch (err) {
       console.error('[learning:course-info]', err.message);
       return res.json({ id: req.params.courseId });

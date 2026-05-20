@@ -86,9 +86,14 @@ export const learningService = {
     api.get<Certificate>(`/learning/certificate/${courseId}`).then((r) => r.data),
 
   // ── Course Player ───────────────────────────────────────
-  /** GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl, …) */
+  /** GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl, extras, …) */
   getCourseInfo: (courseId: string) =>
-    api.get<{ id: string; title: string; pdfBookUrl?: string | null }>(
+    api.get<{
+      id: string
+      title: string
+      pdfBookUrl?: string | null
+      extras?: import('@/types').CourseExtras
+    }>(
       `/learning/course/${courseId}`
     ).then((r) => r.data).catch(() => null as null),
 

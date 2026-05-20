@@ -28,6 +28,11 @@ import {
   History,
   Award,
   BookOpen,
+  Sparkles,
+  ClipboardList,
+  FlaskConical,
+  Gamepad2,
+  ExternalLink,
 } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
 import { cn } from '@/lib/utils'
@@ -36,7 +41,7 @@ import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimelin
 import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
 import TranscriptPanel from '@/components/learning/TranscriptPanel'
 import PdfBookViewer from '@/components/learning/PdfBookViewer'
-import type { CourseVideo } from '@/types'
+import type { CourseVideo, CourseExtras } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
 function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
@@ -287,8 +292,8 @@ function VideoSidebar({
   )
 }
 
-// ── Tabs: Overview / Assets / Feedback / History / PDF Book ─
-type Tab = 'overview' | 'assets' | 'feedback' | 'history' | 'pdfbook'
+// ── Tabs: Overview / Assets / Feedback / History / PDF Book / Extras ─
+type Tab = 'overview' | 'assets' | 'feedback' | 'history' | 'pdfbook' | 'extras'
 
 function OverviewTab({ overview }: { overview: string | null }) {
   return (

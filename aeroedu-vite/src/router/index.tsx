@@ -204,6 +204,8 @@ const CoursePlayerPage = lazy(() => import('@/pages/learning/CoursePlayer'))
 // ── Profile Pages ────────────────────────────────────────────
 const ProfileBasicInfoPage = lazy(() => import('@/pages/profile/BasicInfo'))
 const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
+const PublicProfilePage    = lazy(() => import('@/pages/profile/PublicProfile'))
+const CustomizeProfilePage = lazy(() => import('@/pages/profile/Customize'))
 
 // ── Docs / Hướng dẫn sử dụng ─────────────────────────────────
 const DocsIndexPage   = lazy(() => import('@/pages/docs/DocsIndex'))
@@ -425,7 +427,10 @@ export function AppRouter() {
             {/* ── PROFILE (all roles) ───────────────────────── */}
             <Route path="/profile/basic-information" element={<ProfileBasicInfoPage />} />
             <Route path="/profile/photo"             element={<ProfilePhotoPage />} />
+            <Route path="/profile/customize"         element={<CustomizeProfilePage />} />
             <Route path="/profile"                   element={<Navigate to="/profile/basic-information" replace />} />
+            {/* Trang cá nhân công khai (decorate-able) */}
+            <Route path="/u/:userId"                 element={<PublicProfilePage />} />
 
             {/* ── COURSE PLAYER (full-screen) ───────────────── */}
             <Route path="/learning/course/:slug/:courseId" element={<CoursePlayerPage />} />

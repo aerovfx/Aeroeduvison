@@ -214,6 +214,48 @@ export interface Certificate {
   course: { title: string; slug: string; user: Pick<User, 'id' | 'name'> }
 }
 
+/**
+ * Tài nguyên LIÊN KẾT vào khoá học — exams/assignments/labs/aura/games
+ * Không duplicate content, chỉ lưu reference (id + title + path tuỳ loại).
+ * Persist vào Course.extras JSONB.
+ */
+export interface CourseExtraExam {
+  id: string
+  title: string
+  duration?: number
+  questionCount?: number
+}
+
+export interface CourseExtraAssignment {
+  id: string
+  title: string
+}
+
+export interface CourseExtraLab {
+  id: string
+  title: string
+  path: string  // VD: /labs/iot-lab
+}
+
+export interface CourseExtraAura {
+  id: string
+  title: string
+}
+
+export interface CourseExtraGame {
+  id: string
+  title: string
+  path: string
+}
+
+export interface CourseExtras {
+  exams?: CourseExtraExam[]
+  assignments?: CourseExtraAssignment[]
+  labs?: CourseExtraLab[]
+  auraSimulations?: CourseExtraAura[]
+  games?: CourseExtraGame[]
+}
+
 export interface InstructorCourse {
   id: string
   userId: string
@@ -238,6 +280,8 @@ export interface InstructorCourse {
   user: Pick<User, 'id' | 'name' | 'image'>
   /** URL PDF sách giáo trình — hiển thị dạng sách trong CoursePlayer */
   pdfBookUrl?: string | null
+  /** Tài nguyên liên kết: exams/assignments/labs/aura/games (không duplicate) */
+  extras?: CourseExtras
   createdAt: string
   updatedAt: string
 }

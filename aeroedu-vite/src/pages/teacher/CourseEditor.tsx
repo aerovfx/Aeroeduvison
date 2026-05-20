@@ -1,11 +1,12 @@
 /**
- * CourseEditor — Trình soạn khoá học (Create + Edit, 4 bước)
+ * CourseEditor — Trình soạn khoá học (Create + Edit, 5 bước)
  *
  * Workflow cloned từ elearniv LMS:
- *   Bước 1 · Cơ bản   → title, category, price, duration, cover image
- *   Bước 2 · Nội dung → overview, requirements, learn goals, target audience
- *   Bước 3 · Video    → upload nhóm video (group, title, thumbnail, is_preview)
- *   Bước 4 · Tài liệu → upload file đính kèm (PDF, DOCX, ZIP…)
+ *   Bước 1 · Cơ bản       → title, category, price, duration, cover image
+ *   Bước 2 · Nội dung     → overview, requirements, learn goals, target audience
+ *   Bước 3 · Video        → upload nhóm video (group, title, thumbnail, is_preview)
+ *   Bước 4 · Tài liệu     → upload file đính kèm (PDF, DOCX, ZIP…)
+ *   Bước 5 · Tài nguyên   → liên kết exams/assignments/labs/aura/games (không duplicate)
  *
  * Route:
  *   /teacher/course/create       → courseId = undefined → tạo mới
@@ -26,6 +27,7 @@ import {
 import { instructorService, type CreateCoursePayload } from '@/services/instructor.service'
 import { RichTextEditor } from '@/components/teacher/RichTextEditor'
 import TranscriptEditor from '@/components/teacher/TranscriptEditor'
+import CourseExtrasStep from './CourseExtrasStep'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
 import type { CourseVideo, CourseAsset } from '@/types'
@@ -35,8 +37,8 @@ import type { CourseVideo, CourseAsset } from '@/types'
 // ─────────────────────────────────────────────────────────────
 
 const ACCESS_OPTS = ['Trọn đời', '1 tháng', '3 tháng', '6 tháng', '1 năm']
-const STEPS = ['Cơ bản', 'Nội dung', 'Video', 'Tài liệu'] as const
-type Step = 0 | 1 | 2 | 3
+const STEPS = ['Cơ bản', 'Nội dung', 'Video', 'Tài liệu', 'Tài nguyên'] as const
+type Step = 0 | 1 | 2 | 3 | 4
 
 interface BasicForm {
   title: string
@@ -1061,7 +1063,7 @@ export default function CourseEditor() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [step, setStep] = useState<Step>(() => {
     const s = parseInt(searchParams.get('step') || '0') as Step
-    return (s >= 0 && s <= 3) ? s : 0
+    return (s >= 0 && s <= 4) ? s : 0
   })
 
   const [coverImage, setCoverImage] = useState({ preview: '', url: '' })
@@ -1155,7 +1157,13 @@ export default function CourseEditor() {
     navigate('/teacher/my-courses')
   }
 
-  const stepTitle = ['Thông tin cơ bản', 'Nội dung khoá học', 'Bài học & Video', 'Tài liệu đính kèm'][step]
+  const stepTitle = [
+    'Thông tin cơ bản',
+    'Nội dung khoá học',
+    'Bài học & Video',
+    'Tài liệu đính kèm',
+    'Tài nguyên mở rộng',
+  ][step]
 
   return (
     <div className="p-5 lg:p-8 max-w-3xl mx-auto">
@@ -1275,12 +1283,21 @@ export default function CourseEditor() {
           <AssetStep
             courseId={courseId}
             onBack={() => setStep(2)}
+            onFinish={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && courseId && (
+          <CourseExtrasStep
+            courseId={courseId}
+            initialExtras={course?.extras}
+            onBack={() => setStep(3)}
             onFinish={handleFinish}
           />
         )}
 
-        {/* Step 2/3 — no courseId yet */}
-        {(step === 2 || step === 3) && !courseId && (
+        {/* Step 2/3/4 — no courseId yet */}
+        {(step === 2 || step === 3 || step === 4) && !courseId && (
           <div className="text-center py-10 text-gray-400">
             <p>Vui lòng hoàn thành bước 1 để lưu khoá học trước.</p>
             <button

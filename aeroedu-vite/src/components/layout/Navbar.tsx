@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX, Menu } from 'lucide-react'
+import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX, Menu, Palette, Eye } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
@@ -198,6 +198,24 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void } = {}) {
                     >
                       <User className="w-4 h-4" />
                       {t('profile')}
+                    </Link>
+                    {user?.id && (
+                      <Link
+                        to={`/u/${user.id}`}
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Trang cá nhân công khai
+                      </Link>
+                    )}
+                    <Link
+                      to="/profile/customize"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition"
+                    >
+                      <Palette className="w-4 h-4" />
+                      Tùy chỉnh trang cá nhân
                     </Link>
                     <Link
                       to="/dashboard/settings"

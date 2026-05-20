@@ -3,7 +3,7 @@
  * Ported from elearniv Next.js: /instructor/*, /api/course/*
  */
 import { api } from './api'
-import type { InstructorCourse, CourseVideo, CourseAsset, Category } from '@/types'
+import type { InstructorCourse, CourseVideo, CourseAsset, Category, CourseExtras } from '@/types'
 
 export interface CreateCoursePayload {
   title: string
@@ -19,6 +19,8 @@ export interface CreateCoursePayload {
   requirements: string
   whatYouWillLearn: string
   whoIsThisCourseFor: string
+  /** Tài nguyên liên kết — exams/assignments/labs/aura/games */
+  extras?: CourseExtras
 }
 
 export interface UploadVideoPayload {
