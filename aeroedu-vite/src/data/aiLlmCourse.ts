@@ -77,7 +77,7 @@ Trong khoá học này, ta sẽ đi từ viên gạch nhỏ nhất (token) → e
           'Roadmap: token → embedding → attention → transformer',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_intro',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_llm_course',
       },
       {
         id: 'm1-l2-gpt-claude-gemini',
@@ -99,7 +99,7 @@ Khi chọn LLM cho dự án, hãy hỏi: bạn cần ngữ cảnh dài? (Claude 
           'Lựa chọn phụ thuộc: ngữ cảnh, multimodal, giá',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_intro',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_llm_course',
       },
       {
         id: 'm1-l3-applications',
@@ -123,7 +123,7 @@ Khi chọn LLM cho dự án, hãy hỏi: bạn cần ngữ cảnh dài? (Claude 
           'Agent — LLM tự lập kế hoạch nhiều bước',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_intro',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/01_llm_course',
       },
     ],
   },
@@ -161,7 +161,7 @@ Tiếng Việt thường bị tokenize "tệ" hơn tiếng Anh vì BPE được 
           'Tiếng Việt tốn nhiều token hơn tiếng Anh',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_tokenization',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_words_to_tokens_to_numbers',
       },
       {
         id: 'm2-l2-bpe',
@@ -191,7 +191,7 @@ Ví dụ: với rule "low" + "er" → "lower", chuỗi "lower" được mã hoá
           'GPT-2: 50257 token, GPT-4: ~100k token',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_tokenization',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_words_to_tokens_to_numbers',
       },
       {
         id: 'm2-l3-tiktoken-hands-on',
@@ -220,7 +220,7 @@ Bạn sẽ thấy: "Xin" có thể là 1 token, "chào" có thể tách thành 2
           'API tính tiền theo token → tối ưu prompt',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_tokenization',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_words_to_tokens_to_numbers',
       },
       {
         id: 'm2-l4-special-tokens',
@@ -254,7 +254,7 @@ Nếu fine-tune model, **dùng sai template = output sai**. Hugging Face có hà
           '`apply_chat_template()` tự động format đúng',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_tokenization',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/02_words_to_tokens_to_numbers',
       },
     ],
   },
@@ -290,7 +290,7 @@ $$\\text{vec}(\\text{vua}) - \\text{vec}(\\text{đàn ông}) + \\text{vec}(\\tex
           'Phép toán vector: vua - đàn ông + đàn bà ≈ nữ hoàng',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/03_embeddings',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_embeddings_spaces',
       },
       {
         id: 'm3-l2-word2vec',
@@ -314,7 +314,7 @@ Word2Vec mở đường cho GloVe (2014), FastText (2016), rồi đến ELMo (20
           'Trọng số tầng ẩn = embeddings (sản phẩm phụ)',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/03_embeddings',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_embeddings_spaces',
       },
       {
         id: 'm3-l3-cosine-similarity',
@@ -348,7 +348,7 @@ Cosine là nền tảng của: **vector search** (RAG), **clustering** (gom nhó
           'Nền tảng cho vector search và clustering',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/03_embeddings',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_embeddings_spaces',
       },
       {
         id: 'm3-l4-contextual-embeddings',
@@ -373,7 +373,7 @@ Cách hoạt động: input đi qua nhiều tầng transformer, tại mỗi tầ
           'Cho RAG, dùng text-embedding-3 hoặc bge-m3',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/03_embeddings',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_embeddings_spaces',
       },
     ],
   },
@@ -415,7 +415,7 @@ $$\\text{Attention}(Q, K, V) = \\text{softmax}\\!\\left(\\frac{QK^T}{\\sqrt{d_k}
           'Output = trọng số tổng hợp các V',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_build_gpt',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_buildgpt',
       },
       {
         id: 'm4-l2-multi-head',
@@ -439,7 +439,7 @@ Các nghiên cứu interpretability (Anthropic, OpenAI) đã phát hiện: các 
           'Mỗi head học một kiểu quan hệ khác nhau',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_build_gpt',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_buildgpt',
       },
       {
         id: 'm4-l3-position-encoding',
@@ -467,7 +467,7 @@ Các nghiên cứu interpretability (Anthropic, OpenAI) đã phát hiện: các 
           'RoPE: xoay Q/K, hiện là chuẩn LLM mới',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_build_gpt',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_buildgpt',
       },
       {
         id: 'm4-l4-decoder-block',
@@ -498,7 +498,7 @@ Thường $d_{ff} = 4 d_{model}$ (GPT-2: 768 → 3072 → 768).
           'GPT = N block xếp chồng (GPT-2 small: N=12)',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_build_gpt',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_buildgpt',
       },
       {
         id: 'm4-l5-generation',
@@ -529,7 +529,7 @@ Thường $d_{ff} = 4 d_{model}$ (GPT-2: 768 → 3072 → 768).
           'Top-p: lấy tập có tổng prob ≥ p',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_build_gpt',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/04_buildgpt',
       },
     ],
   },
@@ -573,7 +573,7 @@ loss = F.cross_entropy(logits.view(-1, vocab), targets.view(-1))
           'Perplexity = exp(loss), càng thấp càng tốt',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_pretraining',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_pretraining',
       },
       {
         id: 'm5-l2-gradient-descent',
@@ -603,7 +603,7 @@ optimizer.zero_grad()  # Xoá .grad cho batch tiếp
           'SGD thuần kém với LLM lớn → cần Adam',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_pretraining',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_pretraining',
       },
       {
         id: 'm5-l3-adam',
@@ -634,7 +634,7 @@ Trong đó $\\hat{m}, \\hat{v}$ là bias-corrected. Mặc định $\\beta_1=0.9,
           'Bộ nhớ optimizer = 3× tham số → cần FSDP/ZeRO',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_pretraining',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_pretraining',
       },
       {
         id: 'm5-l4-scaling-laws',
@@ -661,7 +661,7 @@ DeepMind chứng minh bằng cách train Chinchilla 70B với 1.4T token → vư
           'Công thức compute: $C \\approx 6 N D$ FLOPs',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/05_pretraining',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_pretraining',
       },
     ],
   },
@@ -710,7 +710,7 @@ Loss vẫn là cross-entropy, nhưng thường chỉ tính trên phần response
           'Chi phí rẻ hơn pre-training ~10000 lần',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_fine_tuning',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_fine_tune_pretrained_models',
       },
       {
         id: 'm6-l2-rlhf',
@@ -743,7 +743,7 @@ $$\\mathcal{L}_{PPO} = \\mathbb{E}\\left[R_\\phi(p, r) - \\beta \\cdot KL(\\pi_\
           'DPO (2023) thay PPO bằng loss đơn giản hơn',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_fine_tuning',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/08_instruction_tuning',
       },
       {
         id: 'm6-l3-lora',
@@ -774,7 +774,7 @@ Khi train, **chỉ $A, B$ là trainable**, $W$ đóng băng. Số tham số họ
           'Có thể merge vào $W$ → 0 chi phí inference',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/06_fine_tuning',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_fine_tune_pretrained_models',
       },
     ],
   },
@@ -821,7 +821,7 @@ Khi train, **chỉ $A, B$ là trainable**, $W$ đóng băng. Số tham số họ
           'Cho phép trích nguồn, giảm hallucination',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_rag',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/18_rag',
       },
       {
         id: 'm7-l2-chunking',
@@ -855,7 +855,7 @@ Khi train, **chỉ $A, B$ là trainable**, $W$ đóng băng. Số tham số họ
           'Semantic chunking tốt hơn nếu có markdown/HTML',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_rag',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/18_rag',
       },
       {
         id: 'm7-l3-vector-db',
@@ -891,7 +891,7 @@ Khi train, **chỉ $A, B$ là trainable**, $W$ đóng băng. Số tham số họ
           'Hybrid search (vector + BM25) tốt hơn 10-30%',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_rag',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/18_rag',
       },
       {
         id: 'm7-l4-reranking',
@@ -933,7 +933,7 @@ Query → Vector search → Top 50 chunks
           'Tăng nDCG 20-40%, latency +100-500ms',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/07_rag',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/18_rag',
       },
     ],
   },
@@ -978,7 +978,7 @@ Câu "When Mary and John went to the store, John gave a drink to ___". Mô hình
           'Hiểu circuit → kiểm soát + giải thích LLM',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/08_interpretability',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/15_interpretability',
       },
       {
         id: 'm8-l2-features-sae',
@@ -1013,7 +1013,7 @@ Sau khi train, mỗi chiều của $f$ là 1 **feature** — thường mang 1 ý
           'Steering: clamp feature để điều khiển hành vi',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/08_interpretability',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/15_interpretability',
       },
       {
         id: 'm8-l3-probing',
@@ -1041,7 +1041,7 @@ Sau khi train, mỗi chiều của $f$ là 1 **feature** — thường mang 1 ý
           'Cẩn thận với probe overconfidence',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/08_interpretability',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/15_interpretability',
       },
     ],
   },
@@ -1088,7 +1088,7 @@ Sau khi train, mỗi chiều của $f$ là 1 **feature** — thường mang 1 ý
           'Giải pháp: RLHF, scalable oversight, interp',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/09_safety',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/19_ai_safety',
       },
       {
         id: 'm9-l2-jailbreak',
@@ -1123,7 +1123,7 @@ Sau khi train, mỗi chiều của $f$ là 1 **feature** — thường mang 1 ý
           'Defense: filter input/output + Constitutional AI',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/09_safety',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/19_ai_safety',
       },
       {
         id: 'm9-l3-red-teaming',
@@ -1162,7 +1162,7 @@ Sau khi train, mỗi chiều của $f$ là 1 **feature** — thường mang 1 ý
           'Không model nào an toàn 100% → monitor liên tục',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/09_safety',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/19_ai_safety',
       },
     ],
   },
@@ -1214,7 +1214,7 @@ class Config:
           '@dataclass cho data container nhanh gọn',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/10_tools',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/21_python_data_types',
       },
       {
         id: 'm10-l2-pytorch-tensor',
@@ -1263,7 +1263,7 @@ print(x.grad)   # tensor([4.])  vì dy/dx = 2x = 4
           'requires_grad=True → autograd track',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/10_tools',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/26_python_pytorch',
       },
       {
         id: 'm10-l3-linear-algebra',
@@ -1298,7 +1298,7 @@ $$C_{ij} = \\sum_k A_{ik} B_{kj}$$
           'Eigenvalue cho PCA, phân tích attention',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/10_tools',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/27_math_deep_learning',
       },
       {
         id: 'm10-l4-probability',
@@ -1330,7 +1330,7 @@ Dùng trong:
           'KL divergence dùng trong RLHF, VAE, distillation',
         ],
         externalUrl:
-          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/10_tools',
+          'https://github.com/aerovfx/Aero-HowtoLLMs/tree/main/docs/29_essence_deep_learning',
       },
     ],
   },
