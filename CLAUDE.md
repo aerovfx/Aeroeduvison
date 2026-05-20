@@ -15,8 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `99aa919` (revision pixiai-00374-haw, 2026-05-21 — HOTFIX anti-screenshot v4: focus-loss blur + watermark 2× + corner badges + Asset Block Editor)
-- Commits since last deploy: `0/5`
+- Last deployed commit: `4e317a4` (revision pixiai-00376-mop, 2026-05-21 — anti-screenshot v5/v6 ON-DEMAND + curriculum updatedAt fix)
+- Commits since last deploy: `1/5`
+- Prev: `e226923` — 5-layer anti-AI-crawler defense (robots.txt + UA blocker + rate limit + honeypot + admin observability)
+- Prev: `99aa919` → pixiai-00374-haw (anti-screenshot v4 + Asset Block Editor)
 - Prev: `08e7bb3` → pixiai-00373-rop (HOTFIX camera column case + curriculum/lessons + at-risk teachers + PARENT picker)
 - Prev: `432c03a` — LessonAssetEditor: blocks Coursera/Notion-style cho mỗi bài học (11 types)
 - Prev: `a12869d` — UI emphasize form thêm bài học
