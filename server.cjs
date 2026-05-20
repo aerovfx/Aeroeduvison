@@ -32993,44 +32993,91 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       const pool = getCMPool();
       if (!pool) return;
       try {
+        // BUG FIX 2026-05-21: CREATE TABLE trước đây dùng unquoted camelCase
+        // column names → Postgres lưu thành lowercase (ipaddress, httpport...).
+        // Nhưng INSERT/UPDATE/SELECT đều dùng quoted camelCase "ipAddress"
+        // → column-not-found error khi admin add camera.
+        // Fix: dùng quoted "camelCase" trong CREATE TABLE để Postgres giữ
+        // đúng case + add ALTER RENAME migration cho table cũ.
         await pool.query(`CREATE TABLE IF NOT EXISTS "Camera" (
-          id            TEXT PRIMARY KEY,
-          name          TEXT NOT NULL,
-          brand         TEXT,
-          model         TEXT,
-          serialNumber  TEXT,
-          ipAddress     TEXT NOT NULL,
-          httpPort      INT  DEFAULT 80,
-          rtspPort      INT  DEFAULT 554,
-          onvifPort     INT  DEFAULT 80,
-          username      TEXT,
-          password      TEXT,
-          mainProfile   TEXT,
-          subProfile    TEXT,
-          rtspMainUrl   TEXT,
-          rtspSubUrl    TEXT,
-          hlsUrl        TEXT,
-          snapshotUrl   TEXT,
-          location      TEXT,
-          locationType  TEXT,
-          schoolId      TEXT,
-          classId       TEXT,
-          roomNumber    TEXT,
-          enabled       BOOLEAN NOT NULL DEFAULT true,
-          status        TEXT    NOT NULL DEFAULT 'unknown',
-          lastSeenAt    TIMESTAMPTZ,
-          lastError     TEXT,
-          hasPTZ        BOOLEAN NOT NULL DEFAULT false,
-          hasAudio      BOOLEAN NOT NULL DEFAULT false,
-          hasMotion     BOOLEAN NOT NULL DEFAULT false,
-          createdById   TEXT,
-          createdAt     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updatedAt     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          id              TEXT PRIMARY KEY,
+          name            TEXT NOT NULL,
+          brand           TEXT,
+          model           TEXT,
+          "serialNumber"  TEXT,
+          "ipAddress"     TEXT NOT NULL,
+          "httpPort"      INT  DEFAULT 80,
+          "rtspPort"      INT  DEFAULT 554,
+          "onvifPort"     INT  DEFAULT 80,
+          username        TEXT,
+          password        TEXT,
+          "mainProfile"   TEXT,
+          "subProfile"    TEXT,
+          "rtspMainUrl"   TEXT,
+          "rtspSubUrl"    TEXT,
+          "hlsUrl"        TEXT,
+          "snapshotUrl"   TEXT,
+          location        TEXT,
+          "locationType"  TEXT,
+          "schoolId"      TEXT,
+          "classId"       TEXT,
+          "roomNumber"    TEXT,
+          enabled         BOOLEAN NOT NULL DEFAULT true,
+          status          TEXT    NOT NULL DEFAULT 'unknown',
+          "lastSeenAt"    TIMESTAMPTZ,
+          "lastError"     TEXT,
+          "hasPTZ"        BOOLEAN NOT NULL DEFAULT false,
+          "hasAudio"      BOOLEAN NOT NULL DEFAULT false,
+          "hasMotion"     BOOLEAN NOT NULL DEFAULT false,
+          "createdById"   TEXT,
+          "createdAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
-        // Indexes
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_school ON "Camera"(schoolId)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_class  ON "Camera"(classId)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_enabled ON "Camera"(enabled, status)`);
+        // MIGRATION: rename lowercase → camelCase nếu table đã tồn tại từ
+        // schema cũ. ALTER COLUMN RENAME idempotent — wrap try/catch.
+        const renames = [
+          ['ipaddress', 'ipAddress'],
+          ['serialnumber', 'serialNumber'],
+          ['httpport', 'httpPort'],
+          ['rtspport', 'rtspPort'],
+          ['onvifport', 'onvifPort'],
+          ['mainprofile', 'mainProfile'],
+          ['subprofile', 'subProfile'],
+          ['rtspmainurl', 'rtspMainUrl'],
+          ['rtspsuburl', 'rtspSubUrl'],
+          ['hlsurl', 'hlsUrl'],
+          ['snapshoturl', 'snapshotUrl'],
+          ['locationtype', 'locationType'],
+          ['schoolid', 'schoolId'],
+          ['classid', 'classId'],
+          ['roomnumber', 'roomNumber'],
+          ['lastseenat', 'lastSeenAt'],
+          ['lasterror', 'lastError'],
+          ['hasptz', 'hasPTZ'],
+          ['hasaudio', 'hasAudio'],
+          ['hasmotion', 'hasMotion'],
+          ['createdbyid', 'createdById'],
+          ['createdat', 'createdAt'],
+          ['updatedat', 'updatedAt'],
+        ];
+        for (const [oldName, newName] of renames) {
+          try {
+            await pool.query(
+              `DO $$ BEGIN
+                IF EXISTS (SELECT 1 FROM information_schema.columns
+                           WHERE table_name='Camera' AND column_name='${oldName}' AND table_schema='public')
+                AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                WHERE table_name='Camera' AND column_name='${newName}' AND table_schema='public') THEN
+                  ALTER TABLE "Camera" RENAME COLUMN ${oldName} TO "${newName}";
+                END IF;
+              END $$;`
+            );
+          } catch (e) { /* ignore — column might not exist */ }
+        }
+        // Indexes — also quoted now
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_school ON "Camera"("schoolId")`).catch(() => {});
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_class  ON "Camera"("classId")`).catch(() => {});
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_camera_enabled ON "Camera"(enabled, status)`).catch(() => {});
 
         // ── CameraPermission: admin grant per-teacher access ──────
         // 2026-05-19: trước đây GET /api/cameras trả ALL enabled cameras cho
@@ -33272,7 +33319,7 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         await ensureCameraTables();
         const pool = getCMPool();
         if (!pool) return res.json({ cameras: [] });
-        const { rows } = await pool.query(`SELECT * FROM "Camera" ORDER BY createdAt DESC`);
+        const { rows } = await pool.query(`SELECT * FROM "Camera" ORDER BY "createdAt" DESC`);
         res.json({ cameras: rows.map(mapCameraPublic), count: rows.length });
       } catch (e) {
         console.error('[admin:cameras:list]', e.message);
