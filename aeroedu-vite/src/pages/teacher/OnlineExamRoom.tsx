@@ -876,8 +876,44 @@ export default function OnlineExamRoomPage() {
                 )}
               </div>
             ) : (
-              <div className="space-y-2">
-                {filtered.map(room => {
+              <div className="space-y-5">
+                {/* GROUPED BY PHASE — luôn hiển thị 3 sections (nếu phaseFilter=all)
+                    để user thấy đồng thời các phòng đã/đang/sẽ thi. Khi user chọn
+                    tab cụ thể → chỉ hiện section đó. */}
+                {(['ongoing', 'upcoming', 'past', 'unscheduled'] as TimePhase[]).map(sectionPhase => {
+                  // Khi user filter 1 phase cụ thể → chỉ render section đó
+                  if (phaseFilter !== 'all' && phaseFilter !== sectionPhase) return null
+                  const sectionRooms = filtered.filter(r =>
+                    getTimePhase(r.startTime, r.endTime, nowTick) === sectionPhase
+                  )
+                  if (sectionRooms.length === 0) return null
+
+                  const sectionMeta = sectionPhase === 'ongoing'
+                    ? { label: '🟢 Đang diễn ra', color: '#34d399', desc: 'Cần monitor gấp' }
+                    : sectionPhase === 'upcoming'
+                    ? { label: '🔵 Sắp diễn ra', color: '#60a5fa', desc: 'Sẵn sàng cho thi sắp tới' }
+                    : sectionPhase === 'past'
+                    ? { label: '⚪ Đã kết thúc', color: '#94a3b8', desc: 'Xem kết quả + bảng điểm' }
+                    : { label: '🕒 Chưa đặt lịch', color: '#fbbf24', desc: 'Phòng nháp chưa có thời gian' }
+
+                  return (
+                    <div key={sectionPhase} className="space-y-2">
+                      <div className="flex items-center justify-between px-1 py-1 sticky top-0 z-10"
+                           style={{ background: D.bg }}>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold" style={{ color: sectionMeta.color }}>
+                            {sectionMeta.label}
+                          </h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                                style={{ background: sectionMeta.color + '22', color: sectionMeta.color }}>
+                            {sectionRooms.length}
+                          </span>
+                          <span className="text-[10px]" style={{ color: D.muted2 }}>
+                            · {sectionMeta.desc}
+                          </span>
+                        </div>
+                      </div>
+                      {sectionRooms.map(room => {
                   const phase = getTimePhase(room.startTime, room.endTime, nowTick)
                   const phaseLabel = getTimePhaseLabel(phase, room.startTime, room.endTime, nowTick)
                   const phaseStyle =
@@ -973,6 +1009,9 @@ export default function OnlineExamRoomPage() {
                       </div>
                     </div>
                   </div>
+                  )
+                })}
+                    </div>
                   )
                 })}
               </div>
