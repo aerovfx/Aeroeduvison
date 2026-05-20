@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Navbar } from './Navbar'
+import { AntiScreenshotWarning } from '@/components/common/AntiScreenshotWarning'
 
 export function DashboardLayout() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -26,6 +27,9 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Anti-screenshot warning overlay */}
+      <AntiScreenshotWarning />
     </div>
   )
 }

@@ -5,6 +5,7 @@
  */
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
   BookOpen, Clock, CheckCircle, Play, Star, Target,
   Search, Award, Zap, Brain, FileText, RefreshCw,
@@ -202,7 +203,8 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
           )}
         </div>
         {!isComplete && (
-          <button
+          <Link
+            to={`/dashboard/assignments/${a.id}`}
             onClick={() => onStart(a.id)}
             className={`text-[0.72rem] px-3 py-1.5 rounded-lg font-semibold transition-all ${
               isRecommended
@@ -213,7 +215,7 @@ function AssignmentCard({ a, onStart }: { a: Assignment; onStart: (id: string) =
             }`}
           >
             {a.status === 'in-progress' ? 'Tiếp tục' : 'Bắt đầu'}
-          </button>
+          </Link>
         )}
         {isComplete && (
           <div className="flex items-center gap-1 text-[0.6rem] text-emerald-500">

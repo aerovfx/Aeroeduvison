@@ -60,6 +60,7 @@ const DashboardHome    = lazy(() => import('@/pages/dashboard/Home'))
 const AnalyticsPage    = lazy(() => import('@/pages/dashboard/Analytics'))
 const AchievementsPage = lazy(() => import('@/pages/dashboard/Achievements'))
 const AssignmentsPage  = lazy(() => import('@/pages/dashboard/Assignments'))
+const AssignmentWorkspacePage = lazy(() => import('@/pages/student/AssignmentWorkspace'))
 const CoursesPage      = lazy(() => import('@/pages/dashboard/Courses'))
 const AiTutorPage      = lazy(() => import('@/pages/dashboard/AiTutor'))
 const ChatPage         = lazy(() => import('@/pages/dashboard/Chat'))
@@ -311,6 +312,7 @@ export function AppRouter() {
             <Route path="/dashboard/analytics"            element={<AnalyticsPage />} />
             <Route path="/dashboard/achievements"         element={<AchievementsPage />} />
             <Route path="/dashboard/assignments"          element={<AssignmentsPage />} />
+            <Route path="/dashboard/assignments/:id"      element={<AssignmentWorkspacePage />} />
             <Route path="/dashboard/courses"              element={<CoursesPage />} />
             <Route path="/dashboard/emotion"              element={<EmotionPage />} />
             <Route path="/ai-tutor"                       element={<AiTutorPage />} />

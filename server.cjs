@@ -2509,6 +2509,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       ['requirements',        'TEXT'],
       ['what_you_will_learn', 'TEXT'],
       ['who_is_this_course_for', 'TEXT'],
+      ['pdf_book_url',           'TEXT'],
     ];
     for (const [col, kind] of adds) {
       try { await pool.query(`ALTER TABLE "Course" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); }
@@ -2552,6 +2553,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       requirements:       row.requirements || null,                  // ✅ now persisted
       whatYouWillLearn:   row.what_you_will_learn || null,           // ✅ now persisted
       whoIsThisCourseFor: row.who_is_this_course_for || null,        // ✅ now persisted
+      pdfBookUrl:         row.pdf_book_url || null,                  // ✅ sách PDF giáo trình
       isPublished:        row.isPublished,
       categoryId:         row.categoryId || null,
       category:           category || null,
@@ -2816,6 +2818,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         requirements:         'requirements',
         whatYouWillLearn:     'what_you_will_learn',
         whoIsThisCourseFor:   'who_is_this_course_for',
+        pdfBookUrl:           'pdf_book_url',
       };
       const sets = []; const vals = [req.params.id, userId]; let i = 3;
       for (const [feKey, dbCol] of Object.entries(fieldMap)) {
@@ -31007,6 +31010,26 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     }
     return _lrnPool;
   }
+
+  // ── GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl…) ──
+  app.get('/api/learning/course/:courseId', async (req, res) => {
+    try {
+      const pool = getLearnPool();
+      if (!pool) return res.json({ id: req.params.courseId });
+      await ensureCourseColumns().catch(() => {});
+      const { rows } = await pool.query(
+        `SELECT id, title, description, "imageUrl", pdf_book_url AS "pdfBookUrl",
+                "isPublished", "createdAt", "updatedAt"
+           FROM "Course" WHERE id=$1 LIMIT 1`,
+        [req.params.courseId]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Not found' });
+      return res.json(rows[0]);
+    } catch (err) {
+      console.error('[learning:course-info]', err.message);
+      return res.json({ id: req.params.courseId });
+    }
+  });
 
   app.get('/api/learning/course/:courseId/videos', async (req, res) => {
     try {
