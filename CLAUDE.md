@@ -15,10 +15,11 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `08e7bb3` (revision pixiai-00373-rop, 2026-05-21 — HOTFIX camera column case + ship curriculum/lessons + at-risk teachers + PARENT picker)
-- Commits since last deploy: `2/5`
+- Last deployed commit: `99aa919` (revision pixiai-00374-haw, 2026-05-21 — HOTFIX anti-screenshot v4: focus-loss blur + watermark 2× + corner badges + Asset Block Editor)
+- Commits since last deploy: `0/5`
+- Prev: `08e7bb3` → pixiai-00373-rop (HOTFIX camera column case + curriculum/lessons + at-risk teachers + PARENT picker)
 - Prev: `432c03a` — LessonAssetEditor: blocks Coursera/Notion-style cho mỗi bài học (11 types)
-- Prev: `a12869d` — UI emphasize form thêm bài học (banner + bold dashed border)
+- Prev: `a12869d` — UI emphasize form thêm bài học
 - Prev: `9383d76` → pixiai-00372-bay (Curriculum TOC + Camera quick-add + Analytics Phoenix + At-risk real + Payments subscribers + Operations rebuild)
 - Prev: `7fe7b79` → pixiai-00370-pof (Admin Overview việt hoá compact + admin teachers/students real data)
 - Prev: `eb94285` → pixiai-00368-jab (LLM Visualizer 6 sections + bump font sizes)
