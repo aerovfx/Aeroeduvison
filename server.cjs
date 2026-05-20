@@ -30392,6 +30392,190 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     });
 
     console.log('[init] Admin Users management endpoints (list/stats/get/patch/reset/delete) ready');
+
+    // ════════════════════════════════════════════════════════════
+    // ADMIN AT-RISK — /api/admin/at-risk
+    //
+    // Tính học sinh có nguy cơ bỏ học/giảm thành tích dựa trên dữ liệu THẬT:
+    //   - Banned                           → 95 (critical)
+    //   - Không login >14 ngày             → 85 (critical)
+    //   - Không login 7-14 ngày            → 70 (high)
+    //   - Chưa từng login (đăng ký >3 ngày) → 75 (high)
+    //   - Không LessonHistory 14 ngày      → 60 (medium)
+    //   - Email chưa verify (>7 ngày)      → +10
+    //
+    // Trả về danh sách HS at-risk + breakdown factors.
+    // ════════════════════════════════════════════════════════════
+    app.get('/api/admin/at-risk', async (req, res) => {
+      const adminUser = await getAnUser(req, res);
+      if (!adminUser) return;
+      try {
+        const pool = getPool();
+        const now = Date.now();
+        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+
+        // Lấy tất cả STUDENT users (không lấy TEACHER/PARENT/ADMIN)
+        const { rows: students } = await pool.query(
+          `SELECT u.id, u.name, u.email, u.image, u.banned, u."bannedReason",
+                  u."emailVerified", u."lastLoginAt", u."createdAt"
+             FROM "User" u
+            WHERE u.role = 'STUDENT'
+            ORDER BY COALESCE(u."lastLoginAt", '1970-01-01'::timestamp) ASC
+            LIMIT $1`,
+          [limit * 3]  // fetch nhiều hơn để filter
+        );
+
+        // Lấy LessonHistory aggregate: count events last 14 days per user
+        const { rows: activity } = await pool.query(
+          `SELECT "userId", COUNT(*) AS event_count,
+                  MAX("occurredAt") AS last_event
+             FROM "LessonHistory"
+            WHERE "occurredAt" > NOW() - INTERVAL '14 days'
+            GROUP BY "userId"`
+        ).catch(() => ({ rows: [] }));  // graceful nếu LessonHistory chưa tồn tại
+
+        const activityMap = new Map();
+        for (const a of activity) {
+          activityMap.set(a.userId, { eventCount: parseInt(a.event_count), lastEvent: a.last_event });
+        }
+
+        // Compute risk score per student
+        const atRisk = [];
+        for (const s of students) {
+          const factors = [];
+          let score = 0;
+
+          // Factor 1: Banned
+          if (s.banned) {
+            factors.push({ factor: `Bị khoá: ${s.bannedReason || 'không rõ lý do'}`, weight: 0.45, trend: 'declining' });
+            score += 95;
+          }
+
+          // Factor 2: Last login analysis
+          const lastLogin = s.lastLoginAt ? new Date(s.lastLoginAt).getTime() : null;
+          const createdAt = new Date(s.createdAt).getTime();
+          const ageDays = (now - createdAt) / (1000 * 60 * 60 * 24);
+          if (lastLogin === null) {
+            // Chưa từng login
+            if (ageDays > 3) {
+              factors.push({ factor: `Đăng ký ${Math.floor(ageDays)} ngày nhưng chưa từng đăng nhập`, weight: 0.40, trend: 'declining' });
+              score += 75;
+            }
+          } else {
+            const daysSinceLogin = (now - lastLogin) / (1000 * 60 * 60 * 24);
+            if (daysSinceLogin > 14) {
+              factors.push({ factor: `Không đăng nhập ${Math.floor(daysSinceLogin)} ngày`, weight: 0.40, trend: 'declining' });
+              score += 85;
+            } else if (daysSinceLogin > 7) {
+              factors.push({ factor: `Không đăng nhập ${Math.floor(daysSinceLogin)} ngày`, weight: 0.30, trend: 'declining' });
+              score += 65;
+            }
+          }
+
+          // Factor 3: LessonHistory activity
+          const act = activityMap.get(s.id);
+          if (!act || act.eventCount === 0) {
+            // Không có hoạt động học trong 14 ngày
+            if (lastLogin) {  // chỉ tính nếu user đã từng login (không trùng factor 2)
+              factors.push({ factor: 'Không có hoạt động học tập 14 ngày qua', weight: 0.25, trend: 'declining' });
+              score += 40;
+            }
+          } else if (act.eventCount < 3) {
+            factors.push({ factor: `Chỉ ${act.eventCount} hoạt động học 14 ngày`, weight: 0.15, trend: 'stable' });
+            score += 25;
+          }
+
+          // Factor 4: Email chưa verify
+          if (s.emailVerified === false || s.emailVerified === null) {
+            if (ageDays > 7) {
+              factors.push({ factor: 'Email chưa xác minh sau 7 ngày', weight: 0.10, trend: 'stable' });
+              score += 15;
+            }
+          }
+
+          // Skip nếu không có factor nào (không at-risk)
+          if (factors.length === 0) continue;
+
+          // Cap score 0-100, sort factors by weight
+          score = Math.min(100, score);
+          factors.sort((a, b) => b.weight - a.weight);
+
+          // Determine level
+          let riskLevel = 'low';
+          if (score >= 80)      riskLevel = 'critical';
+          else if (score >= 60) riskLevel = 'high';
+          else if (score >= 30) riskLevel = 'medium';
+
+          // Generate recommendations dựa trên factors
+          const recommendations = [];
+          if (factors.some(f => f.factor.includes('khoá'))) {
+            recommendations.push({ title: 'Liên hệ kiểm tra lý do khoá tài khoản', expectedImpact: 90, confidence: 95 });
+          }
+          if (factors.some(f => f.factor.includes('chưa từng đăng nhập'))) {
+            recommendations.push({ title: 'Gửi email hướng dẫn onboarding + hỗ trợ', expectedImpact: 70, confidence: 80 });
+            recommendations.push({ title: 'Gọi điện trực tiếp xác nhận tài khoản', expectedImpact: 85, confidence: 90 });
+          }
+          if (factors.some(f => f.factor.includes('Không đăng nhập'))) {
+            recommendations.push({ title: 'Gửi thông báo nhắc nhở quay lại học', expectedImpact: 60, confidence: 75 });
+            recommendations.push({ title: 'Gửi email cá nhân từ GV chủ nhiệm', expectedImpact: 75, confidence: 85 });
+          }
+          if (factors.some(f => f.factor.includes('hoạt động học'))) {
+            recommendations.push({ title: 'Đề xuất khoá học phù hợp cấp độ', expectedImpact: 55, confidence: 70 });
+          }
+          if (factors.some(f => f.factor.includes('Email chưa'))) {
+            recommendations.push({ title: 'Gửi lại email xác minh + hướng dẫn', expectedImpact: 50, confidence: 90 });
+          }
+
+          // Avatar: 2 chữ đầu tên
+          const avatar = (s.name || s.email).split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+
+          // Last active label
+          let lastActiveLabel = 'Chưa đăng nhập';
+          if (lastLogin) {
+            const d = (now - lastLogin) / (1000 * 60 * 60 * 24);
+            if      (d < 1)  lastActiveLabel = 'Hôm nay';
+            else if (d < 2)  lastActiveLabel = 'Hôm qua';
+            else if (d < 30) lastActiveLabel = `${Math.floor(d)} ngày trước`;
+            else             lastActiveLabel = `${Math.floor(d / 30)} tháng trước`;
+          }
+
+          atRisk.push({
+            id: s.id,
+            studentName: s.name || s.email.split('@')[0],
+            avatar,
+            email: s.email,
+            class: 'Chưa phân lớp',  // TODO: lấy từ ClassStudent table
+            riskScore: score,
+            riskLevel,
+            factors,
+            recommendations,
+            status: 'new',
+            createdAt: s.createdAt,
+            lastActive: lastActiveLabel,
+            emotionTag: s.banned ? 'Bị khoá' : !lastLogin ? 'Chưa quen' : 'Cần hỗ trợ',
+          });
+        }
+
+        // Sort by riskScore desc, limit
+        atRisk.sort((a, b) => b.riskScore - a.riskScore);
+        const result = atRisk.slice(0, limit);
+
+        return res.json({
+          students: result,
+          total: result.length,
+          breakdown: {
+            critical: result.filter(r => r.riskLevel === 'critical').length,
+            high:     result.filter(r => r.riskLevel === 'high').length,
+            medium:   result.filter(r => r.riskLevel === 'medium').length,
+            low:      result.filter(r => r.riskLevel === 'low').length,
+          },
+        });
+      } catch (err) {
+        console.error('[admin:at-risk]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+    console.log('[init] Admin At-Risk endpoint ready');
   }
 
   // ─ STEM AI Project Generator ─────────────────────────────

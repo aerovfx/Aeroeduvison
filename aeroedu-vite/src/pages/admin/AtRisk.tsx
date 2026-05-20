@@ -1,11 +1,13 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ExportMenu } from '@/components/common/ExportMenu'
 import type { SheetData } from '@/lib/exportReport'
+import { api } from '@/services/api'
+import { Link } from 'react-router-dom'
 import {
   AlertTriangle, TrendingDown, TrendingUp, Minus,
   Brain, Play, CheckCircle, Clock, XCircle,
   Users, Filter, ChevronDown, ChevronUp, Eye,
-  MessageSquare, UserCheck, Zap,
+  MessageSquare, UserCheck, Zap, Loader2, RefreshCw,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────────────────────
@@ -344,21 +346,45 @@ function StudentCard({ student }: { student: AtRiskStudent }) {
 export default function AtRisk() {
   const [filterLevel, setFilterLevel] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [students, setStudents] = useState<AtRiskStudent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [totalScanned, setTotalScanned] = useState(0)
+
+  // ── Fetch real at-risk data từ /api/admin/at-risk ──────────────
+  // Compute risk score dựa trên lastLoginAt, LessonHistory, banned, email-verified
+  const loadAtRisk = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const { data } = await api.get<{ students: AtRiskStudent[]; total: number; breakdown: Record<string, number> }>('/admin/at-risk?limit=200')
+      setStudents(data.students || [])
+      setTotalScanned(data.total || 0)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string }
+      setLoadError(e.response?.data?.error || e.message || 'Không tải được danh sách HS rủi ro')
+      setStudents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadAtRisk() }, [loadAtRisk])
 
   const counts = {
-    critical: MOCK_STUDENTS.filter(s => s.riskLevel === 'critical').length,
-    high:     MOCK_STUDENTS.filter(s => s.riskLevel === 'high').length,
-    medium:   MOCK_STUDENTS.filter(s => s.riskLevel === 'medium').length,
-    resolved: MOCK_STUDENTS.filter(s => s.status === 'resolved').length,
+    critical: students.filter(s => s.riskLevel === 'critical').length,
+    high:     students.filter(s => s.riskLevel === 'high').length,
+    medium:   students.filter(s => s.riskLevel === 'medium').length,
+    resolved: students.filter(s => s.status === 'resolved').length,
   }
 
   const filtered = useMemo(() => {
-    return MOCK_STUDENTS.filter(s => {
+    return students.filter(s => {
       const lvlOk = filterLevel === 'all' || s.riskLevel === filterLevel
       const stOk  = filterStatus === 'all' || s.status === filterStatus
       return lvlOk && stOk
     }).sort((a, b) => b.riskScore - a.riskScore)
-  }, [filterLevel, filterStatus])
+  }, [students, filterLevel, filterStatus])
 
   const getAtRiskSheets = useCallback((): SheetData[] => {
     if (filtered.length === 0) return []
@@ -416,19 +442,63 @@ export default function AtRisk() {
             </h1>
           </div>
           <p className="text-white/45 font-medium ml-1">
-            Hệ thống can thiệp sớm tích hợp AI – phát hiện và hỗ trợ học sinh có nguy cơ
+            Dữ liệu THẬT từ DB · phát hiện HS có nguy cơ qua login activity, LessonHistory, banned status
           </p>
         </div>
-        <ExportMenu
-          filename={`at-risk-students-${new Date().toISOString().slice(0, 10)}`}
-          getSheets={getAtRiskSheets}
-          meta={{
-            title: 'Báo cáo HS có nguy cơ (At-Risk)',
-            subtitle: `${filtered.length} HS — AeroEduVision`,
-            authorName: 'Admin Intervention',
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadAtRisk}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-bold hover:bg-violet-500/25 transition disabled:opacity-50"
+            title="Quét lại danh sách"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Quét lại
+          </button>
+          <Link
+            to="/admin/users"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/70 text-xs font-bold hover:bg-white/[0.08] transition"
+            title="Quản lý user (ban/reset)"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            Quản lý
+          </Link>
+          <ExportMenu
+            filename={`at-risk-students-${new Date().toISOString().slice(0, 10)}`}
+            getSheets={getAtRiskSheets}
+            meta={{
+              title: 'Báo cáo HS có nguy cơ (At-Risk)',
+              subtitle: `${filtered.length} HS — AeroEduVision`,
+              authorName: 'Admin Intervention',
+            }}
+          />
+        </div>
       </div>
+
+      {/* Error banner */}
+      {loadError && (
+        <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-300 text-sm flex items-center gap-2">
+          <XCircle className="w-4 h-4" />
+          {loadError}
+        </div>
+      )}
+
+      {/* Loading */}
+      {loading && !students.length && (
+        <div className="mb-6 rounded-xl bg-white/[0.03] border border-white/[0.07] p-10 flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+          <p className="text-white/60 text-sm">Đang phân tích dữ liệu...</p>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !loadError && students.length === 0 && (
+        <div className="mb-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-10 text-center">
+          <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-emerald-300 mb-1">Không có học sinh rủi ro</h3>
+          <p className="text-sm text-white/60">Tất cả HS đăng ký đều có hoạt động bình thường.</p>
+        </div>
+      )}
 
       {/* ── Summary stat cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -498,7 +568,7 @@ export default function AtRisk() {
         </div>
 
         <span className="ml-auto text-xs text-white/30 font-medium">
-          {filtered.length} / {MOCK_STUDENTS.length} học sinh
+          {filtered.length} / {totalScanned} học sinh ({students.length} đang rủi ro)
         </span>
       </div>
 
