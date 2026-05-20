@@ -29607,6 +29607,326 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     });
 
     // ════════════════════════════════════════════════════════════
+    // PHOENIX-INSPIRED ANALYTICS — 3 endpoints lấy cảm hứng từ
+    // X's For You algorithm (Phoenix retrieval + Home Mixer +
+    // Candidate Pipeline + Grox content understanding).
+    //
+    //   /funnel              — Phễu hành trình user 8 stage
+    //   /source-mix          — In-network vs Out-of-network nội dung
+    //   /score-distribution  — Phân phối engagement/score (histogram)
+    // ════════════════════════════════════════════════════════════
+
+    // ── GET /api/admin/analytics/funnel ── User journey funnel
+    // Inspired by Phoenix Pipeline Stages — đếm số user qua từng giai đoạn
+    app.get('/api/admin/analytics/funnel', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ stages: [], totalUsers: 0 });
+
+      // Helper: query 1 stage, trả 0 nếu table không tồn tại
+      const safeCount = async (sql, args = []) => {
+        try {
+          const { rows } = await pool.query(sql, args);
+          return Number(rows[0]?.count) || 0;
+        } catch (e) {
+          return 0;
+        }
+      };
+
+      try {
+        // Stage 1: Registered (total User)
+        const registered = await safeCount(`SELECT COUNT(*)::int AS count FROM "User"`);
+
+        // Stage 2: Email verified (emailVerified IS NOT NULL — column type TIMESTAMPTZ)
+        const verified = await safeCount(`SELECT COUNT(*)::int AS count FROM "User" WHERE "emailVerified" IS NOT NULL`);
+
+        // Stage 3: First login completed (lastLoginAt IS NOT NULL)
+        const firstLogin = await safeCount(`SELECT COUNT(*)::int AS count FROM "User" WHERE "lastLoginAt" IS NOT NULL`);
+
+        // Stage 4: Active last 7 days
+        const active7d = await safeCount(
+          `SELECT COUNT(*)::int AS count FROM "User" WHERE "lastLoginAt" > NOW() - INTERVAL '7 days'`
+        );
+
+        // Stage 5: Made any LessonHistory event (mở bài học)
+        const openedLesson = await safeCount(
+          `SELECT COUNT(DISTINCT "userId")::int AS count FROM "LessonHistory"`
+        );
+
+        // Stage 6: Completed at least 1 lesson (action='COMPLETED')
+        const completedLesson = await safeCount(
+          `SELECT COUNT(DISTINCT "userId")::int AS count FROM "LessonHistory" WHERE action = 'COMPLETED'`
+        );
+
+        // Stage 7: Took an exam — dùng PracticeExam (tablename thực)
+        const tookExam = await safeCount(
+          `SELECT COUNT(DISTINCT "studentId")::int AS count FROM "PracticeExam"`
+        );
+
+        // Stage 8: Completed career survey
+        const careerSurvey = await safeCount(
+          `SELECT COUNT(*)::int AS count FROM "UserProfile" WHERE "careerSurveyCompletedAt" IS NOT NULL`
+        );
+
+        const rawStages = [
+          { name: 'Đăng ký',           count: registered },
+          { name: 'Xác minh email',    count: verified },
+          { name: 'Đăng nhập lần đầu', count: firstLogin },
+          { name: 'Hoạt động 7 ngày',  count: active7d },
+          { name: 'Mở bài học',        count: openedLesson },
+          { name: 'Hoàn thành bài',    count: completedLesson },
+          { name: 'Làm bài thi',       count: tookExam },
+          { name: 'Khảo sát nghề',     count: careerSurvey },
+        ];
+
+        const total = registered || 1;
+        const stages = rawStages.map((s, i) => {
+          const prev = i === 0 ? null : rawStages[i - 1].count;
+          const drop = prev == null ? null : Math.max(0, prev - s.count);
+          const rate = total > 0 ? +((s.count / total) * 100).toFixed(1) : 0;
+          return { name: s.name, count: s.count, drop, rate };
+        });
+
+        return res.json({ stages, totalUsers: registered });
+      } catch (err) {
+        console.error('[analytics:funnel]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/analytics/source-mix?days=7 ──
+    // In-network (nội dung từ GV: courses/exams/assignments) vs
+    // Out-of-network (khám phá: free-courses/news/labs/games/career/aura)
+    app.get('/api/admin/analytics/source-mix', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({
+        inNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
+        outNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
+        ratio: { inNetwork: 0, outNetwork: 0 },
+      });
+
+      try {
+        await ensurePageViewTable();
+        const days = Math.min(90, Math.max(1, Number(req.query.days) || 7));
+
+        const { rows } = await pool.query(`
+          SELECT
+            CASE
+              WHEN path LIKE '/teacher%'           THEN 'teacher'
+              WHEN path LIKE '/dashboard/courses%' THEN 'courses'
+              WHEN path LIKE '/courses%'           THEN 'courses'
+              WHEN path LIKE '/exams%'             THEN 'exams'
+              WHEN path LIKE '/dashboard/exam%'    THEN 'exams'
+              WHEN path LIKE '/assignments%'       THEN 'assignments'
+              WHEN path LIKE '/dashboard/assignment%' THEN 'assignments'
+              WHEN path LIKE '/free-courses%'      THEN 'free-courses'
+              WHEN path LIKE '/news%'              THEN 'news'
+              WHEN path LIKE '/labs%'              THEN 'labs'
+              WHEN path LIKE '/dashboard/lab%'     THEN 'labs'
+              WHEN path LIKE '/games%'             THEN 'games'
+              WHEN path LIKE '/student/games%'     THEN 'games'
+              WHEN path LIKE '/student/career%'    THEN 'career'
+              WHEN path LIKE '/dashboard/aura%'    THEN 'aura'
+              ELSE 'other'
+            END AS bucket,
+            COUNT(*)::int AS views,
+            COUNT(DISTINCT "sessionId")::int AS sessions
+          FROM "PageView"
+          WHERE "createdAt" > NOW() - ($1::int || ' days')::interval
+          GROUP BY bucket
+          ORDER BY views DESC
+        `, [days]);
+
+        const IN_BUCKETS = new Set(['teacher', 'courses', 'exams', 'assignments']);
+        const OUT_BUCKETS = new Set(['free-courses', 'news', 'labs', 'games', 'career', 'aura']);
+
+        const inBreakdown = [];
+        const outBreakdown = [];
+        let inViews = 0, inSessions = 0;
+        let outViews = 0, outSessions = 0;
+
+        for (const r of rows) {
+          const item = {
+            bucket: r.bucket,
+            views: Number(r.views) || 0,
+            sessions: Number(r.sessions) || 0,
+          };
+          if (IN_BUCKETS.has(r.bucket)) {
+            inBreakdown.push(item);
+            inViews += item.views;
+            inSessions += item.sessions;
+          } else if (OUT_BUCKETS.has(r.bucket)) {
+            outBreakdown.push(item);
+            outViews += item.views;
+            outSessions += item.sessions;
+          }
+          // 'other' bucket bỏ qua
+        }
+
+        const total = inViews + outViews;
+        const ratio = {
+          inNetwork: total > 0 ? +((inViews / total) * 100).toFixed(1) : 0,
+          outNetwork: total > 0 ? +((outViews / total) * 100).toFixed(1) : 0,
+        };
+
+        return res.json({
+          inNetwork: { totalViews: inViews, totalSessions: inSessions, breakdown: inBreakdown },
+          outNetwork: { totalViews: outViews, totalSessions: outSessions, breakdown: outBreakdown },
+          ratio,
+        });
+      } catch (err) {
+        console.error('[analytics:source-mix]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/analytics/score-distribution?metric=exam|mastery|engagement ──
+    // Histogram phân phối điểm/engagement/mastery — inspired by Phoenix score distribution
+    app.get('/api/admin/analytics/score-distribution', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ metric: '', buckets: [], total: 0 });
+
+      const metric = String(req.query.metric || 'engagement').toLowerCase();
+
+      try {
+        // ─── Engagement (luôn có vì User.lastLoginAt là core column) ───
+        if (metric === 'engagement') {
+          const { rows } = await pool.query(`
+            SELECT
+              CASE
+                WHEN "lastLoginAt" IS NULL                            THEN 'never'
+                WHEN "lastLoginAt" > NOW() - INTERVAL '1 day'         THEN '0-1d'
+                WHEN "lastLoginAt" > NOW() - INTERVAL '3 days'        THEN '1-3d'
+                WHEN "lastLoginAt" > NOW() - INTERVAL '7 days'        THEN '3-7d'
+                WHEN "lastLoginAt" > NOW() - INTERVAL '14 days'       THEN '7-14d'
+                WHEN "lastLoginAt" > NOW() - INTERVAL '30 days'       THEN '14-30d'
+                ELSE '30d+'
+              END AS bucket,
+              COUNT(*)::int AS count
+            FROM "User"
+            GROUP BY bucket
+          `);
+          const map = Object.fromEntries(rows.map(r => [r.bucket, Number(r.count) || 0]));
+          const order = [
+            { key: 'never',  label: 'Chưa login',  color: '#ef4444' },
+            { key: '0-1d',   label: '<1 ngày',     color: '#10b981' },
+            { key: '1-3d',   label: '1-3 ngày',    color: '#10b981' },
+            { key: '3-7d',   label: '3-7 ngày',    color: '#f59e0b' },
+            { key: '7-14d',  label: '7-14 ngày',   color: '#f97316' },
+            { key: '14-30d', label: '14-30 ngày',  color: '#ef4444' },
+            { key: '30d+',   label: '30+ ngày',    color: '#dc2626' },
+          ];
+          const buckets = order.map(o => ({ label: o.label, count: map[o.key] || 0, color: o.color }));
+          const total = buckets.reduce((s, b) => s + b.count, 0);
+          return res.json({ metric: 'engagement', buckets, total });
+        }
+
+        // ─── Exam score distribution (dùng PracticeExam.percentage) ───
+        if (metric === 'exam') {
+          try {
+            const { rows } = await pool.query(`
+              SELECT
+                CASE
+                  WHEN percentage < 10  THEN '0-10'
+                  WHEN percentage < 20  THEN '10-20'
+                  WHEN percentage < 30  THEN '20-30'
+                  WHEN percentage < 40  THEN '30-40'
+                  WHEN percentage < 50  THEN '40-50'
+                  WHEN percentage < 60  THEN '50-60'
+                  WHEN percentage < 70  THEN '60-70'
+                  WHEN percentage < 80  THEN '70-80'
+                  WHEN percentage < 90  THEN '80-90'
+                  ELSE '90-100'
+                END AS bucket,
+                COUNT(*)::int AS count
+              FROM "PracticeExam"
+              WHERE completed = TRUE AND percentage IS NOT NULL
+              GROUP BY bucket
+            `);
+            const map = Object.fromEntries(rows.map(r => [r.bucket, Number(r.count) || 0]));
+            const order = [
+              { key: '0-10',   label: '0-10%',   color: '#dc2626' },
+              { key: '10-20',  label: '10-20%',  color: '#ef4444' },
+              { key: '20-30',  label: '20-30%',  color: '#f97316' },
+              { key: '30-40',  label: '30-40%',  color: '#f97316' },
+              { key: '40-50',  label: '40-50%',  color: '#f59e0b' },
+              { key: '50-60',  label: '50-60%',  color: '#facc15' },
+              { key: '60-70',  label: '60-70%',  color: '#a3e635' },
+              { key: '70-80',  label: '70-80%',  color: '#10b981' },
+              { key: '80-90',  label: '80-90%',  color: '#059669' },
+              { key: '90-100', label: '90-100%', color: '#047857' },
+            ];
+            const buckets = order.map(o => ({ label: o.label, count: map[o.key] || 0, color: o.color }));
+            const total = buckets.reduce((s, b) => s + b.count, 0);
+            return res.json({ metric: 'exam', buckets, total });
+          } catch (e) {
+            return res.json({ metric: 'exam', buckets: [], total: 0, error: 'data not available' });
+          }
+        }
+
+        // ─── Mastery distribution (dựa trên completion rate của user qua LessonHistory) ───
+        if (metric === 'mastery') {
+          try {
+            const { rows } = await pool.query(`
+              WITH per_user AS (
+                SELECT "userId",
+                       COUNT(*) FILTER (WHERE action = 'COMPLETED')::float
+                       / NULLIF(COUNT(*) FILTER (WHERE action IN ('OPENED','COMPLETED')), 0) AS rate
+                FROM "LessonHistory"
+                GROUP BY "userId"
+              )
+              SELECT
+                CASE
+                  WHEN rate IS NULL     THEN 'unknown'
+                  WHEN rate < 0.1       THEN '0-10'
+                  WHEN rate < 0.2       THEN '10-20'
+                  WHEN rate < 0.3       THEN '20-30'
+                  WHEN rate < 0.4       THEN '30-40'
+                  WHEN rate < 0.5       THEN '40-50'
+                  WHEN rate < 0.6       THEN '50-60'
+                  WHEN rate < 0.7       THEN '60-70'
+                  WHEN rate < 0.8       THEN '70-80'
+                  WHEN rate < 0.9       THEN '80-90'
+                  ELSE                       '90-100'
+                END AS bucket,
+                COUNT(*)::int AS count
+              FROM per_user
+              GROUP BY bucket
+            `);
+            const map = Object.fromEntries(rows.map(r => [r.bucket, Number(r.count) || 0]));
+            const order = [
+              { key: '0-10',   label: '0-10%',   color: '#dc2626' },
+              { key: '10-20',  label: '10-20%',  color: '#ef4444' },
+              { key: '20-30',  label: '20-30%',  color: '#f97316' },
+              { key: '30-40',  label: '30-40%',  color: '#f97316' },
+              { key: '40-50',  label: '40-50%',  color: '#f59e0b' },
+              { key: '50-60',  label: '50-60%',  color: '#facc15' },
+              { key: '60-70',  label: '60-70%',  color: '#a3e635' },
+              { key: '70-80',  label: '70-80%',  color: '#10b981' },
+              { key: '80-90',  label: '80-90%',  color: '#059669' },
+              { key: '90-100', label: '90-100%', color: '#047857' },
+            ];
+            const buckets = order.map(o => ({ label: o.label, count: map[o.key] || 0, color: o.color }));
+            const total = buckets.reduce((s, b) => s + b.count, 0);
+            return res.json({ metric: 'mastery', buckets, total });
+          } catch (e) {
+            return res.json({ metric: 'mastery', buckets: [], total: 0, error: 'data not available' });
+          }
+        }
+
+        return res.status(400).json({ error: 'metric must be one of: engagement, exam, mastery' });
+      } catch (err) {
+        console.error('[analytics:score-distribution]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ════════════════════════════════════════════════════════════
     // ADMIN INSIGHTS — phân tích hành vi user + trending topics/exams
     //
     // 4 endpoints (admin only):

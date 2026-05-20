@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState, useMemo } from 'react'
 import {
   BarChart3, TrendingUp, Users, Clock, Eye, RefreshCw,
   Loader2, Activity, ArrowUpRight, Filter, Calendar,
+  TrendingDown, GitBranch, PieChart, Network, Cpu, Layers,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import { ExportMenu } from '@/components/common/ExportMenu'
@@ -39,6 +40,68 @@ interface RouteRow {
 interface RealtimeData {
   activeNow: number
   recent: { path: string; userRole: string | null; createdAt: string }[]
+}
+
+interface FunnelStage {
+  name: string
+  count: number
+  drop: number | null
+  rate: number
+}
+interface FunnelData {
+  stages: FunnelStage[]
+  totalUsers: number
+}
+
+interface SourceBucket {
+  bucket: string
+  views: number
+  sessions: number
+}
+interface SourceMixData {
+  inNetwork: { totalViews: number; totalSessions: number; breakdown: SourceBucket[] }
+  outNetwork: { totalViews: number; totalSessions: number; breakdown: SourceBucket[] }
+  ratio: { inNetwork: number; outNetwork: number }
+}
+
+interface ScoreBucket {
+  label: string
+  count: number
+  color: string
+}
+interface ScoreDistributionData {
+  metric: string
+  buckets: ScoreBucket[]
+  total: number
+  error?: string
+}
+
+type ScoreMetric = 'engagement' | 'exam' | 'mastery'
+
+const BUCKET_LABELS: Record<string, string> = {
+  teacher:        'Khoá GV (/teacher)',
+  courses:        'Khoá học',
+  exams:          'Đề thi & Luyện thi',
+  assignments:    'Bài tập về nhà',
+  'free-courses': 'Khoá miễn phí',
+  news:           'Tin tức',
+  labs:           'Phòng lab',
+  games:          'Game học tập',
+  career:         'Khám phá nghề',
+  aura:           'Aura',
+}
+
+const BUCKET_COLORS: Record<string, string> = {
+  teacher:        '#8b5cf6',
+  courses:        '#a78bfa',
+  exams:          '#7c3aed',
+  assignments:    '#c4b5fd',
+  'free-courses': '#22d3ee',
+  news:           '#0ea5e9',
+  labs:           '#10b981',
+  games:          '#f59e0b',
+  career:         '#f97316',
+  aura:           '#ec4899',
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -128,6 +191,248 @@ function DailyChart({ data }: { data: { day: string; views: number }[] }) {
   )
 }
 
+// ════════════════════════════════════════════════════════════
+// PHOENIX-INSPIRED VISUALIZATIONS
+// ════════════════════════════════════════════════════════════
+
+/**
+ * FunnelChart — vẽ phễu dọc với mỗi stage shrink dần.
+ * Inspired by Phoenix Pipeline Stages.
+ */
+function FunnelChart({ data }: { data: FunnelData }) {
+  if (!data.stages.length) {
+    return <p className="text-center py-8 text-white/40 text-sm">Chưa có dữ liệu phễu</p>
+  }
+  const max = Math.max(...data.stages.map(s => s.count), 1)
+  return (
+    <div className="space-y-1">
+      {data.stages.map((stage, i) => {
+        const widthPct = max > 0 ? (stage.count / max) * 100 : 0
+        const dropPct = stage.drop != null && i > 0 && data.stages[i - 1].count > 0
+          ? (stage.drop / data.stages[i - 1].count) * 100
+          : 0
+        return (
+          <div key={stage.name}>
+            {/* Drop-off indicator between stages */}
+            {i > 0 && stage.drop != null && stage.drop > 0 && (
+              <div className="flex items-center gap-2 pl-4 py-1">
+                <TrendingDown className="w-3 h-3 text-red-400 flex-shrink-0" />
+                <span className="text-[10px] font-mono text-red-400">
+                  -{fmtNumber(stage.drop)} người ({dropPct.toFixed(1)}% rời)
+                </span>
+              </div>
+            )}
+            {/* Stage bar */}
+            <div className="relative">
+              <div
+                className="relative h-12 rounded-lg overflow-hidden transition-all duration-500"
+                style={{ width: `${Math.max(widthPct, 18)}%`, marginLeft: `${(100 - Math.max(widthPct, 18)) / 2}%` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600/40 via-purple-500/60 to-fuchsia-500/40 border border-purple-400/50 rounded-lg" />
+                <div className="relative h-full flex items-center justify-between px-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-purple-500/30 border border-purple-400/50 flex items-center justify-center text-[10px] font-bold text-purple-200">
+                      {i + 1}
+                    </span>
+                    <span className="text-sm font-semibold text-white truncate">{stage.name}</span>
+                  </div>
+                  <div className="flex items-baseline gap-2 flex-shrink-0">
+                    <span className="text-lg font-bold text-white font-mono">{fmtNumber(stage.count)}</span>
+                    <span className={`text-xs font-bold ${
+                      stage.rate >= 50 ? 'text-emerald-300' :
+                      stage.rate >= 25 ? 'text-yellow-300' :
+                      'text-red-300'
+                    }`}>
+                      {stage.rate}%
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      {/* Footer */}
+      <div className="mt-4 pt-3 border-t border-white/10 text-center">
+        <span className="text-xs text-white/40">
+          Tổng <span className="font-bold text-white/70">{fmtNumber(data.totalUsers)}</span> user · Conversion cuối:{' '}
+          <span className="font-bold text-purple-300">
+            {data.stages.length > 0 ? data.stages[data.stages.length - 1].rate : 0}%
+          </span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * SourceMixDonut — donut chart so sánh in-network vs out-of-network.
+ * Inspired by Thunder (in-network) vs Phoenix (out-of-network) split.
+ */
+function SourceMixDonut({ ratio }: { ratio: { inNetwork: number; outNetwork: number } }) {
+  const R = 80, CX = 100, CY = 100, SW = 22
+  const C = 2 * Math.PI * R
+  const inLen = (ratio.inNetwork / 100) * C
+  const outLen = (ratio.outNetwork / 100) * C
+  return (
+    <div className="flex items-center justify-center">
+      <svg width={200} height={200} viewBox="0 0 200 200">
+        <defs>
+          <linearGradient id="inGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#a78bfa" />
+            <stop offset="100%" stopColor="#7c3aed" />
+          </linearGradient>
+          <linearGradient id="outGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="100%" stopColor="#0ea5e9" />
+          </linearGradient>
+        </defs>
+        {/* Background ring */}
+        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#ffffff10" strokeWidth={SW} />
+        {/* In-network arc */}
+        <circle
+          cx={CX} cy={CY} r={R} fill="none"
+          stroke="url(#inGrad)" strokeWidth={SW}
+          strokeDasharray={`${inLen} ${C}`}
+          strokeLinecap="butt"
+          transform={`rotate(-90 ${CX} ${CY})`}
+          style={{ transition: 'stroke-dasharray 600ms ease' }}
+        />
+        {/* Out-network arc — start where in ends */}
+        <circle
+          cx={CX} cy={CY} r={R} fill="none"
+          stroke="url(#outGrad)" strokeWidth={SW}
+          strokeDasharray={`${outLen} ${C}`}
+          strokeDashoffset={-inLen}
+          strokeLinecap="butt"
+          transform={`rotate(-90 ${CX} ${CY})`}
+          style={{ transition: 'stroke-dasharray 600ms ease' }}
+        />
+        {/* Center text */}
+        <text x={CX} y={CY - 4} textAnchor="middle" fontSize="22" fontWeight="800" fill="#fff">
+          {ratio.inNetwork.toFixed(0)}%
+        </text>
+        <text x={CX} y={CY + 16} textAnchor="middle" fontSize="10" fill="#ffffff70">
+          từ GV
+        </text>
+      </svg>
+    </div>
+  )
+}
+
+/**
+ * SourceCard — card hiển thị 1 nguồn (in/out) với breakdown by bucket.
+ */
+function SourceCard({
+  title, icon, iconColor, totalViews, totalSessions, breakdown, totalAll,
+}: {
+  title: string
+  icon: React.ReactNode
+  iconColor: string
+  totalViews: number
+  totalSessions: number
+  breakdown: SourceBucket[]
+  totalAll: number
+}) {
+  const pct = totalAll > 0 ? (totalViews / totalAll) * 100 : 0
+  return (
+    <div className="rounded-xl bg-white/[0.03] border border-white/10 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconColor}`}>
+            {icon}
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">{title}</h3>
+            <p className="text-[10px] text-white/40 uppercase tracking-wider">
+              {pct.toFixed(1)}% tổng lưu lượng
+            </p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-lg font-bold text-white font-mono">{fmtNumber(totalViews)}</p>
+          <p className="text-[10px] text-white/40">views · {fmtNumber(totalSessions)} sessions</p>
+        </div>
+      </div>
+
+      {/* Breakdown bars */}
+      <div className="space-y-1.5 pt-2 border-t border-white/[0.05]">
+        {breakdown.length === 0 ? (
+          <p className="text-xs text-white/30 text-center py-2">Không có dữ liệu</p>
+        ) : breakdown.map(b => {
+          const bPct = totalViews > 0 ? (b.views / totalViews) * 100 : 0
+          return (
+            <div key={b.bucket}>
+              <div className="flex items-center justify-between text-xs mb-0.5">
+                <span className="text-white/70">{BUCKET_LABELS[b.bucket] || b.bucket}</span>
+                <span className="text-white/50 font-mono">{fmtNumber(b.views)} · {bPct.toFixed(0)}%</span>
+              </div>
+              <div className="h-1.5 bg-white/[0.05] rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${bPct}%`,
+                    backgroundColor: BUCKET_COLORS[b.bucket] || '#94a3b8',
+                  }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * ScoreDistributionChart — horizontal bar chart cho histogram.
+ */
+function ScoreDistributionChart({ data }: { data: ScoreDistributionData | null }) {
+  if (!data) return null
+  if (data.error || data.buckets.length === 0) {
+    return (
+      <div className="py-8 text-center">
+        <p className="text-sm text-white/40">{data.error || 'Chưa có dữ liệu'}</p>
+      </div>
+    )
+  }
+  const max = Math.max(...data.buckets.map(b => b.count), 1)
+  return (
+    <div className="space-y-2">
+      {data.buckets.map(b => {
+        const pct = max > 0 ? (b.count / max) * 100 : 0
+        const totalPct = data.total > 0 ? (b.count / data.total) * 100 : 0
+        return (
+          <div key={b.label}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-white/70 font-medium font-mono w-20">{b.label}</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-white font-bold font-mono">{fmtNumber(b.count)}</span>
+                <span className="text-white/40 text-[10px]">({totalPct.toFixed(1)}%)</span>
+              </div>
+            </div>
+            <div className="h-3 bg-white/[0.04] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${pct}%`,
+                  backgroundColor: b.color,
+                  boxShadow: `0 0 12px ${b.color}40`,
+                }}
+              />
+            </div>
+          </div>
+        )
+      })}
+      <div className="pt-2 border-t border-white/[0.05] mt-3 text-center">
+        <span className="text-xs text-white/40">
+          Tổng <span className="font-bold text-white/70">{fmtNumber(data.total)}</span> bản ghi
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminAnalytics() {
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [routes, setRoutes] = useState<RouteRow[]>([])
@@ -136,6 +441,13 @@ export default function AdminAnalytics() {
   const [period, setPeriod] = useState<7 | 30 | 90>(7)
   const [error, setError] = useState<string | null>(null)
   const [refreshTs, setRefreshTs] = useState(Date.now())
+
+  // Phoenix-inspired sections
+  const [funnel, setFunnel] = useState<FunnelData | null>(null)
+  const [sourceMix, setSourceMix] = useState<SourceMixData | null>(null)
+  const [scoreMetric, setScoreMetric] = useState<ScoreMetric>('engagement')
+  const [scoreDist, setScoreDist] = useState<ScoreDistributionData | null>(null)
+  const [scoreLoading, setScoreLoading] = useState(false)
 
   // Load overview + routes
   useEffect(() => {
@@ -172,6 +484,31 @@ export default function AdminAnalytics() {
     }, 15_000)
     return () => { cancel = true; clearInterval(id) }
   }, [])
+
+  // Load funnel + source-mix (Phoenix-inspired)
+  useEffect(() => {
+    let cancel = false
+    Promise.all([
+      api.get<FunnelData>('/admin/analytics/funnel').catch(() => null),
+      api.get<SourceMixData>(`/admin/analytics/source-mix?days=${period}`).catch(() => null),
+    ]).then(([fRes, sRes]) => {
+      if (cancel) return
+      if (fRes) setFunnel(fRes.data)
+      if (sRes) setSourceMix(sRes.data)
+    })
+    return () => { cancel = true }
+  }, [period, refreshTs])
+
+  // Load score distribution (changes on metric toggle)
+  useEffect(() => {
+    let cancel = false
+    setScoreLoading(true)
+    api.get<ScoreDistributionData>(`/admin/analytics/score-distribution?metric=${scoreMetric}`)
+      .then(r => { if (!cancel) setScoreDist(r.data) })
+      .catch(() => { if (!cancel) setScoreDist({ metric: scoreMetric, buckets: [], total: 0, error: 'data not available' }) })
+      .finally(() => { if (!cancel) setScoreLoading(false) })
+    return () => { cancel = true }
+  }, [scoreMetric, refreshTs])
 
   const totalRoleViews = useMemo(
     () => (overview?.byRole || []).reduce((s, r) => s + r.views, 0),
@@ -290,9 +627,15 @@ export default function AdminAnalytics() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
+            <h1 className="text-3xl font-bold flex items-center gap-3 flex-wrap">
               <BarChart3 className="w-8 h-8 text-purple-400" />
               Page View Analytics
+              <span
+                className="px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[10px] font-bold uppercase tracking-wider"
+                title="Các section dưới được thiết kế theo cảm hứng X's For You algorithm: Phoenix retrieval (out-of-network), Thunder (in-network), Home Mixer (ranking) và Candidate Pipeline framework"
+              >
+                Inspired by Phoenix / Home Mixer
+              </span>
             </h1>
             <p className="text-white/50 mt-1">Thống kê lượt truy cập + tiếp cận nội dung kiểu YouTube</p>
           </div>
@@ -505,6 +848,174 @@ export default function AdminAnalytics() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════ */}
+        {/* PHOENIX-INSPIRED SECTIONS — section divider                   */}
+        {/* ════════════════════════════════════════════════════════════ */}
+        <div className="pt-8 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30">
+              <Cpu className="w-3.5 h-3.5 text-purple-300" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-200">
+                Phoenix · Home Mixer · Candidate Pipeline
+              </span>
+            </div>
+            <div className="flex-1 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+          </div>
+          <p className="text-center text-xs text-white/40 mt-2">
+            Bộ chỉ số lấy cảm hứng từ thuật toán <span className="text-purple-300 font-semibold">For You của X</span> —
+            giúp admin nhìn user journey theo pipeline & phân phối engagement.
+          </p>
+        </div>
+
+        {/* ─── Section A: User Journey Funnel ─── */}
+        <div className="rounded-2xl bg-white/[0.02] border border-white/10 p-5">
+          <div className="flex items-start justify-between mb-5 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <GitBranch className="w-5 h-5 text-purple-400" />
+                Phễu hành trình người dùng
+              </h2>
+              <p className="text-xs text-white/40 mt-1">
+                8 giai đoạn từ đăng ký → hoàn thành khảo sát nghề · Phoenix-style pipeline stages
+              </p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-purple-500/15 border border-purple-500/30 text-purple-300">
+              Pipeline Stages
+            </span>
+          </div>
+          {funnel ? (
+            <FunnelChart data={funnel} />
+          ) : (
+            <div className="py-12 text-center">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-400 mx-auto mb-2" />
+              <p className="text-sm text-white/40">Đang tải phễu...</p>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Section B: Source Mix (In-network vs Out-of-network) ─── */}
+        <div className="rounded-2xl bg-white/[0.02] border border-white/10 p-5">
+          <div className="flex items-start justify-between mb-5 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <Network className="w-5 h-5 text-cyan-400" />
+                Nguồn nội dung — In-Network vs Out-of-Network
+              </h2>
+              <p className="text-xs text-white/40 mt-1">
+                Nội dung từ GV đã đăng ký (Thunder) vs khám phá tự do (Phoenix) · {period} ngày qua
+              </p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-cyan-500/15 border border-cyan-500/30 text-cyan-300">
+              Thunder · Phoenix split
+            </span>
+          </div>
+
+          {sourceMix ? (
+            <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_1fr] gap-5 items-center">
+              {/* Donut */}
+              <div className="flex flex-col items-center gap-3">
+                <SourceMixDonut ratio={sourceMix.ratio} />
+                <div className="flex flex-col gap-1.5 text-xs w-full">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-br from-purple-400 to-purple-600" />
+                      <span className="text-white/70">In-network</span>
+                    </span>
+                    <span className="font-mono font-bold text-purple-300">{sourceMix.ratio.inNetwork.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-gradient-to-br from-cyan-400 to-sky-600" />
+                      <span className="text-white/70">Out-of-network</span>
+                    </span>
+                    <span className="font-mono font-bold text-cyan-300">{sourceMix.ratio.outNetwork.toFixed(1)}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* In-network card */}
+              <SourceCard
+                title="🏫 Nội dung từ GV (In-Network)"
+                icon={<Layers className="w-4 h-4 text-purple-300" />}
+                iconColor="bg-purple-500/20 border border-purple-400/40"
+                totalViews={sourceMix.inNetwork.totalViews}
+                totalSessions={sourceMix.inNetwork.totalSessions}
+                breakdown={sourceMix.inNetwork.breakdown}
+                totalAll={sourceMix.inNetwork.totalViews + sourceMix.outNetwork.totalViews}
+              />
+
+              {/* Out-of-network card */}
+              <SourceCard
+                title="🌍 Khám phá (Out-of-Network)"
+                icon={<PieChart className="w-4 h-4 text-cyan-300" />}
+                iconColor="bg-cyan-500/20 border border-cyan-400/40"
+                totalViews={sourceMix.outNetwork.totalViews}
+                totalSessions={sourceMix.outNetwork.totalSessions}
+                breakdown={sourceMix.outNetwork.breakdown}
+                totalAll={sourceMix.inNetwork.totalViews + sourceMix.outNetwork.totalViews}
+              />
+            </div>
+          ) : (
+            <div className="py-12 text-center">
+              <Loader2 className="w-6 h-6 animate-spin text-cyan-400 mx-auto mb-2" />
+              <p className="text-sm text-white/40">Đang tải nguồn nội dung...</p>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Section C: Engagement / Score Distribution ─── */}
+        <div className="rounded-2xl bg-white/[0.02] border border-white/10 p-5">
+          <div className="flex items-start justify-between mb-5 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-emerald-400" />
+                Phân phối engagement
+              </h2>
+              <p className="text-xs text-white/40 mt-1">
+                Histogram phân phối user theo độ engagement / điểm thi / mastery · Phoenix-style score histogram
+              </p>
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+              Grox · Score histogram
+            </span>
+          </div>
+
+          {/* Metric tabs */}
+          <div className="flex gap-2 mb-5 flex-wrap">
+            {([
+              { key: 'engagement' as const, label: 'Engagement (last-login)',     icon: Activity },
+              { key: 'exam'       as const, label: 'Điểm bài thi',                 icon: BarChart3 },
+              { key: 'mastery'    as const, label: 'Mastery (hoàn thành bài học)', icon: TrendingUp },
+            ]).map(t => {
+              const active = scoreMetric === t.key
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setScoreMetric(t.key)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                    active
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-200'
+                      : 'bg-white/[0.03] border-white/10 text-white/60 hover:bg-white/[0.06] hover:text-white/80'
+                  }`}
+                >
+                  <t.icon className="w-3.5 h-3.5" />
+                  {t.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {scoreLoading ? (
+            <div className="py-12 text-center">
+              <Loader2 className="w-6 h-6 animate-spin text-emerald-400 mx-auto mb-2" />
+              <p className="text-sm text-white/40">Đang tải phân phối...</p>
+            </div>
+          ) : (
+            <ScoreDistributionChart data={scoreDist} />
           )}
         </div>
 
