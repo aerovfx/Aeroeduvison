@@ -15,7 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `e411390` (revision pixiai-00364-xxx, 2026-05-20 — HOTFIX: Learning path lesson page + Anti-screenshot v2 với watermark + blur)
+- Last deployed commit: `86d0b1d` (revision pixiai-00365-xxx, 2026-05-20 — Multi-career KG + Phụ huynh trong đăng ký + Career survey gate + Career World 25 nghề + Profile pages + Course extras)
+- Commits since last deploy: `0/5`
+- Prev: `9572765` — Career survey 4-step wizard cho GV/PH + useCareerSurveyGuard
+- Prev: `374dd90` — Pixel Odyssey 25 nghề + 125 câu hỏi đa dạng
+- Prev: `58ccd03` — Phụ huynh option trong đăng ký (chia chung tài khoản TEACHER)
+- Prev: `b2cdbe4` — Course extras (PDF/Quiz/Lab/Aura/Game) + Profile pages có thể trang trí
+- Prev: `e411390` → pixiai-00364-zek (Hotfix learning path lesson + anti-screenshot v2 watermark/blur)
 - Prev: `d1d883d` → pixiai-00363-dib (Flipbook PDF + Eclipse + Anti-screenshot v1 + Assignment workspace)
 - Commits since last deploy: `0/5`
 - Prev: `715241b` → pixiai-00362-yug (HOTFIX SECURITY: PII exposure + stored XSS)
