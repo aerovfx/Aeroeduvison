@@ -12,7 +12,7 @@ import {
   BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
   Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
   ExternalLink, Target, Wrench, MessageCircle, PlayCircle,
-  ChevronDown, ChevronUp, Loader2,
+  ChevronDown, ChevronUp, Loader2, Link2,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -20,6 +20,10 @@ import { useCareerSurveyGuard } from '@/hooks/useCareerSurveyGuard'
 import * as XLSX from 'xlsx'
 import { api } from '@/services/api'
 import { getSuggestion, type SuggestionMethod } from './skillSuggestions'
+import {
+  buildCareerKG, findCrossCareerBridges, getCareerLabel, annotateWithBridges,
+  type KGCategory,
+} from '@/lib/career-kg'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -310,13 +314,22 @@ const CROSS_EDGES: [string, string][] = [
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+/** Special tab identifiers for the career picker bar. */
+const LEGACY_CAREER_KEY = '__legacy__'
+const BRIDGES_KEY = '__bridges__'
+
 export default function ProfessionalKG() {
   const { user } = useAuth()
   const { checking, allowed } = useCareerSurveyGuard()
   const isAdmin   = user?.role === 'ADMIN'
-  const tree      = isAdmin ? ADMIN_TREE : TEACHER_TREE
-  const milestones = isAdmin ? ADMIN_MILESTONES : TEACHER_MILESTONES
+  const legacyTree = isAdmin ? ADMIN_TREE : TEACHER_TREE
+  const legacyMilestones = isAdmin ? ADMIN_MILESTONES : TEACHER_MILESTONES
   const userId    = user?.id || 'guest'
+
+  // Career selection — list từ survey + tab hiện tại
+  const [selectedCareers, setSelectedCareers] = useState<string[]>([])
+  const [activeCareer, setActiveCareer] = useState<string>(LEGACY_CAREER_KEY)
+  const [careersLoaded, setCareersLoaded] = useState(false)
 
   // State
   const [progressMap, setProgressMap] = useState<ProgressMap>({})
@@ -325,6 +338,45 @@ export default function ProfessionalKG() {
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [newLogNote, setNewLogNote]   = useState('')
   const [newLogSkill, setNewLogSkill] = useState('')
+
+  // ── Fetch career survey để biết user đã chọn nghề nào ──
+  useEffect(() => {
+    if (!userId || userId === 'guest') {
+      setCareersLoaded(true)
+      return
+    }
+    api.get<{ completed: boolean; data?: { profession?: { selectedCareers?: string[] } } }>('/users/me/career-survey')
+      .then((res) => {
+        const list = res.data?.data?.profession?.selectedCareers || []
+        const clean = Array.isArray(list) ? list.filter((c) => typeof c === 'string') : []
+        setSelectedCareers(clean)
+        // Auto-pick tab: first career nếu có, else legacy
+        if (clean.length > 0) {
+          setActiveCareer(clean[0])
+        } else {
+          setActiveCareer(LEGACY_CAREER_KEY)
+        }
+      })
+      .catch(() => {/* fallback to legacy */})
+      .finally(() => setCareersLoaded(true))
+  }, [userId])
+
+  // ── Tree hiện tại dựa trên activeCareer ──
+  const tree: SkillCategory[] = useMemo(() => {
+    if (activeCareer === LEGACY_CAREER_KEY || activeCareer === BRIDGES_KEY) {
+      return legacyTree
+    }
+    const kg = buildCareerKG(activeCareer)
+    if (!kg.length) return legacyTree
+    // Annotate với bridges nếu có nhiều nghề
+    const annotated = annotateWithBridges(kg, activeCareer, selectedCareers) as KGCategory[]
+    return annotated as unknown as SkillCategory[]
+  }, [activeCareer, selectedCareers, legacyTree])
+
+  // Milestones: chỉ áp dụng cho legacy view; với career-specific KG không hiển thị milestones
+  // (để giữ giao diện gọn, role-progression vẫn ở legacy mode).
+  const milestones = legacyMilestones
+  const showMilestones = activeCareer === LEGACY_CAREER_KEY
 
   // Canvas refs
   const canvasRef   = useRef<HTMLCanvasElement>(null)
@@ -538,52 +590,54 @@ export default function ProfessionalKG() {
       })
     })
 
-    // Milestone nodes — pinned right side
-    const milestoneCount = milestones.length
-    const milestoneX = canvasW - 100
-    const milestoneSpacing = (canvasH - 80) / (milestoneCount + 1)
-    milestones.forEach((m, mi) => {
-      const my = 40 + milestoneSpacing * (mi + 1)
-      nodes.push({
-        id: m.id,
-        type: 'milestone',
-        label: m.label,
-        shortLabel: m.shortLabel,
-        x: milestoneX, y: my,
-        vx: 0, vy: 0,
-        fx: milestoneX, fy: my,
-        radius: 20,
-        color: '#d97706',
-        milestoneIndex: mi,
-        emoji: m.emoji,
+    // Milestone nodes — pinned right side (chỉ ở legacy view)
+    if (showMilestones) {
+      const milestoneCount = milestones.length
+      const milestoneX = canvasW - 100
+      const milestoneSpacing = (canvasH - 80) / (milestoneCount + 1)
+      milestones.forEach((m, mi) => {
+        const my = 40 + milestoneSpacing * (mi + 1)
+        nodes.push({
+          id: m.id,
+          type: 'milestone',
+          label: m.label,
+          shortLabel: m.shortLabel,
+          x: milestoneX, y: my,
+          vx: 0, vy: 0,
+          fx: milestoneX, fy: my,
+          radius: 20,
+          color: '#d97706',
+          milestoneIndex: mi,
+          emoji: m.emoji,
+        })
       })
-    })
 
-    // Milestone vertical path edges (bottom → top)
-    for (let mi = milestoneCount - 1; mi > 0; mi--) {
+      // Milestone vertical path edges (bottom → top)
+      for (let mi = milestoneCount - 1; mi > 0; mi--) {
+        edges.push({
+          source: milestones[mi].id,
+          target: milestones[mi - 1].id,
+          type: 'milestone-path',
+          color: '#d97706',
+          width: 2,
+          opacity: 0.35,
+        })
+      }
+
+      // Center → bottom milestone (dashed gold)
       edges.push({
-        source: milestones[mi].id,
-        target: milestones[mi - 1].id,
+        source: 'center',
+        target: milestones[milestoneCount - 1].id,
         type: 'milestone-path',
         color: '#d97706',
-        width: 2,
-        opacity: 0.35,
+        dash: [6, 4],
+        width: 1.5,
+        opacity: 0.3,
       })
     }
 
-    // Center → bottom milestone (dashed gold)
-    edges.push({
-      source: 'center',
-      target: milestones[milestoneCount - 1].id,
-      type: 'milestone-path',
-      color: '#d97706',
-      dash: [6, 4],
-      width: 1.5,
-      opacity: 0.3,
-    })
-
-    // Cross-skill edges (only for teacher tree)
-    if (!isAdmin) {
+    // Cross-skill edges (only for teacher legacy tree)
+    if (!isAdmin && activeCareer === LEGACY_CAREER_KEY) {
       CROSS_EDGES.forEach(([src, tgt]) => {
         const srcNode = nodes.find(n => n.id === src)
         const tgtNode = nodes.find(n => n.id === tgt)
@@ -603,7 +657,7 @@ export default function ProfessionalKG() {
 
     nodesRef.current = nodes
     edgesRef.current = edges
-  }, [tree, milestones, isAdmin])
+  }, [tree, milestones, isAdmin, activeCareer, showMilestones])
 
   // ── Physics step ──
   const physicsStep = useCallback(() => {
@@ -931,6 +985,23 @@ export default function ProfessionalKG() {
     return () => ro.disconnect()
   }, [resizeCanvas])
 
+  // ── Rebuild graph khi đổi career tab ──
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const W = canvas.width / dpr
+    const H = canvas.height / dpr
+    if (W > 0 && H > 0) {
+      // Reset selection & pan/zoom khi đổi nghề
+      setSelectedNode(null)
+      panRef.current = { x: 0, y: 0 }
+      zoomRef.current = 1
+      buildGraph(W, H, progressMap)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCareer])
+
   // Rebuild graph when progress changes (to update skill node colors)
   useEffect(() => {
     const canvas = canvasRef.current
@@ -1176,13 +1247,37 @@ export default function ProfessionalKG() {
           <Brain className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-bold text-white leading-none">
+          <h1 className="text-sm font-bold text-white leading-none flex items-center gap-2 flex-wrap">
             Phát triển Chuyên môn
-            <span className="ml-2 text-[10px] font-medium text-purple-300 bg-purple-900/50 px-1.5 py-0.5 rounded-full">
-              {isAdmin ? 'Quản lý' : 'Giáo viên'}
-            </span>
+            {(() => {
+              if (activeCareer === BRIDGES_KEY) {
+                return (
+                  <span className="text-[10px] font-medium text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded-full">
+                    Liên kết nghề
+                  </span>
+                )
+              }
+              if (activeCareer === LEGACY_CAREER_KEY) {
+                return (
+                  <span className="text-[10px] font-medium text-purple-300 bg-purple-900/50 px-1.5 py-0.5 rounded-full">
+                    {isAdmin ? 'Quản lý' : 'Giáo viên'}
+                  </span>
+                )
+              }
+              const meta = getCareerLabel(activeCareer)
+              return meta ? (
+                <span className="text-[10px] font-medium text-purple-200 bg-purple-900/50 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                  <span>{meta.icon}</span>
+                  <span>{meta.name}</span>
+                </span>
+              ) : null
+            })()}
           </h1>
-          <p className="text-[10px] text-slate-400 mt-0.5 hidden sm:block">Đồ thị năng lực nghề nghiệp — click node để xem & cập nhật</p>
+          <p className="text-[10px] text-slate-400 mt-0.5 hidden sm:block">
+            {activeCareer === BRIDGES_KEY
+              ? 'Skill chung giữa các nghề bạn đã chọn'
+              : 'Đồ thị năng lực nghề nghiệp — click node để xem & cập nhật'}
+          </p>
         </div>
 
         {/* Tabs */}
@@ -1214,6 +1309,60 @@ export default function ProfessionalKG() {
         {/* Chia sẻ vị trí trường lên bản đồ */}
         <ShareLocationButton userId={userId} progressMap={progressMap} syncToBackend={syncToBackend} />
       </div>
+
+      {/* ── Career picker bar — tabs cho mỗi nghề user đã chọn ── */}
+      {careersLoaded && selectedCareers.length > 0 && (
+        <div className="shrink-0 bg-slate-900/70 border-b border-slate-700/40 px-3 py-2 flex items-center gap-1.5 overflow-x-auto">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider shrink-0 mr-1">
+            Nghề:
+          </span>
+          {selectedCareers.map((cid) => {
+            const meta = getCareerLabel(cid)
+            if (!meta) return null
+            const active = activeCareer === cid
+            return (
+              <button
+                key={cid}
+                onClick={() => setActiveCareer(cid)}
+                title={meta.name}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
+                  active
+                    ? 'bg-purple-600 text-white shadow-md shadow-purple-500/30'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <span>{meta.icon}</span>
+                <span className="max-w-[10rem] truncate">{meta.name}</span>
+              </button>
+            )
+          })}
+          {selectedCareers.length >= 2 && (
+            <button
+              onClick={() => setActiveCareer(BRIDGES_KEY)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
+                activeCareer === BRIDGES_KEY
+                  ? 'bg-amber-500 text-slate-900 shadow-md shadow-amber-500/30'
+                  : 'bg-slate-800 text-amber-300 hover:bg-slate-700'
+              }`}
+              title="Skill chung giữa các nghề bạn đã chọn"
+            >
+              <Link2 className="w-3 h-3" />
+              <span>Liên kết nghề</span>
+            </button>
+          )}
+          <button
+            onClick={() => setActiveCareer(LEGACY_CAREER_KEY)}
+            className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
+              activeCareer === LEGACY_CAREER_KEY
+                ? 'bg-slate-200 text-slate-900'
+                : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+            }`}
+            title={isAdmin ? 'CPD Quản lý gốc' : 'CPD Giáo viên gốc'}
+          >
+            <span>{isAdmin ? 'CPD Quản lý' : 'CPD GV gốc'}</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Career stats bar ── */}
       <div className="shrink-0 bg-slate-900/50 border-b border-slate-700/30 px-4 py-2 flex items-center gap-4 text-xs">
@@ -1256,8 +1405,16 @@ export default function ProfessionalKG() {
       {/* ── Main content ── */}
       <div className="flex-1 min-h-0 flex">
 
-        {/* ── Graph tab ── */}
-        {activeTab === 'graph' && (
+        {/* ── Bridges tab — danh sách skill chung giữa các nghề ── */}
+        {activeTab === 'graph' && activeCareer === BRIDGES_KEY && (
+          <BridgesView
+            careerIds={selectedCareers}
+            onPickCareer={(cid) => setActiveCareer(cid)}
+          />
+        )}
+
+        {/* ── Graph tab — KG của 1 nghề (career-specific hoặc legacy) ── */}
+        {activeTab === 'graph' && activeCareer !== BRIDGES_KEY && (
           <>
             {/* Canvas area */}
             <div className="relative flex-1 min-h-0">
@@ -1735,6 +1892,122 @@ export default function ProfessionalKG() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// BridgesView — Danh sách skill chia sẻ giữa các nghề đã chọn
+// ─────────────────────────────────────────────────────────────
+// Hiển thị các skill "cầu nối" — skill cùng label xuất hiện ở ≥2 nghề.
+// Mỗi item show label + category badge + chips các nghề có chung.
+
+const BRIDGE_CAT_LABELS: Record<string, { label: string; color: string }> = {
+  technical: { label: 'Kỹ năng chuyên môn', color: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  soft:      { label: 'Kỹ năng mềm',         color: 'bg-blue-500/15   text-blue-300   border-blue-500/30'   },
+  tools:     { label: 'Công cụ',             color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  subjects:  { label: 'Môn học',             color: 'bg-amber-500/15  text-amber-300  border-amber-500/30'  },
+}
+
+function BridgesView({
+  careerIds, onPickCareer,
+}: {
+  careerIds: string[]
+  onPickCareer: (cid: string) => void
+}) {
+  const bridges = useMemo(() => findCrossCareerBridges(careerIds), [careerIds])
+
+  if (careerIds.length < 2) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="text-center text-slate-400 max-w-md">
+          <Link2 className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">Cần ≥ 2 nghề để hiển thị các skill cầu nối.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Group theo category để gọn UI
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof bridges>()
+    for (const b of bridges) {
+      if (!map.has(b.category)) map.set(b.category, [])
+      map.get(b.category)!.push(b)
+    }
+    return Array.from(map.entries())
+  }, [bridges])
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4 bg-slate-950">
+      <div className="max-w-3xl mx-auto space-y-4">
+        <div className="bg-gradient-to-br from-amber-900/30 to-slate-900/50 border border-amber-700/30 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Link2 className="w-4 h-4 text-amber-300" />
+            <h3 className="text-sm font-bold text-amber-200">
+              Skill chung giữa {careerIds.length} nghề bạn đã chọn
+            </h3>
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Đây là các skill xuất hiện ở nhiều nghề. Nâng cấp 1 skill bridge ở đây → tự động đẩy
+            tiến độ trên tất cả các Cây tri thức nghề mà bạn đã chọn.
+          </p>
+        </div>
+
+        {bridges.length === 0 ? (
+          <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-8 text-center text-sm text-slate-400">
+            <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-30" />
+            Các nghề bạn chọn không có skill nào trùng nhau (theo tên). Đây là combo nghề chuyên biệt!
+          </div>
+        ) : (
+          grouped.map(([cat, items]) => {
+            const catMeta = BRIDGE_CAT_LABELS[cat] || { label: cat, color: 'bg-slate-500/15 text-slate-300 border-slate-500/30' }
+            return (
+              <div key={cat} className="bg-slate-900/60 border border-slate-700/50 rounded-2xl overflow-hidden">
+                <div className={`px-4 py-2 border-b border-slate-700/50 text-xs font-bold ${catMeta.color}`}>
+                  {catMeta.label}
+                  <span className="ml-2 text-[10px] opacity-70 font-normal">{items.length} skill</span>
+                </div>
+                <div className="divide-y divide-slate-800">
+                  {items.map((b, i) => (
+                    <div key={`${cat}-${i}`} className="px-4 py-3">
+                      <div className="text-sm font-semibold text-white mb-2">{b.label}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {b.careerIds.map((cid) => {
+                          const meta = getCareerLabel(cid)
+                          if (!meta) return null
+                          return (
+                            <button
+                              key={cid}
+                              onClick={() => onPickCareer(cid)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 hover:bg-purple-700 text-[11px] text-slate-200 border border-slate-700 hover:border-purple-500 transition"
+                              title={`Mở Cây ${meta.name}`}
+                            >
+                              <span>{meta.icon}</span>
+                              <span className="font-medium">{meta.name}</span>
+                            </button>
+                          )
+                        })}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-amber-500/15 text-[10px] text-amber-300 border border-amber-500/30 font-bold">
+                          ×{b.careerIds.length}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })
+        )}
+
+        <div className="bg-purple-900/20 border border-purple-700/30 rounded-xl p-3 text-xs text-purple-200 flex items-start gap-2">
+          <Lightbulb className="w-4 h-4 text-purple-300 mt-0.5 shrink-0" />
+          <span>
+            <strong>Mẹo:</strong> nâng cấp 1 skill bridge → đẩy điểm trên nhiều KG cùng lúc.
+            Click chip nghề để mở Cây tri thức tương ứng.
+          </span>
+        </div>
       </div>
     </div>
   )

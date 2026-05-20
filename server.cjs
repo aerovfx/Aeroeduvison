@@ -28117,6 +28117,14 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
           .filter(g => g >= 1 && g <= 12)
           .slice(0, 12);
       }
+      // selectedCareers — mảng career IDs (max 10, mỗi ID max 50 chars, slug ASCII)
+      if (Array.isArray(p.selectedCareers)) {
+        prof.selectedCareers = p.selectedCareers
+          .filter(c => typeof c === 'string')
+          .map(c => c.trim().slice(0, 50))
+          .filter(c => /^[a-z0-9-]+$/i.test(c))
+          .slice(0, 10);
+      }
       out.profession = prof;
       // Current skills — Record<skillId, 1..5>
       if (input.currentSkills && typeof input.currentSkills === 'object') {

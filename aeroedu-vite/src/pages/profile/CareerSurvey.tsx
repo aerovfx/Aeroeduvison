@@ -15,12 +15,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Briefcase, Star, Target, CheckCircle2, ArrowLeft, ArrowRight,
   Loader2, BookOpen, GraduationCap, Cpu, TrendingUp, Sparkles, Heart,
+  Search, X,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import confetti from 'canvas-confetti'
 import { api } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import { useAccountType } from '@/hooks/useAccountType'
+import { getAllCareers, getCareerCategories, getCareerLabel } from '@/lib/career-kg'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -40,12 +42,20 @@ interface SurveyData {
     industry?: string
     childrenCount?: number
     childrenGrades?: number[]
+    /** Mảng career IDs (max 5). Một người có thể chọn nhiều nghề. */
+    selectedCareers?: string[]
   }
   currentSkills: Record<string, number>
   developmentGoals: string[]
   motivation: Motivation | ''
   weeklyTimeCommitment: WeeklyTime | ''
 }
+
+const MAX_CAREERS = 5
+/** Pre-select cho TEACHER: nghề "giao-vien". */
+const TEACHER_DEFAULT_CAREERS = ['giao-vien']
+/** Suggestion cho PARENT: nhà tâm lý (định hướng cho con). */
+const PARENT_DEFAULT_CAREERS = ['nha-tam-ly']
 
 interface SkillItem {
   id: string
@@ -198,9 +208,21 @@ export default function CareerSurvey() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync accountType nếu user thay đổi sub-type
+  // Sync accountType nếu user thay đổi sub-type + seed default selectedCareers
   useEffect(() => {
-    setData(prev => ({ ...prev, accountType: surveyAccountType }))
+    setData(prev => {
+      const cur = prev.profession.selectedCareers
+      if (cur && cur.length > 0) {
+        // Đã có lựa chọn từ trước (draft / quay lại sửa) → giữ nguyên
+        return { ...prev, accountType: surveyAccountType }
+      }
+      const defaults = surveyAccountType === 'PARENT' ? PARENT_DEFAULT_CAREERS : TEACHER_DEFAULT_CAREERS
+      return {
+        ...prev,
+        accountType: surveyAccountType,
+        profession: { ...prev.profession, selectedCareers: defaults.slice() },
+      }
+    })
   }, [surveyAccountType])
 
   // Auto-save draft mỗi khi data đổi
@@ -226,6 +248,9 @@ export default function CareerSurvey() {
   const canProceed = useMemo(() => {
     if (step === 0) {
       const p = data.profession
+      // BẮT BUỘC: ≥1 nghề được chọn (multi-career picker)
+      const hasCareer = (p.selectedCareers?.length ?? 0) >= 1
+      if (!hasCareer) return false
       if (isParent) {
         return !!(p.job && p.industry && typeof p.childrenCount === 'number')
       }
@@ -410,6 +435,21 @@ function Step1Career({
   const updateProf = (patch: Partial<SurveyData['profession']>) =>
     setData((d) => ({ ...d, profession: { ...d.profession, ...patch } }))
 
+  const selectedCareers = data.profession.selectedCareers || []
+
+  const toggleCareer = (careerId: string) => {
+    const cur = selectedCareers
+    if (cur.includes(careerId)) {
+      updateProf({ selectedCareers: cur.filter((c) => c !== careerId) })
+    } else {
+      if (cur.length >= MAX_CAREERS) {
+        toast.error(`Tối đa ${MAX_CAREERS} nghề. Bỏ chọn nghề khác trước nhé`)
+        return
+      }
+      updateProf({ selectedCareers: [...cur, careerId] })
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-1">
@@ -422,12 +462,26 @@ function Step1Career({
           : 'Thông tin cơ bản về môn dạy và cấp học của bạn.'}
       </p>
 
+      {/* ── Multi-career picker (BẮT BUỘC ≥ 1 nghề) ─────────────────────────── */}
+      <CareerMultiPicker
+        selectedIds={selectedCareers}
+        onToggle={toggleCareer}
+        isParent={isParent}
+      />
+
+      {/* Divider giữa career picker và info phụ */}
+      <div className="my-6 border-t border-border" />
+
+      <p className="text-xs text-muted-foreground mb-4">
+        Thông tin phụ dưới đây giúp cá nhân hoá thêm — nhưng nghề đã chọn ở trên đã đủ để tạo Cây tri thức.
+      </p>
+
       {isParent ? (
         <div className="space-y-5">
-          {/* Nghề nghiệp hiện tại */}
+          {/* Nghề nghiệp hiện tại — TUỲ CHỌN */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              Nghề nghiệp hiện tại <span className="text-red-400">*</span>
+              Nghề nghiệp cụ thể <span className="text-muted-foreground font-normal">(tuỳ chọn — bổ sung chi tiết)</span>
             </label>
             <input
               type="text"
@@ -445,7 +499,7 @@ function Step1Career({
           {/* Lĩnh vực */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              Lĩnh vực <span className="text-red-400">*</span>
+              Lĩnh vực <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
             </label>
             <select
               value={data.profession.industry || ''}
@@ -473,7 +527,7 @@ function Step1Career({
           {/* Số con đang học */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              Số con đang học <span className="text-red-400">*</span>
+              Số con đang học <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
             </label>
             <input
               type="number"
@@ -516,10 +570,10 @@ function Step1Career({
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Môn dạy chính */}
+          {/* Môn dạy chính — TUỲ CHỌN */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              Môn dạy chính <span className="text-red-400">*</span>
+              Môn dạy chính <span className="text-muted-foreground font-normal">(tuỳ chọn — chi tiết hoá KG Giáo viên)</span>
             </label>
             <select
               value={data.profession.primarySubject || ''}
@@ -534,7 +588,7 @@ function Step1Career({
           {/* Cấp học */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Cấp học <span className="text-red-400">*</span>
+              Cấp học <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
             </label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {EDUCATION_LEVELS.map((l) => {
@@ -557,10 +611,10 @@ function Step1Career({
             </div>
           </div>
 
-          {/* Năm kinh nghiệm */}
+          {/* Năm kinh nghiệm — TUỲ CHỌN */}
           <div>
             <label className="block text-sm font-medium mb-1.5">
-              Số năm kinh nghiệm <span className="text-red-400">*</span>
+              Số năm kinh nghiệm <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
             </label>
             <input
               type="number"
@@ -871,6 +925,28 @@ function Step4Confirm({
             <Briefcase className="w-3.5 h-3.5 inline mr-1.5" />
             Thông tin nghề nghiệp
           </div>
+
+          {/* Selected careers chips */}
+          {(data.profession.selectedCareers?.length ?? 0) > 0 && (
+            <div className="mb-3">
+              <div className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1.5">
+                Nghề đã chọn ({data.profession.selectedCareers!.length})
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {(data.profession.selectedCareers || []).map((id) => {
+                  const meta = getCareerLabel(id)
+                  if (!meta) return null
+                  return (
+                    <span key={id} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/15 border border-purple-500/30 text-xs">
+                      <span>{meta.icon}</span>
+                      <span className="font-medium">{meta.name}</span>
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
             {isParent ? (
               <>
@@ -953,4 +1029,158 @@ function Row({ label, value, fullWidth }: { label: string; value: string; fullWi
       <div className="text-sm font-medium">{value}</div>
     </div>
   )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CareerMultiPicker — Lưới 25 nghề, click toggle, max 5
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CareerMultiPicker({
+  selectedIds, onToggle, isParent,
+}: {
+  selectedIds: string[]
+  onToggle: (careerId: string) => void
+  isParent: boolean
+}) {
+  const allCareers = useMemo(() => getAllCareers(), [])
+  const categories = useMemo(() => getCategoryOrder(), [])
+
+  const [query, setQuery] = useState('')
+  const [activeCat, setActiveCat] = useState<string>('all')
+
+  // Filtered + grouped careers
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return allCareers.filter((c) => {
+      if (activeCat !== 'all' && c.category !== activeCat) return false
+      if (!q) return true
+      return c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)
+    })
+  }, [allCareers, query, activeCat])
+
+  const selectedSet = new Set(selectedIds)
+
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+        <div>
+          <label className="block text-sm font-semibold">
+            Chọn nghề nghiệp của bạn <span className="text-red-400">*</span>
+            <span className="text-muted-foreground font-normal text-xs ml-1">
+              (tối đa {MAX_CAREERS} nghề · {isParent ? 'của con/bản thân' : 'của bạn'})
+            </span>
+          </label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Mỗi nghề có 1 Cây tri thức riêng. Có thể chọn nhiều nghề — các skill chung sẽ tự liên kết.
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs">
+          <span className={`px-2 py-1 rounded font-semibold ${
+            selectedIds.length === 0
+              ? 'bg-amber-500/20 text-amber-300'
+              : 'bg-emerald-500/20 text-emerald-300'
+          }`}>
+            Đã chọn {selectedIds.length}/{MAX_CAREERS}
+          </span>
+        </div>
+      </div>
+
+      {/* Selected chips */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-3 p-2 rounded-lg bg-purple-500/5 border border-purple-500/20">
+          {selectedIds.map((id) => {
+            const meta = getCareerLabel(id)
+            if (!meta) return null
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onToggle(id)}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-500/20 border border-purple-500/40 text-xs text-purple-100 hover:bg-purple-500/30"
+                title="Bỏ chọn"
+              >
+                <span className="text-sm">{meta.icon}</span>
+                <span className="font-medium">{meta.name}</span>
+                <X className="w-3 h-3 opacity-70" />
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Search + category filter */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Tìm nghề (VD: lập trình, bác sĩ...)"
+            className="w-full pl-8 pr-3 py-2 rounded-lg border border-input bg-background text-xs outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+        <select
+          value={activeCat}
+          onChange={(e) => setActiveCat(e.target.value)}
+          className="px-2.5 py-2 rounded-lg border border-input bg-background text-xs outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="all">Tất cả ({allCareers.length})</option>
+          {categories.map((cat) => {
+            const count = allCareers.filter((c) => c.category === cat).length
+            return <option key={cat} value={cat}>{cat} ({count})</option>
+          })}
+        </select>
+      </div>
+
+      {/* Career card grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-[360px] overflow-y-auto pr-1">
+        {visible.map((c) => {
+          const sel = selectedSet.has(c.id)
+          const atLimit = !sel && selectedIds.length >= MAX_CAREERS
+          return (
+            <button
+              type="button"
+              key={c.id}
+              onClick={() => onToggle(c.id)}
+              disabled={atLimit}
+              className={`group text-left p-2.5 rounded-xl border transition relative ${
+                sel
+                  ? 'bg-purple-500/20 border-purple-500/60 ring-2 ring-purple-500/40'
+                  : atLimit
+                    ? 'bg-card border-border opacity-40 cursor-not-allowed'
+                    : 'bg-card border-border hover:border-purple-500/40 hover:bg-purple-500/5'
+              }`}
+              title={atLimit ? `Đã đạt giới hạn ${MAX_CAREERS} nghề` : c.name}
+            >
+              {sel && (
+                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-purple-500 flex items-center justify-center">
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                </div>
+              )}
+              <div className="text-2xl mb-1 leading-none">{c.icon}</div>
+              <div className="text-xs font-semibold leading-tight line-clamp-2 mb-1">{c.name}</div>
+              <div className="text-[9px] text-muted-foreground uppercase tracking-wider line-clamp-1">
+                {c.category}
+              </div>
+            </button>
+          )
+        })}
+        {visible.length === 0 && (
+          <div className="col-span-full py-8 text-center text-xs text-muted-foreground">
+            Không tìm thấy nghề phù hợp. Thử từ khoá khác nhé.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Wrapper an toàn quanh getCareerCategories — fallback empty nếu lib lỗi. */
+function getCategoryOrder(): string[] {
+  try {
+    return getCareerCategories()
+  } catch {
+    return []
+  }
 }
