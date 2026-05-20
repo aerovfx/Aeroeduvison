@@ -603,7 +603,7 @@ export default function ExamGrading() {
         {/* ── Tab: Chấm hàng loạt (≤ 100 phiếu cùng lúc) ── */}
         {activeTab === "bulk" && (
           <BulkGrading
-            savedKeys={savedKeys}
+            savedKeys={savedKeys.map(k => ({ id: k.dbId, key: k }))}
             selectedKeyIdx={selectedKeyIdx}
             setSelectedKeyIdx={setSelectedKeyIdx}
             onSwitchToAnswerKey={() => setActiveTab("answerkey")}
