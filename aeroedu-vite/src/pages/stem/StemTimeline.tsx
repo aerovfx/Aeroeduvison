@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, AlertCircle, CheckCircle2, Clock, Users, Settings, Zap,
-  Plus, FileText, Camera, AlertTriangle, BookOpen, TrendingUp,
+  Plus, FileText, AlertTriangle, BookOpen, TrendingUp, Info, ListTodo,
 } from 'lucide-react'
 import { loadProjects, saveProjects, type STEMProject, type ProgressLog } from './stemStore'
 
@@ -202,6 +202,29 @@ export default function StemTimeline() {
       <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Scrum-Timeline sync banner */}
+          <div className="rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20 p-4 flex items-start gap-3">
+            <Info className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-indigo-300 mb-1">
+                Timeline đồng bộ tự động từ Scrum Board
+              </p>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Để thêm/sửa/xóa giai đoạn (milestone), quay lại trang dự án và dùng
+                <span className="text-indigo-300 font-semibold"> Bảng Scrum</span>.
+                Timeline ở đây chỉ hiển thị — mọi thay đổi trên Scrum sẽ cập nhật ngay.
+              </p>
+              <Link
+                to={`/dashboard/stem/${id}`}
+                className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Mở Scrum Board
+                <ListTodo className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </div>
+
           {/* Overall progress card */}
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
             <div className="flex items-center justify-between mb-4">
