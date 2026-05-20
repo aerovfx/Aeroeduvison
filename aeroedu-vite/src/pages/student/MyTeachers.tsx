@@ -46,7 +46,7 @@ interface TeacherCpdSummary {
 interface TeacherProfile {
   id: string
   name: string | null
-  email: string
+  email: string | null   // null nếu HS chưa kết nối (server ẩn PII)
   image: string | null
   bio: string | null
   phone: string | null
@@ -155,7 +155,7 @@ export default function MyTeachers() {
   const requestConnect = async (teacher: TeacherProfile) => {
     try {
       await teacherStudentLinkService.request({ teacherId: teacher.id })
-      toast.success(`Đã gửi yêu cầu tới ${teacher.name || teacher.email}`)
+      toast.success(`Đã gửi yêu cầu tới ${teacher.name || teacher.email || 'GV'}`)
       reload()
       loadAllTeachers()
     } catch (err: unknown) {
@@ -170,7 +170,7 @@ export default function MyTeachers() {
   const filteredTeachers = allTeachers.filter(t => {
     if (!searchQ.trim()) return true
     const q = searchQ.toLowerCase()
-    return (t.name || '').toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || (t.bio || '').toLowerCase().includes(q)
+    return (t.name || '').toLowerCase().includes(q) || (t.email || '').toLowerCase().includes(q) || (t.bio || '').toLowerCase().includes(q)
   })
 
   return (
@@ -465,7 +465,7 @@ function TeacherCard({ teacher, onConnect }: { teacher: TeacherProfile; onConnec
             <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center text-white font-bold text-lg border-2 border-white/10 overflow-hidden">
               {teacher.image
                 ? <img src={teacher.image} alt={teacher.name || ''} className="w-full h-full object-cover" />
-                : (teacher.name || teacher.email)[0].toUpperCase()}
+                : (teacher.name || teacher.email || '?')[0].toUpperCase()}
             </div>
             {/* Connected badge */}
             {teacher.isConnected && (
@@ -478,7 +478,10 @@ function TeacherCard({ teacher, onConnect }: { teacher: TeacherProfile; onConnec
           <div className="flex-1 min-w-0">
             <h3 className="font-bold text-white truncate">{teacher.name || '(chưa đặt tên)'}</h3>
             <p className="text-xs text-white/50 truncate flex items-center gap-1">
-              <Mail className="w-3 h-3 flex-shrink-0" />{teacher.email}
+              <Mail className="w-3 h-3 flex-shrink-0" />
+              {teacher.email
+                ? teacher.email
+                : <span className="italic text-white/30">Kết nối để xem email</span>}
             </p>
             {/* Milestone badge */}
             {cpd.milestone && (
@@ -855,18 +858,39 @@ function TeacherMap({ teachers }: { teachers: TeacherProfile[] }) {
         color:#fff;font-size:11px;font-weight:700;cursor:pointer;
         box-shadow:0 2px 8px rgba(0,0,0,0.4);
       `
-      el.title = `${t.name || t.email}${t.province ? ' · ' + t.province : ''}`
-      el.textContent = (t.name || t.email)[0].toUpperCase()
+      el.title = `${t.name || t.email || 'GV'}${t.province ? ' · ' + t.province : ''}`
+      el.textContent = (t.name || t.email || '?')[0].toUpperCase()
 
+      // SECURITY: Build popup DOM với textContent thay vì setHTML
+      // để tránh stored XSS qua t.name / t.province (GV có thể inject
+      // <img src=x onerror=...> qua registration name / CPD province field).
+      const popupRoot = document.createElement('div')
+      popupRoot.style.cssText = 'font-family:system-ui;padding:8px;min-width:160px'
+      const nameDiv = document.createElement('div')
+      nameDiv.style.cssText = 'font-weight:700;font-size:13px;margin-bottom:2px'
+      nameDiv.textContent = t.name || '(chưa đặt tên)'
+      popupRoot.appendChild(nameDiv)
+      // Chỉ hiện email nếu HS đã kết nối với GV (tránh PII leak qua popup)
+      if (t.isConnected) {
+        const emailDiv = document.createElement('div')
+        emailDiv.style.cssText = 'font-size:11px;color:#888;margin-bottom:4px'
+        emailDiv.textContent = t.email
+        popupRoot.appendChild(emailDiv)
+      }
+      if (t.province) {
+        const provDiv = document.createElement('div')
+        provDiv.style.cssText = 'font-size:11px;color:#7c3aed'
+        provDiv.textContent = `📍 ${t.province}`
+        popupRoot.appendChild(provDiv)
+      }
+      if (t.cpd.milestone) {
+        const msDiv = document.createElement('div')
+        msDiv.style.cssText = 'font-size:11px;margin-top:4px'
+        msDiv.textContent = `${t.cpd.milestone.emoji} ${t.cpd.milestone.label}`
+        popupRoot.appendChild(msDiv)
+      }
       const popup = new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: '220px' })
-        .setHTML(`
-          <div style="font-family:system-ui;padding:8px;min-width:160px">
-            <div style="font-weight:700;font-size:13px;margin-bottom:2px">${t.name || '(chưa đặt tên)'}</div>
-            <div style="font-size:11px;color:#888;margin-bottom:4px">${t.email}</div>
-            ${t.province ? `<div style="font-size:11px;color:#7c3aed">📍 ${t.province}</div>` : ''}
-            ${t.cpd.milestone ? `<div style="font-size:11px;margin-top:4px">${t.cpd.milestone.emoji} ${t.cpd.milestone.label}</div>` : ''}
-          </div>
-        `)
+        .setDOMContent(popupRoot)
 
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([t.lon!, t.lat!])
@@ -900,10 +924,12 @@ function TeacherMap({ teachers }: { teachers: TeacherProfile[] }) {
             background:#3b82f6;border:3px solid #fff;
             box-shadow:0 0 0 4px rgba(59,130,246,0.3);
           `
+          const userPopupEl = document.createElement('div')
+          userPopupEl.style.cssText = 'font-family:system-ui;padding:6px;font-size:12px;font-weight:600'
+          userPopupEl.textContent = '📍 Vị trí của bạn'
           userMarkerRef.current = new maplibregl.Marker({ element: el })
             .setLngLat([lon, lat])
-            .setPopup(new maplibregl.Popup({ offset: 12, closeButton: false })
-              .setHTML('<div style="font-family:system-ui;padding:6px;font-size:12px;font-weight:600">📍 Vị trí của bạn</div>'))
+            .setPopup(new maplibregl.Popup({ offset: 12, closeButton: false }).setDOMContent(userPopupEl))
             .addTo(map)
           // Count nearby teachers (within ~100km ≈ 0.9 degrees)
           const nearby = teachersWithLocation.filter(t => {

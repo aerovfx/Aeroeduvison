@@ -31232,6 +31232,11 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
           connectedIds = new Set(lr.rows.map(r => r.teacherId));
         } catch {}
 
+        // SECURITY (Luật ATTT 86/2015 — PII protection):
+        // - email + phone CHỈ trả nếu HS đã kết nối approved với GV
+        // - lat/lon RAW chỉ trả nếu kết nối; còn lại làm tròn 1 chữ số
+        //   (~11 km radius) đủ cho map clustering, không định vị chính xác
+        const isAdmin = /ADMIN/i.test(user.role || '');
         const teachers = rows.map(r => {
           const progress = r.cpd_progress || {};
           const skillIds = Object.keys(progress);
@@ -31250,19 +31255,25 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
             { minScore: 30, emoji: '🌱', label: 'Giáo viên trẻ' },
           ];
           const milestone = MILESTONES.find(m => avgScore >= m.minScore) || null;
+          const connected = connectedIds.has(r.id);
+          const canSeePII = connected || isAdmin || r.id === user.id;
+          // Làm tròn coordinate cho user chưa kết nối (privacy fuzzing)
+          const fuzzCoord = (n) => (n == null ? null : Math.round(n * 10) / 10);
           return {
             id: r.id,
             name: r.name,
-            email: r.email,
+            // email/phone chỉ hiện cho GV đã kết nối / admin / chính mình
+            email: canSeePII ? r.email : null,
+            phone: canSeePII ? r.phone : null,
             image: r.image,
             bio: r.bio,
-            phone: r.phone,
             website: r.website,
             joinedAt: r.createdAt,
-            lat: r.lat ?? null,
-            lon: r.lon ?? null,
+            // lat/lon RAW chỉ cho người đã kết nối; còn lại làm tròn ~11km
+            lat: canSeePII ? r.lat : fuzzCoord(r.lat),
+            lon: canSeePII ? r.lon : fuzzCoord(r.lon),
             province: r.province ?? null,
-            isConnected: connectedIds.has(r.id),
+            isConnected: connected,
             cpd: {
               avgScore,
               skillCount: skillIds.length,
@@ -31281,6 +31292,12 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     });
 
     // GET /api/teachers/:id/cpd — CPD chi tiết của 1 GV
+    // SECURITY: chỉ cho phép khi
+    //   (1) là chính GV đó, HOẶC
+    //   (2) là ADMIN, HOẶC
+    //   (3) HS đã kết nối approved với GV qua TeacherStudentLink
+    // Tránh enumeration: harvest CPD + email của tất cả GV qua /all rồi
+    // lặp endpoint này lấy full progress + reflective notes.
     app.get('/api/teachers/:id/cpd', async (req, res) => {
       try {
         const user = getCpdUser(req);
@@ -31288,11 +31305,31 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         const pool = getCpdPool();
         if (!pool) return res.json({ progress: {} });
         await ensureCpdTable();
+
+        // Authorization check
+        const targetId = req.params.id;
+        const isSelf  = targetId === user.id;
+        const isAdmin = /ADMIN/i.test(user.role || '');
+        let isConnected = false;
+        if (!isSelf && !isAdmin) {
+          try {
+            const lr = await pool.query(
+              `SELECT 1 FROM "TeacherStudentLink"
+                WHERE "teacherId"=$1 AND "studentId"=$2 AND status='approved' LIMIT 1`,
+              [targetId, user.id]
+            );
+            isConnected = lr.rowCount > 0;
+          } catch {}
+        }
+        if (!isSelf && !isAdmin && !isConnected) {
+          return res.status(403).json({ error: 'Forbidden — chưa kết nối với GV này' });
+        }
+
         const { rows } = await pool.query(
           `SELECT c.progress, c."updatedAt", u.name, u.email, u.image, u.bio
              FROM "TeacherCPD" c JOIN "User" u ON u.id=c."userId"
             WHERE c."userId"=$1`,
-          [req.params.id]
+          [targetId]
         );
         if (!rows.length) return res.json({ progress: {}, teacher: null });
         return res.json({ progress: rows[0].progress || {}, teacher: { name: rows[0].name, email: rows[0].email, image: rows[0].image, bio: rows[0].bio } });
