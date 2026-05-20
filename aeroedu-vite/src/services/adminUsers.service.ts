@@ -92,6 +92,20 @@ export interface UpdateUserPayload {
   bannedReason?: string | null
 }
 
+/**
+ * UI-side helper: chuyển 4 lựa chọn role admin có thể chọn
+ * (STUDENT / TEACHER / PARENT / ADMIN) sang cặp { role, accountType }
+ * mà backend đang dùng.
+ *
+ * Quy ước:
+ *   PARENT  → role=TEACHER (để dùng chung permission của GV) + accountType=PARENT
+ *   Còn lại → role và accountType trùng nhau.
+ */
+export function getRoleAndAccountType(uiRole: AccountType): { role: UserRole; accountType: AccountType } {
+  if (uiRole === 'PARENT') return { role: 'TEACHER', accountType: 'PARENT' }
+  return { role: uiRole as UserRole, accountType: uiRole }
+}
+
 export const adminUsersService = {
   list: (params?: ListUsersParams) =>
     api.get<ListUsersResponse>('/admin/users', { params }).then(r => r.data),

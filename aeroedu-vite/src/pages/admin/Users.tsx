@@ -20,6 +20,7 @@ import {
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   adminUsersService,
+  getRoleAndAccountType,
   type AdminUser,
   type AccountType,
   type ListUsersParams,
@@ -209,17 +210,21 @@ export default function AdminUsersPage() {
   }
 
   function handleChangeRole(u: AdminUser) {
+    // accountType (UI) — phân biệt PARENT (role=TEACHER+accountType=PARENT)
+    // với GV thông thường.
+    const currentUi: AccountType = u.accountType || (u.role as AccountType)
     const newRole = window.prompt(
-      `Đổi vai trò cho "${u.name || u.email}"\nHiện tại: ${u.role}\n\nNhập STUDENT / TEACHER / ADMIN:`,
-      u.role,
+      `Đổi vai trò cho "${u.name || u.email}"\nHiện tại: ${currentUi}\n\nNhập STUDENT / TEACHER / PARENT / ADMIN:`,
+      currentUi,
     )
     if (!newRole) return
-    const upper = newRole.toUpperCase()
-    if (!['STUDENT', 'TEACHER', 'ADMIN'].includes(upper)) {
-      toast.error('Vai trò không hợp lệ')
+    const upper = newRole.toUpperCase() as AccountType
+    if (!['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(upper)) {
+      toast.error('Vai trò không hợp lệ (chọn STUDENT / TEACHER / PARENT / ADMIN)')
       return
     }
-    updateMut.mutate({ id: u.id, data: { role: upper as 'STUDENT' | 'TEACHER' | 'ADMIN' } })
+    const { role, accountType } = getRoleAndAccountType(upper)
+    updateMut.mutate({ id: u.id, data: { role, accountType } })
     setActionMenuFor(null)
   }
 

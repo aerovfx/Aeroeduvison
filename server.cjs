@@ -31934,6 +31934,331 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       }
     });
     console.log('[init] Admin At-Risk endpoint ready');
+
+    // ════════════════════════════════════════════════════════════
+    // ADMIN AT-RISK BY TEACHER — /api/admin/at-risk/teachers
+    //
+    // Tổng quan từng GV: số HS dạy, số HS at-risk, hoạt động GV.
+    // Mỗi GV mở rộng được để xem danh sách HS at-risk thuộc về họ.
+    //
+    // Pipeline:
+    //   1. SELECT users WHERE role = 'TEACHER' (cả TEACHER + PARENT vì PARENT
+    //      cũng có role TEACHER trong DB, phân biệt bằng accountType)
+    //   2. Cho mỗi GV: tập HS = ClassStudent (qua TeacherClass)
+    //                  ∪ TeacherStudentLink approved → JOIN User
+    //   3. Tính risk score cho từng HS (reuse cùng quy tắc với /at-risk)
+    //   4. Aggregate per teacher.
+    // ════════════════════════════════════════════════════════════
+    app.get('/api/admin/at-risk/teachers', async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) {
+        return res.status(403).json({ error: 'Admin only' });
+      }
+      try {
+        const pool = getPool();
+        const now = Date.now();
+
+        // ── 1) Lấy tất cả teachers (role=TEACHER, exclude PARENT) ──
+        // PARENT cũng có role TEACHER → loại qua UserProfile.accountType
+        const { rows: teachers } = await pool.query(
+          `SELECT u.id, u.name, u.email, u.image, u.banned, u."bannedReason",
+                  u."lastLoginAt", u."createdAt",
+                  COALESCE(up."accountType", 'TEACHER') AS "accountType"
+             FROM "User" u
+             LEFT JOIN "UserProfile" up ON up."userId" = u.id
+            WHERE u.role = 'TEACHER'
+              AND (up."accountType" IS NULL OR up."accountType" <> 'PARENT')
+            ORDER BY u."createdAt" DESC`
+        ).catch(e => {
+          console.warn('[at-risk:teachers] load teachers:', e.message);
+          return { rows: [] };
+        });
+
+        if (teachers.length === 0) {
+          return res.json({
+            teachers: [],
+            summary: { totalTeachers: 0, teachersWithAtRiskStudents: 0, totalStudentsManaged: 0, totalAtRiskStudents: 0 },
+          });
+        }
+
+        const teacherIds = teachers.map(t => t.id);
+
+        // ── 2a) ClassStudent qua TeacherClass: (teacherId → emailLower → {name, classNames[]}) ──
+        const { rows: classRows } = await pool.query(
+          `SELECT tc."teacherId" AS "teacherId",
+                  cs.name, cs.email, tc.name AS "className"
+             FROM "ClassStudent" cs
+             JOIN "TeacherClass" tc ON tc.id = cs."classId"
+            WHERE tc."teacherId" = ANY($1::text[])`,
+          [teacherIds]
+        ).catch(e => {
+          console.warn('[at-risk:teachers] classStudents:', e.message);
+          return { rows: [] };
+        });
+
+        // ── 2b) TSL approved JOIN User ──
+        const { rows: tslRows } = await pool.query(
+          `SELECT tsl."teacherId" AS "teacherId",
+                  u.id AS "userId", u.name, u.email, u.image,
+                  u.banned, u."bannedReason", u."emailVerified",
+                  u."lastLoginAt", u."createdAt"
+             FROM "TeacherStudentLink" tsl
+             JOIN "User" u ON u.id = tsl."studentId"
+            WHERE tsl."teacherId" = ANY($1::text[])
+              AND tsl.status = 'approved'`,
+          [teacherIds]
+        ).catch(e => {
+          console.warn('[at-risk:teachers] tsl:', e.message);
+          return { rows: [] };
+        });
+
+        // ── 2c) Gom toàn bộ studentEmail để query User + LessonHistory một lượt ──
+        const allEmails = new Set();
+        for (const r of classRows) {
+          const k = String(r.email || '').toLowerCase().trim();
+          if (k) allEmails.add(k);
+        }
+        for (const r of tslRows) {
+          const k = String(r.email || '').toLowerCase().trim();
+          if (k) allEmails.add(k);
+        }
+
+        // Lấy thông tin User cho từng email (để compute risk) — TSL đã có sẵn,
+        // nhưng ClassStudent chưa có User account → phải JOIN
+        const emailsArr = Array.from(allEmails);
+        const studentUserMap = new Map();   // emailLower → User row
+        if (emailsArr.length > 0) {
+          const { rows: userRows } = await pool.query(
+            `SELECT u.id, u.name, u.email, u.image, u.banned, u."bannedReason",
+                    u."emailVerified", u."lastLoginAt", u."createdAt"
+               FROM "User" u
+              WHERE LOWER(u.email) = ANY($1::text[])
+                AND u.role = 'STUDENT'`,
+            [emailsArr]
+          ).catch(e => {
+            console.warn('[at-risk:teachers] users:', e.message);
+            return { rows: [] };
+          });
+          for (const u of userRows) {
+            studentUserMap.set(String(u.email || '').toLowerCase().trim(), u);
+          }
+        }
+        // Bổ sung từ TSL (TSL data có thể fresh hơn vì JOIN trực tiếp)
+        for (const r of tslRows) {
+          const k = String(r.email || '').toLowerCase().trim();
+          if (!k) continue;
+          if (!studentUserMap.has(k)) {
+            studentUserMap.set(k, {
+              id: r.userId, name: r.name, email: r.email, image: r.image,
+              banned: r.banned, bannedReason: r.bannedReason,
+              emailVerified: r.emailVerified,
+              lastLoginAt: r.lastLoginAt, createdAt: r.createdAt,
+            });
+          }
+        }
+
+        // ── 2d) LessonHistory aggregate (last 14 days) cho tất cả student.id ──
+        const studentIds = Array.from(studentUserMap.values()).map(u => u.id).filter(Boolean);
+        const activityMap = new Map();
+        if (studentIds.length > 0) {
+          const { rows: activity } = await pool.query(
+            `SELECT "userId", COUNT(*) AS event_count, MAX("occurredAt") AS last_event
+               FROM "LessonHistory"
+              WHERE "userId" = ANY($1::text[])
+                AND "occurredAt" > NOW() - INTERVAL '14 days'
+              GROUP BY "userId"`,
+            [studentIds]
+          ).catch(() => ({ rows: [] }));
+          for (const a of activity) {
+            activityMap.set(a.userId, {
+              eventCount: parseInt(a.event_count),
+              lastEvent: a.last_event,
+            });
+          }
+        }
+
+        // ── 3) Helper compute risk score cho 1 student (cùng logic /at-risk) ──
+        function computeStudentRisk(s) {
+          if (!s) return null;
+          const factors = [];
+          let score = 0;
+
+          if (s.banned) {
+            factors.push({ factor: `Bị khoá: ${s.bannedReason || 'không rõ'}`, weight: 0.45 });
+            score += 95;
+          }
+          const lastLogin = s.lastLoginAt ? new Date(s.lastLoginAt).getTime() : null;
+          const createdAt = s.createdAt ? new Date(s.createdAt).getTime() : now;
+          const ageDays = (now - createdAt) / 86400_000;
+
+          if (lastLogin === null) {
+            if (ageDays > 3) { factors.push({ factor: `Đăng ký ${Math.floor(ageDays)} ngày nhưng chưa đăng nhập`, weight: 0.40 }); score += 75; }
+          } else {
+            const daysSinceLogin = (now - lastLogin) / 86400_000;
+            if (daysSinceLogin > 14) { factors.push({ factor: `Không đăng nhập ${Math.floor(daysSinceLogin)} ngày`, weight: 0.40 }); score += 85; }
+            else if (daysSinceLogin > 7) { factors.push({ factor: `Không đăng nhập ${Math.floor(daysSinceLogin)} ngày`, weight: 0.30 }); score += 65; }
+          }
+
+          const act = activityMap.get(s.id);
+          if (!act || act.eventCount === 0) {
+            if (lastLogin) { factors.push({ factor: 'Không hoạt động học 14 ngày', weight: 0.25 }); score += 40; }
+          } else if (act.eventCount < 3) {
+            factors.push({ factor: `Chỉ ${act.eventCount} hoạt động học 14 ngày`, weight: 0.15 });
+            score += 25;
+          }
+
+          if (s.emailVerified === false || s.emailVerified === null) {
+            if (ageDays > 7) { factors.push({ factor: 'Email chưa xác minh sau 7 ngày', weight: 0.10 }); score += 15; }
+          }
+
+          score = Math.min(100, score);
+          let riskLevel = 'low';
+          if (score >= 80) riskLevel = 'critical';
+          else if (score >= 60) riskLevel = 'high';
+          else if (score >= 30) riskLevel = 'medium';
+
+          // "Active" = login + lesson activity in last 7d
+          const isActive7d = lastLogin && (now - lastLogin) / 86400_000 <= 7 && act && act.eventCount > 0;
+
+          return { score, riskLevel, factors, isActive7d, lastLogin };
+        }
+
+        // ── 4) Build teacher → students map ──
+        const teacherMap = new Map();   // teacherId → { students: Set<emailLower>, byEmail: Map }
+        for (const t of teachers) {
+          teacherMap.set(t.id, { studentEmails: new Set() });
+        }
+        for (const r of classRows) {
+          const t = teacherMap.get(r.teacherId);
+          if (!t) continue;
+          const k = String(r.email || '').toLowerCase().trim();
+          if (k) t.studentEmails.add(k);
+        }
+        for (const r of tslRows) {
+          const t = teacherMap.get(r.teacherId);
+          if (!t) continue;
+          const k = String(r.email || '').toLowerCase().trim();
+          if (k) t.studentEmails.add(k);
+        }
+
+        // ── 5) Aggregate per teacher ──
+        const result = [];
+        let summaryTotalManaged = 0;
+        let summaryTotalAtRisk = 0;
+        let summaryTeachersWithRisk = 0;
+
+        for (const t of teachers) {
+          const bucket = teacherMap.get(t.id);
+          const emails = Array.from(bucket?.studentEmails || []);
+
+          let studentsActive = 0;
+          let studentsInactive = 0;
+          let studentsAtRisk = 0;
+          let studentsCritical = 0;
+          let studentsHigh = 0;
+          let riskScoreSum = 0;
+          let riskScoreCount = 0;
+          const atRiskStudents = [];
+
+          for (const email of emails) {
+            const s = studentUserMap.get(email);
+            const r = computeStudentRisk(s);
+            // s == null: ClassStudent chưa có User → coi như inactive (chưa kích hoạt)
+            if (!s || !r) {
+              studentsInactive++;
+              continue;
+            }
+            if (r.isActive7d) studentsActive++;
+            else studentsInactive++;
+
+            if (r.factors.length > 0) {
+              riskScoreSum += r.score;
+              riskScoreCount++;
+              if (r.riskLevel === 'critical' || r.riskLevel === 'high' || r.riskLevel === 'medium') {
+                studentsAtRisk++;
+                if (r.riskLevel === 'critical') studentsCritical++;
+                else if (r.riskLevel === 'high') studentsHigh++;
+
+                // Last active label
+                let lastActive = 'Chưa đăng nhập';
+                if (r.lastLogin) {
+                  const d = (now - r.lastLogin) / 86400_000;
+                  if (d < 1) lastActive = 'Hôm nay';
+                  else if (d < 2) lastActive = 'Hôm qua';
+                  else if (d < 30) lastActive = `${Math.floor(d)} ngày trước`;
+                  else lastActive = `${Math.floor(d / 30)} tháng trước`;
+                }
+                atRiskStudents.push({
+                  id: s.id,
+                  name: s.name || (s.email || '').split('@')[0],
+                  email: s.email,
+                  riskScore: r.score,
+                  riskLevel: r.riskLevel,
+                  lastActive,
+                });
+              }
+            }
+          }
+
+          // Teacher's own activity health
+          const teacherLastLogin = t.lastLoginAt ? new Date(t.lastLoginAt).getTime() : null;
+          let teacherStatus = 'active';
+          if (t.banned) teacherStatus = 'banned';
+          else if (!teacherLastLogin) teacherStatus = 'inactive';
+          else {
+            const daysSinceLogin = (now - teacherLastLogin) / 86400_000;
+            if (daysSinceLogin > 30) teacherStatus = 'inactive';
+          }
+
+          // Sort atRiskStudents by riskScore desc
+          atRiskStudents.sort((a, b) => b.riskScore - a.riskScore);
+
+          const studentsTotal = emails.length;
+          summaryTotalManaged += studentsTotal;
+          summaryTotalAtRisk += studentsAtRisk;
+          if (studentsAtRisk > 0) summaryTeachersWithRisk++;
+
+          result.push({
+            id: t.id,
+            name: t.name || (t.email || '').split('@')[0],
+            email: t.email,
+            image: t.image || null,
+            lastLoginAt: t.lastLoginAt,
+            teacherStatus,
+            studentsTotal,
+            studentsActive,
+            studentsInactive,
+            studentsAtRisk,
+            studentsCritical,
+            studentsHigh,
+            averageStudentRiskScore: riskScoreCount > 0
+              ? Math.round((riskScoreSum / riskScoreCount) * 10) / 10
+              : 0,
+            atRiskStudents,
+          });
+        }
+
+        // ── 6) Sort: teachers with most at-risk first, then by total students desc ──
+        result.sort((a, b) => {
+          if (b.studentsAtRisk !== a.studentsAtRisk) return b.studentsAtRisk - a.studentsAtRisk;
+          return b.studentsTotal - a.studentsTotal;
+        });
+
+        return res.json({
+          teachers: result,
+          summary: {
+            totalTeachers: teachers.length,
+            teachersWithAtRiskStudents: summaryTeachersWithRisk,
+            totalStudentsManaged: summaryTotalManaged,
+            totalAtRiskStudents: summaryTotalAtRisk,
+          },
+        });
+      } catch (err) {
+        console.error('[admin:at-risk:teachers]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+    console.log('[init] Admin At-Risk by Teacher endpoint ready');
   }
 
   // ─ STEM AI Project Generator ─────────────────────────────
