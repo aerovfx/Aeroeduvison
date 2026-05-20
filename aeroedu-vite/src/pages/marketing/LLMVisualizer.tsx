@@ -248,7 +248,7 @@ function Footer() {
              style={{ color: C.emerald, textDecoration: 'none' }}>karpathy/nanoGPT <ExternalLink size={11} style={{ verticalAlign: '-2px' }}/></a>
         </div>
         <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>
-          © {new Date().getFullYear()} AeroEduVision — inphysic.com. Trang này tự xây từ đầu để giảng dạy phi lợi nhuận.
+          © {new Date().getFullYear()} AeroEduVision — inphysic.com. Trang này tự xây từ đầu để giảng dạy.
         </p>
       </div>
     </footer>
