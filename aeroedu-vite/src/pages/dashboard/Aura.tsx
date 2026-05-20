@@ -344,6 +344,25 @@ const SIMULATIONS: SimEntry[] = [
     color: '#818cf8',
     difficulty: 'Advanced',
   },
+  // ── 🌑 Eclipse Simulations ──────────────────────────────────
+  {
+    id: 'solar-eclipse',
+    title: '🌑 Nhật Thực (Solar Eclipse)',
+    description: 'Giả lập hiện tượng nhật thực: Mặt Trăng che khuất Mặt Trời khi đi qua giữa Trái Đất và Mặt Trời. Quan sát các giai đoạn: bán phần, toàn phần (corona vành nhật hoa), rồi trở lại bình thường.',
+    icon: CircleDot,
+    category: 'astronomy',
+    color: '#f59e0b',
+    difficulty: 'Intermediate',
+  },
+  {
+    id: 'lunar-eclipse',
+    title: '🌕 Nguyệt Thực (Lunar Eclipse)',
+    description: 'Giả lập hiện tượng nguyệt thực: Trái Đất che khuất ánh sáng Mặt Trời chiếu vào Mặt Trăng. Mặt Trăng chuyển sang màu đỏ cam (Blood Moon) khi đi vào vùng bóng tối hoàn toàn (umbra). Có nhãn bán ảnh / bóng tối.',
+    icon: Globe,
+    category: 'astronomy',
+    color: '#ef4444',
+    difficulty: 'Intermediate',
+  },
   // (FPV entry moved to top of array — featured)
 ]
 

@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, BookOpen, Users, MoreVertical, Edit, Upload, FileText,
   Trash2, Eye, EyeOff, TrendingUp, Search, Filter, ExternalLink,
-  Wallet, Tag,
+  Wallet, Tag, BookMarked, X, Check, Link2,
 } from 'lucide-react'
 import { instructorService } from '@/services/instructor.service'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,83 @@ type SortKey = 'newest' | 'oldest' | 'students' | 'earnings'
 function formatCurrency(n: number): string {
   if (n === 0) return 'Miễn phí'
   return n.toLocaleString('vi-VN') + '₫'
+}
+
+function PdfBookEditor({ course }: { course: InstructorCourse }) {
+  const qc = useQueryClient()
+  const [open, setOpen] = useState(false)
+  const [url, setUrl] = useState(course.pdfBookUrl || '')
+
+  const save = useMutation({
+    mutationFn: () => instructorService.updateCourse(course.id, { pdfBookUrl: url.trim() || null } as any),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instructor-courses'] })
+      toast.success(url.trim() ? 'Đã lưu sách PDF' : 'Đã xoá sách PDF')
+      setOpen(false)
+    },
+    onError: () => toast.error('Lưu thất bại'),
+  })
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className={cn(
+          'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+          course.pdfBookUrl
+            ? 'bg-amber-500/20 border-amber-400/40 text-amber-300 hover:bg-amber-500/30'
+            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10 hover:text-gray-200'
+        )}
+        title={course.pdfBookUrl ? 'Sách PDF đã được gắn — bấm để sửa' : 'Gắn sách PDF cho khoá học'}
+      >
+        <BookMarked className="w-3.5 h-3.5" />
+        {course.pdfBookUrl ? 'Sách PDF' : 'Gắn PDF'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="rounded-lg bg-gray-900 border border-amber-500/30 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <BookMarked className="w-4 h-4 text-amber-400 flex-shrink-0" />
+        <span className="text-xs font-semibold text-amber-300">URL sách PDF</span>
+        <button onClick={() => setOpen(false)} className="ml-auto text-gray-500 hover:text-gray-300">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <Link2 className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+        <input
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://... (PDF link hoặc Google Drive link)"
+          className="flex-1 text-xs bg-gray-800 border border-white/10 rounded px-2 py-1.5 text-white placeholder-gray-600 focus:outline-none focus:border-amber-500"
+          autoFocus
+          onKeyDown={e => { if (e.key === 'Enter') save.mutate(); if (e.key === 'Escape') setOpen(false) }}
+        />
+      </div>
+      <p className="text-[10px] text-gray-500 pl-5">Hỗ trợ: link PDF trực tiếp, Google Drive share link</p>
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="flex items-center gap-1 px-3 py-1.5 rounded bg-amber-500/80 hover:bg-amber-500 text-black text-xs font-semibold disabled:opacity-50 transition-colors"
+        >
+          <Check className="w-3 h-3" />
+          {save.isPending ? 'Đang lưu...' : 'Lưu'}
+        </button>
+        {url.trim() && (
+          <button
+            onClick={() => { setUrl(''); save.mutate() }}
+            disabled={save.isPending}
+            className="flex items-center gap-1 px-3 py-1.5 rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs transition-colors"
+          >
+            <X className="w-3 h-3" />Xoá
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function CourseCard({ course }: { course: InstructorCourse }) {
@@ -198,6 +275,11 @@ function CourseCard({ course }: { course: InstructorCourse }) {
           >
             <Upload className="w-3.5 h-3.5 inline mr-1" />Video
           </Link>
+        </div>
+
+        {/* PDF Book URL editor */}
+        <div className="pt-1">
+          <PdfBookEditor course={course} />
         </div>
       </div>
     </div>

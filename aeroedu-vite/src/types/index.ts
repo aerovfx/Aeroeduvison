@@ -236,6 +236,8 @@ export interface InstructorCourse {
   videos: CourseVideo[]
   assets: CourseAsset[]
   user: Pick<User, 'id' | 'name' | 'image'>
+  /** URL PDF sách giáo trình — hiển thị dạng sách trong CoursePlayer */
+  pdfBookUrl?: string | null
   createdAt: string
   updatedAt: string
 }

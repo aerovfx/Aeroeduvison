@@ -27,6 +27,7 @@ import {
   X,
   History,
   Award,
+  BookOpen,
 } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
 import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
 import TranscriptPanel from '@/components/learning/TranscriptPanel'
+import PdfBookViewer from '@/components/learning/PdfBookViewer'
 import type { CourseVideo } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
@@ -285,8 +287,8 @@ function VideoSidebar({
   )
 }
 
-// ── Tabs: Overview / Assets / Feedback / History ────────────
-type Tab = 'overview' | 'assets' | 'feedback' | 'history'
+// ── Tabs: Overview / Assets / Feedback / History / PDF Book ─
+type Tab = 'overview' | 'assets' | 'feedback' | 'history' | 'pdfbook'
 
 function OverviewTab({ overview }: { overview: string | null }) {
   return (
@@ -459,6 +461,14 @@ export default function CoursePlayer() {
     },
   })
 
+  // Fetch course info (pdfBookUrl) — ignore errors gracefully
+  const { data: courseInfo } = useQuery({
+    queryKey: ['course-info', courseId],
+    queryFn: () => learningService.getCourseInfo(courseId!),
+    enabled: !!courseId,
+    staleTime: 5 * 60 * 1000,
+  })
+
   // ── History logging helpers ────────────────────────────────
   const logEvent = learningService.logEvent
 
@@ -627,30 +637,37 @@ export default function CoursePlayer() {
 
         {/* Tabs */}
         <div className="px-4 lg:px-6 pb-8">
-          <div className="flex gap-1 border-b mb-6">
+          <div className="flex gap-1 border-b mb-6 overflow-x-auto">
             {([
               { key: 'overview', label: 'Tổng quan', icon: FileText },
               { key: 'assets', label: 'Tài liệu', icon: Download },
               { key: 'feedback', label: 'Đánh giá', icon: MessageSquare },
               { key: 'history', label: 'Lịch sử', icon: History },
-            ] as const).map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                type="button"
-                style={{ touchAction: 'manipulation' }}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
-                  'min-h-[44px] active:bg-accent/50',  // touch target + tactile
-                  activeTab === key
-                    ? 'border-purple-500 text-purple-700 dark:text-purple-300'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="whitespace-nowrap">{label}</span>
-              </button>
-            ))}
+              { key: 'pdfbook', label: 'Sách giáo trình', icon: BookOpen },
+            ] as const).map(({ key, label, icon: Icon }) => {
+              const hasPdf = courseInfo?.pdfBookUrl
+              if (key === 'pdfbook' && !hasPdf) return null
+              return (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  type="button"
+                  style={{ touchAction: 'manipulation' }}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
+                    'min-h-[44px] active:bg-accent/50 flex-shrink-0',
+                    activeTab === key
+                      ? key === 'pdfbook'
+                        ? 'border-amber-500 text-amber-700 dark:text-amber-300'
+                        : 'border-purple-500 text-purple-700 dark:text-purple-300'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="whitespace-nowrap">{label}</span>
+                </button>
+              )
+            })}
           </div>
 
           {activeTab === 'overview' && (
@@ -664,6 +681,20 @@ export default function CoursePlayer() {
           )}
           {activeTab === 'history' && courseId && (
             <CourseHistoryTimeline courseId={courseId} limit={200} />
+          )}
+          {activeTab === 'pdfbook' && (
+            courseInfo?.pdfBookUrl ? (
+              <PdfBookViewer
+                pdfUrl={courseInfo.pdfBookUrl}
+                title={courseInfo?.title ? `Sách: ${courseInfo.title}` : 'Sách giáo trình'}
+                compact
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-3 py-16 text-muted-foreground">
+                <BookOpen className="w-12 h-12 opacity-30" />
+                <p className="text-sm">Khoá học chưa có sách giáo trình PDF.</p>
+              </div>
+            )
           )}
         </div>
       </div>
