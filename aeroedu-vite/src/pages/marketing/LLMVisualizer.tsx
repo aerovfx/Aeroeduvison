@@ -130,7 +130,7 @@ function Header() {
           to="/free-courses/llm-mastery"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            color: C.muted, textDecoration: 'none', fontSize: 13,
+            color: C.muted, textDecoration: 'none', fontSize: 15,
           }}
         >
           <ArrowLeft size={16} /> Quay lại khoá học
@@ -139,10 +139,10 @@ function Header() {
           height: 20, width: 1, background: C.border, margin: '0 4px',
         }} />
         <h1 style={{
-          margin: 0, fontSize: 18, fontWeight: 700, color: C.text,
+          margin: 0, fontSize: 20, fontWeight: 700, color: C.text,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span style={{ fontSize: 22 }}>🔬</span>
+          <span style={{ fontSize: 24 }}>🔬</span>
           Visualizing LLM Internals & Architecture
         </h1>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -155,7 +155,7 @@ function Header() {
               background: 'rgba(167,139,250,0.10)',
               border: `1px solid ${C.border}`,
               color: C.purple, textDecoration: 'none',
-              fontSize: 12, fontWeight: 600,
+              fontSize: 15, fontWeight: 600,
             }}
           >
             <Github size={14} /> bbycroft/llm-viz
@@ -169,7 +169,7 @@ function Header() {
               background: 'rgba(34,211,238,0.10)',
               border: `1px solid ${C.border}`,
               color: C.cyan, textDecoration: 'none',
-              fontSize: 12, fontWeight: 600,
+              fontSize: 15, fontWeight: 600,
             }}
           >
             <Github size={14} /> nanoGPT
@@ -210,7 +210,7 @@ function TOCSidebar({ active }: { active: string }) {
               border: `1px solid ${isActive ? s.color + '60' : 'transparent'}`,
               color: isActive ? s.color : C.muted,
               textDecoration: 'none',
-              fontSize: 12, fontWeight: 600,
+              fontSize: 15, fontWeight: 600,
               whiteSpace: 'nowrap',
               transition: 'all 0.15s',
             }}
@@ -233,7 +233,7 @@ function Footer() {
       background: 'rgba(0,0,0,0.3)',
       textAlign: 'center',
     }}>
-      <div style={{ maxWidth: 900, margin: '0 auto', color: C.muted, fontSize: 13, lineHeight: 1.7 }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', color: C.muted, fontSize: 15, lineHeight: 1.7 }}>
         <p style={{ margin: '0 0 8px' }}>
           Trang giáo dục mở dựa trên các dự án MIT-licensed sau (re-implemented in React + Tailwind):
         </p>
@@ -247,7 +247,7 @@ function Footer() {
           <a href="https://github.com/karpathy/nanoGPT" target="_blank" rel="noreferrer"
              style={{ color: C.emerald, textDecoration: 'none' }}>karpathy/nanoGPT <ExternalLink size={11} style={{ verticalAlign: '-2px' }}/></a>
         </div>
-        <p style={{ margin: 0, opacity: 0.7, fontSize: 11 }}>
+        <p style={{ margin: 0, opacity: 0.7, fontSize: 14 }}>
           © {new Date().getFullYear()} AeroEduVision — inphysic.com. Trang này tự xây từ đầu để giảng dạy phi lợi nhuận.
         </p>
       </div>
@@ -277,10 +277,10 @@ function SectionShell({
       }} />
       <header style={{ marginBottom: 24 }}>
         <h2 style={{
-          margin: 0, fontSize: 28, fontWeight: 800,
+          margin: 0, fontSize: 30, fontWeight: 800,
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: 36 }}>{emoji}</span>
+          <span style={{ fontSize: 38 }}>{emoji}</span>
           <span style={{
             background: `linear-gradient(90deg, ${accent}, ${C.text})`,
             WebkitBackgroundClip: 'text',
@@ -290,7 +290,7 @@ function SectionShell({
             {title}
           </span>
         </h2>
-        <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 15, lineHeight: 1.6 }}>
+        <p style={{ margin: '8px 0 0', color: C.muted, fontSize: 17, lineHeight: 1.6 }}>
           {subtitle}
         </p>
       </header>
@@ -421,13 +421,13 @@ function Section1Embedding() {
               {/* Axes */}
               <line x1="200" y1="20"  x2="200" y2="380" stroke="#ffffff14" strokeWidth="1"/>
               <line x1="20"  y1="200" x2="380" y2="200" stroke="#ffffff14" strokeWidth="1"/>
-              <text x="384" y="196" fill={C.muted} fontSize="10">dim 1</text>
-              <text x="204" y="20" fill={C.muted} fontSize="10">dim 2</text>
+              <text x="384" y="196" fill={C.muted} fontSize="13">dim 1</text>
+              <text x="204" y="20" fill={C.muted} fontSize="13">dim 2</text>
 
               {/* Cluster labels */}
-              <text x="110" y="40"  fill={C.purple}  fontSize="11" fontWeight="700" opacity="0.8">Động vật</text>
-              <text x="290" y="260" fill={C.pink}    fontSize="11" fontWeight="700" opacity="0.8">Cảm xúc</text>
-              <text x="100" y="395" fill={C.emerald} fontSize="11" fontWeight="700" opacity="0.8">Màu sắc</text>
+              <text x="110" y="40"  fill={C.purple}  fontSize="14" fontWeight="700" opacity="0.8">Động vật</text>
+              <text x="290" y="260" fill={C.pink}    fontSize="14" fontWeight="700" opacity="0.8">Cảm xúc</text>
+              <text x="100" y="395" fill={C.emerald} fontSize="14" fontWeight="700" opacity="0.8">Màu sắc</text>
 
               {/* Selection line */}
               {selA && selB && (
@@ -470,7 +470,7 @@ function Section1Embedding() {
                     <text
                       x={w.x} y={w.y + 4}
                       textAnchor="middle"
-                      fontSize="11" fontWeight="700"
+                      fontSize="14" fontWeight="700"
                       fill="#fff"
                       style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >
@@ -481,7 +481,7 @@ function Section1Embedding() {
               })}
             </svg>
 
-            <p style={{ margin: '12px 0 0', fontSize: 12, color: C.muted, textAlign: 'center' }}>
+            <p style={{ margin: '12px 0 0', fontSize: 15, color: C.muted, textAlign: 'center' }}>
               Hover từ để xem vector · Click 2 từ để tính cosine similarity
             </p>
           </Card>
@@ -489,21 +489,21 @@ function Section1Embedding() {
         right={
           <div style={{ display: 'grid', gap: 16 }}>
             <Card>
-              <h3 style={{ margin: '0 0 8px', fontSize: 16, color: C.purple, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, color: C.purple, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Info size={16} /> Vector hiện tại
               </h3>
               {hover ? (
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: GROUP_COLOR[hover.group], marginBottom: 4 }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: GROUP_COLOR[hover.group], marginBottom: 4 }}>
                     "{hover.text}"
                   </div>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, color: C.muted, marginBottom: 12 }}>
                     Nhóm: {GROUP_LABEL[hover.group]}
                   </div>
                   <VectorBars vec={hover.vec} color={GROUP_COLOR[hover.group]} />
                   <code style={{
                     display: 'block', marginTop: 8,
-                    fontSize: 11, color: C.text,
+                    fontSize: 14, color: C.text,
                     background: 'rgba(0,0,0,0.3)', padding: 8, borderRadius: 6,
                     fontFamily: 'monospace',
                   }}>
@@ -511,20 +511,20 @@ function Section1Embedding() {
                   </code>
                 </div>
               ) : (
-                <p style={{ margin: 0, color: C.muted, fontSize: 13 }}>
+                <p style={{ margin: 0, color: C.muted, fontSize: 15 }}>
                   Di chuột vào một từ trong sơ đồ để xem vector 4 chiều của nó.
                 </p>
               )}
             </Card>
 
             <Card>
-              <h3 style={{ margin: '0 0 8px', fontSize: 16, color: C.amber, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, color: C.amber, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Sparkles size={16} /> Cosine similarity
               </h3>
-              <p style={{ margin: '0 0 8px', fontSize: 12, color: C.muted }}>
+              <p style={{ margin: '0 0 8px', fontSize: 15, color: C.muted }}>
                 Click 2 từ bất kỳ — công thức đo độ tương đồng giữa chúng:
               </p>
-              <div style={{ marginBottom: 12, fontSize: 14 }}>
+              <div style={{ marginBottom: 12, fontSize: 16 }}>
                 <MathText display>{`$$\\cos(\\theta) = \\frac{\\vec{u} \\cdot \\vec{v}}{||\\vec{u}|| \\, ||\\vec{v}||}$$`}</MathText>
               </div>
               {selA && selB && sim !== null ? (
@@ -533,15 +533,15 @@ function Section1Embedding() {
                   background: 'rgba(251,191,36,0.10)',
                   border: `1px solid ${C.amber}50`,
                 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 13 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, fontSize: 15 }}>
                     <span style={{ color: GROUP_COLOR[selA.group], fontWeight: 700 }}>{selA.text}</span>
                     <span style={{ color: C.muted }}>↔</span>
                     <span style={{ color: GROUP_COLOR[selB.group], fontWeight: 700 }}>{selB.text}</span>
                   </div>
-                  <div style={{ fontSize: 28, fontWeight: 800, color: C.amber }}>
+                  <div style={{ fontSize: 30, fontWeight: 800, color: C.amber }}>
                     {sim.toFixed(3)}
                   </div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                  <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
                     {sim > 0.9 ? '→ Rất giống (cùng nhóm)' :
                      sim > 0.5 ? '→ Khá giống' :
                      sim > 0 ? '→ Hơi liên quan' :
@@ -550,11 +550,11 @@ function Section1Embedding() {
                   </div>
                 </div>
               ) : selA ? (
-                <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>
+                <p style={{ margin: 0, color: C.muted, fontSize: 15 }}>
                   Đã chọn: <strong style={{ color: GROUP_COLOR[selA.group] }}>{selA.text}</strong> — click thêm 1 từ nữa.
                 </p>
               ) : (
-                <p style={{ margin: 0, color: C.muted, fontSize: 12 }}>Chưa chọn từ nào.</p>
+                <p style={{ margin: 0, color: C.muted, fontSize: 15 }}>Chưa chọn từ nào.</p>
               )}
             </Card>
           </div>
@@ -571,7 +571,7 @@ function VectorBars({ vec, color }: { vec: number[]; color: string }) {
         const w = Math.abs(v) * 100
         const positive = v >= 0
         return (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
             <span style={{ color: C.muted, width: 28, fontFamily: 'monospace' }}>d{i}</span>
             <div style={{ flex: 1, position: 'relative', height: 12, background: 'rgba(255,255,255,0.05)', borderRadius: 3 }}>
               <div style={{
@@ -640,7 +640,7 @@ function Section2Tokenization() {
       <TwoColumn
         left={
           <Card>
-            <label style={{ fontSize: 12, color: C.muted, marginBottom: 6, display: 'block', fontWeight: 600 }}>
+            <label style={{ fontSize: 15, color: C.muted, marginBottom: 6, display: 'block', fontWeight: 600 }}>
               Văn bản đầu vào:
             </label>
             <textarea
@@ -654,7 +654,7 @@ function Section2Tokenization() {
                 border: `1px solid ${C.border}`,
                 borderRadius: 8,
                 padding: 12,
-                fontSize: 15,
+                fontSize: 17,
                 fontFamily: 'system-ui',
                 resize: 'vertical',
                 boxSizing: 'border-box',
@@ -669,7 +669,7 @@ function Section2Tokenization() {
                   background: 'rgba(167,139,250,0.10)',
                   border: `1px solid ${C.border}`,
                   color: C.purple,
-                  fontSize: 12, fontWeight: 600,
+                  fontSize: 15, fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -682,7 +682,7 @@ function Section2Tokenization() {
                   background: 'rgba(34,211,238,0.10)',
                   border: `1px solid ${C.border}`,
                   color: C.cyan,
-                  fontSize: 12, fontWeight: 600,
+                  fontSize: 15, fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -695,7 +695,7 @@ function Section2Tokenization() {
                   background: 'rgba(244,114,182,0.10)',
                   border: `1px solid ${C.border}`,
                   color: C.pink,
-                  fontSize: 12, fontWeight: 600,
+                  fontSize: 15, fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -704,7 +704,7 @@ function Section2Tokenization() {
             </div>
 
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 12, color: C.muted, marginBottom: 8, fontWeight: 600 }}>
+              <div style={{ fontSize: 15, color: C.muted, marginBottom: 8, fontWeight: 600 }}>
                 Tokens ({tokens.length}):
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -720,10 +720,10 @@ function Section2Tokenization() {
                       minWidth: 40,
                     }}
                   >
-                    <span style={{ fontSize: 14, color: t.color, fontWeight: 700 }}>
+                    <span style={{ fontSize: 16, color: t.color, fontWeight: 700 }}>
                       {t.text === ' ' ? '␣' : t.text === '\n' ? '↵' : t.text}
                     </span>
-                    <span style={{ fontSize: 9, color: C.muted, marginTop: 2 }}>
+                    <span style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
                       {t.id}
                     </span>
                   </div>
@@ -737,23 +737,23 @@ function Section2Tokenization() {
               border: `1px solid ${C.cyan}30`,
               borderRadius: 8,
               display: 'flex', gap: 24, flexWrap: 'wrap',
-              fontSize: 13,
+              fontSize: 15,
             }}>
               <div>
-                <div style={{ color: C.muted, fontSize: 10 }}>Tokens</div>
-                <div style={{ color: C.cyan, fontWeight: 700, fontSize: 18 }}>{tokens.length}</div>
+                <div style={{ color: C.muted, fontSize: 13 }}>Tokens</div>
+                <div style={{ color: C.cyan, fontWeight: 700, fontSize: 20 }}>{tokens.length}</div>
               </div>
               <div>
-                <div style={{ color: C.muted, fontSize: 10 }}>Ký tự</div>
-                <div style={{ color: C.purple, fontWeight: 700, fontSize: 18 }}>{totalChars}</div>
+                <div style={{ color: C.muted, fontSize: 13 }}>Ký tự</div>
+                <div style={{ color: C.purple, fontWeight: 700, fontSize: 20 }}>{totalChars}</div>
               </div>
               <div>
-                <div style={{ color: C.muted, fontSize: 10 }}>Bytes (UTF-8)</div>
-                <div style={{ color: C.pink, fontWeight: 700, fontSize: 18 }}>{totalBytes}</div>
+                <div style={{ color: C.muted, fontSize: 13 }}>Bytes (UTF-8)</div>
+                <div style={{ color: C.pink, fontWeight: 700, fontSize: 20 }}>{totalBytes}</div>
               </div>
               <div>
-                <div style={{ color: C.muted, fontSize: 10 }}>Chars/token</div>
-                <div style={{ color: C.emerald, fontWeight: 700, fontSize: 18 }}>
+                <div style={{ color: C.muted, fontSize: 13 }}>Chars/token</div>
+                <div style={{ color: C.emerald, fontWeight: 700, fontSize: 20 }}>
                   {tokens.length ? (totalChars / tokens.length).toFixed(2) : '0'}
                 </div>
               </div>
@@ -762,8 +762,8 @@ function Section2Tokenization() {
         }
         right={
           <Card>
-            <h3 style={{ margin: '0 0 12px', fontSize: 16, color: C.cyan }}>BPE hoạt động ra sao?</h3>
-            <ol style={{ margin: 0, paddingLeft: 18, color: C.text, fontSize: 13, lineHeight: 1.7 }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18, color: C.cyan }}>BPE hoạt động ra sao?</h3>
+            <ol style={{ margin: 0, paddingLeft: 18, color: C.text, fontSize: 15, lineHeight: 1.7 }}>
               <li><strong>Khởi tạo:</strong> mỗi ký tự = 1 token.</li>
               <li><strong>Đếm cặp:</strong> tìm cặp xuất hiện nhiều nhất (vd: "th" trong tiếng Anh).</li>
               <li><strong>Hợp nhất:</strong> gộp cặp thành 1 token mới.</li>
@@ -772,8 +772,8 @@ function Section2Tokenization() {
 
             <hr style={{ margin: '16px 0', border: 0, borderTop: `1px solid ${C.border}` }} />
 
-            <h4 style={{ margin: '0 0 8px', fontSize: 14, color: C.purple }}>Vocab size thường gặp</h4>
-            <table style={{ width: '100%', fontSize: 12, color: C.text, borderCollapse: 'collapse' }}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 16, color: C.purple }}>Vocab size thường gặp</h4>
+            <table style={{ width: '100%', fontSize: 15, color: C.text, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ color: C.muted, textAlign: 'left' }}>
                   <th style={{ padding: '4px 0' }}>Model</th>
@@ -805,7 +805,7 @@ function Section2Tokenization() {
               background: 'rgba(251,191,36,0.10)',
               border: `1px solid ${C.amber}40`,
               borderRadius: 6,
-              fontSize: 11, color: C.amber, lineHeight: 1.5,
+              fontSize: 14, color: C.amber, lineHeight: 1.6,
             }}>
               <strong>Lưu ý:</strong> demo ở trên dùng tokenizer mô phỏng (tách theo khoảng trắng + dấu câu). BPE thực sẽ tách "lập trình" thành ["lập", "trình"] hoặc thậm chí ["l", "ập", " trình"] tuỳ vocab.
             </div>
@@ -880,7 +880,7 @@ function Section3Attention() {
                   x={margin + c * cellSize + cellSize / 2}
                   y={margin - 12}
                   textAnchor="middle"
-                  fontSize="12"
+                  fontSize="15"
                   fontWeight={hoverCol === c || activeRow === c ? 700 : 500}
                   fill={hoverCol === c ? C.pink : C.muted}
                 >
@@ -889,7 +889,7 @@ function Section3Attention() {
               ))}
               {/* Subtitle for cols */}
               <text x={margin + gridSize / 2} y={margin - 32} textAnchor="middle"
-                    fontSize="10" fill={C.muted} fontStyle="italic">
+                    fontSize="13" fill={C.muted} fontStyle="italic">
                 Key (chú ý đến)
               </text>
 
@@ -900,7 +900,7 @@ function Section3Attention() {
                   x={margin - 10}
                   y={margin + r * cellSize + cellSize / 2 + 4}
                   textAnchor="end"
-                  fontSize="12"
+                  fontSize="15"
                   fontWeight={activeRow === r ? 700 : 500}
                   fill={activeRow === r ? C.pink : C.muted}
                 >
@@ -910,7 +910,7 @@ function Section3Attention() {
               {/* Subtitle for rows */}
               <text
                 x={20} y={margin + gridSize / 2}
-                fontSize="10" fill={C.muted} fontStyle="italic"
+                fontSize="13" fill={C.muted} fontStyle="italic"
                 textAnchor="middle"
                 transform={`rotate(-90 20 ${margin + gridSize / 2})`}
               >
@@ -944,7 +944,7 @@ function Section3Attention() {
                         x={margin + c * cellSize + cellSize / 2}
                         y={margin + r * cellSize + cellSize / 2 + 4}
                         textAnchor="middle"
-                        fontSize="11"
+                        fontSize="14"
                         fontWeight="700"
                         fill={v > 0.25 ? '#fff' : C.muted}
                         style={{ pointerEvents: 'none' }}
@@ -956,7 +956,7 @@ function Section3Attention() {
                 })
               )}
             </svg>
-            <p style={{ margin: '12px 0 0', fontSize: 12, color: C.muted, textAlign: 'center' }}>
+            <p style={{ margin: '12px 0 0', fontSize: 15, color: C.muted, textAlign: 'center' }}>
               Hover ô để highlight · Click hàng để xem công thức · Mỗi hàng softmax tổng = 1
             </p>
           </Card>
@@ -964,11 +964,11 @@ function Section3Attention() {
         right={
           <div style={{ display: 'grid', gap: 16 }}>
             <Card>
-              <h3 style={{ margin: '0 0 8px', fontSize: 16, color: C.pink }}>Công thức Self-Attention</h3>
+              <h3 style={{ margin: '0 0 8px', fontSize: 18, color: C.pink }}>Công thức Self-Attention</h3>
               <div style={{ marginBottom: 12 }}>
                 <MathText display>{`$$\\text{Attention}(Q, K, V) = \\text{softmax}\\!\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right) V$$`}</MathText>
               </div>
-              <ul style={{ margin: 0, paddingLeft: 18, color: C.muted, fontSize: 13, lineHeight: 1.7 }}>
+              <ul style={{ margin: 0, paddingLeft: 18, color: C.muted, fontSize: 15, lineHeight: 1.7 }}>
                 <li><strong style={{ color: C.text }}>Q (Query)</strong> — câu hỏi của từ hiện tại</li>
                 <li><strong style={{ color: C.text }}>K (Key)</strong> — "nhãn" của các từ khác</li>
                 <li><strong style={{ color: C.text }}>V (Value)</strong> — nội dung được kéo về</li>
@@ -979,15 +979,15 @@ function Section3Attention() {
             <Card>
               {activeRow !== null ? (
                 <>
-                  <h4 style={{ margin: '0 0 8px', fontSize: 14, color: C.pink }}>
+                  <h4 style={{ margin: '0 0 8px', fontSize: 16, color: C.pink }}>
                     Hàng: "{ATTN_TOKENS[activeRow]}"
                   </h4>
-                  <p style={{ margin: '0 0 10px', fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
+                  <p style={{ margin: '0 0 10px', fontSize: 15, color: C.muted, lineHeight: 1.6 }}>
                     Token <strong style={{ color: C.text }}>"{ATTN_TOKENS[activeRow]}"</strong> chú ý đến mỗi từ khác theo weights:
                   </p>
                   <div style={{ display: 'grid', gap: 6 }}>
                     {ATTN_MATRIX[activeRow].map((v, c) => (
-                      <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                      <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15 }}>
                         <span style={{ width: 50, color: c === activeRow ? C.pink : C.text, fontWeight: c === activeRow ? 700 : 400 }}>
                           {ATTN_TOKENS[c]}
                         </span>
@@ -1011,17 +1011,17 @@ function Section3Attention() {
                     ))}
                   </div>
                   <p style={{
-                    margin: '12px 0 0', fontSize: 11, color: C.amber,
+                    margin: '12px 0 0', fontSize: 14, color: C.amber,
                     padding: 8,
                     background: 'rgba(251,191,36,0.08)',
                     borderRadius: 6,
-                    lineHeight: 1.5,
+                    lineHeight: 1.6,
                   }}>
                     💡 {explainRow(activeRow)}
                   </p>
                 </>
               ) : (
-                <p style={{ margin: 0, fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+                <p style={{ margin: 0, fontSize: 15, color: C.muted, lineHeight: 1.6 }}>
                   Click 1 hàng trong heatmap để xem chi tiết attention của từ đó với các từ còn lại.
                 </p>
               )}
@@ -1154,7 +1154,7 @@ function TabBtn({ active, label, color, onClick }: { active: boolean; label: str
         background: active ? `${color}25` : 'transparent',
         border: `1px solid ${active ? color + '60' : 'transparent'}`,
         color: active ? color : C.muted,
-        fontSize: 12,
+        fontSize: 15,
         fontWeight: 600,
         cursor: 'pointer',
         transition: 'all 0.15s',
@@ -1185,10 +1185,10 @@ function SmallHeadCard({ matrix, head, idx, onSelect }: { matrix: number[][]; he
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: head.color }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: head.color }}>
           Head {idx + 1}: {head.name}
         </span>
-        <span style={{ fontSize: 10, color: C.muted }}>Click xem chi tiết →</span>
+        <span style={{ fontSize: 13, color: C.muted }}>Click xem chi tiết →</span>
       </div>
       <svg viewBox={`0 0 ${N * cell + 4} ${N * cell + 4}`} width="100%" style={{ maxWidth: 240, display: 'block', margin: '0 auto' }}>
         {matrix.map((row, r) =>
@@ -1205,7 +1205,7 @@ function SmallHeadCard({ matrix, head, idx, onSelect }: { matrix: number[][]; he
           ))
         )}
       </svg>
-      <p style={{ margin: '8px 0 0', fontSize: 11, color: C.muted, lineHeight: 1.4 }}>
+      <p style={{ margin: '8px 0 0', fontSize: 14, color: C.muted, lineHeight: 1.55 }}>
         {head.desc}
       </p>
     </div>
@@ -1233,11 +1233,11 @@ function SingleHeadView({ matrix, head, idx }: { matrix: number[][]; head: typeo
         <svg viewBox={`0 0 ${margin + gridSize + 10} ${margin + gridSize + 10}`} width="100%" style={{ maxWidth: 500, display: 'block' }}>
           {ATTN_TOKENS.map((tok, c) => (
             <text key={`c${c}`} x={margin + c * cellSize + cellSize / 2} y={margin - 10} textAnchor="middle"
-                  fontSize="12" fill={C.muted}>{tok}</text>
+                  fontSize="15" fill={C.muted}>{tok}</text>
           ))}
           {ATTN_TOKENS.map((tok, r) => (
             <text key={`r${r}`} x={margin - 8} y={margin + r * cellSize + cellSize / 2 + 4} textAnchor="end"
-                  fontSize="12" fill={C.muted}>{tok}</text>
+                  fontSize="15" fill={C.muted}>{tok}</text>
           ))}
           {matrix.map((row, r) =>
             row.map((v, c) => (
@@ -1254,7 +1254,7 @@ function SingleHeadView({ matrix, head, idx }: { matrix: number[][]; head: typeo
                   x={margin + c * cellSize + cellSize / 2}
                   y={margin + r * cellSize + cellSize / 2 + 4}
                   textAnchor="middle"
-                  fontSize="11"
+                  fontSize="14"
                   fill={v > 0.25 ? '#fff' : C.muted}
                   fontWeight="700"
                 >
@@ -1266,17 +1266,17 @@ function SingleHeadView({ matrix, head, idx }: { matrix: number[][]; head: typeo
         </svg>
       </div>
       <div>
-        <h3 style={{ margin: '0 0 8px', fontSize: 18, color: head.color }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 20, color: head.color }}>
           Head {idx + 1}: {head.name}
         </h3>
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+        <p style={{ margin: '0 0 12px', fontSize: 15, color: C.text, lineHeight: 1.6 }}>
           {head.desc}.
         </p>
 
-        <h4 style={{ margin: '12px 0 6px', fontSize: 13, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>
+        <h4 style={{ margin: '12px 0 6px', fontSize: 15, color: C.muted, textTransform: 'uppercase', letterSpacing: 1 }}>
           Vai trò trong transformer
         </h4>
-        <p style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 15, color: C.text, lineHeight: 1.6 }}>
           {headRole(idx)}
         </p>
 
@@ -1286,11 +1286,11 @@ function SingleHeadView({ matrix, head, idx }: { matrix: number[][]; head: typeo
           border: `1px solid ${head.color}30`,
           borderRadius: 8,
         }}>
-          <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Công thức multi-head</div>
+          <div style={{ fontSize: 14, color: C.muted, marginBottom: 4 }}>Công thức multi-head</div>
           <MathText display>{`$$\\text{MultiHead}(Q,K,V) = \\text{Concat}(\\text{head}_1, ..., \\text{head}_h) W^O$$`}</MathText>
         </div>
 
-        <div style={{ marginTop: 12, fontSize: 11, color: C.muted }}>
+        <div style={{ marginTop: 12, fontSize: 14, color: C.muted }}>
           GPT-2 small: <span style={{ color: head.color, fontWeight: 700 }}>12 heads</span> × 12 layer = 144 attention patterns/forward pass
         </div>
       </div>
@@ -1363,11 +1363,11 @@ function Section5PositionEnc() {
       <TwoColumn
         left={
           <Card>
-            <h3 style={{ margin: '0 0 12px', fontSize: 15, color: C.amber }}>Curves sin / cos</h3>
+            <h3 style={{ margin: '0 0 12px', fontSize: 17, color: C.amber }}>Curves sin / cos</h3>
 
             {/* Sin curve */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: C.cyan, marginBottom: 2 }}>sin(pos / 10000^(2i/d))</div>
+              <div style={{ fontSize: 14, color: C.cyan, marginBottom: 2 }}>sin(pos / 10000^(2i/d))</div>
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ background: C.bg2, borderRadius: 8 }}>
                 {/* Axes */}
                 <line x1={padding} y1={H / 2} x2={W - padding} y2={H / 2} stroke="#ffffff20" />
@@ -1378,15 +1378,15 @@ function Section5PositionEnc() {
                 <line x1={xScale(pos)} y1={padding} x2={xScale(pos)} y2={H - padding} stroke={C.amber} strokeDasharray="3 3" opacity="0.6"/>
                 <circle cx={xScale(pos)} cy={yScale(curSin)} r="5" fill={C.amber} stroke="#fff" strokeWidth="1.5"/>
                 {/* Labels */}
-                <text x={W - padding} y={H / 2 + 14} fontSize="9" fill={C.muted} textAnchor="end">pos</text>
-                <text x={padding + 4} y={padding - 4} fontSize="9" fill={C.muted}>+1</text>
-                <text x={padding + 4} y={H - padding + 12} fontSize="9" fill={C.muted}>-1</text>
+                <text x={W - padding} y={H / 2 + 14} fontSize="12" fill={C.muted} textAnchor="end">pos</text>
+                <text x={padding + 4} y={padding - 4} fontSize="12" fill={C.muted}>+1</text>
+                <text x={padding + 4} y={H - padding + 12} fontSize="12" fill={C.muted}>-1</text>
               </svg>
             </div>
 
             {/* Cos curve */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: C.pink, marginBottom: 2 }}>cos(pos / 10000^(2i/d))</div>
+              <div style={{ fontSize: 14, color: C.pink, marginBottom: 2 }}>cos(pos / 10000^(2i/d))</div>
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ background: C.bg2, borderRadius: 8 }}>
                 <line x1={padding} y1={H / 2} x2={W - padding} y2={H / 2} stroke="#ffffff20" />
                 <line x1={padding} y1={padding} x2={padding} y2={H - padding} stroke="#ffffff20" />
@@ -1405,8 +1405,8 @@ function Section5PositionEnc() {
         }
         right={
           <Card>
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, color: C.amber }}>Vector PE tại position {pos}</h3>
-            <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: C.amber }}>Vector PE tại position {pos}</h3>
+            <p style={{ margin: '0 0 12px', fontSize: 15, color: C.muted }}>
               16 giá trị, xen kẽ sin/cos với các tần số khác nhau:
             </p>
             <div style={{ display: 'flex', gap: 2, marginBottom: 14 }}>
@@ -1434,12 +1434,12 @@ function Section5PositionEnc() {
                 )
               })}
             </div>
-            <div style={{ display: 'flex', gap: 8, fontSize: 10, color: C.muted, marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8, fontSize: 13, color: C.muted, marginBottom: 16 }}>
               <span><span style={{ color: C.cyan }}>■</span> chẵn = sin</span>
               <span><span style={{ color: C.pink }}>■</span> lẻ = cos</span>
             </div>
 
-            <h4 style={{ margin: '0 0 8px', fontSize: 14, color: C.purple }}>Công thức</h4>
+            <h4 style={{ margin: '0 0 8px', fontSize: 16, color: C.purple }}>Công thức</h4>
             <div style={{ marginBottom: 8 }}>
               <MathText display>{`$$\\text{PE}(\\text{pos}, 2i) = \\sin\\!\\left(\\frac{\\text{pos}}{10000^{2i/d}}\\right)$$`}</MathText>
             </div>
@@ -1451,7 +1451,7 @@ function Section5PositionEnc() {
               marginTop: 14, padding: 10,
               background: 'rgba(34,211,238,0.08)',
               border: `1px solid ${C.cyan}30`, borderRadius: 6,
-              fontSize: 11, color: C.cyan, lineHeight: 1.5,
+              fontSize: 14, color: C.cyan, lineHeight: 1.6,
             }}>
               <strong>Vì sao dùng sin/cos?</strong> Mỗi dim có tần số khác nhau → mỗi vị trí có "vân tay" duy nhất. Sin/cos còn cho phép model học khoảng cách tương đối: PE(pos+k) là phép xoay tuyến tính của PE(pos).
             </div>
@@ -1467,7 +1467,7 @@ function SliderRow({ label, value, min, max, setValue, color }: {
 }) {
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, marginBottom: 4 }}>
         <span style={{ color: C.muted }}>{label}</span>
         <span style={{ color, fontWeight: 700, fontFamily: 'monospace' }}>{value}</span>
       </div>
@@ -1481,7 +1481,7 @@ function SliderRow({ label, value, min, max, setValue, color }: {
           accentColor: color,
         }}
       />
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: C.muted, marginTop: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: C.muted, marginTop: 1 }}>
         <span>{min}</span><span>{max}</span>
       </div>
     </div>
@@ -1611,7 +1611,7 @@ function Section6Architecture() {
                   background: playing ? 'rgba(96,165,250,0.15)' : C.blue,
                   border: `1px solid ${C.blue}80`,
                   color: playing ? C.blue : '#fff',
-                  fontSize: 13, fontWeight: 700,
+                  fontSize: 15, fontWeight: 700,
                   cursor: playing ? 'not-allowed' : 'pointer',
                   opacity: playing ? 0.7 : 1,
                   transition: 'all 0.15s',
@@ -1628,7 +1628,7 @@ function Section6Architecture() {
                   background: 'transparent',
                   border: `1px solid ${C.border}`,
                   color: C.muted,
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: 15, fontWeight: 600,
                   cursor: 'pointer',
                 }}
               >
@@ -1654,7 +1654,7 @@ function Section6Architecture() {
                 stroke="rgba(96,165,250,0.3)"
                 strokeDasharray="4 4"
               />
-              <text x={W - 24} y={blocks[3].y - 12} textAnchor="end" fontSize="10" fill={C.blue} fontWeight="700">
+              <text x={W - 24} y={blocks[3].y - 12} textAnchor="end" fontSize="13" fill={C.blue} fontWeight="700">
                 × N (N=12 cho GPT-2 small)
               </text>
 
@@ -1677,13 +1677,13 @@ function Section6Architecture() {
                       stroke={b.main.color}
                       strokeWidth={isSel ? 2 : 1}
                     />
-                    <text x={W / 2} y={b.y + 22} textAnchor="middle" fontSize="13" fontWeight="700" fill={b.main.color}>
+                    <text x={W / 2} y={b.y + 22} textAnchor="middle" fontSize="15" fontWeight="700" fill={b.main.color}>
                       {b.main.label}
                     </text>
-                    <text x={W / 2} y={b.y + 38} textAnchor="middle" fontSize="10" fill={C.muted}>
+                    <text x={W / 2} y={b.y + 38} textAnchor="middle" fontSize="13" fill={C.muted}>
                       {b.main.sub}
                     </text>
-                    <text x={W - 48} y={b.y + 22} textAnchor="end" fontSize="10" fill={C.amber} fontWeight="700">
+                    <text x={W - 48} y={b.y + 22} textAnchor="end" fontSize="13" fill={C.amber} fontWeight="700">
                       {b.main.params}
                     </text>
                     {/* Arrow to next */}
@@ -1708,7 +1708,7 @@ function Section6Architecture() {
               )}
             </svg>
 
-            <p style={{ margin: '12px 0 0', fontSize: 11, color: C.muted, textAlign: 'center' }}>
+            <p style={{ margin: '12px 0 0', fontSize: 14, color: C.muted, textAlign: 'center' }}>
               Click block để xem chi tiết · Số bên phải = param count
             </p>
           </Card>
@@ -1721,20 +1721,20 @@ function Section6Architecture() {
                   const b = ARCH_BLOCKS.find(x => x.id === selected)!
                   return (
                     <>
-                      <h3 style={{ margin: '0 0 4px', fontSize: 18, color: b.color }}>{b.label}</h3>
-                      {b.sub && <p style={{ margin: '0 0 12px', fontSize: 12, color: C.muted, fontFamily: 'monospace' }}>{b.sub}</p>}
-                      <p style={{ margin: '0 0 14px', fontSize: 13, color: C.text, lineHeight: 1.6 }}>{b.desc}</p>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 20, color: b.color }}>{b.label}</h3>
+                      {b.sub && <p style={{ margin: '0 0 12px', fontSize: 15, color: C.muted, fontFamily: 'monospace' }}>{b.sub}</p>}
+                      <p style={{ margin: '0 0 14px', fontSize: 15, color: C.text, lineHeight: 1.6 }}>{b.desc}</p>
                       <div style={{
                         padding: 12,
                         background: `${b.color}10`,
                         border: `1px solid ${b.color}30`,
                         borderRadius: 8,
                       }}>
-                        <div style={{ fontSize: 11, color: C.muted, marginBottom: 4 }}>Số tham số</div>
-                        <div style={{ fontSize: 24, fontWeight: 800, color: b.color, fontFamily: 'monospace' }}>
+                        <div style={{ fontSize: 14, color: C.muted, marginBottom: 4 }}>Số tham số</div>
+                        <div style={{ fontSize: 26, fontWeight: 800, color: b.color, fontFamily: 'monospace' }}>
                           {b.params}
                         </div>
-                        <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                        <div style={{ fontSize: 14, color: C.muted, marginTop: 4 }}>
                           {b.paramsDetail}
                         </div>
                       </div>
@@ -1743,8 +1743,8 @@ function Section6Architecture() {
                 })()
               ) : (
                 <>
-                  <h3 style={{ margin: '0 0 8px', fontSize: 16, color: C.blue }}>Tổng quan GPT-2 small</h3>
-                  <table style={{ width: '100%', fontSize: 12, color: C.text, borderCollapse: 'collapse' }}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 18, color: C.blue }}>Tổng quan GPT-2 small</h3>
+                  <table style={{ width: '100%', fontSize: 15, color: C.text, borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ color: C.muted, textAlign: 'left' }}>
                         <th style={{ padding: '4px 0' }}>Thành phần</th>
@@ -1764,7 +1764,7 @@ function Section6Architecture() {
                       </tr>
                     </tbody>
                   </table>
-                  <p style={{ margin: '14px 0 0', fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
+                  <p style={{ margin: '14px 0 0', fontSize: 14, color: C.muted, lineHeight: 1.6 }}>
                     Click vào block bên trái để xem chi tiết. Số 124M là tổng tham số GPT-2 small (gpt2). Các phiên bản lớn hơn: medium 345M, large 774M, xl 1.5B.
                   </p>
                 </>
@@ -1772,8 +1772,8 @@ function Section6Architecture() {
             </Card>
 
             <Card>
-              <h4 style={{ margin: '0 0 8px', fontSize: 14, color: C.purple }}>So sánh các đời GPT</h4>
-              <table style={{ width: '100%', fontSize: 12, color: C.text, borderCollapse: 'collapse' }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 16, color: C.purple }}>So sánh các đời GPT</h4>
+              <table style={{ width: '100%', fontSize: 15, color: C.text, borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ color: C.muted, textAlign: 'left' }}>
                     <th style={{ padding: '4px 4px' }}>Model</th>
@@ -1809,16 +1809,16 @@ function Section6Architecture() {
                   </tr>
                 </tbody>
               </table>
-              <p style={{ margin: '8px 0 0', fontSize: 10, color: C.muted }}>
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: C.muted }}>
                 * GPT-4 là Mixture of Experts — tổng params ước tính, active params/forward thấp hơn.
               </p>
             </Card>
 
             <Card style={{ background: `linear-gradient(135deg, ${C.purple}15, ${C.cyan}15)` }}>
-              <h4 style={{ margin: '0 0 8px', fontSize: 14, color: C.text, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 16, color: C.text, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Zap size={16} color={C.amber} /> Tiếp theo học gì?
               </h4>
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: C.text, lineHeight: 1.8 }}>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 15, color: C.text, lineHeight: 1.8 }}>
                 <li>Quay lại <Link to="/free-courses/llm-mastery" style={{ color: C.purple }}>khoá học LLM</Link> để học chi tiết</li>
                 <li>Đọc paper "Attention Is All You Need" (2017)</li>
                 <li>Tự cài <a href="https://github.com/karpathy/nanoGPT" target="_blank" rel="noreferrer" style={{ color: C.cyan }}>nanoGPT</a> và train từ đầu</li>
