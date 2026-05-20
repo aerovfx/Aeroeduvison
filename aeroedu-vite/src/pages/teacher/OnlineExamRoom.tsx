@@ -79,6 +79,45 @@ const statusLabel = (s: string) =>
   : s === "cancelled" ? "Huỷ"
   : s
 
+// ── Time-phase helpers (past / ongoing / upcoming) ─────────────
+type TimePhase = 'upcoming' | 'ongoing' | 'past' | 'unscheduled'
+
+function getTimePhase(startISO?: string, endISO?: string, now: number = Date.now()): TimePhase {
+  if (!startISO || !endISO) return 'unscheduled'
+  const start = new Date(startISO).getTime()
+  const end   = new Date(endISO).getTime()
+  if (isNaN(start) || isNaN(end)) return 'unscheduled'
+  if (now < start) return 'upcoming'
+  if (now > end)   return 'past'
+  return 'ongoing'
+}
+
+// Format khoảng cách thời gian dạng "2 giờ 30 phút" / "3 ngày" / "5 phút"
+function formatRelativeDuration(ms: number): string {
+  const abs = Math.abs(ms)
+  const m = Math.floor(abs / 60_000)
+  const h = Math.floor(m / 60)
+  const d = Math.floor(h / 24)
+  if (d >= 1) return `${d} ngày${h % 24 > 0 ? ` ${h % 24}h` : ''}`
+  if (h >= 1) return `${h}h${m % 60 > 0 ? ` ${m % 60}p` : ''}`
+  if (m >= 1) return `${m} phút`
+  return 'dưới 1 phút'
+}
+
+function getTimePhaseLabel(phase: TimePhase, startISO?: string, endISO?: string, now: number = Date.now()): string {
+  if (phase === 'unscheduled') return 'Chưa đặt lịch'
+  if (phase === 'upcoming' && startISO) {
+    return `Bắt đầu sau ${formatRelativeDuration(new Date(startISO).getTime() - now)}`
+  }
+  if (phase === 'ongoing' && endISO) {
+    return `Đang diễn ra · còn ${formatRelativeDuration(new Date(endISO).getTime() - now)}`
+  }
+  if (phase === 'past' && endISO) {
+    return `Kết thúc ${formatRelativeDuration(now - new Date(endISO).getTime())} trước`
+  }
+  return ''
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string }> = {
     active:    { bg: 'rgba(5,150,105,0.2)',   color: '#34d399' },
@@ -123,7 +162,13 @@ export default function OnlineExamRoomPage() {
   const [publicRooms, setPublicRooms] = useState<ExamRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  // Filter theo TRẠNG THÁI (status do GV set): all/draft/active/completed/cancelled
   const [statusFilter, setStatusFilter] = useState("all")
+  // Filter theo THỜI GIAN (tính từ startTime/endTime so với now):
+  //   'all' | 'upcoming' (sẽ thi) | 'ongoing' (đang thi) | 'past' (đã thi)
+  const [phaseFilter, setPhaseFilter] = useState<'all' | TimePhase>('all')
+  // Tick mỗi 30s để countdown trên UI tự cập nhật mà không cần reload
+  const [nowTick, setNowTick] = useState(Date.now())
 
   const [joinCode, setJoinCode] = useState("")
   const [joining, setJoining] = useState<string | null>(null)
@@ -414,12 +459,46 @@ export default function OnlineExamRoomPage() {
     } catch (e: any) { toast.error(e.response?.data?.error || "Không thể xoá") }
   }
 
+  // Tick countdown mỗi 30s cho text "còn 5 phút" / "bắt đầu sau 2h" tự cập nhật
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
   // ── Computed ───────────────────────────────────────────────
-  const filtered = rooms.filter(r => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false
-    if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
+  // Đếm số phòng theo từng pha (cho badge số trên tab)
+  const phaseCounts = (() => {
+    const c = { all: rooms.length, upcoming: 0, ongoing: 0, past: 0, unscheduled: 0 }
+    for (const r of rooms) {
+      const p = getTimePhase(r.startTime, r.endTime, nowTick)
+      c[p]++
+    }
+    return c
+  })()
+
+  // Filter + sort: ongoing trước (cần monitor gấp), rồi upcoming asc theo startTime,
+  // rồi past desc theo endTime (gần nhất lên đầu).
+  const filtered = rooms
+    .filter(r => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false
+      if (phaseFilter !== "all" && getTimePhase(r.startTime, r.endTime, nowTick) !== phaseFilter) return false
+      if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => {
+      const pa = getTimePhase(a.startTime, a.endTime, nowTick)
+      const pb = getTimePhase(b.startTime, b.endTime, nowTick)
+      const order: Record<TimePhase, number> = { ongoing: 0, upcoming: 1, unscheduled: 2, past: 3 }
+      if (order[pa] !== order[pb]) return order[pa] - order[pb]
+      // Cùng pha: ongoing/upcoming → sort start asc, past → sort end desc
+      const aStart = new Date(a.startTime || 0).getTime()
+      const bStart = new Date(b.startTime || 0).getTime()
+      const aEnd   = new Date(a.endTime || 0).getTime()
+      const bEnd   = new Date(b.endTime || 0).getTime()
+      if (pa === 'past') return bEnd - aEnd
+      return aStart - bStart
+    })
+
   const selected = rooms.find(r => r.id === selectedId)
 
   const openCreate = () => {
@@ -715,6 +794,42 @@ export default function OnlineExamRoomPage() {
 
           {/* Left col */}
           <div className="col-span-12 lg:col-span-8 space-y-4">
+
+            {/* ── Time-phase tabs (Sắp diễn ra / Đang diễn ra / Đã thi) ── */}
+            <div className="flex items-center gap-1 flex-wrap rounded-xl p-1"
+              style={{ background: D.card2, border: `1px solid ${D.border}` }}>
+              {([
+                { v: 'all',      l: 'Tất cả',        c: phaseCounts.all,      icon: CalendarClock, color: D.text },
+                { v: 'ongoing',  l: 'Đang diễn ra',  c: phaseCounts.ongoing,  icon: Zap,           color: '#34d399' },
+                { v: 'upcoming', l: 'Sắp diễn ra',   c: phaseCounts.upcoming, icon: CalendarPlus,  color: '#60a5fa' },
+                { v: 'past',     l: 'Đã kết thúc',   c: phaseCounts.past,     icon: CheckCircle2,  color: '#94a3b8' },
+              ] as const).map(t => {
+                const sel = phaseFilter === t.v
+                const Icon = t.icon
+                const isPulse = t.v === 'ongoing' && phaseCounts.ongoing > 0
+                return (
+                  <button key={t.v} onClick={() => setPhaseFilter(t.v)}
+                    className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                    style={{
+                      background: sel ? (t.v === 'ongoing' ? 'rgba(5,150,105,0.18)' : t.v === 'upcoming' ? 'rgba(37,99,235,0.18)' : t.v === 'past' ? 'rgba(148,163,184,0.18)' : 'rgba(124,58,237,0.18)') : 'transparent',
+                      color: sel ? t.color : D.muted,
+                      border: `1px solid ${sel ? t.color : 'transparent'}`,
+                    }}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isPulse ? 'animate-pulse' : ''}`} />
+                    <span>{t.l}</span>
+                    {t.c > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                        style={{
+                          background: sel ? t.color + '33' : D.card,
+                          color: sel ? t.color : D.muted2,
+                        }}>{t.c}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 min-w-[180px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: D.muted }} />
@@ -747,30 +862,69 @@ export default function OnlineExamRoomPage() {
             ) : filtered.length === 0 ? (
               <div className="text-center py-12">
                 <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(148,163,184,0.3)' }} />
-                <p className="font-medium" style={{ color: D.muted }}>Chưa có phòng thi nào</p>
+                <p className="font-medium" style={{ color: D.muted }}>
+                  {phaseFilter === 'ongoing'  ? 'Không có phòng nào đang diễn ra' :
+                   phaseFilter === 'upcoming' ? 'Không có phòng nào sắp diễn ra' :
+                   phaseFilter === 'past'     ? 'Chưa có phòng nào đã kết thúc' :
+                   'Chưa có phòng thi nào'}
+                </p>
+                {phaseFilter !== 'all' && (
+                  <button onClick={() => setPhaseFilter('all')}
+                    className="mt-3 text-xs underline" style={{ color: '#a78bfa' }}>
+                    Xem tất cả phòng
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
-                {filtered.map(room => (
+                {filtered.map(room => {
+                  const phase = getTimePhase(room.startTime, room.endTime, nowTick)
+                  const phaseLabel = getTimePhaseLabel(phase, room.startTime, room.endTime, nowTick)
+                  const phaseStyle =
+                    phase === 'ongoing'  ? { bg: 'rgba(5,150,105,0.18)',   color: '#34d399', icon: Zap } :
+                    phase === 'upcoming' ? { bg: 'rgba(37,99,235,0.18)',   color: '#60a5fa', icon: CalendarClock } :
+                    phase === 'past'     ? { bg: 'rgba(148,163,184,0.18)', color: '#94a3b8', icon: CheckCircle2 } :
+                                           { bg: 'rgba(245,158,11,0.18)',  color: '#fbbf24', icon: AlertTriangle }
+                  const PhaseIcon = phaseStyle.icon
+                  return (
                   <div key={room.id} onClick={() => setSelectedId(room.id)}
                     className="rounded-xl p-4 cursor-pointer transition-all"
                     style={{
-                      border: `1px solid ${selectedId === room.id ? 'rgba(124,58,237,0.6)' : D.border}`,
+                      border: `1px solid ${selectedId === room.id ? 'rgba(124,58,237,0.6)' : (phase === 'ongoing' ? 'rgba(5,150,105,0.35)' : D.border)}`,
                       background: selectedId === room.id ? 'rgba(124,58,237,0.08)' : D.card,
                     }}
                     onMouseEnter={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)' }}
-                    onMouseLeave={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = D.border }}
+                    onMouseLeave={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = phase === 'ongoing' ? 'rgba(5,150,105,0.35)' : D.border }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           {room.isPublic
                             ? <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: '#34d399' }} />
                             : <Lock className="w-3.5 h-3.5 shrink-0" style={{ color: '#a78bfa' }} />
                           }
                           <h3 className="font-semibold truncate" style={{ color: D.text }}>{room.name}</h3>
                           <StatusBadge status={room.status} />
+                          {/* Time-phase badge với countdown */}
+                          {phase !== 'unscheduled' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold"
+                              style={{ background: phaseStyle.bg, color: phaseStyle.color, whiteSpace: 'nowrap' }}>
+                              <PhaseIcon className={`w-2.5 h-2.5 ${phase === 'ongoing' ? 'animate-pulse' : ''}`} />
+                              {phaseLabel}
+                            </span>
+                          )}
                         </div>
+                        {/* Lịch thi (ngày giờ) — hiển thị compact */}
+                        {room.startTime && room.endTime && (
+                          <div className="flex items-center gap-1.5 text-[11px] mb-1" style={{ color: D.muted2 }}>
+                            <CalendarClock className="w-3 h-3" />
+                            <span>
+                              {new Date(room.startTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              {' → '}
+                              {new Date(room.endTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-4 text-xs" style={{ color: D.muted }}>
                           <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {room.duration}p</span>
                           <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {room._count?.participants || 0}</span>
@@ -819,7 +973,8 @@ export default function OnlineExamRoomPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -835,13 +990,26 @@ export default function OnlineExamRoomPage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { l: "Tổng phòng", v: rooms.length,                              bg: 'rgba(124,58,237,0.2)',  c: '#a78bfa' },
-                  { l: "Đang thi",   v: rooms.filter(r => r.status==="active").length, bg: 'rgba(5,150,105,0.2)',  c: '#34d399' },
-                  { l: "Công khai",  v: rooms.filter(r => r.isPublic).length,       bg: 'rgba(20,184,166,0.2)', c: '#2dd4bf' },
-                  { l: "Bí mật",    v: rooms.filter(r => !r.isPublic).length,       bg: 'rgba(139,92,246,0.2)', c: '#c4b5fd' },
+                  { l: "Tổng phòng",   v: rooms.length,           bg: 'rgba(124,58,237,0.2)',  c: '#a78bfa', click: () => setPhaseFilter('all') },
+                  { l: "Đang diễn ra", v: phaseCounts.ongoing,    bg: 'rgba(5,150,105,0.2)',   c: '#34d399', click: () => setPhaseFilter('ongoing') },
+                  { l: "Sắp diễn ra",  v: phaseCounts.upcoming,   bg: 'rgba(37,99,235,0.2)',   c: '#60a5fa', click: () => setPhaseFilter('upcoming') },
+                  { l: "Đã kết thúc",  v: phaseCounts.past,       bg: 'rgba(148,163,184,0.2)', c: '#94a3b8', click: () => setPhaseFilter('past') },
                 ].map(s => (
-                  <div key={s.l} className="rounded-lg p-3" style={{ background: s.bg }}>
+                  <button key={s.l} onClick={s.click}
+                    className="rounded-lg p-3 text-left hover:brightness-110 transition-all"
+                    style={{ background: s.bg, border: '1px solid transparent' }}>
                     <p className="text-2xl font-black" style={{ color: s.c }}>{s.v}</p>
+                    <p className="text-[10px] font-medium" style={{ color: s.c, opacity: 0.75 }}>{s.l}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: D.border }}>
+                {[
+                  { l: "Công khai",  v: rooms.filter(r => r.isPublic).length,  bg: 'rgba(20,184,166,0.15)', c: '#2dd4bf' },
+                  { l: "Bí mật",    v: rooms.filter(r => !r.isPublic).length, bg: 'rgba(139,92,246,0.15)', c: '#c4b5fd' },
+                ].map(s => (
+                  <div key={s.l} className="rounded-lg p-2.5" style={{ background: s.bg }}>
+                    <p className="text-lg font-bold" style={{ color: s.c }}>{s.v}</p>
                     <p className="text-[10px] font-medium" style={{ color: s.c, opacity: 0.75 }}>{s.l}</p>
                   </div>
                 ))}
