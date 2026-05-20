@@ -15,12 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `715241b` (revision pixiai-00362-yug, 2026-05-20 — HOTFIX SECURITY: PII exposure + stored XSS trên /student/teachers)
-- Commits since last deploy: `4/5`
+- Last deployed commit: `d1d883d` (revision pixiai-00363-xxx, 2026-05-20 — Flipbook PDF + Eclipse + Anti-screenshot + Assignment workspace + Free AI course)
+- Commits since last deploy: `0/5`
+- Prev: `715241b` → pixiai-00362-yug (HOTFIX SECURITY: PII exposure + stored XSS)
+- Prev: `d1d883d` — flipbook 3D + nhạc nền ambient + iOS mobile view + pdfjs-dist v5
 - Prev: `b3af126` — workspace bài tập HS (Word+Slides+Nộp bài) + anti-screenshot + server pdfBookUrl
 - Prev: `1b34702` — PDF sách giáo trình + nhật/nguyệt thực R3F + PdfBookViewer component
 - Prev: `a8b40ea` — Online exam room theo dõi phòng thi đã/đang/sẽ diễn ra
-- Prev: `4080b05` — Khoá học LLM miễn phí từ Aero-HowtoLLMs (10 module, 37 bài)
 - Prev: `7f5e4ca` → pixiai-00361-rem (mobile sidebar w-16/w-56 + tooltip tap + paste JSON khi import câu hỏi + 4 loại câu chuẩn THPT + gợi ý KG 45 skill)
 - Prev: `4dc4bbb` → pixiai-00360-sum (Teacher Directory + CPD + Bản đồ GV + STEM·MONITOR upgrade + mobile sidebar hamburger)
 - Prev: `7071b5a` → pixiai-00359-baw (hotfix deploy từ worktree: latex 503 + BulkGrading crash + Landing team/awards/testimonials)
