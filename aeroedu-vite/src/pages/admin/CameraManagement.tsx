@@ -1,14 +1,17 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Camera, Menu, Maximize2, Minimize2, Play, Square, Video,
-  Settings, Volume2, Mic, ChevronLeft, ChevronRight,
+  Settings, Volume2, Mic, ChevronLeft,
   ZoomIn, ZoomOut, Focus, Search, Wifi, WifiOff,
   Shield, Users, X, Film, AlertTriangle, Plus, Trash2,
   Edit2, Radar, Loader2, RefreshCw,
+  Grid3x3, Wrench, ExternalLink, Copy, Eye, Globe, Network,
+  List, Download,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { cameraService, type CameraAdmin } from '@/services/camera.service';
 import CameraConfigModal from '@/components/camera/CameraConfigModal';
+import RtspUrlBuilder from '@/components/admin/RtspUrlBuilder';
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface CameraEntry {
@@ -32,7 +35,86 @@ interface Recording {
   thumbnail?: string;
 }
 
-type GridSize = 1 | 4 | 9 | 16;
+/** Grid size: 1x1, 2x2, 3x3, 4x4 hoặc 'list' (table view, không phải grid) */
+type GridSize = 1 | 4 | 9 | 16 | 'list';
+
+/** localStorage key cho layout choice */
+const LS_LAYOUT_KEY = 'camera-mgmt-layout';
+
+/** Test RTSP streams công khai — bấm để fill ngay vào form camera */
+const TEST_STREAMS: { label: string; url: string; type: 'pattern' | 'demo' | 'live'; description: string }[] = [
+  {
+    label: 'Test Pattern (rtsp.stream)',
+    url: 'rtsp://rtsp.stream/pattern',
+    type: 'pattern',
+    description: 'SMPTE color bars — kiểm tra player có decode được không',
+  },
+  {
+    label: 'Big Buck Bunny (Wowza VOD)',
+    url: 'rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4',
+    type: 'demo',
+    description: 'VOD demo Wowza — chạy lặp, tốt cho test decoder H.264',
+  },
+  {
+    label: 'Valser Live Stream',
+    url: 'rtsp://valser.ch:554/rtplive/mmshq_live',
+    type: 'live',
+    description: 'Stream live thực (có thể down theo giờ)',
+  },
+];
+
+/** Helper tools — info cards, không trigger gì, chỉ link tải về */
+const HELPER_TOOLS: { name: string; brand: string; url: string; description: string; os: string }[] = [
+  {
+    name: 'SADP Tool',
+    brand: 'Hikvision',
+    url: 'https://www.hikvision.com/en/support/tools/hitools/clea8b3b4ed364fde/',
+    description: 'Scan IP của camera Hikvision trong LAN, đổi IP, reset password',
+    os: 'Windows / macOS',
+  },
+  {
+    name: 'ConfigTool',
+    brand: 'Dahua',
+    url: 'https://dahuawiki.com/ConfigTool',
+    description: 'Discover Dahua/Imou cameras, config IP, upgrade firmware',
+    os: 'Windows / macOS',
+  },
+  {
+    name: 'Advanced IP Scanner',
+    brand: 'Generic',
+    url: 'https://www.advanced-ip-scanner.com/',
+    description: 'Quét toàn bộ thiết bị trong LAN — phát hiện cả camera ONVIF chưa biết IP',
+    os: 'Windows',
+  },
+  {
+    name: 'ONVIF Device Manager (ODM)',
+    brand: 'ONVIF',
+    url: 'https://sourceforge.net/projects/onvifdm/',
+    description: 'Test ONVIF profile, xem stream live, PTZ control, snapshot',
+    os: 'Windows (open-source)',
+  },
+  {
+    name: 'VLC Media Player',
+    brand: 'Test',
+    url: 'https://www.videolan.org/vlc/',
+    description: 'Media → Open Network Stream → paste RTSP → test xem URL có hoạt động chưa',
+    os: 'All platforms',
+  },
+];
+
+/** Camera công cộng để test */
+const PUBLIC_CAMERA_LINKS: { name: string; url: string; description: string }[] = [
+  {
+    name: 'insecam.org',
+    url: 'https://www.insecam.org/',
+    description: 'Directory camera public toàn cầu — categorized by country/city/type',
+  },
+  {
+    name: 'Shodan.io (port:554)',
+    url: 'https://www.shodan.io/search?query=port%3A554',
+    description: 'Search engine cho thiết bị IoT lộ ngoài Internet — filter RTSP port 554',
+  },
+];
 
 /* ─── Constants ─────────────────────────────────────────── */
 // Fallback list khi API rỗng (lần đầu setup, chưa có camera nào trong DB)
@@ -75,13 +157,34 @@ const MOCK_RECORDINGS: Recording[] = [
 
 /* ─── Helpers ────────────────────────────────────────────── */
 function gridCols(size: GridSize) {
+  if (size === 'list') return 'grid-cols-1';
   if (size === 1)  return 'grid-cols-1';
   if (size === 4)  return 'grid-cols-2';
   if (size === 9)  return 'grid-cols-3';
   return 'grid-cols-4';
 }
 
-function slotCount(size: GridSize): number { return size; }
+function slotCount(size: GridSize): number {
+  if (size === 'list') return 16; // list view shows all
+  return size;
+}
+
+/** Đọc layout từ localStorage — fallback về 4 nếu invalid */
+function loadLayoutFromLS(): GridSize {
+  try {
+    const raw = localStorage.getItem(LS_LAYOUT_KEY);
+    if (!raw) return 4;
+    if (raw === 'list') return 'list';
+    const n = Number(raw);
+    if ([1, 4, 9, 16].includes(n)) return n as GridSize;
+  } catch { /* SSR / privacy mode */ }
+  return 4;
+}
+
+/** Lưu layout vào localStorage */
+function saveLayoutToLS(size: GridSize) {
+  try { localStorage.setItem(LS_LAYOUT_KEY, String(size)); } catch { /* noop */ }
+}
 
 /* ─── Sub-components ─────────────────────────────────────── */
 function ControlBtn({ icon: Icon, label, active, onClick, danger }: {
@@ -232,7 +335,7 @@ function CameraSlot({ slotIndex, cameraId, cameras, onPlay, onFullscreen, onRemo
 /* ─── Main Component ─────────────────────────────────────── */
 export default function CameraManagement() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [gridSize, setGridSize] = useState<GridSize>(4);
+  const [gridSize, setGridSize] = useState<GridSize>(() => loadLayoutFromLS());
 
   // ── Cameras từ API (admin view) ──
   const [cameras, setCameras] = useState<CameraEntry[]>(FALLBACK_CAMERAS);
@@ -242,6 +345,16 @@ export default function CameraManagement() {
   const [configOpen, setConfigOpen] = useState(false);
   const [editingCamera, setEditingCamera] = useState<CameraAdmin | null>(null);
   const [discovering, setDiscovering] = useState(false);
+
+  // ── Tools & Test Streams collapsible panel ──
+  const [toolsPanelOpen, setToolsPanelOpen] = useState(false);
+
+  // ── Standalone RTSP URL builder (mở từ panel test streams, ko cần edit camera) ──
+  const [standaloneBuilderOpen, setStandaloneBuilderOpen] = useState(false);
+  const [pendingRtspUrl, setPendingRtspUrl] = useState<string | null>(null);
+
+  // Save layout to LS khi đổi
+  useEffect(() => { saveLayoutToLS(gridSize); }, [gridSize]);
 
   const loadCameras = useCallback(async () => {
     setCamerasLoading(true);
@@ -574,20 +687,40 @@ export default function CameraManagement() {
 
             <div className="flex-1" />
 
-            {/* Grid size switcher */}
-            <div className="flex items-center gap-1 bg-white/5 rounded p-0.5">
-              {([1, 4, 9, 16] as GridSize[]).map(s => (
+            {/* Grid size switcher: 1x1 / 2x2 / 3x3 / 4x4 / List */}
+            <div className="flex items-center gap-1 bg-white/5 rounded p-0.5"
+              title="Chọn cách bố trí lưới giám sát — nhớ qua localStorage">
+              {([1, 4, 9, 16, 'list'] as GridSize[]).map(s => (
                 <button
-                  key={s}
+                  key={String(s)}
                   onClick={() => setGridSize(s)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all
+                  className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all inline-flex items-center gap-1
                     ${gridSize === s ? 'text-white shadow-sm' : 'text-white/40 hover:text-white/70'}`}
                   style={gridSize === s ? { background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)' } : {}}
+                  title={
+                    s === 1 ? '1×1 — Một camera lớn' :
+                    s === 4 ? '2×2 — 4 camera' :
+                    s === 9 ? '3×3 — 9 camera' :
+                    s === 16 ? '4×4 — 16 camera' :
+                    'List — Bảng danh sách chi tiết'
+                  }
                 >
-                  {s === 1 ? '1×1' : s === 4 ? '2×2' : s === 9 ? '3×3' : '4×4'}
+                  {s === 'list' ? <><List className="w-3 h-3" />List</> :
+                   s === 1 ? '1×1' :
+                   s === 4 ? <><Grid3x3 className="w-3 h-3" />2×2</> :
+                   s === 9 ? '3×3' : '4×4'}
                 </button>
               ))}
             </div>
+
+            {/* Tools toggle */}
+            <button
+              onClick={() => setToolsPanelOpen(p => !p)}
+              className={`p-1.5 rounded transition-colors ${toolsPanelOpen ? 'bg-violet-600/30 text-violet-200' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
+              title="Mở/đóng panel Công cụ & Test Streams"
+            >
+              <Wrench className="w-4 h-4" />
+            </button>
 
             <button
               onClick={() => setFullscreenCamera(cameras.find(c => gridAssignments[0] === c.id) ?? null)}
@@ -597,29 +730,66 @@ export default function CameraManagement() {
             </button>
           </div>
 
-          {/* Surveillance grid */}
+          {/* Surveillance grid hoặc List view */}
           <div className="flex-1 p-3 overflow-auto">
-            <div className={`grid ${gridCols(gridSize)} gap-2 h-full`} style={{ gridAutoRows: `calc(${100 / Math.sqrt(slots)}% - 8px)` }}>
-              {Array.from({ length: slots }).map((_, i) => (
-                <div
-                  key={i}
-                  onClick={() => setSelectedSlot(i)}
-                  className={`cursor-pointer rounded transition-all ${selectedSlot === i ? 'ring-2 ring-purple-500' : ''}`}
-                >
-                  <CameraSlot
-                    slotIndex={i}
-                    cameraId={gridAssignments[i] ?? null}
-                    cameras={cameras}
-                    onPlay={cam => openVideoPlayer(
-                      DEMO_VIDEOS[cameras.indexOf(cam) % DEMO_VIDEOS.length]?.url ?? DEMO_VIDEOS[0].url,
-                      cam.name
-                    )}
-                    onFullscreen={openFullscreen}
-                    onRemove={removeFromSlot}
-                  />
-                </div>
-              ))}
-            </div>
+            {gridSize === 'list' ? (
+              /* ── List view: table chi tiết, không phải grid ── */
+              <CameraListView
+                cameras={cameras}
+                onPlay={cam => openVideoPlayer(
+                  DEMO_VIDEOS[cameras.indexOf(cam) % DEMO_VIDEOS.length]?.url ?? DEMO_VIDEOS[0].url,
+                  cam.name
+                )}
+                onFullscreen={openFullscreen}
+                onEdit={handleEditCamera}
+                onDelete={handleDeleteCamera}
+              />
+            ) : (
+              /* ── Grid view: 1x1 / 2x2 / 3x3 / 4x4 ── */
+              <div
+                className={`grid ${gridCols(gridSize)} gap-2 h-full`}
+                style={{ gridAutoRows: `calc(${100 / Math.sqrt(slots || 4)}% - 8px)` }}
+              >
+                {Array.from({ length: slots }).map((_, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setSelectedSlot(i)}
+                    className={`cursor-pointer rounded transition-all ${selectedSlot === i ? 'ring-2 ring-purple-500' : ''}`}
+                  >
+                    <CameraSlot
+                      slotIndex={i}
+                      cameraId={gridAssignments[i] ?? null}
+                      cameras={cameras}
+                      onPlay={cam => openVideoPlayer(
+                        DEMO_VIDEOS[cameras.indexOf(cam) % DEMO_VIDEOS.length]?.url ?? DEMO_VIDEOS[0].url,
+                        cam.name
+                      )}
+                      onFullscreen={openFullscreen}
+                      onRemove={removeFromSlot}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tools & Test Streams panel (collapsible, ở dưới grid) */}
+            {toolsPanelOpen && (
+              <ToolsPanel
+                onClose={() => setToolsPanelOpen(false)}
+                onUseTestStream={(url, label) => {
+                  // Mở video player luôn với URL test (fallback demo nếu RTSP không decode được trên trình duyệt)
+                  openVideoPlayer(url, label, true);
+                  toast(`Đang load: ${label}`, { icon: '📡', duration: 3000 });
+                }}
+                onOpenRtspBuilder={() => setStandaloneBuilderOpen(true)}
+                onCreateCameraWithUrl={url => {
+                  setPendingRtspUrl(url);
+                  setEditingCamera(null);
+                  setConfigOpen(true);
+                  toast.success('Mở form Thêm camera — paste URL vào tab Stream');
+                }}
+              />
+            )}
           </div>
 
           {/* Global control bar */}
@@ -881,10 +1051,293 @@ export default function CameraManagement() {
       {/* ── Camera Config Modal (ONVIF Add/Edit) ── */}
       <CameraConfigModal
         open={configOpen}
-        onClose={() => setConfigOpen(false)}
+        onClose={() => { setConfigOpen(false); setPendingRtspUrl(null); }}
         camera={editingCamera}
         onSaved={() => loadCameras()}
       />
+
+      {/* ── Standalone RTSP URL Builder (mở từ panel Tools, ko cần edit camera) ── */}
+      <RtspUrlBuilder
+        open={standaloneBuilderOpen}
+        initialUrl={pendingRtspUrl ?? undefined}
+        onClose={() => setStandaloneBuilderOpen(false)}
+        onConfirm={url => {
+          // Copy URL vào clipboard và hiện hint cho user
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(url).then(
+              () => toast.success('Đã copy URL — paste vào ô RTSP của camera mới'),
+              () => toast(url, { icon: '📋', duration: 8000 })
+            );
+          } else {
+            toast(url, { icon: '📋', duration: 10000 });
+          }
+          setStandaloneBuilderOpen(false);
+        }}
+      />
     </>
+  );
+}
+
+/* ─── List View ──────────────────────────────────────────── */
+interface CameraListViewProps {
+  cameras: CameraEntry[];
+  onPlay: (cam: CameraEntry) => void;
+  onFullscreen: (cam: CameraEntry) => void;
+  onEdit: (cam: CameraEntry) => void;
+  onDelete: (cam: CameraEntry) => void;
+}
+
+function CameraListView({ cameras, onPlay, onFullscreen, onEdit, onDelete }: CameraListViewProps) {
+  if (cameras.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-white/30">
+        <Camera className="w-12 h-12 mb-3" />
+        <p className="text-sm">Chưa có camera nào</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-[#0d0d0d] border border-white/[0.06] rounded-lg overflow-hidden">
+      <table className="w-full text-left text-xs">
+        <thead className="bg-white/[0.03] border-b border-white/[0.06]">
+          <tr className="text-white/40 uppercase text-[10px] tracking-widest">
+            <th className="px-3 py-2.5 font-semibold">Status</th>
+            <th className="px-3 py-2.5 font-semibold">Tên camera</th>
+            <th className="px-3 py-2.5 font-semibold">Hãng</th>
+            <th className="px-3 py-2.5 font-semibold">Vị trí</th>
+            <th className="px-3 py-2.5 font-semibold">Channel</th>
+            <th className="px-3 py-2.5 font-semibold text-right">Hành động</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cameras.map(cam => (
+            <tr key={cam.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+              <td className="px-3 py-2">
+                <div className="flex items-center gap-1.5">
+                  {cam.status === 'online'
+                    ? <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_6px_#4ade80]" />
+                    : <div className="w-2 h-2 rounded-full bg-red-500" />}
+                  <span className={`text-[10px] font-bold ${cam.status === 'online' ? 'text-green-400' : 'text-red-400'}`}>
+                    {cam.status.toUpperCase()}
+                  </span>
+                </div>
+              </td>
+              <td className="px-3 py-2 text-white/90 font-medium">{cam.name}</td>
+              <td className="px-3 py-2 text-white/60">
+                <span className="px-2 py-0.5 rounded bg-white/5 text-[10px]">{cam.brand}</span>
+              </td>
+              <td className="px-3 py-2 text-white/60">{cam.location}</td>
+              <td className="px-3 py-2 text-white/50 font-mono text-[10px]">{cam.channel}</td>
+              <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-1">
+                  <button onClick={() => onPlay(cam)} title="Play" className="p-1.5 rounded hover:bg-purple-500/20 text-purple-400">
+                    <Play className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => onFullscreen(cam)} title="Fullscreen" className="p-1.5 rounded hover:bg-white/10 text-white/60">
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                  {cam._admin && (
+                    <>
+                      <button onClick={() => onEdit(cam)} title="Edit" className="p-1.5 rounded hover:bg-cyan-500/20 text-cyan-400">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => onDelete(cam)} title="Delete" className="p-1.5 rounded hover:bg-red-500/20 text-red-400">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ─── Tools & Test Streams Panel ─────────────────────────── */
+interface ToolsPanelProps {
+  onClose: () => void;
+  onUseTestStream: (url: string, label: string) => void;
+  onOpenRtspBuilder: () => void;
+  onCreateCameraWithUrl: (url: string) => void;
+}
+
+function ToolsPanel({ onClose, onUseTestStream, onOpenRtspBuilder, onCreateCameraWithUrl }: ToolsPanelProps) {
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  async function copyUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(url);
+      toast.success('Copied');
+      setTimeout(() => setCopiedUrl(null), 1500);
+    } catch {
+      toast.error('Không copy được');
+    }
+  }
+
+  return (
+    <div className="mt-4 bg-[#0d0d0d] border border-white/[0.06] rounded-lg overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02] border-b border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <Wrench className="w-4 h-4 text-violet-300" />
+          <h3 className="text-sm font-semibold text-white/90">Công cụ hỗ trợ & Test Streams</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenRtspBuilder}
+            className="px-2.5 py-1 rounded text-[11px] font-medium bg-violet-600/30 hover:bg-violet-600/50 text-violet-200 inline-flex items-center gap-1"
+            title="Mở wizard sinh URL RTSP theo brand camera"
+          >
+            <Wrench className="w-3 h-3" />
+            Wizard tạo URL RTSP
+          </button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/10 text-white/40">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Grid: 3 cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 p-4">
+
+        {/* Card 1: Test Streams */}
+        <div className="bg-[#050505] border border-white/[0.06] rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Camera className="w-4 h-4 text-cyan-400" />
+            <h4 className="text-xs font-semibold text-white/90">Test Streams (công khai)</h4>
+          </div>
+          <p className="text-[10px] text-white/40 mb-3">
+            Luồng RTSP công khai dùng thử player + test decode. Bấm <b>[Sử dụng]</b> để mở viewer ngay.
+          </p>
+          <div className="flex flex-col gap-2">
+            {TEST_STREAMS.map(s => (
+              <div key={s.url} className="rounded border border-white/[0.06] bg-white/[0.02] p-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${
+                        s.type === 'pattern' ? 'bg-amber-500/20 text-amber-300' :
+                        s.type === 'demo' ? 'bg-cyan-500/20 text-cyan-300' :
+                        'bg-red-500/20 text-red-300'
+                      }`}>
+                        {s.type.toUpperCase()}
+                      </span>
+                      <p className="text-[11px] text-white/80 font-medium truncate">{s.label}</p>
+                    </div>
+                    <code className="block text-[9px] text-white/40 font-mono truncate" title={s.url}>{s.url}</code>
+                    <p className="text-[9px] text-white/30 mt-0.5">{s.description}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 mt-1.5">
+                  <button
+                    onClick={() => onUseTestStream(s.url, s.label)}
+                    className="flex-1 px-2 py-1 rounded text-[10px] font-medium bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 inline-flex items-center justify-center gap-1"
+                  >
+                    <Play className="w-2.5 h-2.5" />
+                    Sử dụng
+                  </button>
+                  <button
+                    onClick={() => copyUrl(s.url)}
+                    className="px-2 py-1 rounded text-[10px] bg-white/5 hover:bg-white/10 text-white/60"
+                    title="Copy URL"
+                  >
+                    {copiedUrl === s.url ? '✓' : <Copy className="w-2.5 h-2.5" />}
+                  </button>
+                  <button
+                    onClick={() => onCreateCameraWithUrl(s.url)}
+                    className="px-2 py-1 rounded text-[10px] bg-violet-500/20 hover:bg-violet-500/30 text-violet-300"
+                    title="Tạo camera mới với URL này"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 2: Helper Tools */}
+        <div className="bg-[#050505] border border-white/[0.06] rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Network className="w-4 h-4 text-emerald-400" />
+            <h4 className="text-xs font-semibold text-white/90">Tìm camera trong LAN</h4>
+          </div>
+          <p className="text-[10px] text-white/40 mb-3">
+            Tải các tool để scan & cấu hình camera. Yêu cầu máy stream + camera <b>cùng mạng LAN</b>.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {HELPER_TOOLS.map(t => (
+              <a
+                key={t.name}
+                href={t.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 p-2 rounded border border-white/[0.06] hover:border-emerald-500/30 bg-white/[0.02] hover:bg-emerald-500/5 transition-all group"
+              >
+                <Download className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <p className="text-[11px] text-white/80 group-hover:text-white font-medium">{t.name}</p>
+                    <span className="px-1.5 py-0 rounded text-[8px] bg-white/10 text-white/60 uppercase">{t.brand}</span>
+                  </div>
+                  <p className="text-[9px] text-white/40">{t.description}</p>
+                  <p className="text-[9px] text-emerald-400/60 mt-0.5">{t.os}</p>
+                </div>
+                <ExternalLink className="w-3 h-3 text-white/30 group-hover:text-emerald-400 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 3: Public Camera Directories */}
+        <div className="bg-[#050505] border border-white/[0.06] rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Globe className="w-4 h-4 text-amber-400" />
+            <h4 className="text-xs font-semibold text-white/90">Camera công cộng (test)</h4>
+          </div>
+          <p className="text-[10px] text-white/40 mb-3">
+            Trang web liệt kê camera public toàn cầu — dùng để test player hoặc nghiên cứu OPSEC.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {PUBLIC_CAMERA_LINKS.map(l => (
+              <a
+                key={l.url}
+                href={l.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 p-2 rounded border border-white/[0.06] hover:border-amber-500/30 bg-white/[0.02] hover:bg-amber-500/5 transition-all group"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-white/80 group-hover:text-white font-medium">{l.name}</p>
+                  <p className="text-[9px] text-white/40">{l.description}</p>
+                </div>
+                <ExternalLink className="w-3 h-3 text-white/30 group-hover:text-amber-400 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+
+          {/* Notes & warnings */}
+          <div className="mt-3 pt-3 border-t border-white/[0.06]">
+            <p className="text-[10px] text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              Lưu ý quan trọng
+            </p>
+            <ul className="space-y-1 text-[10px] text-white/50">
+              <li>• Camera + máy stream phải cùng <b className="text-white/70">LAN</b></li>
+              <li>• Stream ra Internet: cần <b className="text-white/70">port forward</b> hoặc VPN</li>
+              <li>• Port RTSP default: <code className="text-cyan-300">554</code></li>
+              <li>• Trình duyệt KHÔNG decode RTSP trực tiếp — cần proxy HLS/WebRTC</li>
+              <li>• Server pixiai có HLS proxy: <code className="text-cyan-300">/api/cameras/:id/hls</code></li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
   );
 }

@@ -12,9 +12,10 @@
  * Test button: gọi /api/admin/cameras/:id/test → TCP probe → toast.
  */
 import { useState, useEffect } from 'react'
-import { X, Loader2, TestTube2, CheckCircle, AlertCircle, Network, Lock, Tv, MapPin } from 'lucide-react'
+import { X, Loader2, TestTube2, CheckCircle, AlertCircle, Network, Lock, Tv, MapPin, Wrench } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { cameraService, type CameraAdmin, type CameraCreatePayload } from '@/services/camera.service'
+import RtspUrlBuilder, { type RtspBrand } from '@/components/admin/RtspUrlBuilder'
 
 const BRANDS = [
   { id: 'Hikvision', label: 'Hikvision' },
@@ -50,6 +51,9 @@ export default function CameraConfigModal({ open, onClose, camera, onSaved }: Pr
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  // RTSP URL builder modal — sinh URL tự động theo brand
+  const [rtspBuilderOpen, setRtspBuilderOpen] = useState(false)
+  const [rtspBuilderTarget, setRtspBuilderTarget] = useState<'main' | 'sub'>('main')
   const [form, setForm] = useState<CameraCreatePayload>({
     name: '', ipAddress: '', brand: 'Hikvision',
     httpPort: 80, rtspPort: 554, onvifPort: 80,
@@ -257,16 +261,35 @@ export default function CameraConfigModal({ open, onClose, camera, onSaved }: Pr
               <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-xs text-cyan-200">
                 📡 <b>RTSP URL tự động:</b> Để trống ô bên dưới → server tự build URL theo brand đã chọn ở tab Cơ bản.
                 Override chỉ khi camera có path đặc biệt không match preset.
+                Hoặc bấm nút <b>"🔧 Tạo URL RTSP tự động"</b> để dùng wizard sinh URL theo brand.
               </div>
               <Field label="RTSP Main URL (override)" hint="Để trống → auto build theo brand">
-                <input type="text" value={form.rtspMainUrl || ''} onChange={e => update('rtspMainUrl', e.target.value)}
-                  placeholder="rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/101"
-                  className="w-full px-3 py-2 rounded-lg text-sm font-mono" />
+                <div className="flex gap-2">
+                  <input type="text" value={form.rtspMainUrl || ''} onChange={e => update('rtspMainUrl', e.target.value)}
+                    placeholder="rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/101"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" />
+                  <button type="button"
+                    onClick={() => { setRtspBuilderTarget('main'); setRtspBuilderOpen(true) }}
+                    title="Mở wizard tạo URL RTSP tự động theo brand"
+                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-violet-600/20 hover:bg-violet-600/40 text-violet-200 border border-violet-500/30 inline-flex items-center gap-1.5 flex-shrink-0">
+                    <Wrench className="w-3.5 h-3.5" />
+                    Tạo URL
+                  </button>
+                </div>
               </Field>
               <Field label="RTSP Sub URL (override)" hint="Stream phụ, độ phân giải thấp hơn cho mobile/grid view">
-                <input type="text" value={form.rtspSubUrl || ''} onChange={e => update('rtspSubUrl', e.target.value)}
-                  placeholder="rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/102"
-                  className="w-full px-3 py-2 rounded-lg text-sm font-mono" />
+                <div className="flex gap-2">
+                  <input type="text" value={form.rtspSubUrl || ''} onChange={e => update('rtspSubUrl', e.target.value)}
+                    placeholder="rtsp://admin:pass@192.168.1.64:554/Streaming/Channels/102"
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-mono" />
+                  <button type="button"
+                    onClick={() => { setRtspBuilderTarget('sub'); setRtspBuilderOpen(true) }}
+                    title="Mở wizard tạo URL RTSP tự động theo brand"
+                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-violet-600/20 hover:bg-violet-600/40 text-violet-200 border border-violet-500/30 inline-flex items-center gap-1.5 flex-shrink-0">
+                    <Wrench className="w-3.5 h-3.5" />
+                    Tạo URL
+                  </button>
+                </div>
               </Field>
               <Field label="HLS Proxy URL (tuỳ chọn)" hint="Nếu có proxy HLS (vd: ffmpeg restream → /hls/cam-1.m3u8)">
                 <input type="text" value={form.hlsUrl || ''} onChange={e => update('hlsUrl', e.target.value)}
@@ -346,6 +369,25 @@ export default function CameraConfigModal({ open, onClose, camera, onSaved }: Pr
           </div>
         </div>
       </div>
+
+      {/* RTSP URL Builder modal — sinh URL tự động theo brand */}
+      <RtspUrlBuilder
+        open={rtspBuilderOpen}
+        initialBrand={form.brand as RtspBrand}
+        initialUrl={rtspBuilderTarget === 'main' ? form.rtspMainUrl : form.rtspSubUrl}
+        onClose={() => setRtspBuilderOpen(false)}
+        onConfirm={(url, brand) => {
+          if (rtspBuilderTarget === 'main') update('rtspMainUrl', url)
+          else update('rtspSubUrl', url)
+          // sync brand từ wizard → form (nếu user đổi brand trong wizard)
+          if (brand !== 'Custom' && brand !== form.brand) {
+            update('brand', brand)
+            toast.success(`Đã update brand → ${brand} + URL`)
+          } else {
+            toast.success(`Đã update RTSP ${rtspBuilderTarget === 'main' ? 'Main' : 'Sub'} URL`)
+          }
+        }}
+      />
     </div>
   )
 }
