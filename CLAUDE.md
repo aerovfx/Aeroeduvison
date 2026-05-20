@@ -15,8 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `86d0b1d` (revision pixiai-00365-xxx, 2026-05-20 — Multi-career KG + Phụ huynh trong đăng ký + Career survey gate + Career World 25 nghề + Profile pages + Course extras)
+- Last deployed commit: `1fdc513` (revision pixiai-00366-xxx, 2026-05-20 — Admin user mgmt + 2FA + Forgot pwd polish + Anti-screenshot v3 + Career survey retake + Free course links fix)
 - Commits since last deploy: `0/5`
+- Prev: `9ce4c21` — Admin module quản lý người dùng (HS/GV/PH/Admin)
+- Prev: `aade959` — 2FA TOTP + Forgot password polish
+- Prev: `56ce2d1` — Sửa link GitHub repo trong free course
+- Prev: `1899074` — Cho phép làm lại career survey
+- Prev: `86d0b1d` → pixiai-00365-hal (Multi-career KG + Phụ huynh registration + Career survey + Career World)
 - Prev: `9572765` — Career survey 4-step wizard cho GV/PH + useCareerSurveyGuard
 - Prev: `374dd90` — Pixel Odyssey 25 nghề + 125 câu hỏi đa dạng
 - Prev: `58ccd03` — Phụ huynh option trong đăng ký (chia chung tài khoản TEACHER)
