@@ -19,6 +19,7 @@ import CircuitBuilder from './CircuitBuilder'
 import CircuitPresets from './CircuitPresets'
 import SemiconductorLab from './SemiconductorLab'
 import CustomWokwiBoard from './CustomWokwiBoard'
+import AnalogCircuitBuilder from '@/components/iot/AnalogCircuitBuilder'
 import usePageTitle from '@/hooks/usePageTitle'
 
 // ───────────────────────────────────────────────────────────────────
@@ -1288,7 +1289,7 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 export default function IoTLab() {
   usePageTitle('IoT Lab — Mạch điện & Arduino')
   const [mode, setMode] = useState<'arduino' | 'analog' | 'semi' | 'custom'>('arduino')
-  const [analogTab, setAnalogTab] = useState<'builder' | 'presets'>('presets')
+  const [analogTab, setAnalogTab] = useState<'builder' | 'presets' | 'assembly'>('assembly')
   const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)
   const [running, setRunning] = useState(true)
   const [tMs, setTMs] = useState(0)
@@ -1508,8 +1509,34 @@ export default function IoTLab() {
 
         {mode === 'analog' && (
           <>
-            {/* Sub-tabs: Mạch mẫu (presets) vs Mô phỏng tự do (builder) */}
-            <div className="flex items-center gap-1 bg-card dark:bg-zinc-900/60 border border-border rounded-lg p-1 mb-4 w-fit">
+            {/* Banner — NEW feature highlight */}
+            {analogTab === 'assembly' && (
+              <div className="rounded-2xl bg-gradient-to-r from-cyan-500/[0.10] to-blue-500/[0.10] border border-cyan-500/30 p-5 mb-4">
+                <h2 className="text-xl font-bold text-cyan-300 mb-2 flex items-center gap-2">
+                  🔌 Mạch điện Analog — Tự lắp ghép
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-500/30 text-cyan-100 font-bold ml-1">MỚI</span>
+                </h2>
+                <p className="text-sm text-white/70">
+                  Tự lắp ghép mạch điện với linh kiện có sẵn (pin, LED, điện trở, công tắc, biến trở,
+                  tụ điện, cuộn cảm, buzzer…). Kéo-thả vào canvas, nối dây, bấm "Mô phỏng" để xem mạch
+                  chạy. Không cần lập trình — học vật lý mạch điện cơ bản.
+                </p>
+              </div>
+            )}
+
+            {/* Sub-tabs: 3 chế độ analog */}
+            <div className="flex items-center gap-1 bg-card dark:bg-zinc-900/60 border border-border rounded-lg p-1 mb-4 w-fit flex-wrap">
+              <button
+                onClick={() => setAnalogTab('assembly')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'assembly'
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40'
+                    : 'text-zinc-400 hover:text-foreground'
+                }`}
+              >
+                🔌 Tự lắp ghép
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/30 ml-1">NEW</span>
+              </button>
               <button
                 onClick={() => setAnalogTab('presets')}
                 className={`px-3 py-1.5 text-xs rounded-md transition ${
@@ -1524,13 +1551,14 @@ export default function IoTLab() {
                 onClick={() => setAnalogTab('builder')}
                 className={`px-3 py-1.5 text-xs rounded-md transition ${
                   analogTab === 'builder'
-                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40'
+                    ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40'
                     : 'text-zinc-400 hover:text-foreground'
                 }`}
               >
-                ⚙ Mô phỏng tự do (ghép linh kiện)
+                ⚙ Mô phỏng nối tiếp 3-slot
               </button>
             </div>
+            {analogTab === 'assembly' && <AnalogCircuitBuilder />}
             {analogTab === 'presets'  && <CircuitPresets />}
             {analogTab === 'builder'  && <CircuitBuilder />}
           </>
