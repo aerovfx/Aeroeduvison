@@ -4,10 +4,14 @@ import {
   Plus, Search, Users, Trash2, UserPlus,
   BarChart3, Calendar, GraduationCap, Loader2, School, X,
   Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download,
+  Building2, BookOpenCheck,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import * as XLSX from 'xlsx'
 import { api } from '@/services/api'
+
+/** SCHOOL = lớp tại trường chính thức | CENTER = lớp tại trung tâm */
+type ContextType = 'SCHOOL' | 'CENTER'
 
 interface Class {
   id: string
@@ -17,6 +21,10 @@ interface Class {
   description?: string
   studentCount: number
   createdAt: string
+  /** context_type phân biệt trường học / trung tâm (2026-05-20) */
+  context_type?: ContextType
+  /** Tên trường hoặc tên trung tâm */
+  institution_name?: string
 }
 
 interface Student {
@@ -64,6 +72,24 @@ function StatusBadge({
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${cls}`}>
       {children}
+    </span>
+  )
+}
+
+/** Badge phân biệt trường học vs trung tâm */
+function ContextBadge({ type }: { type?: ContextType }) {
+  if (!type || type === 'SCHOOL') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+        <School className="w-3 h-3" />
+        Trường
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
+      <Building2 className="w-3 h-3" />
+      Trung tâm
     </span>
   )
 }
@@ -861,11 +887,15 @@ export default function ClassesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<string | null>(null)
 
+  const [contextFilter, setContextFilter] = useState<'ALL' | ContextType>('ALL')
+
   const [newClass, setNewClass] = useState({
     name: '',
     grade: 'Khối 9',
     schoolYear: '2025-2026',
     description: '',
+    context_type: 'SCHOOL' as ContextType,
+    institution_name: '',
   })
 
   useEffect(() => {
@@ -893,7 +923,7 @@ export default function ClassesPage() {
       await api.post('/classes', newClass)
       toast.success('Đã tạo lớp học thành công')
       setCreateOpen(false)
-      setNewClass({ name: '', grade: 'Khối 9', schoolYear: '2025-2026', description: '' })
+      setNewClass({ name: '', grade: 'Khối 9', schoolYear: '2025-2026', description: '', context_type: 'SCHOOL', institution_name: '' })
       fetchClasses()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
@@ -913,12 +943,20 @@ export default function ClassesPage() {
     }
   }
 
-  const filtered = classes.filter(
-    c =>
+  const filtered = classes.filter(c => {
+    const matchSearch =
       !searchQuery ||
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.grade.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      c.grade.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.institution_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const matchCtx =
+      contextFilter === 'ALL' ||
+      (c.context_type || 'SCHOOL') === contextFilter
+    return matchSearch && matchCtx
+  })
+
+  const schoolCount = classes.filter(c => (c.context_type || 'SCHOOL') === 'SCHOOL').length
+  const centerCount = classes.filter(c => c.context_type === 'CENTER').length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50/30 px-4 sm:px-6 lg:px-8 py-8">
@@ -955,16 +993,40 @@ export default function ClassesPage() {
             </button>
           </div>
         </div>
-        <div className="max-w-md">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm lớp học..."
+              placeholder="Tìm kiếm lớp, khối, tên trường..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+              className="w-full sm:w-80 pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
             />
+          </div>
+          {/* Context filter tabs */}
+          <div className="flex items-center gap-1.5 bg-gray-100 rounded-xl p-1">
+            {([
+              { key: 'ALL',    label: 'Tất cả',    count: classes.length },
+              { key: 'SCHOOL', label: 'Trường',    count: schoolCount, icon: <School className="w-3.5 h-3.5" /> },
+              { key: 'CENTER', label: 'Trung tâm', count: centerCount, icon: <Building2 className="w-3.5 h-3.5" /> },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setContextFilter(tab.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  contextFilter === tab.key
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {'icon' in tab && tab.icon}
+                {tab.label}
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                  contextFilter === tab.key ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-500'
+                }`}>{tab.count}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -999,7 +1061,13 @@ export default function ClassesPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-purple-600 truncate mb-3">{cls.name}</h3>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <ContextBadge type={cls.context_type} />
+                    {cls.institution_name && (
+                      <span className="text-[11px] text-gray-500 truncate">{cls.institution_name}</span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-purple-600 truncate mb-2">{cls.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap text-sm">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-600 border border-purple-200">
                       <GraduationCap className="h-3.5 w-3.5" />
@@ -1030,13 +1098,19 @@ export default function ClassesPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => navigate(
-                    `/teacher/gradebook?grade=${encodeURIComponent(cls.grade)}&classId=${cls.id}&semester=HK2`
+                    `/teacher/gradebook?grade=${encodeURIComponent(cls.grade)}&classId=${cls.id}&semester=HK2&ctx=${cls.context_type || 'SCHOOL'}`
                   )}
-                  title="Mở sổ điểm TT58"
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-colors"
+                  title={cls.context_type === 'CENTER' ? 'Bảng điểm trung tâm' : 'Mở sổ điểm TT58'}
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${
+                    cls.context_type === 'CENTER'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  <FileSpreadsheet className="h-3.5 w-3.5" />
-                  Sổ điểm
+                  {cls.context_type === 'CENTER'
+                    ? <><BookOpenCheck className="h-3.5 w-3.5" />Bảng điểm</>
+                    : <><FileSpreadsheet className="h-3.5 w-3.5" />Sổ điểm</>
+                  }
                 </button>
                 <button
                   onClick={() => {
@@ -1080,6 +1154,65 @@ export default function ClassesPage() {
       {/* Create Modal */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Tạo lớp học mới">
         <div className="space-y-4">
+          {/* Context type: SCHOOL vs CENTER */}
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-2 block">
+              Loại lớp học <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'SCHOOL', label: 'Lớp trường học', desc: 'Chấm điểm theo TT58', icon: School, color: 'blue' },
+                { value: 'CENTER', label: 'Lớp trung tâm', desc: 'Đánh giá linh hoạt',  icon: Building2, color: 'emerald' },
+              ] as const).map(opt => {
+                const Icon = opt.icon
+                const isSelected = newClass.context_type === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setNewClass({ ...newClass, context_type: opt.value })}
+                    className={`flex items-start gap-2 p-3 rounded-xl border-2 text-left transition-all ${
+                      isSelected
+                        ? opt.color === 'blue'
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-emerald-400 bg-emerald-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${
+                      isSelected
+                        ? opt.color === 'blue' ? 'text-blue-600' : 'text-emerald-600'
+                        : 'text-gray-400'
+                    }`} />
+                    <div>
+                      <p className={`text-sm font-semibold ${
+                        isSelected
+                          ? opt.color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
+                          : 'text-gray-700'
+                      }`}>{opt.label}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Institution name */}
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-1.5 block">
+              {newClass.context_type === 'CENTER' ? 'Tên trung tâm' : 'Tên trường học'}
+              <span className="ml-1 font-normal text-gray-400 text-xs">(tùy chọn)</span>
+            </label>
+            <input
+              type="text"
+              value={newClass.institution_name}
+              onChange={e => setNewClass({ ...newClass, institution_name: e.target.value })}
+              placeholder={newClass.context_type === 'CENTER' ? 'Ví dụ: Trung tâm Gia sư ABC' : 'Ví dụ: THPT Nguyễn Bỉnh Khiêm'}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+
           <div>
             <label className="text-sm font-bold text-gray-700 mb-1.5 block">
               Tên lớp <span className="text-red-500">*</span>

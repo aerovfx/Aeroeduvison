@@ -26028,6 +26028,16 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         // và DROP NOT NULL trên MỌI column không nằm trong whitelist của code.
         // Idempotent + an toàn (dữ liệu cũ vẫn còn).
 
+        // (0) Migrate TeacherClass — thêm context_type + institution_name
+        //     context_type: 'SCHOOL' (trường học) | 'CENTER' (trung tâm)
+        //     institution_name: tên trường hoặc tên trung tâm
+        try {
+          await pool.query(`ALTER TABLE "TeacherClass" ADD COLUMN IF NOT EXISTS "context_type" TEXT DEFAULT 'SCHOOL'`);
+          await pool.query(`ALTER TABLE "TeacherClass" ADD COLUMN IF NOT EXISTS "institution_name" TEXT`);
+        } catch (e) {
+          console.warn('[classes] migrate TeacherClass context cols:', e.message?.slice(0, 100));
+        }
+
         // (1) ADD COLUMN cho 7 cột code dùng
         const cols = [
           ['stt',    'INT'],
@@ -26245,15 +26255,17 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         if (!pool) return res.status(503).json({ error: 'DB not available' });
         await ensureClsTables();
 
-        const { name, grade, schoolYear, subject, description } = req.body || {};
+        const { name, grade, schoolYear, subject, description, context_type, institution_name } = req.body || {};
         if (!name) return res.status(400).json({ error: 'Tên lớp là bắt buộc' });
         const id = clsUUID();
         const now = new Date();
+        const ctxType = (context_type === 'CENTER') ? 'CENTER' : 'SCHOOL'; // whitelist
         const { rows } = await pool.query(
-          `INSERT INTO "TeacherClass" (id, name, grade, subject, "schoolYear", description, "teacherId", "createdAt", "updatedAt")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) RETURNING *`,
+          `INSERT INTO "TeacherClass" (id, name, grade, subject, "schoolYear", description, "teacherId", "context_type", "institution_name", "createdAt", "updatedAt")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10) RETURNING *`,
           [id, String(name).slice(0, 200), grade || null, subject || null,
-           schoolYear || null, description || null, tid, now]
+           schoolYear || null, description || null, tid,
+           ctxType, institution_name ? String(institution_name).slice(0, 200) : null, now]
         );
         console.log(`[classes:create] ✅ id=${id.slice(0,8)} name=${name} teacher=${tid.slice(0,8)}`);
         return res.status(201).json({ success: true, class: rows[0], id });

@@ -9,6 +9,11 @@
  * `html:not(.dark) .xxx`. Xem file để biết 20 rule sets. */
 @import './styles/light-mode.css';
 
+/* 📱 MOBILE RWD GLOBAL — Responsive Web Design fixes platform-wide.
+ * Touch targets, iOS no-zoom inputs, safe-area-inset, modal fullscreen
+ * mobile, table horizontal scroll, grid stack ≤640px, etc. */
+@import './styles/mobile.css';
+
 /* ============================================================
  * AI NATIVE DESIGN SYSTEM — globals.css
  * Light: flat white cards, bg-slate-50, pill tabs, purple accent
@@ -1486,4 +1491,10 @@ html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* Sidebar icon tooltip — slide-in từ trái sang phải */
+@keyframes sidebar-tooltip-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-6px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
 }

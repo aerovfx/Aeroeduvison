@@ -2,7 +2,8 @@
  * Sidebar — bilingual (VI / EN) via useLanguage()
  * Port từ app/(dashboard)/_components/sidebar.tsx
  */
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation } from 'react-router-dom'
 import {
   BarChart, Layout, BookOpen, FileEdit, FileText,
@@ -221,6 +222,46 @@ const adminSections: RouteSection[] = [
   },
 ]
 
+// ── SidebarTooltip ─────────────────────────────────────────────────────────
+/** Tooltip rendered as a body portal — tránh bị clip bởi overflow-y:auto của nav */
+function SidebarTooltip({
+  label,
+  badge,
+  anchorY,
+  anchorRight,
+  visible,
+}: {
+  label: string
+  badge?: string
+  anchorY: number
+  anchorRight: number
+  visible: boolean
+}) {
+  if (!visible) return null
+  return createPortal(
+    <div
+      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs font-medium rounded-md shadow-lg border border-border whitespace-nowrap"
+      style={{
+        position: 'fixed',
+        left: anchorRight + 8,
+        top: anchorY,
+        transform: 'translateY(-50%)',
+        zIndex: 9999,
+        pointerEvents: 'none',
+        animation: 'sidebar-tooltip-in 0.12s ease-out',
+      }}
+    >
+      {label}
+      {badge && (
+        <span className="text-[9px] px-1 py-0.5 rounded bg-[hsl(262,83%,58%)]/20 text-[hsl(262,83%,58%)] font-semibold leading-none">
+          {badge}
+        </span>
+      )}
+    </div>,
+    document.body,
+  )
+}
+
 // ── SidebarItem ────────────────────────────────────────────────────────────
 
 function SidebarItem({
@@ -234,44 +275,67 @@ function SidebarItem({
 }: Route & { label: string; collapsed: boolean; notifCount?: number }) {
   const location = useLocation()
   const isActive = location.pathname === href || location.pathname.startsWith(href + '/')
+  const linkRef = useRef<HTMLAnchorElement>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ y: number; right: number } | null>(null)
+
+  const handleMouseEnter = () => {
+    if (!collapsed || !linkRef.current) return
+    const rect = linkRef.current.getBoundingClientRect()
+    setTooltipPos({ y: rect.top + rect.height / 2, right: rect.right })
+  }
+  const handleMouseLeave = () => setTooltipPos(null)
 
   return (
-    <Link
-      to={href}
-      className={cn(
-        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative',
-        isActive
-          ? 'bg-[hsl(262,83%,58%)]/10 text-[hsl(262,83%,58%)]'
-          : isHighlighted
-          ? 'text-[hsl(262,83%,58%)] hover:bg-[hsl(262,83%,58%)]/8'
-          : 'text-muted-foreground hover:text-foreground hover:bg-accent',
-        collapsed && 'justify-center px-2',
-      )}
-      title={collapsed ? label : undefined}
-    >
-      <div className="relative shrink-0">
-        <Icon className={cn('w-4 h-4', isActive && 'text-[hsl(262,83%,58%)]')} />
-        {/* Red dot indicator khi collapsed + có notification */}
-        {collapsed && notifCount !== undefined && notifCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-1 ring-background" />
+    <>
+      <Link
+        ref={linkRef}
+        to={href}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative',
+          isActive
+            ? 'bg-[hsl(262,83%,58%)]/10 text-[hsl(262,83%,58%)]'
+            : isHighlighted
+            ? 'text-[hsl(262,83%,58%)] hover:bg-[hsl(262,83%,58%)]/8'
+            : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+          collapsed && 'justify-center px-2',
         )}
-      </div>
-      {!collapsed && (
-        <>
-          <span className="flex-1 truncate">{label}</span>
-          {notifCount !== undefined && notifCount > 0 && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 animate-pulse">
-              {notifCount > 99 ? '99+' : notifCount}
-            </span>
+      >
+        <div className="relative shrink-0">
+          <Icon className={cn('w-4 h-4', isActive && 'text-[hsl(262,83%,58%)]')} />
+          {/* Red dot indicator khi collapsed + có notification */}
+          {collapsed && notifCount !== undefined && notifCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500 ring-1 ring-background" />
           )}
-          {badge && !notifCount && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[hsl(262,83%,58%)]/15 text-[hsl(262,83%,58%)] font-semibold">
-              {badge}
-            </span>
-          )}
-        </>
+        </div>
+        {!collapsed && (
+          <>
+            <span className="flex-1 truncate">{label}</span>
+            {notifCount !== undefined && notifCount > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/40 animate-pulse">
+                {notifCount > 99 ? '99+' : notifCount}
+              </span>
+            )}
+            {badge && !notifCount && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[hsl(262,83%,58%)]/15 text-[hsl(262,83%,58%)] font-semibold">
+                {badge}
+              </span>
+            )}
+          </>
+        )}
+      </Link>
+      {/* Portal tooltip — tránh clip bởi overflow-y:auto trong nav */}
+      {collapsed && tooltipPos && (
+        <SidebarTooltip
+          label={label}
+          badge={badge}
+          anchorY={tooltipPos.y}
+          anchorRight={tooltipPos.right}
+          visible
+        />
       )}
-    </Link>
+    </>
   )
 }
 
@@ -298,11 +362,44 @@ function useAdminNotifications(enabled: boolean) {
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
 
-export const Sidebar = memo(function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+interface SidebarProps {
+  /** Mobile drawer mode — khi true, render as fixed overlay từ trái */
+  mobileOpen?: boolean
+  /** Callback đóng drawer (gọi khi click backdrop / route change) */
+  onMobileClose?: () => void
+}
+
+export const Sidebar = memo(function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps = {}) {
+  /* 2026-05-20: mặc định COLLAPSED — tiết kiệm chỗ cho content area.
+     User có thể bấm "Expand" để mở rộng. localStorage lưu preference. */
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem('sidebar.collapsed')
+    return saved === null ? true : saved === 'true'
+  })
+
+  /* Persist collapsed state khi user đổi */
+  useEffect(() => {
+    try { localStorage.setItem('sidebar.collapsed', String(collapsed)) } catch {}
+  }, [collapsed])
   const role = useCurrentRole()
   const location = useLocation()
   const { t } = useLanguage()
+
+  /* 2026-05-20: Auto-close mobile drawer khi đổi route — tránh
+     drawer còn mở khi user vừa navigate. Touch UX standard. */
+  useEffect(() => {
+    if (mobileOpen) onMobileClose?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
+
+  /* Lock body scroll khi mobile drawer mở */
+  useEffect(() => {
+    if (!mobileOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [mobileOpen])
 
   const isAdminContext = role === 'ADMIN' || location.pathname.startsWith('/admin')
   const adminNotifs = useAdminNotifications(isAdminContext)
@@ -317,10 +414,26 @@ export const Sidebar = memo(function Sidebar() {
   }, [role, location.pathname])
 
   return (
+    <>
+      {/* Mobile backdrop — chỉ render khi drawer open */}
+      {mobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
     <aside
+      data-sidebar="main"
       className={cn(
         'flex flex-col h-full border-r border-border bg-card transition-all duration-300',
-        collapsed ? 'w-14' : 'w-60',
+        /* Desktop: always visible, fixed width 60/14
+           Mobile: hidden by default (CSS), shown as drawer when mobileOpen=true */
+        collapsed ? 'lg:w-14' : 'lg:w-60',
+        'w-64',
+        mobileOpen
+          ? 'fixed top-0 left-0 h-full z-50 shadow-2xl lg:relative lg:shadow-none mobile-open'
+          : 'hidden lg:flex',
       )}
     >
       {/* Logo */}
@@ -374,5 +487,6 @@ export const Sidebar = memo(function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   )
 })

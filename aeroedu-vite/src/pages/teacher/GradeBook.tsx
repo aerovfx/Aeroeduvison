@@ -80,6 +80,8 @@ export default function GradeBook() {
   const classId  = searchParams.get('classId')  || ''
   const subject  = searchParams.get('subject')  || ''
   const semester = searchParams.get('semester') || 'HK2'
+  /** ctx=SCHOOL | CENTER — phân biệt hệ thống chấm điểm (2026-05-20) */
+  const ctxType  = searchParams.get('ctx') === 'CENTER' ? 'CENTER' : 'SCHOOL'
 
   const [showDob, setShowDob] = useState(false)
   const [tabMode, setTabMode] = useState<'col' | 'row'>('col')  // mặc định nhảy cột
@@ -311,6 +313,19 @@ export default function GradeBook() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 lg:p-6">
+      {/* ── CENTER class notice banner ── */}
+      {ctxType === 'CENTER' && (
+        <div className="mb-4 flex items-start gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800">
+          <span className="text-base">🏫</span>
+          <div>
+            <span className="font-semibold">Lớp trung tâm:</span>{' '}
+            Bảng điểm này dành cho lớp học ở <strong>trung tâm</strong> (không phải trường chính thức).
+            Điểm được ghi theo tiêu chí của trung tâm, không áp dụng công thức TT58 Bộ GD&ĐT.
+            Phần <em>Nhận xét tiến bộ</em> có thể dùng để ghi khen thưởng hoặc phản hồi cá nhân hóa.
+          </div>
+        </div>
+      )}
+
       {/* ── Header bar ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <div className="flex flex-wrap items-center gap-3">
