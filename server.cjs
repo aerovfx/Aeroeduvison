@@ -347,12 +347,19 @@ if (USE_NODEJS_AUTH) {
       const cacheKey = `auth:me:${decoded.sub}`;
       const result = await cache.getOrFetch(cacheKey, 60, async () => {
         const pool = getPool();
+        // LEFT JOIN UserProfile để lấy accountType (phụ huynh vs giáo viên)
         const { rows } = await pool.query(
-          'SELECT * FROM "User" WHERE id = $1 LIMIT 1',
+          `SELECT u.*, up."accountType" AS "accountType"
+             FROM "User" u
+             LEFT JOIN "UserProfile" up ON up."userId" = u.id
+            WHERE u.id = $1 LIMIT 1`,
           [decoded.sub]
         );
         if (!rows[0]) return { __notFound: true };
-        return publicUser(rows[0]);
+        const pub = publicUser(rows[0]);
+        // Gắn accountType (PARENT/TEACHER/STUDENT) vào response
+        pub.accountType = rows[0].accountType || rows[0].role;
+        return pub;
       });
       if (result?.__notFound) return res.status(404).json({ error: 'User not found' });
       return res.json(result);
@@ -550,12 +557,17 @@ if (USE_NODEJS_AUTH) {
   // ── POST /api/auth/register ───────────────────────────────
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { email, password, name, role } = req.body || {};
+      const { email, password, name, role, accountType } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email và mật khẩu không được để trống' });
       }
       // role: 'STUDENT' (default) hoặc 'TEACHER'. KHÔNG cho phép tự đăng ký ADMIN.
+      // accountType (UI-only): STUDENT / TEACHER / PARENT — phụ huynh chia chung
+      // role TEACHER với GV nhưng UI dùng accountType để phân biệt label.
       const safeRole = String(role || '').toUpperCase() === 'TEACHER' ? 'TEACHER' : 'STUDENT';
+      const safeAccountType = ['STUDENT', 'TEACHER', 'PARENT'].includes(String(accountType || '').toUpperCase())
+        ? String(accountType).toUpperCase()
+        : safeRole;
 
       const pool = getPool();
       const existing = await pool.query(
@@ -581,8 +593,45 @@ if (USE_NODEJS_AUTH) {
         [id, email.toLowerCase().trim(), displayName, hash, safeRole, now, now]
       );
 
+      // ── Lưu accountType (PARENT/TEACHER/STUDENT) vào UserProfile ──
+      // Phụ huynh = TEACHER role + accountType='PARENT' để UI biết hiển thị
+      // label "Phụ huynh" thay vì "Giáo viên". Lưu trong UserProfile để bền
+      // qua các thiết bị (localStorage chỉ giữ trên trình duyệt).
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "UserProfile" (
+            id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            "userId" TEXT UNIQUE NOT NULL,
+            "accountType" TEXT,
+            bio TEXT,
+            "bannerStyle" TEXT DEFAULT 'gradient-purple',
+            "bannerImageUrl" TEXT,
+            "avatarFrame" TEXT DEFAULT 'none',
+            "themeColor" TEXT DEFAULT 'purple',
+            skills JSONB DEFAULT '[]'::jsonb,
+            socials JSONB DEFAULT '{}'::jsonb,
+            showcase JSONB DEFAULT '[]'::jsonb,
+            visibility JSONB DEFAULT '{}'::jsonb,
+            "createdAt" TIMESTAMP DEFAULT NOW(),
+            "updatedAt" TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS "accountType" TEXT`);
+        await pool.query(
+          `INSERT INTO "UserProfile" ("userId", "accountType")
+             VALUES ($1, $2)
+             ON CONFLICT ("userId") DO UPDATE SET "accountType" = EXCLUDED."accountType"`,
+          [id, safeAccountType]
+        );
+      } catch (e) {
+        console.warn('[register] save accountType:', e.message);
+      }
+
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
       const user = rows[0];
+      // Gắn accountType vào user response (BE chỉ trả role gốc, FE cần để
+      // hiển thị label đúng + lưu vào localStorage userSubType)
+      user.accountType = safeAccountType;
 
       // ── Auto-link nếu role=STUDENT và email match ClassStudent đã import ──
       // GV import HS với cột email → khi HS đăng ký bằng email đó, tự động

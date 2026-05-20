@@ -27,6 +27,9 @@ export interface RegisterInput {
   email: string
   password: string
   role?: 'STUDENT' | 'TEACHER'
+  /** UI-only sub-type: STUDENT / TEACHER / PARENT. PARENT lưu vào UserProfile
+   *  trên server để bền qua các thiết bị (không chỉ localStorage). */
+  accountType?: 'STUDENT' | 'TEACHER' | 'PARENT'
 }
 
 export interface ForgotPasswordInput {

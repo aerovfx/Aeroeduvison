@@ -11,6 +11,9 @@ export interface User {
   email: string
   image: string | null
   role: UserRole
+  /** UI-level sub-type: STUDENT / TEACHER / PARENT / ADMIN. PARENT chia
+   *  chung role TEACHER nhưng accountType khác biệt để hiển thị label đúng. */
+  accountType?: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN'
   isTwoFactorEnabled: boolean
   createdAt: string
   updatedAt: string

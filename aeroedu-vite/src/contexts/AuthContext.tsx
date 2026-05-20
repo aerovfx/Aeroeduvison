@@ -15,7 +15,7 @@ interface AuthContextValue {
   isAuthenticated: boolean
 
   login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string, role?: 'STUDENT' | 'TEACHER') => Promise<void>
+  register: (name: string, email: string, password: string, role?: 'STUDENT' | 'TEACHER', accountType?: 'STUDENT' | 'TEACHER' | 'PARENT') => Promise<void>
   googleLogin: (credential: string) => Promise<void>
   logout: () => Promise<void>
   /** Refetch user từ /api/auth/me — gọi sau khi update profile để UI reflect */
@@ -67,8 +67,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(user)
   }, [])
 
-  const register = useCallback(async (name: string, email: string, password: string, role: 'STUDENT' | 'TEACHER' = 'STUDENT') => {
-    const { user } = await authService.register({ name, email, password, role })
+  const register = useCallback(async (
+    name: string, email: string, password: string,
+    role: 'STUDENT' | 'TEACHER' = 'STUDENT',
+    accountType?: 'STUDENT' | 'TEACHER' | 'PARENT',
+  ) => {
+    const { user } = await authService.register({ name, email, password, role, accountType })
     setUser(user)
   }, [])
 
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await authService.logout()
+    try { localStorage.removeItem('userSubType') } catch { /* ignore */ }
     setUser(null)
   }, [])
 
