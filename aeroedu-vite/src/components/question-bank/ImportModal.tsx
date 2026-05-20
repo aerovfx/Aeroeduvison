@@ -575,8 +575,8 @@ function normalizeQuestion(raw: any, defaultSubject: string, defaultGrade: strin
   }
 }
 
-// Mẫu JSON ngắn để placeholder trong textarea
-const PASTE_PLACEHOLDER = `{
+// ── Mẫu JSON ngắn (1 câu MCQ) — dùng làm placeholder hint trong textarea ──
+const PASTE_PLACEHOLDER_SHORT = `{
   "questions": [
     {
       "questionType": "MCQ",
@@ -588,6 +588,65 @@ const PASTE_PLACEHOLDER = `{
       "difficulty": "easy",
       "topic": "Lực và chuyển động",
       "explanation": "Lực được đo bằng Newton (N) trong hệ SI."
+    }
+  ]
+}`
+
+// ── Mẫu JSON đầy đủ 4 loại câu hỏi chuẩn THPT QG 2025+ ──
+// Phần 1 — Trắc nghiệm A/B/C/D (MCQ)
+// Phần 2 — Đúng/Sai 4 mệnh đề (MULTIPLE_TF)
+// Phần 3 — Trả lời ngắn (SHORT_ANSWER, đáp án thường 4 ký tự số)
+// Phần 4 — Tự luận có đáp án (ESSAY)
+const PASTE_PLACEHOLDER_FULL = `{
+  "questions": [
+    {
+      "questionType": "MCQ",
+      "content": "Một vật khối lượng $m = 2$ kg chịu lực $F = 10$ N. Gia tốc của vật là?",
+      "options": ["$2$ m/s²", "$5$ m/s²", "$10$ m/s²", "$20$ m/s²"],
+      "correctAnswer": "B",
+      "subject": "Vật lý",
+      "grade": "Khối 10",
+      "difficulty": "medium",
+      "topic": "Định luật II Newton",
+      "explanation": "$a = \\\\dfrac{F}{m} = 5$ m/s²."
+    },
+    {
+      "questionType": "MULTIPLE_TF",
+      "content": "Xét các phát biểu về định luật II Newton:",
+      "options": [
+        "Gia tốc tỉ lệ thuận với lực tác dụng",
+        "Gia tốc tỉ lệ nghịch với khối lượng vật",
+        "Hướng gia tốc cùng hướng với lực",
+        "Đơn vị gia tốc là $m/s$"
+      ],
+      "correctAnswer": "Đúng,Đúng,Đúng,Sai",
+      "subject": "Vật lý",
+      "grade": "Khối 10",
+      "difficulty": "medium",
+      "topic": "Định luật II Newton",
+      "explanation": "a,b,c đúng theo định luật. d sai — đơn vị gia tốc là $m/s^2$. Có thể nhập compact 'TTTF' thay cho 'Đúng,Đúng,Đúng,Sai'."
+    },
+    {
+      "questionType": "SHORT_ANSWER",
+      "content": "Tìm 4 chữ số đầu sau dấu phẩy của $\\\\sqrt{2}$ (không có dấu chấm).",
+      "options": [],
+      "correctAnswer": "1414",
+      "subject": "Toán học",
+      "grade": "Khối 9",
+      "difficulty": "easy",
+      "topic": "Căn bậc hai",
+      "explanation": "$\\\\sqrt{2} = 1{,}41421356... \\\\Rightarrow$ 4 chữ số đầu = 1414. (Phần 3 đề THPT QG: đáp án 4 ký tự)"
+    },
+    {
+      "questionType": "ESSAY",
+      "content": "Giải thích vì sao bầu trời có màu xanh vào ban ngày? (4 điểm)",
+      "options": [],
+      "correctAnswer": "Ánh sáng Mặt Trời gồm nhiều thành phần bước sóng khác nhau. Khi đi qua khí quyển, ánh sáng bị tán xạ Rayleigh bởi các phân tử khí (chủ yếu N₂ và O₂). Cường độ tán xạ tỉ lệ nghịch với $\\\\lambda^4$, nên ánh sáng xanh (λ ngắn) bị tán xạ mạnh hơn ánh sáng đỏ (λ dài) khoảng 10 lần, làm cho bầu trời ta nhìn lên có màu xanh.",
+      "subject": "Vật lý",
+      "grade": "Khối 12",
+      "difficulty": "medium",
+      "topic": "Tán xạ ánh sáng",
+      "explanation": "Đáp án mẫu cho GV chấm tự luận tham khảo (key points: tán xạ Rayleigh + tỉ lệ 1/λ⁴ + bước sóng ngắn tán xạ mạnh hơn)."
     }
   ]
 }`
@@ -774,7 +833,27 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
       }
       setParsedQuestions(questions)
       setImportStep("review")
-      toast.success(`Đã phân tích ${questions.length} câu hỏi từ JSON dán`)
+      // Breakdown loại câu cho user biết đã parse đúng
+      const breakdown = questions.reduce<Record<string, number>>((acc, q) => {
+        acc[q.questionType] = (acc[q.questionType] || 0) + 1; return acc
+      }, {})
+      const breakdownStr = Object.entries(breakdown)
+        .map(([type, count]) => `${count} ${type === 'MCQ' ? 'MCQ' :
+                                          type === 'MULTIPLE_TF' ? 'Đúng/Sai' :
+                                          type === 'SHORT_ANSWER' ? 'Trả lời ngắn' :
+                                          type === 'ESSAY' ? 'Tự luận' :
+                                          type === 'TRUE_FALSE' ? 'Đ/S' : type}`)
+        .join(' · ')
+      toast.success(`Đã phân tích ${questions.length} câu (${breakdownStr})`)
+      // Cảnh báo nhẹ nếu SHORT_ANSWER không phải 4 ký tự (chuẩn THPT QG)
+      const oddShort = questions.filter(q =>
+        q.questionType === 'SHORT_ANSWER' &&
+        q.correctAnswer &&
+        q.correctAnswer.length !== 4
+      )
+      if (oddShort.length > 0) {
+        toast(`💡 ${oddShort.length} câu trả lời ngắn có đáp án ≠ 4 ký tự (chuẩn THPT QG là 4)`, { icon: 'ℹ️', duration: 4500 })
+      }
     } catch (err: any) {
       // JSON syntax error — chỉ rõ vị trí nếu có
       const msg = err?.message || "JSON không hợp lệ"
@@ -899,12 +978,12 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                 </div>
 
                 <div className="bg-[#0c0d1a] border border-[#2a2b3d] rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Code2 className="w-4 h-4 text-amber-400" />
                       <span className="text-sm font-bold text-slate-200">Dán code JSON trực tiếp</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {pastedJson && (
                         <button
                           type="button"
@@ -917,14 +996,19 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                       )}
                       <button
                         type="button"
-                        onClick={() => {
-                          setPastedJson(PASTE_PLACEHOLDER)
-                          setPasteError(null)
-                        }}
-                        className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 px-1.5 py-1 rounded transition-colors"
-                        title="Dán mẫu mặc định để chỉnh sửa"
+                        onClick={() => { setPastedJson(PASTE_PLACEHOLDER_SHORT); setPasteError(null) }}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 px-1.5 py-1 rounded transition-colors border border-amber-500/30"
+                        title="Dán 1 câu MCQ mẫu"
                       >
-                        <ClipboardPaste className="w-3 h-3" />Dán mẫu
+                        <ClipboardPaste className="w-3 h-3" />1 câu MCQ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setPastedJson(PASTE_PLACEHOLDER_FULL); setPasteError(null) }}
+                        className="text-[11px] text-fuchsia-400 hover:text-fuchsia-300 flex items-center gap-1 px-1.5 py-1 rounded transition-colors border border-fuchsia-500/30 bg-fuchsia-500/10"
+                        title="Dán đầy đủ 4 loại câu hỏi: MCQ + Đúng/Sai + Trả lời ngắn + Tự luận"
+                      >
+                        <ClipboardPaste className="w-3 h-3" />4 loại câu chuẩn THPT
                       </button>
                     </div>
                   </div>
@@ -933,10 +1017,21 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                     value={pastedJson}
                     onChange={e => { setPastedJson(e.target.value); if (pasteError) setPasteError(null) }}
                     spellCheck={false}
-                    placeholder={PASTE_PLACEHOLDER}
+                    placeholder={PASTE_PLACEHOLDER_SHORT}
                     className="w-full h-48 bg-[#06070f] border border-[#1e2033] rounded-lg p-3 text-xs text-slate-200 placeholder:text-slate-700 focus:outline-none focus:border-amber-500/60 font-mono leading-relaxed resize-y"
                     style={{ tabSize: 2 }}
                   />
+
+                  {/* ── Cheat sheet: cú pháp 4 loại câu hỏi ── */}
+                  <div className="text-[11px] text-slate-400 space-y-1 bg-[#06070f]/60 border border-[#1e2033] rounded-lg p-2.5">
+                    <p className="text-slate-300 font-semibold mb-1.5">💡 Hỗ trợ 4 loại câu — quy ước <code className="text-amber-400">correctAnswer</code>:</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                      <span><code className="text-blue-400">MCQ</code>: "A" / "B" / "C" / "D" (1 đáp án)</span>
+                      <span><code className="text-emerald-400">MULTIPLE_TF</code>: "Đúng,Sai,Đúng,Sai" hoặc "TFTF"</span>
+                      <span><code className="text-cyan-400">SHORT_ANSWER</code>: "1414" (4 ký tự số, đề THPT QG)</span>
+                      <span><code className="text-fuchsia-400">ESSAY</code>: đáp án mẫu để GV chấm tham khảo</span>
+                    </div>
+                  </div>
 
                   {pasteError && (
                     <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-950/30 border border-rose-700/40 text-xs text-rose-300">
@@ -945,7 +1040,7 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-[11px] text-slate-500">
                       Cấu trúc: <code className="text-amber-400 bg-[#161728] px-1 rounded">{`{ "questions": [{ content, options, correctAnswer, ... }] }`}</code>
                     </p>
