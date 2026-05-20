@@ -308,12 +308,14 @@ function ShortGrid({
 // PDF IMPORT TAB
 // ─────────────────────────────────────────────────────────────
 function PdfImportTab({
-  baseForm, onSaved,
+  baseForm, onSaved, onStepChange,
 }: {
   baseForm: CreateExamForm
   onSaved: (examId: string) => void
+  onStepChange?: (step: 'upload' | 'config' | 'answers') => void
 }) {
   const [step, setStep] = useState<'upload' | 'config' | 'answers'>('upload')
+  const goStep = (s: 'upload' | 'config' | 'answers') => { setStep(s); onStepChange?.(s) }
 
   // PDF file state
   const [pdfFile, setPdfFile] = useState<File | null>(null)
@@ -331,6 +333,7 @@ function PdfImportTab({
   const [shortAnswers, setShortAnswers]  = useState<string[]>(() => Array(20).fill(''))
 
   const [saving, setSaving] = useState(false)
+  const [showPdf, setShowPdf] = useState(true)   // PDF panel visibility at step 3
 
   // ── Upload handlers ──────────────────────────────────────
   const handleFile = useCallback((file: File) => {
@@ -351,7 +354,7 @@ function PdfImportTab({
   const removePdf = () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl)
     setPdfFile(null); setPdfUrl(null)
-    setStep('upload')
+    goStep('upload')
   }
 
   // ── Answer mutations ─────────────────────────────────────
@@ -586,7 +589,7 @@ function PdfImportTab({
 
           {pdfFile && (
             <button
-              onClick={() => setStep('config')}
+              onClick={() => goStep('config')}
               style={{
                 marginTop: 16, width: '100%', background: D.purple, color: '#fff',
                 border: 'none', borderRadius: 10, padding: '12px 0',
@@ -700,7 +703,7 @@ function PdfImportTab({
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setStep('upload')} style={{
+            <button onClick={() => goStep('upload')} style={{
               flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
               color: D.muted, borderRadius: 10, padding: '11px 0',
               fontWeight: 600, fontSize: 14, cursor: 'pointer',
@@ -708,7 +711,7 @@ function PdfImportTab({
               ← Quay lại
             </button>
             <button
-              onClick={() => setStep('answers')}
+              onClick={() => goStep('answers')}
               disabled={cfg.mcqCount + cfg.tfCount + cfg.shortCount === 0}
               style={{
                 flex: 2, background: D.purple, color: '#fff', border: 'none',
@@ -725,91 +728,151 @@ function PdfImportTab({
 
       {/* ── STEP 3: Answers ────────────────────────────────── */}
       {step === 'answers' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Progress bar */}
-          <div style={{
-            background: D.card, border: `1px solid ${D.border}`, borderRadius: 10, padding: '12px 16px',
-            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-          }}>
-            <span style={{ fontSize: 13, color: D.muted }}>Đã điền:</span>
-            {cfg.mcqCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: mcqFilled === cfg.mcqCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần I: {mcqFilled}/{cfg.mcqCount}
-              </span>
-            )}
-            {cfg.tfCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: tfFilled === tfTotal ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${tfFilled === tfTotal ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: tfFilled === tfTotal ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần II: {tfFilled}/{tfTotal}
-              </span>
-            )}
-            {cfg.shortCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: shortFilled === cfg.shortCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần III: {shortFilled}/{cfg.shortCount}
-              </span>
-            )}
-          </div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
-          {/* Scrollable answer sheet */}
-          <div style={{
-            overflowX: 'auto', display: 'flex', flexDirection: 'column', gap: 16,
-          }}>
-            {cfg.mcqCount > 0 && (
-              <McqGrid count={cfg.mcqCount} answers={mcqAnswers} onChange={setMcq} />
-            )}
-            {cfg.tfCount > 0 && (
-              <TfGrid count={cfg.tfCount} answers={tfAnswers} onChange={setTf} />
-            )}
-            {cfg.shortCount > 0 && (
-              <ShortGrid count={cfg.shortCount} answers={shortAnswers} onChange={setShort} />
-            )}
-          </div>
-
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setStep('config')} style={{
-              flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
-              color: D.muted, borderRadius: 10, padding: '11px 0',
-              fontWeight: 600, fontSize: 14, cursor: 'pointer',
+          {/* ── LEFT: PDF reference panel ──────────────────── */}
+          {pdfUrl && showPdf && (
+            <div style={{
+              flex: '0 0 46%', position: 'sticky', top: 80,
+              background: D.card, border: `1px solid ${D.border}`,
+              borderRadius: 12, overflow: 'hidden',
+              height: 'calc(100vh - 160px)',
+              display: 'flex', flexDirection: 'column',
             }}>
-              ← Quay lại
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !baseForm.title.trim()}
-              style={{
-                flex: 2, background: '#22c55e', color: '#fff', border: 'none',
-                borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 15,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: saving || !baseForm.title.trim() ? 0.65 : 1,
-              }}
-            >
-              {saving
-                ? <><Loader2 size={18} className="animate-spin" /> Đang lưu...</>
-                : <><CheckCircle2 size={18} /> Tạo đề thi & lưu đáp án</>
-              }
-            </button>
-          </div>
-          {!baseForm.title.trim() && (
-            <p style={{ fontSize: 12, color: '#f87171', textAlign: 'center', margin: '-10px 0 0' }}>
-              ⚠ Hãy nhập tiêu đề đề thi ở tab "Tạo thủ công" trước khi lưu.
-            </p>
+              {/* PDF panel header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 12px', background: D.card2,
+                borderBottom: `1px solid ${D.border}`, flexShrink: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Eye size={14} style={{ color: D.purple }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: D.text, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {pdfFile?.name ?? 'Đề thi PDF'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowPdf(false)}
+                  title="Ẩn đề"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: D.muted, padding: 4, borderRadius: 6,
+                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                  }}
+                >
+                  <X size={13} /> Ẩn đề
+                </button>
+              </div>
+              {/* PDF embed */}
+              <iframe
+                src={pdfUrl + '#toolbar=1&navpanes=0&scrollbar=1&view=FitH'}
+                title="PDF đề thi"
+                style={{ flex: 1, width: '100%', border: 'none' }}
+              />
+            </div>
           )}
+
+          {/* ── RIGHT: Answer inputs ───────────────────────── */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Show-PDF toggle (when panel hidden) */}
+            {pdfUrl && !showPdf && (
+              <button
+                onClick={() => setShowPdf(true)}
+                style={{
+                  alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)',
+                  color: '#a78bfa', borderRadius: 8, padding: '6px 12px',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <Eye size={14} /> Hiện đề PDF
+              </button>
+            )}
+
+            {/* Progress bar */}
+            <div style={{
+              background: D.card, border: `1px solid ${D.border}`, borderRadius: 10, padding: '12px 16px',
+              display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 13, color: D.muted }}>Đã điền:</span>
+              {cfg.mcqCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: mcqFilled === cfg.mcqCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần I: {mcqFilled}/{cfg.mcqCount}
+                </span>
+              )}
+              {cfg.tfCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: tfFilled === tfTotal ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${tfFilled === tfTotal ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: tfFilled === tfTotal ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần II: {tfFilled}/{tfTotal}
+                </span>
+              )}
+              {cfg.shortCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: shortFilled === cfg.shortCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần III: {shortFilled}/{cfg.shortCount}
+                </span>
+              )}
+            </div>
+
+            {/* Scrollable answer sheet */}
+            <div style={{ overflowX: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {cfg.mcqCount > 0 && (
+                <McqGrid count={cfg.mcqCount} answers={mcqAnswers} onChange={setMcq} />
+              )}
+              {cfg.tfCount > 0 && (
+                <TfGrid count={cfg.tfCount} answers={tfAnswers} onChange={setTf} />
+              )}
+              {cfg.shortCount > 0 && (
+                <ShortGrid count={cfg.shortCount} answers={shortAnswers} onChange={setShort} />
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => goStep('config')} style={{
+                flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
+                color: D.muted, borderRadius: 10, padding: '11px 0',
+                fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}>
+                ← Quay lại
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !baseForm.title.trim()}
+                style={{
+                  flex: 2, background: '#22c55e', color: '#fff', border: 'none',
+                  borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 15,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: saving || !baseForm.title.trim() ? 0.65 : 1,
+                }}
+              >
+                {saving
+                  ? <><Loader2 size={18} className="animate-spin" /> Đang lưu...</>
+                  : <><CheckCircle2 size={18} /> Tạo đề thi & lưu đáp án</>
+                }
+              </button>
+            </div>
+            {!baseForm.title.trim() && (
+              <p style={{ fontSize: 12, color: '#f87171', textAlign: 'center', margin: '-10px 0 0' }}>
+                ⚠ Hãy nhập tiêu đề đề thi ở tab "Tạo thủ công" trước khi lưu.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -823,6 +886,7 @@ export default function CreateExamPage() {
   const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<'manual' | 'matrix' | 'pdf'>('manual')
+  const [pdfStep, setPdfStep] = useState<'upload' | 'config' | 'answers'>('upload')
 
   // ── Matrix tab state ──────────────────────────────────
   const [matrices, setMatrices] = useState<Array<{ id: string; name: string; subject?: string; grade?: string; totalQuestions?: number }>>([])
@@ -1043,7 +1107,7 @@ export default function CreateExamPage() {
       </div>
 
       {/* ── Body ─────────────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className={activeTab === 'pdf' && pdfStep === 'answers' ? 'px-4 py-6' : 'max-w-5xl mx-auto px-6 py-6'}>
 
         {/* ═══ TAB 1: Manual ═══════════════════════════════════ */}
         {activeTab === 'manual' && (
@@ -1320,7 +1384,7 @@ export default function CreateExamPage() {
 
         {activeTab === 'pdf' && (
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8">
+            <div className={pdfStep === 'answers' ? 'col-span-12' : 'col-span-12 lg:col-span-8'}>
 
               {/* Info banner */}
               {!form.title.trim() && (
@@ -1336,11 +1400,12 @@ export default function CreateExamPage() {
               <PdfImportTab
                 baseForm={form}
                 onSaved={examId => navigate(examId ? `/teacher/exams/${examId}` : '/teacher/exams')}
+                onStepChange={setPdfStep}
               />
             </div>
 
-            {/* Right: instructions */}
-            <div className="col-span-12 lg:col-span-4">
+            {/* Right: instructions — hidden at answers step (PDF panel takes that role) */}
+            <div className={pdfStep === 'answers' ? 'hidden' : 'col-span-12 lg:col-span-4'}>
               <div style={{
                 background: D.card, border: `1px solid ${D.border}`, borderRadius: 12,
                 padding: 20, position: 'sticky', top: 90,
