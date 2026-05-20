@@ -1,29 +1,22 @@
 /**
- * ProfessionalKG — Cây tri thức nghề nghiệp cho Giáo viên & Admin
+ * ProfessionalKG — Cây tri thức nghề nghiệp GV/Admin (Force-directed Graph)
  *
- * Tính năng:
- *   - Cây kỹ năng theo 4 lĩnh vực (chuyên môn / sư phạm / số / phát triển)
- *   - Mức độ thành thạo 5 cấp: Chưa biết → Chuyên gia
- *   - Ghi chú học tập per-skill
- *   - CPD Log (nhật ký cập nhật kiến thức)
- *   - Xuất báo cáo Excel & JSON
- *   - Persist vào localStorage (key theo userId)
+ * Hiển thị kỹ năng nghề nghiệp dạng đồ thị lực tương tác, tương tự Knowledge Graph của HS.
+ * Center node "CPD" → 4 category nodes → ~24 skill nodes + 7 career milestone nodes (bên phải).
  *
  * Route: /teacher/knowledge-graph & /admin/knowledge-graph
  */
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
-  Brain, Star, Zap, ChevronDown, ChevronRight, Save, Download,
-  FileJson, BookOpen, TrendingUp, Award, CheckCircle2, Plus,
-  RotateCcw, Sparkles, Settings, Users, BarChart2, Shield,
-  GraduationCap, Cpu, MessageSquare, FlaskConical, Lightbulb,
-  PenLine, Clock, Search, Filter,
+  Brain, Download, FileJson, TrendingUp, Award, Plus, PenLine,
+  BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
+  Shield, Save, Clock, Lightbulb, CheckCircle2, X,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import * as XLSX from 'xlsx'
 
-// ── Competency data ────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MasteryLevel = 0 | 25 | 50 | 75 | 100
 
@@ -38,10 +31,12 @@ export interface SkillCategory {
   id: string
   label: string
   description: string
-  icon: React.ComponentType<{className?: string}>
-  color: string         // Tailwind color token (e.g. 'purple', 'blue')
+  icon: React.ComponentType<{ className?: string }>
+  color: string
   skills: Skill[]
 }
+
+// ── Teacher skill tree ─────────────────────────────────────────────────────────
 
 const TEACHER_TREE: SkillCategory[] = [
   {
@@ -81,12 +76,12 @@ const TEACHER_TREE: SkillCategory[] = [
     icon: Cpu,
     color: 'emerald',
     skills: [
-      { id: 'tds-lms',             label: 'Sử dụng LMS (inphysic.com)',       description: 'Tạo bài giảng, quản lý lớp, chấm điểm, báo cáo trên nền tảng', tags: ['bắt buộc'] },
-      { id: 'tds-ai-tools',        label: 'Công cụ AI hỗ trợ giảng dạy',    description: 'Claude AI Tutor, AI tạo đề, tóm tắt nội dung bằng AI', tags: ['xu hướng'] },
-      { id: 'tds-content-creation',label: 'Tạo nội dung số',                 description: 'Video bài giảng, slides tương tác, infographic, podcast' },
-      { id: 'tds-data-analytics',  label: 'Phân tích dữ liệu học tập',      description: 'Đọc dashboard, phát hiện học sinh cần hỗ trợ sớm qua data' },
-      { id: 'tds-online-teaching', label: 'Dạy học trực tuyến',              description: 'Zoom/Meet, quản lý lớp online, giữ tương tác học sinh' },
-      { id: 'tds-security',        label: 'An toàn thông tin cơ bản',        description: 'Bảo vệ dữ liệu học sinh, password hygiene, phishing awareness', tags: ['pháp lý'] },
+      { id: 'tds-lms',              label: 'Sử dụng LMS (inphysic.com)',       description: 'Tạo bài giảng, quản lý lớp, chấm điểm, báo cáo trên nền tảng', tags: ['bắt buộc'] },
+      { id: 'tds-ai-tools',         label: 'Công cụ AI hỗ trợ giảng dạy',    description: 'Claude AI Tutor, AI tạo đề, tóm tắt nội dung bằng AI', tags: ['xu hướng'] },
+      { id: 'tds-content-creation', label: 'Tạo nội dung số',                 description: 'Video bài giảng, slides tương tác, infographic, podcast' },
+      { id: 'tds-data-analytics',   label: 'Phân tích dữ liệu học tập',      description: 'Đọc dashboard, phát hiện học sinh cần hỗ trợ sớm qua data' },
+      { id: 'tds-online-teaching',  label: 'Dạy học trực tuyến',              description: 'Zoom/Meet, quản lý lớp online, giữ tương tác học sinh' },
+      { id: 'tds-security',         label: 'An toàn thông tin cơ bản',        description: 'Bảo vệ dữ liệu học sinh, password hygiene, phishing awareness', tags: ['pháp lý'] },
     ],
   },
   {
@@ -166,26 +161,57 @@ const ADMIN_TREE: SkillCategory[] = [
   },
 ]
 
-// ── Mastery level config ───────────────────────────────────────────────────
+// ── Mastery ───────────────────────────────────────────────────────────────────
 
 const MASTERY_LEVELS = [
-  { value: 0  as MasteryLevel, label: 'Chưa biết',  color: 'text-gray-400 bg-gray-100  border-gray-200',  dot: 'bg-gray-300'    },
-  { value: 25 as MasteryLevel, label: 'Mới bắt đầu', color: 'text-red-600   bg-red-50    border-red-200',   dot: 'bg-red-400'     },
-  { value: 50 as MasteryLevel, label: 'Đang học',    color: 'text-amber-700 bg-amber-50  border-amber-200', dot: 'bg-amber-400'   },
-  { value: 75 as MasteryLevel, label: 'Thành thạo',  color: 'text-blue-700  bg-blue-50   border-blue-200',  dot: 'bg-blue-500'    },
-  { value: 100 as MasteryLevel,label: 'Chuyên gia',  color: 'text-green-700 bg-green-50  border-green-200', dot: 'bg-green-500'   },
+  { value: 0   as MasteryLevel, label: 'Chưa biết',   color: 'text-gray-400  bg-gray-100  border-gray-200',  dot: 'bg-gray-300',   hex: '#6b7280' },
+  { value: 25  as MasteryLevel, label: 'Mới bắt đầu', color: 'text-red-600   bg-red-50    border-red-200',   dot: 'bg-red-400',    hex: '#ef4444' },
+  { value: 50  as MasteryLevel, label: 'Đang học',    color: 'text-amber-700 bg-amber-50  border-amber-200', dot: 'bg-amber-400',  hex: '#f59e0b' },
+  { value: 75  as MasteryLevel, label: 'Thành thạo',  color: 'text-blue-700  bg-blue-50   border-blue-200',  dot: 'bg-blue-500',   hex: '#3b82f6' },
+  { value: 100 as MasteryLevel, label: 'Chuyên gia',  color: 'text-green-700 bg-green-50  border-green-200', dot: 'bg-green-500',  hex: '#22c55e' },
 ]
 
 const CATEGORY_COLORS: Record<string, {
-  header: string; bar: string; badge: string; border: string; icon: string
+  header: string; bar: string; badge: string; border: string; icon: string; hex: string; abbr: string
 }> = {
-  purple: { header: 'from-purple-600 to-purple-700', bar: 'bg-purple-500',  badge: 'bg-purple-100 text-purple-700', border: 'border-purple-200', icon: 'text-purple-600' },
-  blue:   { header: 'from-blue-600   to-blue-700',   bar: 'bg-blue-500',    badge: 'bg-blue-100   text-blue-700',   border: 'border-blue-200',   icon: 'text-blue-600'   },
-  emerald:{ header: 'from-emerald-600 to-emerald-700',bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700',border: 'border-emerald-200',icon: 'text-emerald-600'},
-  amber:  { header: 'from-amber-500  to-amber-600',   bar: 'bg-amber-500',   badge: 'bg-amber-100  text-amber-700',  border: 'border-amber-200',  icon: 'text-amber-600'  },
+  purple: { header: 'from-purple-600 to-purple-700', bar: 'bg-purple-500',  badge: 'bg-purple-100 text-purple-700', border: 'border-purple-200', icon: 'text-purple-600', hex: '#9333ea', abbr: 'CM' },
+  blue:   { header: 'from-blue-600   to-blue-700',   bar: 'bg-blue-500',    badge: 'bg-blue-100   text-blue-700',   border: 'border-blue-200',   icon: 'text-blue-600',   hex: '#3b82f6', abbr: 'SP' },
+  emerald:{ header: 'from-emerald-600 to-emerald-700',bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700',border: 'border-emerald-200',icon: 'text-emerald-600',hex: '#10b981', abbr: 'KS' },
+  amber:  { header: 'from-amber-500  to-amber-600',   bar: 'bg-amber-500',   badge: 'bg-amber-100  text-amber-700',  border: 'border-amber-200',  icon: 'text-amber-600',  hex: '#f59e0b', abbr: 'PN' },
 }
 
-// ── Persistence helpers ────────────────────────────────────────────────────
+// ── Career milestones ──────────────────────────────────────────────────────────
+
+interface CareerMilestone {
+  id: string
+  label: string
+  shortLabel: string
+  minScore: number
+  requiredSkillIds?: string[]
+  emoji: string
+}
+
+const TEACHER_MILESTONES: CareerMilestone[] = [
+  { id: 'cm-young',      label: 'Giáo viên trẻ',         shortLabel: 'GV Trẻ',   minScore: 30, emoji: '🌱' },
+  { id: 'cm-experienced',label: 'GV có kinh nghiệm',     shortLabel: 'GV KN',    minScore: 50, emoji: '📚' },
+  { id: 'cm-core',       label: 'Giáo viên cốt cán',     shortLabel: 'GV Cốt',   minScore: 65, emoji: '⭐' },
+  { id: 'cm-headteacher',label: 'Tổ trưởng bộ môn',      shortLabel: 'Tổ trưởng', minScore: 75, requiredSkillIds: ['tpd-leadership'], emoji: '🏅' },
+  { id: 'cm-vp',         label: 'Phó Hiệu trưởng',       shortLabel: 'P.HT',     minScore: 80, emoji: '🎖️' },
+  { id: 'cm-principal',  label: 'Hiệu trưởng',           shortLabel: 'HT',       minScore: 88, emoji: '🏆' },
+  { id: 'cm-expert',     label: 'Chuyên gia Quốc gia',   shortLabel: 'CG Quốc Gia', minScore: 95, emoji: '🌟' },
+]
+
+const ADMIN_MILESTONES: CareerMilestone[] = [
+  { id: 'adm-chuyenvien', label: 'Chuyên viên',        shortLabel: 'CV',       minScore: 30, emoji: '🌱' },
+  { id: 'adm-totruong',   label: 'Tổ trưởng',          shortLabel: 'Tổ Trưởng', minScore: 50, emoji: '📚' },
+  { id: 'adm-pho-ht',     label: 'Phó Hiệu trưởng',   shortLabel: 'P.HT',     minScore: 65, emoji: '⭐' },
+  { id: 'adm-ht',         label: 'Hiệu trưởng',        shortLabel: 'HT',       minScore: 75, emoji: '🏅' },
+  { id: 'adm-truong-pgd', label: 'Trưởng phòng GD',   shortLabel: 'Trưởng Phg', minScore: 82, emoji: '🎖️' },
+  { id: 'adm-giam-doc',   label: 'Giám đốc Sở',       shortLabel: 'GĐ Sở',    minScore: 90, emoji: '🏆' },
+  { id: 'adm-cg-bo',      label: 'Chuyên gia Bộ',     shortLabel: 'CG Bộ',    minScore: 95, emoji: '🌟' },
+]
+
+// ── Persistence types ─────────────────────────────────────────────────────────
 
 interface SkillProgress {
   score: MasteryLevel
@@ -208,49 +234,148 @@ function loadProgress(userId: string): ProgressMap {
     return raw ? JSON.parse(raw) : {}
   } catch { return {} }
 }
-
 function saveProgress(userId: string, map: ProgressMap) {
   try { localStorage.setItem(`cpd_progress_${userId}`, JSON.stringify(map)) } catch {}
 }
-
 function loadCpdLog(userId: string): CpdEntry[] {
   try {
     const raw = localStorage.getItem(`cpd_log_${userId}`)
     return raw ? JSON.parse(raw) : []
   } catch { return [] }
 }
-
 function saveCpdLog(userId: string, log: CpdEntry[]) {
   try { localStorage.setItem(`cpd_log_${userId}`, JSON.stringify(log)) } catch {}
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Graph node types ───────────────────────────────────────────────────────────
+
+type NodeType = 'center' | 'category' | 'skill' | 'milestone'
+
+interface GraphNode {
+  id: string
+  type: NodeType
+  label: string
+  shortLabel?: string
+  x: number
+  y: number
+  vx: number
+  vy: number
+  fx?: number   // pinned x
+  fy?: number   // pinned y
+  radius: number
+  color: string
+  catColor?: string   // for category nodes
+  skillId?: string    // for skill nodes
+  catId?: string      // which category this skill belongs to
+  milestoneIndex?: number
+  emoji?: string
+}
+
+interface GraphEdge {
+  source: string
+  target: string
+  type: 'center-cat' | 'cat-skill' | 'cross' | 'milestone-path'
+  color: string
+  dash?: number[]
+  width: number
+  opacity: number
+}
+
+// ── Physics constants ──────────────────────────────────────────────────────────
+
+const REPULSION     = 2000
+const SPRING_K      = 0.022
+const SPRING_LENGTH = 150
+const CENTERING     = 0.0008
+const DAMPING       = 0.86
+const MAX_VELOCITY  = 10
+
+// ── Cross-skill edges ──────────────────────────────────────────────────────────
+
+const CROSS_EDGES: [string, string][] = [
+  ['tce-curriculum2018', 'tp-lesson-design'],
+  ['tce-research',       'tp-formative'],
+  ['tp-active-learning', 'tds-ai-tools'],
+  ['tp-differentiation', 'tds-data-analytics'],
+  ['tds-lms',            'tpd-cpd-plan'],
+  ['tds-content-creation','tp-stem'],
+  ['tpd-reflection',     'tce-update'],
+  ['tpd-mentoring',      'tpd-leadership'],
+]
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export default function ProfessionalKG() {
   const { user } = useAuth()
   const isAdmin   = user?.role === 'ADMIN'
   const tree      = isAdmin ? ADMIN_TREE : TEACHER_TREE
+  const milestones = isAdmin ? ADMIN_MILESTONES : TEACHER_MILESTONES
   const userId    = user?.id || 'guest'
 
-  const [progress, setProgress]       = useState<ProgressMap>({})
+  // State
+  const [progressMap, setProgressMap] = useState<ProgressMap>({})
   const [cpdLog, setCpdLog]           = useState<CpdEntry[]>([])
-  const [expanded, setExpanded]       = useState<Set<string>>(new Set([tree[0].id]))
-  const [activeTab, setActiveTab]     = useState<'tree' | 'log' | 'report'>('tree')
-  const [searchQ, setSearchQ]         = useState('')
-  const [filterLevel, setFilterLevel] = useState<MasteryLevel | -1>(-1)
+  const [activeTab, setActiveTab]     = useState<'graph' | 'log' | 'report'>('graph')
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [newLogNote, setNewLogNote]   = useState('')
   const [newLogSkill, setNewLogSkill] = useState('')
-  const [editSkill, setEditSkill]     = useState<string | null>(null)
+
+  // Canvas refs
+  const canvasRef   = useRef<HTMLCanvasElement>(null)
+  const nodesRef    = useRef<GraphNode[]>([])
+  const edgesRef    = useRef<GraphEdge[]>([])
+  const animRef     = useRef<number>(0)
+  const panRef      = useRef({ x: 0, y: 0 })
+  const zoomRef     = useRef(1)
+  const dragRef     = useRef<{ nodeId: string | null; panStart: { x: number; y: number } | null; mouseStart: { x: number; y: number } | null }>({ nodeId: null, panStart: null, mouseStart: null })
+  const hoveredRef  = useRef<string | null>(null)
+  const glowPhase   = useRef(0)
+  const selectedRef = useRef<GraphNode | null>(null)
+
+  // Keep selectedRef in sync
+  useEffect(() => { selectedRef.current = selectedNode }, [selectedNode])
 
   // Load from localStorage on mount
   useEffect(() => {
-    setProgress(loadProgress(userId))
+    setProgressMap(loadProgress(userId))
     setCpdLog(loadCpdLog(userId))
   }, [userId])
 
-  // Persist progress
+  // Derived stats
+  const allSkills = useMemo(() => tree.flatMap(c => c.skills.map(s => ({ ...s, catId: c.id, catLabel: c.label, color: c.color }))), [tree])
+  const totalSkills = allSkills.length
+
+  const avgScore = useMemo(() => {
+    if (!totalSkills) return 0
+    return Math.round(allSkills.reduce((sum, s) => sum + (progressMap[s.id]?.score ?? 0), 0) / totalSkills)
+  }, [allSkills, progressMap, totalSkills])
+
+  const catStats = useMemo(() => tree.map(cat => {
+    const n = cat.skills.length
+    const sum = cat.skills.reduce((s, sk) => s + (progressMap[sk.id]?.score ?? 0), 0)
+    const avg = n ? Math.round(sum / n) : 0
+    const mastered = cat.skills.filter(sk => (progressMap[sk.id]?.score ?? 0) >= 75).length
+    return { id: cat.id, avg, mastered, total: n }
+  }), [tree, progressMap])
+
+  const currentMilestone = useMemo(() => {
+    return milestones.slice().reverse().find(m => {
+      if (avgScore < m.minScore) return false
+      if (m.requiredSkillIds) return m.requiredSkillIds.every(id => (progressMap[id]?.score ?? 0) >= 75)
+      return true
+    }) || null
+  }, [milestones, avgScore, progressMap])
+
+  const nextMilestone = useMemo(() => {
+    return milestones.find(m => {
+      if (avgScore >= m.minScore) return false
+      return true
+    }) || null
+  }, [milestones, avgScore])
+
+  // ── Update skill ──
   const updateSkill = useCallback((skillId: string, score: MasteryLevel, note?: string) => {
-    setProgress(prev => {
+    setProgressMap(prev => {
       const next = {
         ...prev,
         [skillId]: {
@@ -265,7 +390,7 @@ export default function ProfessionalKG() {
   }, [userId])
 
   const updateNote = useCallback((skillId: string, note: string) => {
-    setProgress(prev => {
+    setProgressMap(prev => {
       const existing = prev[skillId] || { score: 0 as MasteryLevel, note: '', updatedAt: new Date().toISOString() }
       const next = { ...prev, [skillId]: { ...existing, note, updatedAt: new Date().toISOString() } }
       saveProgress(userId, next)
@@ -273,7 +398,6 @@ export default function ProfessionalKG() {
     })
   }, [userId])
 
-  // CPD Log add
   const addCpdEntry = () => {
     if (!newLogNote.trim()) return
     const skill = tree.flatMap(c => c.skills).find(s => s.id === newLogSkill)
@@ -293,42 +417,631 @@ export default function ProfessionalKG() {
     toast.success('Đã thêm nhật ký học tập')
   }
 
-  // All skills flat list
-  const allSkills = useMemo(() => tree.flatMap(c => c.skills.map(s => ({ ...s, catId: c.id, catLabel: c.label, color: c.color }))), [tree])
+  // ── Build graph nodes + edges ──
+  const buildGraph = useCallback((canvasW: number, canvasH: number, currentProgress: ProgressMap) => {
+    const nodes: GraphNode[] = []
+    const edges: GraphEdge[] = []
+    const cx = canvasW / 2 - 80  // shift left a bit for milestone column
+    const cy = canvasH / 2
 
-  // Filter for search / level filter
-  const filteredSkills = useMemo(() => {
-    return allSkills.filter(s => {
-      const q = searchQ.toLowerCase()
-      const matchQ = !q || s.label.toLowerCase().includes(q) || s.description.toLowerCase().includes(q) || (s.tags || []).some(t => t.includes(q))
-      const lvl = progress[s.id]?.score ?? 0
-      const matchLevel = filterLevel === -1 || lvl === filterLevel
-      return matchQ && matchLevel
+    // Center node
+    nodes.push({
+      id: 'center',
+      type: 'center',
+      label: 'CPD',
+      x: cx, y: cy,
+      vx: 0, vy: 0,
+      fx: cx, fy: cy,
+      radius: 40,
+      color: '#7c3aed',
     })
-  }, [allSkills, searchQ, filterLevel, progress])
 
-  // Stats
-  const stats = useMemo(() => {
-    const total  = allSkills.length
-    const done   = allSkills.filter(s => (progress[s.id]?.score ?? 0) >= 75).length
-    const inProg = allSkills.filter(s => { const v = progress[s.id]?.score ?? 0; return v >= 25 && v < 75 }).length
-    const avgScore = total ? Math.round(allSkills.reduce((s, sk) => s + (progress[sk.id]?.score ?? 0), 0) / total) : 0
-    return { total, done, inProg, avgScore }
-  }, [allSkills, progress])
+    // Category nodes (around center)
+    const catAngles = [(-3 * Math.PI) / 6, (-1 * Math.PI) / 6, (1 * Math.PI) / 6, (3 * Math.PI) / 6]
+    tree.forEach((cat, ci) => {
+      const angle = catAngles[ci]
+      const col = CATEGORY_COLORS[cat.color]
+      const nx = cx + Math.cos(angle) * 200
+      const ny = cy + Math.sin(angle) * 200
+      nodes.push({
+        id: `cat-${cat.id}`,
+        type: 'category',
+        label: cat.label,
+        shortLabel: col.abbr,
+        x: nx, y: ny,
+        vx: 0, vy: 0,
+        radius: 28,
+        color: col.hex,
+        catColor: cat.color,
+        catId: cat.id,
+      })
+      edges.push({
+        source: 'center',
+        target: `cat-${cat.id}`,
+        type: 'center-cat',
+        color: '#9333ea',
+        width: 2.5,
+        opacity: 0.5,
+      })
 
-  const catStats = useMemo(() => tree.map(cat => {
-    const n = cat.skills.length
-    const sum = cat.skills.reduce((s, sk) => s + (progress[sk.id]?.score ?? 0), 0)
-    const avg = n ? Math.round(sum / n) : 0
-    const mastered = cat.skills.filter(sk => (progress[sk.id]?.score ?? 0) >= 75).length
-    return { id: cat.id, avg, mastered, total: n }
-  }), [tree, progress])
+      // Skill nodes (around category)
+      cat.skills.forEach((skill, si) => {
+        const skillAngle = angle + (si - (cat.skills.length - 1) / 2) * (Math.PI / 5)
+        const skillDist = 120
+        const sx = nx + Math.cos(skillAngle) * skillDist
+        const sy = ny + Math.sin(skillAngle) * skillDist
+        const score = currentProgress[skill.id]?.score ?? 0
+        const masteryConfig = MASTERY_LEVELS.find(l => l.value === score) || MASTERY_LEVELS[0]
+        nodes.push({
+          id: skill.id,
+          type: 'skill',
+          label: skill.label,
+          x: sx, y: sy,
+          vx: 0, vy: 0,
+          radius: 16,
+          color: masteryConfig.hex,
+          catColor: cat.color,
+          skillId: skill.id,
+          catId: cat.id,
+        })
+        edges.push({
+          source: `cat-${cat.id}`,
+          target: skill.id,
+          type: 'cat-skill',
+          color: col.hex,
+          width: 1.5,
+          opacity: 0.4,
+        })
+      })
+    })
+
+    // Milestone nodes — pinned right side
+    const milestoneCount = milestones.length
+    const milestoneX = canvasW - 100
+    const milestoneSpacing = (canvasH - 80) / (milestoneCount + 1)
+    milestones.forEach((m, mi) => {
+      const my = 40 + milestoneSpacing * (mi + 1)
+      nodes.push({
+        id: m.id,
+        type: 'milestone',
+        label: m.label,
+        shortLabel: m.shortLabel,
+        x: milestoneX, y: my,
+        vx: 0, vy: 0,
+        fx: milestoneX, fy: my,
+        radius: 20,
+        color: '#d97706',
+        milestoneIndex: mi,
+        emoji: m.emoji,
+      })
+    })
+
+    // Milestone vertical path edges (bottom → top)
+    for (let mi = milestoneCount - 1; mi > 0; mi--) {
+      edges.push({
+        source: milestones[mi].id,
+        target: milestones[mi - 1].id,
+        type: 'milestone-path',
+        color: '#d97706',
+        width: 2,
+        opacity: 0.35,
+      })
+    }
+
+    // Center → bottom milestone (dashed gold)
+    edges.push({
+      source: 'center',
+      target: milestones[milestoneCount - 1].id,
+      type: 'milestone-path',
+      color: '#d97706',
+      dash: [6, 4],
+      width: 1.5,
+      opacity: 0.3,
+    })
+
+    // Cross-skill edges (only for teacher tree)
+    if (!isAdmin) {
+      CROSS_EDGES.forEach(([src, tgt]) => {
+        const srcNode = nodes.find(n => n.id === src)
+        const tgtNode = nodes.find(n => n.id === tgt)
+        if (srcNode && tgtNode) {
+          edges.push({
+            source: src,
+            target: tgt,
+            type: 'cross',
+            color: '#94a3b8',
+            dash: [4, 3],
+            width: 1,
+            opacity: 0.35,
+          })
+        }
+      })
+    }
+
+    nodesRef.current = nodes
+    edgesRef.current = edges
+  }, [tree, milestones, isAdmin])
+
+  // ── Physics step ──
+  const physicsStep = useCallback(() => {
+    const nodes = nodesRef.current
+    const edges = edgesRef.current
+    const n = nodes.length
+
+    for (let i = 0; i < n; i++) {
+      const a = nodes[i]
+      if (a.fx !== undefined || a.fy !== undefined) continue
+
+      let fx = 0, fy = 0
+
+      // Repulsion from other nodes
+      for (let j = 0; j < n; j++) {
+        if (i === j) continue
+        const b = nodes[j]
+        const dx = a.x - b.x
+        const dy = a.y - b.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const minDist = a.radius + b.radius + 20
+        if (dist < minDist * 3) {
+          const force = REPULSION / (dist * dist)
+          fx += (dx / dist) * force
+          fy += (dy / dist) * force
+        }
+      }
+
+      // Spring forces from edges
+      for (const edge of edges) {
+        let otherNode: GraphNode | undefined
+        if (edge.source === a.id) otherNode = nodes.find(n => n.id === edge.target)
+        else if (edge.target === a.id) otherNode = nodes.find(n => n.id === edge.source)
+        if (!otherNode) continue
+
+        const dx = otherNode.x - a.x
+        const dy = otherNode.y - a.y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const stretch = dist - SPRING_LENGTH
+        fx += (dx / dist) * stretch * SPRING_K
+        fy += (dy / dist) * stretch * SPRING_K
+      }
+
+      // Centering force toward canvas center (use canvas size approximation)
+      const canvasEl = canvasRef.current
+      if (canvasEl) {
+        const cxCanvas = canvasEl.width / (window.devicePixelRatio || 1) / 2
+        const cyCanvas = canvasEl.height / (window.devicePixelRatio || 1) / 2
+        fx += (cxCanvas - a.x) * CENTERING
+        fy += (cyCanvas - a.y) * CENTERING
+      }
+
+      a.vx = (a.vx + fx) * DAMPING
+      a.vy = (a.vy + fy) * DAMPING
+      const speed = Math.sqrt(a.vx * a.vx + a.vy * a.vy)
+      if (speed > MAX_VELOCITY) { a.vx = (a.vx / speed) * MAX_VELOCITY; a.vy = (a.vy / speed) * MAX_VELOCITY }
+      a.x += a.vx
+      a.y += a.vy
+    }
+
+    // Keep pinned nodes locked
+    for (const node of nodes) {
+      if (node.fx !== undefined) node.x = node.fx
+      if (node.fy !== undefined) node.y = node.fy
+    }
+  }, [])
+
+  // ── Draw star shape ──
+  const drawStar = (ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number) => {
+    const spikes = 5
+    const outerR = r
+    const innerR = r * 0.45
+    ctx.beginPath()
+    for (let i = 0; i < spikes * 2; i++) {
+      const angle = (i * Math.PI) / spikes - Math.PI / 2
+      const radius = i % 2 === 0 ? outerR : innerR
+      const px = cx + Math.cos(angle) * radius
+      const py = cy + Math.sin(angle) * radius
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.closePath()
+  }
+
+  // ── Draw frame ──
+  const drawFrame = useCallback((currentProgress: ProgressMap) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const dpr = window.devicePixelRatio || 1
+    const W = canvas.width / dpr
+    const H = canvas.height / dpr
+
+    ctx.save()
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    ctx.clearRect(0, 0, W, H)
+
+    const pan = panRef.current
+    const zoom = zoomRef.current
+
+    ctx.save()
+    ctx.translate(pan.x, pan.y)
+    ctx.scale(zoom, zoom)
+
+    const nodes = nodesRef.current
+    const edges = edgesRef.current
+    const nodeMap = new Map(nodes.map(n => [n.id, n]))
+    const selected = selectedRef.current
+    const hovered = hoveredRef.current
+
+    glowPhase.current += 0.06
+
+    // 1. Milestone vertical line (behind all)
+    const mNodes = nodes.filter(n => n.type === 'milestone').sort((a, b) => (a.milestoneIndex ?? 0) - (b.milestoneIndex ?? 0))
+    if (mNodes.length >= 2) {
+      ctx.save()
+      ctx.strokeStyle = '#d97706'
+      ctx.lineWidth = 3
+      ctx.globalAlpha = 0.18
+      ctx.setLineDash([8, 6])
+      ctx.beginPath()
+      ctx.moveTo(mNodes[0].x, mNodes[0].y)
+      for (let mi = 1; mi < mNodes.length; mi++) ctx.lineTo(mNodes[mi].x, mNodes[mi].y)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    // 2. Edges
+    for (const edge of edges) {
+      if (edge.type === 'milestone-path') continue  // handled above
+      const src = nodeMap.get(edge.source)
+      const tgt = nodeMap.get(edge.target)
+      if (!src || !tgt) continue
+
+      ctx.save()
+      ctx.strokeStyle = edge.color
+      ctx.lineWidth = edge.width
+      ctx.globalAlpha = edge.opacity
+      if (edge.dash) ctx.setLineDash(edge.dash)
+      ctx.beginPath()
+      ctx.moveTo(src.x, src.y)
+      ctx.lineTo(tgt.x, tgt.y)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    // 3. Nodes
+    for (const node of nodes) {
+      const isHovered  = hoveredRef.current === node.id
+      const isSelected = selected?.id === node.id
+      const scale = isHovered && !isSelected ? 1.15 : 1
+      const r = node.radius * scale
+
+      ctx.save()
+      ctx.translate(node.x, node.y)
+
+      // Pulsing glow for selected
+      if (isSelected) {
+        const glowR = r + 8 + Math.sin(glowPhase.current) * 4
+        ctx.shadowColor = '#ffffff'
+        ctx.shadowBlur = 18
+        ctx.beginPath()
+        ctx.arc(0, 0, glowR, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+        ctx.lineWidth = 2.5
+        ctx.stroke()
+        ctx.shadowBlur = 0
+      }
+
+      if (node.type === 'center') {
+        // Gradient circle
+        const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 0, 0, 0, r)
+        grad.addColorStop(0, '#a855f7')
+        grad.addColorStop(1, '#4c1d95')
+        ctx.beginPath()
+        ctx.arc(0, 0, r, 0, Math.PI * 2)
+        ctx.fillStyle = grad
+        ctx.fill()
+        ctx.strokeStyle = '#d8b4fe'
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.font = `bold ${Math.round(r * 0.45)}px system-ui`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText('CPD', 0, 0)
+
+      } else if (node.type === 'category') {
+        const col = node.catColor ? CATEGORY_COLORS[node.catColor] : null
+        ctx.beginPath()
+        ctx.arc(0, 0, r, 0, Math.PI * 2)
+        ctx.fillStyle = node.color
+        ctx.globalAlpha = 0.92
+        ctx.fill()
+        ctx.globalAlpha = 1
+        ctx.strokeStyle = col ? col.hex + 'aa' : '#fff'
+        ctx.lineWidth = 2
+        ctx.stroke()
+        ctx.fillStyle = '#fff'
+        ctx.font = `bold ${Math.round(r * 0.55)}px system-ui`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(node.shortLabel || node.label.slice(0, 2), 0, 0)
+
+      } else if (node.type === 'skill') {
+        const score = currentProgress[node.id]?.score ?? 0
+        const masteryHex = (MASTERY_LEVELS.find(l => l.value === score) || MASTERY_LEVELS[0]).hex
+
+        ctx.beginPath()
+        ctx.arc(0, 0, r, 0, Math.PI * 2)
+        ctx.fillStyle = '#1e1b4b'
+        ctx.globalAlpha = 0.85
+        ctx.fill()
+        ctx.globalAlpha = 1
+
+        if (score > 0) {
+          ctx.beginPath()
+          ctx.arc(0, 0, r, 0, Math.PI * 2)
+          ctx.strokeStyle = masteryHex
+          ctx.lineWidth = 3
+          ctx.stroke()
+        } else {
+          ctx.beginPath()
+          ctx.arc(0, 0, r, 0, Math.PI * 2)
+          ctx.strokeStyle = '#4b5563'
+          ctx.lineWidth = 1.5
+          ctx.stroke()
+        }
+
+        // Inner dot
+        ctx.beginPath()
+        ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2)
+        ctx.fillStyle = masteryHex
+        ctx.globalAlpha = 0.8
+        ctx.fill()
+        ctx.globalAlpha = 1
+
+      } else if (node.type === 'milestone') {
+        const mIdx = node.milestoneIndex ?? 0
+        const ms = milestones[mIdx]
+        const unlocked = ms ? avgScore >= ms.minScore && (!ms.requiredSkillIds || ms.requiredSkillIds.every(id => (currentProgress[id]?.score ?? 0) >= 75)) : false
+
+        drawStar(ctx, 0, 0, r)
+        ctx.fillStyle = unlocked ? '#fbbf24' : '#374151'
+        ctx.globalAlpha = unlocked ? 0.95 : 0.5
+        ctx.fill()
+        ctx.globalAlpha = 1
+        ctx.strokeStyle = unlocked ? '#d97706' : '#6b7280'
+        ctx.lineWidth = 2
+        ctx.stroke()
+
+        // Emoji
+        ctx.font = `${Math.round(r * 0.65)}px system-ui`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.globalAlpha = unlocked ? 1 : 0.4
+        ctx.fillText(node.emoji || '⭐', 0, 0)
+        ctx.globalAlpha = 1
+      }
+
+      ctx.restore()
+    }
+
+    // 4. Labels
+    ctx.save()
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'top'
+    for (const node of nodes) {
+      if (node.type === 'center') continue
+      const isHovered  = hovered === node.id
+      const isSelected = selected?.id === node.id
+
+      const labelY = node.y + node.radius + 5
+      const fontSize = node.type === 'skill' ? 9 : node.type === 'milestone' ? 8 : 10
+      ctx.font = `${isSelected || isHovered ? 'bold ' : ''}${fontSize}px system-ui`
+
+      // Draw text with bg
+      const label = node.type === 'milestone' ? (node.shortLabel || node.label) : (isHovered || isSelected ? node.label : (node.shortLabel || node.label))
+      const maxLen = node.type === 'skill' ? 14 : 16
+      const truncated = label.length > maxLen ? label.slice(0, maxLen - 1) + '…' : label
+
+      ctx.fillStyle = isSelected ? '#c4b5fd' : isHovered ? '#e2e8f0' : node.type === 'milestone' ? '#fcd34d' : '#cbd5e1'
+      ctx.globalAlpha = isHovered || isSelected ? 1 : 0.85
+      ctx.fillText(truncated, node.x, labelY)
+      ctx.globalAlpha = 1
+    }
+    ctx.restore()
+
+    ctx.restore()  // undo translate/scale
+    ctx.restore()  // undo DPR transform
+  }, [milestones, avgScore])
+
+  // ── Resize observer ──
+  const resizeCanvas = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    const W = rect.width
+    const H = rect.height
+    canvas.width  = W * dpr
+    canvas.height = H * dpr
+    buildGraph(W, H, progressMap)
+  }, [buildGraph, progressMap])
+
+  // ── RAF loop ──
+  useEffect(() => {
+    const loop = () => {
+      physicsStep()
+      drawFrame(progressMap)
+      animRef.current = requestAnimationFrame(loop)
+    }
+    animRef.current = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(animRef.current)
+  }, [physicsStep, drawFrame, progressMap])
+
+  // ── Canvas resize ──
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    resizeCanvas()
+    const ro = new ResizeObserver(resizeCanvas)
+    ro.observe(canvas.parentElement || canvas)
+    return () => ro.disconnect()
+  }, [resizeCanvas])
+
+  // Rebuild graph when progress changes (to update skill node colors)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    const W = canvas.width / dpr
+    const H = canvas.height / dpr
+    if (W > 0 && H > 0) {
+      // Only update skill node colors, don't rebuild full graph (would reset positions)
+      nodesRef.current.forEach(node => {
+        if (node.type === 'skill' && node.skillId) {
+          const score = progressMap[node.skillId]?.score ?? 0
+          const m = MASTERY_LEVELS.find(l => l.value === score) || MASTERY_LEVELS[0]
+          node.color = m.hex
+        }
+      })
+    }
+  }, [progressMap])
+
+  // ── Mouse helpers ──
+  const getWorldPos = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const wx = (mx - panRef.current.x) / zoomRef.current
+    const wy = (my - panRef.current.y) / zoomRef.current
+    return { mx, my, wx, wy }
+  }
+
+  const hitTest = (wx: number, wy: number): GraphNode | null => {
+    const nodes = nodesRef.current
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const n = nodes[i]
+      const dx = wx - n.x
+      const dy = wy - n.y
+      const hitR = n.type === 'milestone' ? n.radius + 4 : n.radius
+      if (dx * dx + dy * dy <= hitR * hitR) return n
+    }
+    return null
+  }
+
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { mx, my, wx, wy } = getWorldPos(e)
+    const drag = dragRef.current
+
+    if (drag.nodeId) {
+      // Dragging a node
+      const node = nodesRef.current.find(n => n.id === drag.nodeId)
+      if (node && node.fx === undefined && node.fy === undefined) {
+        node.x = wx
+        node.y = wy
+        node.vx = 0; node.vy = 0
+      }
+    } else if (drag.panStart && drag.mouseStart) {
+      // Panning
+      panRef.current = {
+        x: drag.panStart.x + (mx - drag.mouseStart.x),
+        y: drag.panStart.y + (my - drag.mouseStart.y),
+      }
+    } else {
+      // Hover detection
+      const hit = hitTest(wx, wy)
+      const newHovered = hit?.id || null
+      if (hoveredRef.current !== newHovered) {
+        hoveredRef.current = newHovered
+        if (canvasRef.current) {
+          canvasRef.current.style.cursor = newHovered ? 'pointer' : 'grab'
+        }
+      }
+    }
+  }
+
+  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { mx, my, wx, wy } = getWorldPos(e)
+    const hit = hitTest(wx, wy)
+    if (hit) {
+      dragRef.current = { nodeId: hit.id, panStart: null, mouseStart: null }
+    } else {
+      dragRef.current = { nodeId: null, panStart: { ...panRef.current }, mouseStart: { x: mx, y: my } }
+      if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+    }
+  }
+
+  const onMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const { wx, wy } = getWorldPos(e)
+    const drag = dragRef.current
+    // If we were dragging a node with very small movement — treat as click
+    if (drag.nodeId && drag.mouseStart === null) {
+      const node = nodesRef.current.find(n => n.id === drag.nodeId)
+      if (node) {
+        setSelectedNode(prev => prev?.id === node.id ? null : node)
+      }
+    } else if (!drag.nodeId && drag.mouseStart) {
+      // check if it was a click (tiny movement) on empty space → deselect
+      const hit = hitTest(wx, wy)
+      if (hit) {
+        setSelectedNode(prev => prev?.id === hit.id ? null : hit)
+      } else {
+        setSelectedNode(null)
+      }
+    }
+    dragRef.current = { nodeId: null, panStart: null, mouseStart: null }
+    if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
+  }
+
+  const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    const rect = canvasRef.current!.getBoundingClientRect()
+    const mx = e.clientX - rect.left
+    const my = e.clientY - rect.top
+    const delta = e.deltaY < 0 ? 1.12 : 0.9
+    const newZoom = Math.min(3.0, Math.max(0.4, zoomRef.current * delta))
+    // Zoom toward mouse
+    panRef.current = {
+      x: mx - (mx - panRef.current.x) * (newZoom / zoomRef.current),
+      y: my - (my - panRef.current.y) * (newZoom / zoomRef.current),
+    }
+    zoomRef.current = newZoom
+  }
+
+  // ── Right panel data ──
+  const panelData = useMemo(() => {
+    if (!selectedNode) return null
+    if (selectedNode.type === 'skill' && selectedNode.skillId) {
+      const skill = allSkills.find(s => s.id === selectedNode.skillId)
+      if (!skill) return null
+      const progress = progressMap[skill.id]
+      const neighbors = edgesRef.current
+        .filter(e => e.type !== 'milestone-path' && (e.source === skill.id || e.target === skill.id))
+        .map(e => e.source === skill.id ? e.target : e.source)
+        .filter(id => id !== skill.id)
+        .slice(0, 5)
+      return { type: 'skill' as const, skill, progress, neighbors }
+    }
+    if (selectedNode.type === 'milestone' && selectedNode.milestoneIndex !== undefined) {
+      const ms = milestones[selectedNode.milestoneIndex]
+      if (!ms) return null
+      const unlocked = avgScore >= ms.minScore && (!ms.requiredSkillIds || ms.requiredSkillIds.every(id => (progressMap[id]?.score ?? 0) >= 75))
+      return { type: 'milestone' as const, milestone: ms, unlocked }
+    }
+    if (selectedNode.type === 'category') {
+      const cat = tree.find(c => `cat-${c.id}` === selectedNode.id)
+      if (!cat) return null
+      const ci = tree.indexOf(cat)
+      return { type: 'category' as const, cat, stats: catStats[ci] }
+    }
+    return null
+  }, [selectedNode, allSkills, progressMap, milestones, avgScore, tree, catStats])
 
   // ── Export Excel ──
   const exportExcel = () => {
     const hdr = ['STT', 'Lĩnh vực', 'Kỹ năng / Năng lực', 'Mô tả', 'Mức độ thành thạo', 'Điểm', 'Ghi chú học tập', 'Cập nhật lần cuối']
     const rows = allSkills.map((s, i) => {
-      const p = progress[s.id]
+      const p = progressMap[s.id]
       const lvl = MASTERY_LEVELS.find(l => l.value === (p?.score ?? 0))
       return [
         i + 1, s.catLabel, s.label, s.description,
@@ -337,10 +1050,9 @@ export default function ProfessionalKG() {
         p?.updatedAt ? new Date(p.updatedAt).toLocaleString('vi-VN') : '',
       ]
     })
-    // Sheet 1: kỹ năng
     const ws1 = XLSX.utils.aoa_to_sheet([
       [`BÁO CÁO PHÁT TRIỂN CHUYÊN MÔN — ${user?.name || ''} — ${isAdmin ? 'Quản lý' : 'Giáo viên'}`],
-      [`Xuất ngày: ${new Date().toLocaleString('vi-VN')} — Tiến độ tổng thể: ${stats.avgScore}% — Thành thạo: ${stats.done}/${stats.total} kỹ năng`],
+      [`Xuất ngày: ${new Date().toLocaleString('vi-VN')} — Tiến độ tổng thể: ${avgScore}% — Thành thạo: ${allSkills.filter(s => (progressMap[s.id]?.score ?? 0) >= 75).length}/${totalSkills} kỹ năng`],
       [],
       hdr,
       ...rows,
@@ -350,7 +1062,6 @@ export default function ProfessionalKG() {
       { s: { r: 0, c: 0 }, e: { r: 0, c: hdr.length - 1 } },
       { s: { r: 1, c: 0 }, e: { r: 1, c: hdr.length - 1 } },
     ]
-    // Sheet 2: tổng hợp per category
     const ws2 = XLSX.utils.aoa_to_sheet([
       ['Lĩnh vực', 'Số kỹ năng', 'Thành thạo (≥75%)', 'Điểm TB (%)'],
       ...tree.map((cat, i) => {
@@ -359,54 +1070,44 @@ export default function ProfessionalKG() {
       }),
     ])
     ws2['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 14 }]
-    // Sheet 3: CPD log
-    const logRows = cpdLog.map(e => [
-      new Date(e.createdAt).toLocaleString('vi-VN'),
-      e.skillLabel,
-      e.note,
-    ])
     const ws3 = XLSX.utils.aoa_to_sheet([
       ['Thời gian', 'Kỹ năng liên quan', 'Nội dung cập nhật'],
-      ...logRows,
+      ...cpdLog.map(e => [new Date(e.createdAt).toLocaleString('vi-VN'), e.skillLabel, e.note]),
     ])
     ws3['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 60 }]
-
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws1, 'Kỹ năng chi tiết')
     XLSX.utils.book_append_sheet(wb, ws2, 'Tổng hợp lĩnh vực')
     XLSX.utils.book_append_sheet(wb, ws3, 'Nhật ký học tập')
-    const safe = (user?.name || 'user').replace(/[^\w\d-]+/g, '_')
-    XLSX.writeFile(wb, `CPD_${safe}_${new Date().toISOString().slice(0,10)}.xlsx`)
+    XLSX.writeFile(wb, `CPD_${(user?.name || 'user').replace(/[^\w\d-]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`)
     toast.success('Đã xuất báo cáo CPD Excel (3 sheets)')
   }
 
-  // ── Export JSON ──
   const exportJson = () => {
     const data = {
       meta: {
         user: { name: user?.name, role: user?.role },
         exportedAt: new Date().toISOString(),
-        stats: { total: stats.total, mastered: stats.done, inProgress: stats.inProg, avgScore: stats.avgScore },
+        stats: { total: totalSkills, mastered: allSkills.filter(s => (progressMap[s.id]?.score ?? 0) >= 75).length, avgScore },
       },
       categories: tree.map((cat, i) => ({
-        ...cat,
-        icon: undefined,
+        id: cat.id, label: cat.label, description: cat.description, color: cat.color,
         stats: catStats[i],
         skills: cat.skills.map(s => ({
           id: s.id, label: s.label, description: s.description, tags: s.tags,
-          mastery: progress[s.id]?.score ?? 0,
-          masteryLabel: MASTERY_LEVELS.find(l => l.value === (progress[s.id]?.score ?? 0))?.label,
-          note: progress[s.id]?.note || '',
-          updatedAt: progress[s.id]?.updatedAt || null,
+          mastery: progressMap[s.id]?.score ?? 0,
+          masteryLabel: MASTERY_LEVELS.find(l => l.value === (progressMap[s.id]?.score ?? 0))?.label,
+          note: progressMap[s.id]?.note || '',
+          updatedAt: progressMap[s.id]?.updatedAt || null,
         })),
       })),
-      cpdLog: cpdLog.map(e => ({ ...e })),
+      cpdLog,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url
-    a.download = `CPD_${(user?.name || 'user').replace(/[^\w\d-]+/g, '_')}_${new Date().toISOString().slice(0,10)}.json`
+    a.download = `CPD_${(user?.name || 'user').replace(/[^\w\d-]+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     toast.success('Đã xuất JSON phát triển chuyên môn')
@@ -414,471 +1115,568 @@ export default function ProfessionalKG() {
 
   // ── Render ──
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50/20">
-      {/* ── Page header ── */}
-      <div className="bg-white border-b border-gray-100 px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-3 flex-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center shrink-0">
-              <Brain className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">
-                Cây tri thức Nghề nghiệp
-                <span className="ml-2 text-sm font-normal text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                  {isAdmin ? 'Quản lý' : 'Giáo viên'}
-                </span>
-              </h1>
-              <p className="text-sm text-gray-500">
-                Theo dõi, cập nhật và phát triển năng lực nghề nghiệp liên tục
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={exportExcel} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold">
-              <Download className="w-3.5 h-3.5" />Excel
-            </button>
-            <button onClick={exportJson} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold">
-              <FileJson className="w-3.5 h-3.5" />JSON
-            </button>
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }} className="bg-slate-950 text-white">
+
+      {/* ── Top bar ── */}
+      <div className="shrink-0 bg-slate-900/80 border-b border-slate-700/50 px-4 py-2.5 flex items-center gap-3 backdrop-blur-sm">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center shrink-0">
+          <Brain className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-sm font-bold text-white leading-none">
+            Phát triển Chuyên môn
+            <span className="ml-2 text-[10px] font-medium text-purple-300 bg-purple-900/50 px-1.5 py-0.5 rounded-full">
+              {isAdmin ? 'Quản lý' : 'Giáo viên'}
+            </span>
+          </h1>
+          <p className="text-[10px] text-slate-400 mt-0.5 hidden sm:block">Đồ thị năng lực nghề nghiệp — click node để xem & cập nhật</p>
         </div>
 
-        {/* ── Stats bar ── */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Tổng kỹ năng', value: stats.total, icon: BookOpen, color: 'text-gray-600' },
-            { label: 'Thành thạo (≥75%)', value: stats.done, icon: CheckCircle2, color: 'text-green-600' },
-            { label: 'Đang học',     value: stats.inProg,  icon: TrendingUp,   color: 'text-amber-600' },
-            { label: 'Điểm tổng thể', value: `${stats.avgScore}%`, icon: Award, color: 'text-purple-600' },
-          ].map(s => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 px-3 py-2.5 flex items-center gap-2.5 shadow-sm">
-              <s.icon className={`w-5 h-5 ${s.color} shrink-0`} />
-              <div>
-                <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-[11px] text-gray-500">{s.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* ── Tabs ── */}
-        <div className="mt-3 flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+        {/* Tabs */}
+        <div className="flex items-center gap-1 bg-slate-800 rounded-xl p-1">
           {([
-            { key: 'tree', label: 'Cây kỹ năng', icon: Brain },
-            { key: 'log',  label: `Nhật ký CPD (${cpdLog.length})`, icon: PenLine },
-            { key: 'report', label: 'Tổng quan', icon: BarChart2 },
+            { key: 'graph', label: 'Cây kỹ năng', icon: Brain },
+            { key: 'log',   label: `CPD (${cpdLog.length})`, icon: PenLine },
+            { key: 'report',label: 'Báo cáo', icon: BarChart2 },
           ] as const).map(t => (
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                activeTab === t.key ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeTab === t.key ? 'bg-purple-700 text-white shadow-sm' : 'text-slate-400 hover:text-white'
               }`}
             >
-              <t.icon className="w-3.5 h-3.5" />
-              {t.label}
+              <t.icon className="w-3 h-3" />
+              <span className="hidden sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
+
+        <button onClick={exportExcel} className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold">
+          <Download className="w-3 h-3" /><span className="hidden sm:inline">Excel</span>
+        </button>
+        <button onClick={exportJson} className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold">
+          <FileJson className="w-3 h-3" /><span className="hidden sm:inline">JSON</span>
+        </button>
       </div>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-6">
-        {/* ═══════════════════════════════════════════════
-            TAB: Cây kỹ năng
-        ═══════════════════════════════════════════════ */}
-        {activeTab === 'tree' && (
-          <div className="space-y-4">
-            {/* Search + filter */}
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm kỹ năng, từ khóa..."
-                  value={searchQ}
-                  onChange={e => setSearchQ(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
-                />
+      {/* ── Career stats bar ── */}
+      <div className="shrink-0 bg-slate-900/50 border-b border-slate-700/30 px-4 py-2 flex items-center gap-4 text-xs">
+        <div className="flex items-center gap-2">
+          <Award className="w-4 h-4 text-amber-400" />
+          <span className="text-slate-300 font-medium">
+            {currentMilestone ? `${currentMilestone.emoji} ${currentMilestone.label}` : '🌱 Bắt đầu'}
+          </span>
+        </div>
+        <div className="flex-1 max-w-48">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-slate-700 rounded-full h-1.5">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-amber-400 rounded-full transition-all duration-500"
+                style={{ width: `${avgScore}%` }}
+              />
+            </div>
+            <span className="text-slate-300 font-bold w-8 text-right">{avgScore}%</span>
+          </div>
+        </div>
+        {nextMilestone && (
+          <span className="text-slate-400 hidden sm:inline">
+            Tiếp theo: <span className="text-amber-300">{nextMilestone.emoji} {nextMilestone.label}</span>
+            <span className="text-slate-500 ml-1">({nextMilestone.minScore}%)</span>
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          {MASTERY_LEVELS.slice(1).map(l => {
+            const count = allSkills.filter(s => (progressMap[s.id]?.score ?? 0) === l.value).length
+            return count > 0 ? (
+              <span key={l.value} className="flex items-center gap-1" style={{ color: l.hex }}>
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: l.hex }} />
+                <span className="text-slate-400">{count}</span>
+              </span>
+            ) : null
+          })}
+        </div>
+      </div>
+
+      {/* ── Main content ── */}
+      <div className="flex-1 min-h-0 flex">
+
+        {/* ── Graph tab ── */}
+        {activeTab === 'graph' && (
+          <>
+            {/* Canvas area */}
+            <div className="relative flex-1 min-h-0">
+              <canvas
+                ref={canvasRef}
+                style={{ width: '100%', height: '100%', cursor: 'grab', display: 'block' }}
+                onMouseMove={onMouseMove}
+                onMouseDown={onMouseDown}
+                onMouseUp={onMouseUp}
+                onMouseLeave={() => {
+                  hoveredRef.current = null
+                  dragRef.current = { nodeId: null, panStart: null, mouseStart: null }
+                  if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
+                }}
+                onWheel={onWheel}
+              />
+              {/* Legend overlay */}
+              <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur rounded-xl px-3 py-2 text-[10px] text-slate-400 space-y-1">
+                <div className="text-slate-300 font-semibold mb-1.5">Mức thành thạo</div>
+                {MASTERY_LEVELS.map(l => (
+                  <div key={l.value} className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: l.hex }} />
+                    <span>{l.label}</span>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl px-2 py-1">
-                <Filter className="w-3.5 h-3.5 text-gray-400 shrink-0 ml-1" />
-                {[-1, ...MASTERY_LEVELS.map(l => l.value)].map(v => {
-                  const lvl = MASTERY_LEVELS.find(l => l.value === v)
-                  return (
-                    <button
-                      key={v}
-                      onClick={() => setFilterLevel(v as MasteryLevel | -1)}
-                      className={`px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                        filterLevel === v ? 'bg-purple-100 text-purple-700' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      {v === -1 ? 'Tất cả' : lvl?.label}
-                    </button>
-                  )
-                })}
+              {/* Zoom hint */}
+              <div className="absolute top-3 left-3 bg-slate-900/60 backdrop-blur rounded-lg px-2 py-1 text-[10px] text-slate-500">
+                Scroll để zoom · Kéo để di chuyển · Click node để xem
               </div>
             </div>
 
-            {/* If search active, show flat filtered list */}
-            {(searchQ || filterLevel !== -1) ? (
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 text-sm text-gray-600 font-medium">
-                  Tìm thấy {filteredSkills.length} kỹ năng
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {filteredSkills.map(s => (
-                    <SkillRow
-                      key={s.id}
-                      skill={s}
-                      progress={progress[s.id]}
-                      onScore={(sc) => updateSkill(s.id, sc)}
-                      onNote={(n) => updateNote(s.id, n)}
-                      editActive={editSkill === s.id}
-                      onToggleEdit={() => setEditSkill(editSkill === s.id ? null : s.id)}
-                      color={s.color}
-                    />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* Full category tree */
-              tree.map((cat, ci) => {
-                const cs = catStats[ci]
-                const col = CATEGORY_COLORS[cat.color]
-                const isOpen = expanded.has(cat.id)
-                return (
-                  <div key={cat.id} className={`bg-white rounded-2xl border overflow-hidden ${col.border} shadow-sm`}>
-                    {/* Category header */}
-                    <button
-                      className={`w-full flex items-center gap-3 px-5 py-4 bg-gradient-to-r ${col.header} text-white text-left`}
-                      onClick={() => setExpanded(prev => {
-                        const next = new Set(prev)
-                        next.has(cat.id) ? next.delete(cat.id) : next.add(cat.id)
-                        return next
-                      })}
-                    >
-                      <cat.icon className="w-5 h-5 shrink-0 opacity-90" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-base">{cat.label}</p>
-                        <p className="text-xs text-white/75 truncate">{cat.description}</p>
-                      </div>
-                      {/* Progress pill */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-                          {cs.mastered}/{cs.total} ✓
+            {/* ── Right panel ── */}
+            {selectedNode && panelData && (
+              <div className="w-72 shrink-0 bg-slate-900 border-l border-slate-700/50 overflow-y-auto flex flex-col">
+                <div className="p-4 border-b border-slate-700/50 flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    {panelData.type === 'skill' && (
+                      <>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {(panelData.skill.tags || []).map(tag => (
+                            <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-900/60 text-purple-300">{tag}</span>
+                          ))}
+                        </div>
+                        <h3 className="text-sm font-bold text-white leading-snug">{panelData.skill.label}</h3>
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{panelData.skill.description}</p>
+                      </>
+                    )}
+                    {panelData.type === 'milestone' && (
+                      <>
+                        <div className="text-xl mb-1">{panelData.milestone.emoji}</div>
+                        <h3 className="text-sm font-bold text-white">{panelData.milestone.label}</h3>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${panelData.unlocked ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+                          {panelData.unlocked ? 'Đã đạt' : 'Chưa đạt'}
                         </span>
-                        <span className="bg-white/20 text-white text-xs font-bold px-2 py-1 rounded-full">
-                          {cs.avg}%
-                        </span>
-                        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                      </div>
-                    </button>
-
-                    {/* Progress bar */}
-                    <div className="h-1.5 bg-gray-100">
-                      <div
-                        className={`h-full ${col.bar} transition-all duration-500`}
-                        style={{ width: `${cs.avg}%` }}
-                      />
-                    </div>
-
-                    {/* Skills list */}
-                    {isOpen && (
-                      <div className="divide-y divide-gray-50">
-                        {cat.skills.map(s => (
-                          <SkillRow
-                            key={s.id}
-                            skill={s}
-                            progress={progress[s.id]}
-                            onScore={(sc) => updateSkill(s.id, sc)}
-                            onNote={(n) => updateNote(s.id, n)}
-                            editActive={editSkill === s.id}
-                            onToggleEdit={() => setEditSkill(editSkill === s.id ? null : s.id)}
-                            color={cat.color}
-                          />
-                        ))}
-                      </div>
+                      </>
+                    )}
+                    {panelData.type === 'category' && (
+                      <>
+                        <h3 className="text-sm font-bold text-white">{panelData.cat.label}</h3>
+                        <p className="text-[11px] text-slate-400 mt-1">{panelData.cat.description}</p>
+                      </>
                     )}
                   </div>
-                )
-              })
+                  <button onClick={() => setSelectedNode(null)} className="p-1 text-slate-500 hover:text-white shrink-0 ml-2">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+                  {panelData.type === 'skill' && (() => {
+                    const skill = panelData.skill
+                    const prog = panelData.progress
+                    const score = prog?.score ?? 0
+                    const currentLvl = MASTERY_LEVELS.find(l => l.value === score)!
+                    return (
+                      <>
+                        {/* Mastery badge */}
+                        <div>
+                          <p className="text-[10px] text-slate-500 mb-2 uppercase font-semibold tracking-wide">Mức thành thạo</p>
+                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold ${currentLvl.color}`}>
+                            <span className={`w-2 h-2 rounded-full ${currentLvl.dot}`} />
+                            {currentLvl.label}
+                          </div>
+                        </div>
+
+                        {/* Mastery picker */}
+                        <div>
+                          <p className="text-[10px] text-slate-500 mb-2 uppercase font-semibold tracking-wide">Cập nhật mức độ</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {MASTERY_LEVELS.map(l => (
+                              <button
+                                key={l.value}
+                                onClick={() => {
+                                  updateSkill(skill.id, l.value)
+                                  toast.success(`${skill.label}: ${l.label}`, { duration: 1200 })
+                                }}
+                                title={l.label}
+                                className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center ${
+                                  l.value === score
+                                    ? 'border-white scale-125 ring-2 ring-offset-1 ring-offset-slate-900 ring-white/30'
+                                    : 'border-slate-600 hover:scale-110 hover:border-slate-400'
+                                }`}
+                                style={{ background: l.hex + '33', borderColor: l.value === score ? l.hex : undefined }}
+                              >
+                                <span className="w-3 h-3 rounded-full" style={{ background: l.hex }} />
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex gap-1 mt-1.5">
+                            {MASTERY_LEVELS.map(l => (
+                              <span key={l.value} className="text-[9px] text-slate-500 w-8 text-center">{l.value}%</span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Note */}
+                        <div>
+                          <p className="text-[10px] text-slate-500 mb-1.5 uppercase font-semibold tracking-wide">Ghi chú học tập</p>
+                          <textarea
+                            defaultValue={prog?.note || ''}
+                            onBlur={e => updateNote(skill.id, e.target.value)}
+                            placeholder="Tài liệu tham khảo, kinh nghiệm thực tế..."
+                            rows={3}
+                            className="w-full px-2.5 py-2 bg-slate-800 border border-slate-600 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
+                          />
+                        </div>
+
+                        {/* Add CPD button */}
+                        <button
+                          onClick={() => {
+                            const entry: CpdEntry = {
+                              id: Date.now().toString(),
+                              skillId: skill.id,
+                              skillLabel: skill.label,
+                              note: `Cập nhật ${currentLvl.label} — ${skill.label}`,
+                              createdAt: new Date().toISOString(),
+                            }
+                            setCpdLog(prev => {
+                              const next = [entry, ...prev]
+                              saveCpdLog(userId, next)
+                              return next
+                            })
+                            toast.success('Đã thêm vào nhật ký CPD')
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-semibold"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Thêm vào CPD Log
+                        </button>
+
+                        {/* Related skills */}
+                        {panelData.neighbors.length > 0 && (
+                          <div>
+                            <p className="text-[10px] text-slate-500 mb-2 uppercase font-semibold tracking-wide">Kỹ năng liên quan</p>
+                            <div className="space-y-1.5">
+                              {panelData.neighbors.map(nId => {
+                                const neighbor = allSkills.find(s => s.id === nId)
+                                if (!neighbor) return null
+                                const nScore = progressMap[nId]?.score ?? 0
+                                const nLvl = MASTERY_LEVELS.find(l => l.value === nScore)!
+                                return (
+                                  <button
+                                    key={nId}
+                                    onClick={() => {
+                                      const n = nodesRef.current.find(node => node.id === nId)
+                                      if (n) setSelectedNode(n)
+                                    }}
+                                    className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-left"
+                                  >
+                                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: nLvl.hex }} />
+                                    <span className="text-xs text-slate-300 flex-1 truncate">{neighbor.label}</span>
+                                    <span className="text-[9px] text-slate-500">{nScore}%</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Last updated */}
+                        {prog?.updatedAt && (
+                          <p className="text-[10px] text-slate-600 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(prog.updatedAt).toLocaleString('vi-VN')}
+                          </p>
+                        )}
+                      </>
+                    )
+                  })()}
+
+                  {panelData.type === 'milestone' && (
+                    <div className="space-y-3">
+                      <div className="bg-slate-800 rounded-xl p-3">
+                        <p className="text-[10px] text-slate-500 mb-1.5 uppercase font-semibold tracking-wide">Yêu cầu</p>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex-1 bg-slate-700 rounded-full h-1.5">
+                            <div
+                              className="h-full bg-amber-400 rounded-full"
+                              style={{ width: `${Math.min(100, (avgScore / panelData.milestone.minScore) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-amber-300 font-bold">{avgScore}/{panelData.milestone.minScore}%</span>
+                        </div>
+                        <p className="text-xs text-slate-400">Điểm TB tối thiểu: <strong className="text-white">{panelData.milestone.minScore}%</strong></p>
+                        {panelData.milestone.requiredSkillIds && (
+                          <div className="mt-2 space-y-1">
+                            <p className="text-[10px] text-slate-500">Kỹ năng bắt buộc:</p>
+                            {panelData.milestone.requiredSkillIds.map(id => {
+                              const sk = allSkills.find(s => s.id === id)
+                              const score = progressMap[id]?.score ?? 0
+                              return (
+                                <div key={id} className="flex items-center gap-2 text-xs">
+                                  <CheckCircle2 className={`w-3 h-3 ${score >= 75 ? 'text-green-400' : 'text-slate-600'}`} />
+                                  <span className={score >= 75 ? 'text-green-300' : 'text-slate-400'}>{sk?.label || id}</span>
+                                  <span className="ml-auto text-slate-500">{score}%</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {panelData.type === 'category' && (
+                    <div className="space-y-3">
+                      <div className="bg-slate-800 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs text-slate-400">Tiến độ lĩnh vực</span>
+                          <span className="text-sm font-bold" style={{ color: CATEGORY_COLORS[panelData.cat.color]?.hex }}>{panelData.stats.avg}%</span>
+                        </div>
+                        <div className="bg-slate-700 rounded-full h-2 mb-3">
+                          <div
+                            className="h-full rounded-full"
+                            style={{ width: `${panelData.stats.avg}%`, background: CATEGORY_COLORS[panelData.cat.color]?.hex }}
+                          />
+                        </div>
+                        <p className="text-xs text-slate-400">Thành thạo <strong className="text-white">{panelData.stats.mastered}/{panelData.stats.total}</strong> kỹ năng</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        {panelData.cat.skills.map(s => {
+                          const score = progressMap[s.id]?.score ?? 0
+                          const lvl = MASTERY_LEVELS.find(l => l.value === score)!
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                const n = nodesRef.current.find(node => node.id === s.id)
+                                if (n) setSelectedNode(n)
+                              }}
+                              className="w-full flex items-center gap-2 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-left"
+                            >
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.hex }} />
+                              <span className="text-xs text-slate-300 flex-1 truncate">{s.label}</span>
+                              <span className="text-[9px] text-slate-500">{score}%</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
+          </>
+        )}
+
+        {/* ── CPD Log tab ── */}
+        {activeTab === 'log' && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-2xl mx-auto space-y-4">
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+                <p className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-purple-400" />
+                  Thêm nhật ký học tập
+                </p>
+                <div className="space-y-3">
+                  <select
+                    value={newLogSkill}
+                    onChange={e => setNewLogSkill(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="">— Chọn kỹ năng liên quan (tùy chọn) —</option>
+                    {tree.map(cat => (
+                      <optgroup key={cat.id} label={cat.label}>
+                        {cat.skills.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                  <textarea
+                    value={newLogNote}
+                    onChange={e => setNewLogNote(e.target.value)}
+                    placeholder="Ghi lại điều bạn vừa học, tài liệu tham khảo, khóa học hoàn thành..."
+                    rows={3}
+                    className="w-full px-3 py-2.5 bg-slate-700 border border-slate-600 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  />
+                  <button
+                    onClick={addCpdEntry}
+                    disabled={!newLogNote.trim()}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white rounded-xl text-sm font-semibold"
+                  >
+                    <Save className="w-4 h-4" />Lưu nhật ký
+                  </button>
+                </div>
+              </div>
+
+              {cpdLog.length === 0 ? (
+                <div className="text-center py-12 text-slate-500">
+                  <PenLine className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm">Chưa có nhật ký nào. Hãy ghi lại những gì bạn học hôm nay!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cpdLog.map(entry => (
+                    <div key={entry.id} className="bg-slate-800 rounded-xl border border-slate-700 px-4 py-3 flex gap-3">
+                      <div className="w-0.5 rounded-full bg-purple-500/50 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="text-[10px] font-semibold text-purple-300 bg-purple-900/40 px-2 py-0.5 rounded-full border border-purple-700/40">
+                            {entry.skillLabel}
+                          </span>
+                          <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(entry.createdAt).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-300 leading-relaxed">{entry.note}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB: Nhật ký CPD
-        ═══════════════════════════════════════════════ */}
-        {activeTab === 'log' && (
-          <div className="space-y-4 max-w-3xl">
-            {/* Add entry form */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-              <p className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-purple-500" />
-                Thêm nhật ký học tập mới
-              </p>
-              <div className="space-y-3">
-                <select
-                  value={newLogSkill}
-                  onChange={e => setNewLogSkill(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
-                >
-                  <option value="">— Chọn kỹ năng liên quan (tùy chọn) —</option>
-                  {tree.map(cat => (
-                    <optgroup key={cat.id} label={cat.label}>
-                      {cat.skills.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-                <textarea
-                  value={newLogNote}
-                  onChange={e => setNewLogNote(e.target.value)}
-                  placeholder="Ghi lại điều bạn vừa học, tài liệu tham khảo, phương pháp mới thử, khóa học hoàn thành..."
-                  rows={3}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
-                />
-                <button
-                  onClick={addCpdEntry}
-                  disabled={!newLogNote.trim()}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-40 text-white rounded-xl text-sm font-semibold"
-                >
-                  <Save className="w-4 h-4" />Lưu nhật ký
-                </button>
-              </div>
-            </div>
-
-            {/* Log entries */}
-            {cpdLog.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
-                <PenLine className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">Chưa có nhật ký nào. Hãy ghi lại những gì bạn học hôm nay!</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {cpdLog.map(entry => (
-                  <div key={entry.id} className="bg-white rounded-xl border border-gray-100 px-4 py-3 shadow-sm flex gap-3">
-                    <div className="w-0.5 rounded-full bg-purple-300 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[11px] font-semibold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                          {entry.skillLabel}
-                        </span>
-                        <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(entry.createdAt).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{entry.note}</p>
+        {/* ── Report tab ── */}
+        {activeTab === 'report' && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-4xl mx-auto space-y-6">
+              {/* Stats overview */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Tổng kỹ năng', value: totalSkills, icon: BookOpen, color: 'text-slate-300' },
+                  { label: 'Thành thạo (≥75%)', value: allSkills.filter(s => (progressMap[s.id]?.score ?? 0) >= 75).length, icon: CheckCircle2, color: 'text-green-400' },
+                  { label: 'Đang học', value: allSkills.filter(s => { const v = progressMap[s.id]?.score ?? 0; return v >= 25 && v < 75 }).length, icon: TrendingUp, color: 'text-amber-400' },
+                  { label: 'Điểm tổng thể', value: `${avgScore}%`, icon: Award, color: 'text-purple-400' },
+                ].map(s => (
+                  <div key={s.label} className="bg-slate-800 rounded-xl border border-slate-700 px-3 py-3 flex items-center gap-2.5">
+                    <s.icon className={`w-5 h-5 ${s.color} shrink-0`} />
+                    <div>
+                      <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+                      <p className="text-[10px] text-slate-500">{s.label}</p>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB: Tổng quan / Report
-        ═══════════════════════════════════════════════ */}
-        {activeTab === 'report' && (
-          <div className="space-y-6 max-w-4xl">
-            {/* Per-category breakdown */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              {tree.map((cat, ci) => {
-                const cs = catStats[ci]
-                const col = CATEGORY_COLORS[cat.color]
-                const skills = cat.skills
+              {/* Category breakdown */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                {tree.map((cat, ci) => {
+                  const cs = catStats[ci]
+                  const col = CATEGORY_COLORS[cat.color]
+                  return (
+                    <div key={cat.id} className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+                      <div className="px-4 py-3 flex items-center gap-2" style={{ background: col.hex + '22', borderBottom: `1px solid ${col.hex}33` }}>
+                        <span style={{ color: col.hex }}><cat.icon className="w-4 h-4" /></span>
+                        <span className="font-semibold text-sm text-white">{cat.label}</span>
+                        <span className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: col.hex + '33', color: col.hex }}>{cs.avg}%</span>
+                      </div>
+                      <div className="h-1" style={{ background: '#1e293b' }}>
+                        <div className="h-full" style={{ width: `${cs.avg}%`, background: col.hex }} />
+                      </div>
+                      <div className="p-3 space-y-1.5">
+                        {cat.skills.map(s => {
+                          const score = progressMap[s.id]?.score ?? 0
+                          const lvl = MASTERY_LEVELS.find(l => l.value === score)!
+                          return (
+                            <div key={s.id} className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.hex }} />
+                              <span className="text-xs text-slate-300 flex-1 truncate">{s.label}</span>
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: lvl.hex + '22', color: lvl.hex }}>{lvl.label}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="px-3 py-2 border-t border-slate-700 text-[10px] text-slate-500">
+                        Thành thạo: <strong style={{ color: col.hex }}>{cs.mastered}/{cs.total}</strong> kỹ năng
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Career milestones progress */}
+              <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+                <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  Lộ trình sự nghiệp
+                </h3>
+                <div className="space-y-2">
+                  {milestones.map(m => {
+                    const unlocked = avgScore >= m.minScore && (!m.requiredSkillIds || m.requiredSkillIds.every(id => (progressMap[id]?.score ?? 0) >= 75))
+                    const isCurrent = currentMilestone?.id === m.id
+                    return (
+                      <div key={m.id} className={`flex items-center gap-3 px-3 py-2 rounded-xl ${isCurrent ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-900/50'}`}>
+                        <span className="text-base">{m.emoji}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-semibold ${unlocked ? 'text-white' : 'text-slate-400'}`}>{m.label}</span>
+                            {isCurrent && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/30 text-amber-300 font-bold">Đang ở</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 bg-slate-700 rounded-full h-1">
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${Math.min(100, (avgScore / m.minScore) * 100)}%`, background: unlocked ? '#f59e0b' : '#4b5563' }}
+                              />
+                            </div>
+                            <span className="text-[9px] text-slate-500 w-16 text-right">{avgScore}/{m.minScore}%</span>
+                          </div>
+                        </div>
+                        <CheckCircle2 className={`w-4 h-4 shrink-0 ${unlocked ? 'text-amber-400' : 'text-slate-700'}`} />
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Weak skills */}
+              {(() => {
+                const weak = allSkills.filter(s => (progressMap[s.id]?.score ?? 0) < 50)
+                if (!weak.length) return (
+                  <div className="bg-green-900/20 border border-green-700/30 rounded-2xl p-4 text-center text-green-300 text-sm">
+                    Tuyệt vời! Tất cả kỹ năng đều đạt 50% trở lên.
+                  </div>
+                )
                 return (
-                  <div key={cat.id} className={`bg-white rounded-2xl border overflow-hidden ${col.border} shadow-sm`}>
-                    <div className={`px-4 py-3 bg-gradient-to-r ${col.header} text-white flex items-center gap-2`}>
-                      <cat.icon className="w-4 h-4" />
-                      <span className="font-semibold text-sm">{cat.label}</span>
-                      <span className="ml-auto text-xs bg-white/25 px-2 py-0.5 rounded-full font-bold">{cs.avg}%</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-100">
-                      <div className={`h-full ${col.bar}`} style={{ width: `${cs.avg}%` }} />
-                    </div>
-                    <div className="p-4 space-y-2">
-                      {skills.map(s => {
-                        const p = progress[s.id]
-                        const score = p?.score ?? 0
+                  <div className="bg-amber-900/20 border border-amber-700/30 rounded-2xl p-4">
+                    <p className="font-semibold text-amber-300 mb-3 flex items-center gap-2 text-sm">
+                      <Lightbulb className="w-4 h-4" />
+                      Kỹ năng cần chú ý ({weak.length} kỹ năng dưới 50%)
+                    </p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {weak.slice(0, 10).map(s => {
+                        const score = progressMap[s.id]?.score ?? 0
                         const lvl = MASTERY_LEVELS.find(l => l.value === score)!
                         return (
-                          <div key={s.id} className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full shrink-0 ${lvl.dot}`} />
-                            <span className="text-xs text-gray-700 flex-1 truncate">{s.label}</span>
-                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${lvl.color}`}>{lvl.label}</span>
+                          <div key={s.id} className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-2 border border-amber-800/30">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: lvl.hex }} />
+                            <span className="text-xs text-slate-300 flex-1 truncate">{s.label}</span>
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded" style={{ background: lvl.hex + '22', color: lvl.hex }}>{lvl.label}</span>
                           </div>
                         )
                       })}
                     </div>
-                    <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
-                      Thành thạo: <strong className={col.icon}>{cs.mastered}/{cs.total}</strong> kỹ năng
-                    </div>
+                    {weak.length > 10 && <p className="text-xs text-amber-600 mt-2">... và {weak.length - 10} kỹ năng khác</p>}
                   </div>
                 )
-              })}
-            </div>
+              })()}
 
-            {/* Overall radar-like summary table */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2"><Award className="w-4 h-4 text-purple-500" />Tóm tắt năng lực</h3>
-                <div className="flex gap-2">
-                  <button onClick={exportExcel} className="text-xs text-emerald-600 hover:underline flex items-center gap-1"><Download className="w-3 h-3" />Excel</button>
-                  <button onClick={exportJson} className="text-xs text-orange-500 hover:underline flex items-center gap-1"><FileJson className="w-3 h-3" />JSON</button>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-gray-600">
-                    <tr>
-                      <th className="px-4 py-2.5 text-left font-semibold">Lĩnh vực</th>
-                      <th className="px-4 py-2.5 text-center font-semibold">Điểm TB</th>
-                      <th className="px-4 py-2.5 text-center font-semibold">Thành thạo</th>
-                      <th className="px-4 py-2.5 text-left font-semibold">Tiến độ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tree.map((cat, ci) => {
-                      const cs = catStats[ci]
-                      const col = CATEGORY_COLORS[cat.color]
-                      return (
-                        <tr key={cat.id} className="border-t border-gray-50 hover:bg-gray-50">
-                          <td className="px-4 py-2.5 flex items-center gap-2 font-medium text-gray-800">
-                            <cat.icon className={`w-4 h-4 ${col.icon}`} />
-                            {cat.label}
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-bold text-gray-700">{cs.avg}%</td>
-                          <td className="px-4 py-2.5 text-center">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${col.badge}`}>
-                              {cs.mastered}/{cs.total}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="w-full bg-gray-100 rounded-full h-2">
-                              <div className={`h-2 rounded-full ${col.bar} transition-all`} style={{ width: `${cs.avg}%` }} />
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              {/* Export buttons */}
+              <div className="flex gap-3">
+                <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold">
+                  <Download className="w-4 h-4" />Xuất Excel (3 sheets)
+                </button>
+                <button onClick={exportJson} className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-sm font-semibold">
+                  <FileJson className="w-4 h-4" />Xuất JSON
+                </button>
               </div>
             </div>
-
-            {/* Skills needing attention */}
-            {(() => {
-              const weak = allSkills.filter(s => (progress[s.id]?.score ?? 0) < 50)
-              if (!weak.length) return null
-              return (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                  <p className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
-                    <Lightbulb className="w-4 h-4" />
-                    Kỹ năng cần chú ý ({weak.length} kỹ năng &lt; 50%)
-                  </p>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    {weak.slice(0, 8).map(s => {
-                      const score = progress[s.id]?.score ?? 0
-                      const lvl = MASTERY_LEVELS.find(l => l.value === score)!
-                      return (
-                        <div key={s.id} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-amber-100">
-                          <div className={`w-2 h-2 rounded-full ${lvl.dot} shrink-0`} />
-                          <span className="text-xs text-gray-700 flex-1 truncate">{s.label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${lvl.color}`}>{lvl.label}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {weak.length > 8 && <p className="text-xs text-amber-600 mt-2">... và {weak.length - 8} kỹ năng khác</p>}
-                </div>
-              )
-            })()}
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-// ── SkillRow subcomponent ──────────────────────────────────────────────────
-
-function SkillRow({
-  skill,
-  progress,
-  onScore,
-  onNote,
-  editActive,
-  onToggleEdit,
-  color,
-}: {
-  skill: Skill
-  progress?: SkillProgress
-  onScore: (score: MasteryLevel) => void
-  onNote: (note: string) => void
-  editActive: boolean
-  onToggleEdit: () => void
-  color: string
-}) {
-  const score = progress?.score ?? 0
-  const lvl   = MASTERY_LEVELS.find(l => l.value === score) ?? MASTERY_LEVELS[0]
-  const col   = CATEGORY_COLORS[color]
-
-  return (
-    <div className="px-4 sm:px-5 py-3">
-      <div className="flex items-start gap-3">
-        {/* Mastery dot */}
-        <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ${lvl.dot}`} />
-        {/* Name + description */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-            <span className="text-sm font-semibold text-gray-800">{skill.label}</span>
-            {(skill.tags || []).map(tag => (
-              <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">{tag}</span>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 leading-relaxed">{skill.description}</p>
-          {/* Note preview */}
-          {progress?.note && !editActive && (
-            <p className="mt-1 text-xs text-indigo-600 italic line-clamp-1">📝 {progress.note}</p>
-          )}
-          {/* Edit note area */}
-          {editActive && (
-            <textarea
-              defaultValue={progress?.note || ''}
-              onBlur={e => onNote(e.target.value)}
-              placeholder="Ghi chú học tập (nguồn tài liệu, kinh nghiệm thực tế...)"
-              rows={2}
-              autoFocus
-              className="mt-2 w-full px-2 py-1.5 text-xs border border-indigo-200 rounded-lg bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none text-gray-700"
-            />
-          )}
-        </div>
-        {/* Mastery level picker */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0">
-          <div className="flex items-center gap-1">
-            {MASTERY_LEVELS.map(l => (
-              <button
-                key={l.value}
-                onClick={() => { onScore(l.value); toast.success(`${skill.label}: ${l.label}`, { duration: 1000 }) }}
-                title={l.label}
-                className={`w-5 h-5 rounded-full border-2 transition-all ${
-                  l.value === score
-                    ? `${l.dot} border-current scale-125 ring-2 ring-offset-1 ring-gray-300`
-                    : 'bg-gray-100 border-gray-200 hover:scale-110'
-                }`}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-1">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${lvl.color}`}>{lvl.label}</span>
-            <button onClick={onToggleEdit} className="p-0.5 text-gray-400 hover:text-indigo-500" title="Ghi chú">
-              <PenLine className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )
