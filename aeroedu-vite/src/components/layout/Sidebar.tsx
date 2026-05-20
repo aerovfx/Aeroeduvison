@@ -279,13 +279,23 @@ function SidebarItem({
   const isActive = location.pathname === href || location.pathname.startsWith(href + '/')
   const linkRef = useRef<HTMLAnchorElement>(null)
   const [tooltipPos, setTooltipPos] = useState<{ y: number; right: number } | null>(null)
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleMouseEnter = () => {
+  const showTooltipAt = () => {
     if (!collapsed || !linkRef.current) return
     const rect = linkRef.current.getBoundingClientRect()
     setTooltipPos({ y: rect.top + rect.height / 2, right: rect.right })
   }
+  const handleMouseEnter = showTooltipAt
   const handleMouseLeave = () => setTooltipPos(null)
+
+  // Mobile: tap nhanh = hiện tooltip 1.5s rồi tự ẩn (long-press đến đó user đã đọc xong)
+  const handleTouchStart = () => {
+    showTooltipAt()
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current)
+    touchTimerRef.current = setTimeout(() => setTooltipPos(null), 1500)
+  }
+  useEffect(() => () => { if (touchTimerRef.current) clearTimeout(touchTimerRef.current) }, [])
 
   return (
     <>
@@ -294,6 +304,8 @@ function SidebarItem({
         to={href}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchStart}
+        title={collapsed ? label : undefined}
         className={cn(
           'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group relative',
           isActive
@@ -429,10 +441,10 @@ export const Sidebar = memo(function Sidebar({ mobileOpen = false, onMobileClose
       data-sidebar="main"
       className={cn(
         'flex flex-col h-full border-r border-border bg-card transition-all duration-300',
-        /* Desktop: always visible, fixed width 60/14
-           Mobile: hidden by default (CSS), shown as drawer when mobileOpen=true */
-        collapsed ? 'lg:w-14' : 'lg:w-60',
-        'w-64',
+        /* Desktop: w-14 collapsed / w-60 expanded
+           Mobile drawer: w-16 collapsed (just icon) / w-56 expanded (labels visible)
+           — co theo collapsed để không có vùng trống thừa bên phải. */
+        collapsed ? 'lg:w-14 w-16' : 'lg:w-60 w-56',
         mobileOpen
           ? 'fixed top-0 left-0 h-full z-50 shadow-2xl lg:relative lg:shadow-none mobile-open'
           : 'hidden lg:flex',
