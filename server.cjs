@@ -4362,6 +4362,14 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       )`);
       await pool.query(`ALTER TABLE "Chapter" ADD COLUMN IF NOT EXISTS "description" TEXT`);
       await pool.query(`ALTER TABLE "Chapter" ADD COLUMN IF NOT EXISTS "duration" INTEGER`);
+      // BUG FIX 2026-05-21: Prisma-created tables có "updatedAt" NOT NULL
+      // mà KHÔNG có DEFAULT → INSERT thiếu cột này sẽ throw not-null violation.
+      // Force ALTER để add DEFAULT NOW() vào cả createdAt + updatedAt (idempotent).
+      await pool.query(`ALTER TABLE "Chapter" ALTER COLUMN "createdAt" SET DEFAULT NOW()`).catch(() => {});
+      await pool.query(`ALTER TABLE "Chapter" ALTER COLUMN "updatedAt" SET DEFAULT NOW()`).catch(() => {});
+      // Backfill NULL rows (defensive — nếu legacy row tồn tại với updatedAt NULL)
+      await pool.query(`UPDATE "Chapter" SET "updatedAt" = NOW() WHERE "updatedAt" IS NULL`).catch(() => {});
+      await pool.query(`UPDATE "Chapter" SET "createdAt" = NOW() WHERE "createdAt" IS NULL`).catch(() => {});
       await pool.query(`CREATE INDEX IF NOT EXISTS "Chapter_course_idx" ON "Chapter"("courseId", position ASC)`);
       // Lesson table — lazy migration
       await pool.query(`CREATE TABLE IF NOT EXISTS "Lesson" (
@@ -4376,6 +4384,11 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         "updatedAt" TIMESTAMPTZ DEFAULT NOW()
       )`);
       await pool.query(`CREATE INDEX IF NOT EXISTS "Lesson_chapter_idx" ON "Lesson"("chapterId", position ASC)`);
+      // Same fix cho Lesson table — đề phòng Prisma cũ tạo updatedAt NOT NULL
+      await pool.query(`ALTER TABLE "Lesson" ALTER COLUMN "createdAt" SET DEFAULT NOW()`).catch(() => {});
+      await pool.query(`ALTER TABLE "Lesson" ALTER COLUMN "updatedAt" SET DEFAULT NOW()`).catch(() => {});
+      await pool.query(`UPDATE "Lesson" SET "updatedAt" = NOW() WHERE "updatedAt" IS NULL`).catch(() => {});
+      await pool.query(`UPDATE "Lesson" SET "createdAt" = NOW() WHERE "createdAt" IS NULL`).catch(() => {});
       // FK cascade: nếu Chapter bị xoá → Lessons xoá theo
       try {
         await pool.query(`ALTER TABLE "Lesson" DROP CONSTRAINT IF EXISTS "Lesson_chapterId_fkey"`);
@@ -4504,8 +4517,8 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const { randomUUID } = require('crypto');
         const id = randomUUID();
         await pool.query(
-          `INSERT INTO "Chapter" (id, "courseId", title, description, position, "isPublished")
-           VALUES ($1, $2, $3, $4, $5, true)`,
+          `INSERT INTO "Chapter" (id, "courseId", title, description, position, "isPublished", "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, true, NOW(), NOW())`,
           [id, req.params.courseId, title.slice(0, 300), description, position]
         );
         const { rows } = await pool.query(
@@ -4601,8 +4614,8 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const { randomUUID } = require('crypto');
         const id = randomUUID();
         await pool.query(
-          `INSERT INTO "Lesson" (id, "chapterId", title, description, duration, type, position)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          `INSERT INTO "Lesson" (id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
           [id, req.params.chapterId, title.slice(0, 300), description, duration, type, position]
         );
         const { rows } = await pool.query(
