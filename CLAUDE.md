@@ -16,7 +16,8 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `128c9d0` (revision pixiai-00357-nih, 2026-05-20 — PDF split-panel khi điền đáp án + Professional KG GV/Admin)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `1/5`
+- Prev: `845dc8e` (Professional KG v2 — Canvas force-directed graph + Career Pathway)
 - Prev: `128c9d0` → pixiai-00357-nih (PDF split-panel khi điền đáp án — đề thi bên cạnh bubble sheet)
 - Prev: `ab669c7` → pixiai-00357-nih (Professional KG — Cây tri thức phát triển chuyên môn GV/Admin — same deploy)
 - Prev: `a1db1b9` → pixiai-00357-nih (Báo cáo tiến bộ HS theo các thời kỳ + xuất Excel/JSON — same deploy)
