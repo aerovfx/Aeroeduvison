@@ -19,7 +19,7 @@
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, Save, Plus, X, GraduationCap, BookOpen, Download, Upload, CheckCircle2, AlertCircle, FileJson } from 'lucide-react'
+import { Loader2, Save, Plus, X, GraduationCap, BookOpen, Download, Upload, CheckCircle2, AlertCircle, FileJson, TrendingUp, TrendingDown, Minus, BarChart2, ChevronDown } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -243,6 +243,57 @@ function fmtScore(n: number | null): string {
   return n.toFixed(1).replace(/\.0$/, '')
 }
 
+/** Xếp loại học lực theo TT22/2021 */
+function computeRating(dtb: number | null): 'Giỏi' | 'Khá' | 'TB' | 'Yếu' | '—' {
+  if (dtb == null) return '—'
+  if (dtb >= 8) return 'Giỏi'
+  if (dtb >= 6.5) return 'Khá'
+  if (dtb >= 5) return 'TB'
+  return 'Yếu'
+}
+
+/** Tính xu hướng dựa trên chênh lệch, ngưỡng 0.3 điểm */
+type Trend = 'up' | 'down' | 'stable' | 'none'
+function computeTrend(from: number | null, to: number | null): Trend {
+  if (from == null || to == null) return 'none'
+  const d = to - from
+  if (d > 0.3) return 'up'
+  if (d < -0.3) return 'down'
+  return 'stable'
+}
+
+/** Tính xu hướng chuỗi ĐĐGtx: so sánh trung bình nửa đầu vs nửa sau */
+function computeTxTrend(ddgtx: (number | null)[]): Trend {
+  const vals = ddgtx.filter((v): v is number => v != null)
+  if (vals.length < 2) return 'none'
+  const mid = Math.floor(vals.length / 2)
+  const first = vals.slice(0, mid)
+  const last  = vals.slice(mid)
+  const avgFirst = first.reduce((s, v) => s + v, 0) / first.length
+  const avgLast  = last.reduce((s, v) => s + v, 0)  / last.length
+  return computeTrend(avgFirst, avgLast)
+}
+
+export interface ProgressEntry {
+  studentId: string
+  name: string
+  stt: number | null
+  /** ĐĐGtx raw values (current semester) */
+  ddgtx: (number | null)[]
+  /** Xu hướng nội kỳ (ĐĐGtx1→5) */
+  txTrend: Trend
+  dtbHk1: number | null
+  dtbHk2: number | null
+  /** = dtbHk2 - dtbHk1 */
+  crossDelta: number | null
+  /** Xu hướng giữa 2 học kỳ */
+  crossTrend: Trend
+  /** ĐTBmhk của học kỳ hiện tại đang xem */
+  currentDtb: number | null
+  rating: ReturnType<typeof computeRating>
+  progressNote: string
+}
+
 export default function GradeBook() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
@@ -266,6 +317,7 @@ export default function GradeBook() {
   const [addSubjOpen, setAddSubjOpen] = useState(false)
   const [newSubject, setNewSubject] = useState('')
   const [importOpen, setImportOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -608,6 +660,14 @@ export default function GradeBook() {
               <span className="text-green-600 text-xs">✓ Đã lưu</span>
             )}
             <button
+              onClick={() => setProgressOpen(true)}
+              disabled={!classId || !subject || students.length === 0}
+              title="Xem báo cáo tiến bộ học sinh theo các thời kỳ"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />Tiến bộ
+            </button>
+            <button
               onClick={() => setImportOpen(true)}
               disabled={!classId || !subject || students.length === 0}
               title="Import điểm từ file Excel (.xlsx) hoặc JSON"
@@ -788,6 +848,29 @@ export default function GradeBook() {
             </span>
           </div>
         </div>
+      )}
+
+      {/* ── Progress report panel ── */}
+      {progressOpen && (
+        <ProgressReportPanel
+          students={students}
+          currentGrades={grades}
+          currentSemester={semester}
+          classId={classId}
+          subject={subject}
+          classes={classes}
+          onClose={() => setProgressOpen(false)}
+          onUpdateNotes={(updates) => {
+            setGrades(prev => {
+              const next = { ...prev }
+              for (const [sid, note] of Object.entries(updates)) {
+                next[sid] = { ...(next[sid] || emptyGrade()), noteProgress: note }
+              }
+              return next
+            })
+            scheduleAutoSave()
+          }}
+        />
       )}
 
       {/* ── Import điểm modal ── */}
@@ -1210,6 +1293,476 @@ function GradeImportModal({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── ProgressReportPanel ────────────────────────────────────────────────────
+/**
+ * Báo cáo tiến bộ học sinh — full-screen overlay.
+ * - Load cả 2 học kỳ (HK1 + HK2) song song
+ * - Tính xu hướng nội kỳ (ĐĐGtx1→5) và liên kỳ (ĐTBmhk1→ĐTBmhk2)
+ * - GV có thể sửa nhận xét tiến bộ inline → lưu lại qua callback
+ * - Xuất Excel (1 sheet data + 1 sheet tổng hợp) và JSON
+ */
+function ProgressReportPanel({
+  students,
+  currentGrades,
+  currentSemester,
+  classId,
+  subject,
+  classes,
+  onClose,
+  onUpdateNotes,
+}: {
+  students: ClassStudent[]
+  currentGrades: Record<string, GradeRow>
+  currentSemester: string
+  classId: string
+  subject: string
+  classes: ClassInfo[]
+  onClose: () => void
+  onUpdateNotes: (updates: Record<string, string>) => void
+}) {
+  const otherSemester = currentSemester === 'HK1' ? 'HK2' : 'HK1'
+  const [otherGrades, setOtherGrades] = useState<Record<string, GradeRow>>({})
+  const [loadingOther, setLoadingOther] = useState(false)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [expandNote, setExpandNote] = useState<string | null>(null)
+
+  // Load other semester on mount
+  useEffect(() => {
+    if (!classId || !subject) return
+    // Init notes from current grades
+    const init: Record<string, string> = {}
+    for (const s of students) init[s.id] = currentGrades[s.id]?.noteProgress || ''
+    setNotes(init)
+    // Fetch other semester
+    setLoadingOther(true)
+    api.get<{ students: ClassStudent[]; grades: Record<string, GradeRow> }>(
+      '/teacher/gradebook', { params: { classId, subject, semester: otherSemester } }
+    ).then(r => {
+      const g = { ...(r.data?.grades || {}) }
+      for (const s of r.data?.students || []) {
+        if (!g[s.id]) g[s.id] = emptyGrade()
+        while (g[s.id].ddgtx.length < NUM_TX) g[s.id].ddgtx.push(null)
+      }
+      setOtherGrades(g)
+    }).catch(() => setOtherGrades({}))
+    .finally(() => setLoadingOther(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId, subject, otherSemester])
+
+  // Build progress entries
+  const entries = useMemo<ProgressEntry[]>(() => students.map(s => {
+    const curr = currentGrades[s.id] || emptyGrade()
+    const other = otherGrades[s.id] || emptyGrade()
+    const hk1 = currentSemester === 'HK1' ? curr : other
+    const hk2 = currentSemester === 'HK2' ? curr : other
+    const dtbHk1 = computeDTBmhk(hk1)
+    const dtbHk2 = computeDTBmhk(hk2)
+    const currentDtb = computeDTBmhk(curr)
+    const crossDelta = dtbHk1 != null && dtbHk2 != null ? Math.round((dtbHk2 - dtbHk1) * 10) / 10 : null
+    return {
+      studentId: s.id,
+      name: s.name,
+      stt: s.stt,
+      ddgtx: curr.ddgtx,
+      txTrend: computeTxTrend(curr.ddgtx),
+      dtbHk1,
+      dtbHk2,
+      crossDelta,
+      crossTrend: computeTrend(dtbHk1, dtbHk2),
+      currentDtb,
+      rating: computeRating(currentDtb),
+      progressNote: notes[s.id] ?? curr.noteProgress,
+    }
+  }), [students, currentGrades, otherGrades, currentSemester, notes])
+
+  // Aggregate stats
+  const upCount     = entries.filter(e => e.crossTrend === 'up').length
+  const downCount   = entries.filter(e => e.crossTrend === 'down').length
+  const stableCount = entries.filter(e => e.crossTrend === 'stable').length
+  const hasOther    = Object.keys(otherGrades).length > 0
+
+  const className   = classes.find(c => c.id === classId)?.name || ''
+  const schoolYear  = classes.find(c => c.id === classId)?.schoolYear || ''
+
+  // ── Export Excel ──
+  const exportExcel = () => {
+    // Sheet 1 — data tiến bộ
+    const hdr = [
+      'STT', 'Họ và tên',
+      'ĐĐGtx1', 'ĐĐGtx2', 'ĐĐGtx3', 'ĐĐGtx4', 'ĐĐGtx5',
+      'Xu hướng TX', 'ĐTBmhk1', 'ĐTBmhk2', 'Chênh lệch (HK2−HK1)',
+      'Xu hướng HK', 'ĐTBm hiện tại', 'Xếp loại', 'Nhận xét tiến bộ',
+    ]
+    const dataRows = entries.map((e, i) => [
+      e.stt ?? i + 1,
+      e.name,
+      ...e.ddgtx.map(v => v ?? ''),
+      e.txTrend === 'up' ? 'Tăng' : e.txTrend === 'down' ? 'Giảm' : e.txTrend === 'stable' ? 'Ổn định' : '—',
+      e.dtbHk1 ?? '',
+      e.dtbHk2 ?? '',
+      e.crossDelta != null ? (e.crossDelta > 0 ? `+${e.crossDelta}` : `${e.crossDelta}`) : '—',
+      e.crossTrend === 'up' ? 'Tiến bộ' : e.crossTrend === 'down' ? 'Giảm sút' : e.crossTrend === 'stable' ? 'Ổn định' : '—',
+      e.currentDtb ?? '',
+      e.rating,
+      notes[e.studentId] ?? e.progressNote,
+    ])
+    const titleRow = [`BÁO CÁO TIẾN BỘ HỌC SINH — ${subject} — ${className} — ${schoolYear}`]
+    const metaRow  = [`Xuất ngày: ${new Date().toLocaleString('vi-VN')} — Học kỳ xem: ${currentSemester}`]
+    const aoa1 = [titleRow, metaRow, [], hdr, ...dataRows]
+    const ws1 = XLSX.utils.aoa_to_sheet(aoa1)
+    ws1['!cols'] = [
+      { wch: 5 }, { wch: 30 },
+      ...Array(5).fill({ wch: 9 }),
+      { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 20 },
+      { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 40 },
+    ]
+    ws1['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: hdr.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: hdr.length - 1 } },
+    ]
+    // Sheet 2 — tổng hợp thống kê
+    const statHdr   = ['Chỉ số', 'Giá trị', 'Tỷ lệ']
+    const total     = entries.length
+    const withData  = entries.filter(e => e.currentDtb != null).length
+    const excellent = entries.filter(e => e.rating === 'Giỏi').length
+    const good      = entries.filter(e => e.rating === 'Khá').length
+    const avg       = entries.filter(e => e.rating === 'TB').length
+    const weak      = entries.filter(e => e.rating === 'Yếu').length
+    const dtbArr    = entries.map(e => e.currentDtb).filter((v): v is number => v != null)
+    const classAvg  = dtbArr.length ? Math.round(dtbArr.reduce((s, v) => s + v, 0) / dtbArr.length * 10) / 10 : null
+    const pct = (n: number) => total > 0 ? `${Math.round(n / total * 100)}%` : '0%'
+    const aoa2 = [
+      ['THỐNG KÊ — ' + className],
+      [],
+      statHdr,
+      ['Tổng học sinh',         total, ''],
+      ['Có dữ liệu điểm',       withData, pct(withData)],
+      ['Trung bình lớp (DTBm)', classAvg ?? '—', ''],
+      [],
+      ['XẾP LOẠI HỌC LỰC', '', ''],
+      ['Giỏi (≥8)',             excellent, pct(excellent)],
+      ['Khá (6.5–7.9)',         good,      pct(good)],
+      ['Trung bình (5–6.4)',    avg,       pct(avg)],
+      ['Yếu (<5)',              weak,      pct(weak)],
+      [],
+      ...(hasOther ? [
+        ['SO SÁNH HK1 ↔ HK2', '', ''],
+        ['HS tiến bộ (HK2>HK1)',    upCount,     pct(upCount)],
+        ['HS ổn định',              stableCount, pct(stableCount)],
+        ['HS giảm sút (HK2<HK1)',   downCount,   pct(downCount)],
+      ] : [['(Chỉ có dữ liệu 1 học kỳ, chưa tính được tiến bộ)', '', '']]),
+    ]
+    const ws2 = XLSX.utils.aoa_to_sheet(aoa2)
+    ws2['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 10 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws1, 'Tiến bộ HS')
+    XLSX.utils.book_append_sheet(wb, ws2, 'Thống kê')
+    const safe = (s: string) => s.replace(/[^\w\d-]+/g, '_')
+    XLSX.writeFile(wb, `TienBo_${safe(className)}_${safe(subject)}_${currentSemester}_${new Date().toISOString().slice(0,10)}.xlsx`)
+    toast.success(`Đã xuất báo cáo tiến bộ ${entries.length} HS`)
+  }
+
+  // ── Export JSON ──
+  const exportJson = () => {
+    const data = {
+      meta: {
+        subject, className, schoolYear,
+        semester: currentSemester,
+        exportedAt: new Date().toISOString(),
+        totalStudents: entries.length,
+        stats: {
+          classAverage: (() => {
+            const v = entries.map(e => e.currentDtb).filter((x): x is number => x != null)
+            return v.length ? Math.round(v.reduce((s, n) => s + n, 0) / v.length * 10) / 10 : null
+          })(),
+          ratingCounts: {
+            Giỏi: entries.filter(e => e.rating === 'Giỏi').length,
+            Khá:  entries.filter(e => e.rating === 'Khá').length,
+            TB:   entries.filter(e => e.rating === 'TB').length,
+            Yếu:  entries.filter(e => e.rating === 'Yếu').length,
+          },
+          crossSemester: hasOther ? { tiếnBộ: upCount, ổnĐịnh: stableCount, giảmSút: downCount } : null,
+        },
+      },
+      students: entries.map(e => ({
+        stt: e.stt,
+        name: e.name,
+        ddgtx: e.ddgtx,
+        txTrend: e.txTrend,
+        dtbHk1: e.dtbHk1,
+        dtbHk2: e.dtbHk2,
+        crossDelta: e.crossDelta,
+        crossTrend: e.crossTrend,
+        currentDtb: e.currentDtb,
+        rating: e.rating,
+        progressNote: notes[e.studentId] ?? e.progressNote,
+      })),
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    const safe = (s: string) => s.replace(/[^\w\d-]+/g, '_')
+    a.download = `TienBo_${safe(className)}_${safe(subject)}_${currentSemester}_${new Date().toISOString().slice(0,10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Đã xuất JSON ${entries.length} HS`)
+  }
+
+  // ── Save notes back to parent ──
+  const handleSaveNotes = () => {
+    onUpdateNotes(notes)
+    toast.success('Đã lưu nhận xét tiến bộ vào sổ điểm')
+  }
+
+  // ── Trend icon helper ──
+  function TrendIcon({ trend, size = 'sm' }: { trend: Trend; size?: 'sm' | 'lg' }) {
+    const cls = size === 'lg' ? 'w-5 h-5' : 'w-3.5 h-3.5'
+    if (trend === 'up')     return <TrendingUp   className={`${cls} text-green-500`} />
+    if (trend === 'down')   return <TrendingDown className={`${cls} text-red-500`} />
+    if (trend === 'stable') return <Minus        className={`${cls} text-blue-400`} />
+    return <span className="text-gray-300 text-xs">—</span>
+  }
+
+  const ratingColor = (r: string) =>
+    r === 'Giỏi' ? 'bg-green-100 text-green-700 border-green-200' :
+    r === 'Khá'  ? 'bg-blue-100 text-blue-700 border-blue-200' :
+    r === 'TB'   ? 'bg-amber-100 text-amber-700 border-amber-200' :
+    r === 'Yếu'  ? 'bg-red-100 text-red-700 border-red-200' :
+                   'bg-gray-100 text-gray-400 border-gray-200'
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+      {/* ── Top bar ── */}
+      <div className="flex items-center justify-between px-6 py-3 bg-indigo-700 text-white shrink-0">
+        <div className="flex items-center gap-3">
+          <BarChart2 className="w-5 h-5" />
+          <div>
+            <h2 className="font-bold text-sm">Báo cáo tiến bộ học sinh</h2>
+            <p className="text-indigo-200 text-xs">
+              {subject} — {className} — {schoolYear} — {currentSemester === 'HK1' ? 'Học kỳ 1' : 'Học kỳ 2'}
+              {loadingOther && <span className="ml-2 italic opacity-75">(đang tải {otherSemester}...)</span>}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSaveNotes}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded text-xs font-semibold"
+          >
+            <Save className="w-3.5 h-3.5" />Lưu nhận xét
+          </button>
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-white rounded text-xs font-semibold"
+          >
+            <Download className="w-3.5 h-3.5" />Xuất Excel
+          </button>
+          <button
+            onClick={exportJson}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-400 text-white rounded text-xs font-semibold"
+          >
+            <FileJson className="w-3.5 h-3.5" />Xuất JSON
+          </button>
+          <button onClick={onClose} className="ml-2 p-1.5 rounded hover:bg-white/20">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats bar ── */}
+      <div className="bg-indigo-50 border-b border-indigo-100 px-6 py-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          {/* Xếp loại */}
+          {(['Giỏi', 'Khá', 'TB', 'Yếu'] as const).map(r => {
+            const n = entries.filter(e => e.rating === r).length
+            return (
+              <span key={r} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border font-semibold ${ratingColor(r)}`}>
+                {r}: {n}
+              </span>
+            )
+          })}
+          <span className="text-indigo-300">|</span>
+          {/* Cross-semester comparison */}
+          {hasOther ? (
+            <>
+              <span className="flex items-center gap-1 text-green-700 font-semibold">
+                <TrendingUp className="w-3.5 h-3.5" />Tiến bộ: {upCount}
+              </span>
+              <span className="flex items-center gap-1 text-blue-600 font-semibold">
+                <Minus className="w-3.5 h-3.5" />Ổn định: {stableCount}
+              </span>
+              <span className="flex items-center gap-1 text-red-600 font-semibold">
+                <TrendingDown className="w-3.5 h-3.5" />Giảm sút: {downCount}
+              </span>
+            </>
+          ) : (
+            <span className="text-indigo-400 italic">
+              {loadingOther ? `Đang tải ${otherSemester}...` : `Chưa có dữ liệu ${otherSemester} để so sánh`}
+            </span>
+          )}
+          <span className="text-indigo-300">|</span>
+          <span className="text-indigo-700 font-semibold">Tổng: {entries.length} HS</span>
+        </div>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="flex-1 overflow-auto">
+        <table className="min-w-full text-xs border-collapse">
+          <thead className="sticky top-0 z-10 bg-indigo-700 text-white">
+            <tr>
+              <th className="px-2 py-2 text-center w-10 font-semibold border-r border-indigo-600">STT</th>
+              <th className="px-3 py-2 text-left min-w-[180px] font-semibold border-r border-indigo-600">Họ và tên</th>
+              {/* TX scores */}
+              <th colSpan={NUM_TX} className="px-2 py-2 text-center font-semibold border-r border-indigo-600">
+                ĐĐGtx trong {currentSemester}
+              </th>
+              <th className="px-2 py-2 text-center w-20 font-semibold border-r border-indigo-600">Xu hướng TX</th>
+              {/* Cross-semester */}
+              <th className="px-2 py-2 text-center w-16 font-semibold border-r border-indigo-600">ĐTBmhk1</th>
+              <th className="px-2 py-2 text-center w-16 font-semibold border-r border-indigo-600">ĐTBmhk2</th>
+              <th className="px-2 py-2 text-center w-16 font-semibold border-r border-indigo-600">Δ</th>
+              <th className="px-2 py-2 text-center w-20 font-semibold border-r border-indigo-600">Tiến bộ HK</th>
+              {/* Summary */}
+              <th className="px-2 py-2 text-center w-16 font-semibold border-r border-indigo-600">ĐTBm</th>
+              <th className="px-2 py-2 text-center w-16 font-semibold border-r border-indigo-600">Xếp loại</th>
+              {/* Note */}
+              <th className="px-3 py-2 text-left min-w-[260px] font-semibold">Nhận xét tiến bộ</th>
+            </tr>
+            <tr className="bg-indigo-600 text-indigo-200">
+              <th colSpan={2} />
+              {Array.from({ length: NUM_TX }, (_, i) => (
+                <th key={i} className="px-1 py-1 text-center text-[10px] w-12">TX{i+1}</th>
+              ))}
+              <th colSpan={9} />
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((e, r) => {
+              const rowBg = r % 2 ? 'bg-slate-50' : 'bg-white'
+              const isExpanded = expandNote === e.studentId
+              return (
+                <tr key={e.studentId} className={`${rowBg} border-b border-slate-100 hover:bg-indigo-50/40 transition-colors`}>
+                  <td className="px-2 py-2 text-center text-gray-400 border-r border-slate-200">{e.stt ?? r + 1}</td>
+                  <td className="px-3 py-2 font-semibold text-gray-800 border-r border-slate-200">{e.name}</td>
+                  {/* TX scores */}
+                  {e.ddgtx.map((v, i) => (
+                    <td key={i} className="px-1 py-2 text-center border-r border-slate-100">
+                      {v != null ? (
+                        <span className={`font-semibold ${
+                          v >= 8 ? 'text-green-700' : v >= 6.5 ? 'text-blue-700' :
+                          v >= 5 ? 'text-amber-700' : 'text-red-600'
+                        }`}>{v}</span>
+                      ) : <span className="text-gray-200">·</span>}
+                    </td>
+                  ))}
+                  {/* TX trend */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <TrendIcon trend={e.txTrend} />
+                      <span className="text-[10px] text-gray-500">
+                        {e.txTrend === 'up' ? 'Tăng' : e.txTrend === 'down' ? 'Giảm' : e.txTrend === 'stable' ? 'Ổn' : '—'}
+                      </span>
+                    </div>
+                  </td>
+                  {/* HK1 */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    {e.dtbHk1 != null ? (
+                      <span className={`font-semibold ${
+                        e.dtbHk1 >= 8 ? 'text-green-700' : e.dtbHk1 >= 6.5 ? 'text-blue-700' :
+                        e.dtbHk1 >= 5 ? 'text-amber-700' : 'text-red-600'
+                      }`}>{e.dtbHk1.toFixed(1)}</span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                  {/* HK2 */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    {e.dtbHk2 != null ? (
+                      <span className={`font-semibold ${
+                        e.dtbHk2 >= 8 ? 'text-green-700' : e.dtbHk2 >= 6.5 ? 'text-blue-700' :
+                        e.dtbHk2 >= 5 ? 'text-amber-700' : 'text-red-600'
+                      }`}>{e.dtbHk2.toFixed(1)}</span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                  {/* Delta */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    {e.crossDelta != null ? (
+                      <span className={`font-bold text-sm ${
+                        e.crossDelta > 0 ? 'text-green-600' : e.crossDelta < 0 ? 'text-red-500' : 'text-gray-500'
+                      }`}>
+                        {e.crossDelta > 0 ? '+' : ''}{e.crossDelta.toFixed(1)}
+                      </span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                  {/* Cross-semester trend */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    <div className="flex items-center justify-center gap-1">
+                      <TrendIcon trend={e.crossTrend} />
+                      <span className={`text-[10px] font-semibold ${
+                        e.crossTrend === 'up'     ? 'text-green-600' :
+                        e.crossTrend === 'down'   ? 'text-red-500' :
+                        e.crossTrend === 'stable' ? 'text-blue-500' : 'text-gray-300'
+                      }`}>
+                        {e.crossTrend === 'up' ? 'Tiến bộ' : e.crossTrend === 'down' ? 'Giảm' : e.crossTrend === 'stable' ? 'Ổn định' : '—'}
+                      </span>
+                    </div>
+                  </td>
+                  {/* Current DTB */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    {e.currentDtb != null ? (
+                      <span className={`font-bold text-sm ${
+                        e.currentDtb >= 8 ? 'text-green-700' : e.currentDtb >= 6.5 ? 'text-blue-700' :
+                        e.currentDtb >= 5 ? 'text-amber-700' : 'text-red-600'
+                      }`}>{e.currentDtb.toFixed(1)}</span>
+                    ) : <span className="text-gray-300">—</span>}
+                  </td>
+                  {/* Rating */}
+                  <td className="px-2 py-2 text-center border-r border-slate-200">
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-bold border ${ratingColor(e.rating)}`}>
+                      {e.rating}
+                    </span>
+                  </td>
+                  {/* Progress note */}
+                  <td className="px-2 py-1.5">
+                    <div className="relative">
+                      <textarea
+                        value={notes[e.studentId] ?? ''}
+                        onChange={ev => setNotes(n => ({ ...n, [e.studentId]: ev.target.value }))}
+                        rows={isExpanded ? 4 : 1}
+                        placeholder="Nhập nhận xét tiến bộ..."
+                        className="w-full px-2 py-1 text-[11px] border border-gray-200 rounded bg-white text-gray-800 placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none"
+                      />
+                      <button
+                        onClick={() => setExpandNote(isExpanded ? null : e.studentId)}
+                        className="absolute right-1 bottom-1 text-gray-300 hover:text-indigo-400"
+                        title={isExpanded ? 'Thu gọn' : 'Mở rộng'}
+                      >
+                        <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Footer ── */}
+      <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0 text-xs text-gray-500">
+        <span>
+          Xu hướng TX: so sánh trung bình nửa đầu vs nửa sau các lần ĐĐGtx · Ngưỡng: ±0.3 điểm
+        </span>
+        <button
+          onClick={handleSaveNotes}
+          className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold"
+        >
+          <Save className="w-3.5 h-3.5" />Lưu tất cả nhận xét
+        </button>
       </div>
     </div>
   )
