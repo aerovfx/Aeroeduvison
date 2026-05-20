@@ -15,6 +15,7 @@ import {
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import * as XLSX from 'xlsx'
+import { api } from '@/services/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -335,11 +336,46 @@ export default function ProfessionalKG() {
   // Keep selectedRef in sync
   useEffect(() => { selectedRef.current = selectedNode }, [selectedNode])
 
-  // Load from localStorage on mount
+  // Load from backend (primary) + localStorage (fallback) on mount
   useEffect(() => {
-    setProgressMap(loadProgress(userId))
+    if (!userId || userId === 'guest') {
+      setProgressMap(loadProgress(userId))
+      setCpdLog(loadCpdLog(userId))
+      return
+    }
+    // Try backend first
+    api.get('/teachers/cpd').then(res => {
+      const remoteProgress = res.data?.progress || {}
+      if (Object.keys(remoteProgress).length > 0) {
+        // Merge remote với local (ưu tiên newer updatedAt)
+        const local = loadProgress(userId)
+        const merged: ProgressMap = { ...local }
+        for (const [k, v] of Object.entries(remoteProgress)) {
+          const rem = v as SkillProgress
+          const loc = local[k]
+          if (!loc || new Date(rem.updatedAt) >= new Date(loc.updatedAt)) {
+            merged[k] = rem
+          }
+        }
+        setProgressMap(merged)
+        saveProgress(userId, merged)
+      } else {
+        setProgressMap(loadProgress(userId))
+      }
+    }).catch(() => {
+      setProgressMap(loadProgress(userId))
+    })
     setCpdLog(loadCpdLog(userId))
   }, [userId])
+
+  // Debounced backend sync (fire-and-forget sau mỗi lần update skill)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const syncToBackend = useCallback((map: ProgressMap) => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => {
+      api.post('/teachers/cpd', { progress: map }).catch(() => {/* silent */})
+    }, 2000) // debounce 2s
+  }, [])
 
   // Derived stats
   const allSkills = useMemo(() => tree.flatMap(c => c.skills.map(s => ({ ...s, catId: c.id, catLabel: c.label, color: c.color }))), [tree])
@@ -385,18 +421,20 @@ export default function ProfessionalKG() {
         },
       }
       saveProgress(userId, next)
+      syncToBackend(next)
       return next
     })
-  }, [userId])
+  }, [userId, syncToBackend])
 
   const updateNote = useCallback((skillId: string, note: string) => {
     setProgressMap(prev => {
       const existing = prev[skillId] || { score: 0 as MasteryLevel, note: '', updatedAt: new Date().toISOString() }
       const next = { ...prev, [skillId]: { ...existing, note, updatedAt: new Date().toISOString() } }
       saveProgress(userId, next)
+      syncToBackend(next)
       return next
     })
-  }, [userId])
+  }, [userId, syncToBackend])
 
   const addCpdEntry = () => {
     if (!newLogNote.trim()) return

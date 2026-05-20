@@ -1,20 +1,23 @@
 /**
- * /student/teachers — HS quản lý kết nối với giáo viên
+ * /student/teachers — HS quản lý kết nối + khám phá giáo viên
  *
- * 3 tab:
- *   - Đã kết nối (approved teachers)
- *   - Đang chờ duyệt (outgoing requests + incoming invites)
- *   - Tìm GV mới (search modal trigger)
+ * 4 tab:
+ *   - Khám phá GV   — danh sách TẤT CẢ GV trên hệ thống + CPD profile
+ *   - Đã kết nối    — approved teachers
+ *   - Đang chờ      — outgoing requests + incoming invites
+ *   - Tìm GV mới    — modal search-and-connect
  *
- * Sau khi approve/disconnect: invalidate query cache → refresh list.
+ * CPD summary được lấy từ /api/teachers/all (server aggregate từ TeacherCPD table).
  */
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
   GraduationCap, Search, UserPlus, Check, X, Clock, Mail,
   Loader2, AlertCircle, ArrowRight, Trash2, MessageSquare,
+  Brain, Star, Award, ChevronRight, Users,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { api } from '@/services/api'
 import {
   teacherStudentLinkService,
   type LinkedUser,
@@ -22,18 +25,50 @@ import {
   type SearchUser,
 } from '@/services/teacherStudentLink.service'
 
-type Tab = 'connected' | 'pending' | 'find'
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+interface CpdMilestone {
+  emoji: string
+  label: string
+}
+
+interface TeacherCpdSummary {
+  avgScore: number
+  skillCount: number
+  expertCount: number
+  proficientCount: number
+  milestone: CpdMilestone | null
+  updatedAt: string | null
+}
+
+interface TeacherProfile {
+  id: string
+  name: string | null
+  email: string
+  image: string | null
+  bio: string | null
+  phone: string | null
+  website: string | null
+  joinedAt: string | null
+  isConnected: boolean
+  cpd: TeacherCpdSummary
+}
+
+type Tab = 'explore' | 'connected' | 'pending' | 'find'
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function MyTeachers() {
-  const [tab, setTab] = useState<Tab>('connected')
-  const [teachers, setTeachers] = useState<LinkedUser[]>([])
-  const [pending, setPending] = useState<{
-    incoming: TeacherStudentLink[]
-    outgoing: TeacherStudentLink[]
-  }>({ incoming: [], outgoing: [] })
-  const [loading, setLoading] = useState(true)
-  const [findOpen, setFindOpen] = useState(false)
+  const [tab, setTab]         = useState<Tab>('explore')
+  const [teachers, setTeachers]   = useState<LinkedUser[]>([])
+  const [pending, setPending]     = useState<{ incoming: TeacherStudentLink[]; outgoing: TeacherStudentLink[] }>({ incoming: [], outgoing: [] })
+  const [allTeachers, setAllTeachers] = useState<TeacherProfile[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [exploreLoading, setExploreLoading] = useState(true)
+  const [findOpen, setFindOpen]   = useState(false)
+  const [searchQ, setSearchQ]     = useState('')
 
+  // Load connected + pending
   const reload = useCallback(async () => {
     setLoading(true)
     try {
@@ -51,13 +86,28 @@ export default function MyTeachers() {
     }
   }, [])
 
+  // Load all teachers for explore
+  const loadAllTeachers = useCallback(async () => {
+    setExploreLoading(true)
+    try {
+      const res = await api.get('/teachers/all')
+      setAllTeachers(res.data?.teachers || [])
+    } catch {
+      setAllTeachers([])
+    } finally {
+      setExploreLoading(false)
+    }
+  }, [])
+
   useEffect(() => { reload() }, [reload])
+  useEffect(() => { loadAllTeachers() }, [loadAllTeachers])
 
   const acceptInvite = async (linkId: string) => {
     try {
       await teacherStudentLinkService.approve(linkId)
       toast.success('Đã đồng ý kết nối — bài tập sẽ được đồng bộ')
       reload()
+      loadAllTeachers()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
       toast.error(e.response?.data?.error || 'Không đồng ý được')
@@ -90,25 +140,46 @@ export default function MyTeachers() {
       await teacherStudentLinkService.disconnect(linkId)
       toast.success('Đã gỡ kết nối')
       reload()
+      loadAllTeachers()
     } catch {
       toast.error('Không gỡ được')
     }
   }
 
+  // Request kết nối từ trang Khám phá
+  const requestConnect = async (teacher: TeacherProfile) => {
+    try {
+      await teacherStudentLinkService.request({ teacherId: teacher.id })
+      toast.success(`Đã gửi yêu cầu tới ${teacher.name || teacher.email}`)
+      reload()
+      loadAllTeachers()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không gửi được yêu cầu')
+    }
+  }
+
   const totalPending = pending.incoming.length + pending.outgoing.length
+
+  // Filter explore
+  const filteredTeachers = allTeachers.filter(t => {
+    if (!searchQ.trim()) return true
+    const q = searchQ.toLowerCase()
+    return (t.name || '').toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || (t.bio || '').toLowerCase().includes(q)
+  })
 
   return (
     <div className="min-h-screen bg-background p-6 text-white">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
             <GraduationCap className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Giáo viên dạy tôi</h1>
+            <h1 className="text-2xl font-bold">Giáo viên</h1>
             <p className="text-sm text-white/50">
-              Kết nối với GV để đồng bộ bài tập, điểm số và thông báo realtime
+              Khám phá đội ngũ GV trên hệ thống · kết nối để đồng bộ bài tập & điểm số
             </p>
           </div>
         </div>
@@ -116,10 +187,11 @@ export default function MyTeachers() {
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-5 border-b border-white/[0.08]">
           {([
-            { key: 'connected' as const, label: 'Đã kết nối', count: teachers.length },
-            { key: 'pending'   as const, label: 'Đang chờ',   count: totalPending },
-            { key: 'find'      as const, label: 'Tìm GV mới', count: null },
-          ]).map(({ key, label, count }) => (
+            { key: 'explore'   as const, label: 'Khám phá GV',  count: allTeachers.length, icon: <Users className="w-4 h-4" /> },
+            { key: 'connected' as const, label: 'Đã kết nối',   count: teachers.length,    icon: null },
+            { key: 'pending'   as const, label: 'Đang chờ',     count: totalPending,       icon: null },
+            { key: 'find'      as const, label: 'Tìm GV mới',   count: null,               icon: <UserPlus className="w-4 h-4" /> },
+          ]).map(({ key, label, count, icon }) => (
             <button
               key={key}
               onClick={() => {
@@ -132,10 +204,14 @@ export default function MyTeachers() {
                   : 'border-transparent text-white/50 hover:text-white/80'
               }`}
             >
-              {key === 'find' && <UserPlus className="w-4 h-4" />}
+              {icon}
               {label}
               {count !== null && (
-                <span className={`text-xs px-1.5 py-0.5 rounded ${count > 0 && key === 'pending' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-white/10 text-white/60'}`}>
+                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  count > 0 && key === 'pending' ? 'bg-yellow-500/20 text-yellow-300' :
+                  count > 0 && key === 'explore' ? 'bg-purple-500/20 text-purple-300' :
+                  'bg-white/10 text-white/60'
+                }`}>
                   {count}
                 </span>
               )}
@@ -143,128 +219,201 @@ export default function MyTeachers() {
           ))}
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+        {/* ── Tab: Khám phá GV ── */}
+        {tab === 'explore' && (
+          <div>
+            {/* Search bar */}
+            <div className="mb-5 relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input
+                type="text"
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+                placeholder="Tìm GV theo tên, email hoặc chuyên môn..."
+                className="w-full bg-white/[0.04] border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/60"
+              />
+              {searchQ && (
+                <button onClick={() => setSearchQ('')} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {exploreLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+              </div>
+            ) : filteredTeachers.length === 0 ? (
+              <div className="text-center py-16 text-white/40">
+                <GraduationCap className="w-14 h-14 mx-auto mb-3 opacity-30" />
+                {searchQ ? 'Không tìm thấy GV phù hợp' : 'Chưa có giáo viên nào đăng ký'}
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTeachers.map(t => (
+                  <TeacherCard
+                    key={t.id}
+                    teacher={t}
+                    onConnect={() => requestConnect(t)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        ) : tab === 'connected' ? (
-          teachers.length === 0 ? (
+        )}
+
+        {/* ── Tab: Đã kết nối ── */}
+        {tab === 'connected' && (
+          loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+            </div>
+          ) : teachers.length === 0 ? (
             <EmptyConnected onFind={() => setFindOpen(true)} />
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teachers.map(t => (
-                <div key={t.linkId} className="rounded-2xl bg-white/[0.03] border border-white/[0.08] p-5">
-                  <div className="flex items-start gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300 font-bold flex-shrink-0">
-                      {t.image
-                        ? <img src={t.image} alt={t.name || ''} className="w-12 h-12 rounded-full object-cover" />
-                        : (t.name || t.email)[0].toUpperCase()}
+              {teachers.map(t => {
+                // Tìm CPD data cho GV đã kết nối
+                const profile = allTeachers.find(p => p.id === t.id)
+                return (
+                  <div key={t.linkId} className="rounded-2xl bg-white/[0.03] border border-white/[0.08] p-5">
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-300 font-bold flex-shrink-0">
+                        {t.image
+                          ? <img src={t.image} alt={t.name || ''} className="w-12 h-12 rounded-full object-cover" />
+                          : (t.name || t.email)[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-white truncate">{t.name || '(chưa đặt tên)'}</h3>
+                        <p className="text-xs text-white/50 truncate flex items-center gap-1">
+                          <Mail className="w-3 h-3" />{t.email}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white truncate">{t.name || '(chưa đặt tên)'}</h3>
-                      <p className="text-xs text-white/50 truncate flex items-center gap-1">
-                        <Mail className="w-3 h-3" />{t.email}
-                      </p>
+                    {/* CPD mini badge nếu có */}
+                    {profile?.cpd?.milestone && (
+                      <div className="mb-3 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                        <span className="text-base">{profile.cpd.milestone.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-purple-300 truncate">{profile.cpd.milestone.label}</p>
+                          {profile.cpd.avgScore > 0 && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <div className="flex-1 h-1 rounded-full bg-white/10">
+                                <div className="h-1 rounded-full bg-purple-500" style={{ width: `${profile.cpd.avgScore}%` }} />
+                              </div>
+                              <span className="text-[10px] text-white/40">{profile.cpd.avgScore}%</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 text-[11px] text-white/40 mb-3">
+                      <Clock className="w-3 h-3" />
+                      {t.initiatedBy === 'auto' && '🔗 Tự động kết nối'}
+                      {t.initiatedBy === 'student' && 'Bạn đã yêu cầu'}
+                      {t.initiatedBy === 'teacher' && 'GV đã mời'}
+                      {' • '}
+                      {t.approvedAt && new Date(t.approvedAt).toLocaleDateString('vi-VN')}
                     </div>
+                    <button
+                      onClick={() => disconnect(t.linkId, t.name || t.email)}
+                      className="w-full text-xs flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20"
+                    >
+                      <Trash2 className="w-3 h-3" />Gỡ kết nối
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2 text-[11px] text-white/40 mb-3">
-                    <Clock className="w-3 h-3" />
-                    {t.initiatedBy === 'auto' && '🔗 Tự động kết nối'}
-                    {t.initiatedBy === 'student' && 'Bạn đã yêu cầu'}
-                    {t.initiatedBy === 'teacher' && 'GV đã mời'}
-                    {' • '}
-                    {t.approvedAt && new Date(t.approvedAt).toLocaleDateString('vi-VN')}
-                  </div>
-                  <button
-                    onClick={() => disconnect(t.linkId, t.name || t.email)}
-                    className="w-full text-xs flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-red-400 hover:bg-red-500/10 border border-red-500/20"
-                  >
-                    <Trash2 className="w-3 h-3" />Gỡ kết nối
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
-        ) : (
-          /* Pending tab */
-          <div className="space-y-6">
-            {pending.incoming.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-white/80 mb-3 uppercase tracking-wider">
-                  📥 GV mời bạn ({pending.incoming.length})
-                </h3>
-                <div className="space-y-2">
-                  {pending.incoming.map(p => (
-                    <div key={p.id} className="rounded-xl bg-yellow-500/5 border border-yellow-500/20 p-4 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-300 font-bold">
-                        {(p.otherName || p.otherEmail || 'G')[0].toUpperCase()}
+        )}
+
+        {/* ── Tab: Đang chờ ── */}
+        {tab === 'pending' && (
+          loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {pending.incoming.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-white/80 mb-3 uppercase tracking-wider">
+                    📥 GV mời bạn ({pending.incoming.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {pending.incoming.map(p => (
+                      <div key={p.id} className="rounded-xl bg-yellow-500/5 border border-yellow-500/20 p-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center text-yellow-300 font-bold">
+                          {(p.otherName || p.otherEmail || 'G')[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-white truncate">{p.otherName || p.otherEmail}</p>
+                          <p className="text-xs text-white/50 truncate">{p.otherEmail}</p>
+                          {p.message && (
+                            <p className="text-xs text-white/70 mt-1 italic flex items-start gap-1">
+                              <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />"{p.message}"
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => acceptInvite(p.id)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />Đồng ý
+                          </button>
+                          <button
+                            onClick={() => rejectInvite(p.id)}
+                            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-red-400 text-sm font-semibold flex items-center gap-1 border border-red-500/30"
+                          >
+                            <X className="w-3.5 h-3.5" />Từ chối
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-white truncate">{p.otherName || p.otherEmail}</p>
-                        <p className="text-xs text-white/50 truncate">{p.otherEmail}</p>
-                        {p.message && (
-                          <p className="text-xs text-white/70 mt-1 italic flex items-start gap-1">
-                            <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />"{p.message}"
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => acceptInvite(p.id)}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-1"
-                        >
-                          <Check className="w-3.5 h-3.5" />Đồng ý
-                        </button>
-                        <button
-                          onClick={() => rejectInvite(p.id)}
-                          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-red-400 text-sm font-semibold flex items-center gap-1 border border-red-500/30"
-                        >
-                          <X className="w-3.5 h-3.5" />Từ chối
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {pending.outgoing.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-white/80 mb-3 uppercase tracking-wider">
-                  📤 Bạn đã gửi ({pending.outgoing.length})
-                </h3>
-                <div className="space-y-2">
-                  {pending.outgoing.map(p => (
-                    <div key={p.id} className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-300 font-bold">
-                        {(p.otherName || p.otherEmail || 'G')[0].toUpperCase()}
+              )}
+              {pending.outgoing.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-white/80 mb-3 uppercase tracking-wider">
+                    📤 Bạn đã gửi ({pending.outgoing.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {pending.outgoing.map(p => (
+                      <div key={p.id} className="rounded-xl bg-blue-500/5 border border-blue-500/20 p-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-300 font-bold">
+                          {(p.otherName || p.otherEmail || 'G')[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-white truncate">{p.otherName || p.otherEmail}</p>
+                          <p className="text-xs text-white/50 truncate">Đang chờ GV duyệt</p>
+                        </div>
+                        <button
+                          onClick={() => cancelOutgoing(p.id)}
+                          className="text-xs text-white/50 hover:text-red-400 px-3 py-1.5"
+                        >Huỷ yêu cầu</button>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-white truncate">{p.otherName || p.otherEmail}</p>
-                        <p className="text-xs text-white/50 truncate">Đang chờ GV duyệt</p>
-                      </div>
-                      <button
-                        onClick={() => cancelOutgoing(p.id)}
-                        className="text-xs text-white/50 hover:text-red-400 px-3 py-1.5"
-                      >Huỷ yêu cầu</button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {totalPending === 0 && (
-              <div className="text-center py-12 text-white/40">
-                <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                Không có yêu cầu nào đang chờ
-              </div>
-            )}
-          </div>
+              )}
+              {totalPending === 0 && (
+                <div className="text-center py-12 text-white/40">
+                  <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  Không có yêu cầu nào đang chờ
+                </div>
+              )}
+            </div>
+          )
         )}
 
         {/* Find teacher modal */}
         {findOpen && (
           <FindTeacherModal
             onClose={() => setFindOpen(false)}
-            onSent={() => { setFindOpen(false); reload() }}
+            onSent={() => { setFindOpen(false); reload(); loadAllTeachers() }}
           />
         )}
       </div>
@@ -272,6 +421,209 @@ export default function MyTeachers() {
   )
 }
 
+// ─────────────────────────────────────────────────────────────
+// TeacherCard — hiển thị GV với đầy đủ thông tin + CPD
+// ─────────────────────────────────────────────────────────────
+
+function TeacherCard({ teacher, onConnect }: { teacher: TeacherProfile; onConnect: () => void }) {
+  const [expanded, setExpanded]   = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const cpd = teacher.cpd
+
+  const handleConnect = async () => {
+    setRequesting(true)
+    try {
+      await onConnect()
+    } finally {
+      setRequesting(false)
+    }
+  }
+
+  // Màu progress bar theo score
+  const scoreColor = (s: number) =>
+    s >= 100 ? 'bg-green-500' :
+    s >= 75  ? 'bg-blue-500'  :
+    s >= 50  ? 'bg-amber-500' :
+    s >= 25  ? 'bg-red-500'   :
+    'bg-gray-600'
+
+  return (
+    <div className="rounded-2xl bg-white/[0.03] border border-white/[0.08] overflow-hidden transition-all hover:border-white/[0.14]">
+      {/* Card header */}
+      <div className="p-5">
+        <div className="flex items-start gap-3 mb-3">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-500/30 to-blue-500/30 flex items-center justify-center text-white font-bold text-lg border-2 border-white/10 overflow-hidden">
+              {teacher.image
+                ? <img src={teacher.image} alt={teacher.name || ''} className="w-full h-full object-cover" />
+                : (teacher.name || teacher.email)[0].toUpperCase()}
+            </div>
+            {/* Connected badge */}
+            {teacher.isConnected && (
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-emerald-500 border-2 border-[#0a0f1e] flex items-center justify-center">
+                <Check className="w-2.5 h-2.5 text-white" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h3 className="font-bold text-white truncate">{teacher.name || '(chưa đặt tên)'}</h3>
+            <p className="text-xs text-white/50 truncate flex items-center gap-1">
+              <Mail className="w-3 h-3 flex-shrink-0" />{teacher.email}
+            </p>
+            {/* Milestone badge */}
+            {cpd.milestone && (
+              <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/25 text-purple-300 text-[11px] font-semibold">
+                <span>{cpd.milestone.emoji}</span>
+                <span>{cpd.milestone.label}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Bio */}
+        {teacher.bio && (
+          <p className="text-xs text-white/60 line-clamp-2 mb-3 leading-relaxed">{teacher.bio}</p>
+        )}
+
+        {/* CPD progress summary */}
+        {cpd.skillCount > 0 ? (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1.5 text-xs text-white/50">
+                <Brain className="w-3.5 h-3.5 text-purple-400" />
+                <span>Cây tri thức nghề nghiệp</span>
+              </div>
+              <span className="text-xs font-bold text-white/70">{cpd.avgScore}%</span>
+            </div>
+            {/* Overall progress bar */}
+            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-2">
+              <div
+                className={`h-full rounded-full transition-all ${scoreColor(cpd.avgScore)}`}
+                style={{ width: `${cpd.avgScore}%` }}
+              />
+            </div>
+            {/* Stats row */}
+            <div className="flex items-center gap-3 text-[11px] text-white/40">
+              {cpd.expertCount > 0 && (
+                <span className="flex items-center gap-1 text-green-400">
+                  <Star className="w-3 h-3" />{cpd.expertCount} chuyên gia
+                </span>
+              )}
+              {cpd.proficientCount > cpd.expertCount && (
+                <span className="flex items-center gap-1 text-blue-400">
+                  <Award className="w-3 h-3" />{cpd.proficientCount - cpd.expertCount} thành thạo
+                </span>
+              )}
+              <span>{cpd.skillCount} kỹ năng</span>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-3 flex items-center gap-2 text-xs text-white/30 py-1">
+            <Brain className="w-3.5 h-3.5" />
+            <span>Chưa có dữ liệu CPD</span>
+          </div>
+        )}
+
+        {/* Connect / Connected button */}
+        {teacher.isConnected ? (
+          <div className="w-full text-xs flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 font-semibold">
+            <Check className="w-3.5 h-3.5" />Đã kết nối
+          </div>
+        ) : (
+          <button
+            onClick={handleConnect}
+            disabled={requesting}
+            className="w-full text-xs flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold transition-colors"
+          >
+            {requesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+            Gửi yêu cầu kết nối
+          </button>
+        )}
+      </div>
+
+      {/* Expandable CPD detail */}
+      {cpd.skillCount > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="w-full px-5 py-2 flex items-center justify-between text-xs text-white/40 hover:text-white/70 bg-white/[0.02] border-t border-white/[0.06] transition-colors"
+          >
+            <span>Xem chi tiết kỹ năng</span>
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          </button>
+          {expanded && cpd.skillCount > 0 && (
+            <div className="px-5 pb-4 space-y-3 bg-white/[0.01] border-t border-white/[0.04]">
+              <CpdDetailPanel avgScore={cpd.avgScore} milestone={cpd.milestone} updatedAt={cpd.updatedAt} />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── CPD Detail Panel (expanded view) ─────────────────────────────────────────
+
+function CpdDetailPanel({
+  avgScore,
+  milestone,
+  updatedAt,
+}: {
+  avgScore: number
+  milestone: CpdMilestone | null
+  updatedAt: string | null
+}) {
+  const MILESTONES = [
+    { minScore: 95, emoji: '🌟', label: 'Chuyên gia Quốc gia' },
+    { minScore: 88, emoji: '🏆', label: 'Hiệu trưởng' },
+    { minScore: 80, emoji: '🎖️', label: 'Phó Hiệu trưởng' },
+    { minScore: 75, emoji: '🏅', label: 'Tổ trưởng bộ môn' },
+    { minScore: 65, emoji: '⭐', label: 'Giáo viên cốt cán' },
+    { minScore: 50, emoji: '📚', label: 'GV có kinh nghiệm' },
+    { minScore: 30, emoji: '🌱', label: 'Giáo viên trẻ' },
+  ]
+
+  return (
+    <div className="pt-3">
+      {/* Milestone roadmap mini */}
+      <p className="text-[10px] text-white/40 uppercase tracking-wider mb-2 font-semibold">Lộ trình sự nghiệp</p>
+      <div className="space-y-1.5">
+        {MILESTONES.slice().reverse().map(m => {
+          const achieved = avgScore >= m.minScore
+          const isCurrent = milestone?.label === m.label
+          return (
+            <div
+              key={m.label}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-all ${
+                isCurrent
+                  ? 'bg-purple-500/20 border border-purple-500/40 text-purple-200 font-semibold'
+                  : achieved
+                  ? 'bg-white/5 text-white/60'
+                  : 'text-white/25'
+              }`}
+            >
+              <span className={`text-sm ${!achieved ? 'grayscale opacity-40' : ''}`}>{m.emoji}</span>
+              <span className="flex-1">{m.label}</span>
+              <span className="text-[10px] text-white/40">{m.minScore}%</span>
+              {achieved && <Check className="w-3 h-3 text-emerald-400" />}
+            </div>
+          )
+        })}
+      </div>
+      {updatedAt && (
+        <p className="text-[10px] text-white/25 mt-2">
+          Cập nhật: {new Date(updatedAt).toLocaleDateString('vi-VN')}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// EmptyConnected
+// ─────────────────────────────────────────────────────────────
 function EmptyConnected({ onFind }: { onFind: () => void }) {
   return (
     <div className="text-center py-16 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
@@ -295,10 +647,10 @@ function EmptyConnected({ onFind }: { onFind: () => void }) {
 // FindTeacherModal — search GV theo email/tên + gửi request
 // ─────────────────────────────────────────────────────────────
 function FindTeacherModal({ onClose, onSent }: { onClose: () => void; onSent: () => void }) {
-  const [query, setQuery] = useState('')
+  const [query, setQuery]     = useState('')
   const [results, setResults] = useState<SearchUser[]>([])
   const [loading, setLoading] = useState(false)
-  const [picked, setPicked] = useState<SearchUser | null>(null)
+  const [picked, setPicked]   = useState<SearchUser | null>(null)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
 

@@ -31101,6 +31101,185 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
   // Hook hooks/useGcsUpload.ts POST tới /upload/request để xin signed-URL GCS.
   // Stub trả 501 — FE đã có fallback data-URL trong instructor.service.ts.
   app.post('/api/upload/request', notImpl('Upload signed URL đang phát triển — dùng client-side data URL'));
+
+  // ─ Teacher CPD (Professional KG) ─────────────────────────────────────────
+  // Lưu/đọc tiến trình CPD của GV vào DB để HS xem trong trang /student/teachers
+  // Bảng: TeacherCPD (userId TEXT PK, progress_json JSONB, updated_at TIMESTAMPTZ)
+  //
+  // POST /api/teachers/cpd        — GV lưu progress (upsert)
+  // GET  /api/teachers/cpd        — GV đọc progress của chính mình
+  // GET  /api/teachers/all        — HS xem danh sách tất cả GV + CPD summary
+  // GET  /api/teachers/:id/cpd    — xem CPD chi tiết của GV bất kỳ (có auth)
+  {
+    const _cpdJwt = require('jsonwebtoken');
+    const _cpdSecret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    const { Pool: CpdPool } = require('pg');
+    let _cpdPool = null;
+    function getCpdPool() {
+      if (!_cpdPool && process.env.DATABASE_URL) {
+        _cpdPool = new CpdPool({ connectionString: process.env.DATABASE_URL, max: 3, idleTimeoutMillis: 30_000, connectionTimeoutMillis: 5_000 });
+      }
+      return _cpdPool;
+    }
+    function getCpdUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = _cpdJwt.verify(auth.slice(7), _cpdSecret, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id, email: d.email, role: d.role };
+      } catch { return null; }
+    }
+    let _cpdTableReady = false;
+    async function ensureCpdTable() {
+      if (_cpdTableReady) return;
+      const pool = getCpdPool();
+      if (!pool) return;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "TeacherCPD" (
+          "userId"     TEXT PRIMARY KEY REFERENCES "User"(id) ON DELETE CASCADE,
+          progress     JSONB NOT NULL DEFAULT '{}',
+          "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      // Ensure User table has bio/phone/website for teacher profiles
+      for (const [col, kind] of [['bio','TEXT'],['phone','TEXT'],['website','TEXT'],['image','TEXT']]) {
+        try { await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); } catch {}
+      }
+      _cpdTableReady = true;
+    }
+
+    // POST /api/teachers/cpd — GV lưu CPD progress (upsert)
+    app.post('/api/teachers/cpd', express.json({ limit: '256kb' }), async (req, res) => {
+      try {
+        const user = getCpdUser(req);
+        if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+        if (!/TEACHER|ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Chỉ GV được lưu CPD' });
+        const pool = getCpdPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCpdTable();
+        const progress = req.body?.progress;
+        if (!progress || typeof progress !== 'object') return res.status(400).json({ error: 'Missing progress object' });
+        await pool.query(`
+          INSERT INTO "TeacherCPD" ("userId", progress, "updatedAt")
+          VALUES ($1, $2::jsonb, NOW())
+          ON CONFLICT ("userId") DO UPDATE SET progress=$2::jsonb, "updatedAt"=NOW()
+        `, [user.id, JSON.stringify(progress)]);
+        return res.json({ ok: true });
+      } catch (e) {
+        console.error('[cpd:save]', e.message);
+        return res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/teachers/cpd — GV đọc CPD của chính mình
+    app.get('/api/teachers/cpd', async (req, res) => {
+      try {
+        const user = getCpdUser(req);
+        if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+        const pool = getCpdPool();
+        if (!pool) return res.json({ progress: {} });
+        await ensureCpdTable();
+        const { rows } = await pool.query(`SELECT progress FROM "TeacherCPD" WHERE "userId"=$1`, [user.id]);
+        return res.json({ progress: rows[0]?.progress || {} });
+      } catch (e) {
+        return res.json({ progress: {} });
+      }
+    });
+
+    // GET /api/teachers/all — danh sách tất cả GV + CPD summary (HS xem)
+    app.get('/api/teachers/all', async (req, res) => {
+      try {
+        const user = getCpdUser(req);
+        if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+        const pool = getCpdPool();
+        if (!pool) return res.json({ teachers: [] });
+        await ensureCpdTable();
+        // Lấy danh sách GV kèm CPD progress
+        const { rows } = await pool.query(`
+          SELECT u.id, u.email, u.name, u.image, u.bio, u.phone, u.website,
+                 c.progress AS cpd_progress, c."updatedAt" AS cpd_updated_at,
+                 u."createdAt"
+            FROM "User" u
+            LEFT JOIN "TeacherCPD" c ON c."userId" = u.id
+           WHERE UPPER(u.role) = 'TEACHER'
+           ORDER BY u.name ASC NULLS LAST
+        `);
+        // Kiểm tra HS đã kết nối với GV nào chưa
+        let connectedIds = new Set();
+        try {
+          const lr = await pool.query(
+            `SELECT "teacherId" FROM "TeacherStudentLink" WHERE "studentId"=$1 AND status='approved'`,
+            [user.id]
+          );
+          connectedIds = new Set(lr.rows.map(r => r.teacherId));
+        } catch {}
+
+        const teachers = rows.map(r => {
+          const progress = r.cpd_progress || {};
+          const skillIds = Object.keys(progress);
+          const scores = skillIds.map(k => progress[k]?.score || 0);
+          const avgScore = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          const expertCount = scores.filter(s => s === 100).length;
+          const proficientCount = scores.filter(s => s >= 75).length;
+          // Milestone đạt được cao nhất (dựa trên avgScore)
+          const MILESTONES = [
+            { minScore: 95, emoji: '🌟', label: 'Chuyên gia Quốc gia' },
+            { minScore: 88, emoji: '🏆', label: 'Hiệu trưởng' },
+            { minScore: 80, emoji: '🎖️', label: 'Phó Hiệu trưởng' },
+            { minScore: 75, emoji: '🏅', label: 'Tổ trưởng bộ môn' },
+            { minScore: 65, emoji: '⭐', label: 'Giáo viên cốt cán' },
+            { minScore: 50, emoji: '📚', label: 'GV có kinh nghiệm' },
+            { minScore: 30, emoji: '🌱', label: 'Giáo viên trẻ' },
+          ];
+          const milestone = MILESTONES.find(m => avgScore >= m.minScore) || null;
+          return {
+            id: r.id,
+            name: r.name,
+            email: r.email,
+            image: r.image,
+            bio: r.bio,
+            phone: r.phone,
+            website: r.website,
+            joinedAt: r.createdAt,
+            isConnected: connectedIds.has(r.id),
+            cpd: {
+              avgScore,
+              skillCount: skillIds.length,
+              expertCount,
+              proficientCount,
+              milestone,
+              updatedAt: r.cpd_updated_at,
+            },
+          };
+        });
+        return res.json({ teachers });
+      } catch (e) {
+        console.error('[teachers:all]', e.message);
+        return res.status(500).json({ error: e.message });
+      }
+    });
+
+    // GET /api/teachers/:id/cpd — CPD chi tiết của 1 GV
+    app.get('/api/teachers/:id/cpd', async (req, res) => {
+      try {
+        const user = getCpdUser(req);
+        if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+        const pool = getCpdPool();
+        if (!pool) return res.json({ progress: {} });
+        await ensureCpdTable();
+        const { rows } = await pool.query(
+          `SELECT c.progress, c."updatedAt", u.name, u.email, u.image, u.bio
+             FROM "TeacherCPD" c JOIN "User" u ON u.id=c."userId"
+            WHERE c."userId"=$1`,
+          [req.params.id]
+        );
+        if (!rows.length) return res.json({ progress: {}, teacher: null });
+        return res.json({ progress: rows[0].progress || {}, teacher: { name: rows[0].name, email: rows[0].email, image: rows[0].image, bio: rows[0].bio } });
+      } catch (e) {
+        return res.json({ progress: {} });
+      }
+    });
+  }
 }
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
