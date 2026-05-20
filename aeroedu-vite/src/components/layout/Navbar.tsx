@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX } from 'lucide-react'
+import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX, Menu } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
@@ -96,7 +96,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
 }
 
 // ─── Navbar ───────────────────────────────────────────────────────────────────
-export function Navbar() {
+export function Navbar({ onMenuClick }: { onMenuClick?: () => void } = {}) {
   const [cmdOpen, setCmdOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { user, logout } = useAuth()
@@ -128,8 +128,17 @@ export function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-40 h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center px-4 gap-3">
-        {/* Logo area (mobile) */}
-        <Brain className="w-5 h-5 text-[hsl(262,83%,58%)] md:hidden" />
+        {/* Hamburger — only on mobile (lg và trên đã thấy sidebar) */}
+        <button
+          onClick={onMenuClick}
+          aria-label="Mở menu"
+          className="lg:hidden flex items-center justify-center w-9 h-9 rounded-lg hover:bg-accent transition-colors text-foreground/70 hover:text-foreground"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+
+        {/* Logo (mobile — ẩn khi đã có hamburger) */}
+        <Brain className="w-5 h-5 text-[hsl(262,83%,58%)] hidden" />
 
         {/* Search bar / Command Palette trigger */}
         <button
