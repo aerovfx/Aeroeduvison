@@ -15,7 +15,7 @@ import {
   Activity, Cpu, HardDrive, Server, Shield, ShieldAlert,
   CheckCircle, XCircle, AlertTriangle, RefreshCw, Database,
   Cloud, Mail, Bot, Zap, Sparkles, Search, ExternalLink,
-  Loader2, Eye, Lock, Globe, Clock,
+  Loader2, Eye, Lock, Globe, Clock, Bug, Ban, AlertOctagon,
 } from 'lucide-react'
 import { api } from '@/services/api'
 import toast from 'react-hot-toast'
@@ -157,6 +157,34 @@ const EVENT_LABEL: Record<string, string> = {
   'failed-login':         'Đăng nhập sai',
   'ban':                  'Bị chặn',
   'banned-login-attempt': 'Đăng nhập tài khoản banned',
+  'ai-crawler-blocked':   'Bot AI bị chặn',
+  'honeypot-hit':         'Honeypot bắt được bot',
+}
+
+/* ── Crawler types ──────────────────────────────────────── */
+
+interface CrawlerEvent {
+  id: string
+  eventType: 'ai-crawler-blocked' | 'honeypot-hit' | string
+  userAgent: string | null
+  ip: string | null
+  url: string | null
+  reason: string | null
+  severity: SeverityLevel
+  occurredAt: string
+}
+
+interface CrawlerResponse {
+  events: CrawlerEvent[]
+  summary: {
+    total: number
+    last24h: number
+    uniqueIps: number
+    honeypotHits: number
+    blockedByUa: number
+  }
+  topUserAgents: Array<{ ua: string; count: number }>
+  updatedAt: string
 }
 
 /* ── Main page ──────────────────────────────────────────── */
@@ -445,6 +473,7 @@ function SystemResourcesPanel() {
 /* ──────────────────────────────────────────────────────── */
 
 function SecurityAuditPanel() {
+  const [sub, setSub] = useState<'events' | 'crawlers'>('events')
   const [data, setData] = useState<SecurityResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [eventType, setEventType] = useState('')
@@ -485,6 +514,29 @@ function SecurityAuditPanel() {
 
   return (
     <div className="space-y-4">
+      {/* Sub-tab selector */}
+      <div className="flex items-center gap-1 bg-white/[0.025] rounded-lg p-1 w-fit border border-white/[0.06]">
+        {([
+          ['events',   'User events', Shield],
+          ['crawlers', 'Bots & Crawlers', Bot],
+        ] as const).map(([k, label, Icon]) => (
+          <button
+            key={k}
+            onClick={() => setSub(k)}
+            className={`px-3 py-1.5 text-[11px] font-medium rounded-md transition flex items-center gap-1.5 whitespace-nowrap ${
+              sub === k
+                ? 'bg-orange-500/15 text-orange-200 border border-orange-500/30'
+                : 'text-white/55 hover:text-white/85 border border-transparent'
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5" /> {label}
+          </button>
+        ))}
+      </div>
+
+      {sub === 'crawlers' && <BotsCrawlersPanel />}
+      {sub === 'events' && <>
+
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <SumCard
@@ -603,6 +655,173 @@ function SecurityAuditPanel() {
                       </td>
                       <td className="px-3 py-3 text-xs text-white/55 font-mono whitespace-nowrap">
                         {e.ip || '—'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      </>}
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────── */
+/* Sub-panel: Bots & Crawlers (inside Security tab)          */
+/* ──────────────────────────────────────────────────────── */
+
+function BotsCrawlersPanel() {
+  const [data, setData] = useState<CrawlerResponse | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const fetchCrawlers = async () => {
+    setLoading(true)
+    try {
+      const { data: d } = await api.get<CrawlerResponse>(
+        '/admin/operations/crawler-attempts',
+        { params: { limit: 200 } }
+      )
+      setData(d)
+    } catch (err: any) {
+      toast.error('Không tải được crawler attempts: ' + (err?.response?.data?.error || err.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCrawlers()
+    const i = setInterval(fetchCrawlers, 30_000)
+    return () => clearInterval(i)
+  }, [])
+
+  const summary = data?.summary
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <SumCard
+          icon={Bot} color="cyan" label="Tổng bot bị chặn"
+          value={String(summary?.total ?? 0)}
+        />
+        <SumCard
+          icon={Clock} color="amber" label="24h gần đây"
+          value={String(summary?.last24h ?? 0)}
+          highlight={(summary?.last24h ?? 0) > 20}
+        />
+        <SumCard
+          icon={Bug} color="rose" label="Honeypot bắt được"
+          value={String(summary?.honeypotHits ?? 0)}
+          highlight={(summary?.honeypotHits ?? 0) > 0}
+        />
+        <SumCard
+          icon={Ban} color="violet" label="IP độc nhất"
+          value={String(summary?.uniqueIps ?? 0)}
+        />
+      </div>
+
+      {/* Top user-agents */}
+      {data && data.topUserAgents.length > 0 && (
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
+          <h3 className="text-xs font-semibold text-white/80 mb-3 flex items-center gap-2 uppercase tracking-wider">
+            <AlertOctagon className="w-3.5 h-3.5 text-amber-400" />
+            Top User-Agents
+          </h3>
+          <div className="space-y-1.5">
+            {data.topUserAgents.map(({ ua, count }, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-3 text-xs"
+              >
+                <div className="text-white/70 font-mono truncate flex-1 min-w-0" title={ua}>
+                  {ua}
+                </div>
+                <span className="text-amber-300 font-bold font-mono whitespace-nowrap text-[11px]">
+                  {count}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Refresh */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-white/40 flex items-center gap-2">
+          <Clock className="w-3 h-3" /> Auto-refresh 30s
+          {data && <span className="ml-3 text-white/30">· {formatTime(data.updatedAt)}</span>}
+        </div>
+        <button
+          onClick={fetchCrawlers}
+          disabled={loading}
+          className="px-3 py-1.5 rounded-lg bg-white/[0.06] text-white/70 hover:bg-white/[0.1] flex items-center gap-2 text-xs disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Tải lại
+        </button>
+      </div>
+
+      {/* Events table */}
+      {!data ? (
+        <div className="flex items-center justify-center py-16 text-white/40 text-sm">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Đang tải…
+        </div>
+      ) : data.events.length === 0 ? (
+        <div className="text-center py-12 text-white/40">
+          <Bot className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <div className="text-sm">Chưa bot nào bị chặn — defense đang hoạt động yên ắng.</div>
+          <div className="text-xs text-white/30 mt-2">
+            (robots.txt + UA blocker + honeypot đều active)
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-white/[0.08] overflow-hidden bg-white/[0.025]">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white/[0.04] text-[10px] uppercase tracking-wider text-white/50">
+                <tr>
+                  <th className="text-left px-4 py-3 w-32">Thời gian</th>
+                  <th className="text-left px-3 py-3 w-32">Loại</th>
+                  <th className="text-left px-3 py-3 w-32">IP</th>
+                  <th className="text-left px-3 py-3">User-Agent</th>
+                  <th className="text-left px-3 py-3">Đường dẫn</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/[0.04]">
+                {data.events.map(e => {
+                  const isHoneypot = e.eventType === 'honeypot-hit'
+                  return (
+                    <tr key={e.id} className={`hover:bg-white/[0.03] ${isHoneypot ? 'bg-rose-500/[0.04]' : ''}`}>
+                      <td className="px-4 py-3 text-xs text-white/60 font-mono whitespace-nowrap">
+                        {formatTime(e.occurredAt)}
+                      </td>
+                      <td className="px-3 py-3 text-xs">
+                        {isHoneypot ? (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 w-fit bg-rose-500/15 text-rose-300 border-rose-500/40">
+                            <Bug className="w-2.5 h-2.5" /> HONEYPOT
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border flex items-center gap-1 w-fit bg-amber-500/15 text-amber-300 border-amber-500/40">
+                            <Ban className="w-2.5 h-2.5" /> UA-BLOCK
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-white/55 font-mono whitespace-nowrap">
+                        {e.ip || '—'}
+                      </td>
+                      <td className="px-3 py-3 text-xs">
+                        <div className="text-white/70 font-mono truncate max-w-[300px]" title={e.userAgent || ''}>
+                          {e.userAgent || '—'}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-xs">
+                        <div className="text-white/60 font-mono truncate max-w-[260px]" title={e.url || ''}>
+                          <Globe className="w-2.5 h-2.5 inline mr-1 opacity-50" />
+                          {e.url || '—'}
+                        </div>
                       </td>
                     </tr>
                   )

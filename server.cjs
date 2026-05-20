@@ -92,6 +92,156 @@ app.use((_req, res, next) => {
 // nên ta dùng giới hạn lớn cho mọi request — tin tưởng vì backend đứng sau auth.
 app.use(express.json({ limit: '50mb' }));
 
+// ════════════════════════════════════════════════════════════════
+// ANTI-CRAWLER / RATE LIMIT — 5-layer defense (registered early)
+//   Layer 1: robots.txt (in /aeroedu-vite/public/robots.txt)
+//   Layer 2: HTML meta noai (in /aeroedu-vite/index.html)
+//   Layer 3: rate-limit per IP (anonymous only)            ← below
+//   Layer 4: HTTP UA blocker (AI training bots → 403)      ← below
+//   Layer 5: honeypot trap (/honeypot-ai-trap → 410)       ← see route below
+// ════════════════════════════════════════════════════════════════
+
+// ── Simple in-memory rate limiter: 200 req/min per IP ──
+// Anonymous only — authenticated users (Bearer JWT) bypass.
+// Suitable for single-instance Cloud Run (revisions are independent).
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 200;
+const rateLimitBuckets = new Map(); // ip → { count, resetAt }
+
+function _extractIp(req) {
+  return (req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown')
+    .toString().split(',')[0].trim();
+}
+
+function rateLimitMiddleware(req, res, next) {
+  // Skip for authenticated users — they have JWT, throttling them hurts UX.
+  const hasAuth = typeof req.headers.authorization === 'string'
+                  && req.headers.authorization.startsWith('Bearer ');
+  if (hasAuth) return next();
+
+  // Skip static assets to avoid throttling SPA reloads
+  if (req.path === '/robots.txt' || req.path === '/favicon.ico' || req.path === '/favicon-32x32.png') {
+    return next();
+  }
+
+  const ip = _extractIp(req);
+  const now = Date.now();
+  let bucket = rateLimitBuckets.get(ip);
+  if (!bucket || bucket.resetAt < now) {
+    bucket = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitBuckets.set(ip, bucket);
+  }
+  bucket.count++;
+
+  // Cleanup old buckets occasionally (cap memory)
+  if (rateLimitBuckets.size > 10000) {
+    for (const [k, v] of rateLimitBuckets) {
+      if (v.resetAt < now) rateLimitBuckets.delete(k);
+    }
+  }
+
+  if (bucket.count > RATE_LIMIT_MAX) {
+    res.status(429)
+       .set('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)))
+       .json({ error: 'Quá nhiều request. Thử lại sau 1 phút.' });
+    return;
+  }
+  next();
+}
+
+// ── Anti-AI-crawler: block by User-Agent at HTTP layer ──
+const AI_BOT_PATTERNS = [
+  // OpenAI
+  /GPTBot/i, /ChatGPT-User/i, /OAI-SearchBot/i,
+  // Anthropic
+  /ClaudeBot/i, /Claude-Web/i, /anthropic-ai/i,
+  // Google AI (Extended schema — distinct from Googlebot)
+  /Google-Extended/i, /GoogleOther/i,
+  // Perplexity
+  /PerplexityBot/i, /Perplexity-User/i,
+  // ByteDance / TikTok
+  /Bytespider/i, /ByteDance/i,
+  // Meta
+  /FacebookBot/i, /Meta-ExternalAgent/i, /Meta-ExternalFetcher/i,
+  // Amazon / Apple
+  /Amazonbot/i, /Applebot-Extended/i,
+  // Other AI orgs
+  /cohere-ai/i, /Diffbot/i, /ImagesiftBot/i,
+  /omgili/i, /peer39/i, /PetalBot/i, /Webzio-Extended/i,
+  /YouBot/i, /Timpibot/i, /Velen Crawler/i, /img2dataset/i,
+  /CCBot/i,
+  // Generic scrapers / HTTP libraries
+  /scrapy/i, /^python-requests/i, /^python-urllib/i,
+  /^curl\//i, /^Wget\//i, /^Go-http-client/i,
+  // Headless browsers (real Chrome never advertises HeadlessChrome)
+  /HeadlessChrome/i, /PhantomJS/i,
+];
+
+function isAiCrawler(req) {
+  const ua = req.headers['user-agent'] || '';
+  return AI_BOT_PATTERNS.some(p => p.test(ua));
+}
+
+function antiCrawlerMiddleware(req, res, next) {
+  // robots.txt MUST be reachable — bots need to read it to honor it.
+  if (req.path === '/robots.txt' || req.path === '/favicon.ico') return next();
+
+  if (isAiCrawler(req)) {
+    const ip = _extractIp(req);
+    const ua = req.headers['user-agent'] || '';
+    try {
+      console.warn('[SECURITY:ai-crawler-blocked]', JSON.stringify({
+        ua, ip, path: req.path, ts: Date.now(),
+      }));
+      if (typeof global.__insertSecurityEvent === 'function') {
+        // Fire-and-forget; failure to log must not break the block.
+        Promise.resolve(global.__insertSecurityEvent({
+          eventType: 'ai-crawler-blocked',
+          severity: 'medium',
+          reason: `Bot UA: ${ua.slice(0, 100)}`,
+          url: req.originalUrl,
+          ip,
+          userAgent: ua,
+        })).catch(() => {});
+      }
+    } catch { /* ignore log failures */ }
+
+    res.status(403)
+       .set('X-Robots-Tag', 'noindex, nofollow, noarchive, noai, noimageai')
+       .send('AI training bots are not permitted. See /robots.txt');
+    return;
+  }
+  next();
+}
+
+// Order matters: rate-limit FIRST (cheap), then UA block, then routes.
+app.use(rateLimitMiddleware);
+app.use(antiCrawlerMiddleware);
+
+// ── Honeypot trap (Layer 5) ──
+// Hidden link in <body> that real users never click but headless crawlers
+// rendering HTML will fetch. Returns 410 Gone + persists hit to SecurityEvent.
+app.get('/honeypot-ai-trap', (req, res) => {
+  const ip = _extractIp(req);
+  const ua = req.headers['user-agent'] || '';
+  try {
+    console.warn('[SECURITY:honeypot-hit]', JSON.stringify({ ip, ua, ts: Date.now() }));
+    if (typeof global.__insertSecurityEvent === 'function') {
+      Promise.resolve(global.__insertSecurityEvent({
+        eventType: 'honeypot-hit',
+        severity: 'high',
+        reason: `Bot fell into honeypot trap — UA: ${ua.slice(0, 100)}`,
+        url: '/honeypot-ai-trap',
+        ip,
+        userAgent: ua,
+      })).catch(() => {});
+    }
+  } catch { /* ignore */ }
+  res.status(410)
+     .set('X-Robots-Tag', 'noindex, nofollow, noarchive, noai, noimageai')
+     .send('Forbidden');
+});
+
 // ══════════════════════════════════════════════════════════════
 // BUILT-IN NODE.JS AUTH — active when AUTH_SERVICE_URL is not set
 // Handles: /api/auth/login, /api/auth/google, /api/auth/me, /api/auth/logout
@@ -3421,6 +3571,61 @@ function makeProxy(target, label, pathFilter) {
       });
     } catch (err) {
       console.error('[admin:security-events] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GET /api/admin/operations/crawler-attempts
+  // Liệt kê bots bị chặn (ai-crawler-blocked) + honeypot hits.
+  // Reuse SecurityEvent table — riêng endpoint để Operations UI có
+  // sub-section riêng cho "Bots & Crawlers".
+  // ══════════════════════════════════════════════════════════════
+  app.get('/api/admin/operations/crawler-attempts', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      await ensureSecurityEventTable();
+      const pool = getPool();
+      const limit = Math.min(500, Math.max(10, Number(req.query.limit) || 200));
+      const { rows } = await pool.query(`
+        SELECT id, "userAgent", ip, url, reason, severity, "eventType", "occurredAt"
+          FROM "SecurityEvent"
+         WHERE "eventType" IN ('ai-crawler-blocked', 'honeypot-hit')
+         ORDER BY "occurredAt" DESC
+         LIMIT $1
+      `, [limit]).catch(() => ({ rows: [] }));
+
+      const now = Date.now();
+      const cutoff24h = now - 24 * 3600 * 1000;
+      const last24h = rows.filter(r => new Date(r.occurredAt).getTime() >= cutoff24h).length;
+      const honeypotHits = rows.filter(r => r.eventType === 'honeypot-hit').length;
+      const blockedByUa = rows.filter(r => r.eventType === 'ai-crawler-blocked').length;
+
+      // Aggregate top user-agents (helpful to spot dominant scraper)
+      const uaCounts = {};
+      for (const r of rows) {
+        const ua = (r.userAgent || 'unknown').slice(0, 80);
+        uaCounts[ua] = (uaCounts[ua] || 0) + 1;
+      }
+      const topUserAgents = Object.entries(uaCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([ua, count]) => ({ ua, count }));
+
+      res.json({
+        events: rows,
+        summary: {
+          total: rows.length,
+          last24h,
+          uniqueIps: new Set(rows.map(r => r.ip).filter(Boolean)).size,
+          honeypotHits,
+          blockedByUa,
+        },
+        topUserAgents,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[admin:crawler-attempts] ❌', err.message);
       res.status(500).json({ error: err.message });
     }
   });

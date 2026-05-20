@@ -9,6 +9,13 @@
     <meta name="description" content="AeroEduVision — Nền tảng STEM thông minh tích hợp AI gia sư, mô phỏng Vật lý 3D và mạch điện Wokwi cho giáo viên & học sinh THPT Việt Nam." />
     <meta name="keywords" content="aeroeduvision, inphysic, ai gia sư, ôn thi THPT, mạch điện wokwi, lab 3d, giáo dục stem việt nam, đề thi trắc nghiệm, lộ trình học, vật lý lớp 12" />
     <meta name="author" content="Đặng Việt Chung, Trần Thị Hương — AeroEduVision Team" />
+
+    <!-- ── Anti-AI-training (Cloudflare/X standard 2026) ─────── -->
+    <!-- Tell well-behaved AI crawlers: do NOT use this content for model training. -->
+    <!-- Hard enforcement: see UA-blocker middleware + honeypot in server.cjs.       -->
+    <meta name="robots" content="noai, noimageai" />
+    <meta name="googlebot" content="noai, noimageai, index, follow" />
+
     <title>AeroEduVision — Nền tảng STEM thông minh cho trường học Việt Nam</title>
 
     <!-- ── Open Graph (Facebook, Zalo, Telegram link preview) ── -->
@@ -91,6 +98,17 @@
     </script>
   </head>
   <body>
+    <!--
+      Honeypot trap (Layer 5 of anti-crawler defense).
+      Invisible to humans (hidden via inline style + aria-hidden + tabindex -1).
+      Bots that ignore robots.txt + render HTML will follow this link.
+      Server handler: /honeypot-ai-trap → 410 Gone + persists SecurityEvent.
+    -->
+    <a href="/honeypot-ai-trap"
+       style="display:none;position:absolute;top:-9999px;left:-9999px;width:0;height:0;overflow:hidden;pointer-events:none;"
+       aria-hidden="true"
+       tabindex="-1"
+       rel="nofollow">Do not follow</a>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
