@@ -75,7 +75,7 @@
       (function () {
         try {
           var raw = localStorage.getItem('themeSettings');
-          var mode = raw ? JSON.parse(raw).mode : 'system';
+          var mode = raw ? JSON.parse(raw).mode : 'dark';
           var resolved =
             mode === 'dark'  ? 'dark'  :
             mode === 'light' ? 'light' :
@@ -84,10 +84,8 @@
             document.documentElement.classList.add('dark');
           }
         } catch (e) {
-          // If anything fails, use system default
-          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            document.documentElement.classList.add('dark');
-          }
+          // If anything fails, default to dark
+          document.documentElement.classList.add('dark');
         }
       })();
     </script>
