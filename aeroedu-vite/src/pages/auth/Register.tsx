@@ -56,7 +56,13 @@ export default function RegisterPage() {
       } else {
         try { localStorage.removeItem('userSubType') } catch { /* ignore */ }
       }
-      navigate(from, { replace: true })
+      // TEACHER/PARENT/ADMIN phải làm khảo sát nghề nghiệp trước khi vào KG/skill builder
+      // STUDENT vào thẳng dashboard
+      if (role === 'TEACHER') {
+        navigate('/profile/career-survey?onboarding=1', { replace: true })
+      } else {
+        navigate(from, { replace: true })
+      }
     } catch (err: unknown) {
       type ApiErr = {
         response?: { status?: number; data?: { message?: string; error?: string } | string }

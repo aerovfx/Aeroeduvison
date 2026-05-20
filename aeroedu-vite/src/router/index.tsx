@@ -207,6 +207,7 @@ const ProfileBasicInfoPage = lazy(() => import('@/pages/profile/BasicInfo'))
 const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
 const PublicProfilePage    = lazy(() => import('@/pages/profile/PublicProfile'))
 const CustomizeProfilePage = lazy(() => import('@/pages/profile/Customize'))
+const CareerSurveyPage     = lazy(() => import('@/pages/profile/CareerSurvey'))
 
 // ── Docs / Hướng dẫn sử dụng ─────────────────────────────────
 const DocsIndexPage   = lazy(() => import('@/pages/docs/DocsIndex'))
@@ -429,6 +430,7 @@ export function AppRouter() {
             <Route path="/profile/basic-information" element={<ProfileBasicInfoPage />} />
             <Route path="/profile/photo"             element={<ProfilePhotoPage />} />
             <Route path="/profile/customize"         element={<CustomizeProfilePage />} />
+            <Route path="/profile/career-survey"     element={<CareerSurveyPage />} />
             <Route path="/profile"                   element={<Navigate to="/profile/basic-information" replace />} />
             {/* Trang cá nhân công khai (decorate-able) */}
             <Route path="/u/:userId"                 element={<PublicProfilePage />} />

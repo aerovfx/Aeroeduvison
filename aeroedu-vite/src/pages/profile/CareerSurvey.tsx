@@ -1,0 +1,956 @@
+/**
+ * CareerSurvey — Khảo sát nghề nghiệp bắt buộc với TEACHER/PARENT/ADMIN
+ *
+ * 4 bước:
+ *   1. Thông tin nghề nghiệp (khác nhau GV vs PH)
+ *   2. Năng lực hiện tại (self-rating 1-5 cho mỗi skill)
+ *   3. Mục tiêu phát triển (chọn ≤5 skill + motivation + thời gian)
+ *   4. Xác nhận → POST → confetti → redirect KG
+ *
+ * Persist draft vào localStorage `career-survey-draft` để user không mất data
+ * khi F5 hoặc đóng tab giữa chừng.
+ */
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  Briefcase, Star, Target, CheckCircle2, ArrowLeft, ArrowRight,
+  Loader2, BookOpen, GraduationCap, Cpu, TrendingUp, Sparkles, Heart,
+} from 'lucide-react'
+import { toast } from 'react-hot-toast'
+import confetti from 'canvas-confetti'
+import { api } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
+import { useAccountType } from '@/hooks/useAccountType'
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+type EducationLevel = 'primary' | 'middle' | 'high' | 'university' | 'center'
+type Motivation = 'work' | 'passion' | 'support-children' | 'career-growth' | 'ai-trend'
+type WeeklyTime = '<1' | '1-3' | '3-5' | '5-10' | '>10'
+type AccountTypeSurvey = 'TEACHER' | 'PARENT' | 'ADMIN'
+
+interface SurveyData {
+  accountType: AccountTypeSurvey
+  profession: {
+    primarySubject?: string
+    educationLevel?: EducationLevel
+    yearsExperience?: number
+    school?: string
+    job?: string
+    industry?: string
+    childrenCount?: number
+    childrenGrades?: number[]
+  }
+  currentSkills: Record<string, number>
+  developmentGoals: string[]
+  motivation: Motivation | ''
+  weeklyTimeCommitment: WeeklyTime | ''
+}
+
+interface SkillItem {
+  id: string
+  label: string
+  description: string
+  category: string
+  catColor: string
+  icon: React.ComponentType<{ className?: string }>
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const SUBJECTS = [
+  'Toán', 'Vật lý', 'Hóa học', 'Sinh học', 'Văn', 'Sử', 'Địa', 'Anh',
+  'GDCD', 'Tin học', 'Công nghệ', 'Mỹ thuật', 'Âm nhạc', 'Thể dục', 'GDQP', 'Khác',
+] as const
+
+const EDUCATION_LEVELS: { value: EducationLevel; label: string }[] = [
+  { value: 'primary',    label: 'Tiểu học' },
+  { value: 'middle',     label: 'THCS' },
+  { value: 'high',       label: 'THPT' },
+  { value: 'university', label: 'Đại học' },
+  { value: 'center',     label: 'Trung tâm' },
+]
+
+const INDUSTRIES = [
+  'CNTT', 'Y tế', 'Tài chính ngân hàng', 'Giáo dục', 'Xây dựng',
+  'Công nghiệp', 'Dịch vụ', 'Khác',
+] as const
+
+const JOB_SUGGESTIONS = [
+  'Kỹ sư phần mềm', 'Bác sĩ', 'Giáo viên', 'Kế toán', 'Kiến trúc sư',
+  'Nhân viên kinh doanh', 'Kỹ sư cơ khí', 'Y tá', 'Dược sĩ', 'Luật sư',
+  'Designer', 'Marketing', 'Kỹ sư xây dựng', 'Công an', 'Bộ đội',
+  'Nội trợ', 'Tự kinh doanh',
+]
+
+// Teacher 24 skills (4 category x 6) — đồng bộ với ProfessionalKG.tsx
+const TEACHER_SKILLS: SkillItem[] = [
+  // CM - Kiến thức Chuyên môn (purple)
+  { id: 'tce-curriculum2018', label: 'Chương trình GDPT 2018',       description: 'Nắm vững cấu trúc, mục tiêu CT mới',         category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  { id: 'tce-content-depth',  label: 'Kiến thức chuyên sâu bộ môn',   description: 'Hiểu nguyên lý, giải thích nhiều cách',      category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  { id: 'tce-cross-subject',  label: 'Tích hợp liên môn',             description: 'Kết nối kiến thức giữa các môn',            category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  { id: 'tce-tt58',           label: 'Quy định đánh giá TT22/TT58',    description: 'Thông hiểu chuẩn đánh giá, ĐTBm',           category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  { id: 'tce-research',       label: 'Nghiên cứu khoa học giáo dục',   description: 'Đọc hiểu nghiên cứu giáo dục',              category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  { id: 'tce-update',         label: 'Cập nhật kiến thức liên tục',    description: 'Theo dõi xu hướng mới',                     category: 'Kiến thức Chuyên môn', catColor: 'purple', icon: BookOpen },
+  // SP - Năng lực Sư phạm (blue)
+  { id: 'tp-lesson-design',   label: 'Thiết kế bài dạy theo năng lực', description: '5 hoạt động, mục tiêu NL',                  category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  { id: 'tp-active-learning', label: 'Dạy học tích cực',                description: 'Flip classroom, PBL, game-based',           category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  { id: 'tp-differentiation', label: 'Dạy học phân hóa',               description: 'Bài tập theo cấp độ HS',                    category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  { id: 'tp-formative',       label: 'Đánh giá quá trình',              description: 'Exit ticket, rubric, portfolio',            category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  { id: 'tp-stem',            label: 'Tích hợp STEM/STEAM',             description: 'Dự án STEM liên môn',                       category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  { id: 'tp-classroom-mgmt',  label: 'Quản lý lớp học hiệu quả',       description: 'Bầu không khí học tích cực',                category: 'Năng lực Sư phạm', catColor: 'blue', icon: GraduationCap },
+  // KS - Kỹ năng Số (emerald)
+  { id: 'tds-lms',             label: 'Sử dụng LMS (inphysic.com)',     description: 'Tạo bài giảng, quản lý lớp online',         category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  { id: 'tds-ai-tools',        label: 'Công cụ AI hỗ trợ giảng dạy',  description: 'Claude AI Tutor, AI tạo đề',                category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  { id: 'tds-content-creation',label: 'Tạo nội dung số',                description: 'Video bài giảng, slides tương tác',         category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  { id: 'tds-data-analytics',  label: 'Phân tích dữ liệu học tập',     description: 'Đọc dashboard, phát hiện HS at-risk',        category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  { id: 'tds-online-teaching', label: 'Dạy học trực tuyến',             description: 'Zoom/Meet, giữ tương tác',                  category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  { id: 'tds-security',        label: 'An toàn thông tin cơ bản',       description: 'Bảo vệ dữ liệu HS, phishing',               category: 'Kỹ năng Số', catColor: 'emerald', icon: Cpu },
+  // PN - Phát triển Nghề nghiệp (amber)
+  { id: 'tpd-communication',  label: 'Giao tiếp với phụ huynh & HS',  description: 'Phản hồi tích cực, họp phụ huynh',          category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-mentoring',      label: 'Hỗ trợ & Mentoring đồng nghiệp', description: 'Chia sẻ kinh nghiệm, dự giờ',               category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-reflection',     label: 'Phản tư chuyên nghiệp',           description: 'Tự đánh giá bài dạy, journal',              category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-wellbeing',      label: 'Chăm sóc sức khỏe tâm lý',       description: 'Quản lý stress, phòng burnout',             category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-leadership',     label: 'Lãnh đạo nhóm & Tổ bộ môn',     description: 'Điều phối họp, mentoring GV mới',           category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-cpd-plan',       label: 'Lập kế hoạch phát triển cá nhân', description: 'IDP hàng năm, SMART goals',                category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+]
+
+// Parent 8 tracking skills
+const PARENT_SKILLS: SkillItem[] = [
+  { id: 'parent-track-results',   label: 'Theo dõi kết quả học tập',        description: 'Đọc điểm, hiểu báo cáo của con',          category: 'Theo dõi học tập', catColor: 'pink', icon: Heart },
+  { id: 'parent-comm-teacher',    label: 'Giao tiếp với GV chủ nhiệm',      description: 'Trao đổi hiệu quả với giáo viên',          category: 'Theo dõi học tập', catColor: 'pink', icon: Heart },
+  { id: 'parent-gdpt2018',        label: 'Hiểu chương trình GDPT 2018',     description: 'Nắm cấu trúc CT mới Bộ GD&ĐT',             category: 'Hỗ trợ học tập', catColor: 'purple', icon: BookOpen },
+  { id: 'parent-home-support',    label: 'Hỗ trợ con học tại nhà',          description: 'Hướng dẫn bài tập, tạo môi trường học',    category: 'Hỗ trợ học tập', catColor: 'purple', icon: BookOpen },
+  { id: 'parent-psychology',      label: 'Hiểu tâm lý lứa tuổi',           description: 'Tâm lý tuổi thiếu niên / dậy thì',         category: 'Tâm lý & định hướng', catColor: 'blue', icon: Sparkles },
+  { id: 'parent-time-mgmt',       label: 'Quản lý thời gian con',           description: 'Cân bằng học - chơi - nghỉ',                category: 'Tâm lý & định hướng', catColor: 'blue', icon: Sparkles },
+  { id: 'parent-career',          label: 'Hỗ trợ chọn nghề định hướng',     description: 'Khám phá sở thích, ngành nghề tương lai',   category: 'Tâm lý & định hướng', catColor: 'blue', icon: Sparkles },
+  { id: 'parent-edtech',          label: 'Dùng công nghệ giáo dục',         description: 'LMS, app học, AI Tutor',                    category: 'Công nghệ', catColor: 'emerald', icon: Cpu },
+]
+
+const MOTIVATION_OPTIONS: { value: Motivation; label: string }[] = [
+  { value: 'work',              label: 'Yêu cầu công việc' },
+  { value: 'passion',           label: 'Đam mê cá nhân' },
+  { value: 'support-children',  label: 'Để hỗ trợ con/học sinh tốt hơn' },
+  { value: 'career-growth',     label: 'Để thăng tiến sự nghiệp' },
+  { value: 'ai-trend',          label: 'Cập nhật xu hướng AI' },
+]
+
+const TIME_OPTIONS: { value: WeeklyTime; label: string }[] = [
+  { value: '<1',    label: '< 1 giờ' },
+  { value: '1-3',   label: '1 – 3 giờ' },
+  { value: '3-5',   label: '3 – 5 giờ' },
+  { value: '5-10',  label: '5 – 10 giờ' },
+  { value: '>10',   label: '> 10 giờ' },
+]
+
+const DRAFT_KEY = 'career-survey-draft'
+
+// ── Color helpers ─────────────────────────────────────────────────────────────
+
+const CAT_COLOR_CLASSES: Record<string, { ring: string; bg: string; text: string; border: string; fill: string }> = {
+  purple:  { ring: 'ring-purple-500/40',  bg: 'bg-purple-500/10',  text: 'text-purple-300',  border: 'border-purple-500/30',  fill: 'bg-purple-500'  },
+  blue:    { ring: 'ring-blue-500/40',    bg: 'bg-blue-500/10',    text: 'text-blue-300',    border: 'border-blue-500/30',    fill: 'bg-blue-500'    },
+  emerald: { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', fill: 'bg-emerald-500' },
+  amber:   { ring: 'ring-amber-500/40',   bg: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/30',   fill: 'bg-amber-500'   },
+  pink:    { ring: 'ring-pink-500/40',    bg: 'bg-pink-500/10',    text: 'text-pink-300',    border: 'border-pink-500/30',    fill: 'bg-pink-500'    },
+}
+
+const RATING_LABELS = ['Chưa biết', 'Mới bắt đầu', 'Đang học', 'Thành thạo', 'Chuyên gia']
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function CareerSurvey() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
+  const accountType = useAccountType()
+
+  // Account type for survey form (TEACHER / PARENT / ADMIN)
+  const surveyAccountType: AccountTypeSurvey = useMemo(() => {
+    if (accountType === 'PARENT') return 'PARENT'
+    if (accountType === 'ADMIN') return 'ADMIN'
+    return 'TEACHER'
+  }, [accountType])
+
+  const isParent = surveyAccountType === 'PARENT'
+  const skillList = isParent ? PARENT_SKILLS : TEACHER_SKILLS
+
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0)
+  const [submitting, setSubmitting] = useState(false)
+  const [data, setData] = useState<SurveyData>(() => ({
+    accountType: surveyAccountType,
+    profession: {},
+    currentSkills: {},
+    developmentGoals: [],
+    motivation: '',
+    weeklyTimeCommitment: '',
+  }))
+
+  // Restore draft on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY)
+      if (raw) {
+        const draft = JSON.parse(raw) as Partial<SurveyData>
+        setData(prev => ({ ...prev, ...draft, accountType: surveyAccountType }))
+      }
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Sync accountType nếu user thay đổi sub-type
+  useEffect(() => {
+    setData(prev => ({ ...prev, accountType: surveyAccountType }))
+  }, [surveyAccountType])
+
+  // Auto-save draft mỗi khi data đổi
+  useEffect(() => {
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)) } catch { /* ignore */ }
+  }, [data])
+
+  // Already completed → redirect (avoid trapping user who already finished)
+  useEffect(() => {
+    if (!user) return
+    api.get<{ completed: boolean }>('/users/me/career-survey')
+      .then(r => {
+        if (r.data?.completed && !searchParams.get('onboarding')) {
+          const returnUrl = searchParams.get('return') || (accountType === 'ADMIN' ? '/admin/knowledge-graph' : '/teacher/knowledge-graph')
+          navigate(returnUrl, { replace: true })
+        }
+      })
+      .catch(() => { /* ignore */ })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
+
+  // ── Validation ───────────────────────────────────────────────
+  const canProceed = useMemo(() => {
+    if (step === 0) {
+      const p = data.profession
+      if (isParent) {
+        return !!(p.job && p.industry && typeof p.childrenCount === 'number')
+      }
+      return !!(p.primarySubject && p.educationLevel && typeof p.yearsExperience === 'number')
+    }
+    if (step === 1) {
+      // Yêu cầu rate ít nhất 50% skill list (để tránh skip toàn bộ)
+      const needed = Math.ceil(skillList.length / 2)
+      return Object.keys(data.currentSkills).length >= needed
+    }
+    if (step === 2) {
+      return data.developmentGoals.length > 0 && !!data.motivation && !!data.weeklyTimeCommitment
+    }
+    return true
+  }, [step, data, isParent, skillList.length])
+
+  // ── Submit ───────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    setSubmitting(true)
+    try {
+      const payload: SurveyData = { ...data, accountType: surveyAccountType }
+      await api.post('/users/me/career-survey', payload)
+      // Confetti
+      confetti({ particleCount: 160, spread: 90, origin: { y: 0.6 } })
+      setTimeout(() => confetti({ particleCount: 100, spread: 120, origin: { y: 0.4 } }), 250)
+      // Clear draft
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+      toast.success('Cảm ơn bạn! Bắt đầu xây dựng skill ngay nhé')
+      // Redirect after short delay
+      setTimeout(() => {
+        const returnUrl = searchParams.get('return')
+        if (returnUrl) {
+          navigate(returnUrl, { replace: true })
+        } else {
+          navigate(accountType === 'ADMIN' ? '/admin/knowledge-graph' : '/teacher/knowledge-graph', { replace: true })
+        }
+      }, 1200)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không lưu được khảo sát, thử lại nhé')
+      setSubmitting(false)
+    }
+  }
+
+  // ── UI ───────────────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-xs text-purple-300 mb-3">
+            <Sparkles className="w-3.5 h-3.5" />
+            Khảo sát đầu vào
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">
+            Khảo sát nghề nghiệp {isParent ? 'phụ huynh' : surveyAccountType === 'ADMIN' ? 'quản trị' : 'giáo viên'}
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-xl mx-auto">
+            Trả lời nhanh 4 bước (~3 phút) để AeroEduVision cá nhân hoá lộ trình phát triển skill phù hợp với bạn.
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs text-muted-foreground">Bước {step + 1}/4</div>
+            <div className="text-xs text-muted-foreground">{Math.round(((step + 1) / 4) * 100)}%</div>
+          </div>
+          <div className="h-1.5 rounded-full bg-card overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+              style={{ width: `${((step + 1) / 4) * 100}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-4 gap-2 mt-3">
+            {['Thông tin', 'Năng lực', 'Mục tiêu', 'Xác nhận'].map((label, i) => (
+              <div
+                key={label}
+                className={`text-center text-[11px] py-1.5 rounded ${
+                  i === step
+                    ? 'bg-purple-500/15 text-purple-300 font-semibold'
+                    : i < step
+                      ? 'text-emerald-400'
+                      : 'text-muted-foreground'
+                }`}
+              >
+                {i < step && <CheckCircle2 className="w-3 h-3 inline mr-1" />}
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Step content */}
+        <div className="bg-card border border-border rounded-2xl p-6 md:p-8 mb-6">
+          {step === 0 && (
+            <Step1Career
+              data={data}
+              setData={setData}
+              isParent={isParent}
+            />
+          )}
+          {step === 1 && (
+            <Step2Skills
+              skillList={skillList}
+              currentSkills={data.currentSkills}
+              setCurrentSkills={(v) => setData(d => ({ ...d, currentSkills: v }))}
+            />
+          )}
+          {step === 2 && (
+            <Step3Goals
+              skillList={skillList}
+              data={data}
+              setData={setData}
+            />
+          )}
+          {step === 3 && (
+            <Step4Confirm
+              data={data}
+              skillList={skillList}
+              isParent={isParent}
+            />
+          )}
+        </div>
+
+        {/* Nav buttons */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => setStep((s) => (s > 0 ? ((s - 1) as 0 | 1 | 2 | 3) : s))}
+            disabled={step === 0 || submitting}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card border border-border text-sm font-medium hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Quay lại
+          </button>
+
+          {step < 3 ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!canProceed) {
+                  toast.error('Vui lòng điền đủ thông tin bắt buộc')
+                  return
+                }
+                setStep((s) => ((s + 1) as 0 | 1 | 2 | 3))
+              }}
+              disabled={!canProceed}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-purple-500/20"
+            >
+              Tiếp theo
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-semibold disabled:opacity-60 shadow-lg shadow-purple-500/30"
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {submitting ? 'Đang lưu...' : 'Hoàn thành khảo sát & Bắt đầu xây dựng skill'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 1 — Thông tin nghề nghiệp
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Step1Career({
+  data, setData, isParent,
+}: {
+  data: SurveyData
+  setData: React.Dispatch<React.SetStateAction<SurveyData>>
+  isParent: boolean
+}) {
+  const updateProf = (patch: Partial<SurveyData['profession']>) =>
+    setData((d) => ({ ...d, profession: { ...d.profession, ...patch } }))
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <Briefcase className="w-5 h-5 text-purple-400" />
+        <h2 className="text-lg font-bold">Thông tin nghề nghiệp</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        {isParent
+          ? 'Giúp chúng tôi hiểu rõ bối cảnh của bạn để đưa ra gợi ý phù hợp.'
+          : 'Thông tin cơ bản về môn dạy và cấp học của bạn.'}
+      </p>
+
+      {isParent ? (
+        <div className="space-y-5">
+          {/* Nghề nghiệp hiện tại */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Nghề nghiệp hiện tại <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="text"
+              list="job-suggest"
+              value={data.profession.job || ''}
+              onChange={(e) => updateProf({ job: e.target.value })}
+              placeholder="VD: Kỹ sư phần mềm, Bác sĩ..."
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+            <datalist id="job-suggest">
+              {JOB_SUGGESTIONS.map(j => <option key={j} value={j} />)}
+            </datalist>
+          </div>
+
+          {/* Lĩnh vực */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Lĩnh vực <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={data.profession.industry || ''}
+              onChange={(e) => updateProf({ industry: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">— Chọn lĩnh vực —</option>
+              {INDUSTRIES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Năm kinh nghiệm */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Số năm kinh nghiệm</label>
+            <input
+              type="number"
+              min={0}
+              max={60}
+              value={data.profession.yearsExperience ?? ''}
+              onChange={(e) => updateProf({ yearsExperience: e.target.value === '' ? undefined : Math.max(0, +e.target.value) })}
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* Số con đang học */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Số con đang học <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={data.profession.childrenCount ?? ''}
+              onChange={(e) => updateProf({ childrenCount: e.target.value === '' ? undefined : Math.max(0, +e.target.value) })}
+              placeholder="VD: 2"
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* Lớp các con đang học */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Lớp các con đang học</label>
+            <div className="flex flex-wrap gap-2">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((g) => {
+                const sel = data.profession.childrenGrades?.includes(g) || false
+                return (
+                  <button
+                    type="button"
+                    key={g}
+                    onClick={() => {
+                      const cur = data.profession.childrenGrades || []
+                      const next = sel ? cur.filter(x => x !== g) : [...cur, g].sort((a, b) => a - b)
+                      updateProf({ childrenGrades: next })
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                      sel
+                        ? 'bg-pink-500/20 border-pink-500/50 text-pink-200'
+                        : 'bg-card border-border text-muted-foreground hover:border-pink-500/30'
+                    }`}
+                  >
+                    Lớp {g}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          {/* Môn dạy chính */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Môn dạy chính <span className="text-red-400">*</span>
+            </label>
+            <select
+              value={data.profession.primarySubject || ''}
+              onChange={(e) => updateProf({ primarySubject: e.target.value })}
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">— Chọn môn dạy —</option>
+              {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Cấp học */}
+          <div>
+            <label className="block text-sm font-medium mb-2">
+              Cấp học <span className="text-red-400">*</span>
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              {EDUCATION_LEVELS.map((l) => {
+                const sel = data.profession.educationLevel === l.value
+                return (
+                  <button
+                    type="button"
+                    key={l.value}
+                    onClick={() => updateProf({ educationLevel: l.value })}
+                    className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
+                      sel
+                        ? 'bg-purple-500/20 border-purple-500/50 text-purple-200'
+                        : 'bg-card border-border text-muted-foreground hover:border-purple-500/30'
+                    }`}
+                  >
+                    {l.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Năm kinh nghiệm */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Số năm kinh nghiệm <span className="text-red-400">*</span>
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={40}
+              value={data.profession.yearsExperience ?? ''}
+              onChange={(e) => updateProf({ yearsExperience: e.target.value === '' ? undefined : Math.max(0, Math.min(40, +e.target.value)) })}
+              placeholder="VD: 5"
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* Trường công tác */}
+          <div>
+            <label className="block text-sm font-medium mb-1.5">
+              Trường đang công tác <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
+            </label>
+            <input
+              type="text"
+              value={data.profession.school || ''}
+              onChange={(e) => updateProf({ school: e.target.value })}
+              placeholder="VD: THPT Chu Văn An"
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2 — Năng lực hiện tại
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Step2Skills({
+  skillList, currentSkills, setCurrentSkills,
+}: {
+  skillList: SkillItem[]
+  currentSkills: Record<string, number>
+  setCurrentSkills: (v: Record<string, number>) => void
+}) {
+  // Group skills by category
+  const grouped = useMemo(() => {
+    const map = new Map<string, { color: string; items: SkillItem[] }>()
+    for (const s of skillList) {
+      if (!map.has(s.category)) map.set(s.category, { color: s.catColor, items: [] })
+      map.get(s.category)!.items.push(s)
+    }
+    return Array.from(map.entries())
+  }, [skillList])
+
+  const ratedCount = Object.keys(currentSkills).length
+  const needed = Math.ceil(skillList.length / 2)
+  const remaining = Math.max(0, needed - ratedCount)
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <Star className="w-5 h-5 text-amber-400" />
+        <h2 className="text-lg font-bold">Năng lực hiện tại</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-2">
+        Tự đánh giá mức độ hiện tại cho từng kỹ năng (1 = Chưa biết, 5 = Chuyên gia).
+      </p>
+      <div className="flex items-center gap-2 mb-6 text-xs">
+        <span className={`px-2 py-1 rounded ${ratedCount >= needed ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}`}>
+          Đã đánh giá: {ratedCount}/{skillList.length}
+        </span>
+        {remaining > 0 && (
+          <span className="text-muted-foreground">Còn cần đánh giá ít nhất {remaining} kỹ năng nữa</span>
+        )}
+      </div>
+
+      <div className="space-y-6">
+        {grouped.map(([catName, { color, items }]) => {
+          const c = CAT_COLOR_CLASSES[color] || CAT_COLOR_CLASSES.purple
+          return (
+            <div key={catName}>
+              <div className={`text-sm font-semibold mb-3 px-3 py-1.5 rounded-md inline-flex items-center gap-2 ${c.bg} ${c.text} border ${c.border}`}>
+                {catName}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {items.map((s) => (
+                  <SkillRatingCard
+                    key={s.id}
+                    skill={s}
+                    value={currentSkills[s.id] || 0}
+                    onChange={(v) => {
+                      const next = { ...currentSkills }
+                      if (v === 0) delete next[s.id]
+                      else next[s.id] = v
+                      setCurrentSkills(next)
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function SkillRatingCard({
+  skill, value, onChange,
+}: {
+  skill: SkillItem
+  value: number
+  onChange: (v: number) => void
+}) {
+  const c = CAT_COLOR_CLASSES[skill.catColor] || CAT_COLOR_CLASSES.purple
+  return (
+    <div className={`p-3 rounded-xl bg-card border ${value > 0 ? c.border : 'border-border'} transition`}>
+      <div className="text-sm font-semibold mb-0.5">{skill.label}</div>
+      <div className="text-xs text-muted-foreground mb-2.5 line-clamp-2">{skill.description}</div>
+
+      <div className="flex items-center gap-1.5">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            type="button"
+            key={n}
+            onClick={() => onChange(value === n ? 0 : n)}
+            aria-label={`Chọn mức ${n}: ${RATING_LABELS[n - 1]}`}
+            className={`flex-1 h-9 rounded-md text-xs font-bold transition border ${
+              value >= n
+                ? `${c.fill} text-white border-transparent`
+                : 'bg-background border-border text-muted-foreground hover:border-foreground/30'
+            }`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <div className="text-[11px] text-muted-foreground mt-1.5 text-center">
+        {value > 0 ? RATING_LABELS[value - 1] : 'Chưa chọn'}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 3 — Mục tiêu phát triển
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Step3Goals({
+  skillList, data, setData,
+}: {
+  skillList: SkillItem[]
+  data: SurveyData
+  setData: React.Dispatch<React.SetStateAction<SurveyData>>
+}) {
+  const toggleGoal = (id: string) => {
+    setData((d) => {
+      const cur = d.developmentGoals
+      if (cur.includes(id)) return { ...d, developmentGoals: cur.filter(x => x !== id) }
+      if (cur.length >= 5) {
+        toast.error('Chỉ chọn tối đa 5 kỹ năng để tập trung phát triển')
+        return d
+      }
+      return { ...d, developmentGoals: [...cur, id] }
+    })
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <Target className="w-5 h-5 text-indigo-400" />
+        <h2 className="text-lg font-bold">Mục tiêu phát triển</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Chọn 1–5 kỹ năng bạn muốn phát triển trong 6 tháng tới, cùng với động lực và thời gian sẵn sàng.
+      </p>
+
+      {/* Goals — multi-select */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-sm font-medium">
+            Bạn muốn phát triển kỹ năng nào trong 6 tháng tới? <span className="text-red-400">*</span>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Đã chọn {data.developmentGoals.length}/5
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {skillList.map((s) => {
+            const sel = data.developmentGoals.includes(s.id)
+            const c = CAT_COLOR_CLASSES[s.catColor] || CAT_COLOR_CLASSES.purple
+            return (
+              <button
+                type="button"
+                key={s.id}
+                onClick={() => toggleGoal(s.id)}
+                className={`text-left p-3 rounded-xl border transition ${
+                  sel
+                    ? `${c.bg} ${c.border} ${c.ring} ring-2`
+                    : 'bg-card border-border hover:border-foreground/20'
+                }`}
+              >
+                <div className="flex items-start gap-2">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded border-2 mt-0.5 flex items-center justify-center ${
+                    sel ? `${c.fill} border-transparent` : 'border-border'
+                  }`}>
+                    {sel && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">{s.label}</div>
+                    <div className="text-[11px] text-muted-foreground line-clamp-1">{s.description}</div>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Motivation */}
+      <div className="mb-6">
+        <div className="text-sm font-medium mb-3">
+          Lý do bạn muốn phát triển? <span className="text-red-400">*</span>
+        </div>
+        <div className="space-y-2">
+          {MOTIVATION_OPTIONS.map((m) => {
+            const sel = data.motivation === m.value
+            return (
+              <button
+                type="button"
+                key={m.value}
+                onClick={() => setData((d) => ({ ...d, motivation: m.value }))}
+                className={`w-full text-left px-4 py-3 rounded-lg border transition flex items-center gap-3 ${
+                  sel
+                    ? 'bg-purple-500/15 border-purple-500/50 text-purple-100'
+                    : 'bg-card border-border hover:border-purple-500/30'
+                }`}
+              >
+                <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                  sel ? 'border-purple-400 bg-purple-500' : 'border-border'
+                }`}>
+                  {sel && <div className="w-1.5 h-1.5 bg-white rounded-full m-auto mt-1" />}
+                </div>
+                <span className="text-sm font-medium">{m.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Weekly time */}
+      <div>
+        <div className="text-sm font-medium mb-3">
+          Thời gian bạn có thể dành mỗi tuần? <span className="text-red-400">*</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+          {TIME_OPTIONS.map((t) => {
+            const sel = data.weeklyTimeCommitment === t.value
+            return (
+              <button
+                type="button"
+                key={t.value}
+                onClick={() => setData((d) => ({ ...d, weeklyTimeCommitment: t.value }))}
+                className={`px-3 py-3 rounded-lg text-sm font-medium border transition ${
+                  sel
+                    ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-100'
+                    : 'bg-card border-border text-muted-foreground hover:border-indigo-500/30'
+                }`}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 4 — Xác nhận
+// ─────────────────────────────────────────────────────────────────────────────
+
+function Step4Confirm({
+  data, skillList, isParent,
+}: {
+  data: SurveyData
+  skillList: SkillItem[]
+  isParent: boolean
+}) {
+  const skillMap = useMemo(() => new Map(skillList.map(s => [s.id, s])), [skillList])
+  const motivationLabel = MOTIVATION_OPTIONS.find(m => m.value === data.motivation)?.label || '—'
+  const timeLabel = TIME_OPTIONS.find(t => t.value === data.weeklyTimeCommitment)?.label || '—'
+  const levelLabel = EDUCATION_LEVELS.find(l => l.value === data.profession.educationLevel)?.label
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+        <h2 className="text-lg font-bold">Xác nhận thông tin</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Kiểm tra lại trước khi gửi. Bạn có thể quay lại chỉnh sửa bất cứ lúc nào.
+      </p>
+
+      <div className="space-y-5">
+        {/* Profession */}
+        <section className="p-4 rounded-xl bg-background border border-border">
+          <div className="text-xs font-semibold text-purple-300 mb-2 uppercase tracking-wider">
+            <Briefcase className="w-3.5 h-3.5 inline mr-1.5" />
+            Thông tin nghề nghiệp
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+            {isParent ? (
+              <>
+                <Row label="Nghề nghiệp" value={data.profession.job || '—'} />
+                <Row label="Lĩnh vực" value={data.profession.industry || '—'} />
+                <Row label="Năm kinh nghiệm" value={data.profession.yearsExperience !== undefined ? `${data.profession.yearsExperience} năm` : '—'} />
+                <Row label="Số con đang học" value={data.profession.childrenCount !== undefined ? `${data.profession.childrenCount}` : '—'} />
+                {data.profession.childrenGrades && data.profession.childrenGrades.length > 0 && (
+                  <Row label="Lớp các con" value={data.profession.childrenGrades.map(g => `Lớp ${g}`).join(', ')} fullWidth />
+                )}
+              </>
+            ) : (
+              <>
+                <Row label="Môn dạy" value={data.profession.primarySubject || '—'} />
+                <Row label="Cấp học" value={levelLabel || '—'} />
+                <Row label="Năm kinh nghiệm" value={data.profession.yearsExperience !== undefined ? `${data.profession.yearsExperience} năm` : '—'} />
+                <Row label="Trường" value={data.profession.school || '—'} />
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* Skills rated */}
+        <section className="p-4 rounded-xl bg-background border border-border">
+          <div className="text-xs font-semibold text-amber-300 mb-2 uppercase tracking-wider">
+            <Star className="w-3.5 h-3.5 inline mr-1.5" />
+            Năng lực đã đánh giá ({Object.keys(data.currentSkills).length}/{skillList.length})
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {Object.entries(data.currentSkills)
+              .sort((a, b) => b[1] - a[1])
+              .map(([id, score]) => {
+                const s = skillMap.get(id)
+                if (!s) return null
+                const c = CAT_COLOR_CLASSES[s.catColor] || CAT_COLOR_CLASSES.purple
+                return (
+                  <span key={id} className={`text-xs px-2 py-1 rounded ${c.bg} ${c.text} border ${c.border}`}>
+                    {s.label} · <strong>{score}/5</strong>
+                  </span>
+                )
+              })}
+          </div>
+        </section>
+
+        {/* Development goals */}
+        <section className="p-4 rounded-xl bg-background border border-border">
+          <div className="text-xs font-semibold text-indigo-300 mb-2 uppercase tracking-wider">
+            <Target className="w-3.5 h-3.5 inline mr-1.5" />
+            Mục tiêu phát triển 6 tháng tới
+          </div>
+          <ul className="space-y-1.5 mb-3">
+            {data.developmentGoals.map((id) => {
+              const s = skillMap.get(id)
+              return s ? (
+                <li key={id} className="text-sm flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <span>{s.label}</span>
+                </li>
+              ) : null
+            })}
+          </ul>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm pt-3 border-t border-border">
+            <Row label="Động lực" value={motivationLabel} />
+            <Row label="Thời gian/tuần" value={timeLabel} />
+          </div>
+        </section>
+
+        <div className="text-center text-xs text-muted-foreground">
+          Sau khi xác nhận, lộ trình phát triển skill sẽ được kích hoạt và hiển thị trong Cây tri thức.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Row({ label, value, fullWidth }: { label: string; value: string; fullWidth?: boolean }) {
+  return (
+    <div className={fullWidth ? 'md:col-span-2' : ''}>
+      <div className="text-[11px] text-muted-foreground uppercase tracking-wider">{label}</div>
+      <div className="text-sm font-medium">{value}</div>
+    </div>
+  )
+}

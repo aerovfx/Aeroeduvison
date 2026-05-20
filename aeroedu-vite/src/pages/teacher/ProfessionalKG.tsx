@@ -12,10 +12,11 @@ import {
   BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
   Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
   ExternalLink, Target, Wrench, MessageCircle, PlayCircle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, Loader2,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
+import { useCareerSurveyGuard } from '@/hooks/useCareerSurveyGuard'
 import * as XLSX from 'xlsx'
 import { api } from '@/services/api'
 import { getSuggestion, type SuggestionMethod } from './skillSuggestions'
@@ -311,6 +312,7 @@ const CROSS_EDGES: [string, string][] = [
 
 export default function ProfessionalKG() {
   const { user } = useAuth()
+  const { checking, allowed } = useCareerSurveyGuard()
   const isAdmin   = user?.role === 'ADMIN'
   const tree      = isAdmin ? ADMIN_TREE : TEACHER_TREE
   const milestones = isAdmin ? ADMIN_MILESTONES : TEACHER_MILESTONES
@@ -1153,6 +1155,16 @@ export default function ProfessionalKG() {
     URL.revokeObjectURL(url)
     toast.success('Đã xuất JSON phát triển chuyên môn')
   }
+
+  // ── Career survey gate — TEACHER/PARENT/ADMIN phải hoàn thành khảo sát trước ──
+  if (checking) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+      </div>
+    )
+  }
+  if (!allowed) return null  // hook đã redirect
 
   // ── Render ──
   return (

@@ -28076,6 +28076,129 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         res.status(500).json({ error: err.message });
       }
     });
+
+    // ── Career Survey — bắt buộc với TEACHER/PARENT/ADMIN trước khi vào KG ──
+    // Khảo sát nghề nghiệp: thông tin nghề, năng lực hiện tại, mục tiêu phát triển.
+    // Lưu trong UserProfile.careerSurvey (JSONB) + careerSurveyCompletedAt timestamp.
+    let _csColsReady = false;
+    async function ensureCareerSurveyColumns() {
+      if (_csColsReady) return;
+      const pool = getUPPool();
+      if (!pool) return;
+      try {
+        await ensureUserProfileTable();
+        await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS "careerSurvey" JSONB DEFAULT NULL`);
+        await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS "careerSurveyCompletedAt" TIMESTAMP`);
+      } catch (e) { console.warn('[career-survey] migrate:', e.message); }
+      _csColsReady = true;
+    }
+
+    // Sanitize survey JSON — chống lưu rác. Whitelist key, giới hạn kích thước,
+    // ép kiểu số/chuỗi an toàn. Không validate giá trị enum nghiêm khắc để
+    // schema có thể mở rộng về sau mà không cần migration.
+    function sanitizeCareerSurvey(input) {
+      if (!input || typeof input !== 'object') return null;
+      const out = { accountType: '', profession: {}, currentSkills: {}, developmentGoals: [], motivation: '', weeklyTimeCommitment: '' };
+      const at = String(input.accountType || '').toUpperCase();
+      if (['TEACHER', 'PARENT', 'ADMIN'].includes(at)) out.accountType = at;
+      // Profession block
+      const p = input.profession && typeof input.profession === 'object' ? input.profession : {};
+      const prof = {};
+      if (typeof p.primarySubject === 'string')   prof.primarySubject   = p.primarySubject.slice(0, 80);
+      if (typeof p.educationLevel === 'string')   prof.educationLevel   = p.educationLevel.slice(0, 30);
+      if (Number.isFinite(+p.yearsExperience))    prof.yearsExperience  = Math.min(60, Math.max(0, Math.floor(+p.yearsExperience)));
+      if (typeof p.school === 'string')           prof.school           = p.school.slice(0, 200);
+      if (typeof p.job === 'string')              prof.job              = p.job.slice(0, 120);
+      if (typeof p.industry === 'string')         prof.industry         = p.industry.slice(0, 60);
+      if (Number.isFinite(+p.childrenCount))      prof.childrenCount    = Math.min(20, Math.max(0, Math.floor(+p.childrenCount)));
+      if (Array.isArray(p.childrenGrades)) {
+        prof.childrenGrades = p.childrenGrades
+          .map(g => Math.floor(+g))
+          .filter(g => g >= 1 && g <= 12)
+          .slice(0, 12);
+      }
+      out.profession = prof;
+      // Current skills — Record<skillId, 1..5>
+      if (input.currentSkills && typeof input.currentSkills === 'object') {
+        const skills = {};
+        let cnt = 0;
+        for (const [k, v] of Object.entries(input.currentSkills)) {
+          if (cnt >= 100) break;
+          const key = String(k).slice(0, 60);
+          const val = Math.min(5, Math.max(1, Math.floor(+v) || 1));
+          skills[key] = val;
+          cnt++;
+        }
+        out.currentSkills = skills;
+      }
+      // Development goals — array of skillIds (max 10 phòng hờ)
+      if (Array.isArray(input.developmentGoals)) {
+        out.developmentGoals = input.developmentGoals
+          .map(s => String(s).slice(0, 60))
+          .filter(Boolean)
+          .slice(0, 10);
+      }
+      if (typeof input.motivation === 'string') out.motivation = input.motivation.slice(0, 30);
+      if (typeof input.weeklyTimeCommitment === 'string') out.weeklyTimeCommitment = input.weeklyTimeCommitment.slice(0, 10);
+      return out;
+    }
+
+    // GET /api/users/me/career-survey — trả về trạng thái survey
+    app.get('/api/users/me/career-survey', async (req, res) => {
+      const user = getUPUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getUPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureCareerSurveyColumns();
+        const { rows } = await pool.query(
+          `SELECT "careerSurvey", "careerSurveyCompletedAt"
+             FROM "UserProfile" WHERE "userId" = $1 LIMIT 1`, [user.id]
+        );
+        const row = rows[0];
+        const completedAt = row?.careerSurveyCompletedAt || null;
+        res.json({
+          completed: !!completedAt,
+          data: row?.careerSurvey || null,
+          completedAt: completedAt ? new Date(completedAt).toISOString() : null,
+        });
+      } catch (err) {
+        console.error('[career-survey:get]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    // POST /api/users/me/career-survey — upsert survey
+    app.post('/api/users/me/career-survey', async (req, res) => {
+      const user = getUPUser(req);
+      if (!user) return res.status(401).json({ error: 'Unauthorized' });
+      const pool = getUPPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureCareerSurveyColumns();
+        const sanitized = sanitizeCareerSurvey(req.body);
+        if (!sanitized) return res.status(400).json({ error: 'Invalid survey payload' });
+
+        const { rows } = await pool.query(
+          `INSERT INTO "UserProfile" ("userId", "careerSurvey", "careerSurveyCompletedAt")
+             VALUES ($1, $2::jsonb, NOW())
+             ON CONFLICT ("userId") DO UPDATE
+               SET "careerSurvey" = EXCLUDED."careerSurvey",
+                   "careerSurveyCompletedAt" = NOW(),
+                   "updatedAt" = NOW()
+             RETURNING "careerSurveyCompletedAt"`,
+          [user.id, JSON.stringify(sanitized)]
+        );
+        const completedAt = rows[0]?.careerSurveyCompletedAt
+          ? new Date(rows[0].careerSurveyCompletedAt).toISOString()
+          : new Date().toISOString();
+        console.log(`[career-survey:save] ✅ ${user.id} type=${sanitized.accountType} goals=${sanitized.developmentGoals.length}`);
+        res.json({ ok: true, completedAt });
+      } catch (err) {
+        console.error('[career-survey:save]', err.message);
+        res.status(500).json({ error: err.message });
+      }
+    });
   }
 
   // ─ Emotion ────────────────────────────────────────────────
