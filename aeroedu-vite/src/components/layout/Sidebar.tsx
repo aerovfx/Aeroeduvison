@@ -118,6 +118,7 @@ const teacherSections: RouteSection[] = [
       { icon: Users,   labelKey: 'routeClassMgmt',   href: '/teacher/dashboard' },
       { icon: BarChart,labelKey: 'routeAnalytics',   href: '/teacher/analytics' },
       { icon: Heart,   labelKey: 'routeEmotionMap',  href: '/teacher/emotion-map' },
+      { icon: Network, labelKey: 'routeProfKG',      href: '/teacher/knowledge-graph', badge: 'CPD' },
     ],
   },
   {
@@ -189,6 +190,7 @@ const adminSections: RouteSection[] = [
       { icon: GraduationCap,labelKey: 'routeTeachers',      href: '/admin/teachers' },
       { icon: AlertTriangle,labelKey: 'routeAtRisk',        href: '/admin/at-risk' },
       { icon: MessageSquare,labelKey: 'routeAgents',        href: '/admin/agents',     badge: 'AI' },
+      { icon: Network,      labelKey: 'routeProfKG',        href: '/admin/knowledge-graph', badge: 'CPD' },
     ],
   },
   {

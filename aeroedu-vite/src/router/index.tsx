@@ -169,6 +169,7 @@ const LessonPlansPage         = lazy(() => import('@/pages/teacher/LessonPlans')
 const LessonPlanEditorPage    = lazy(() => import('@/pages/teacher/LessonPlanEditor'))
 const CameraManagementPage         = lazy(() => import('@/pages/teacher/CameraManagement'))
 const EnvironmentMonitoringPage    = lazy(() => import('@/pages/teacher/EnvironmentMonitoring'))
+const ProfessionalKGPage           = lazy(() => import('@/pages/teacher/ProfessionalKG'))
 
 // ── Student Pages (đã port) ──────────────────────────────────
 const StudentDashboardPage            = lazy(() => import('@/pages/student/Dashboard'))
@@ -527,6 +528,7 @@ export function AppRouter() {
               <Route path="/teacher/question-bank/list"            element={<PageFallback />} />
               <Route path="/teacher/student/:studentId"            element={<StudentInsightPage />} />
               <Route path="/teacher/scrumboard"                    element={<TeacherScrumboardPage />} />
+              <Route path="/teacher/knowledge-graph"              element={<ProfessionalKGPage />} />
               <Route path="/teacher/system-flow"                   element={<PageFallback />} />
               <Route path="/teacher/transcript/library"            element={<PageFallback />} />
               <Route path="/teacher/transcript/recording"          element={<TranscriptRecordingPage />} />
@@ -563,6 +565,7 @@ export function AppRouter() {
               <Route path="/admin/insights"            element={<AdminInsightsPage />} />
               <Route path="/admin/scrumboard"          element={<AdminScrumboardPage />} />
               <Route path="/admin/rs-experiments"      element={<AdminRsExperimentsPage />} />
+              <Route path="/admin/knowledge-graph"     element={<ProfessionalKGPage />} />
             </Route>
 
           </Route>{/* /DashboardLayout */}
