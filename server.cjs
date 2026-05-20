@@ -8111,6 +8111,30 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
     }
   );
 
+  // ── POST /api/audit/screenshot-attempt ────────────────────────
+  // Best-effort log khi FE phát hiện user cố screenshot/devtools
+  // → in stdout (Cloud Run logs) → có thể aggregate analyze sau
+  app.post('/api/audit/screenshot-attempt', express.json({ limit: '4kb' }), async (req, res) => {
+    try {
+      const { userId, reason, ts, url, ua } = req.body || {};
+      const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
+      console.warn('[SECURITY:screenshot-attempt]',
+        JSON.stringify({
+          userId: userId || 'guest',
+          reason: reason || 'unknown',
+          ts: ts || Date.now(),
+          url: url || '',
+          ip: String(ip).split(',')[0].trim(),
+          ua: String(ua || '').substring(0, 120),
+        })
+      );
+      return res.json({ ok: true });
+    } catch (err) {
+      // Never fail — silent log
+      return res.json({ ok: true });
+    }
+  });
+
   // ════════════════════════════════════════════════════════════
   // LESSON PLANS — GV soạn giáo án WYSIWYG (Google Docs-like)
   // Lưu HTML/JSON content → DB. Optional snapshot lên GCS bucket.

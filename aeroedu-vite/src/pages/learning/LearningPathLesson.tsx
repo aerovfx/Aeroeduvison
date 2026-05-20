@@ -311,7 +311,7 @@ export default function LearningPathLesson() {
   const showContent = !hasVideo  // Show description as lesson content
 
   return (
-    <div className="flex h-[calc(100vh-0px)] overflow-hidden bg-[hsl(225,15%,7%)]">
+    <div className="flex h-[calc(100vh-0px)] overflow-hidden bg-[hsl(225,15%,7%)] protected-content">
 
       {/* ════════════ SIDEBAR ════════════════════════════════════ */}
       {/* Mobile overlay */}

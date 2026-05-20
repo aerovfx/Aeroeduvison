@@ -538,7 +538,7 @@ export default function CoursePlayer() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden bg-background protected-content">
       {/* Main area */}
       <div className="flex-1 flex flex-col overflow-y-auto">
         {/* Top nav — Udemy style với progress badge */}

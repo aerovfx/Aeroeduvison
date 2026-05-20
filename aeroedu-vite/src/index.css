@@ -183,6 +183,51 @@ body {
 }
 
 /* ============================================================
+ * CONTENT PROTECTION — bảo vệ bản quyền cho khoá học/bài học
+ * Áp dụng .protected-content cho element bao bọc nội dung nhạy cảm
+ * → không cho copy/select/print/save
+ * ============================================================ */
+.protected-content {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.protected-content img,
+.protected-content video {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  pointer-events: auto;
+}
+.protected-content input,
+.protected-content textarea,
+.protected-content [contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+/* Khi in (Ctrl+P) → trang trắng + warning thay vì content thực */
+@media print {
+  body { visibility: hidden !important; }
+  body::before {
+    content: '⚠ Tài liệu này được bảo vệ bản quyền · Không được in/lưu trữ · inphysic.com';
+    visibility: visible;
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: #cc0000;
+    text-align: center;
+    width: 80%;
+  }
+}
+
+/* ============================================================
  * AI NATIVE COMPONENT CLASSES
  * Token-based — automatically correct in light & dark modes.
  * ============================================================ */

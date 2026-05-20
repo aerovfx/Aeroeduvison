@@ -528,7 +528,7 @@ export default function PdfBookViewer({
     <div
       ref={containerRef}
       className={cn(
-        'relative flex flex-col select-none overflow-hidden',
+        'relative flex flex-col select-none overflow-hidden protected-content',
         isFullscreen
           ? 'fixed inset-0 z-[9999]'
           : 'w-full rounded-2xl border border-white/10',
