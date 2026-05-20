@@ -15,9 +15,10 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `eb94285` (revision pixiai-00368-xxx, 2026-05-20 — LLM Visualizer 6 interactive sections + bump font sizes ≥15px)
+- Last deployed commit: `7fe7b79` (revision pixiai-00369-xxx, 2026-05-20 — Admin Overview việt hoá compact + admin teachers/students real data từ DB)
 - Commits since last deploy: `0/5`
-- Prev: `787e791` → pixiai-00367-foy (HOTFIX otplib Dockerfile + ship 2FA/Admin users/Anti-screenshot v3/Career survey retake)
+- Prev: `eb94285` → pixiai-00368-jab (LLM Visualizer 6 sections + bump font sizes)
+- Prev: `787e791` → pixiai-00367-foy (HOTFIX otplib Dockerfile + 2FA/Admin users/Anti-screenshot v3/Career survey retake)
 - Prev: `1fdc513` — Anti-screenshot v3 (bỏ blur/modal, chặn phím tắt + toast)
 - Prev: `9ce4c21` — Admin module quản lý người dùng (HS/GV/PH/Admin)
 - Prev: `aade959` — 2FA TOTP + Forgot password polish
