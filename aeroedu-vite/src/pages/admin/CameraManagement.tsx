@@ -732,6 +732,15 @@ export default function CameraManagement() {
 
           {/* Surveillance grid hoặc List view */}
           <div className="flex-1 p-3 overflow-auto">
+            {/* ── PROMINENT QUICK-ADD PANEL ── 3 cách thêm camera */}
+            <QuickAddCameraPanel
+              discovering={discovering}
+              onScan={handleDiscover}
+              onManualCreate={handleAddCamera}
+              onPasteRtsp={() => setStandaloneBuilderOpen(true)}
+              cameraCount={cameras.filter(c => c._admin).length}
+            />
+
             {gridSize === 'list' ? (
               /* ── List view: table chi tiết, không phải grid ── */
               <CameraListView
@@ -1075,6 +1084,126 @@ export default function CameraManagement() {
         }}
       />
     </>
+  );
+}
+
+/* ─── Quick Add Camera Panel — hero CTA ─────────────────── */
+interface QuickAddPanelProps {
+  discovering: boolean;
+  cameraCount: number;
+  onScan: () => void;
+  onManualCreate: () => void;
+  onPasteRtsp: () => void;
+}
+
+function QuickAddCameraPanel({
+  discovering, cameraCount, onScan, onManualCreate, onPasteRtsp,
+}: QuickAddPanelProps) {
+  return (
+    <div className="mb-3 rounded-xl overflow-hidden border border-violet-500/30 bg-gradient-to-br from-violet-900/30 via-purple-900/20 to-indigo-900/20 shadow-lg shadow-violet-900/10">
+      {/* Header */}
+      <div className="px-4 py-3 flex items-center justify-between border-b border-white/[0.06] bg-black/20">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg bg-violet-500/25 flex items-center justify-center">
+            <Plus className="w-5 h-5 text-violet-200" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white">Thêm camera mới</h3>
+            <p className="text-[10px] text-white/50">
+              Đang quản lý <b className="text-violet-300">{cameraCount}</b> camera ·
+              Chọn 1 trong 3 cách bên dưới
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 3 cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 p-3">
+        {/* Card 1: ONVIF Auto Discovery */}
+        <button
+          type="button"
+          onClick={onScan}
+          disabled={discovering}
+          className="group text-left rounded-lg border border-cyan-500/20 hover:border-cyan-400/60 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all p-3.5 flex flex-col gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-cyan-500/20 group-hover:bg-cyan-500/30 flex items-center justify-center transition-colors">
+              {discovering
+                ? <Loader2 className="w-5 h-5 text-cyan-300 animate-spin" />
+                : <Radar className="w-5 h-5 text-cyan-300" />
+              }
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-cyan-200">
+                {discovering ? 'Đang quét...' : 'Cách 1: Tự động ONVIF'}
+              </p>
+              <p className="text-[10px] text-cyan-300/60">Khuyến nghị</p>
+            </div>
+          </div>
+          <p className="text-[11px] text-white/60 leading-snug">
+            Quét toàn bộ mạng LAN — tự nhận diện camera Hikvision, Dahua, Axis, Imou, Yoosee... đang chạy.
+          </p>
+          <div className="flex items-center gap-1.5 text-[10px] text-cyan-300/80 mt-1">
+            <Network className="w-3 h-3" />
+            <span>WS-Discovery + UPnP</span>
+          </div>
+        </button>
+
+        {/* Card 2: Manual Create */}
+        <button
+          type="button"
+          onClick={onManualCreate}
+          className="group text-left rounded-lg border border-violet-500/30 hover:border-violet-400/70 bg-violet-500/10 hover:bg-violet-500/15 transition-all p-3.5 flex flex-col gap-1.5 ring-2 ring-violet-500/0 hover:ring-violet-500/30"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-violet-500/30 group-hover:bg-violet-500/40 flex items-center justify-center transition-colors">
+              <Plus className="w-5 h-5 text-violet-200" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-violet-200">Cách 2: Nhập thủ công</p>
+              <p className="text-[10px] text-violet-300/60">Đầy đủ thông số</p>
+            </div>
+          </div>
+          <p className="text-[11px] text-white/60 leading-snug">
+            Mở form nhập: tên, hãng, IP, ports, username, password, RTSP URL, vị trí lắp đặt, capabilities...
+          </p>
+          <div className="flex items-center gap-1.5 text-[10px] text-violet-300/80 mt-1">
+            <Camera className="w-3 h-3" />
+            <span>Hikvision · Dahua · Axis · Uniview · Vivotek · Bosch · ONVIF</span>
+          </div>
+        </button>
+
+        {/* Card 3: Paste RTSP */}
+        <button
+          type="button"
+          onClick={onPasteRtsp}
+          className="group text-left rounded-lg border border-emerald-500/20 hover:border-emerald-400/60 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all p-3.5 flex flex-col gap-1.5"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-emerald-500/20 group-hover:bg-emerald-500/30 flex items-center justify-center transition-colors">
+              <Wrench className="w-5 h-5 text-emerald-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-emerald-200">Cách 3: Có sẵn link RTSP</p>
+              <p className="text-[10px] text-emerald-300/60">Wizard tạo URL</p>
+            </div>
+          </div>
+          <p className="text-[11px] text-white/60 leading-snug">
+            Dán link RTSP có sẵn (vd: <code className="text-[10px] text-emerald-300/80">rtsp://admin:pass@...</code>) → wizard tự parse + sinh URL chuẩn.
+          </p>
+          <div className="flex items-center gap-1.5 text-[10px] text-emerald-300/80 mt-1">
+            <Globe className="w-3 h-3" />
+            <span>Auto-build theo brand</span>
+          </div>
+        </button>
+      </div>
+
+      {/* Hint footer */}
+      <div className="px-4 py-2 border-t border-white/[0.04] bg-black/30 flex items-center justify-between gap-3 text-[10px] text-white/40">
+        <span>💡 Chưa biết bắt đầu? Bấm <b className="text-cyan-300">Cách 1</b> để tự động dò.</span>
+        <span className="hidden sm:inline">Camera xuất hiện ở sidebar trái + grid sau khi thêm</span>
+      </div>
+    </div>
   );
 }
 

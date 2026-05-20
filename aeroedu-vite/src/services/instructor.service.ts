@@ -46,6 +46,64 @@ export interface UploadAssetPayload {
   fileType: string
 }
 
+// ─── Curriculum (Mục lục: Chapter → Lesson) ───────────────────
+export type LessonType = 'video' | 'reading' | 'quiz' | 'assignment'
+
+export interface CurriculumLesson {
+  id: string
+  chapterId: string
+  title: string
+  description?: string | null
+  duration?: number | null   // minutes
+  type: LessonType
+  position: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CurriculumChapter {
+  id: string
+  title: string
+  description?: string | null
+  duration?: number | null
+  position: number
+  isPublished?: boolean
+  isFree?: boolean
+  createdAt: string
+  updatedAt: string
+  lessons: CurriculumLesson[]
+}
+
+export interface CreateChapterPayload {
+  title: string
+  description?: string | null
+  position?: number
+}
+
+export interface UpdateChapterPayload {
+  title?: string
+  description?: string | null
+  position?: number
+  isPublished?: boolean
+  isFree?: boolean
+}
+
+export interface CreateLessonPayload {
+  title: string
+  description?: string | null
+  duration?: number | null
+  type?: LessonType
+  position?: number
+}
+
+export interface UpdateLessonPayload {
+  title?: string
+  description?: string | null
+  duration?: number | null
+  type?: LessonType
+  position?: number
+}
+
 export const instructorService = {
   // ── Courses ─────────────────────────────────────────────
   /** GET /api/instructor/courses — my courses as instructor */
@@ -149,6 +207,43 @@ export const instructorService = {
   /** DELETE /api/instructor/courses/:courseId/assets/:assetId */
   deleteAsset: (courseId: string, assetId: string) =>
     api.delete(`/instructor/courses/${courseId}/assets/${assetId}`).then((r) => r.data),
+
+  // ── Curriculum (Chapters + Lessons) ──────────────────────
+  /** GET /api/instructor/courses/:courseId/chapters — full curriculum with lessons */
+  getCurriculum: (courseId: string) =>
+    api.get<CurriculumChapter[]>(`/instructor/courses/${courseId}/chapters`).then((r) => r.data),
+
+  /** POST /api/instructor/courses/:courseId/chapters */
+  createChapter: (courseId: string, data: CreateChapterPayload) =>
+    api.post<CurriculumChapter>(`/instructor/courses/${courseId}/chapters`, data).then((r) => r.data),
+
+  /** PATCH /api/instructor/courses/:courseId/chapters/:chapterId */
+  updateChapter: (courseId: string, chapterId: string, data: UpdateChapterPayload) =>
+    api.patch<CurriculumChapter>(`/instructor/courses/${courseId}/chapters/${chapterId}`, data).then((r) => r.data),
+
+  /** DELETE /api/instructor/courses/:courseId/chapters/:chapterId (cascade lessons) */
+  deleteChapter: (courseId: string, chapterId: string) =>
+    api.delete(`/instructor/courses/${courseId}/chapters/${chapterId}`).then((r) => r.data),
+
+  /** POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons */
+  createLesson: (courseId: string, chapterId: string, data: CreateLessonPayload) =>
+    api.post<CurriculumLesson>(`/instructor/courses/${courseId}/chapters/${chapterId}/lessons`, data).then((r) => r.data),
+
+  /** PATCH /api/instructor/lessons/:lessonId */
+  updateLesson: (lessonId: string, data: UpdateLessonPayload) =>
+    api.patch<CurriculumLesson>(`/instructor/lessons/${lessonId}`, data).then((r) => r.data),
+
+  /** DELETE /api/instructor/lessons/:lessonId */
+  deleteLesson: (lessonId: string) =>
+    api.delete(`/instructor/lessons/${lessonId}`).then((r) => r.data),
+
+  /** POST /api/instructor/courses/:courseId/chapters/reorder */
+  reorderChapters: (courseId: string, chapterIds: string[]) =>
+    api.post(`/instructor/courses/${courseId}/chapters/reorder`, { chapterIds }).then((r) => r.data),
+
+  /** POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder */
+  reorderLessons: (courseId: string, chapterId: string, lessonIds: string[]) =>
+    api.post(`/instructor/courses/${courseId}/chapters/${chapterId}/lessons/reorder`, { lessonIds }).then((r) => r.data),
 
   // ── Categories ──────────────────────────────────────────
   /** GET /api/categories */

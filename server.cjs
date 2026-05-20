@@ -4315,6 +4315,409 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
     });
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // CURRICULUM — Mục lục khoá học: Chapter (chương) → Lesson (bài học).
+  // Teacher xây cấu trúc khoá học TRƯỚC khi thêm video. Mỗi Chapter
+  // hold N Lessons. Cả 2 đều có position để reorder bằng Up/Down.
+  // Bảng "Chapter" đã có sẵn (xem ensureTeacherDemo). Bảng "Lesson"
+  // được tạo lazy bên dưới.
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: CcPool } = require('pg');
+    const ccJwt = require('jsonwebtoken');
+    let _ccPool = null;
+    function getCcPool() {
+      if (!_ccPool && process.env.DATABASE_URL) {
+        _ccPool = new CcPool({ connectionString: process.env.DATABASE_URL, max: 3 });
+      }
+      return _ccPool;
+    }
+    const CC_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getCcTeacher(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = ccJwt.verify(auth.slice(7), CC_SECRET, { ignoreExpiration: true });
+        return d.sub || d.userId || d.id || null;
+      } catch { return null; }
+    }
+    let _ccReady = false;
+    async function ensureCurriculumTables() {
+      if (_ccReady) return;
+      const pool = getCcPool();
+      if (!pool) return;
+      // Chapter table (may already exist) — ensure all needed columns
+      await pool.query(`CREATE TABLE IF NOT EXISTS "Chapter" (
+        id          TEXT PRIMARY KEY,
+        title       TEXT NOT NULL,
+        description TEXT,
+        duration    INTEGER,
+        "videoUrl"  TEXT,
+        position    INTEGER NOT NULL DEFAULT 1,
+        "isPublished" BOOLEAN DEFAULT false,
+        "isFree"    BOOLEAN DEFAULT false,
+        "courseId"  TEXT NOT NULL,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      await pool.query(`ALTER TABLE "Chapter" ADD COLUMN IF NOT EXISTS "description" TEXT`);
+      await pool.query(`ALTER TABLE "Chapter" ADD COLUMN IF NOT EXISTS "duration" INTEGER`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Chapter_course_idx" ON "Chapter"("courseId", position ASC)`);
+      // Lesson table — lazy migration
+      await pool.query(`CREATE TABLE IF NOT EXISTS "Lesson" (
+        id          TEXT PRIMARY KEY,
+        "chapterId" TEXT NOT NULL,
+        title       TEXT NOT NULL,
+        description TEXT,
+        duration    INTEGER,
+        type        TEXT DEFAULT 'video',
+        position    INTEGER NOT NULL DEFAULT 1,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "Lesson_chapter_idx" ON "Lesson"("chapterId", position ASC)`);
+      // FK cascade: nếu Chapter bị xoá → Lessons xoá theo
+      try {
+        await pool.query(`ALTER TABLE "Lesson" DROP CONSTRAINT IF EXISTS "Lesson_chapterId_fkey"`);
+        await pool.query(`ALTER TABLE "Lesson" ADD CONSTRAINT "Lesson_chapterId_fkey"
+          FOREIGN KEY ("chapterId") REFERENCES "Chapter"(id) ON DELETE CASCADE`);
+      } catch (e) { /* ignore — đã có constraint hoặc bảng chưa sẵn sàng */ }
+      _ccReady = true;
+    }
+
+    // Verify course ownership helper
+    async function ownsCourse(pool, courseId, tid) {
+      const r = await pool.query(`SELECT 1 FROM "Course" WHERE id=$1 AND "userId"=$2 LIMIT 1`, [courseId, tid]);
+      return r.rows.length > 0;
+    }
+    async function ownsChapter(pool, chapterId, tid) {
+      const r = await pool.query(
+        `SELECT 1 FROM "Chapter" ch JOIN "Course" c ON c.id = ch."courseId"
+          WHERE ch.id=$1 AND c."userId"=$2 LIMIT 1`,
+        [chapterId, tid]
+      );
+      return r.rows.length > 0;
+    }
+    async function ownsLesson(pool, lessonId, tid) {
+      const r = await pool.query(
+        `SELECT 1 FROM "Lesson" l
+           JOIN "Chapter" ch ON ch.id = l."chapterId"
+           JOIN "Course"  c  ON c.id  = ch."courseId"
+          WHERE l.id=$1 AND c."userId"=$2 LIMIT 1`,
+        [lessonId, tid]
+      );
+      return r.rows.length > 0;
+    }
+
+    // ── GET /api/instructor/courses/:courseId/chapters ── full curriculum
+    app.get('/api/instructor/courses/:courseId/chapters', async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.json([]);
+        await ensureCurriculumTables();
+        if (!(await ownsCourse(pool, req.params.courseId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        }
+        const { rows: chapters } = await pool.query(
+          `SELECT id, title, description, duration, position, "isPublished", "isFree", "createdAt", "updatedAt"
+             FROM "Chapter" WHERE "courseId"=$1 ORDER BY position ASC, "createdAt" ASC`,
+          [req.params.courseId]
+        );
+        if (chapters.length === 0) return res.json([]);
+        const chapterIds = chapters.map(c => c.id);
+        const { rows: lessons } = await pool.query(
+          `SELECT id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt"
+             FROM "Lesson" WHERE "chapterId" = ANY($1)
+            ORDER BY position ASC, "createdAt" ASC`,
+          [chapterIds]
+        );
+        const byChapter = lessons.reduce((acc, l) => {
+          (acc[l.chapterId] ??= []).push(l);
+          return acc;
+        }, {});
+        const out = chapters.map(ch => ({ ...ch, lessons: byChapter[ch.id] || [] }));
+        return res.json(out);
+      } catch (err) {
+        console.error('[curriculum:list]', err.message);
+        return res.json([]);
+      }
+    });
+
+    // ── POST /api/instructor/courses/:courseId/chapters ── tạo chapter
+    app.post('/api/instructor/courses/:courseId/chapters', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsCourse(pool, req.params.courseId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        }
+        const b = req.body || {};
+        const title = String(b.title || '').trim();
+        if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề chương' });
+        const description = b.description ? String(b.description).slice(0, 2000) : null;
+        // Compute next position
+        const posR = await pool.query(
+          `SELECT COALESCE(MAX(position), 0) + 1 AS next FROM "Chapter" WHERE "courseId"=$1`,
+          [req.params.courseId]
+        );
+        const position = Number(b.position) || posR.rows[0].next;
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        await pool.query(
+          `INSERT INTO "Chapter" (id, "courseId", title, description, position, "isPublished")
+           VALUES ($1, $2, $3, $4, $5, true)`,
+          [id, req.params.courseId, title.slice(0, 300), description, position]
+        );
+        const { rows } = await pool.query(
+          `SELECT id, title, description, duration, position, "isPublished", "isFree", "createdAt", "updatedAt"
+             FROM "Chapter" WHERE id=$1`, [id]
+        );
+        return res.status(201).json({ ...rows[0], lessons: [] });
+      } catch (err) {
+        console.error('[curriculum:create-chapter]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── PATCH /api/instructor/courses/:courseId/chapters/:chapterId ──
+    app.patch('/api/instructor/courses/:courseId/chapters/:chapterId', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsChapter(pool, req.params.chapterId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy chương' });
+        }
+        const b = req.body || {};
+        const sets = []; const vals = []; let i = 1;
+        if (b.title !== undefined) { sets.push(`title=$${i++}`); vals.push(String(b.title).slice(0, 300)); }
+        if (b.description !== undefined) { sets.push(`description=$${i++}`); vals.push(b.description ? String(b.description).slice(0, 2000) : null); }
+        if (b.position !== undefined) { sets.push(`position=$${i++}`); vals.push(Number(b.position) || 1); }
+        if (b.isPublished !== undefined) { sets.push(`"isPublished"=$${i++}`); vals.push(!!b.isPublished); }
+        if (b.isFree !== undefined) { sets.push(`"isFree"=$${i++}`); vals.push(!!b.isFree); }
+        if (!sets.length) return res.status(400).json({ error: 'Không có trường nào để cập nhật' });
+        sets.push(`"updatedAt"=NOW()`);
+        vals.push(req.params.chapterId);
+        await pool.query(`UPDATE "Chapter" SET ${sets.join(', ')} WHERE id=$${i}`, vals);
+        const { rows } = await pool.query(
+          `SELECT id, title, description, duration, position, "isPublished", "isFree", "createdAt", "updatedAt"
+             FROM "Chapter" WHERE id=$1`, [req.params.chapterId]
+        );
+        return res.json(rows[0]);
+      } catch (err) {
+        console.error('[curriculum:update-chapter]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── DELETE /api/instructor/courses/:courseId/chapters/:chapterId ──
+    // CASCADE xoá tất cả Lessons trong chương (FK ON DELETE CASCADE)
+    app.delete('/api/instructor/courses/:courseId/chapters/:chapterId', async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsChapter(pool, req.params.chapterId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy chương' });
+        }
+        // Defensive: xoá Lesson trước rồi xoá Chapter (phòng FK chưa có)
+        await pool.query(`DELETE FROM "Lesson"  WHERE "chapterId"=$1`, [req.params.chapterId]);
+        await pool.query(`DELETE FROM "Chapter" WHERE id=$1`, [req.params.chapterId]);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[curriculum:delete-chapter]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons ──
+    app.post('/api/instructor/courses/:courseId/chapters/:chapterId/lessons', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsChapter(pool, req.params.chapterId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy chương' });
+        }
+        const b = req.body || {};
+        const title = String(b.title || '').trim();
+        if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề bài học' });
+        const description = b.description ? String(b.description).slice(0, 2000) : null;
+        const duration = b.duration ? Math.max(0, Math.min(9999, Number(b.duration))) : null;
+        const allowedTypes = ['video', 'reading', 'quiz', 'assignment'];
+        const type = allowedTypes.includes(String(b.type)) ? String(b.type) : 'video';
+        // Compute next position within chapter
+        const posR = await pool.query(
+          `SELECT COALESCE(MAX(position), 0) + 1 AS next FROM "Lesson" WHERE "chapterId"=$1`,
+          [req.params.chapterId]
+        );
+        const position = Number(b.position) || posR.rows[0].next;
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        await pool.query(
+          `INSERT INTO "Lesson" (id, "chapterId", title, description, duration, type, position)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [id, req.params.chapterId, title.slice(0, 300), description, duration, type, position]
+        );
+        const { rows } = await pool.query(
+          `SELECT id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt"
+             FROM "Lesson" WHERE id=$1`, [id]
+        );
+        return res.status(201).json(rows[0]);
+      } catch (err) {
+        console.error('[curriculum:create-lesson]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── PATCH /api/instructor/lessons/:lessonId ──
+    app.patch('/api/instructor/lessons/:lessonId', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsLesson(pool, req.params.lessonId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy bài học' });
+        }
+        const b = req.body || {};
+        const sets = []; const vals = []; let i = 1;
+        if (b.title !== undefined) { sets.push(`title=$${i++}`); vals.push(String(b.title).slice(0, 300)); }
+        if (b.description !== undefined) { sets.push(`description=$${i++}`); vals.push(b.description ? String(b.description).slice(0, 2000) : null); }
+        if (b.duration !== undefined) { sets.push(`duration=$${i++}`); vals.push(b.duration ? Math.max(0, Math.min(9999, Number(b.duration))) : null); }
+        if (b.type !== undefined) {
+          const allowed = ['video', 'reading', 'quiz', 'assignment'];
+          sets.push(`type=$${i++}`);
+          vals.push(allowed.includes(String(b.type)) ? String(b.type) : 'video');
+        }
+        if (b.position !== undefined) { sets.push(`position=$${i++}`); vals.push(Number(b.position) || 1); }
+        if (!sets.length) return res.status(400).json({ error: 'Không có trường nào để cập nhật' });
+        sets.push(`"updatedAt"=NOW()`);
+        vals.push(req.params.lessonId);
+        await pool.query(`UPDATE "Lesson" SET ${sets.join(', ')} WHERE id=$${i}`, vals);
+        const { rows } = await pool.query(
+          `SELECT id, "chapterId", title, description, duration, type, position, "createdAt", "updatedAt"
+             FROM "Lesson" WHERE id=$1`, [req.params.lessonId]
+        );
+        return res.json(rows[0]);
+      } catch (err) {
+        console.error('[curriculum:update-lesson]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── DELETE /api/instructor/lessons/:lessonId ──
+    app.delete('/api/instructor/lessons/:lessonId', async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsLesson(pool, req.params.lessonId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy bài học' });
+        }
+        await pool.query(`DELETE FROM "Lesson" WHERE id=$1`, [req.params.lessonId]);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[curriculum:delete-lesson]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/instructor/courses/:courseId/chapters/reorder ──
+    // Body: { chapterIds: ['id1', 'id2', ...] } — new order
+    app.post('/api/instructor/courses/:courseId/chapters/reorder', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsCourse(pool, req.params.courseId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+        }
+        const ids = Array.isArray(req.body?.chapterIds) ? req.body.chapterIds.filter(Boolean) : [];
+        if (!ids.length) return res.status(400).json({ error: 'Thiếu chapterIds' });
+        // Validate all chapters belong to course
+        const { rows: own } = await pool.query(
+          `SELECT id FROM "Chapter" WHERE "courseId"=$1 AND id = ANY($2)`,
+          [req.params.courseId, ids]
+        );
+        if (own.length !== ids.length) {
+          return res.status(400).json({ error: 'Một số chương không thuộc khoá học này' });
+        }
+        // Update positions in a single transaction
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          for (let i = 0; i < ids.length; i++) {
+            await client.query(`UPDATE "Chapter" SET position=$1, "updatedAt"=NOW() WHERE id=$2`, [i + 1, ids[i]]);
+          }
+          await client.query('COMMIT');
+        } catch (e) {
+          await client.query('ROLLBACK');
+          throw e;
+        } finally { client.release(); }
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[curriculum:reorder-chapters]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder ──
+    // Body: { lessonIds: ['id1', 'id2', ...] }
+    app.post('/api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder', express.json({ limit: '8kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsChapter(pool, req.params.chapterId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy chương' });
+        }
+        const ids = Array.isArray(req.body?.lessonIds) ? req.body.lessonIds.filter(Boolean) : [];
+        if (!ids.length) return res.status(400).json({ error: 'Thiếu lessonIds' });
+        const { rows: own } = await pool.query(
+          `SELECT id FROM "Lesson" WHERE "chapterId"=$1 AND id = ANY($2)`,
+          [req.params.chapterId, ids]
+        );
+        if (own.length !== ids.length) {
+          return res.status(400).json({ error: 'Một số bài học không thuộc chương này' });
+        }
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          for (let i = 0; i < ids.length; i++) {
+            await client.query(`UPDATE "Lesson" SET position=$1, "updatedAt"=NOW() WHERE id=$2`, [i + 1, ids[i]]);
+          }
+          await client.query('COMMIT');
+        } catch (e) {
+          await client.query('ROLLBACK');
+          throw e;
+        } finally { client.release(); }
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[curriculum:reorder-lessons]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
+
   // ── Upload image endpoint (avatar / course thumbnail) ─────
   // POST /api/upload/image — DEPRECATED stub (FE đã chuyển sang client-side
   // compress + data URL). Giữ stub để không vỡ extension cũ nào còn gọi.
