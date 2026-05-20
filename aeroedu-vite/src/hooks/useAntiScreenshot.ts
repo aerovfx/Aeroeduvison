@@ -1,26 +1,31 @@
 /**
- * useAntiScreenshot v4 (2026-05-21) — Chặn screenshot mạnh hơn
+ * useAntiScreenshot v5 (2026-05-21) — Proactive modifier-key blur
  *
- * VẤN ĐỀ: macOS bắt Cmd+Shift+3/4/5 ở OS layer TRƯỚC khi đến browser.
- * Browser KHÔNG thể preventDefault — keystroke không bao giờ tới JS.
- * → Phải dùng cơ chế gián tiếp: detect focus loss + blur ngay tức thì.
+ * ROOT CAUSE v4 không hoạt động: macOS Cmd+Shift+4 KHÔNG fire blur event
+ * vì picker overlay crosshair, browser vẫn giữ focus đúng nghĩa OS-level.
+ * User chụp được ảnh rõ nét dù v4 đã có focus-loss listener.
  *
- * STRATEGY v4 (multi-layer defense):
- *   1. ⚡ INSTANT BLUR ON FOCUS LOSS — khi window mất focus (xảy ra
- *      0.1-0.3s sau khi Cmd+Shift+4 picker xuất hiện), ngay lập tức
- *      blur(40px) toàn bộ #root. Ảnh chụp sẽ thấy màn hình MỜ TỊT.
- *   2. 🏷 PROMINENT WATERMARK — overlay user email + IP rõ ràng ở
- *      4 góc + center diagonal lưới đậm. Mọi ảnh rò rỉ có ID user.
- *   3. ⌨️ KEYBOARD CAPTURE — vẫn try chặn cho Windows/Linux + cảnh báo
- *      qua toast. Mac không catch được nhưng cũng không hại.
- *   4. 📹 SCREEN RECORDING DETECTION — monitor getDisplayMedia API,
- *      nếu user start screen recording → toast + audit log.
- *   5. 🔍 DEVTOOLS DETECTION đã bỏ (false positive khi resize).
+ * STRATEGY v5 — KEY MODIFIER DETECTION:
+ *   1. ⚡ PROACTIVE BLUR — listen keydown cho metaKey/ctrlKey + shiftKey
+ *      → blur(40px) NGAY khi user vừa NHẤN Cmd+Shift (chưa nhả + chưa
+ *      nhấn số 3/4/5). Khi nhấn số → screenshot tool activate → màn hình
+ *      đã blur sẵn ≥50ms trước → ảnh capture được là MÀN HÌNH MỜ.
+ *   2. ⌨️ KEYUP CLEAR — khi user nhả Cmd HOẶC Shift → clear blur 300ms
+ *      → UI quay lại bình thường.
+ *   3. 👆 POINTER LEAVE — cursor di chuyển ra ngoài viewport (lên menu bar
+ *      macOS hoặc app khác) → blur 600ms (auto-clear).
+ *   4. 🪟 FOCUS LOSS — vẫn giữ cho Windows Snipping Tool + switch tab.
+ *   5. 🏷 PROMINENT WATERMARK + 4 CORNER BADGES — vẫn giữ từ v4.
+ *   6. 📹 SCREEN RECORDING DETECTION via getDisplayMedia.
  *
- * Trade-off: blur ngắn (300ms) khi user chuyển tab có thể gây flash,
- * nhưng đảm bảo screenshot tool không capture được nội dung rõ nét.
+ * Trade-off: Cmd+Shift+Z (redo), Cmd+Shift+T (reopen tab), Cmd+Shift+]
+ * (next tab) sẽ blur 800ms. Tolerable vì shortcuts này hiếm dùng trên
+ * trang admin, và blur tự tan nhanh.
  *
- * Toast warning: hiển thị nhẹ ở góc dưới — không ngăn cản UX.
+ * GIỚI HẠN browser KHÔNG thể vượt qua:
+ * - iPhone screenshot (volume + power)
+ * - Camera ngoài chụp màn hình vật lý
+ * - macOS Cmd+Shift+5 với screen recording — picker bám chặt
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 
@@ -62,22 +67,45 @@ export function useAntiScreenshot() {
     } catch { /* ignore */ }
   }, [])
 
-  // ─── Instant blur on focus loss (catches macOS screenshot picker) ──
-  // Khi user nhấn Cmd+Shift+4, macOS hiển thị crosshair picker. Window
-  // browser mất focus trong khoảnh khắc đó. Ta blur(40px) ngay → ảnh
-  // chụp được sẽ là màn hình mờ tịt. Khi user click chọn vùng / thoát
-  // → focus quay lại → blur tan dần.
+  // ─── v5: PROACTIVE BLUR ON MODIFIER KEY ──────────────────────
+  // INSIGHT mới: macOS Cmd+Shift+4 KHÔNG fire window.blur event vì picker
+  // chỉ overlay crosshair, không thực sự switch app.
+  // → Phải detect Cmd+Shift COMBO ngay khi user vừa NHẤN (chưa nhả).
+  //   Sau đó nếu user nhấn 3/4/5/6 → screenshot tool activate → màn hình
+  //   ĐÃ BLUR sẵn ≥ 50ms TRƯỚC khi picker capture.
+  //
+  // False positive: Cmd+Shift+Z (redo), Cmd+Shift+T (reopen tab),
+  // Cmd+Shift+] (next tab), v.v. → blur 800ms rồi tự tan.
+  // Trade-off: hơi flash khi dùng shortcut hợp lệ, nhưng đảm bảo screenshot
+  // luôn capture được màn hình mờ.
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Modifier key kết hợp + Shift → CÓ THỂ sắp nhấn screenshot key
+      // metaKey = Cmd (Mac) / Win key (Windows)
+      // ctrlKey = Ctrl (Windows/Linux)
+      const hasDangerousMod = (e.metaKey || e.ctrlKey) && e.shiftKey
+      if (hasDangerousMod) {
+        setBlurActive(true)
+        if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+        // Auto-clear sau 800ms nếu user không nhả Cmd/Shift
+        blurTimerRef.current = setTimeout(() => setBlurActive(false), 800)
+      }
+    }
+    const handleKeyUp = (e: KeyboardEvent) => {
+      // Khi user nhả Cmd HOẶC Shift → no longer dangerous → clear blur
+      // sau 300ms (đủ thời gian cho screenshot tool đã tắt)
+      const stillDangerous = (e.metaKey || e.ctrlKey) && e.shiftKey
+      if (!stillDangerous) {
+        if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+        blurTimerRef.current = setTimeout(() => setBlurActive(false), 300)
+      }
+    }
+    // Backup: window blur cũng trigger (cho switch tab + Snipping Tool Win)
     const handleFocusLoss = () => {
-      // Blur ngay tức thì — kể cả nếu false positive (user chuyển tab thường)
-      // vẫn OK vì user không nhìn page lúc đó. Khi focus quay lại → blur tan.
       setBlurActive(true)
       if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
-      // Khi window blur kéo dài >2s → có khả năng đang screen recording
-      // → blur kéo dài thêm (không tự clear). Khi focus quay lại sẽ clear.
     }
     const handleFocusGain = () => {
-      // Delay nhẹ 300ms để chắc chắn screenshot tool đã tắt
       if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
       blurTimerRef.current = setTimeout(() => setBlurActive(false), 300)
     }
@@ -85,14 +113,37 @@ export function useAntiScreenshot() {
       if (document.hidden) handleFocusLoss()
       else handleFocusGain()
     }
+    // POINTER LEAVE: khi cursor rời browser viewport (di chuyển sang menu bar
+    // macOS hoặc app khác) → có thể chuẩn bị screenshot
+    const handlePointerLeave = (e: PointerEvent) => {
+      // Chỉ trigger nếu cursor thực sự ra ngoài viewport
+      if (e.clientY <= 0 || e.clientX <= 0 ||
+          e.clientX >= window.innerWidth || e.clientY >= window.innerHeight) {
+        setBlurActive(true)
+        if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+        blurTimerRef.current = setTimeout(() => setBlurActive(false), 600)
+      }
+    }
+    const handlePointerEnter = () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
+      blurTimerRef.current = setTimeout(() => setBlurActive(false), 150)
+    }
 
+    window.addEventListener('keydown', handleKeyDown, { capture: true })
+    window.addEventListener('keyup', handleKeyUp, { capture: true })
     window.addEventListener('blur', handleFocusLoss)
     window.addEventListener('focus', handleFocusGain)
     document.addEventListener('visibilitychange', handleVisibility)
+    document.addEventListener('pointerleave', handlePointerLeave)
+    document.addEventListener('pointerenter', handlePointerEnter)
     return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true })
+      window.removeEventListener('keyup', handleKeyUp, { capture: true })
       window.removeEventListener('blur', handleFocusLoss)
       window.removeEventListener('focus', handleFocusGain)
       document.removeEventListener('visibilitychange', handleVisibility)
+      document.removeEventListener('pointerleave', handlePointerLeave)
+      document.removeEventListener('pointerenter', handlePointerEnter)
     }
   }, [])
 
