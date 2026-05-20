@@ -12,7 +12,7 @@ import {
   BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
   Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
   ExternalLink, Target, Wrench, MessageCircle, PlayCircle,
-  ChevronDown, ChevronUp, Loader2, Link2,
+  ChevronDown, ChevronUp, Loader2, Link2, RotateCcw,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -1361,6 +1361,19 @@ export default function ProfessionalKG() {
           >
             <span>{isAdmin ? 'CPD Quản lý' : 'CPD GV gốc'}</span>
           </button>
+
+          {/* Spacer to push retake button right */}
+          <div className="flex-1 min-w-2" />
+
+          {/* Retake survey button — cho phép user chọn lại nghề/cập nhật rating */}
+          <a
+            href="/profile/career-survey?retake=1"
+            className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition bg-amber-500/15 border border-amber-500/30 text-amber-300 hover:bg-amber-500/25"
+            title="Làm lại khảo sát — chọn lại nghề, cập nhật rating skill"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Làm lại khảo sát</span>
+          </a>
         </div>
       )}
 

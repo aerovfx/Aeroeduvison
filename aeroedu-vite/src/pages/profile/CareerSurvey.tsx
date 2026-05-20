@@ -195,6 +195,10 @@ export default function CareerSurvey() {
     motivation: '',
     weeklyTimeCommitment: '',
   }))
+  // Retake mode: user đã hoàn thành 1 lần và muốn làm lại (chọn nghề khác,
+  // cập nhật rating, đổi mục tiêu...). Khác onboarding vì có pre-fill data cũ.
+  const isRetake = searchParams.get('retake') === '1'
+  const [retakeLoaded, setRetakeLoaded] = useState(false)
 
   // Restore draft on mount
   useEffect(() => {
@@ -230,19 +234,36 @@ export default function CareerSurvey() {
     try { localStorage.setItem(DRAFT_KEY, JSON.stringify(data)) } catch { /* ignore */ }
   }, [data])
 
-  // Already completed → redirect (avoid trapping user who already finished)
+  // Already completed → load existing data (retake mode) HOẶC redirect (default).
+  // - ?retake=1   → pre-fill data cũ, cho user sửa rồi submit lại
+  // - ?onboarding → cho qua dù chưa hoàn thành (luồng từ Register)
+  // - mặc định    → đã hoàn thành rồi sẽ redirect khỏi survey
   useEffect(() => {
     if (!user) return
-    api.get<{ completed: boolean }>('/users/me/career-survey')
+    api.get<{ completed: boolean; data?: SurveyData }>('/users/me/career-survey')
       .then(r => {
-        if (r.data?.completed && !searchParams.get('onboarding')) {
+        const completed = r.data?.completed
+        if (completed && isRetake && r.data?.data) {
+          // Retake: pre-fill toàn bộ data cũ vào form
+          const old = r.data.data
+          setData({
+            accountType: surveyAccountType,
+            profession: old.profession || {},
+            currentSkills: old.currentSkills || {},
+            developmentGoals: old.developmentGoals || [],
+            motivation: old.motivation || '',
+            weeklyTimeCommitment: old.weeklyTimeCommitment || '',
+          })
+          setRetakeLoaded(true)
+          toast.success('Đã tải lại khảo sát trước đó — bạn có thể chỉnh sửa.')
+        } else if (completed && !searchParams.get('onboarding') && !isRetake) {
           const returnUrl = searchParams.get('return') || (accountType === 'ADMIN' ? '/admin/knowledge-graph' : '/teacher/knowledge-graph')
           navigate(returnUrl, { replace: true })
         }
       })
       .catch(() => { /* ignore */ })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+  }, [user?.id, isRetake])
 
   // ── Validation ───────────────────────────────────────────────
   const canProceed = useMemo(() => {
@@ -278,7 +299,10 @@ export default function CareerSurvey() {
       setTimeout(() => confetti({ particleCount: 100, spread: 120, origin: { y: 0.4 } }), 250)
       // Clear draft
       try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
-      toast.success('Cảm ơn bạn! Bắt đầu xây dựng skill ngay nhé')
+      toast.success(isRetake
+        ? 'Đã cập nhật khảo sát! KG sẽ làm mới theo lựa chọn mới.'
+        : 'Cảm ơn bạn! Bắt đầu xây dựng skill ngay nhé'
+      )
       // Redirect after short delay
       setTimeout(() => {
         const returnUrl = searchParams.get('return')
@@ -301,17 +325,43 @@ export default function CareerSurvey() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-500/30 text-xs text-purple-300 mb-3">
+          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs mb-3 border ${
+            isRetake
+              ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+              : 'bg-purple-500/15 border-purple-500/30 text-purple-300'
+          }`}>
             <Sparkles className="w-3.5 h-3.5" />
-            Khảo sát đầu vào
+            {isRetake ? 'Đang chỉnh sửa khảo sát' : 'Khảo sát đầu vào'}
           </div>
           <h1 className="text-2xl md:text-3xl font-bold mb-2">
-            Khảo sát nghề nghiệp {isParent ? 'phụ huynh' : surveyAccountType === 'ADMIN' ? 'quản trị' : 'giáo viên'}
+            {isRetake ? 'Làm lại khảo sát nghề nghiệp' : `Khảo sát nghề nghiệp ${isParent ? 'phụ huynh' : surveyAccountType === 'ADMIN' ? 'quản trị' : 'giáo viên'}`}
           </h1>
           <p className="text-sm text-muted-foreground max-w-xl mx-auto">
-            Trả lời nhanh 4 bước (~3 phút) để AeroEduVision cá nhân hoá lộ trình phát triển skill phù hợp với bạn.
+            {isRetake
+              ? 'Bạn đã hoàn thành khảo sát trước đây — giờ có thể chọn lại nghề / cập nhật rating / đổi mục tiêu. KG sẽ tự cập nhật theo dữ liệu mới.'
+              : 'Trả lời nhanh 4 bước (~3 phút) để AeroEduVision cá nhân hoá lộ trình phát triển skill phù hợp với bạn.'
+            }
           </p>
         </div>
+
+        {/* Retake banner */}
+        {isRetake && retakeLoaded && (
+          <div className="mb-6 rounded-xl bg-amber-500/[0.06] border border-amber-500/20 px-4 py-3 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-300" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-200 mb-0.5">
+                Đã tải dữ liệu khảo sát trước đó
+              </p>
+              <p className="text-xs text-amber-300/70 leading-relaxed">
+                Mọi câu trả lời đã được điền sẵn. Bạn có thể chỉnh sửa từng phần
+                (chọn lại nghề, đổi rating, cập nhật mục tiêu) rồi bấm "Lưu lại"
+                ở bước cuối — các thay đổi sẽ ghi đè khảo sát cũ.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="mb-8">
@@ -412,7 +462,11 @@ export default function CareerSurvey() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-sm font-semibold disabled:opacity-60 shadow-lg shadow-purple-500/30"
             >
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-              {submitting ? 'Đang lưu...' : 'Hoàn thành khảo sát & Bắt đầu xây dựng skill'}
+              {submitting
+                ? 'Đang lưu...'
+                : isRetake
+                  ? 'Lưu lại khảo sát (ghi đè cũ)'
+                  : 'Hoàn thành khảo sát & Bắt đầu xây dựng skill'}
             </button>
           )}
         </div>

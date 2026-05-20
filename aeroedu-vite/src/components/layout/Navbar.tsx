@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX, Menu, Palette, Eye } from 'lucide-react'
+import { Brain, Search, ArrowRight, LogOut, Settings, User, Bell, CheckCheck, FileText, UserPlus, UserCheck, UserX, Menu, Palette, Eye, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
@@ -217,6 +217,18 @@ export function Navbar({ onMenuClick }: { onMenuClick?: () => void } = {}) {
                       <Palette className="w-4 h-4" />
                       Tùy chỉnh trang cá nhân
                     </Link>
+                    {/* Làm lại khảo sát — chỉ hiển thị cho TEACHER/PARENT/ADMIN
+                        (STUDENT không cần khảo sát nghề) */}
+                    {user?.role !== 'STUDENT' && (
+                      <Link
+                        to="/profile/career-survey?retake=1"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-foreground hover:bg-accent transition"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Làm lại khảo sát nghề
+                      </Link>
+                    )}
                     <Link
                       to="/dashboard/settings"
                       onClick={() => setUserMenuOpen(false)}
