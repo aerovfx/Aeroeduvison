@@ -19,11 +19,186 @@
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Loader2, Save, Plus, X, GraduationCap, BookOpen, Download } from 'lucide-react'
+import { Loader2, Save, Plus, X, GraduationCap, BookOpen, Download, Upload, CheckCircle2, AlertCircle, FileJson } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
 import { useAuth } from '@/hooks/useAuth'
 import * as XLSX from 'xlsx'
+
+// ── Import điểm — helpers ─────────────────────────────────────────────────
+
+/** Chuẩn hoá tên HS để so sánh fuzzy: bỏ dấu + lower + trim spaces */
+function normalizeName(s: string): string {
+  return (s || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .toLowerCase().trim().replace(/\s+/g, ' ')
+}
+
+/** Parse 1 cell thành điểm 0-10, trả null nếu trống/sai */
+function parseScore(val: unknown): number | null {
+  if (val == null || val === '' || val === '-' || val === '—') return null
+  const n = Number(String(val).replace(',', '.').trim())
+  if (!Number.isFinite(n) || n < 0 || n > 10) return null
+  return Math.round(n * 10) / 10   // 1 decimal place
+}
+
+export interface ImportedRow {
+  studentId: string | null     // ID học sinh match được
+  rawName: string              // tên từ file
+  rawMssv?: string             // mssv từ file (nếu có)
+  grade: {
+    ddgtx: (number | null)[]
+    ddggk: number | null
+    ddgck: number | null
+    noteProgress: string
+    noteRecord: string
+  }
+  matched: boolean
+}
+
+/**
+ * Parse worksheet Excel → ImportedRow[].
+ * Tự detect row header bằng cách tìm row chứa keyword "họ" (tên HS).
+ * Hỗ trợ tên cột: ĐĐGtx1..5, TX1..5, GK, ĐĐGgk, CK, ĐĐGck, ...
+ */
+function parseExcelToRows(buf: ArrayBuffer, students: ClassStudent[]): ImportedRow[] {
+  const wb = XLSX.read(buf, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const aoa: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+  // Tìm row header (chứa "họ" hoặc "tên")
+  let headerRow = -1
+  for (let i = 0; i < Math.min(aoa.length, 10); i++) {
+    const row = aoa[i]
+    if (row.some(c => /họ|tên|name/i.test(String(c)))) {
+      headerRow = i; break
+    }
+  }
+  if (headerRow < 0) return []
+
+  const headers = aoa[headerRow].map(c => String(c).trim().toLowerCase())
+
+  // Map cột theo tên
+  const colIdx = (patterns: RegExp[]): number =>
+    headers.findIndex(h => patterns.some(p => p.test(h)))
+
+  const nameCol  = colIdx([/họ v?à? ?tên|họ tên|name/i])
+  const mssvCol  = colIdx([/mã định danh|mssv|student.?id|ms/i])
+  const gkCol    = colIdx([/ĐĐGgk|gk|giữa kỳ|đgk|midterm/i])
+  const ckCol    = colIdx([/ĐĐGck|ck|cuối kỳ|đck|final/i])
+  const npCol    = colIdx([/tiến bộ|nhận xét.*tiến|progress/i])
+  const nrCol    = colIdx([/học bạ|nhận xét.*học bạ|record/i])
+  const txCols   = Array.from({ length: 5 }, (_, i) => {
+    // "ĐĐGtx1" | "TX1" | "Tx 1" | "1" (khi header đã có "ĐĐGtx" ở merged parent)
+    const idx = colIdx([
+      new RegExp(`(?:ĐĐGtx|TX|tx)\\s*0*${i + 1}(?:\\D|$)`, 'i'),
+    ])
+    // Nếu không tìm thấy, thử tìm số thứ tự bare (cột "1" "2" "3")
+    if (idx < 0) {
+      const bare = headers.findIndex(h => h.trim() === String(i + 1))
+      return bare
+    }
+    return idx
+  })
+
+  // Normalise students map: name → id, mssv → id
+  const byName = new Map<string, string>()
+  const byMssv = new Map<string, string>()
+  for (const s of students) {
+    byName.set(normalizeName(s.name), s.id)
+    if (s.mssv) byMssv.set(s.mssv.trim(), s.id)
+  }
+
+  const rows: ImportedRow[] = []
+  for (let i = headerRow + 1; i < aoa.length; i++) {
+    const row = aoa[i]
+    if (!row.some(c => c !== '' && c != null)) continue  // skip empty rows
+    const rawName = nameCol >= 0 ? String(row[nameCol] ?? '').trim() : ''
+    const rawMssv = mssvCol >= 0 ? String(row[mssvCol] ?? '').trim() : ''
+    if (!rawName) continue
+
+    // Match student
+    let studentId: string | null = null
+    if (rawMssv && byMssv.has(rawMssv)) studentId = byMssv.get(rawMssv)!
+    if (!studentId) studentId = byName.get(normalizeName(rawName)) ?? null
+
+    rows.push({
+      studentId,
+      rawName,
+      rawMssv: rawMssv || undefined,
+      grade: {
+        ddgtx: txCols.map(c => (c >= 0 ? parseScore(row[c]) : null)),
+        ddggk: gkCol >= 0 ? parseScore(row[gkCol]) : null,
+        ddgck: ckCol >= 0 ? parseScore(row[ckCol]) : null,
+        noteProgress: npCol >= 0 ? String(row[npCol] ?? '').trim() : '',
+        noteRecord:   nrCol >= 0 ? String(row[nrCol] ?? '').trim() : '',
+      },
+      matched: !!studentId,
+    })
+  }
+  return rows
+}
+
+/**
+ * Parse JSON → ImportedRow[].
+ * Hỗ trợ 3 format:
+ *  1. Array gốc: [{name, ddgtx, ddggk, ddgck, ...}]
+ *  2. Object: {students:[...]}
+ *  3. Simple: [{hoTen | name, TX1..TX5, GK, CK, ...}]
+ */
+function parseJsonToRows(text: string, students: ClassStudent[]): ImportedRow[] {
+  let raw: unknown
+  try { raw = JSON.parse(text) } catch { return [] }
+
+  const arr: unknown[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray((raw as {students?: unknown}).students)
+      ? (raw as {students: unknown[]}).students
+      : []
+
+  const byName = new Map<string, string>()
+  const byMssv = new Map<string, string>()
+  for (const s of students) {
+    byName.set(normalizeName(s.name), s.id)
+    if (s.mssv) byMssv.set(s.mssv.trim(), s.id)
+  }
+
+  return arr.map(item => {
+    const o = item as Record<string, unknown>
+    const rawName = String(o.name ?? o.hoTen ?? o.họTên ?? o['Họ tên'] ?? o['Họ và tên'] ?? '').trim()
+    const rawMssv = String(o.mssv ?? o.maDinhDanh ?? o['Mã định danh'] ?? '').trim()
+
+    let studentId: string | null = null
+    if (rawMssv && byMssv.has(rawMssv)) studentId = byMssv.get(rawMssv)!
+    if (!studentId) studentId = byName.get(normalizeName(rawName)) ?? null
+
+    // ddgtx từ array hoặc các key TX1..TX5
+    let ddgtx: (number | null)[]
+    if (Array.isArray(o.ddgtx)) {
+      ddgtx = (o.ddgtx as unknown[]).slice(0, 5).map(parseScore)
+      while (ddgtx.length < 5) ddgtx.push(null)
+    } else {
+      ddgtx = Array.from({ length: 5 }, (_, i) =>
+        parseScore(o[`TX${i+1}`] ?? o[`ĐĐGtx${i+1}`] ?? o[`tx${i+1}`] ?? null)
+      )
+    }
+
+    return {
+      studentId,
+      rawName,
+      rawMssv: rawMssv || undefined,
+      grade: {
+        ddgtx,
+        ddggk: parseScore(o.ddggk ?? o.GK ?? o.gk ?? o['Giữa kỳ'] ?? null),
+        ddgck: parseScore(o.ddgck ?? o.CK ?? o.ck ?? o['Cuối kỳ'] ?? null),
+        noteProgress: String(o.noteProgress ?? o['Nhận xét tiến bộ'] ?? o.nhanXetTienBo ?? '').trim(),
+        noteRecord:   String(o.noteRecord   ?? o['Nhận xét học bạ'] ?? o.nhanXetHocBa ?? '').trim(),
+      },
+      matched: !!studentId,
+    }
+  }).filter(r => r.rawName)
+}
 
 interface ClassInfo {
   id: string
@@ -90,6 +265,7 @@ export default function GradeBook() {
   const [dirty, setDirty]     = useState(false)
   const [addSubjOpen, setAddSubjOpen] = useState(false)
   const [newSubject, setNewSubject] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -432,6 +608,14 @@ export default function GradeBook() {
               <span className="text-green-600 text-xs">✓ Đã lưu</span>
             )}
             <button
+              onClick={() => setImportOpen(true)}
+              disabled={!classId || !subject || students.length === 0}
+              title="Import điểm từ file Excel (.xlsx) hoặc JSON"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Upload className="w-3.5 h-3.5" />Import điểm
+            </button>
+            <button
               onClick={handleExportGradebook}
               disabled={!subject || students.length === 0}
               title="Xuất sổ điểm Excel — file export sẽ kèm cột Mã định danh BộGD&ĐT"
@@ -606,6 +790,40 @@ export default function GradeBook() {
         </div>
       )}
 
+      {/* ── Import điểm modal ── */}
+      {importOpen && (
+        <GradeImportModal
+          students={students}
+          currentSubject={subject}
+          currentSemester={semester}
+          onClose={() => setImportOpen(false)}
+          onApply={(rows) => {
+            setGrades(prev => {
+              const next = { ...prev }
+              for (const r of rows) {
+                if (!r.matched || !r.studentId) continue
+                const existing = next[r.studentId] || emptyGrade()
+                // Merge: chỉ ghi đè field nào có giá trị trong file
+                const mergedTx = [...existing.ddgtx]
+                r.grade.ddgtx.forEach((v, i) => { if (v != null) mergedTx[i] = v })
+                next[r.studentId] = {
+                  ddgtx: mergedTx,
+                  ddggk: r.grade.ddggk ?? existing.ddggk,
+                  ddgck: r.grade.ddgck ?? existing.ddgck,
+                  noteProgress: r.grade.noteProgress || existing.noteProgress,
+                  noteRecord:   r.grade.noteRecord   || existing.noteRecord,
+                }
+              }
+              return next
+            })
+            scheduleAutoSave()
+            setImportOpen(false)
+            const matched = rows.filter(r => r.matched).length
+            toast.success(`Đã import điểm cho ${matched}/${rows.length} học sinh`)
+          }}
+        />
+      )}
+
       {/* ── Add subject modal ── */}
       {addSubjOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -703,5 +921,296 @@ function ScoreCell({ value, onChange, onKeyDown, 'data-cell': dataCell, highligh
         focus:outline-none focus:bg-blue-100 focus:ring-2 focus:ring-blue-400 focus:ring-inset focus:text-slate-900 focus:font-bold
         transition-colors`}
     />
+  )
+}
+
+// ── GradeImportModal ──────────────────────────────────────────────────────
+
+function GradeImportModal({
+  students,
+  currentSubject,
+  currentSemester,
+  onClose,
+  onApply,
+}: {
+  students: ClassStudent[]
+  currentSubject: string
+  currentSemester: string
+  onClose: () => void
+  onApply: (rows: ImportedRow[]) => void
+}) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [rows, setRows] = useState<ImportedRow[] | null>(null)
+  const [parsing, setParsing] = useState(false)
+  const [fileName, setFileName] = useState('')
+
+  const matchedCount = rows?.filter(r => r.matched).length ?? 0
+  const totalCount   = rows?.length ?? 0
+
+  // ── Download template Excel (điền sẵn tên HS, để trống điểm) ──
+  const downloadTemplate = () => {
+    const headers = [
+      'STT', 'Họ và tên',
+      'ĐĐGtx1', 'ĐĐGtx2', 'ĐĐGtx3', 'ĐĐGtx4', 'ĐĐGtx5',
+      'ĐĐGgk', 'ĐĐGck',
+      'Nhận xét sự tiến bộ', 'Nhận xét ghi học bạ',
+    ]
+    const dataRows = students.map((s, i) => [
+      s.stt ?? i + 1, s.name, '', '', '', '', '', '', '', '', '',
+    ])
+    const aoa = [
+      [`TEMPLATE NHẬP ĐIỂM — ${currentSubject} — ${currentSemester === 'HK1' ? 'Học kỳ 1' : 'Học kỳ 2'}`],
+      [`Điền điểm vào các cột ĐĐGtx1..5, ĐĐGgk, ĐĐGck. Để trống = không có điểm.`],
+      [`Thang điểm 0–10. Chấp nhận số thập phân (dấu chấm hoặc phẩy).`],
+      [],
+      headers,
+      ...dataRows,
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [
+      { wch: 5 }, { wch: 30 },
+      ...Array(5).fill({ wch: 10 }),
+      { wch: 10 }, { wch: 10 },
+      { wch: 35 }, { wch: 35 },
+    ]
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: headers.length - 1 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: headers.length - 1 } },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Nhập điểm')
+    XLSX.writeFile(wb, `Template_Diem_${currentSubject}_${currentSemester}.xlsx`)
+    toast.success('Đã tải template — điền điểm rồi import lại')
+  }
+
+  // ── Parse file khi chọn ──
+  const handleFile = async (file: File) => {
+    setFileName(file.name)
+    setParsing(true)
+    setRows(null)
+    try {
+      if (file.name.endsWith('.json')) {
+        const text = await file.text()
+        const parsed = parseJsonToRows(text, students)
+        setRows(parsed)
+      } else {
+        // Excel (.xlsx, .xls, .csv)
+        const buf = await file.arrayBuffer()
+        const parsed = parseExcelToRows(buf, students)
+        setRows(parsed)
+      }
+    } catch (e) {
+      toast.error('Không đọc được file — kiểm tra lại định dạng')
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl z-10 max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Import điểm từ Excel / JSON</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Môn: <strong>{currentSubject}</strong> — {currentSemester === 'HK1' ? 'Học kỳ 1' : 'Học kỳ 2'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          {/* Step 1 — Download template + Upload */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Template download */}
+            <div className="flex-1 border border-violet-200 bg-violet-50 rounded-xl p-4">
+              <p className="text-sm font-semibold text-violet-800 mb-1">① Tải template Excel</p>
+              <p className="text-xs text-violet-600 mb-3">
+                File đã điền sẵn danh sách {students.length} HS, để trống cột điểm.
+              </p>
+              <button
+                onClick={downloadTemplate}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Tải template ({students.length} HS)
+              </button>
+            </div>
+            {/* File upload */}
+            <div className="flex-1 border-2 border-dashed border-gray-300 hover:border-violet-400 rounded-xl p-4 text-center transition-colors cursor-pointer"
+              onClick={() => fileRef.current?.click()}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => {
+                e.preventDefault()
+                const f = e.dataTransfer.files[0]
+                if (f) handleFile(f)
+              }}
+            >
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,.json"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0]
+                  if (f) handleFile(f)
+                  e.target.value = ''
+                }}
+              />
+              {parsing ? (
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+                  <span className="text-xs text-gray-500">Đang phân tích file...</span>
+                </div>
+              ) : fileName ? (
+                <div className="flex flex-col items-center gap-1 py-2">
+                  {fileName.endsWith('.json')
+                    ? <FileJson className="w-6 h-6 text-orange-500" />
+                    : <Download className="w-6 h-6 text-emerald-500" />}
+                  <span className="text-xs font-medium text-gray-700 truncate max-w-[180px]">{fileName}</span>
+                  <span className="text-[11px] text-violet-600 mt-0.5">Nhấp để đổi file</span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <Upload className="w-6 h-6 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-700">② Kéo thả hoặc nhấp để chọn file</p>
+                  <p className="text-xs text-gray-400">.xlsx · .xls · .csv · .json</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* JSON format hint */}
+          <details className="text-xs text-gray-500 cursor-pointer">
+            <summary className="flex items-center gap-1.5 font-medium text-gray-600 hover:text-gray-800">
+              <FileJson className="w-3.5 h-3.5" />Định dạng JSON được hỗ trợ
+            </summary>
+            <pre className="mt-2 bg-gray-50 rounded-lg p-3 text-[10px] overflow-x-auto leading-relaxed border border-gray-200">{`[
+  {
+    "name": "Nguyễn Văn A",
+    "ddgtx": [8.5, 7, null, null, null],
+    "ddggk": 8,
+    "ddgck": 7.5,
+    "noteProgress": "Tiến bộ tốt"
+  },
+  { "name": "Trần Thị B", "TX1": 9, "TX2": 8, "GK": 8.5, "CK": 9 }
+]`}</pre>
+          </details>
+
+          {/* Preview table */}
+          {rows !== null && (
+            <div>
+              {/* Summary bar */}
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium mb-3 ${
+                matchedCount === totalCount
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : matchedCount === 0
+                    ? 'bg-red-50 text-red-700 border border-red-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}>
+                {matchedCount === totalCount
+                  ? <CheckCircle2 className="w-4 h-4" />
+                  : <AlertCircle className="w-4 h-4" />}
+                Tìm thấy {matchedCount}/{totalCount} học sinh khớp
+                {matchedCount < totalCount && (
+                  <span className="ml-1 text-xs font-normal">
+                    — {totalCount - matchedCount} tên không khớp (kiểm tra chính tả)
+                  </span>
+                )}
+              </div>
+
+              {/* Table */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="max-h-72 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-gray-100 text-gray-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold">Học sinh</th>
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <th key={i} className="px-1.5 py-2 text-center font-semibold w-12">TX{i+1}</th>
+                        ))}
+                        <th className="px-1.5 py-2 text-center font-semibold w-12">GK</th>
+                        <th className="px-1.5 py-2 text-center font-semibold w-12">CK</th>
+                        <th className="px-2 py-2 text-center font-semibold w-16">Khớp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i} className={`border-t border-gray-100 ${r.matched ? '' : 'bg-red-50'}`}>
+                          <td className="px-3 py-1.5 font-medium text-gray-800 max-w-[180px] truncate">
+                            {r.rawName}
+                          </td>
+                          {r.grade.ddgtx.map((v, j) => (
+                            <td key={j} className="px-1.5 py-1.5 text-center text-gray-600">
+                              {v != null ? (
+                                <span className={`font-semibold ${
+                                  v >= 8 ? 'text-green-700' : v >= 6.5 ? 'text-blue-700' :
+                                  v >= 5 ? 'text-amber-700' : 'text-red-700'
+                                }`}>{v}</span>
+                              ) : <span className="text-gray-300">—</span>}
+                            </td>
+                          ))}
+                          <td className="px-1.5 py-1.5 text-center">
+                            {r.grade.ddggk != null ? (
+                              <span className="font-semibold text-amber-700">{r.grade.ddggk}</span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-1.5 py-1.5 text-center">
+                            {r.grade.ddgck != null ? (
+                              <span className="font-semibold text-orange-700">{r.grade.ddgck}</span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-2 py-1.5 text-center">
+                            {r.matched
+                              ? <CheckCircle2 className="w-4 h-4 text-green-500 mx-auto" />
+                              : <span className="text-red-500 text-[10px] font-bold">✗ Ko khớp</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Unmatched warning */}
+              {matchedCount < totalCount && (
+                <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <strong>Tên không khớp:</strong>{' '}
+                  {rows.filter(r => !r.matched).map(r => `"${r.rawName}"`).join(', ')}.
+                  Kiểm tra chính tả hoặc copy đúng tên từ sổ điểm.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+          <p className="text-xs text-gray-400">
+            Chỉ ghi đè các ô có giá trị trong file — ô trống sẽ giữ nguyên điểm cũ
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={() => rows && onApply(rows)}
+              disabled={!rows || matchedCount === 0}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold"
+            >
+              Áp dụng ({matchedCount} HS)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
