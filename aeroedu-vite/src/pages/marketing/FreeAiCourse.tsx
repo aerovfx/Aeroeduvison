@@ -168,7 +168,62 @@ function ModulesSection() {
           title="10 Module — Từ nền tảng đến thực hành"
           description="Theo thứ tự, mỗi module 3-5 bài học có markdown + key points + link tới repo gốc"
         />
-        <div style={{ marginTop: 32, display: 'grid', gap: 16 }}>
+
+        {/* ── Module 0: Interactive Visualizer CTA ───────────── */}
+        <Link
+          to="/free-courses/llm-mastery/visualize"
+          style={{
+            display: 'block',
+            marginTop: 24, marginBottom: 8,
+            padding: 24,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.25), rgba(34,211,238,0.20))',
+            border: '1px solid rgba(167,139,250,0.45)',
+            textDecoration: 'none',
+            color: C.text,
+            transition: 'all 0.2s',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px) scale(1.005)'; e.currentTarget.style.borderColor = 'rgba(167,139,250,0.7)' }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'none';                                e.currentTarget.style.borderColor = 'rgba(167,139,250,0.45)' }}
+        >
+          <div style={{
+            position: 'absolute', top: -40, right: -40,
+            width: 160, height: 160, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(167,139,250,0.25), transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 32 }}>🔬</span>
+            <h3 style={{ margin: 0, fontSize: 22, fontWeight: 800 }}>
+              Visualizing LLM Internals & Architecture
+            </h3>
+            <span style={{
+              padding: '4px 10px', borderRadius: 99,
+              background: 'rgba(167,139,250,0.25)',
+              color: '#c4b5fd',
+              fontSize: 11, fontWeight: 800, letterSpacing: 0.5,
+            }}>
+              MỚI · TƯƠNG TÁC
+            </span>
+          </div>
+          <p style={{ margin: '0 0 10px', color: 'rgba(232,236,245,0.85)', fontSize: 14, lineHeight: 1.6, maxWidth: 760 }}>
+            Khám phá GPT một cách tương tác: token embeddings 2D, tokenization live demo, self-attention heatmap,
+            multi-head với 4 góc nhìn, position encoding sin/cos, và kiến trúc transformer đầy đủ.
+            Cảm hứng từ bbycroft/llm-viz + Karpathy nanoGPT.
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: 'rgba(232,236,245,0.7)', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Sparkles size={13} color={C.purple}/> 6 visualizations</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Zap size={13} color={C.cyan}/> No login</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><Github size={13}/> MIT-inspired</span>
+          </div>
+          <div style={{ marginTop: 12, color: C.cyan, fontWeight: 700, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            Bắt đầu khám phá <ArrowRight size={16} />
+          </div>
+        </Link>
+
+        <div style={{ marginTop: 24, display: 'grid', gap: 16 }}>
           {AI_LLM_COURSE.modules.map(m => <ModuleCard key={m.id} module={m} />)}
         </div>
       </div>

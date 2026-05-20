@@ -43,6 +43,7 @@ import ResetPasswordPage from '@/pages/auth/ResetPassword'
 // ── Marketing Pages ─────────────────────────────────────────
 const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
 const FreeAiCoursePage = lazy(() => import('@/pages/marketing/FreeAiCourse'))
+const LLMVisualizerPage = lazy(() => import('@/pages/marketing/LLMVisualizer'))
 const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
 const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
@@ -259,6 +260,7 @@ export function AppRouter() {
         ══════════════════════════════════════════════════ */}
         <Route path="/"               element={<LandingPage />} />
         <Route path="/free-courses/llm-mastery" element={<FreeAiCoursePage />} />
+        <Route path="/free-courses/llm-mastery/visualize" element={<LLMVisualizerPage />} />
         <Route path="/pricing"          element={<PricingPage2 />} />
         <Route path="/payment/:orderId" element={<PaymentDetailPage />} />
         <Route path="/activate"         element={<ActivatePage />} />
