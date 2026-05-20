@@ -112,6 +112,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Tổng quan',
+    routeAdminUsers:    'Người dùng',
     routeStudents:      'Học sinh',
     routeTeachers:      'Giáo viên',
     routeAtRisk:        'Cảnh báo rủi ro',
@@ -451,6 +452,7 @@ export const translations: Record<Language, Record<string, string>> = {
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Overview',
+    routeAdminUsers:    'Users',
     routeStudents:      'Students',
     routeTeachers:      'Teachers',
     routeAtRisk:        'At-Risk Alerts',

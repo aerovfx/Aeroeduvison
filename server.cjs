@@ -189,6 +189,14 @@ if (USE_NODEJS_AUTH) {
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
       }
 
+      // ── Banned account check (admin /api/admin/users/:id DELETE | PATCH banned=true) ──
+      if (user.banned) {
+        console.log(`[auth:login] 🚫 banned account blocked: ${user.email}`);
+        return res.status(403).json({
+          error: `Tài khoản đã bị khoá: ${user.bannedReason || 'liên hệ admin để biết thêm chi tiết'}`,
+        });
+      }
+
       // ── 2FA check ──────────────────────────────────────────
       // Nếu user đã bật 2FA → KHÔNG cấp access token ngay. Trả tempToken
       // (JWT 5 phút, type='2fa_pending'). UI phải gọi /api/auth/2fa/verify-login
@@ -317,6 +325,13 @@ if (USE_NODEJS_AUTH) {
         user = fetched.rows[0];
         console.log(`[auth:google] 🆕 New user: ${email}`);
       } else {
+        // Banned check — Google OAuth path
+        if (user.banned) {
+          console.log(`[auth:google] 🚫 banned account blocked: ${user.email}`);
+          return res.status(403).json({
+            error: `Tài khoản đã bị khoá: ${user.bannedReason || 'liên hệ admin để biết thêm chi tiết'}`,
+          });
+        }
         // Update profile picture if missing
         if (!user.image && claims.picture) {
           pool.query(
@@ -325,6 +340,12 @@ if (USE_NODEJS_AUTH) {
           ).catch(() => {});
         }
       }
+
+      // Update lastLoginAt for Google OAuth login too
+      pool.query(
+        'UPDATE "User" SET "lastLoginAt" = $1 WHERE id = $2',
+        [new Date(), user.id]
+      ).catch(() => {});
 
       const token = issueToken(user);
       console.log(`[auth:google] ✅ ${user.email}`);
@@ -781,6 +802,11 @@ if (USE_NODEJS_AUTH) {
       );
       const user = rows[0];
       if (!user) return res.status(404).json({ error: 'User not found' });
+      if (user.banned) {
+        return res.status(403).json({
+          error: `Tài khoản đã bị khoá: ${user.bannedReason || 'liên hệ admin để biết thêm chi tiết'}`,
+        });
+      }
       if (!user.twoFactorEnabled || !user.twoFactorSecret) {
         return res.status(400).json({ error: '2FA không bật trên tài khoản này' });
       }
@@ -29953,6 +29979,419 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     });
 
     console.log('[init] Admin Insights endpoints (behavior + trending + recommendations) ready');
+
+    // ════════════════════════════════════════════════════════════
+    // ADMIN USER MANAGEMENT — /api/admin/users
+    //
+    // 7 endpoints (admin only):
+    //   GET    /api/admin/users           — list users (filter/search/pagination)
+    //   GET    /api/admin/users/stats     — counts by role/accountType + activity
+    //   GET    /api/admin/users/:id       — detail (profile + careerSurvey)
+    //   PATCH  /api/admin/users/:id       — update (name/email/role/accountType/banned)
+    //   POST   /api/admin/users/:id/reset-password
+    //   DELETE /api/admin/users/:id       — soft delete (set banned=true)
+    //
+    // Plus: lazy migration of "banned*" columns on User.
+    // ════════════════════════════════════════════════════════════
+    let _adminUsersReady = false;
+    async function ensureAdminUserColumns() {
+      if (_adminUsersReady) return;
+      const pool = getAnPool();
+      if (!pool) return;
+      try {
+        await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "banned" BOOLEAN DEFAULT false`);
+        await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedReason" TEXT`);
+        await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMP`);
+        await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastLoginAt" TIMESTAMP`);
+        // UserProfile may not exist on fresh DBs — ensure with accountType column
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "UserProfile" (
+            id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            "userId" TEXT UNIQUE NOT NULL,
+            "accountType" TEXT,
+            bio TEXT,
+            "bannerStyle" TEXT DEFAULT 'gradient-purple',
+            "bannerImageUrl" TEXT,
+            "avatarFrame" TEXT DEFAULT 'none',
+            "themeColor" TEXT DEFAULT 'purple',
+            skills JSONB DEFAULT '[]'::jsonb,
+            socials JSONB DEFAULT '{}'::jsonb,
+            showcase JSONB DEFAULT '[]'::jsonb,
+            visibility JSONB DEFAULT '{}'::jsonb,
+            "careerSurvey" JSONB,
+            "createdAt" TIMESTAMP DEFAULT NOW(),
+            "updatedAt" TIMESTAMP DEFAULT NOW()
+          )
+        `);
+        await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS "accountType" TEXT`);
+        _adminUsersReady = true;
+      } catch (e) {
+        console.warn('[admin:users] ensure columns:', e.message);
+      }
+    }
+
+    // Helper: serialize user row (mask sensitive fields)
+    function shapeAdminUser(row) {
+      if (!row) return null;
+      return {
+        id: row.id,
+        name: row.name || null,
+        email: row.email,
+        image: row.image || null,
+        role: row.role || 'STUDENT',
+        accountType: row.accountType || row.role || 'STUDENT',
+        emailVerified: !!row.emailVerified,
+        twoFactorEnabled: !!row.twoFactorEnabled,
+        createdAt: row.createdAt,
+        lastLoginAt: row.lastLoginAt || null,
+        banned: !!row.banned,
+        bannedReason: row.bannedReason || null,
+        bannedAt: row.bannedAt || null,
+      };
+    }
+
+    // ── GET /api/admin/users ──────────────────────────────────
+    app.get('/api/admin/users', async (req, res) => {
+      const user = getAnUser(req);
+      if (!user || !/ADMIN/i.test(user.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ users: [], total: 0, page: 1, limit: 50 });
+      try {
+        await ensureAdminUserColumns();
+
+        const accountType = String(req.query.accountType || '').toUpperCase();
+        const role = String(req.query.role || '').toUpperCase();
+        const search = String(req.query.search || '').trim();
+        const status = String(req.query.status || '').toLowerCase();
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
+        const offset = (page - 1) * limit;
+
+        const sortByMap = {
+          name: 'u.name',
+          email: 'u.email',
+          createdAt: 'u."createdAt"',
+          lastLoginAt: 'u."lastLoginAt"',
+        };
+        const sortBy = sortByMap[String(req.query.sortBy || '')] || 'u."createdAt"';
+        const sortOrder = String(req.query.sortOrder || '').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+        const where = [];
+        const params = [];
+        let p = 1;
+
+        if (['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(accountType)) {
+          // accountType=ADMIN → fallback to role='ADMIN' because admin doesn't
+          // necessarily have a UserProfile row.
+          if (accountType === 'ADMIN') {
+            where.push(`u.role = 'ADMIN'`);
+          } else if (accountType === 'PARENT') {
+            where.push(`up."accountType" = 'PARENT'`);
+          } else if (accountType === 'TEACHER') {
+            // GV = role='TEACHER' AND (accountType IS NULL OR accountType='TEACHER')
+            where.push(`u.role = 'TEACHER' AND (up."accountType" IS NULL OR up."accountType" = 'TEACHER')`);
+          } else if (accountType === 'STUDENT') {
+            where.push(`u.role = 'STUDENT' AND (up."accountType" IS NULL OR up."accountType" = 'STUDENT')`);
+          }
+        }
+
+        if (['STUDENT', 'TEACHER', 'ADMIN'].includes(role)) {
+          where.push(`u.role = $${p++}`);
+          params.push(role);
+        }
+
+        if (search.length > 0) {
+          where.push(`(LOWER(u.name) LIKE $${p} OR LOWER(u.email) LIKE $${p})`);
+          params.push(`%${search.toLowerCase()}%`);
+          p++;
+        }
+
+        if (status === 'active') where.push(`COALESCE(u."banned", false) = false`);
+        else if (status === 'banned') where.push(`COALESCE(u."banned", false) = true`);
+
+        const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
+        // Count total
+        const countSql = `
+          SELECT COUNT(*)::int AS total
+          FROM "User" u
+          LEFT JOIN "UserProfile" up ON up."userId" = u.id
+          ${whereClause}
+        `;
+        const countRes = await pool.query(countSql, params);
+        const total = Number(countRes.rows[0]?.total) || 0;
+
+        // List rows
+        params.push(limit, offset);
+        const listSql = `
+          SELECT u.id, u.name, u.email, u.image, u.role, u."emailVerified",
+                 u."twoFactorEnabled", u."createdAt", u."lastLoginAt",
+                 u."banned", u."bannedReason", u."bannedAt",
+                 up."accountType" AS "accountType"
+            FROM "User" u
+            LEFT JOIN "UserProfile" up ON up."userId" = u.id
+            ${whereClause}
+            ORDER BY ${sortBy} ${sortOrder} NULLS LAST, u.id ASC
+            LIMIT $${p++} OFFSET $${p++}
+        `;
+        const listRes = await pool.query(listSql, params);
+
+        return res.json({
+          users: listRes.rows.map(shapeAdminUser),
+          total,
+          page,
+          limit,
+        });
+      } catch (err) {
+        console.error('[admin:users:list]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/users/stats ────────────────────────────
+    app.get('/api/admin/users/stats', async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.json({ total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 });
+      try {
+        await ensureAdminUserColumns();
+        const { rows } = await pool.query(`
+          SELECT
+            COUNT(*)::int                                                                              AS total,
+            COUNT(*) FILTER (WHERE u.role = 'STUDENT' AND (up."accountType" IS NULL OR up."accountType" = 'STUDENT'))::int AS students,
+            COUNT(*) FILTER (WHERE u.role = 'TEACHER' AND (up."accountType" IS NULL OR up."accountType" = 'TEACHER'))::int AS teachers,
+            COUNT(*) FILTER (WHERE up."accountType" = 'PARENT')::int                                    AS parents,
+            COUNT(*) FILTER (WHERE u.role = 'ADMIN')::int                                                AS admins,
+            COUNT(*) FILTER (WHERE u."lastLoginAt" >= NOW() - INTERVAL '7 days')::int                    AS "activeLast7d",
+            COUNT(*) FILTER (WHERE u."createdAt" >= DATE_TRUNC('month', NOW()))::int                     AS "newThisMonth",
+            COUNT(*) FILTER (WHERE u."twoFactorEnabled" = true)::int                                     AS "twoFactorEnabledCount",
+            COUNT(*) FILTER (WHERE COALESCE(u."banned", false) = true)::int                              AS "bannedCount"
+          FROM "User" u
+          LEFT JOIN "UserProfile" up ON up."userId" = u.id
+        `);
+        const r = rows[0] || {};
+        return res.json({
+          total: Number(r.total) || 0,
+          students: Number(r.students) || 0,
+          teachers: Number(r.teachers) || 0,
+          parents: Number(r.parents) || 0,
+          admins: Number(r.admins) || 0,
+          activeLast7d: Number(r.activeLast7d) || 0,
+          newThisMonth: Number(r.newThisMonth) || 0,
+          twoFactorEnabledCount: Number(r.twoFactorEnabledCount) || 0,
+          bannedCount: Number(r.bannedCount) || 0,
+        });
+      } catch (err) {
+        console.error('[admin:users:stats]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/admin/users/:id ──────────────────────────────
+    app.get('/api/admin/users/:id', async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureAdminUserColumns();
+        const { rows } = await pool.query(`
+          SELECT u.id, u.name, u.email, u.image, u.role, u."emailVerified",
+                 u."twoFactorEnabled", u."createdAt", u."lastLoginAt", u."lastLoginIp",
+                 u."banned", u."bannedReason", u."bannedAt",
+                 u."dateOfBirth", u.gender,
+                 up."accountType" AS "accountType",
+                 up.bio, up.skills, up.socials, up."careerSurvey",
+                 up."themeColor", up."bannerStyle"
+            FROM "User" u
+            LEFT JOIN "UserProfile" up ON up."userId" = u.id
+           WHERE u.id = $1
+           LIMIT 1
+        `, [req.params.id]);
+        if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+        const base = shapeAdminUser(rows[0]);
+        const detail = {
+          ...base,
+          dateOfBirth: rows[0].dateOfBirth || null,
+          gender: rows[0].gender || null,
+          lastLoginIp: rows[0].lastLoginIp || null,
+          profile: {
+            bio: rows[0].bio || null,
+            skills: rows[0].skills || [],
+            socials: rows[0].socials || {},
+            themeColor: rows[0].themeColor || null,
+            bannerStyle: rows[0].bannerStyle || null,
+          },
+          careerSurvey: rows[0].careerSurvey || null,
+        };
+
+        // Best-effort: recent activity từ LessonHistory (nếu bảng tồn tại)
+        try {
+          const act = await pool.query(`
+            SELECT id, action, title, "courseId", "occurredAt"
+              FROM "LessonHistory"
+             WHERE "userId" = $1
+             ORDER BY "occurredAt" DESC
+             LIMIT 10
+          `, [req.params.id]);
+          detail.recentActivity = act.rows;
+        } catch {
+          detail.recentActivity = [];
+        }
+
+        return res.json(detail);
+      } catch (err) {
+        console.error('[admin:users:get]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── PATCH /api/admin/users/:id ────────────────────────────
+    app.patch('/api/admin/users/:id', express.json({ limit: '16kb' }), async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureAdminUserColumns();
+
+        const id = req.params.id;
+        const body = req.body || {};
+
+        // Anti-lockout: admin không được tự thay đổi vai trò của chính mình
+        if (id === adminUser.id && body.role && String(body.role).toUpperCase() !== 'ADMIN') {
+          return res.status(400).json({ error: 'Không thể tự hạ vai trò ADMIN của chính bạn' });
+        }
+        if (id === adminUser.id && body.banned === true) {
+          return res.status(400).json({ error: 'Không thể tự khoá tài khoản của chính bạn' });
+        }
+
+        // Validate fields
+        const updates = [];
+        const params = [];
+        let p = 1;
+
+        if (typeof body.name === 'string') {
+          updates.push(`name = $${p++}`);
+          params.push(body.name.slice(0, 200));
+        }
+        if (typeof body.email === 'string' && body.email.includes('@')) {
+          const newEmail = body.email.toLowerCase().trim();
+          // Email uniqueness check
+          const dup = await pool.query(
+            `SELECT id FROM "User" WHERE LOWER(email) = $1 AND id <> $2 LIMIT 1`,
+            [newEmail, id]
+          );
+          if (dup.rows.length) return res.status(409).json({ error: 'Email đã được sử dụng' });
+          updates.push(`email = $${p++}`);
+          params.push(newEmail);
+        }
+        if (['STUDENT', 'TEACHER', 'ADMIN'].includes(String(body.role || '').toUpperCase())) {
+          updates.push(`role = $${p++}`);
+          params.push(String(body.role).toUpperCase());
+        }
+        if (typeof body.banned === 'boolean') {
+          updates.push(`"banned" = $${p++}`);
+          params.push(body.banned);
+          if (body.banned) {
+            updates.push(`"bannedReason" = $${p++}`);
+            params.push(String(body.bannedReason || 'Khoá bởi admin').slice(0, 500));
+            updates.push(`"bannedAt" = NOW()`);
+          } else {
+            updates.push(`"bannedReason" = NULL`);
+            updates.push(`"bannedAt" = NULL`);
+          }
+        }
+        if (updates.length > 0) {
+          updates.push(`"updatedAt" = NOW()`);
+          params.push(id);
+          const sql = `UPDATE "User" SET ${updates.join(', ')} WHERE id = $${p}`;
+          await pool.query(sql, params);
+        }
+
+        // accountType lives in UserProfile
+        if (['STUDENT', 'TEACHER', 'PARENT', 'ADMIN'].includes(String(body.accountType || '').toUpperCase())) {
+          const at = String(body.accountType).toUpperCase();
+          await pool.query(`
+            INSERT INTO "UserProfile" ("userId", "accountType", "updatedAt")
+              VALUES ($1, $2, NOW())
+              ON CONFLICT ("userId") DO UPDATE SET "accountType" = EXCLUDED."accountType", "updatedAt" = NOW()
+          `, [id, at]);
+        }
+
+        // Return updated row
+        const { rows } = await pool.query(`
+          SELECT u.*, up."accountType" AS "accountType"
+            FROM "User" u
+            LEFT JOIN "UserProfile" up ON up."userId" = u.id
+           WHERE u.id = $1 LIMIT 1
+        `, [id]);
+        if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+        console.log(`[admin:users:update] admin=${adminUser.id} target=${id} fields=${Object.keys(body).join(',')}`);
+        return res.json(shapeAdminUser(rows[0]));
+      } catch (err) {
+        console.error('[admin:users:update]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── POST /api/admin/users/:id/reset-password ──────────────
+    app.post('/api/admin/users/:id/reset-password', express.json({ limit: '4kb' }), async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        const { newPassword } = req.body || {};
+        if (typeof newPassword !== 'string' || newPassword.length < 8) {
+          return res.status(400).json({ error: 'Mật khẩu mới phải ≥ 8 ký tự' });
+        }
+        const bcryptLocal = require('bcryptjs');
+        const hash = await bcryptLocal.hash(newPassword, 12);
+        const r = await pool.query(
+          `UPDATE "User" SET password = $1, "updatedAt" = NOW() WHERE id = $2`,
+          [hash, req.params.id]
+        );
+        if (r.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+        console.log(`[admin:users:reset-pwd] admin=${adminUser.id} target=${req.params.id}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[admin:users:reset-pwd]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── DELETE /api/admin/users/:id ───────────────────────────
+    // Soft delete: banned=true, KHÔNG xoá row để giữ referential integrity
+    app.delete('/api/admin/users/:id', async (req, res) => {
+      const adminUser = getAnUser(req);
+      if (!adminUser || !/ADMIN/i.test(adminUser.role || '')) return res.status(403).json({ error: 'Admin only' });
+      const pool = getAnPool();
+      if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+      try {
+        await ensureAdminUserColumns();
+        if (req.params.id === adminUser.id) {
+          return res.status(400).json({ error: 'Không thể tự xoá tài khoản admin của chính bạn' });
+        }
+        const r = await pool.query(`
+          UPDATE "User"
+             SET "banned" = true,
+                 "bannedReason" = 'Admin xoá tài khoản',
+                 "bannedAt" = NOW(),
+                 "updatedAt" = NOW()
+           WHERE id = $1
+        `, [req.params.id]);
+        if (r.rowCount === 0) return res.status(404).json({ error: 'User not found' });
+        console.log(`[admin:users:delete] admin=${adminUser.id} soft-deleted=${req.params.id}`);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[admin:users:delete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    console.log('[init] Admin Users management endpoints (list/stats/get/patch/reset/delete) ready');
   }
 
   // ─ STEM AI Project Generator ─────────────────────────────

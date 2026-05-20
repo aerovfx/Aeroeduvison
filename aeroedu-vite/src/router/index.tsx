@@ -222,6 +222,7 @@ const AdminNewsReviewPage    = lazy(() => import('@/pages/admin/NewsReview'))
 
 // ── Admin Pages (đã port) ────────────────────────────────────
 const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
+const AdminUsersPage        = lazy(() => import('@/pages/admin/Users'))
 const AdminStudents         = lazy(() => import('@/pages/admin/Students'))
 const AdminTeachers         = lazy(() => import('@/pages/admin/Teachers'))
 const AdminCameraManagement = lazy(() => import('@/pages/admin/CameraManagement'))
@@ -560,6 +561,7 @@ export function AppRouter() {
               {/* Đã port */}
               <Route path="/admin/overview"            element={<AdminOverview />} />
               <Route path="/admin/news/review"         element={<AdminNewsReviewPage />} />
+              <Route path="/admin/users"               element={<AdminUsersPage />} />
               <Route path="/admin/students"            element={<AdminStudents />} />
               <Route path="/admin/teachers"            element={<AdminTeachers />} />
               <Route path="/admin/camera-management"   element={<AdminCameraManagement />} />
