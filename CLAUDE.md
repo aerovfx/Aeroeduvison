@@ -15,8 +15,14 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `1fdc513` (revision pixiai-00366-xxx, 2026-05-20 — Admin user mgmt + 2FA + Forgot pwd polish + Anti-screenshot v3 + Career survey retake + Free course links fix)
+- Last deployed commit: `787e791` (revision pixiai-00367-foy, 2026-05-20 — HOTFIX: thêm otplib vào Dockerfile + ship 2FA/Admin users/Anti-screenshot v3/Career survey retake/Free course links)
 - Commits since last deploy: `0/5`
+- Prev: `1fdc513` — Anti-screenshot v3 (bỏ blur/modal, chặn phím tắt + toast)
+- Prev: `9ce4c21` — Admin module quản lý người dùng (HS/GV/PH/Admin)
+- Prev: `aade959` — 2FA TOTP + Forgot password polish
+- Prev: `56ce2d1` — Sửa link GitHub repo trong free course
+- Prev: `1899074` — Cho phép làm lại career survey
+- Prev: `86d0b1d` → pixiai-00365-hal (Multi-career KG + Phụ huynh registration + Career survey + Career World)
 - Prev: `9ce4c21` — Admin module quản lý người dùng (HS/GV/PH/Admin)
 - Prev: `aade959` — 2FA TOTP + Forgot password polish
 - Prev: `56ce2d1` — Sửa link GitHub repo trong free course
