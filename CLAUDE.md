@@ -15,9 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `128c9d0` (revision pixiai-00357-nih, 2026-05-20 — PDF split-panel khi điền đáp án + Professional KG GV/Admin)
-- Commits since last deploy: `1/5`
-- Prev: `845dc8e` (Professional KG v2 — Canvas force-directed graph + Career Pathway)
+- Last deployed commit: `7071b5a` (revision pixiai-00359-baw, 2026-05-20 — hotfix deploy từ worktree: latex 503 + BulkGrading crash + Landing team/awards/testimonials)
+- Commits since last deploy: `2/5`
+- Prev: `9ddd5de` → pixiai-00358-zuc (nhầm deploy từ main — thiếu landing sections, latex 503)
 - Prev: `128c9d0` → pixiai-00357-nih (PDF split-panel khi điền đáp án — đề thi bên cạnh bubble sheet)
 - Prev: `ab669c7` → pixiai-00357-nih (Professional KG — Cây tri thức phát triển chuyên môn GV/Admin — same deploy)
 - Prev: `a1db1b9` → pixiai-00357-nih (Báo cáo tiến bộ HS theo các thời kỳ + xuất Excel/JSON — same deploy)
