@@ -57,6 +57,8 @@ export interface CurriculumLesson {
   duration?: number | null   // minutes
   type: LessonType
   position: number
+  /** Số content block đính kèm (video/pdf/text/quiz/...) — populated bởi GET curriculum */
+  blockCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -101,6 +103,41 @@ export interface UpdateLessonPayload {
   description?: string | null
   duration?: number | null
   type?: LessonType
+  position?: number
+}
+
+// ─── Lesson Blocks (Coursera/Notion-style content blocks) ───
+export type LessonBlockType =
+  | 'video' | 'pdf' | 'text' | 'audio' | 'quiz' | 'pptx'
+  | 'simulation' | 'lab' | 'game' | 'link' | 'embed'
+
+export interface LessonBlock {
+  id: string
+  lessonId: string
+  type: LessonBlockType
+  title?: string | null
+  /** Nội dung chính — URL (video/pdf/audio/pptx/link/embed), HTML (text), ID (sim/lab/game/quiz) */
+  content?: string | null
+  /** Metadata type-specific: { duration, fileSize, pages, mime, examId, simId, height, ... } */
+  metadata?: Record<string, any>
+  position: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface CreateLessonBlockPayload {
+  type: LessonBlockType
+  title?: string | null
+  content?: string | null
+  metadata?: Record<string, any>
+  position?: number
+}
+
+export interface UpdateLessonBlockPayload {
+  type?: LessonBlockType
+  title?: string | null
+  content?: string | null
+  metadata?: Record<string, any>
   position?: number
 }
 
@@ -244,6 +281,27 @@ export const instructorService = {
   /** POST /api/instructor/courses/:courseId/chapters/:chapterId/lessons/reorder */
   reorderLessons: (courseId: string, chapterId: string, lessonIds: string[]) =>
     api.post(`/instructor/courses/${courseId}/chapters/${chapterId}/lessons/reorder`, { lessonIds }).then((r) => r.data),
+
+  // ── Lesson Blocks (content blocks Coursera/Notion-style) ──
+  /** GET /api/instructor/lessons/:lessonId/blocks — ordered by position */
+  listLessonBlocks: (lessonId: string) =>
+    api.get<LessonBlock[]>(`/instructor/lessons/${lessonId}/blocks`).then((r) => r.data),
+
+  /** POST /api/instructor/lessons/:lessonId/blocks */
+  createLessonBlock: (lessonId: string, data: CreateLessonBlockPayload) =>
+    api.post<LessonBlock>(`/instructor/lessons/${lessonId}/blocks`, data).then((r) => r.data),
+
+  /** PATCH /api/instructor/lesson-blocks/:blockId */
+  updateLessonBlock: (blockId: string, data: UpdateLessonBlockPayload) =>
+    api.patch<LessonBlock>(`/instructor/lesson-blocks/${blockId}`, data).then((r) => r.data),
+
+  /** DELETE /api/instructor/lesson-blocks/:blockId */
+  deleteLessonBlock: (blockId: string) =>
+    api.delete(`/instructor/lesson-blocks/${blockId}`).then((r) => r.data),
+
+  /** POST /api/instructor/lessons/:lessonId/blocks/reorder  body: { blockIds } */
+  reorderLessonBlocks: (lessonId: string, blockIds: string[]) =>
+    api.post(`/instructor/lessons/${lessonId}/blocks/reorder`, { blockIds }).then((r) => r.data),
 
   // ── Categories ──────────────────────────────────────────
   /** GET /api/categories */

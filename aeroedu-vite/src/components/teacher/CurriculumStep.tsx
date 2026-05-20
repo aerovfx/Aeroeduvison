@@ -23,6 +23,7 @@ import {
   ChevronDown, ChevronUp, ArrowUp, ArrowDown, Save,
   Clock, Video, FileText, HelpCircle, ClipboardList,
   ChevronLeft, ChevronRight, Check, X, GripVertical,
+  Settings,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import {
@@ -32,6 +33,7 @@ import {
   type LessonType,
 } from '@/services/instructor.service'
 import { cn } from '@/lib/utils'
+import LessonAssetEditor from './LessonAssetEditor'
 
 /* ─── Helpers ────────────────────────────────────────────── */
 const LESSON_TYPES: { value: LessonType; label: string; icon: any; color: string }[] = [
@@ -77,6 +79,8 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
   const [editingLesson, setEditingLesson] = useState<string | null>(null)
   const [editingLessonTitle, setEditingLessonTitle] = useState('')
   const [editingLessonDuration, setEditingLessonDuration] = useState('')
+  // Asset editor modal — { lessonId, lessonTitle } | null
+  const [assetEditor, setAssetEditor] = useState<{ lessonId: string; lessonTitle: string } | null>(null)
 
   /* ── Data ── */
   const { data: chapters = [], isLoading } = useQuery({
@@ -531,6 +535,26 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
                               <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full hidden sm:block flex-shrink-0', lt.color, 'bg-white/5')}>
                                 {lt.label}
                               </span>
+                              {/* Asset button — visible if blockCount > 0, else only on hover */}
+                              <button
+                                type="button"
+                                onClick={() => setAssetEditor({ lessonId: lesson.id, lessonTitle: lesson.title })}
+                                className={cn(
+                                  'flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium transition-all flex-shrink-0',
+                                  (lesson.blockCount ?? 0) > 0
+                                    ? 'bg-purple-500/20 text-purple-200 hover:bg-purple-500/30'
+                                    : 'opacity-0 group-hover:opacity-100 bg-white/5 text-gray-400 hover:bg-purple-500/20 hover:text-purple-200'
+                                )}
+                                title="Quản lý asset của bài học (video/PDF/text/quiz...)"
+                              >
+                                <Settings className="w-3 h-3" />
+                                Asset
+                                {(lesson.blockCount ?? 0) > 0 && (
+                                  <span className="ml-0.5 px-1 rounded-full bg-purple-600/40 text-purple-100 font-bold">
+                                    {lesson.blockCount}
+                                  </span>
+                                )}
+                              </button>
                               <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                 <button
                                   type="button"
@@ -681,6 +705,17 @@ export default function CurriculumStep({ courseId, onBack, onNext }: CurriculumS
           </button>
         </div>
       </div>
+
+      {/* Asset editor modal — fullscreen, portal mounted to body */}
+      {assetEditor && (
+        <LessonAssetEditor
+          open
+          courseId={courseId}
+          lessonId={assetEditor.lessonId}
+          lessonTitle={assetEditor.lessonTitle}
+          onClose={() => setAssetEditor(null)}
+        />
+      )}
     </div>
   )
 }

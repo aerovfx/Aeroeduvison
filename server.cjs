@@ -4382,8 +4382,28 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         await pool.query(`ALTER TABLE "Lesson" ADD CONSTRAINT "Lesson_chapterId_fkey"
           FOREIGN KEY ("chapterId") REFERENCES "Chapter"(id) ON DELETE CASCADE`);
       } catch (e) { /* ignore — đã có constraint hoặc bảng chưa sẵn sàng */ }
+      // ── LessonBlock — content blocks Coursera/Notion-style trong mỗi Lesson
+      // Mỗi Lesson chứa N block (video/pdf/text/audio/quiz/pptx/sim/lab/game/link/embed)
+      // theo thứ tự position. Teacher add/reorder/delete trong LessonAssetEditor.
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LessonBlock" (
+        id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "lessonId"  TEXT NOT NULL REFERENCES "Lesson"(id) ON DELETE CASCADE,
+        type        TEXT NOT NULL,
+        title       TEXT,
+        content     TEXT,
+        metadata    JSONB DEFAULT '{}'::jsonb,
+        position    INTEGER NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+        "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LessonBlock_lessonId_idx" ON "LessonBlock"("lessonId", position ASC)`);
       _ccReady = true;
     }
+    // Allowed block types — keep in sync với FE LessonBlockType
+    const LESSON_BLOCK_TYPES = new Set([
+      'video', 'pdf', 'text', 'audio', 'quiz', 'pptx',
+      'simulation', 'lab', 'game', 'link', 'embed',
+    ]);
 
     // Verify course ownership helper
     async function ownsCourse(pool, courseId, tid) {
@@ -4433,8 +4453,23 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
             ORDER BY position ASC, "createdAt" ASC`,
           [chapterIds]
         );
+        // Count blocks per lesson (cheap aggregate query — LessonBlock có thể chưa tồn tại
+        // ở DB cũ → wrap try/catch để rơi về 0 thay vì 500)
+        let blockCounts = {};
+        if (lessons.length > 0) {
+          try {
+            const lessonIds = lessons.map(l => l.id);
+            const { rows: cnts } = await pool.query(
+              `SELECT "lessonId", COUNT(*)::int AS cnt
+                 FROM "LessonBlock" WHERE "lessonId" = ANY($1)
+                GROUP BY "lessonId"`,
+              [lessonIds]
+            );
+            blockCounts = cnts.reduce((a, r) => { a[r.lessonId] = r.cnt; return a; }, {});
+          } catch (e) { /* table chưa migrate → blockCount=0 cho mọi lesson */ }
+        }
         const byChapter = lessons.reduce((acc, l) => {
-          (acc[l.chapterId] ??= []).push(l);
+          (acc[l.chapterId] ??= []).push({ ...l, blockCount: blockCounts[l.id] || 0 });
           return acc;
         }, {});
         const out = chapters.map(ch => ({ ...ch, lessons: byChapter[ch.id] || [] }));
@@ -4713,6 +4748,194 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         return res.json({ ok: true });
       } catch (err) {
         console.error('[curriculum:reorder-lessons]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────
+    // LESSON BLOCKS — content blocks Coursera/Notion-style
+    // (video/pdf/text/audio/quiz/pptx/sim/lab/game/link/embed)
+    // Mỗi Lesson chứa N block ordered, edit qua LessonAssetEditor.tsx
+    // ─────────────────────────────────────────────────────────
+
+    // GET /api/instructor/lessons/:lessonId/blocks
+    app.get('/api/instructor/lessons/:lessonId/blocks', async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.json([]);
+        await ensureCurriculumTables();
+        if (!(await ownsLesson(pool, req.params.lessonId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy bài học' });
+        }
+        const { rows } = await pool.query(
+          `SELECT id, "lessonId", type, title, content, metadata, position, "createdAt", "updatedAt"
+             FROM "LessonBlock" WHERE "lessonId"=$1
+            ORDER BY position ASC, "createdAt" ASC`,
+          [req.params.lessonId]
+        );
+        return res.json(rows);
+      } catch (err) {
+        console.error('[lessonBlock:list]', err.message);
+        return res.json([]);
+      }
+    });
+
+    // POST /api/instructor/lessons/:lessonId/blocks
+    app.post('/api/instructor/lessons/:lessonId/blocks', express.json({ limit: '256kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsLesson(pool, req.params.lessonId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy bài học' });
+        }
+        const b = req.body || {};
+        const type = String(b.type || '').trim().toLowerCase();
+        if (!LESSON_BLOCK_TYPES.has(type)) {
+          return res.status(400).json({ error: 'Loại block không hợp lệ' });
+        }
+        const title = b.title ? String(b.title).slice(0, 300) : null;
+        const content = b.content !== undefined && b.content !== null ? String(b.content).slice(0, 200000) : null;
+        let metadata = {};
+        if (b.metadata && typeof b.metadata === 'object') {
+          // Defensive — strip huge fields
+          try { metadata = JSON.parse(JSON.stringify(b.metadata).slice(0, 50000)); } catch { metadata = {}; }
+        }
+        // Compute next position within lesson
+        const posR = await pool.query(
+          `SELECT COALESCE(MAX(position), 0) + 1 AS next FROM "LessonBlock" WHERE "lessonId"=$1`,
+          [req.params.lessonId]
+        );
+        const position = Number.isFinite(Number(b.position)) ? Number(b.position) : posR.rows[0].next;
+        const { randomUUID } = require('crypto');
+        const id = randomUUID();
+        await pool.query(
+          `INSERT INTO "LessonBlock" (id, "lessonId", type, title, content, metadata, position)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)`,
+          [id, req.params.lessonId, type, title, content, JSON.stringify(metadata), position]
+        );
+        const { rows } = await pool.query(
+          `SELECT id, "lessonId", type, title, content, metadata, position, "createdAt", "updatedAt"
+             FROM "LessonBlock" WHERE id=$1`, [id]
+        );
+        return res.status(201).json(rows[0]);
+      } catch (err) {
+        console.error('[lessonBlock:create]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // Helper: ownership for a block by id
+    async function ownsBlock(pool, blockId, tid) {
+      const r = await pool.query(
+        `SELECT 1 FROM "LessonBlock" lb
+           JOIN "Lesson"  l  ON l.id  = lb."lessonId"
+           JOIN "Chapter" ch ON ch.id = l."chapterId"
+           JOIN "Course"  c  ON c.id  = ch."courseId"
+          WHERE lb.id=$1 AND c."userId"=$2 LIMIT 1`,
+        [blockId, tid]
+      );
+      return r.rows.length > 0;
+    }
+
+    // PATCH /api/instructor/lesson-blocks/:blockId
+    app.patch('/api/instructor/lesson-blocks/:blockId', express.json({ limit: '256kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsBlock(pool, req.params.blockId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy block' });
+        }
+        const b = req.body || {};
+        const sets = []; const vals = []; let i = 1;
+        if (b.type !== undefined) {
+          const t = String(b.type).trim().toLowerCase();
+          if (!LESSON_BLOCK_TYPES.has(t)) return res.status(400).json({ error: 'Loại block không hợp lệ' });
+          sets.push(`type=$${i++}`); vals.push(t);
+        }
+        if (b.title !== undefined) { sets.push(`title=$${i++}`); vals.push(b.title ? String(b.title).slice(0, 300) : null); }
+        if (b.content !== undefined) { sets.push(`content=$${i++}`); vals.push(b.content !== null ? String(b.content).slice(0, 200000) : null); }
+        if (b.metadata !== undefined && b.metadata && typeof b.metadata === 'object') {
+          let m = {};
+          try { m = JSON.parse(JSON.stringify(b.metadata).slice(0, 50000)); } catch { m = {}; }
+          sets.push(`metadata=$${i++}::jsonb`); vals.push(JSON.stringify(m));
+        }
+        if (b.position !== undefined) { sets.push(`position=$${i++}`); vals.push(Number(b.position) || 0); }
+        if (!sets.length) return res.status(400).json({ error: 'Không có trường nào để cập nhật' });
+        sets.push(`"updatedAt"=NOW()`);
+        vals.push(req.params.blockId);
+        await pool.query(`UPDATE "LessonBlock" SET ${sets.join(', ')} WHERE id=$${i}`, vals);
+        const { rows } = await pool.query(
+          `SELECT id, "lessonId", type, title, content, metadata, position, "createdAt", "updatedAt"
+             FROM "LessonBlock" WHERE id=$1`, [req.params.blockId]
+        );
+        return res.json(rows[0]);
+      } catch (err) {
+        console.error('[lessonBlock:update]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // DELETE /api/instructor/lesson-blocks/:blockId
+    app.delete('/api/instructor/lesson-blocks/:blockId', async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsBlock(pool, req.params.blockId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy block' });
+        }
+        await pool.query(`DELETE FROM "LessonBlock" WHERE id=$1`, [req.params.blockId]);
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[lessonBlock:delete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // POST /api/instructor/lessons/:lessonId/blocks/reorder  body: { blockIds: [] }
+    app.post('/api/instructor/lessons/:lessonId/blocks/reorder', express.json({ limit: '16kb' }), async (req, res) => {
+      try {
+        const tid = getCcTeacher(req);
+        if (!tid) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getCcPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureCurriculumTables();
+        if (!(await ownsLesson(pool, req.params.lessonId, tid))) {
+          return res.status(404).json({ error: 'Không tìm thấy bài học' });
+        }
+        const ids = Array.isArray(req.body?.blockIds) ? req.body.blockIds.filter(Boolean) : [];
+        if (!ids.length) return res.status(400).json({ error: 'Thiếu blockIds' });
+        const { rows: own } = await pool.query(
+          `SELECT id FROM "LessonBlock" WHERE "lessonId"=$1 AND id = ANY($2)`,
+          [req.params.lessonId, ids]
+        );
+        if (own.length !== ids.length) {
+          return res.status(400).json({ error: 'Một số block không thuộc bài học này' });
+        }
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          for (let i = 0; i < ids.length; i++) {
+            await client.query(`UPDATE "LessonBlock" SET position=$1, "updatedAt"=NOW() WHERE id=$2`, [i + 1, ids[i]]);
+          }
+          await client.query('COMMIT');
+        } catch (e) {
+          await client.query('ROLLBACK');
+          throw e;
+        } finally { client.release(); }
+        return res.json({ ok: true });
+      } catch (err) {
+        console.error('[lessonBlock:reorder]', err.message);
         return res.status(500).json({ error: err.message });
       }
     });
