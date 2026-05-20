@@ -17,6 +17,7 @@
  * Persist: localStorage 'rs.odyssey.tokens' lưu list job IDs đã thu.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Compass, RotateCcw, Trophy, X, Sparkles, MessageCircle, Map as MapIcon, User,
 } from 'lucide-react'
@@ -642,12 +643,12 @@ export default function PixelOdyssey() {
           <p className="text-xs font-bold text-amber-100 flex-1 min-w-[60%]">
             🎉 Hoàn thành Odyssey! Bạn đã khám phá đủ {totalNPCs} nghề.
           </p>
-          <a
-            href="/student/career"
+          <Link
+            to="/student/career-world"
             className="text-[11px] font-bold text-emerald-300 hover:text-emerald-200 underline whitespace-nowrap"
           >
-            Khám phá 22 nghề khác →
-          </a>
+            🎮 Khám phá 25 nghề khác (Pixel World) →
+          </Link>
           <button onClick={resetTokens}
             className="text-[10px] text-zinc-400 hover:text-zinc-200 underline whitespace-nowrap">
             Chơi lại
