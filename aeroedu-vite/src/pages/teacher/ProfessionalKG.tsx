@@ -11,11 +11,14 @@ import {
   Brain, Download, FileJson, TrendingUp, Award, Plus, PenLine,
   BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
   Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
+  ExternalLink, Target, Wrench, MessageCircle, PlayCircle,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import * as XLSX from 'xlsx'
 import { api } from '@/services/api'
+import { getSuggestion, type SuggestionMethod } from './skillSuggestions'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1394,6 +1397,9 @@ export default function ProfessionalKG() {
                           Thêm vào CPD Log
                         </button>
 
+                        {/* Gợi ý phương pháp + bài tập nâng cao năng lực */}
+                        <SkillSuggestionsPanel skillId={skill.id} />
+
                         {/* Related skills */}
                         {panelData.neighbors.length > 0 && (
                           <div>
@@ -1787,5 +1793,183 @@ function ShareLocationButton({ userId, progressMap, syncToBackend: _syncToBacken
         : <><MapPin className="w-3 h-3" /><span className="hidden sm:inline">Vị trí</span></>
       }
     </button>
+  )
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// SkillSuggestionsPanel — Phương pháp + bài tập nâng cao
+// ─────────────────────────────────────────────────────────────
+// Đọc database SKILL_SUGGESTIONS (skillSuggestions.ts) → hiển thị
+// dạng accordion 2 phần: "Phương pháp" + "Bài tập gợi ý".
+// Mỗi method có icon theo type, có link nếu có url.
+// Mỗi exercise có badge difficulty + time + steps + deliverable.
+
+const METHOD_ICONS: Record<SuggestionMethod['type'], React.ComponentType<{ className?: string }>> = {
+  course:    PlayCircle,
+  book:      BookOpen,
+  practice:  Wrench,
+  community: MessageCircle,
+  project:   Target,
+  tool:      Cpu,
+  video:     PlayCircle,
+}
+
+const METHOD_LABELS: Record<SuggestionMethod['type'], string> = {
+  course:    'Khóa học',
+  book:      'Sách',
+  practice:  'Thực hành',
+  community: 'Cộng đồng',
+  project:   'Dự án',
+  tool:      'Công cụ',
+  video:     'Video',
+}
+
+const DIFFICULTY_BADGE: Record<'easy' | 'medium' | 'hard', { label: string; color: string }> = {
+  easy:   { label: 'Dễ',         color: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/40' },
+  medium: { label: 'Trung bình', color: 'bg-amber-900/40   text-amber-300   border-amber-700/40' },
+  hard:   { label: 'Khó',        color: 'bg-rose-900/40    text-rose-300    border-rose-700/40' },
+}
+
+function SkillSuggestionsPanel({ skillId }: { skillId: string }) {
+  const sug = getSuggestion(skillId)
+  const [methodsOpen,   setMethodsOpen]   = useState(true)
+  const [exercisesOpen, setExercisesOpen] = useState(true)
+
+  if (!sug) {
+    return (
+      <div className="rounded-lg bg-slate-800/50 border border-slate-700/30 p-3 text-[11px] text-slate-500 italic flex items-start gap-2">
+        <Lightbulb className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-600" />
+        Chưa có gợi ý cho kỹ năng này. Liên hệ admin để bổ sung.
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* ── Phương pháp nâng cao ── */}
+      <div className="rounded-lg bg-gradient-to-br from-purple-950/40 to-slate-900/40 border border-purple-700/30 overflow-hidden">
+        <button
+          onClick={() => setMethodsOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-purple-900/20 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-purple-300">
+            <Lightbulb className="w-3.5 h-3.5" />
+            Phương pháp nâng cao
+            <span className="text-[9px] text-purple-400/60 normal-case font-normal">({sug.methods.length})</span>
+          </span>
+          {methodsOpen ? <ChevronUp className="w-3.5 h-3.5 text-purple-400" /> : <ChevronDown className="w-3.5 h-3.5 text-purple-400" />}
+        </button>
+        {methodsOpen && (
+          <div className="px-3 pb-3 space-y-2">
+            {sug.methods.map((m, i) => {
+              const Icon = METHOD_ICONS[m.type] || Lightbulb
+              return (
+                <div key={i} className="bg-slate-900/60 border border-slate-700/40 rounded-md p-2.5">
+                  <div className="flex items-start gap-2">
+                    <Icon className="w-3.5 h-3.5 text-purple-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        <span className="text-[9px] uppercase tracking-wider font-bold text-purple-400/80">
+                          {METHOD_LABELS[m.type]}
+                        </span>
+                        {m.duration && (
+                          <span className="text-[9px] text-slate-500 flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" />{m.duration}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-slate-100 leading-snug mb-0.5">
+                        {m.title}
+                      </p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        {m.description}
+                      </p>
+                      {m.url && (
+                        <a
+                          href={m.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-1.5 text-[10px] text-purple-300 hover:text-purple-200 transition-colors"
+                        >
+                          <ExternalLink className="w-2.5 h-2.5" />
+                          Mở liên kết
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Bài tập gợi ý ── */}
+      <div className="rounded-lg bg-gradient-to-br from-emerald-950/40 to-slate-900/40 border border-emerald-700/30 overflow-hidden">
+        <button
+          onClick={() => setExercisesOpen(v => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-emerald-900/20 transition-colors"
+        >
+          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-300">
+            <Target className="w-3.5 h-3.5" />
+            Bài tập thực hành
+            <span className="text-[9px] text-emerald-400/60 normal-case font-normal">({sug.exercises.length})</span>
+          </span>
+          {exercisesOpen ? <ChevronUp className="w-3.5 h-3.5 text-emerald-400" /> : <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />}
+        </button>
+        {exercisesOpen && (
+          <div className="px-3 pb-3 space-y-2.5">
+            {sug.exercises.map((ex, i) => {
+              const diff = DIFFICULTY_BADGE[ex.difficulty]
+              return (
+                <div key={i} className="bg-slate-900/60 border border-slate-700/40 rounded-md p-2.5">
+                  <div className="flex items-start gap-2 mb-2">
+                    <span className="w-5 h-5 rounded-md bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-100 leading-snug">
+                        {ex.title}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${diff.color} font-semibold uppercase tracking-wider`}>
+                          {diff.label}
+                        </span>
+                        <span className="text-[9px] text-slate-500 flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5" />{ex.estimatedTime}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pl-7">
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Các bước:</p>
+                    <ol className="space-y-1">
+                      {ex.steps.map((s, j) => (
+                        <li key={j} className="text-[11px] text-slate-300 leading-relaxed flex gap-1.5">
+                          <span className="text-emerald-500/80 font-mono flex-shrink-0">{j + 1}.</span>
+                          <span>{s}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="pl-7 mt-2 pt-2 border-t border-slate-700/40">
+                    <div className="flex items-start gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400 mt-0.5 flex-shrink-0" />
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        <span className="text-emerald-400 font-semibold">Sản phẩm: </span>
+                        {ex.deliverable}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
