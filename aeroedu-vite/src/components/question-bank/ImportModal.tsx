@@ -1,6 +1,7 @@
 import { useState, useRef } from "react"
 import {
   Upload, X, FileText, CheckCircle, AlertCircle, Loader2, Trash2, Download,
+  ClipboardPaste, Code2, Eraser,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import * as XLSX from "xlsx"
@@ -574,6 +575,23 @@ function normalizeQuestion(raw: any, defaultSubject: string, defaultGrade: strin
   }
 }
 
+// Mẫu JSON ngắn để placeholder trong textarea
+const PASTE_PLACEHOLDER = `{
+  "questions": [
+    {
+      "questionType": "MCQ",
+      "content": "Đơn vị của lực trong hệ SI là?",
+      "options": ["Newton (N)", "Joule (J)", "Watt (W)", "Pascal (Pa)"],
+      "correctAnswer": "A",
+      "subject": "Vật lý",
+      "grade": "Khối 10",
+      "difficulty": "easy",
+      "topic": "Lực và chuyển động",
+      "explanation": "Lực được đo bằng Newton (N) trong hệ SI."
+    }
+  ]
+}`
+
 export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -584,6 +602,9 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
   const [importStep, setImportStep] = useState<"upload" | "review" | "complete">("upload")
   const [saving, setSaving] = useState(false)
   const [savedCount, setSavedCount] = useState(0)
+  const [pastedJson, setPastedJson] = useState("")
+  const [pasteError, setPasteError] = useState<string | null>(null)
+  const [pasteParsing, setPasteParsing] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent) => {
@@ -727,11 +748,49 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
     }
   }
 
+  // ── Parse JSON dán trực tiếp từ clipboard ──
+  // Quy trình: validate JSON syntax → parse → normalize → đẩy sang bước review
+  // (giống parseJsonFile + handleFile flow, không cần tải file lên server)
+  const handlePasteJson = async () => {
+    const text = pastedJson.trim()
+    if (!text) {
+      setPasteError("Vui lòng dán code JSON vào ô bên trên")
+      return
+    }
+    setPasteError(null)
+    setPasteParsing(true)
+    try {
+      const rawRows = await parseJsonFile(text)
+      if (rawRows.length === 0) {
+        setPasteError("JSON hợp lệ nhưng không tìm thấy câu hỏi. Cấu trúc cần: { questions: [...] } hoặc array trực tiếp.")
+        return
+      }
+      const questions = rawRows
+        .filter(r => r.content || r.question || r.nội_dung || r.câu_hỏi || r.question_text || r.questionText)
+        .map(r => normalizeQuestion(r, subject, grade))
+      if (questions.length === 0) {
+        setPasteError("Không có câu hỏi nào có field 'content'. Kiểm tra lại cú pháp.")
+        return
+      }
+      setParsedQuestions(questions)
+      setImportStep("review")
+      toast.success(`Đã phân tích ${questions.length} câu hỏi từ JSON dán`)
+    } catch (err: any) {
+      // JSON syntax error — chỉ rõ vị trí nếu có
+      const msg = err?.message || "JSON không hợp lệ"
+      setPasteError(`Lỗi cú pháp JSON: ${msg}`)
+    } finally {
+      setPasteParsing(false)
+    }
+  }
+
   const handleClose = () => {
     setFile(null)
     setParsedQuestions([])
     setImportStep("upload")
     setSavedCount(0)
+    setPastedJson("")
+    setPasteError(null)
     onClose()
   }
 
@@ -828,6 +887,81 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* ── Dán JSON trực tiếp (alternative to file upload) ── */}
+              <div className="relative">
+                {/* "Hoặc" divider */}
+                <div className="flex items-center gap-3 my-2">
+                  <div className="flex-1 h-px bg-[#2a2b3d]" />
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">hoặc</span>
+                  <div className="flex-1 h-px bg-[#2a2b3d]" />
+                </div>
+
+                <div className="bg-[#0c0d1a] border border-[#2a2b3d] rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Code2 className="w-4 h-4 text-amber-400" />
+                      <span className="text-sm font-bold text-slate-200">Dán code JSON trực tiếp</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {pastedJson && (
+                        <button
+                          type="button"
+                          onClick={() => { setPastedJson(""); setPasteError(null) }}
+                          className="text-[11px] text-slate-500 hover:text-rose-400 flex items-center gap-1 px-1.5 py-1 rounded transition-colors"
+                          title="Xoá nội dung"
+                        >
+                          <Eraser className="w-3 h-3" />Xoá
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPastedJson(PASTE_PLACEHOLDER)
+                          setPasteError(null)
+                        }}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 px-1.5 py-1 rounded transition-colors"
+                        title="Dán mẫu mặc định để chỉnh sửa"
+                      >
+                        <ClipboardPaste className="w-3 h-3" />Dán mẫu
+                      </button>
+                    </div>
+                  </div>
+
+                  <textarea
+                    value={pastedJson}
+                    onChange={e => { setPastedJson(e.target.value); if (pasteError) setPasteError(null) }}
+                    spellCheck={false}
+                    placeholder={PASTE_PLACEHOLDER}
+                    className="w-full h-48 bg-[#06070f] border border-[#1e2033] rounded-lg p-3 text-xs text-slate-200 placeholder:text-slate-700 focus:outline-none focus:border-amber-500/60 font-mono leading-relaxed resize-y"
+                    style={{ tabSize: 2 }}
+                  />
+
+                  {pasteError && (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-950/30 border border-rose-700/40 text-xs text-rose-300">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                      <span>{pasteError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] text-slate-500">
+                      Cấu trúc: <code className="text-amber-400 bg-[#161728] px-1 rounded">{`{ "questions": [{ content, options, correctAnswer, ... }] }`}</code>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handlePasteJson}
+                      disabled={pasteParsing || !pastedJson.trim()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors flex-shrink-0"
+                    >
+                      {pasteParsing
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang phân tích...</>
+                        : <><FileText className="w-3.5 h-3.5" /> Phân tích JSON</>
+                      }
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Format hint + Template download */}
