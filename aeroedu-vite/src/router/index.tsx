@@ -42,6 +42,7 @@ import ResetPasswordPage from '@/pages/auth/ResetPassword'
 
 // ── Marketing Pages ─────────────────────────────────────────
 const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
+const FreeAiCoursePage = lazy(() => import('@/pages/marketing/FreeAiCourse'))
 const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
 const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
@@ -249,6 +250,7 @@ export function AppRouter() {
             PUBLIC / MARKETING
         ══════════════════════════════════════════════════ */}
         <Route path="/"               element={<LandingPage />} />
+        <Route path="/free-courses/llm-mastery" element={<FreeAiCoursePage />} />
         <Route path="/pricing"          element={<PricingPage2 />} />
         <Route path="/payment/:orderId" element={<PaymentDetailPage />} />
         <Route path="/activate"         element={<ActivatePage />} />

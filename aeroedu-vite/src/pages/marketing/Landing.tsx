@@ -227,6 +227,9 @@ export default function Landing() {
             <a href="#testimonials" className="land-nav-link">Phản hồi</a>
             <a href="#team" className="land-nav-link">Đội ngũ</a>
             <a href="#awards" className="land-nav-link">Giải thưởng</a>
+            <Link to="/free-courses/llm-mastery" className="land-nav-link" style={{ color: C.cyan, fontWeight: 700 }}>
+              🎓 Khoá AI MIỄN PHÍ
+            </Link>
           </div>
 
           {/* Desktop CTA */}
