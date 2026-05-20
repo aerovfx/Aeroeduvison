@@ -15,7 +15,7 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `d1d883d` (revision pixiai-00363-xxx, 2026-05-20 — Flipbook PDF + Eclipse + Anti-screenshot + Assignment workspace + Free AI course)
+- Last deployed commit: `d1d883d` (revision pixiai-00363-dib, 2026-05-20 — Flipbook PDF + Eclipse + Anti-screenshot + Assignment workspace + Free AI course)
 - Commits since last deploy: `0/5`
 - Prev: `715241b` → pixiai-00362-yug (HOTFIX SECURITY: PII exposure + stored XSS)
 - Prev: `d1d883d` — flipbook 3D + nhạc nền ambient + iOS mobile view + pdfjs-dist v5
