@@ -1,16 +1,20 @@
 /**
- * AntiScreenshotWarning v4 (2026-05-21) — Bảo vệ nội dung mạnh hơn
+ * AntiScreenshotWarning v6 (2026-05-21) — Watermark ON-DEMAND
  *
- * 4 lớp phòng thủ:
- *   1. WATERMARK GRID — luôn hiển thị, opacity vừa đủ để ảnh chụp dính
- *      email + thời gian. Density cao + tone đậm hơn v3.
- *   2. INSTANT BLUR ON FOCUS LOSS — khi window mất focus (xảy ra khi
- *      Cmd+Shift+4 picker xuất hiện hoặc switch tab), blur(40px) toàn
- *      bộ #root. Khi focus quay lại → fade out 300ms.
- *   3. CORNER ID BADGE — góc trên-trái + dưới-phải hiển thị email + IP
- *      lờ mờ. Mọi screenshot dính ít nhất 1 góc.
- *   4. TOAST WARNING — góc dưới phải khi phát hiện phím tắt screenshot
- *      (chỉ hữu hiệu cho Windows/Linux — macOS bắt phím trước browser).
+ * Yêu cầu user: bỏ sọc giữa màn hình lúc bình thường — chỉ hiện khi user
+ * nhấn phím tắt screenshot (Cmd+Shift+3/4, Win+Shift+S, PrintScreen).
+ *
+ * Strategy:
+ *   1. NORMAL BROWSING — KHÔNG watermark, KHÔNG blur, KHÔNG cản UX
+ *   2. SCREENSHOT DETECT (Cmd/Ctrl+Shift hoặc focus loss):
+ *      • Blur(40px) toàn bộ #root
+ *      • Watermark grid + 4 corner badges xuất hiện
+ *      • Modal "Nội dung được bảo vệ" hiện giữa
+ *      → ảnh chụp bắt được màn hình mờ + watermark + email user
+ *   3. RELEASE → fade out 300ms → bình thường lại
+ *
+ * Toast warning ở góc dưới (khi chặn được phím tắt qua keydown):
+ * không cản UX, chỉ thông báo.
  */
 import { useEffect, useState } from 'react'
 import { ShieldAlert } from 'lucide-react'
@@ -156,7 +160,11 @@ export function AntiScreenshotWarning() {
 
   return (
     <>
-      <WatermarkGrid userLabel={userLabel} timeStr={timeStr} />
+      {/* Watermark CHỈ hiện khi user nhấn phím tắt screenshot (blurActive)
+          → bình thường không có sọc nào trên màn hình, không ảnh hưởng UX.
+          Khi screenshot tool active → watermark xuất hiện cùng blur →
+          ảnh chụp dính email + timestamp truy nguồn. */}
+      {blurActive && <WatermarkGrid userLabel={userLabel} timeStr={timeStr} />}
 
       {/* Anti-screenshot overlay khi blur active — hiển thị 1 thông điệp
           lớn để ảnh chụp tool capture nội dung này thay vì content thật */}
