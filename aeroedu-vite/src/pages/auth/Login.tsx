@@ -6,12 +6,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react'
+import { Eye, EyeOff, Loader2, GraduationCap, Shield, KeyRound, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { LanguagePicker } from '@/components/ui/LanguagePicker'
 import { loadGsi } from '@/lib/loadGsi'
 import { getGoogleClientId } from '@/lib/googleClientId'
+import { twoFactorService } from '@/services/twoFactor.service'
 
 // ── Module-level GSI guard ──────────────────────────────────
 // useRef resets to false on every remount (navigate away → back).
@@ -55,7 +56,12 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
-  const { login, googleLogin } = useAuth()
+  // 2FA challenge state — khi server trả require2FA, lưu tempToken và hiển thị
+  // màn nhập mã 6 số (hoặc 8 ký tự backup code).
+  const [twoFactorState, setTwoFactorState] = useState<{
+    tempToken: string
+  } | null>(null)
+  const { login, googleLogin, complete2FALogin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const googleButtonRef = useRef<HTMLDivElement>(null)
@@ -170,7 +176,12 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setError(null)
     try {
-      await login(data.email, data.password)
+      const result = await login(data.email, data.password)
+      if (result.kind === 'require2FA') {
+        // Server yêu cầu 2FA → chuyển sang màn nhập mã (KHÔNG navigate yet)
+        setTwoFactorState({ tempToken: result.tempToken })
+        return
+      }
       navigate(from, { replace: true })
     } catch (err: unknown) {
       // Phân loại lỗi theo nguồn:
@@ -245,6 +256,20 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-card border border-border rounded-2xl p-8 shadow-md">
+          {twoFactorState ? (
+            <TwoFactorChallenge
+              tempToken={twoFactorState.tempToken}
+              onCancel={() => {
+                setTwoFactorState(null)
+                setError(null)
+              }}
+              onSuccess={(user) => {
+                complete2FALogin(user)
+                navigate(from, { replace: true })
+              }}
+            />
+          ) : (
+          <>
           <h1 className="text-2xl font-bold text-foreground mb-1">{t('loginTitle')}</h1>
           <p className="text-muted-foreground text-sm mb-6">{t('loginSubtitle')}</p>
 
@@ -346,7 +371,125 @@ export default function LoginPage() {
               {t('loginRegisterLink')}
             </Link>
           </p>
+          </>
+          )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════
+// 2FA challenge sau khi user nhập email/password đúng và server yêu
+// cầu mã 2 lớp. Hỗ trợ cả mã TOTP (6 số) và backup code (8 ký tự).
+// ════════════════════════════════════════════════════════════════
+function TwoFactorChallenge({
+  tempToken,
+  onSuccess,
+  onCancel,
+}: {
+  tempToken: string
+  onSuccess: (user: any) => void
+  onCancel: () => void
+}) {
+  const [code, setCode] = useState('')
+  const [useBackup, setUseBackup] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }, [useBackup])
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const minLen = useBackup ? 8 : 6
+    const cleaned = useBackup
+      ? code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+      : code.replace(/\D/g, '').slice(0, 6)
+    if (cleaned.length < minLen) {
+      setError(useBackup ? 'Mã dự phòng phải có 8 ký tự' : 'Mã phải có 6 chữ số')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { user } = await twoFactorService.verifyLogin(tempToken, cleaned)
+      onSuccess(user)
+    } catch (err) {
+      const e = err as { response?: { data?: { error?: string } } }
+      setError(e.response?.data?.error || 'Mã không đúng. Thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <Shield className="w-5 h-5 text-purple-400" />
+        <h1 className="text-2xl font-bold text-foreground">Xác thực 2 lớp</h1>
+      </div>
+      <p className="text-muted-foreground text-sm mb-6">
+        {useBackup
+          ? 'Nhập mã dự phòng 8 ký tự (chỉ dùng được 1 lần).'
+          : 'Mở ứng dụng Authenticator và nhập mã 6 số hiện tại.'}
+      </p>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="space-y-4">
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode={useBackup ? 'text' : 'numeric'}
+          autoComplete="one-time-code"
+          value={code}
+          onChange={e => {
+            setCode(useBackup ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ''))
+            setError(null)
+          }}
+          maxLength={useBackup ? 8 : 6}
+          placeholder={useBackup ? 'ABCD2345' : '000000'}
+          className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground text-2xl font-mono text-center tracking-[0.4em] outline-none focus:ring-2 focus:ring-ring uppercase"
+        />
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full py-2.5 rounded-lg bg-[hsl(262,83%,58%)] hover:bg-[hsl(262,83%,50%)] text-white font-medium text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
+        >
+          {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+          {submitting ? 'Đang xác thực...' : 'Xác thực'}
+        </button>
+      </form>
+
+      <div className="mt-4 flex flex-col items-center gap-2 text-sm">
+        <button
+          type="button"
+          onClick={() => {
+            setUseBackup(b => !b)
+            setCode('')
+            setError(null)
+          }}
+          className="text-[hsl(262,83%,58%)] hover:underline flex items-center gap-1.5"
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          {useBackup ? 'Dùng mã từ ứng dụng' : 'Mất điện thoại? Dùng mã dự phòng'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Đăng nhập tài khoản khác
+        </button>
       </div>
     </div>
   )

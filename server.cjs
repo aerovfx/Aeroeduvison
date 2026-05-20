@@ -189,6 +189,23 @@ if (USE_NODEJS_AUTH) {
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
       }
 
+      // ── 2FA check ──────────────────────────────────────────
+      // Nếu user đã bật 2FA → KHÔNG cấp access token ngay. Trả tempToken
+      // (JWT 5 phút, type='2fa_pending'). UI phải gọi /api/auth/2fa/verify-login
+      // với mã 6 số (TOTP) hoặc 8 ký tự (backup code) để hoàn tất login.
+      if (user.twoFactorEnabled) {
+        const tempToken = jwt.sign(
+          { sub: user.id, type: '2fa_pending' },
+          JWT_SECRET,
+          { expiresIn: '5m' }
+        );
+        console.log(`[auth:login] 🔐 2FA required: ${user.email}`);
+        return res.json({
+          require2FA: true,
+          tempToken,
+        });
+      }
+
       // Update lastLoginAt
       pool.query(
         'UPDATE "User" SET "lastLoginAt" = $1 WHERE id = $2',
@@ -512,6 +529,338 @@ if (USE_NODEJS_AUTH) {
       return res.json({ ok: true, message: 'Đặt lại mật khẩu thành công' });
     } catch (err) {
       console.error('[auth:reset] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // 2FA / TOTP — Two-Factor Authentication
+  // ══════════════════════════════════════════════════════════════
+  // Endpoints:
+  //   POST /api/auth/2fa/setup          → Bearer JWT: tạo secret mới + otpauth URL
+  //   POST /api/auth/2fa/enable         → Bearer JWT: confirm code → enable 2FA + tạo 10 backup codes
+  //   POST /api/auth/2fa/disable        → Bearer JWT: tắt 2FA (yêu cầu password)
+  //   POST /api/auth/2fa/verify-login   → Public: tempToken + code → cấp accessToken
+  //   GET  /api/auth/2fa/status         → Bearer JWT: trạng thái + số backup codes còn
+  //
+  // Login flow: nếu twoFactorEnabled=true, /login trả { require2FA: true, tempToken }
+  // thay vì accessToken. UI phải gọi /verify-login để hoàn tất.
+  // ══════════════════════════════════════════════════════════════
+  // otplib v13 functional API — async-first, but generateSync/verifySync work
+  // with the default @otplib/plugin-crypto-noble plugin (sync-compatible).
+  // Defaults: TOTP strategy, 30s period, 6 digits, sha1 (Google Authenticator standard).
+  const { generateSecret, generateURI, verifySync } = require('otplib');
+  // Tolerance: accept ±1 step (±30s) to handle clock drift between server & phone.
+  const TOTP_TOLERANCE = 1;
+  function verifyTotp(token, secret) {
+    try {
+      const res = verifySync({ secret, token: String(token), epochTolerance: TOTP_TOLERANCE });
+      return !!(res && res.valid);
+    } catch {
+      return false;
+    }
+  }
+
+  // Lazy migration — gọi trước mọi 2FA endpoint
+  async function ensureTwoFactorColumns(pool) {
+    try {
+      await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFactorSecret" TEXT`);
+      await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFactorBackupCodes" JSONB DEFAULT '[]'::jsonb`);
+      await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "twoFactorEnabledAt" TIMESTAMP`);
+    } catch (e) {
+      console.warn('[2fa] migrate:', e.message);
+    }
+  }
+
+  // Helper: verify Bearer token & return decoded payload
+  function requireAuth(req) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) {
+      const err = new Error('Unauthorized');
+      err.status = 401;
+      throw err;
+    }
+    try {
+      return jwt.verify(auth.slice(7), JWT_SECRET);
+    } catch {
+      const err = new Error('Token không hợp lệ');
+      err.status = 401;
+      throw err;
+    }
+  }
+
+  // Helper: sinh 10 backup codes (8 chars alphanumeric uppercase, no I/0/O để tránh nhầm)
+  function generateBackupCodes() {
+    const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const codes = [];
+    for (let i = 0; i < 10; i++) {
+      let code = '';
+      for (let j = 0; j < 8; j++) {
+        code += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+      }
+      codes.push(code);
+    }
+    return codes;
+  }
+
+  // ── POST /api/auth/2fa/setup ──────────────────────────────
+  app.post('/api/auth/2fa/setup', async (req, res) => {
+    try {
+      const decoded = requireAuth(req);
+      const pool = getPool();
+      await ensureTwoFactorColumns(pool);
+
+      const { rows } = await pool.query(
+        'SELECT id, email, "twoFactorEnabled" FROM "User" WHERE id = $1',
+        [decoded.sub]
+      );
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (user.twoFactorEnabled) {
+        return res.status(400).json({ error: '2FA đã được bật. Tắt trước khi setup lại.' });
+      }
+
+      // Generate new TOTP secret + otpauth URL
+      const secret = generateSecret();
+      const otpauthUrl = generateURI({
+        issuer: 'AeroEduVision',
+        label: user.email,
+        secret,
+      });
+
+      // Store secret in DB (NOT activated yet — twoFactorEnabled still false)
+      await pool.query(
+        'UPDATE "User" SET "twoFactorSecret" = $1, "updatedAt" = $2 WHERE id = $3',
+        [secret, new Date(), user.id]
+      );
+
+      console.log(`[2fa:setup] ${user.email}`);
+      return res.json({
+        secret,
+        otpauthUrl,
+        qrCodeData: otpauthUrl, // frontend renders QR using qrcode.react
+      });
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      console.error('[2fa:setup] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── POST /api/auth/2fa/enable ─────────────────────────────
+  app.post('/api/auth/2fa/enable', async (req, res) => {
+    try {
+      const decoded = requireAuth(req);
+      const { code } = req.body || {};
+      if (!code) return res.status(400).json({ error: 'Thiếu mã 2FA' });
+
+      const pool = getPool();
+      await ensureTwoFactorColumns(pool);
+
+      const { rows } = await pool.query(
+        'SELECT id, email, "twoFactorSecret", "twoFactorEnabled" FROM "User" WHERE id = $1',
+        [decoded.sub]
+      );
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user.twoFactorSecret) {
+        return res.status(400).json({ error: 'Chưa setup 2FA. Hãy quét QR trước.' });
+      }
+      if (user.twoFactorEnabled) {
+        return res.status(400).json({ error: '2FA đã được bật' });
+      }
+
+      const ok = verifyTotp(String(code).trim(), user.twoFactorSecret);
+      if (!ok) return res.status(401).json({ error: 'Mã không đúng' });
+
+      // Generate 10 backup codes (plain text → return to user) + bcrypt-hashed → DB
+      const plainCodes = generateBackupCodes();
+      const hashedCodes = await Promise.all(plainCodes.map(c => bcrypt.hash(c, 10)));
+
+      await pool.query(
+        `UPDATE "User"
+         SET "twoFactorEnabled" = true,
+             "twoFactorEnabledAt" = $1,
+             "twoFactorBackupCodes" = $2::jsonb,
+             "updatedAt" = $3
+         WHERE id = $4`,
+        [new Date(), JSON.stringify(hashedCodes), new Date(), user.id]
+      );
+
+      // Invalidate /auth/me cache cho user này
+      try { require('./lib/cache.cjs').del(`auth:me:${user.id}`); } catch {}
+
+      console.log(`[2fa:enable] ✅ ${user.email}`);
+      return res.json({ ok: true, backupCodes: plainCodes });
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      console.error('[2fa:enable] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── POST /api/auth/2fa/disable ────────────────────────────
+  app.post('/api/auth/2fa/disable', async (req, res) => {
+    try {
+      const decoded = requireAuth(req);
+      const { password, code } = req.body || {};
+      if (!password) return res.status(400).json({ error: 'Vui lòng nhập mật khẩu' });
+
+      const pool = getPool();
+      await ensureTwoFactorColumns(pool);
+
+      const { rows } = await pool.query(
+        'SELECT * FROM "User" WHERE id = $1',
+        [decoded.sub]
+      );
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user.password) {
+        return res.status(400).json({ error: 'Tài khoản này dùng Google đăng nhập' });
+      }
+
+      // Verify password
+      const valid = await verifyPassword(password, user.password);
+      if (!valid) return res.status(401).json({ error: 'Mật khẩu không đúng' });
+
+      // Optional: verify TOTP code if provided
+      if (code && user.twoFactorSecret) {
+        const ok = verifyTotp(String(code).trim(), user.twoFactorSecret);
+        if (!ok) return res.status(401).json({ error: 'Mã 2FA không đúng' });
+      }
+
+      // Clear 2FA state
+      await pool.query(
+        `UPDATE "User"
+         SET "twoFactorEnabled" = false,
+             "twoFactorSecret" = NULL,
+             "twoFactorBackupCodes" = '[]'::jsonb,
+             "twoFactorEnabledAt" = NULL,
+             "updatedAt" = $1
+         WHERE id = $2`,
+        [new Date(), user.id]
+      );
+
+      // Invalidate /auth/me cache
+      try { require('./lib/cache.cjs').del(`auth:me:${user.id}`); } catch {}
+
+      console.log(`[2fa:disable] ✅ ${user.email}`);
+      return res.json({ ok: true });
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      console.error('[2fa:disable] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── POST /api/auth/2fa/verify-login ───────────────────────
+  // Body: { tempToken, code }. code có thể là 6-digit TOTP hoặc 8-char backup code.
+  app.post('/api/auth/2fa/verify-login', async (req, res) => {
+    try {
+      const { tempToken, code } = req.body || {};
+      if (!tempToken || !code) {
+        return res.status(400).json({ error: 'Thiếu tempToken hoặc mã' });
+      }
+
+      let decoded;
+      try {
+        decoded = jwt.verify(tempToken, JWT_SECRET);
+      } catch {
+        return res.status(401).json({ error: 'Phiên 2FA hết hạn. Vui lòng đăng nhập lại.' });
+      }
+      if (decoded.type !== '2fa_pending') {
+        return res.status(401).json({ error: 'Token sai loại' });
+      }
+
+      const pool = getPool();
+      await ensureTwoFactorColumns(pool);
+
+      const { rows } = await pool.query(
+        'SELECT * FROM "User" WHERE id = $1',
+        [decoded.sub]
+      );
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+        return res.status(400).json({ error: '2FA không bật trên tài khoản này' });
+      }
+
+      const codeTrim = String(code).trim().toUpperCase();
+      let verified = false;
+
+      // 1) Thử TOTP trước (6 digits)
+      if (/^\d{6}$/.test(codeTrim)) {
+        verified = verifyTotp(codeTrim, user.twoFactorSecret);
+      }
+
+      // 2) Nếu TOTP fail, thử backup codes (8 chars)
+      if (!verified && codeTrim.length === 8) {
+        const stored = Array.isArray(user.twoFactorBackupCodes) ? user.twoFactorBackupCodes : [];
+        for (let i = 0; i < stored.length; i++) {
+          const hash = stored[i];
+          if (typeof hash === 'string' && await bcrypt.compare(codeTrim, hash)) {
+            // Single-use: remove this backup code
+            const newCodes = stored.filter((_, idx) => idx !== i);
+            await pool.query(
+              `UPDATE "User" SET "twoFactorBackupCodes" = $1::jsonb, "updatedAt" = $2 WHERE id = $3`,
+              [JSON.stringify(newCodes), new Date(), user.id]
+            );
+            verified = true;
+            console.log(`[2fa:verify] backup code used by ${user.email} — ${newCodes.length} remaining`);
+            break;
+          }
+        }
+      }
+
+      if (!verified) {
+        return res.status(401).json({ error: 'Mã không đúng' });
+      }
+
+      // Update lastLoginAt
+      pool.query(
+        'UPDATE "User" SET "lastLoginAt" = $1 WHERE id = $2',
+        [new Date(), user.id]
+      ).catch(() => {});
+
+      // Issue full access token
+      const token = issueToken(user);
+      console.log(`[2fa:verify] ✅ ${user.email}`);
+      return res.json({
+        user: publicUser(user),
+        tokens: { accessToken: token, refreshToken: '' },
+      });
+    } catch (err) {
+      console.error('[2fa:verify] ❌', err.message);
+      return res.status(500).json({ error: 'Lỗi máy chủ' });
+    }
+  });
+
+  // ── GET /api/auth/2fa/status ──────────────────────────────
+  app.get('/api/auth/2fa/status', async (req, res) => {
+    try {
+      const decoded = requireAuth(req);
+      const pool = getPool();
+      await ensureTwoFactorColumns(pool);
+
+      const { rows } = await pool.query(
+        'SELECT "twoFactorEnabled", "twoFactorEnabledAt", "twoFactorBackupCodes" FROM "User" WHERE id = $1',
+        [decoded.sub]
+      );
+      const user = rows[0];
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      const backupCodesRemaining = Array.isArray(user.twoFactorBackupCodes)
+        ? user.twoFactorBackupCodes.length
+        : 0;
+
+      return res.json({
+        enabled: !!user.twoFactorEnabled,
+        enabledAt: user.twoFactorEnabledAt ? new Date(user.twoFactorEnabledAt).toISOString() : null,
+        backupCodesRemaining,
+      });
+    } catch (err) {
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      console.error('[2fa:status] ❌', err.message);
       return res.status(500).json({ error: 'Lỗi máy chủ' });
     }
   });
