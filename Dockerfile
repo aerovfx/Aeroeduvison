@@ -104,7 +104,8 @@ RUN npm config set fetch-timeout 600000 && \
       pdf-parse@1.1.4 \
       nodemailer@6 \
       multer@1 \
-      @google-cloud/storage@7
+      @google-cloud/storage@7 \
+      otplib@13
 
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist
