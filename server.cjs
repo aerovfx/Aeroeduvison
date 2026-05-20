@@ -31141,6 +31141,10 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
           "updatedAt"  TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
       `);
+      // Add lat/lon/province columns if not exist (lazy migration)
+      for (const [col, kind] of [['lat','FLOAT'],['lon','FLOAT'],['province','TEXT']]) {
+        try { await pool.query(`ALTER TABLE "TeacherCPD" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); } catch {}
+      }
       // Ensure User table has bio/phone/website for teacher profiles
       for (const [col, kind] of [['bio','TEXT'],['phone','TEXT'],['website','TEXT'],['image','TEXT']]) {
         try { await pool.query(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "${col}" ${kind}`); } catch {}
@@ -31159,11 +31163,24 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         await ensureCpdTable();
         const progress = req.body?.progress;
         if (!progress || typeof progress !== 'object') return res.status(400).json({ error: 'Missing progress object' });
-        await pool.query(`
-          INSERT INTO "TeacherCPD" ("userId", progress, "updatedAt")
-          VALUES ($1, $2::jsonb, NOW())
-          ON CONFLICT ("userId") DO UPDATE SET progress=$2::jsonb, "updatedAt"=NOW()
-        `, [user.id, JSON.stringify(progress)]);
+        // Optional location fields
+        const lat  = typeof req.body?.lat  === 'number' ? req.body.lat  : null;
+        const lon  = typeof req.body?.lon  === 'number' ? req.body.lon  : null;
+        const province = typeof req.body?.province === 'string' ? req.body.province.slice(0, 100) : null;
+        const hasLoc = lat !== null && lon !== null;
+        if (hasLoc) {
+          await pool.query(`
+            INSERT INTO "TeacherCPD" ("userId", progress, lat, lon, province, "updatedAt")
+            VALUES ($1, $2::jsonb, $3, $4, $5, NOW())
+            ON CONFLICT ("userId") DO UPDATE SET progress=$2::jsonb, lat=$3, lon=$4, province=$5, "updatedAt"=NOW()
+          `, [user.id, JSON.stringify(progress), lat, lon, province]);
+        } else {
+          await pool.query(`
+            INSERT INTO "TeacherCPD" ("userId", progress, "updatedAt")
+            VALUES ($1, $2::jsonb, NOW())
+            ON CONFLICT ("userId") DO UPDATE SET progress=$2::jsonb, "updatedAt"=NOW()
+          `, [user.id, JSON.stringify(progress)]);
+        }
         return res.json({ ok: true });
       } catch (e) {
         console.error('[cpd:save]', e.message);
@@ -31198,6 +31215,7 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         const { rows } = await pool.query(`
           SELECT u.id, u.email, u.name, u.image, u.bio, u.phone, u.website,
                  c.progress AS cpd_progress, c."updatedAt" AS cpd_updated_at,
+                 c.lat, c.lon, c.province,
                  u."createdAt"
             FROM "User" u
             LEFT JOIN "TeacherCPD" c ON c."userId" = u.id
@@ -31241,6 +31259,9 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
             phone: r.phone,
             website: r.website,
             joinedAt: r.createdAt,
+            lat: r.lat ?? null,
+            lon: r.lon ?? null,
+            province: r.province ?? null,
             isConnected: connectedIds.has(r.id),
             cpd: {
               avgScore,

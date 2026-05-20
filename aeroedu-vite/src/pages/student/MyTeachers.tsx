@@ -9,15 +9,17 @@
  *
  * CPD summary được lấy từ /api/teachers/all (server aggregate từ TeacherCPD table).
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import {
   GraduationCap, Search, UserPlus, Check, X, Clock, Mail,
   Loader2, AlertCircle, ArrowRight, Trash2, MessageSquare,
-  Brain, Star, Award, ChevronRight, Users,
+  Brain, Star, Award, ChevronRight, Users, MapPin, Navigation,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { api } from '@/services/api'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import {
   teacherStudentLinkService,
   type LinkedUser,
@@ -50,6 +52,9 @@ interface TeacherProfile {
   phone: string | null
   website: string | null
   joinedAt: string | null
+  lat: number | null
+  lon: number | null
+  province: string | null
   isConnected: boolean
   cpd: TeacherCpdSummary
 }
@@ -259,6 +264,9 @@ export default function MyTeachers() {
                 ))}
               </div>
             )}
+
+            {/* ── Bản đồ GV gần địa phương ── */}
+            <TeacherMap teachers={allTeachers} />
           </div>
         )}
 
@@ -785,6 +793,222 @@ function FindTeacherModal({ onClose, onSent }: { onClose: () => void; onSent: ()
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+// TeacherMap — OpenFreeMap map với GPS request + teacher markers
+// ─────────────────────────────────────────────────────────────
+
+const VN_CENTER: [number, number] = [106.0, 16.0]
+const VN_ZOOM = 5.5
+const BASEMAP = 'https://tiles.openfreemap.org/styles/liberty'
+
+function TeacherMap({ teachers }: { teachers: TeacherProfile[] }) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const mapRef       = useRef<maplibregl.Map | null>(null)
+  const markersRef   = useRef<maplibregl.Marker[]>([])
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null)
+  const [gpsStatus, setGpsStatus]   = useState<'idle' | 'loading' | 'granted' | 'denied'>('idle')
+  const [collapsed, setCollapsed]   = useState(false)
+  const [nearbyCount, setNearbyCount] = useState(0)
+
+  const teachersWithLocation = teachers.filter(t => t.lat !== null && t.lon !== null)
+
+  // Init map once
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: BASEMAP,
+      center: VN_CENTER,
+      zoom: VN_ZOOM,
+      attributionControl: false,
+    })
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'bottom-right')
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left')
+    mapRef.current = map
+    return () => {
+      markersRef.current.forEach(m => m.remove())
+      if (userMarkerRef.current) userMarkerRef.current.remove()
+      map.remove()
+      mapRef.current = null
+    }
+  }, [])
+
+  // Add teacher markers when map ready
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    // Remove old markers
+    markersRef.current.forEach(m => m.remove())
+    markersRef.current = []
+
+    teachersWithLocation.forEach(t => {
+      const el = document.createElement('div')
+      el.style.cssText = `
+        width:28px;height:28px;border-radius:50%;
+        background:${t.isConnected ? '#10b981' : '#7c3aed'};
+        border:2px solid ${t.isConnected ? '#34d399' : '#a78bfa'};
+        display:flex;align-items:center;justify-content:center;
+        color:#fff;font-size:11px;font-weight:700;cursor:pointer;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);
+      `
+      el.title = `${t.name || t.email}${t.province ? ' · ' + t.province : ''}`
+      el.textContent = (t.name || t.email)[0].toUpperCase()
+
+      const popup = new maplibregl.Popup({ offset: 16, closeButton: false, maxWidth: '220px' })
+        .setHTML(`
+          <div style="font-family:system-ui;padding:8px;min-width:160px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:2px">${t.name || '(chưa đặt tên)'}</div>
+            <div style="font-size:11px;color:#888;margin-bottom:4px">${t.email}</div>
+            ${t.province ? `<div style="font-size:11px;color:#7c3aed">📍 ${t.province}</div>` : ''}
+            ${t.cpd.milestone ? `<div style="font-size:11px;margin-top:4px">${t.cpd.milestone.emoji} ${t.cpd.milestone.label}</div>` : ''}
+          </div>
+        `)
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([t.lon!, t.lat!])
+        .setPopup(popup)
+        .addTo(map)
+      markersRef.current.push(marker)
+    })
+  }, [teachersWithLocation])
+
+  // Request GPS
+  const requestGPS = () => {
+    if (!navigator.geolocation) {
+      toast.error('Trình duyệt không hỗ trợ GPS')
+      setGpsStatus('denied')
+      return
+    }
+    setGpsStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords
+        setGpsStatus('granted')
+        const map = mapRef.current
+        if (map) {
+          // Fly to user location
+          map.flyTo({ center: [lon, lat], zoom: 9, duration: 1200 })
+          // User marker
+          if (userMarkerRef.current) userMarkerRef.current.remove()
+          const el = document.createElement('div')
+          el.style.cssText = `
+            width:18px;height:18px;border-radius:50%;
+            background:#3b82f6;border:3px solid #fff;
+            box-shadow:0 0 0 4px rgba(59,130,246,0.3);
+          `
+          userMarkerRef.current = new maplibregl.Marker({ element: el })
+            .setLngLat([lon, lat])
+            .setPopup(new maplibregl.Popup({ offset: 12, closeButton: false })
+              .setHTML('<div style="font-family:system-ui;padding:6px;font-size:12px;font-weight:600">📍 Vị trí của bạn</div>'))
+            .addTo(map)
+          // Count nearby teachers (within ~100km ≈ 0.9 degrees)
+          const nearby = teachersWithLocation.filter(t => {
+            const dlat = (t.lat! - lat) * 111
+            const dlon = (t.lon! - lon) * 111 * Math.cos(lat * Math.PI / 180)
+            return Math.sqrt(dlat * dlat + dlon * dlon) <= 100
+          })
+          setNearbyCount(nearby.length)
+          if (nearby.length > 0) {
+            toast.success(`Tìm thấy ${nearby.length} GV trong bán kính 100km`)
+          } else {
+            toast(`Không có GV nào gần vị trí bạn (bán kính 100km)\nGV có thể cập nhật vị trí trong phần Cây tri thức nghề nghiệp`, { icon: '📍' })
+          }
+        }
+      },
+      (err) => {
+        setGpsStatus('denied')
+        if (err.code === 1) toast.error('Bạn đã từ chối cấp quyền GPS')
+        else toast.error('Không lấy được vị trí GPS')
+      },
+      { timeout: 10000, maximumAge: 60000 }
+    )
+  }
+
+  return (
+    <div className="mt-8 rounded-2xl border border-white/[0.08] overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-white/[0.02] border-b border-white/[0.06]">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-4 h-4 text-blue-400" />
+          <span className="text-sm font-bold text-white">Bản đồ GV theo khu vực</span>
+          {teachersWithLocation.length > 0 && (
+            <span className="text-xs bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded-full">
+              {teachersWithLocation.length} GV có vị trí
+            </span>
+          )}
+          {gpsStatus === 'granted' && nearbyCount > 0 && (
+            <span className="text-xs bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-full">
+              {nearbyCount} GV gần bạn
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {gpsStatus === 'idle' && (
+            <button
+              onClick={requestGPS}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-colors"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Dùng GPS
+            </button>
+          )}
+          {gpsStatus === 'loading' && (
+            <span className="flex items-center gap-1.5 text-xs text-blue-300">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />Đang xác định...
+            </span>
+          )}
+          {gpsStatus === 'granted' && (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-300">
+              <Check className="w-3.5 h-3.5" />GPS đang dùng
+            </span>
+          )}
+          {gpsStatus === 'denied' && (
+            <span className="text-xs text-red-400">GPS bị từ chối</span>
+          )}
+          <button
+            onClick={() => setCollapsed(v => !v)}
+            className="text-white/40 hover:text-white/70 transition-colors"
+          >
+            <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? '' : 'rotate-90'}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Map */}
+      {!collapsed && (
+        <div className="relative" style={{ height: 420 }}>
+          <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+          {/* Overlay hint */}
+          {teachersWithLocation.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="bg-black/60 backdrop-blur-sm rounded-xl px-6 py-4 text-center max-w-sm">
+                <GraduationCap className="w-8 h-8 text-white/40 mx-auto mb-2" />
+                <p className="text-sm text-white/70 font-medium">Chưa có GV nào chia sẻ vị trí</p>
+                <p className="text-xs text-white/40 mt-1">GV có thể cập nhật vị trí trong Cây tri thức nghề nghiệp</p>
+              </div>
+            </div>
+          )}
+          {/* Legend */}
+          <div className="absolute bottom-8 left-3 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2 text-xs text-white/70 space-y-1 pointer-events-none">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-purple-600 border border-purple-400 flex-shrink-0" />
+              GV chưa kết nối
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-emerald-600 border border-emerald-400 flex-shrink-0" />
+              GV đã kết nối
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-blue-500 border border-white flex-shrink-0" />
+              Vị trí của bạn
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

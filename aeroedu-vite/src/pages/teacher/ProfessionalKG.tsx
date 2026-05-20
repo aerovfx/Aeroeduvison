@@ -10,7 +10,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Brain, Download, FileJson, TrendingUp, Award, Plus, PenLine,
   BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
-  Shield, Save, Clock, Lightbulb, CheckCircle2, X,
+  Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
@@ -1196,6 +1196,8 @@ export default function ProfessionalKG() {
         <button onClick={exportJson} className="flex items-center gap-1 px-2.5 py-1.5 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-xs font-semibold">
           <FileJson className="w-3 h-3" /><span className="hidden sm:inline">JSON</span>
         </button>
+        {/* Chia sẻ vị trí trường lên bản đồ */}
+        <ShareLocationButton userId={userId} progressMap={progressMap} syncToBackend={syncToBackend} />
       </div>
 
       {/* ── Career stats bar ── */}
@@ -1717,5 +1719,73 @@ export default function ProfessionalKG() {
         )}
       </div>
     </div>
+  )
+}
+
+// ── ShareLocationButton — GV chia sẻ vị trí trường để hiện trên bản đồ HS ──
+
+interface ShareLocationProps {
+  userId: string
+  progressMap: ProgressMap
+  syncToBackend: (map: ProgressMap) => void
+}
+
+function ShareLocationButton({ userId, progressMap, syncToBackend: _syncToBackend }: ShareLocationProps) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'denied'>('idle')
+
+  const share = () => {
+    if (!navigator.geolocation) { toast.error('Trình duyệt không hỗ trợ GPS'); return }
+    setStatus('loading')
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude: lat, longitude: lon } = pos.coords
+        try {
+          // Reverse geocode to province using a simple approach
+          let province = ''
+          try {
+            const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&accept-language=vi`)
+            const d = await r.json()
+            province = d.address?.state || d.address?.province || d.address?.county || ''
+          } catch {}
+          await api.post('/teachers/cpd', { progress: progressMap, lat, lon, province })
+          saveProgress(userId, progressMap)
+          setStatus('done')
+          toast.success(`Đã chia sẻ vị trí${province ? ' (' + province + ')' : ''} lên bản đồ GV`)
+        } catch (e) {
+          setStatus('idle')
+          toast.error('Không lưu được vị trí')
+        }
+      },
+      (err) => {
+        setStatus(err.code === 1 ? 'denied' : 'idle')
+        if (err.code === 1) toast.error('Quyền GPS bị từ chối')
+      },
+      { timeout: 10000, maximumAge: 300000 }
+    )
+  }
+
+  if (status === 'done') return (
+    <button disabled className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-800/50 text-blue-300 rounded-lg text-xs font-semibold opacity-70 cursor-default">
+      <MapPin className="w-3 h-3" /><span className="hidden sm:inline">Đã chia sẻ</span>
+    </button>
+  )
+  if (status === 'denied') return (
+    <button disabled className="flex items-center gap-1 px-2.5 py-1.5 bg-red-900/30 text-red-400 rounded-lg text-xs font-semibold opacity-70 cursor-default">
+      <MapPin className="w-3 h-3" /><span className="hidden sm:inline">GPS bị từ chối</span>
+    </button>
+  )
+
+  return (
+    <button
+      onClick={share}
+      disabled={status === 'loading'}
+      title="Chia sẻ vị trí trường để HS có thể tìm GV gần địa phương"
+      className="flex items-center gap-1 px-2.5 py-1.5 bg-blue-700 hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg text-xs font-semibold"
+    >
+      {status === 'loading'
+        ? <><Navigation className="w-3 h-3 animate-spin" /><span className="hidden sm:inline">...</span></>
+        : <><MapPin className="w-3 h-3" /><span className="hidden sm:inline">Vị trí</span></>
+      }
+    </button>
   )
 }

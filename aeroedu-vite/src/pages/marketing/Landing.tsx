@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import WorldMonitorGlobe from '@/components/world-monitor/WorldMonitorGlobe'
 import IntelDashboard from '@/components/world-monitor/IntelDashboard'
-import StemMonitor2DMap from '@/components/world-monitor/StemMonitor2DMap'
 import StemMonitorDeckMap from '@/components/world-monitor/StemMonitorDeckMap'
 import { useAeroGeo } from '@/services/aeroBackend.service'
 
@@ -136,8 +135,6 @@ export default function Landing() {
   const [activeFeature, setActiveFeature] = useState(0)
   const [videoPaused, setVideoPaused] = useState(true)
   const [fullScreenMonitor, setFullScreenMonitor] = useState(false)
-  // 'svg' = procedural 1024×512 SVG renderer, 'deck' = real MapLibre + deck.gl
-  const [monitorEngine, setMonitorEngine] = useState<'svg' | 'deck'>('deck')
 
   // Live startup + user geo data from aero-backend (inphysic.com Rust API).
   // When VITE_AERO_BACKEND_URL is unset these return [] and the globe falls
@@ -315,7 +312,7 @@ export default function Landing() {
             <Globe size={12} /> Hero
           </button>
           <button
-            onClick={() => { setFullScreenMonitor(true); setMonitorEngine('svg') }}
+            onClick={() => setFullScreenMonitor(true)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 14px',
@@ -325,55 +322,20 @@ export default function Landing() {
               fontFamily: 'inherit',
               fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
               textTransform: 'uppercase',
-              color: fullScreenMonitor && monitorEngine === 'svg' ? '#020412' : C.muted,
-              background: fullScreenMonitor && monitorEngine === 'svg'
-                ? `linear-gradient(135deg, ${C.cyan}, ${C.purple})`
-                : 'transparent',
-              transition: 'all .2s',
-            }}
-          >
-            <Layers size={12} /> Stem Monitor
-            <span style={{
-              marginLeft: 2,
-              padding: '1px 5px',
-              fontSize: 9,
-              borderRadius: 4,
-              background: fullScreenMonitor && monitorEngine === 'svg' ? 'rgba(0,0,0,0.25)' : C.cyanA(0.15),
-              color: fullScreenMonitor && monitorEngine === 'svg' ? '#020412' : C.cyan,
-              fontWeight: 800,
-            }}>
-              SVG
-            </span>
-          </button>
-          <button
-            onClick={() => { setFullScreenMonitor(true); setMonitorEngine('deck') }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px',
-              borderRadius: 99,
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-              textTransform: 'uppercase',
-              color: fullScreenMonitor && monitorEngine === 'deck' ? '#020412' : C.muted,
-              background: fullScreenMonitor && monitorEngine === 'deck'
+              color: fullScreenMonitor ? '#020412' : C.muted,
+              background: fullScreenMonitor
                 ? `linear-gradient(135deg, ${C.purple}, ${C.cyan})`
                 : 'transparent',
               transition: 'all .2s',
             }}
           >
-            <MapPin size={12} /> Stem Monitor
+            <MapPin size={12} /> STEM·MONITOR
             <span style={{
-              marginLeft: 2,
-              padding: '1px 5px',
-              fontSize: 9,
-              borderRadius: 4,
-              background: fullScreenMonitor && monitorEngine === 'deck' ? 'rgba(0,0,0,0.25)' : C.purpleA(0.15),
-              color: fullScreenMonitor && monitorEngine === 'deck' ? '#020412' : C.purple,
-              fontWeight: 800,
+              marginLeft: 2, padding: '1px 5px', fontSize: 9, borderRadius: 4,
+              background: fullScreenMonitor ? 'rgba(0,0,0,0.25)' : C.purpleA(0.15),
+              color: fullScreenMonitor ? '#020412' : C.purple, fontWeight: 800,
             }}>
-              MAP
+              LIVE
             </span>
           </button>
         </div>
@@ -1394,10 +1356,7 @@ export default function Landing() {
       `}</style>
 
       {/* ══ Full-screen STEM MONITOR overlay (worldmonitor.app-style) ══ */}
-      {fullScreenMonitor && monitorEngine === 'svg' && (
-        <StemMonitor2DMap onClose={() => setFullScreenMonitor(false)} initialView="asia" />
-      )}
-      {fullScreenMonitor && monitorEngine === 'deck' && (
+      {fullScreenMonitor && (
         <StemMonitorDeckMap onClose={() => setFullScreenMonitor(false)} initialView="asia" />
       )}
     </div>
