@@ -196,6 +196,7 @@ const StudentVideoTranscriptHistoryPage = lazy(() => import('@/pages/student/Vid
 // ── Learning Paths ────────────────────────────────────────────
 const LearningPathsPage            = lazy(() => import('@/pages/learning/LearningPaths'))
 const LearningPathsRecommendedPage = lazy(() => import('@/pages/learning/LearningPathsRecommended'))
+const LearningPathLessonPage       = lazy(() => import('@/pages/learning/LearningPathLesson'))
 
 // ── Learning / Course Player ─────────────────────────────────
 const CoursePlayerPage = lazy(() => import('@/pages/learning/CoursePlayer'))
@@ -412,7 +413,7 @@ export function AppRouter() {
             {/* ── LEARNING PATHS ────────────────────────────── */}
             <Route path="/learning-paths"                     element={<LearningPathsPage />} />
             <Route path="/learning-paths/recommended"         element={<LearningPathsRecommendedPage />} />
-            <Route path="/learning-paths/lesson/:lessonId"    element={<PageFallback />} />
+            <Route path="/learning-paths/lesson/:lessonId"    element={<LearningPathLessonPage />} />
 
             {/* ── SEARCH ────────────────────────────────────── */}
             <Route path="/search"          element={<PageFallback />} />

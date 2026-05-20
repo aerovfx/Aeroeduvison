@@ -8057,6 +8057,60 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
     }
   });
 
+  // ── PATCH /api/student/learning-paths/:pathId/modules/:moduleId/complete ──
+  // Đánh dấu 1 module là completed, cập nhật progressPct
+  app.patch('/api/student/learning-paths/:pathId/modules/:moduleId/complete',
+    express.json({ limit: '8kb' }),
+    async (req, res) => {
+      try {
+        const user = getUserAsgn(req);
+        if (!user?.id) return res.status(401).json({ error: 'unauthorized' });
+        const { pathId, moduleId } = req.params;
+        await ensureLPTables();
+        const pool = getAsgnPool();
+        // Load assignment
+        const { rows } = await pool.query(
+          `SELECT id, "moduleStatus", "progressPct"
+             FROM "LearningPathAssignment"
+            WHERE "pathId"=$1 AND ("studentId"=$2 OR "studentEmail"=LOWER($3))
+            LIMIT 1`,
+          [pathId, user.id, user.email || '']
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Assignment not found' });
+        const asgn = rows[0];
+        const ms = asgn.moduleStatus || {};
+        ms[moduleId] = 'completed';
+        // Recalculate progress: fetch path modules to count total
+        const { rows: pathRows } = await pool.query(
+          `SELECT modules FROM "LearningPath" WHERE id=$1 LIMIT 1`,
+          [pathId]
+        );
+        let newPct = asgn.progressPct || 0;
+        if (pathRows.length) {
+          const mods = pathRows[0].modules || [];
+          const total = mods.length;
+          if (total > 0) {
+            const done = Object.values(ms).filter(s => s === 'completed').length;
+            newPct = Math.round((done / total) * 100);
+          }
+        }
+        const newStatus = newPct >= 100 ? 'completed' : 'in_progress';
+        await pool.query(
+          `UPDATE "LearningPathAssignment"
+              SET "moduleStatus"=$1, "progressPct"=$2, status=$3,
+                  "lastActivityAt"=NOW(),
+                  "completedAt"=CASE WHEN $3='completed' THEN NOW() ELSE "completedAt" END
+            WHERE id=$4`,
+          [ms, newPct, newStatus, asgn.id]
+        );
+        return res.json({ ok: true, moduleStatus: ms, progressPct: newPct, status: newStatus });
+      } catch (err) {
+        console.error('[student:lp:module:complete]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    }
+  );
+
   // ════════════════════════════════════════════════════════════
   // LESSON PLANS — GV soạn giáo án WYSIWYG (Google Docs-like)
   // Lưu HTML/JSON content → DB. Optional snapshot lên GCS bucket.
