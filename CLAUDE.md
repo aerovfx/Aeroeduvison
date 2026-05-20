@@ -15,8 +15,9 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `7f5e4ca` (revision pixiai-00361-rem, 2026-05-20 — mobile sidebar w-16/w-56 + tooltip tap + paste JSON khi import câu hỏi)
-- Commits since last deploy: `3/5`
+- Last deployed commit: `715241b` (revision pixiai-00362-yug, 2026-05-20 — HOTFIX SECURITY: PII exposure + stored XSS trên /student/teachers)
+- Commits since last deploy: `0/5`
+- Prev: `7f5e4ca` → pixiai-00361-rem (mobile sidebar w-16/w-56 + tooltip tap + paste JSON khi import câu hỏi + 4 loại câu chuẩn THPT + gợi ý KG 45 skill)
 - Prev: `4dc4bbb` → pixiai-00360-sum (Teacher Directory + CPD + Bản đồ GV + STEM·MONITOR upgrade + mobile sidebar hamburger)
 - Prev: `7071b5a` → pixiai-00359-baw (hotfix deploy từ worktree: latex 503 + BulkGrading crash + Landing team/awards/testimonials)
 - Prev: `9ddd5de` → pixiai-00358-zuc (nhầm deploy từ main — thiếu landing sections, latex 503)
