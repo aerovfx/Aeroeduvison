@@ -1,215 +1,189 @@
 /**
- * useAntiScreenshot — Hệ thống bảo vệ nội dung khỏi screenshot/screen-recording
+ * useAntiScreenshot — Chặn phím tắt screenshot/recording, KHÔNG làm phiền UX
  *
- * Strategy (chuẩn Udemy / Netflix / Coursera):
- *   1. PHÁT HIỆN — keyboard shortcut, visibility change, blur (sự kiện
- *      thường xảy ra khi user mở tool chụp/quay màn hình)
- *   2. BLUR NỘI DUNG — khi phát hiện → toàn bộ trang blur(20px) 3 giây
- *      → ảnh chụp được sẽ mờ hết
- *   3. CẢNH BÁO — overlay rõ ràng + ghi sự kiện server (audit log)
- *   4. WATERMARK — overlay user email + timestamp khắp màn hình
- *      → ảnh nếu rò rỉ vẫn truy được người chia sẻ
- *   5. CHẶN PHỤ TRỢ — right-click, drag, text selection
+ * Phiên bản 3 (2026-05-20) — đáp ứng feedback user:
+ *   "dừng việc thông báo bản quyền và thoát màn hình khi người dùng refresh trang"
  *
- * ⚠️  Limitation thực tế: browser KHÔNG thể chặn OS-level screenshot
- *     (Cmd+Shift+4, Win+PrtScr ở OS layer). Nhưng combo "blur khi mất focus"
- *     + "watermark" giảm 90% rò rỉ vì ảnh chụp được luôn mờ + có ID user.
+ * Thay đổi so với v2:
+ *   ❌ XOÁ window blur/focus listener — vì refresh / switch tab thường cũng
+ *      trigger → blur toàn màn hình rất phiền
+ *   ❌ XOÁ visibilitychange listener — cùng lý do
+ *   ❌ XOÁ DevTools heuristic — false positive khi user resize cửa sổ
+ *   ❌ XOÁ modal warning chiếm toàn màn hình — thay bằng toast nhẹ
+ *   ✅ GIỮ chặn phím tắt screenshot Windows/Mac (preventDefault capture phase)
+ *   ✅ GIỮ chặn right-click + drag image/video
+ *   ✅ GIỮ watermark grid (passive, không ảnh hưởng UI)
+ *   ✅ GIỮ audit log fire-and-forget cho admin xem
+ *
+ * Phím chặn:
+ *   Windows:  PrintScreen, Win+Shift+S, Win+G (Game Bar), Ctrl+S, Ctrl+P, F12
+ *   macOS:    Cmd+Shift+3/4/5/6, Cmd+Ctrl+Shift+3/4, Cmd+S, Cmd+P,
+ *             Cmd+Opt+I (DevTools), Cmd+Opt+U (View Source)
+ *   Cross:    Ctrl+Shift+I (DevTools), Ctrl+U (View Source)
+ *
+ * ⚠️  Limitation: browser KHÔNG thể chặn OS-level screenshot 100%. Phím tắt
+ *     được preventDefault ở capture phase, nhưng nếu OS bắt phím trước
+ *     browser (rất hiếm với các phím trên), vẫn có thể chụp được.
+ *     Watermark + audit log là layer phòng thủ thứ 2.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-interface AntiScreenshotState {
-  /** Hiển thị warning overlay */
-  showWarning: boolean
-  /** Đang trong giai đoạn blur (3s sau khi detect) */
-  blurActive: boolean
-  /** Reason để hiển thị trong cảnh báo */
-  reason: string
-}
-
-const BLUR_DURATION_MS = 3000        // mờ 3 giây sau khi detect
-const WARNING_DURATION_MS = 6000     // overlay warning 6 giây
+const TOAST_DURATION_MS = 2500  // toast hiển thị 2.5 giây
 
 export function useAntiScreenshot() {
-  const [state, setState] = useState<AntiScreenshotState>({
-    showWarning: false, blurActive: false, reason: '',
-  })
-  const blurTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const warnTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const focusedRef     = useRef(true)
+  // Thông báo dạng toast — ngắn gọn, không cản trở user
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const toastTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastTriggerRef = useRef(0)
 
-  // ─── Trigger protection ─────────────────────────────────────────────
+  // ─── Hiển thị toast cảnh báo ───────────────────────────────────────
   const trigger = useCallback((reason: string) => {
     const now = Date.now()
-    // Debounce — tránh trigger liên tiếp khi user chuyển tab nhanh
-    if (now - lastTriggerRef.current < 500) return
+    // Debounce 1 giây — tránh spam khi user nhấn liên tiếp
+    if (now - lastTriggerRef.current < 1000) return
     lastTriggerRef.current = now
 
-    setState({ showWarning: true, blurActive: true, reason })
+    setToastMsg(`⛔ ${reason} — nội dung được bảo vệ bản quyền`)
 
-    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
-    if (warnTimerRef.current) clearTimeout(warnTimerRef.current)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), TOAST_DURATION_MS)
 
-    blurTimerRef.current = setTimeout(() => {
-      setState(s => ({ ...s, blurActive: false }))
-    }, BLUR_DURATION_MS)
-
-    warnTimerRef.current = setTimeout(() => {
-      setState(s => ({ ...s, showWarning: false }))
-    }, WARNING_DURATION_MS)
-
-    // ── Best-effort audit log ──
+    // ── Best-effort audit log (silent, không block UI) ──
     try {
       const userStr = localStorage.getItem('user')
-      const userId = userStr ? JSON.parse(userStr).id : 'guest'
-      // Fire-and-forget — nếu network lỗi cũng không sao
+      const userId  = userStr ? JSON.parse(userStr).id : 'guest'
       fetch('/api/audit/screenshot-attempt', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId, reason, ts: now,
           url: window.location.href,
           ua: navigator.userAgent,
         }),
-      }).catch(() => {})
+      }).catch(() => { /* network lỗi cũng không sao */ })
     } catch { /* ignore */ }
   }, [])
 
-  const dismissWarning = useCallback(() => {
-    setState(s => ({ ...s, showWarning: false }))
-  }, [])
+  const dismissWarning = useCallback(() => setToastMsg(null), [])
 
-  // ─── Keyboard shortcuts ─────────────────────────────────────────────
+  // ─── CHẶN PHÍM TẮT ─────────────────────────────────────────────────
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       const { key, code, shiftKey, metaKey, ctrlKey, altKey } = e
+      const upperKey = (key || '').toUpperCase()
 
-      // PrintScreen (Windows / generic)
+      // ── PrintScreen (Windows / generic) ──
       if (code === 'PrintScreen' || key === 'PrintScreen') {
-        e.preventDefault()
-        trigger('PrintScreen key')
+        e.preventDefault(); e.stopPropagation()
+        trigger('Phím PrintScreen bị chặn')
         return
       }
-      // Win+Shift+S (Snipping Tool) — OS modifier detection
-      if (shiftKey && (key === 'S' || key === 's')) {
+
+      // ── Win+Shift+S (Snipping Tool) ──
+      // OS modifier ≈ Windows logo key. Một số trình duyệt dùng Meta.
+      if (shiftKey && upperKey === 'S') {
         const isOS = e.getModifierState?.('OS') || e.getModifierState?.('Meta')
         if (isOS) {
-          e.preventDefault()
-          trigger('Snipping Tool')
+          e.preventDefault(); e.stopPropagation()
+          trigger('Snipping Tool bị chặn')
           return
         }
       }
-      // macOS Cmd+Shift+3/4/5
-      if (metaKey && shiftKey && (key === '3' || key === '4' || key === '5')) {
-        e.preventDefault()
-        trigger('macOS screenshot shortcut')
+
+      // ── Win+G (Xbox Game Bar — quay video Windows 10/11) ──
+      if (e.getModifierState?.('OS') && upperKey === 'G') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Game Bar bị chặn')
         return
       }
-      // macOS Cmd+Ctrl+Shift+4 (clipboard)
-      if (metaKey && ctrlKey && shiftKey && key === '4') {
-        e.preventDefault()
-        trigger('macOS screenshot to clipboard')
+
+      // ── macOS Cmd+Shift+3/4/5/6 (screenshot/recording) ──
+      if (metaKey && shiftKey && ['3','4','5','6'].includes(key)) {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Phím chụp macOS bị chặn')
         return
       }
-      // F12 / Ctrl+Shift+I (DevTools)
-      if (key === 'F12' || (ctrlKey && shiftKey && (key === 'I' || key === 'i'))) {
-        e.preventDefault()
-        trigger('Developer Tools')
+
+      // ── macOS Cmd+Ctrl+Shift+3/4 (chụp vào clipboard) ──
+      if (metaKey && ctrlKey && shiftKey && ['3','4'].includes(key)) {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Chụp vào clipboard bị chặn')
         return
       }
-      // Cmd+Opt+I (macOS DevTools)
-      if (metaKey && altKey && (key === 'I' || key === 'i')) {
-        e.preventDefault()
-        trigger('Developer Tools (macOS)')
+
+      // ── F12 / Ctrl+Shift+I / Cmd+Opt+I (DevTools) ──
+      if (key === 'F12') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('DevTools bị chặn')
         return
       }
-      // Ctrl+S / Cmd+S (Save page)
-      if ((ctrlKey || metaKey) && (key === 's' || key === 'S')) {
-        e.preventDefault()
-        trigger('Save page')
+      if (ctrlKey && shiftKey && upperKey === 'I') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('DevTools bị chặn')
         return
       }
-      // Ctrl+P / Cmd+P (Print → can save as PDF)
-      if ((ctrlKey || metaKey) && (key === 'p' || key === 'P')) {
-        e.preventDefault()
-        trigger('Print page')
+      if (metaKey && altKey && upperKey === 'I') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('DevTools bị chặn')
         return
       }
-      // Ctrl+U / Cmd+Opt+U (View source)
-      if ((ctrlKey && (key === 'u' || key === 'U')) ||
-          (metaKey && altKey && (key === 'u' || key === 'U'))) {
-        e.preventDefault()
-        trigger('View source')
+
+      // ── Ctrl+S / Cmd+S (Lưu trang) ──
+      if ((ctrlKey || metaKey) && !shiftKey && !altKey && upperKey === 'S') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Lưu trang bị chặn')
+        return
+      }
+
+      // ── Ctrl+P / Cmd+P (In trang — có thể save PDF) ──
+      if ((ctrlKey || metaKey) && !shiftKey && !altKey && upperKey === 'P') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('In trang bị chặn')
+        return
+      }
+
+      // ── Ctrl+U / Cmd+Opt+U (Xem source) ──
+      if ((ctrlKey && upperKey === 'U' && !metaKey) ||
+          (metaKey && altKey && upperKey === 'U')) {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Xem source bị chặn')
+        return
+      }
+
+      // ── Ctrl+Shift+P (Command palette DevTools) ──
+      if (ctrlKey && shiftKey && upperKey === 'P') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('DevTools command bị chặn')
+        return
+      }
+
+      // ── Ctrl+Shift+C (Inspect element) ──
+      if (ctrlKey && shiftKey && upperKey === 'C') {
+        e.preventDefault(); e.stopPropagation()
+        trigger('Inspect bị chặn')
         return
       }
     }
+
+    // Capture phase — chặn TRƯỚC mọi handler khác trên trang
     window.addEventListener('keydown', handleKey, { capture: true })
     return () => window.removeEventListener('keydown', handleKey, { capture: true })
   }, [trigger])
 
-  // ─── Visibility / Focus detection ───────────────────────────────────
-  // Khi user mở Snipping Tool / Cmd+Shift+5 picker → window mất focus
-  // → blur content ngay lập tức cho đến khi focus quay lại
-  useEffect(() => {
-    const handleBlur = () => {
-      focusedRef.current = false
-      // Chỉ blur — không hiển thị warning (tránh annoying khi user chuyển tab thường)
-      setState(s => ({ ...s, blurActive: true }))
-    }
-    const handleFocus = () => {
-      focusedRef.current = true
-      // Clear blur khi focus quay lại
-      if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
-      setState(s => ({ ...s, blurActive: false }))
-    }
-    const handleVisibility = () => {
-      if (document.hidden) {
-        // Tab ẩn → blur nội dung
-        setState(s => ({ ...s, blurActive: true }))
-      } else {
-        setState(s => ({ ...s, blurActive: false }))
-      }
-    }
-    window.addEventListener('blur', handleBlur)
-    window.addEventListener('focus', handleFocus)
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => {
-      window.removeEventListener('blur', handleBlur)
-      window.removeEventListener('focus', handleFocus)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [])
-
-  // ─── DevTools detection (resize-based heuristic) ────────────────────
-  useEffect(() => {
-    let devtoolsOpen = false
-    const threshold = 160
-    const check = () => {
-      const widthDiff  = window.outerWidth  - window.innerWidth
-      const heightDiff = window.outerHeight - window.innerHeight
-      const isOpen = widthDiff > threshold || heightDiff > threshold
-      if (isOpen && !devtoolsOpen) {
-        devtoolsOpen = true
-        trigger('DevTools opened')
-      } else if (!isOpen) {
-        devtoolsOpen = false
-      }
-    }
-    const id = setInterval(check, 1500)
-    return () => clearInterval(id)
-  }, [trigger])
-
-  // ─── Disable right-click + drag globally ────────────────────────────
+  // ─── CHẶN right-click + drag image/video ──────────────────────────
   useEffect(() => {
     const onContextMenu = (e: MouseEvent) => {
-      // Cho phép right-click trên input/textarea (UX cần thiết)
-      const t = e.target as HTMLElement
+      const t = e.target as HTMLElement | null
+      if (!t) return
+      // Cho phép right-click trên input/textarea/contenteditable
+      // (UX cần thiết — paste, copy, select all)
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable) return
       e.preventDefault()
-      trigger('Right-click menu')
+      // KHÔNG trigger toast cho right-click — phổ biến và không nguy hiểm bằng key
     }
     const onDragStart = (e: DragEvent) => {
-      const t = e.target as HTMLElement
+      const t = e.target as HTMLElement | null
+      if (!t) return
       if (t.tagName === 'IMG' || t.tagName === 'VIDEO') {
         e.preventDefault()
       }
@@ -220,18 +194,20 @@ export function useAntiScreenshot() {
       document.removeEventListener('contextmenu', onContextMenu)
       document.removeEventListener('dragstart', onDragStart)
     }
-  }, [trigger])
+  }, [])
 
   // ─── Cleanup ────────────────────────────────────────────────────────
   useEffect(() => () => {
-    if (blurTimerRef.current) clearTimeout(blurTimerRef.current)
-    if (warnTimerRef.current) clearTimeout(warnTimerRef.current)
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
   }, [])
 
   return {
-    showWarning: state.showWarning,
-    blurActive: state.blurActive,
-    reason: state.reason,
+    /** Thông báo toast (null khi không có) */
+    toastMsg,
     dismissWarning,
+    // Legacy compat — luôn false để các nơi check không phải sửa
+    showWarning: false,
+    blurActive: false,
+    reason: '',
   }
 }

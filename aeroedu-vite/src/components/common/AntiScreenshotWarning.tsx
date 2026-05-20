@@ -1,21 +1,26 @@
 /**
- * AntiScreenshotWarning — hệ thống bảo vệ nội dung 3-lớp:
+ * AntiScreenshotWarning — Bảo vệ nội dung NHẸ NHÀNG
  *
- *   1. BLUR LAYER — toàn bộ #app-root → filter:blur(24px) khi blurActive=true
- *      → ảnh chụp được sẽ mờ tịt
- *   2. WATERMARK GRID — overlay đầy màn hình với email + thời gian
- *      → ảnh nếu rò rỉ vẫn truy được user
- *   3. WARNING MODAL — cảnh báo rõ ràng khi phát hiện screenshot shortcut
+ * Phiên bản 3 (2026-05-20):
+ *   ❌ XOÁ blur toàn màn hình (bị trigger khi user refresh / chuyển tab)
+ *   ❌ XOÁ modal warning chiếm full screen
+ *   ✅ GIỮ watermark grid (passive, không cản UX)
+ *   ✅ THÊM toast nhỏ ở góc dưới phải khi phát hiện phím tắt screenshot
  *
- * Tích hợp vào DashboardLayout → áp dụng toàn bộ dashboard.
+ * Component này render:
+ *   1. Watermark luôn hiển thị (lưới chéo + email user) — bảo vệ thụ động,
+ *      ảnh chụp rò rỉ vẫn truy được nguồn
+ *   2. Toast cảnh báo ngắn (2.5s) khi user nhấn phím tắt bị chặn —
+ *      KHÔNG modal full screen, KHÔNG blur, KHÔNG yêu cầu dismiss
  */
 import { useEffect, useState } from 'react'
-import { ShieldAlert, X, Lock } from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
 import { useAntiScreenshot } from '@/hooks/useAntiScreenshot'
 
 // ── Watermark Grid ─────────────────────────────────────────────────────────
 function WatermarkGrid({ userLabel }: { userLabel: string }) {
-  // Lưới watermark — diagonal, đủ dày để ảnh chụp luôn dính label
+  // Lưới watermark — diagonal, opacity rất thấp để không ảnh hưởng đọc,
+  // nhưng đủ để ảnh chụp dính label người dùng (truy nguồn)
   return (
     <div
       className="fixed inset-0 pointer-events-none z-[9990] overflow-hidden select-none"
@@ -27,18 +32,18 @@ function WatermarkGrid({ userLabel }: { userLabel: string }) {
           backgroundImage: `repeating-linear-gradient(
             -30deg,
             transparent 0px,
-            transparent 180px,
-            rgba(255,255,255,0.04) 180px,
-            rgba(255,255,255,0.04) 181px
+            transparent 240px,
+            rgba(255,255,255,0.025) 240px,
+            rgba(255,255,255,0.025) 241px
           )`,
         }}
       />
       <div
         className="absolute inset-0 flex items-center justify-center"
         style={{
-          opacity: 0.045,
+          opacity: 0.035,
           transform: 'rotate(-22deg) scale(1.3)',
-          fontSize: '14px',
+          fontSize: '13px',
           color: '#fff',
           fontWeight: 600,
           letterSpacing: '0.05em',
@@ -58,7 +63,7 @@ function WatermarkGrid({ userLabel }: { userLabel: string }) {
 }
 
 export function AntiScreenshotWarning() {
-  const { showWarning, blurActive, reason, dismissWarning } = useAntiScreenshot()
+  const { toastMsg } = useAntiScreenshot()
   const [userLabel, setUserLabel] = useState('inphysic.com')
 
   // Đọc thông tin user cho watermark
@@ -73,87 +78,24 @@ export function AntiScreenshotWarning() {
     } catch { /* ignore */ }
   }, [])
 
-  // ── Apply / remove blur to #app-root khi blurActive thay đổi ──
-  useEffect(() => {
-    const root = document.getElementById('root') || document.body
-    if (blurActive) {
-      root.style.transition = 'filter 0.25s ease-in-out'
-      root.style.filter = 'blur(24px) brightness(0.3)'
-    } else {
-      root.style.filter = ''
-      // remove transition sau khi xong để không ảnh hưởng UI khác
-      setTimeout(() => { root.style.transition = '' }, 300)
-    }
-    return () => {
-      root.style.filter = ''
-      root.style.transition = ''
-    }
-  }, [blurActive])
-
   return (
     <>
       {/* Watermark luôn hiển thị (mờ nhạt — không ảnh hưởng đọc) */}
       <WatermarkGrid userLabel={userLabel} />
 
-      {/* Warning modal khi phát hiện screenshot shortcut */}
-      {showWarning && (
+      {/* Toast cảnh báo nhỏ góc dưới phải khi phát hiện phím tắt screenshot */}
+      {toastMsg && (
         <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center"
-          style={{
-            backgroundColor: 'rgba(0,0,0,0.92)',
-            backdropFilter: 'blur(8px)',
-          }}
-          onClick={dismissWarning}
+          className="fixed bottom-4 right-4 z-[10000] max-w-sm animate-fade-in"
+          style={{ pointerEvents: 'none' }}
         >
           <div
-            className="relative mx-4 max-w-md w-full rounded-2xl border border-red-500/30 bg-[hsl(0,0%,7%)] p-7 text-center shadow-[0_0_80px_rgba(239,68,68,0.25)]"
-            onClick={e => e.stopPropagation()}
-            style={{ filter: 'none' }}  // ép modal không bị blur
+            className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-[hsl(0,0%,8%)]/95 border border-red-500/30 shadow-2xl shadow-red-500/20 backdrop-blur"
+            style={{ pointerEvents: 'auto' }}
           >
-            <button
-              onClick={dismissWarning}
-              className="absolute right-3 top-3 w-7 h-7 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/[0.06] transition-all"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-20 h-20 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center relative">
-                <ShieldAlert className="w-10 h-10 text-red-400" />
-                <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-red-500 flex items-center justify-center border-2 border-[hsl(0,0%,7%)]">
-                  <Lock className="w-3.5 h-3.5 text-white" />
-                </div>
-              </div>
-            </div>
-
-            <h2 className="text-lg font-bold text-white/90 mb-1">⚠ Phát hiện cố gắng chụp/ghi</h2>
-            <p className="text-xs text-red-400/80 mb-4 font-mono">{reason}</p>
-
-            <p className="text-sm text-white/55 leading-relaxed mb-5">
-              Nội dung này được <strong className="text-white/80">bảo vệ bản quyền</strong>.
-              Việc chụp màn hình, ghi hình, lưu trữ, hoặc phân phối lại tài liệu này
-              KHÔNG được phép và có thể vi phạm <strong className="text-amber-300/80">
-              Luật Sở hữu trí tuệ 50/2005/QH11
-              </strong>.
-            </p>
-
-            <div className="rounded-xl bg-amber-500/[0.06] border border-amber-500/15 p-3 mb-5 text-left">
-              <p className="text-[11px] text-amber-300/90 leading-relaxed">
-                🔍 <strong>Phiên này được giám sát:</strong> tài khoản{' '}
-                <span className="font-mono text-amber-200">{userLabel}</span>{' '}
-                và thời điểm sự kiện đã được ghi nhận. Watermark trên màn hình
-                giúp truy nguồn rò rỉ.
-              </p>
-            </div>
-
-            <button
-              onClick={dismissWarning}
-              className="w-full py-2.5 rounded-xl bg-red-500/15 border border-red-500/25 text-sm font-semibold text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-all"
-            >
-              Tôi hiểu và tiếp tục học
-            </button>
-            <p className="text-[0.65rem] text-white/20 mt-3">
-              Tự động đóng sau 6 giây · Nội dung tạm mờ 3 giây để bảo vệ
+            <ShieldAlert className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-white/85 leading-relaxed flex-1">
+              {toastMsg}
             </p>
           </div>
         </div>
