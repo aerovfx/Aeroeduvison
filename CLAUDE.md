@@ -16,7 +16,8 @@
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `fdced77` (revision pixiai-00356-jas, 2026-05-20 — PDF zoom CSS transform reliable + Drag-drop attach Word/Excel/PPT/PDF/ảnh/video)
-- Commits since last deploy: `4/5`
+- Commits since last deploy: `5/5 → DEPLOY!`
+- Prev: `128c9d0` (PDF split-panel khi điền đáp án — đề thi bên cạnh bubble sheet)
 - Prev: `ab669c7` (Professional KG — Cây tri thức phát triển chuyên môn GV/Admin)
 - Prev: `a1db1b9` (Báo cáo tiến bộ HS theo các thời kỳ + xuất Excel/JSON)
 - Prev: `1e36179` (Import điểm Excel/JSON vào GradeBook)
