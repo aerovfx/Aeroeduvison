@@ -179,19 +179,56 @@ if (USE_NODEJS_AUTH) {
         [email.toLowerCase().trim()]
       );
       const user = rows[0];
+      const reqIp = String(req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown').split(',')[0].trim();
+      const reqUa = String(req.headers['user-agent'] || '').substring(0, 250);
 
       if (!user || !user.password) {
+        // Log failed login (no such email)
+        if (typeof global.__insertSecurityEvent === 'function') {
+          global.__insertSecurityEvent({
+            userId: null,
+            userEmail: email.toLowerCase().trim(),
+            eventType: 'failed-login',
+            severity: 'low',
+            reason: 'Email không tồn tại hoặc không có password',
+            ip: reqIp,
+            userAgent: reqUa,
+          }).catch(() => {});
+        }
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
       }
 
       const valid = await verifyPassword(password, user.password);
       if (!valid) {
+        if (typeof global.__insertSecurityEvent === 'function') {
+          global.__insertSecurityEvent({
+            userId: user.id,
+            userEmail: user.email,
+            eventType: 'failed-login',
+            severity: 'medium',
+            reason: 'Mật khẩu sai',
+            ip: reqIp,
+            userAgent: reqUa,
+          }).catch(() => {});
+        }
         return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng' });
       }
 
       // ── Banned account check (admin /api/admin/users/:id DELETE | PATCH banned=true) ──
       if (user.banned) {
         console.log(`[auth:login] 🚫 banned account blocked: ${user.email}`);
+        if (typeof global.__insertSecurityEvent === 'function') {
+          global.__insertSecurityEvent({
+            userId: user.id,
+            userEmail: user.email,
+            eventType: 'banned-login-attempt',
+            severity: 'high',
+            reason: 'Tài khoản banned đã thử đăng nhập',
+            ip: reqIp,
+            userAgent: reqUa,
+            metadata: { bannedReason: user.bannedReason || null },
+          }).catch(() => {});
+        }
         return res.status(403).json({
           error: `Tài khoản đã bị khoá: ${user.bannedReason || 'liên hệ admin để biết thêm chi tiết'}`,
         });
@@ -2818,6 +2855,572 @@ function makeProxy(target, label, pathFilter) {
       res.json(result);
     } catch (err) {
       console.error('[admin:notifications] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GET /api/admin/payments/subscribers
+  // ── Per-user view: ai đang dùng gói nào, dùng đã bao lâu, còn bao lâu,
+  // dùng feature gì + tổng tiền đã chi.
+  // Aggregate: PaymentOrder PAID (LATEST/user) ⊕ User profile ⊕ LessonHistory
+  // ══════════════════════════════════════════════════════════════
+  app.get('/api/admin/payments/subscribers', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const filter = String(req.query.filter || 'all'); // all | expiring | expired
+      const search = String(req.query.search || '').trim().toLowerCase();
+      const limit = Math.min(500, Math.max(10, Number(req.query.limit) || 200));
+
+      const pool = getPool();
+      // Plan duration table — fallback nếu plan id không match thì 30 ngày
+      const PLAN_DURATIONS = Object.fromEntries(
+        orders.PLANS.map(p => [p.id, p.durationDays || 30])
+      );
+
+      // Lấy tất cả đơn PAID, sắp xếp DESC theo approvedAt — sau đó group by user (latest)
+      let paidOrders = [];
+      try {
+        const { rows } = await pool.query(`
+          SELECT id, "userId", "userEmail", "userName", "planId", "planName",
+                 amount, "approvedAt", "createdAt"
+            FROM "PaymentOrder"
+           WHERE status = 'PAID' AND ("userId" IS NOT NULL OR "userEmail" IS NOT NULL)
+           ORDER BY "approvedAt" DESC NULLS LAST, "createdAt" DESC
+           LIMIT 2000
+        `);
+        paidOrders = rows;
+      } catch (e) {
+        // Bảng có thể chưa tồn tại nếu chưa có đơn nào
+        console.warn('[admin:subscribers] PaymentOrder unavailable:', e.message);
+        return res.json({ subscribers: [], total: 0 });
+      }
+
+      // Group by userId (fallback email nếu userId null) → lifetime spend + latest order
+      const byUser = new Map(); // key → { latest, lifetimeSpend, orderCount }
+      for (const o of paidOrders) {
+        const key = o.userId || `email:${(o.userEmail || '').toLowerCase()}`;
+        if (!key || key === 'email:') continue;
+        const amt = Number(o.amount) || 0;
+        if (!byUser.has(key)) {
+          byUser.set(key, { latest: o, lifetimeSpend: amt, orderCount: 1 });
+        } else {
+          const rec = byUser.get(key);
+          rec.lifetimeSpend += amt;
+          rec.orderCount += 1;
+          // latest đã sort DESC nên không cần update
+        }
+      }
+
+      // Fetch User info batch (chỉ những userId có thật)
+      const userIds = Array.from(byUser.values())
+        .map(r => r.latest.userId)
+        .filter(Boolean);
+      const usersMap = new Map();
+      if (userIds.length > 0) {
+        try {
+          const { rows: users } = await pool.query(
+            `SELECT id, email, name, image, role, "createdAt" FROM "User" WHERE id = ANY($1)`,
+            [userIds]
+          );
+          for (const u of users) usersMap.set(u.id, u);
+        } catch (e) {
+          console.warn('[admin:subscribers] User fetch failed:', e.message);
+        }
+      }
+
+      // Feature usage from LessonHistory — count distinct actions per user (last 90 days)
+      const featureUsage = new Map(); // userId → { feature: { count, lastUsed } }
+      if (userIds.length > 0) {
+        try {
+          const { rows: features } = await pool.query(`
+            SELECT "userId", action, COUNT(*)::int AS count, MAX("occurredAt") AS last_used
+              FROM "LessonHistory"
+             WHERE "userId" = ANY($1)
+               AND "occurredAt" > NOW() - INTERVAL '90 days'
+             GROUP BY "userId", action
+          `, [userIds]);
+          for (const f of features) {
+            if (!featureUsage.has(f.userId)) featureUsage.set(f.userId, {});
+            featureUsage.get(f.userId)[f.action] = {
+              count: Number(f.count) || 0,
+              lastUsed: f.last_used,
+            };
+          }
+        } catch (e) {
+          // LessonHistory có thể chưa tồn tại
+          console.warn('[admin:subscribers] LessonHistory unavailable:', e.message);
+        }
+      }
+
+      const now = Date.now();
+      const subscribers = [];
+      for (const [key, rec] of byUser.entries()) {
+        const o = rec.latest;
+        const user = o.userId ? usersMap.get(o.userId) : null;
+        const startedAtIso = o.approvedAt || o.createdAt;
+        const startedAt = startedAtIso ? new Date(startedAtIso).getTime() : now;
+        const durationDays = PLAN_DURATIONS[o.planId] || 30;
+        const expiresAt = startedAt + durationDays * 86400_000;
+        const daysUsed = Math.max(0, Math.floor((now - startedAt) / 86400_000));
+        const daysRemaining = Math.max(0, Math.ceil((expiresAt - now) / 86400_000));
+        const percentUsed = Math.min(100, Math.round((daysUsed / durationDays) * 100));
+        const isExpired = now > expiresAt;
+        const isExpiringSoon = !isExpired && daysRemaining < 7;
+
+        const usageObj = (o.userId && featureUsage.get(o.userId)) || {};
+        const featuresAccessed = Object.entries(usageObj)
+          .map(([feature, v]) => ({
+            feature,
+            count: v.count,
+            lastUsed: v.lastUsed ? new Date(v.lastUsed).toISOString() : null,
+          }))
+          .sort((a, b) => b.count - a.count);
+
+        const lastActivityAt = featuresAccessed[0]?.lastUsed || null;
+
+        const sub = {
+          userId: o.userId || null,
+          name: user?.name || o.userName || '(không tên)',
+          email: user?.email || o.userEmail || '(không email)',
+          image: user?.image || null,
+          role: user?.role || null,
+          activePlan: {
+            id: o.planId,
+            name: o.planName,
+            priceVnd: Number(o.amount) || 0,
+            durationDays,
+          },
+          startedAt: new Date(startedAt).toISOString(),
+          expiresAt: new Date(expiresAt).toISOString(),
+          daysUsed,
+          daysRemaining,
+          percentUsed,
+          isExpiringSoon,
+          isExpired,
+          featuresAccessed,
+          lastActivityAt,
+          lifetimeSpend: rec.lifetimeSpend,
+          orderCount: rec.orderCount,
+        };
+
+        // Apply filter
+        if (filter === 'expiring' && !isExpiringSoon) continue;
+        if (filter === 'expired' && !isExpired) continue;
+        if (filter === 'active' && (isExpired)) continue;
+        // Apply search
+        if (search) {
+          const blob = `${sub.name} ${sub.email}`.toLowerCase();
+          if (!blob.includes(search)) continue;
+        }
+        subscribers.push(sub);
+      }
+
+      // Sort: still active first, expiring soon prioritized
+      subscribers.sort((a, b) => {
+        if (a.isExpired !== b.isExpired) return a.isExpired ? 1 : -1;
+        if (a.isExpiringSoon !== b.isExpiringSoon) return a.isExpiringSoon ? -1 : 1;
+        return b.lifetimeSpend - a.lifetimeSpend;
+      });
+
+      const trimmed = subscribers.slice(0, limit);
+      res.json({
+        subscribers: trimmed,
+        total: subscribers.length,
+        truncated: subscribers.length > limit,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[admin:subscribers] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GET /api/admin/operations/services-health
+  // Probe từng service phụ thuộc (DB, GCS, AI APIs, Telegram, Rust services)
+  // Cache 20s — auto-refresh UI 30s nên không bao giờ stale.
+  // ══════════════════════════════════════════════════════════════
+  app.get('/api/admin/operations/services-health', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const cache = require('./lib/cache.cjs');
+      const result = await cache.getOrFetch('admin:ops:health', 20, async () => {
+        const checks = [];
+
+        // 1. Postgres (Neon)
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const pool = getPool();
+            await pool.query('SELECT 1');
+            return { name: 'PostgreSQL (Neon)', icon: 'database', status: 'up', latencyMs: Date.now() - t0 };
+          } catch (e) {
+            return { name: 'PostgreSQL (Neon)', icon: 'database', status: 'down', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0 };
+          }
+        })());
+
+        // 2. Redis (best-effort — internal cache)
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const cacheLib = require('./lib/cache.cjs');
+            // Use a write+read cycle as basic ping
+            const k = `__health__${Date.now()}`;
+            if (typeof cacheLib.set === 'function') {
+              await cacheLib.set(k, '1', 5);
+              return { name: 'Cache (Redis/Memory)', icon: 'zap', status: 'up', latencyMs: Date.now() - t0 };
+            }
+            return { name: 'Cache (Redis/Memory)', icon: 'zap', status: 'up', latencyMs: Date.now() - t0, note: 'in-memory' };
+          } catch (e) {
+            return { name: 'Cache (Redis/Memory)', icon: 'zap', status: 'degraded', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0 };
+          }
+        })());
+
+        // 3. Email (SMTP)
+        checks.push((async () => {
+          const configured = !!(process.env.SMTP_HOST || process.env.GMAIL_USER || process.env.RESEND_API_KEY);
+          return {
+            name: 'Email Service',
+            icon: 'mail',
+            status: configured ? 'up' : 'down',
+            note: configured
+              ? `${process.env.SMTP_HOST || process.env.GMAIL_USER || 'Resend'} configured`
+              : 'SMTP/Gmail/Resend chưa cấu hình',
+          };
+        })());
+
+        // 4. GCS Storage (asset bucket)
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const bucketName = process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2';
+            const { Storage } = require('@google-cloud/storage');
+            const storage = new Storage();
+            const [exists] = await Promise.race([
+              storage.bucket(bucketName).exists(),
+              new Promise((_, rj) => setTimeout(() => rj(new Error('timeout 3s')), 3000)),
+            ]);
+            return { name: 'GCS Storage', icon: 'cloud', status: exists ? 'up' : 'down', latencyMs: Date.now() - t0, note: `bucket: ${bucketName}` };
+          } catch (e) {
+            return { name: 'GCS Storage', icon: 'cloud', status: 'down', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0 };
+          }
+        })());
+
+        // 5. Anthropic Claude
+        checks.push((async () => ({
+          name: 'Anthropic Claude',
+          icon: 'sparkles',
+          status: process.env.ANTHROPIC_API_KEY ? 'up' : 'down',
+          note: process.env.ANTHROPIC_API_KEY ? 'API key configured' : 'ANTHROPIC_API_KEY missing',
+        }))());
+
+        // 6. fal.ai
+        checks.push((async () => ({
+          name: 'fal.ai',
+          icon: 'sparkles',
+          status: process.env.FAL_KEY ? 'up' : 'down',
+          note: process.env.FAL_KEY ? 'API key configured' : 'FAL_KEY missing',
+        }))());
+
+        // 7. Telegram Bot
+        checks.push((async () => ({
+          name: 'Telegram Bot',
+          icon: 'bot',
+          status: process.env.TELEGRAM_BOT_TOKEN ? 'up' : 'down',
+          note: process.env.TELEGRAM_BOT_TOKEN ? 'token configured' : 'TELEGRAM_BOT_TOKEN missing',
+        }))());
+
+        // 8. Rust Backend (aero-backend)
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const ctrl = new AbortController();
+            const tm = setTimeout(() => ctrl.abort(), 2500);
+            const r = await fetch(`${BACKEND_URL}/health`, { signal: ctrl.signal }).catch(() => null);
+            clearTimeout(tm);
+            const ok = !!(r && r.ok);
+            return { name: 'Rust Backend', icon: 'cpu', status: ok ? 'up' : 'down', latencyMs: Date.now() - t0, note: BACKEND_URL };
+          } catch (e) {
+            return { name: 'Rust Backend', icon: 'cpu', status: 'down', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0, note: BACKEND_URL };
+          }
+        })());
+
+        // 9. Teacher Service
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const ctrl = new AbortController();
+            const tm = setTimeout(() => ctrl.abort(), 2500);
+            const r = await fetch(`${TEACHER_SERVICE_URL}/health`, { signal: ctrl.signal }).catch(() => null);
+            clearTimeout(tm);
+            const ok = !!(r && r.ok);
+            return { name: 'Teacher Service', icon: 'server', status: ok ? 'up' : 'down', latencyMs: Date.now() - t0, note: TEACHER_SERVICE_URL };
+          } catch (e) {
+            return { name: 'Teacher Service', icon: 'server', status: 'down', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0, note: TEACHER_SERVICE_URL };
+          }
+        })());
+
+        // 10. LaTeX Service
+        checks.push((async () => {
+          const t0 = Date.now();
+          try {
+            const ctrl = new AbortController();
+            const tm = setTimeout(() => ctrl.abort(), 2500);
+            const r = await fetch(`${LATEX_SERVICE_URL}/health`, { signal: ctrl.signal }).catch(() => null);
+            clearTimeout(tm);
+            const ok = !!(r && r.ok);
+            return { name: 'LaTeX Service', icon: 'server', status: ok ? 'up' : 'down', latencyMs: Date.now() - t0, note: LATEX_SERVICE_URL };
+          } catch (e) {
+            return { name: 'LaTeX Service', icon: 'server', status: 'down', error: String(e.message || e).slice(0, 200), latencyMs: Date.now() - t0, note: LATEX_SERVICE_URL };
+          }
+        })());
+
+        const services = await Promise.all(checks);
+        const now = new Date().toISOString();
+        services.forEach(s => { s.lastCheck = now; });
+        const up = services.filter(s => s.status === 'up').length;
+        const down = services.filter(s => s.status === 'down').length;
+        const degraded = services.filter(s => s.status === 'degraded').length;
+        const uptime = services.length > 0 ? ((up / services.length) * 100).toFixed(1) + '%' : '0%';
+
+        return {
+          services,
+          summary: { up, down, degraded, total: services.length, uptime },
+          updatedAt: now,
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      console.error('[admin:ops:health] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // GET /api/admin/operations/system-resources
+  // CPU loadavg + Memory + Process info (live, không cache)
+  // ══════════════════════════════════════════════════════════════
+  app.get('/api/admin/operations/system-resources', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const os = require('os');
+      const mem = process.memoryUsage();
+      const loadavg = os.loadavg();
+      const cores = os.cpus().length;
+      // Normalize loadavg → percent (1m avg / cores * 100)
+      const cpuPercent = Math.min(100, Math.round((loadavg[0] / cores) * 100));
+      const heapPercent = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+      const sysMemPercent = Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 100);
+
+      res.json({
+        cpu: { loadavg, cores, percent: cpuPercent },
+        memory: {
+          rss: mem.rss,
+          heapUsed: mem.heapUsed,
+          heapTotal: mem.heapTotal,
+          external: mem.external,
+          arrayBuffers: mem.arrayBuffers,
+          sysTotal: os.totalmem(),
+          sysFree: os.freemem(),
+          sysUsedPercent: sysMemPercent,
+          heapPercent,
+        },
+        process: {
+          uptime: process.uptime(),
+          pid: process.pid,
+          nodeVersion: process.version,
+          platform: os.platform(),
+          arch: os.arch(),
+          hostname: os.hostname(),
+        },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[admin:ops:resources] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // SecurityEvent — lazy migration helper
+  // ══════════════════════════════════════════════════════════════
+  let _securityEventTableReady = false;
+  async function ensureSecurityEventTable() {
+    if (_securityEventTableReady) return true;
+    try {
+      const pool = getPool();
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "SecurityEvent" (
+          id TEXT PRIMARY KEY,
+          "userId" TEXT,
+          "userEmail" TEXT,
+          "eventType" TEXT NOT NULL,
+          "severity" TEXT NOT NULL DEFAULT 'low',
+          reason TEXT,
+          url TEXT,
+          ip TEXT,
+          "userAgent" TEXT,
+          metadata JSONB,
+          "occurredAt" TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "SecurityEvent_occurredAt_idx" ON "SecurityEvent" ("occurredAt" DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "SecurityEvent_eventType_idx" ON "SecurityEvent" ("eventType")`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "SecurityEvent_userId_idx" ON "SecurityEvent" ("userId")`);
+      _securityEventTableReady = true;
+      return true;
+    } catch (e) {
+      console.warn('[security-event:ensure-table]', e.message);
+      return false;
+    }
+  }
+
+  // Expose helper globally so other endpoints có thể insert
+  global.__insertSecurityEvent = async function insertSecurityEvent(evt) {
+    try {
+      const ready = await ensureSecurityEventTable();
+      if (!ready) return false;
+      const pool = getPool();
+      const { randomUUID } = require('crypto');
+      await pool.query(
+        `INSERT INTO "SecurityEvent"
+          (id, "userId", "userEmail", "eventType", severity, reason, url, ip, "userAgent", metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          `sec-${randomUUID()}`,
+          evt.userId || null,
+          evt.userEmail || null,
+          evt.eventType,
+          evt.severity || 'low',
+          evt.reason || null,
+          evt.url || null,
+          evt.ip || null,
+          evt.userAgent || null,
+          evt.metadata ? JSON.stringify(evt.metadata) : null,
+        ]
+      );
+      return true;
+    } catch (e) {
+      console.warn('[security-event:insert]', e.message);
+      return false;
+    }
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // GET /api/admin/operations/security-events
+  // Bảo mật: liệt kê screenshot attempt, failed login, ban, devtools.
+  // ══════════════════════════════════════════════════════════════
+  app.get('/api/admin/operations/security-events', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const limit = Math.min(500, Math.max(10, Number(req.query.limit) || 100));
+      const eventType = req.query.eventType ? String(req.query.eventType) : null;
+      const search = String(req.query.search || '').trim().toLowerCase();
+      await ensureSecurityEventTable();
+      const pool = getPool();
+      const events = [];
+      const summaryByType = {};
+      const summaryBySeverity = {};
+      let totalLast24h = 0;
+
+      // 1. Lấy SecurityEvent rows
+      try {
+        const where = [];
+        const vals = [];
+        let i = 1;
+        if (eventType) { where.push(`"eventType" = $${i++}`); vals.push(eventType); }
+        if (search) {
+          where.push(`(LOWER(COALESCE("userEmail", '')) LIKE $${i} OR LOWER(COALESCE(reason, '')) LIKE $${i})`);
+          vals.push(`%${search}%`);
+          i++;
+        }
+        const sql = `
+          SELECT id, "userId", "userEmail", "eventType", severity, reason, url, ip, "userAgent", metadata, "occurredAt"
+            FROM "SecurityEvent"
+            ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+            ORDER BY "occurredAt" DESC
+            LIMIT $${i}
+        `;
+        vals.push(limit);
+        const { rows } = await pool.query(sql, vals);
+        for (const r of rows) {
+          events.push({
+            id: r.id,
+            userId: r.userId,
+            userEmail: r.userEmail,
+            eventType: r.eventType,
+            severity: r.severity,
+            reason: r.reason,
+            url: r.url,
+            ip: r.ip,
+            userAgent: r.userAgent,
+            metadata: r.metadata,
+            occurredAt: r.occurredAt,
+          });
+        }
+      } catch (e) {
+        console.warn('[admin:security-events] table query failed:', e.message);
+      }
+
+      // 2. Banned users — pull as ban events
+      try {
+        const { rows: banned } = await pool.query(`
+          SELECT id, email, name, "bannedReason", "bannedAt"
+            FROM "User"
+           WHERE banned = true
+           ORDER BY "bannedAt" DESC NULLS LAST
+           LIMIT 50
+        `);
+        for (const u of banned) {
+          if (eventType && eventType !== 'ban') continue;
+          if (search && !(`${u.email || ''} ${u.name || ''} ${u.bannedReason || ''}`).toLowerCase().includes(search)) continue;
+          events.push({
+            id: `ban-${u.id}`,
+            userId: u.id,
+            userEmail: u.email,
+            eventType: 'ban',
+            severity: 'high',
+            reason: u.bannedReason || 'Bị chặn bởi admin',
+            url: null,
+            ip: null,
+            userAgent: null,
+            metadata: { name: u.name },
+            occurredAt: u.bannedAt || new Date().toISOString(),
+          });
+        }
+      } catch (e) {
+        // banned column có thể chưa tồn tại
+      }
+
+      // Sort merged events DESC by date
+      events.sort((a, b) => {
+        const ta = new Date(a.occurredAt || 0).getTime();
+        const tb = new Date(b.occurredAt || 0).getTime();
+        return tb - ta;
+      });
+
+      // Aggregate summary
+      const cutoff24h = Date.now() - 24 * 3600 * 1000;
+      for (const e of events) {
+        const t = new Date(e.occurredAt || 0).getTime();
+        if (t >= cutoff24h) totalLast24h += 1;
+        summaryByType[e.eventType] = (summaryByType[e.eventType] || 0) + 1;
+        summaryBySeverity[e.severity] = (summaryBySeverity[e.severity] || 0) + 1;
+      }
+
+      res.json({
+        events: events.slice(0, limit),
+        summary: {
+          totalLast24h,
+          totalAll: events.length,
+          byType: summaryByType,
+          bySeverity: summaryBySeverity,
+        },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[admin:security-events] ❌', err.message);
       res.status(500).json({ error: err.message });
     }
   });
@@ -8559,21 +9162,53 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
 
   // ── POST /api/audit/screenshot-attempt ────────────────────────
   // Best-effort log khi FE phát hiện user cố screenshot/devtools
-  // → in stdout (Cloud Run logs) → có thể aggregate analyze sau
+  // → in stdout (Cloud Run logs) + insert vào SecurityEvent table
   app.post('/api/audit/screenshot-attempt', express.json({ limit: '4kb' }), async (req, res) => {
     try {
-      const { userId, reason, ts, url, ua } = req.body || {};
+      const { userId, userEmail, reason, ts, url, ua } = req.body || {};
       const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
-      console.warn('[SECURITY:screenshot-attempt]',
+      const cleanIp = String(ip).split(',')[0].trim();
+      const cleanUa = String(ua || '').substring(0, 250);
+      const rsn = reason || 'unknown';
+
+      // Map reason → eventType + severity
+      let eventType = 'screenshot-attempt';
+      let severity = 'medium';
+      if (rsn.includes('devtools') || rsn.includes('dev-tools')) {
+        eventType = 'devtools';
+        severity = 'high';
+      } else if (rsn.includes('print') || rsn.includes('save')) {
+        eventType = 'save-page-attempt';
+        severity = 'medium';
+      }
+
+      console.warn(`[SECURITY:${eventType}]`,
         JSON.stringify({
           userId: userId || 'guest',
-          reason: reason || 'unknown',
+          userEmail: userEmail || null,
+          reason: rsn,
           ts: ts || Date.now(),
           url: url || '',
-          ip: String(ip).split(',')[0].trim(),
-          ua: String(ua || '').substring(0, 120),
+          ip: cleanIp,
+          ua: cleanUa.substring(0, 120),
         })
       );
+
+      // Persist to SecurityEvent table (best-effort, silent on fail)
+      if (typeof global.__insertSecurityEvent === 'function') {
+        global.__insertSecurityEvent({
+          userId: userId || null,
+          userEmail: userEmail || null,
+          eventType,
+          severity,
+          reason: rsn,
+          url: url || null,
+          ip: cleanIp,
+          userAgent: cleanUa,
+          metadata: { clientTs: ts || null },
+        }).catch(() => {});
+      }
+
       return res.json({ ok: true });
     } catch (err) {
       // Never fail — silent log
