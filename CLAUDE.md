@@ -15,12 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `623d505` (revision pixiai-00379-wep, 2026-05-21 — Lab Challenge V1+V2: Analog/Digital/Arduino chấm tự động + Leaderboard + GV xem screenshot + Pricing 3 đối tượng GV/HS/PH + Manhattan wires)
+- Last deployed commit: `ef8135f` (revision pixiai-00380-naz, 2026-05-21 — CoursePlayer mục lục Chapter→Lesson + ExamReports per-question analysis + LearningPathBuilder wizard khung NL GDPT 2018 + KG node học liệu liên quan + QuestionBank toggle môn)
 - Commits since last deploy: `0/5`
-- Prev: `e475d5c` — Lab Challenge V1 (Analog behavioral matching + gate next lesson)
-- Prev: `9958aef` — Manhattan wires + waypoints drag-drop + snap grid
-- Prev: `61e5c55` — Pricing live subscription status (Đang sử dụng + Gia hạn + Nâng cấp)
-- Prev: `38a7f8e` — Pricing redesign 3 tabs GV/HS/PH + gói Phụ huynh mới
+- Prev: `d78256b` — KG node detail panel "Học liệu liên quan" 5 nhóm
+- Prev: `1170380` — LearningPathBuilder wizard 6 bước + khung năng lực GDPT 2018 + rubric
+- Prev: `cb17d0d` — Exam Reports per-question analysis + Cronbach α (data thực)
+- Prev: `f2df798` — CoursePlayer mục lục Chapter→Lesson→Block hierarchy
+- Prev: `623d505` → pixiai-00379-wep (Lab Challenge V1+V2 + Pricing 3 đối tượng + Manhattan wires)
 - Prev: `180edbb` → pixiai-00378-qel (SGK 11 Bài 26 lab + Mạch Analog tự lắp ghép + STEM Scrum + Online exam sections + anti-screenshot v6)
 - Prev: `a417da7` — Mạch Analog tự lắp ghép drag-drop SVG + 5 templates
 - Prev: `99d4773` — STEM Scrum board sync timeline
