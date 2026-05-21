@@ -15,8 +15,13 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `180edbb` (revision pixiai-00378-xxx, 2026-05-21 — SGK 11 Bài 26 lab + Mạch Analog tự lắp ghép + STEM Scrum + Online exam sections + anti-screenshot v6)
+- Last deployed commit: `623d505` (revision pixiai-00379-wep, 2026-05-21 — Lab Challenge V1+V2: Analog/Digital/Arduino chấm tự động + Leaderboard + GV xem screenshot + Pricing 3 đối tượng GV/HS/PH + Manhattan wires)
 - Commits since last deploy: `0/5`
+- Prev: `e475d5c` — Lab Challenge V1 (Analog behavioral matching + gate next lesson)
+- Prev: `9958aef` — Manhattan wires + waypoints drag-drop + snap grid
+- Prev: `61e5c55` — Pricing live subscription status (Đang sử dụng + Gia hạn + Nâng cấp)
+- Prev: `38a7f8e` — Pricing redesign 3 tabs GV/HS/PH + gói Phụ huynh mới
+- Prev: `180edbb` → pixiai-00378-qel (SGK 11 Bài 26 lab + Mạch Analog tự lắp ghép + STEM Scrum + Online exam sections + anti-screenshot v6)
 - Prev: `a417da7` — Mạch Analog tự lắp ghép drag-drop SVG + 5 templates
 - Prev: `99d4773` — STEM Scrum board sync timeline
 - Prev: `6ab6995` — Online exam 3 sections đang/sắp/đã
@@ -46,7 +51,6 @@
 - Prev: `b2cdbe4` — Course extras (PDF/Quiz/Lab/Aura/Game) + Profile pages có thể trang trí
 - Prev: `e411390` → pixiai-00364-zek (Hotfix learning path lesson + anti-screenshot v2 watermark/blur)
 - Prev: `d1d883d` → pixiai-00363-dib (Flipbook PDF + Eclipse + Anti-screenshot v1 + Assignment workspace)
-- Commits since last deploy: `0/5`
 - Prev: `715241b` → pixiai-00362-yug (HOTFIX SECURITY: PII exposure + stored XSS)
 - Prev: `d1d883d` — flipbook 3D + nhạc nền ambient + iOS mobile view + pdfjs-dist v5
 - Prev: `b3af126` — workspace bài tập HS (Word+Slides+Nộp bài) + anti-screenshot + server pdfBookUrl
