@@ -35,6 +35,7 @@ import {
 import { cn } from '@/lib/utils'
 import { RichTextEditor } from './RichTextEditor'
 import { LabChallengeAuthor, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
+import LabAttemptsReviewer from '@/components/iot/LabAttemptsReviewer'
 
 /* ─── Block type registry ────────────────────────────────────────── */
 interface BlockTypeMeta {
@@ -92,11 +93,16 @@ const SIM_OPTIONS: { id: string; title: string }[] = [
 ]
 
 // Labs — hardcoded list (paths đã có route trong app)
-const LAB_OPTIONS: { id: string; title: string; path: string; supportsChallenge?: boolean }[] = [
-  { id: 'analog-circuit',   title: 'Mạch Analog — tự lắp ghép (hỗ trợ chấm)',  path: '/dashboard/iot-lab', supportsChallenge: true },
+const LAB_OPTIONS: {
+  id: string; title: string; path: string;
+  supportsChallenge?: boolean;
+  labType?: 'analog' | 'digital' | 'arduino';
+}[] = [
+  { id: 'analog-circuit',   title: '🔌 Mạch Analog — tự lắp ghép (hỗ trợ chấm)',  path: '/dashboard/iot-lab',     supportsChallenge: true, labType: 'analog' },
+  { id: 'digital-logic',    title: '🧠 Digital Logic — cổng AND/OR/XOR (hỗ trợ chấm)', path: '/labs/digital-logic', supportsChallenge: true, labType: 'digital' },
+  { id: 'arduino-emulator', title: '🤖 Arduino Emulator — viết C++ chạy giả lập (hỗ trợ chấm)', path: '/labs/arduino', supportsChallenge: true, labType: 'arduino' },
   { id: 'iot-lab',          title: 'IoT Lab — cảm biến + actuator',  path: '/labs/iot' },
   { id: 'circuit-lab',      title: 'Circuit Lab — mạch điện',          path: '/labs/circuit' },
-  { id: 'arduino-emulator', title: 'Arduino Emulator',                  path: '/labs/arduino' },
   { id: 'graph-lab',        title: 'Graph Lab — đồ thị hàm số',         path: '/labs/graph' },
   { id: 'custom-circuit',   title: 'Custom Circuit Builder',            path: '/labs/custom-circuit' },
   { id: 'eclipse',          title: 'Eclipse — Nhật/Nguyệt thực 3D',    path: '/labs/eclipse' },
@@ -458,6 +464,7 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
         const selectedLab = LAB_OPTIONS.find(l => l.id === content)
         const supportsChallenge = !!selectedLab?.supportsChallenge
         const isChallenge = !!meta.challenge
+        const inferredLabType = selectedLab?.labType || (meta.labType as 'analog' | 'digital' | 'arduino' | undefined) || 'analog'
         return (
           <div className="space-y-3">
             <div>
@@ -467,7 +474,15 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
                 onChange={e => {
                   const lab = LAB_OPTIONS.find(l => l.id === e.target.value)
                   setContent(e.target.value)
-                  if (lab) meta_('path', lab.path)
+                  if (lab) {
+                    meta_('path', lab.path)
+                    // Reset challenge data khi đổi lab type khác (tránh mismatch)
+                    if (meta.labType && lab.labType && meta.labType !== lab.labType) {
+                      meta_('referenceSnapshot', undefined)
+                      meta_('criteria', undefined)
+                    }
+                    if (lab.labType) meta_('labType', lab.labType)
+                  }
                 }}
                 className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
               >
@@ -490,16 +505,19 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
                     checked={isChallenge}
                     onChange={e => {
                       meta_('challenge', e.target.checked || undefined)
-                      meta_('labType', e.target.checked ? 'analog' : undefined)
+                      meta_('labType', e.target.checked ? inferredLabType : undefined)
                     }}
                     className="mt-1"
                   />
                   <div className="flex-1">
                     <div className="text-sm font-bold text-amber-200 flex items-center gap-2">
-                      <Trophy className="w-4 h-4" /> Bài tập có chấm — Khoá lesson tiếp theo nếu HS chưa pass
+                      <Trophy className="w-4 h-4" /> Bài tập có chấm —
+                      <span className="text-[11px] uppercase px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40">
+                        {inferredLabType}
+                      </span>
                     </div>
                     <div className="text-xs text-amber-100/70 mt-1">
-                      HS phải lắp được mạch đạt yêu cầu (đúng linh kiện + LED đúng trạng thái + dòng điện đúng) mới qua được bài học sau.
+                      Có thể thêm <b>nhiều bài tập</b> trong cùng 1 lesson — HS phải pass HẾT mới qua bài kế tiếp.
                     </div>
                   </div>
                 </label>
@@ -509,9 +527,8 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
             {/* Inline challenge author — show simulator + save reference */}
             {supportsChallenge && isChallenge && (
               <LabChallengeAuthor
-                initialMetadata={meta as Partial<LabChallengeMetadata>}
+                initialMetadata={{ ...meta, labType: inferredLabType } as Partial<LabChallengeMetadata>}
                 onSave={(md) => {
-                  // Merge metadata: keep path + selected lab, add challenge fields
                   meta_('challenge', true)
                   meta_('labType', md.labType)
                   meta_('referenceSnapshot', md.referenceSnapshot)
@@ -627,6 +644,7 @@ export default function LessonAssetEditor({ open, lessonId, lessonTitle, courseI
   const qc = useQueryClient()
   const [addingType, setAddingType] = useState<LessonBlockType | null>(null)
   const [editingBlock, setEditingBlock] = useState<LessonBlock | null>(null)
+  const [reviewingBlock, setReviewingBlock] = useState<LessonBlock | null>(null)
 
   // Lock body scroll when open
   useEffect(() => {
@@ -911,6 +929,17 @@ export default function LessonAssetEditor({ open, lessonId, lessonTitle, courseI
                       >
                         <Copy className="w-3.5 h-3.5" />
                       </button>
+                      {/* Reviewer button — chỉ show cho lab challenge */}
+                      {block.type === 'lab' && (block.metadata as { challenge?: boolean })?.challenge && (
+                        <button
+                          type="button"
+                          onClick={() => setReviewingBlock(block)}
+                          className="w-7 h-7 rounded-lg hover:bg-amber-500/20 flex items-center justify-center text-amber-400"
+                          title="Xem bài nộp của HS"
+                        >
+                          <Trophy className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       {(block.type === 'video' || block.type === 'pdf' || block.type === 'audio' || block.type === 'link' || block.type === 'pptx' || block.type === 'embed') && block.content && (
                         <a
                           href={block.content}
@@ -965,6 +994,15 @@ export default function LessonAssetEditor({ open, lessonId, lessonTitle, courseI
           </button>
         </footer>
       </div>
+
+      {/* Reviewer modal — GV xem bài nộp HS */}
+      {reviewingBlock && (
+        <LabAttemptsReviewer
+          blockId={reviewingBlock.id}
+          blockTitle={reviewingBlock.title || undefined}
+          onClose={() => setReviewingBlock(null)}
+        />
+      )}
     </div>
   )
 

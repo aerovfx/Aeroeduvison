@@ -5314,10 +5314,17 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         feedback      JSONB,
         "submittedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )`);
+      // V2: lazy migration thêm cột screenshot (PNG data URL) — bảng DB cũ
+      // sẽ được ADD COLUMN IF NOT EXISTS lần đầu ensure
+      await pool.query(`ALTER TABLE "LabAttempt"
+        ADD COLUMN IF NOT EXISTS screenshot TEXT`);
       await pool.query(`CREATE INDEX IF NOT EXISTS "LabAttempt_user_block_idx"
         ON "LabAttempt"("userId", "blockId", "submittedAt" DESC)`);
       await pool.query(`CREATE INDEX IF NOT EXISTS "LabAttempt_lesson_idx"
         ON "LabAttempt"("userId", "lessonId") WHERE success = TRUE`);
+      // V2: index hỗ trợ leaderboard query (top scores per block)
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LabAttempt_block_score_idx"
+        ON "LabAttempt"("blockId", score DESC, "submittedAt" ASC) WHERE success = TRUE`);
       _labReady = true;
     }
 
@@ -5426,12 +5433,189 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
       return { success, score, feedback: { checks, passed, total } };
     }
 
+    // ─── Validation: digital logic circuit ──────────────────────
+    // Snapshot expected: { circuit: { gates, wires }, truthTable }
+    // Criteria có thể có: requiredGates (count by kind), expectedOutputs
+    // (so sánh truth table giữa student và reference).
+    function validateDigitalCircuit(studentSnap, criteria) {
+      const checks = [];
+      const circuit = studentSnap?.circuit || {};
+      const gates = Array.isArray(circuit.gates) ? circuit.gates : [];
+      const wires = Array.isArray(circuit.wires) ? circuit.wires : [];
+      const truthTable = studentSnap?.truthTable;
+
+      // CHECK 1: Cổng đầy đủ theo requiredGates
+      const reqGates = criteria?.requiredGates || [];
+      const gateCounts = gates.reduce((m, g) => { m[g.kind] = (m[g.kind] || 0) + 1; return m; }, {});
+      const missingG = [];
+      for (const r of reqGates) {
+        const kind = typeof r === 'string' ? r : r.kind;
+        const need = typeof r === 'string' ? 1 : (r.count || 1);
+        const have = gateCounts[kind] || 0;
+        if (have < need) missingG.push({ kind, need, have });
+      }
+      checks.push({
+        name: 'gates',
+        label: 'Cổng logic đầy đủ',
+        pass: missingG.length === 0,
+        msg: missingG.length === 0
+          ? `Đủ ${reqGates.length} loại cổng yêu cầu`
+          : `Thiếu: ${missingG.map(m => `${m.kind} (cần ${m.need}, có ${m.have})`).join(', ')}`,
+      });
+
+      // CHECK 2: Có INPUT và OUTPUT
+      const hasInput  = gates.some(g => g.kind === 'INPUT');
+      const hasOutput = gates.some(g => g.kind === 'OUTPUT');
+      checks.push({
+        name: 'io',
+        label: 'Có cổng INPUT và OUTPUT',
+        pass: hasInput && hasOutput,
+        msg: hasInput && hasOutput
+          ? 'Có đủ INPUT + OUTPUT'
+          : `Thiếu ${!hasInput ? 'INPUT' : ''}${!hasInput && !hasOutput ? ' và ' : ''}${!hasOutput ? 'OUTPUT' : ''}`,
+      });
+
+      // CHECK 3: Có dây nối
+      checks.push({
+        name: 'wires',
+        label: 'Có dây nối',
+        pass: wires.length >= (criteria?.minWires || 1),
+        msg: `${wires.length} dây nối`,
+      });
+
+      // CHECK 4: Truth table match — so sánh column outputs
+      // expectedTruthTable format: { rows: [{ inputs: {A:0,B:1}, outputs: {Sum:1,Cout:0} }] }
+      // → student truthTable phải có TẤT CẢ rows match expected outputs
+      const expectedTT = criteria?.expectedTruthTable;
+      if (expectedTT && Array.isArray(expectedTT.rows) && truthTable) {
+        const studentRows = truthTable.rows || [];
+        let matched = 0;
+        const mismatches = [];
+        for (const expRow of expectedTT.rows) {
+          // Tìm student row có same inputs (theo label hoặc index)
+          const sRow = studentRows.find(sr => {
+            return Object.entries(expRow.inputs).every(([k, v]) => sr.inputs?.[k] === v);
+          });
+          if (sRow && Object.entries(expRow.outputs).every(([k, v]) => sRow.outputs?.[k] === v)) {
+            matched++;
+          } else {
+            mismatches.push(expRow.inputs);
+          }
+        }
+        const allMatch = matched === expectedTT.rows.length;
+        checks.push({
+          name: 'truth_table',
+          label: 'Bảng chân lý đúng',
+          pass: allMatch,
+          msg: allMatch
+            ? `Đúng ${matched}/${expectedTT.rows.length} dòng`
+            : `Sai ${expectedTT.rows.length - matched}/${expectedTT.rows.length} dòng`,
+        });
+      }
+
+      const passed = checks.filter(c => c.pass).length;
+      const total = checks.length;
+      const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+      const success = passed === total && total >= 2;
+      return { success, score, feedback: { checks, passed, total } };
+    }
+
+    // ─── Validation: Arduino sketch ─────────────────────────────
+    // V2 minimal: keyword check + pin assignment + code length.
+    // Snapshot expected: { code, pinStates, error }
+    function validateArduinoCircuit(studentSnap, criteria) {
+      const checks = [];
+      const code = String(studentSnap?.code || '');
+      const pinStates = studentSnap?.pinStates;
+      const runtimeError = studentSnap?.error;
+
+      // CHECK 1: Code không rỗng + có setup() + loop()
+      const hasSetup = /void\s+setup\s*\(\s*\)/.test(code);
+      const hasLoop  = /void\s+loop\s*\(\s*\)/.test(code);
+      checks.push({
+        name: 'structure',
+        label: 'Có setup() + loop()',
+        pass: hasSetup && hasLoop && code.length > 30,
+        msg: hasSetup && hasLoop
+          ? `Code hợp lệ (${code.length} ký tự)`
+          : `Thiếu ${!hasSetup ? 'setup()' : ''}${!hasSetup && !hasLoop ? ' + ' : ''}${!hasLoop ? 'loop()' : ''}`,
+      });
+
+      // CHECK 2: Required keywords (từ khoá phải có trong code)
+      // VD: ['pinMode', 'digitalWrite', 'delay']
+      const reqKeywords = criteria?.requiredKeywords || [];
+      const missingK = reqKeywords.filter(k => !code.includes(k));
+      if (reqKeywords.length > 0) {
+        checks.push({
+          name: 'keywords',
+          label: 'Sử dụng API yêu cầu',
+          pass: missingK.length === 0,
+          msg: missingK.length === 0
+            ? `Có đủ ${reqKeywords.length} API`
+            : `Thiếu: ${missingK.join(', ')}`,
+        });
+      }
+
+      // CHECK 3: Required pin assignments — VD pin 13 phải dùng OUTPUT
+      // criteria.requiredPins: [{ pin: 13, mode: 'OUTPUT' }]
+      const reqPins = criteria?.requiredPins || [];
+      if (reqPins.length > 0) {
+        const missingP = [];
+        for (const rp of reqPins) {
+          // Naive regex: pinMode(13, OUTPUT) or pinMode(LED, OUTPUT) where LED=13
+          const pinRegex = new RegExp(`pinMode\\s*\\(\\s*\\w*\\s*${rp.pin}\\s*\\w*\\s*,\\s*${rp.mode}\\s*\\)`, 'i');
+          const pinDirectRegex = new RegExp(`pinMode\\s*\\([^,)]*,\\s*${rp.mode}\\s*\\)`, 'i');
+          if (!pinRegex.test(code) && !pinDirectRegex.test(code)) {
+            missingP.push(`pin ${rp.pin}=${rp.mode}`);
+          }
+        }
+        checks.push({
+          name: 'pins',
+          label: 'Pin assignment đúng',
+          pass: missingP.length === 0,
+          msg: missingP.length === 0 ? 'Đã set đủ pin' : `Thiếu: ${missingP.join(', ')}`,
+        });
+      }
+
+      // CHECK 4: Runtime không error
+      checks.push({
+        name: 'no_runtime_error',
+        label: 'Code chạy không lỗi',
+        pass: !runtimeError,
+        msg: runtimeError ? `Lỗi: ${String(runtimeError).slice(0, 100)}` : 'OK',
+      });
+
+      // CHECK 5: Expected pin states (nếu có)
+      // criteria.expectedPinStates: { 13: 1 } — pin 13 phải HIGH sau khi chạy
+      const expPins = criteria?.expectedPinStates;
+      if (expPins && pinStates?.digitalOut) {
+        const mismatches = [];
+        for (const [pin, expState] of Object.entries(expPins)) {
+          const actual = pinStates.digitalOut[pin] ?? pinStates.digitalOut[Number(pin)];
+          if (actual !== expState) mismatches.push(`pin ${pin}=${actual} (cần ${expState})`);
+        }
+        checks.push({
+          name: 'pin_states',
+          label: 'Trạng thái pin đúng',
+          pass: mismatches.length === 0,
+          msg: mismatches.length === 0 ? 'Pin states match' : mismatches.join(', '),
+        });
+      }
+
+      const passed = checks.filter(c => c.pass).length;
+      const total = checks.length;
+      const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+      const success = passed === total && total >= 2;
+      return { success, score, feedback: { checks, passed, total } };
+    }
+
     // ── POST /api/labs/attempts — HS submit ─────────────────────
-    app.post('/api/labs/attempts', express.json({ limit: '256kb' }), async (req, res) => {
+    // V2: nhận thêm screenshot (data URL PNG ≤ 500KB), dispatch theo labType.
+    app.post('/api/labs/attempts', express.json({ limit: '1mb' }), async (req, res) => {
       try {
         const u = getLabUser(req);
         if (!u?.id) return res.status(401).json({ error: 'Unauthorized' });
-        const { blockId, lessonId, snapshot } = req.body || {};
+        const { blockId, lessonId, snapshot, screenshot } = req.body || {};
         if (!blockId || !snapshot) return res.status(400).json({ error: 'blockId & snapshot required' });
 
         const pool = getLabPool();
@@ -5453,20 +5637,31 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         const criteria = meta.criteria || {};
 
         let result;
-        if (labType === 'analog') {
-          result = validateAnalogCircuit(snapshot, criteria);
-        } else {
-          // V1 chỉ support analog. Lab khác → tạm pass nếu có snapshot
-          result = { success: true, score: 100, feedback: { checks: [{ name: 'submitted', label: 'Đã nộp', pass: true, msg: 'V1: lab này chưa có chấm tự động' }], passed: 1, total: 1 } };
+        switch (labType) {
+          case 'digital':
+            result = validateDigitalCircuit(snapshot, criteria);
+            break;
+          case 'arduino':
+            result = validateArduinoCircuit(snapshot, criteria);
+            break;
+          case 'analog':
+          default:
+            result = validateAnalogCircuit(snapshot, criteria);
+        }
+
+        // Validate screenshot: phải là data:image PNG, < 500KB
+        let validScreenshot = null;
+        if (typeof screenshot === 'string' && screenshot.startsWith('data:image/') && screenshot.length < 500_000) {
+          validScreenshot = screenshot;
         }
 
         // Insert attempt
         const id = require('crypto').randomBytes(8).toString('hex');
         await pool.query(
-          `INSERT INTO "LabAttempt" (id, "userId", "blockId", "lessonId", snapshot, success, score, feedback)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          `INSERT INTO "LabAttempt" (id, "userId", "blockId", "lessonId", snapshot, success, score, feedback, screenshot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [id, u.id, blockId, lessonId || block.lessonId, JSON.stringify(snapshot),
-           result.success, result.score, JSON.stringify(result.feedback)]
+           result.success, result.score, JSON.stringify(result.feedback), validScreenshot]
         );
 
         return res.json({
@@ -5478,6 +5673,56 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         });
       } catch (err) {
         console.error('[lab:submit]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/labs/leaderboard/block/:blockId ────────────────
+    // Top scores cho 1 block challenge. Trả top 10 + rank của user hiện tại.
+    // Optional ?classId= để filter chỉ HS trong lớp (V2 đơn giản: bỏ qua classId, lấy tất cả).
+    app.get('/api/labs/leaderboard/block/:blockId', async (req, res) => {
+      try {
+        const u = getLabUser(req);
+        const pool = getLabPool();
+        if (!pool) return res.json({ entries: [], me: null });
+        await ensureLabTables();
+
+        // Best score per user trên block này (chỉ tính success=true)
+        const { rows } = await pool.query(
+          `SELECT a."userId", u.name, u.email, u.image,
+                  MAX(a.score) AS best_score,
+                  MIN(a."submittedAt") FILTER (WHERE a.success = TRUE) AS first_pass_at,
+                  COUNT(*)::int AS attempts
+             FROM "LabAttempt" a
+             LEFT JOIN "User" u ON u.id = a."userId"
+            WHERE a."blockId"=$1
+            GROUP BY a."userId", u.name, u.email, u.image
+            HAVING MAX(a.score) > 0
+            ORDER BY best_score DESC, first_pass_at ASC NULLS LAST
+            LIMIT 100`,
+          [req.params.blockId]
+        );
+
+        const entries = rows.map((r, i) => ({
+          rank: i + 1,
+          userId: r.userId,
+          name: r.name || '(ẩn danh)',
+          email: r.email,
+          image: r.image,
+          bestScore: Number(r.best_score) || 0,
+          firstPassAt: r.first_pass_at,
+          attempts: r.attempts,
+          isMe: u?.id === r.userId,
+        }));
+
+        const meEntry = entries.find(e => e.isMe) || null;
+        return res.json({
+          entries: entries.slice(0, 10),
+          me: meEntry,
+          totalRanked: entries.length,
+        });
+      } catch (err) {
+        console.error('[lab:leaderboard]', err.message);
         return res.status(500).json({ error: err.message });
       }
     });
@@ -5564,7 +5809,7 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
 
         const { rows } = await pool.query(
           `SELECT a.id, a."userId", a.success, a.score, a.feedback, a."submittedAt",
-                  u.name AS user_name, u.email AS user_email
+                  a.screenshot, u.name AS user_name, u.email AS user_email, u.image
              FROM "LabAttempt" a
              LEFT JOIN "User" u ON u.id = a."userId"
             WHERE a."blockId"=$1
@@ -5574,7 +5819,9 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
         );
         return res.json({ attempts: rows.map(r => ({
           id: r.id, userId: r.userId, userName: r.user_name, userEmail: r.user_email,
+          userImage: r.image,
           success: r.success, score: r.score, feedback: r.feedback,
+          screenshot: r.screenshot,
           submittedAt: r.submittedAt,
         }))});
       } catch (err) {

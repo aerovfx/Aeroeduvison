@@ -19,7 +19,7 @@
  *
  * Hoàn toàn frontend — không cần backend.
  */
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Play, Pause, RotateCcw, Trash2, Save, FolderOpen,
@@ -353,8 +353,27 @@ const LS_KEY = 'inphysic_digital_logic_circuit_v1'
 // ─────────────────────────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────────────────────────
-export default function DigitalLogicLab() {
+/**
+ * Imperative API exposed via forwardRef cho LabChallenge wrapper:
+ * - getSnapshot() → mạch hiện tại + truth table evaluated
+ * - loadSnapshot(c) → load mạch GV làm reference
+ */
+export interface DigitalLogicHandle {
+  getSnapshot(): { circuit: Circuit; truthTable: ReturnType<typeof generateTruthTable> }
+  loadSnapshot(c: Circuit): void
+}
+
+interface DigitalLogicProps {
+  /** Initial circuit — challenge reference từ GV */
+  initialCircuit?: Circuit
+}
+
+function DigitalLogicLabInner(
+  { initialCircuit }: DigitalLogicProps,
+  ref: React.Ref<DigitalLogicHandle>,
+) {
   const [circuit, setCircuit] = useState<Circuit>(() => {
+    if (initialCircuit?.gates && initialCircuit?.wires) return initialCircuit
     try {
       const raw = localStorage.getItem(LS_KEY)
       if (raw) {
@@ -392,6 +411,19 @@ export default function DigitalLogicLab() {
     () => running ? simulate(circuit, clockState) : circuit.gates,
     [circuit, clockState, running],
   )
+
+  // Expose imperative API cho LabChallengeBlock
+  useImperativeHandle(ref, () => ({
+    getSnapshot: () => {
+      const evaluated: Circuit = { ...circuit, gates: simulatedGates }
+      return { circuit: evaluated, truthTable: generateTruthTable(evaluated) }
+    },
+    loadSnapshot: (c) => {
+      setCircuit(c)
+      setSelectedGateId(null)
+      setPendingWire(null)
+    },
+  }), [circuit, simulatedGates])
 
   // Truth table (auto-update)
   const truthTable = useMemo(() => generateTruthTable(circuit), [circuit])
@@ -1077,3 +1109,7 @@ export default function DigitalLogicLab() {
     </div>
   )
 }
+
+const DigitalLogicLab = forwardRef<DigitalLogicHandle, DigitalLogicProps>(DigitalLogicLabInner)
+DigitalLogicLab.displayName = 'DigitalLogicLab'
+export default DigitalLogicLab

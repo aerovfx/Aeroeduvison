@@ -16,7 +16,7 @@
  * analogWrite/Read, delay, Serial.print/ln, user-defined functions.
  * Không hỗ trợ: classes, structs, pointers, #include, String class.
  */
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Play, Pause, RotateCcw, Cpu, Code2, Terminal, AlertTriangle, Zap,
@@ -199,8 +199,27 @@ void loop() {
 ]
 
 // ─── Component ─────────────────────────────────────────────────────
-export default function ArduinoEmulator() {
-  const [code, setCode] = useState(PRESETS[0].code)
+
+/**
+ * Imperative API exposed cho LabChallengeBlock:
+ * - getSnapshot() → code hiện tại + pin states snapshot sau khi chạy
+ * - loadSnapshot({ code }) → load code GV làm reference
+ */
+export interface ArduinoEmulatorHandle {
+  getSnapshot(): { code: string; pinStates: RuntimeSnapshot | null; error: string | null }
+  loadSnapshot(snap: { code: string }): void
+}
+
+interface ArduinoProps {
+  /** Initial code — challenge reference */
+  initialCode?: string
+}
+
+function ArduinoEmulatorInner(
+  { initialCode }: ArduinoProps,
+  ref: React.Ref<ArduinoEmulatorHandle>,
+) {
+  const [code, setCode] = useState(initialCode || PRESETS[0].code)
   const [snapshot, setSnapshot] = useState<RuntimeSnapshot | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -275,6 +294,15 @@ export default function ArduinoEmulator() {
   useEffect(() => {
     return () => { signalRef.current.stopped = true }
   }, [])
+
+  // Expose imperative API cho LabChallengeBlock
+  useImperativeHandle(ref, () => ({
+    getSnapshot: () => ({ code, pinStates: snapshot, error }),
+    loadSnapshot: (snap) => {
+      if (typeof snap.code === 'string') setCode(snap.code)
+      setSnapshot(null); setError(null)
+    },
+  }), [code, snapshot, error])
 
   // ── Toggle pin 2 (virtual button) ──
   const togglePin2 = useCallback(() => {
@@ -495,6 +523,10 @@ export default function ArduinoEmulator() {
     </div>
   )
 }
+
+const ArduinoEmulator = forwardRef<ArduinoEmulatorHandle, ArduinoProps>(ArduinoEmulatorInner)
+ArduinoEmulator.displayName = 'ArduinoEmulator'
+export default ArduinoEmulator
 
 // ─── Schematic component (realistic) ──────────────────────────────
 function Schematic({
