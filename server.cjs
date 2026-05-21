@@ -10240,6 +10240,9 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
         ['"isTemplate"',    'BOOLEAN DEFAULT false'],
         ['"createdAt"',     'TIMESTAMPTZ DEFAULT NOW()'],
         ['"updatedAt"',     'TIMESTAMPTZ DEFAULT NOW()'],
+        // V2 (2026-05): khung năng lực + rubric tổng cho path
+        ['competencies',    `JSONB DEFAULT '[]'::jsonb`],  // path-level targets [{pillarId, targetLevel}]
+        ['"pathRubric"',    `JSONB DEFAULT '{}'::jsonb`],  // { gradingScale, certificateThreshold, ...}
       ];
       for (const [col, typeDef] of lpCols) {
         try {
@@ -10255,6 +10258,7 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
           'id', 'teacherId', 'name', 'description', 'subject', 'difficulty',
           'modules', 'estimatedDays', 'totalXP', 'totalDuration', 'isTemplate',
           'createdAt', 'updatedAt',
+          'competencies', 'pathRubric',  // V2 competency framework
         ]);
         const { rows: schemaCols } = await pool.query(
           `SELECT column_name, is_nullable
@@ -10436,6 +10440,8 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
       totalXP: r.totalXP,
       totalDuration: r.totalDuration,
       isTemplate: !!r.isTemplate,
+      competencies: r.competencies || [],     // V2 path-level competency targets
+      pathRubric: r.pathRubric || {},         // V2 path-level rubric config
       assignments,
       assignedCount: assignments.length,
       createdAt: r.createdAt,
@@ -10527,18 +10533,21 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
       const totalXP = modules.reduce((s, m) => s + (Number(m.xpTarget) || 0), 0);
       const totalDuration = modules.reduce((s, m) => s + (Number(m.duration) || 0), 0);
       const estimatedDays = Math.max(1, Math.ceil(totalDuration / 60));
+      const competencies = Array.isArray(b.competencies) ? b.competencies : [];
+      const pathRubric = (b.pathRubric && typeof b.pathRubric === 'object') ? b.pathRubric : {};
       await ensureLPTables();
       const pool = getAsgnPool();
       const id = lpGenId();
       const { rows } = await pool.query(
         `INSERT INTO "LearningPath" (id, "teacherId", name, description, subject,
             difficulty, modules, "estimatedDays", "totalXP", "totalDuration", "isTemplate",
-            "createdAt", "updatedAt")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW(), NOW())
+            competencies, "pathRubric", "createdAt", "updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), NOW())
          RETURNING *`,
         [id, user.id, String(b.name).trim(), b.description || '', b.subject || null,
          b.difficulty || 'medium', JSON.stringify(modules),
-         estimatedDays, totalXP, totalDuration, !!b.isTemplate]
+         estimatedDays, totalXP, totalDuration, !!b.isTemplate,
+         JSON.stringify(competencies), JSON.stringify(pathRubric)]
       );
       // Auto-assign tới studentIds nếu kèm
       let assignments = [];
@@ -10589,6 +10598,13 @@ Khi cần, tham khảo Cây tri thức AeroEdu (KG) — gợi ý họ vào /dash
         sets.push(`"totalXP" = $${vals.length + 1}`); vals.push(totalXP);
         sets.push(`"totalDuration" = $${vals.length + 1}`); vals.push(totalDuration);
         sets.push(`"estimatedDays" = $${vals.length + 1}`); vals.push(estimatedDays);
+      }
+      // V2: cập nhật competencies + pathRubric
+      if (Array.isArray(b.competencies)) {
+        sets.push(`competencies = $${vals.length + 1}`); vals.push(JSON.stringify(b.competencies));
+      }
+      if (b.pathRubric && typeof b.pathRubric === 'object') {
+        sets.push(`"pathRubric" = $${vals.length + 1}`); vals.push(JSON.stringify(b.pathRubric));
       }
       if (sets.length === 0) return res.status(400).json({ error: 'Không có gì để cập nhật' });
       sets.push(`"updatedAt" = NOW()`);
