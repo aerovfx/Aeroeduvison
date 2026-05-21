@@ -2805,6 +2805,112 @@ function makeProxy(target, label, pathFilter) {
     res.json({ order: o });
   });
 
+  // ─── GET /api/payment/my-subscription ───────────────────────
+  // User tự xem gói hiện tại của mình: active plan + ngày còn lại + lịch sử
+  // → trang /pricing dùng để show "Đang sử dụng" badge + nút "Gia hạn"
+  //   thay vì "Chọn gói" cho gói đang active.
+  app.get('/api/payment/my-subscription', async (req, res) => {
+    try {
+      const userKey = getUserKey(req);
+      if (!userKey) return res.status(401).json({ error: 'Unauthorized' });
+
+      // Parse JWT để lấy userId chính xác (getUserKey có thể là email fallback)
+      const payload = getJwtPayload(req);
+      const userId = payload?.sub || payload?.id || null;
+      const userEmail = payload?.email || null;
+
+      const pool = getPool();
+      const PLAN_MAP = Object.fromEntries(orders.PLANS.map(p => [p.id, p]));
+
+      // Lấy đơn PAID gần nhất theo userId hoặc email
+      let allOrders = [];
+      try {
+        const { rows } = await pool.query(`
+          SELECT id, "planId", "planName", amount, status, "createdAt", "approvedAt"
+            FROM "PaymentOrder"
+           WHERE ($1::text IS NOT NULL AND "userId" = $1)
+              OR ($2::text IS NOT NULL AND LOWER("userEmail") = LOWER($2))
+           ORDER BY "createdAt" DESC
+           LIMIT 50
+        `, [userId, userEmail]);
+        allOrders = rows;
+      } catch (e) {
+        // Bảng có thể chưa tồn tại — return rỗng thay vì 500
+        if (!String(e.message).includes('does not exist')) {
+          console.warn('[payment:my-subscription] DB warn:', e.message);
+        }
+      }
+
+      // Tìm đơn PAID gần nhất CÒN HẠN
+      const now = Date.now();
+      let activeSub = null;
+      const paidOrders = allOrders.filter(o => o.status === 'PAID');
+      for (const o of paidOrders) {
+        const plan = PLAN_MAP[o.planId];
+        const durationDays = plan?.durationDays || 30;
+        const startedAt = o.approvedAt ? new Date(o.approvedAt).getTime()
+                       : o.createdAt  ? new Date(o.createdAt).getTime()
+                       : now;
+        const expiresAt = startedAt + durationDays * 86_400_000;
+        if (expiresAt > now) {
+          const daysRemaining = Math.max(0, Math.ceil((expiresAt - now) / 86_400_000));
+          const daysUsed = Math.max(0, Math.floor((now - startedAt) / 86_400_000));
+          activeSub = {
+            orderId: o.id,
+            planId: o.planId,
+            planName: o.planName || plan?.name || o.planId,
+            audience: plan?.audience || null,
+            amount: Number(o.amount) || 0,
+            startedAt: new Date(startedAt).toISOString(),
+            expiresAt: new Date(expiresAt).toISOString(),
+            daysUsed,
+            daysRemaining,
+            durationDays,
+            percentUsed: Math.min(100, Math.round((daysUsed / durationDays) * 100)),
+            isExpiringSoon: daysRemaining < 7,
+            features: entitlements.PLAN_FEATURES[o.planId] || [],
+          };
+          break; // chỉ lấy đơn còn hạn gần nhất
+        }
+      }
+
+      // Có gói đang chờ duyệt không?
+      const pendingOrder = allOrders.find(o => o.status === 'AWAITING_REVIEW' || o.status === 'PENDING') || null;
+
+      // Lifetime spend
+      const lifetimeSpend = paidOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0);
+
+      res.json({
+        userId,
+        userEmail,
+        activeSubscription: activeSub,                // null nếu chưa có / hết hạn
+        pendingOrder: pendingOrder ? {
+          orderId: pendingOrder.id,
+          planId: pendingOrder.planId,
+          planName: pendingOrder.planName,
+          amount: Number(pendingOrder.amount) || 0,
+          status: pendingOrder.status,
+          createdAt: pendingOrder.createdAt,
+        } : null,
+        orderCount: allOrders.length,
+        paidCount: paidOrders.length,
+        lifetimeSpend,
+        history: allOrders.slice(0, 10).map(o => ({
+          id: o.id,
+          planId: o.planId,
+          planName: o.planName,
+          amount: Number(o.amount) || 0,
+          status: o.status,
+          createdAt: o.createdAt,
+          approvedAt: o.approvedAt,
+        })),
+      });
+    } catch (err) {
+      console.error('[payment:my-subscription] ❌', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   app.post('/api/payment/orders/:id/notify', async (req, res) => {
     try {
       const order = await orders.getOrder(req.params.id);
