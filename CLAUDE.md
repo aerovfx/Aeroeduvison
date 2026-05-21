@@ -15,9 +15,12 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `84bd9db` (revision pixiai-00377-nuy, 2026-05-21 — anti-screenshot v6 watermark ON-DEMAND + 5-layer anti-AI-crawler + LLM Viz copy fix)
-- Commits since last deploy: `1/5`
-- Prev: `6ab6995` — Online exam room: luôn hiển thị 3 sections (đang/sắp/đã) đồng thời
+- Last deployed commit: `180edbb` (revision pixiai-00378-xxx, 2026-05-21 — SGK 11 Bài 26 lab + Mạch Analog tự lắp ghép + STEM Scrum + Online exam sections + anti-screenshot v6)
+- Commits since last deploy: `0/5`
+- Prev: `a417da7` — Mạch Analog tự lắp ghép drag-drop SVG + 5 templates
+- Prev: `99d4773` — STEM Scrum board sync timeline
+- Prev: `6ab6995` — Online exam 3 sections đang/sắp/đã
+- Prev: `84bd9db` → pixiai-00377-nuy (anti-screenshot v6 + 5-layer anti-AI-crawler)
 - Prev: `4e317a4` → pixiai-00376-mop (anti-screenshot v5/v6 + curriculum updatedAt fix)
 - Prev: `99aa919` → pixiai-00374-haw (anti-screenshot v4 + Asset Block Editor)
 - Prev: `08e7bb3` → pixiai-00373-rop (HOTFIX camera column case + curriculum/lessons + at-risk teachers + PARENT picker)
