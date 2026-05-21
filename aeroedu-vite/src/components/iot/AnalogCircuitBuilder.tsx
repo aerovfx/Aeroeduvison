@@ -17,6 +17,7 @@ import {
   Zap, Plus, Trash2, Save, Play, RotateCw, MousePointer,
   Cable, FolderOpen, BookOpen, AlertTriangle, CheckCircle2,
   XCircle, Lightbulb, ChevronDown,
+  FlaskConical, LineChart,
 } from 'lucide-react'
 
 // ───────────────────────────────────────────────────────────────────
@@ -36,6 +37,9 @@ type ComponentType =
   | 'buzzer'
   | 'potentiometer'
   | 'ground'
+  | 'ammeter'
+  | 'voltmeter'
+  | 'emf_cell'
 
 interface PlacedComponent {
   id: string
@@ -45,6 +49,9 @@ interface PlacedComponent {
   value?: number       // ohms (resistor/pot), volts (battery), μF (cap), mH (inductor)
   rotation: 0 | 90 | 180 | 270
   on?: boolean         // for switch
+  emf?: number         // EMF for emf_cell (V)
+  internalR?: number   // internal resistance for emf_cell (Ω)
+  reading?: number     // measured value for ammeter (A) / voltmeter (V)
 }
 
 interface Wire {
@@ -63,6 +70,12 @@ interface SimResult {
   level: 'success' | 'warn' | 'error' | 'info'
   current?: number     // amps
   ledStates: Record<string, 'off' | 'on' | 'burnt'>
+  /**
+   * Readings keyed by componentId.
+   *   - ammeter: current (A) through it
+   *   - voltmeter: voltage (V) across its terminals
+   */
+  meterReadings?: Record<string, number>
 }
 
 interface SavedCircuit {
@@ -88,6 +101,7 @@ interface PaletteItem {
 const PALETTE: PaletteItem[] = [
   { type: 'battery_9v',    label: 'Pin 9V',       emoji: '🔋', defaultValue: 9,    unit: 'V',  hint: 'Nguồn 9V (pin vuông)' },
   { type: 'battery_aa',    label: 'Pin AA 1.5V',  emoji: '🪫', defaultValue: 1.5,  unit: 'V',  hint: 'Nguồn 1.5V' },
+  { type: 'emf_cell',      label: 'Pin điện hoá (ξ,r)', emoji: '🧪', defaultValue: 1.5, unit: 'V', hint: 'Nguồn có ξ + nội trở r (SGK)' },
   { type: 'led_red',       label: 'LED đỏ',       emoji: '🟥', hint: 'Vf ~2V, If 20mA' },
   { type: 'led_blue',      label: 'LED xanh dương', emoji: '🟦', hint: 'Vf ~3V, If 20mA' },
   { type: 'led_green',     label: 'LED xanh lá',  emoji: '🟩', hint: 'Vf ~2.1V, If 20mA' },
@@ -97,6 +111,8 @@ const PALETTE: PaletteItem[] = [
   { type: 'capacitor',     label: 'Tụ điện',      emoji: '⚙️', defaultValue: 100,  unit: 'μF', hint: 'DC steady state: hở' },
   { type: 'buzzer',        label: 'Loa buzzer',   emoji: '🔔', hint: 'Còi báo (R~16Ω)' },
   { type: 'potentiometer', label: 'Biến trở',     emoji: '🔧', defaultValue: 500,  unit: 'Ω',  hint: 'Chỉnh được 0-1kΩ' },
+  { type: 'ammeter',       label: 'Ampe kế (A)',  emoji: '🔵', hint: 'Đo dòng — mắc nối tiếp' },
+  { type: 'voltmeter',     label: 'Vôn kế (V)',   emoji: '🟢', hint: 'Đo áp — mắc song song' },
   { type: 'ground',        label: 'Đất (GND)',    emoji: '🌐', hint: '0V tham chiếu' },
 ]
 
@@ -114,6 +130,7 @@ interface CompGeometry {
 const GEOM: Record<ComponentType, CompGeometry> = {
   battery_9v:    { w: 70, h: 40, termA: { x: 0, y: 20 }, termB: { x: 70, y: 20 } },
   battery_aa:    { w: 70, h: 40, termA: { x: 0, y: 20 }, termB: { x: 70, y: 20 } },
+  emf_cell:      { w: 80, h: 50, termA: { x: 0, y: 25 }, termB: { x: 80, y: 25 } },
   led_red:       { w: 60, h: 40, termA: { x: 0, y: 20 }, termB: { x: 60, y: 20 } },
   led_blue:      { w: 60, h: 40, termA: { x: 0, y: 20 }, termB: { x: 60, y: 20 } },
   led_green:     { w: 60, h: 40, termA: { x: 0, y: 20 }, termB: { x: 60, y: 20 } },
@@ -123,6 +140,8 @@ const GEOM: Record<ComponentType, CompGeometry> = {
   capacitor:     { w: 60, h: 40, termA: { x: 0, y: 20 }, termB: { x: 60, y: 20 } },
   buzzer:        { w: 60, h: 50, termA: { x: 0, y: 25 }, termB: { x: 60, y: 25 } },
   potentiometer: { w: 90, h: 50, termA: { x: 0, y: 30 }, termB: { x: 90, y: 30 } },
+  ammeter:       { w: 60, h: 40, termA: { x: 0, y: 20 }, termB: { x: 60, y: 20 } },
+  voltmeter:     { w: 50, h: 60, termA: { x: 25, y: 0 }, termB: { x: 25, y: 60 } },
   ground:        { w: 50, h: 50, termA: { x: 25, y: 0 }, termB: { x: 25, y: 0 } }, // single terminal
 }
 
@@ -173,12 +192,13 @@ function newId() {
 // Component SVG symbols (drawn in original orientation, rotated via <g>)
 // ───────────────────────────────────────────────────────────────────
 
-function ComponentSymbol({ c, isSelected, isLit, ledOn, ledBurnt }: {
+function ComponentSymbol({ c, isSelected, isLit, ledOn, ledBurnt, reading }: {
   c: PlacedComponent
   isSelected: boolean
   isLit: boolean      // for bulb-style
   ledOn: boolean
   ledBurnt: boolean
+  reading?: number    // measured value for ammeter / voltmeter
 }) {
   const g = GEOM[c.type]
   const t = c.type
@@ -348,6 +368,75 @@ function ComponentSymbol({ c, isSelected, isLit, ledOn, ledBurnt }: {
         </>
       )
     }
+
+    case 'ammeter': {
+      // Circle with "A" letter, horizontal terminals
+      // Reading shown in mA below
+      const mA = reading !== undefined ? reading * 1000 : null
+      return (
+        <>
+          <line x1={0}  y1={20} x2={15} y2={20} stroke={stroke} strokeWidth={sw} />
+          <line x1={45} y1={20} x2={60} y2={20} stroke={stroke} strokeWidth={sw} />
+          <circle cx={30} cy={20} r={14} fill="#0f172a" stroke="#22d3ee" strokeWidth={1.8} />
+          <text x={30} y={24.5} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#22d3ee">A</text>
+          {mA !== null ? (
+            <text x={30} y={50} textAnchor="middle" fontSize={9} fontWeight="bold" fill="#34d399">
+              {mA < 1 ? `${(mA * 1000).toFixed(0)} μA` : mA < 1000 ? `${mA.toFixed(1)} mA` : `${(mA / 1000).toFixed(2)} A`}
+            </text>
+          ) : (
+            <text x={30} y={50} textAnchor="middle" fontSize={8} fill="#64748b">Ampe kế</text>
+          )}
+        </>
+      )
+    }
+
+    case 'voltmeter': {
+      // Circle with "V" letter, vertical terminals (top + bottom)
+      // Reading shown in V on right side
+      const V = reading
+      return (
+        <>
+          <line x1={25} y1={0}  x2={25} y2={12} stroke={stroke} strokeWidth={sw} />
+          <line x1={25} y1={48} x2={25} y2={60} stroke={stroke} strokeWidth={sw} />
+          <circle cx={25} cy={30} r={14} fill="#0f172a" stroke="#a78bfa" strokeWidth={1.8} />
+          <text x={25} y={34.5} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#a78bfa">V</text>
+          {V !== undefined ? (
+            <text x={45} y={33} fontSize={9} fontWeight="bold" fill="#34d399">
+              {V.toFixed(2)} V
+            </text>
+          ) : (
+            <text x={45} y={33} fontSize={8} fill="#64748b">Vôn kế</text>
+          )}
+        </>
+      )
+    }
+
+    case 'emf_cell': {
+      // Battery symbol with ξ, r labels — emphasises internal resistance
+      const emf = c.emf ?? c.value ?? 1.5
+      const rIn = c.internalR ?? 0.5
+      return (
+        <>
+          {/* leads */}
+          <line x1={0}  y1={25} x2={28} y2={25} stroke={stroke} strokeWidth={sw} />
+          <line x1={52} y1={25} x2={80} y2={25} stroke={stroke} strokeWidth={sw} />
+          {/* cell + plate (long) */}
+          <line x1={28} y1={8}  x2={28} y2={42} stroke="#fbbf24" strokeWidth={3} />
+          {/* cell - plate (short) */}
+          <line x1={52} y1={14} x2={52} y2={36} stroke={stroke} strokeWidth={3} />
+          {/* polarity */}
+          <text x={24} y={6}  fontSize={10} fill="#fbbf24" textAnchor="end" fontWeight="bold">+</text>
+          <text x={56} y={6}  fontSize={10} fill="#94a3b8" fontWeight="bold">−</text>
+          {/* dashed box highlighting internal-r model */}
+          <rect x={22} y={6} width={36} height={38} fill="none" stroke="#fbbf24"
+                strokeWidth={0.8} strokeDasharray="2 2" opacity={0.6} />
+          {/* labels */}
+          <text x={40} y={50} textAnchor="middle" fontSize={9} fill="#fbbf24" fontWeight="bold">
+            ξ={emf}V · r={rIn}Ω
+          </text>
+        </>
+      )
+    }
   }
 }
 
@@ -468,6 +557,37 @@ const TEMPLATES: Template[] = [
       }
     },
   },
+  {
+    id: 'sgk11-bai26',
+    emoji: '🔬',
+    name: 'Bài 26 SGK — Đo ξ & r pin điện hoá (Vật lý 11)',
+    hint: 'Mạch đo suất điện động ξ và điện trở trong r của pin theo SGK Kết nối Tri thức',
+    build: () => {
+      // Layout: pin top-left → K → A → R(biến trở) → R₀ → about pin- (loop closes)
+      // Voltmeter parallel across M (between K and A) ↔ N (between R₀ and pin-)
+      // Canvas: 880×500. Pin at left, components along top, R₀ on bottom return path.
+      const pin    = { id: 'pin',  type: 'emf_cell' as const,      x: 60,  y: 220, emf: 1.5, internalR: 0.5, value: 1.5, rotation: 0 as const }
+      const swK    = { id: 'sw_k', type: 'switch' as const,        x: 200, y: 100, on: true, rotation: 0 as const }
+      const amp    = { id: 'amp',  type: 'ammeter' as const,       x: 360, y: 100, rotation: 0 as const }
+      const rVar   = { id: 'r_var', type: 'potentiometer' as const, x: 520, y: 95, value: 50, rotation: 0 as const }
+      const r0     = { id: 'r0',   type: 'resistor' as const,      x: 640, y: 240, value: 10, rotation: 0 as const }
+      const volt   = { id: 'volt', type: 'voltmeter' as const,     x: 380, y: 280, rotation: 0 as const }
+      return {
+        components: [pin, swK, amp, rVar, r0, volt],
+        wires: [
+          // Loop: pin(+) → K → A → R → R₀ → pin(-)
+          { id: 'w1', fromId: 'pin',   fromTerminal: 'b', toId: 'sw_k',  toTerminal: 'a' }, // pin+ → K (left)
+          { id: 'w2', fromId: 'sw_k',  fromTerminal: 'b', toId: 'amp',   toTerminal: 'a' }, // K → A (node M)
+          { id: 'w3', fromId: 'amp',   fromTerminal: 'b', toId: 'r_var', toTerminal: 'a' }, // A → R
+          { id: 'w4', fromId: 'r_var', fromTerminal: 'b', toId: 'r0',    toTerminal: 'a' }, // R → R₀ (top)
+          { id: 'w5', fromId: 'r0',    fromTerminal: 'b', toId: 'pin',   toTerminal: 'a' }, // R₀ → pin- (node N)
+          // Voltmeter parallel: V+ at M (sw_k:b), V- at N (r0:b)
+          { id: 'w6', fromId: 'volt',  fromTerminal: 'a', toId: 'sw_k',  toTerminal: 'b' },
+          { id: 'w7', fromId: 'volt',  fromTerminal: 'b', toId: 'r0',    toTerminal: 'b' },
+        ],
+      }
+    },
+  },
 ]
 
 // ───────────────────────────────────────────────────────────────────
@@ -497,15 +617,29 @@ function simulate(
   wires: Wire[],
 ): SimResult {
   const ledStates: Record<string, 'off' | 'on' | 'burnt'> = {}
+  const meterReadings: Record<string, number> = {}
   components.filter(c => c.type.startsWith('led_')).forEach(c => { ledStates[c.id] = 'off' })
+  components.filter(c => c.type === 'ammeter' || c.type === 'voltmeter').forEach(c => {
+    meterReadings[c.id] = 0
+  })
 
-  // Find batteries
-  const batteries = components.filter(c => c.type === 'battery_9v' || c.type === 'battery_aa')
-  if (batteries.length === 0) {
-    return { ok: false, message: '⚠ Chưa có nguồn điện — thêm pin vào mạch.', level: 'info', ledStates }
+  // Find sources: legacy battery OR emf_cell (with internal R)
+  const sources = components.filter(c =>
+    c.type === 'battery_9v' || c.type === 'battery_aa' || c.type === 'emf_cell'
+  )
+  if (sources.length === 0) {
+    return {
+      ok: false,
+      message: '⚠ Chưa có nguồn điện — thêm pin hoặc pin điện hoá vào mạch.',
+      level: 'info', ledStates, meterReadings,
+    }
   }
-  const bat = batteries[0]   // use first battery
-  const V = bat.value ?? (bat.type === 'battery_9v' ? 9 : 1.5)
+  const src = sources[0]   // use first source
+  const isEmfCell = src.type === 'emf_cell'
+  const V = isEmfCell
+    ? (src.emf ?? src.value ?? 1.5)
+    : (src.value ?? (src.type === 'battery_9v' ? 9 : 1.5))
+  const internalR = isEmfCell ? (src.internalR ?? 0.5) : 0
 
   // Build adjacency: nodeKey -> list of { to, R, vDrop, fromComp }
   // nodeKey = `${compId}:${term}` for component terminals
@@ -530,7 +664,8 @@ function simulate(
     switch (c.type) {
       case 'battery_9v':
       case 'battery_aa':
-        // battery handled separately — DON'T add internal edge here (the V source is the boundary)
+      case 'emf_cell':
+        // source handled separately — DON'T add internal edge here (the V source is the boundary)
         break
       case 'resistor':
         addEdge(a, b, c.value ?? 220, 0, c.id)
@@ -550,6 +685,14 @@ function simulate(
       case 'potentiometer':
         addEdge(a, b, c.value ?? 500, 0, c.id)
         break
+      case 'ammeter':
+        // Ideal ammeter: ~0Ω, current flows through, we'll read it after sim
+        addEdge(a, b, 0.001, 0, c.id)
+        break
+      case 'voltmeter':
+        // Ideal voltmeter: ~∞Ω in parallel — model with very high R so essentially no current
+        addEdge(a, b, 1e9, 0, c.id)
+        break
       case 'ground':
         // single terminal — only a, used as 0V reference (no internal edge needed)
         break
@@ -563,62 +706,85 @@ function simulate(
     }
   }
 
-  // BFS to find ANY path from bat+:b to bat−:a
-  const start = `${bat.id}:b`
-  const goal  = `${bat.id}:a`
+  // BFS to find ANY path from src+:b to src−:a (b=positive, a=negative)
+  const start = `${src.id}:b`
+  const goal  = `${src.id}:a`
 
   if (!adj.has(start) || !adj.has(goal)) {
-    return { ok: false, message: '⚠ Mạch hở — pin chưa được nối với phần còn lại.', level: 'warn', ledStates }
+    return {
+      ok: false,
+      message: '⚠ Mạch hở — nguồn chưa được nối với phần còn lại.',
+      level: 'warn', ledStates, meterReadings,
+    }
   }
 
-  // Find shortest path (BFS) carrying total R + total Vdrop
+  // Find ALL simple paths from start to goal (DFS), then pick the lowest-resistance one.
+  // We bias toward non-voltmeter paths because voltmeter has 1e9 Ω.
+  // For typical SGK circuits this is small enough.
   interface QItem { node: string; pathR: number; pathV: number; visited: Set<string>; trail: string[] }
-  const queue: QItem[] = [{ node: start, pathR: 0, pathV: 0, visited: new Set([start]), trail: [] }]
-  let foundPath: QItem | null = null
-
-  while (queue.length > 0) {
-    const cur = queue.shift()!
-    if (cur.node === goal) {
-      foundPath = cur
-      break
-    }
+  const seed: QItem = { node: start, pathR: 0, pathV: 0, visited: new Set([start]), trail: [] }
+  const allPaths: QItem[] = []
+  const dfs = (cur: QItem, depth: number) => {
+    if (depth > 40) return
+    if (cur.node === goal) { allPaths.push(cur); return }
     for (const edge of adj.get(cur.node) ?? []) {
       if (cur.visited.has(edge.to)) continue
       const nv = new Set(cur.visited); nv.add(edge.to)
-      queue.push({
+      dfs({
         node: edge.to,
         pathR: cur.pathR + edge.R,
         pathV: cur.pathV + edge.vDrop,
         visited: nv,
         trail: [...cur.trail, edge.compId],
-      })
+      }, depth + 1)
     }
+  }
+  dfs(seed, 0)
+
+  // Pick the path with the LOWEST resistance that excludes voltmeter (voltmeter is a sense element)
+  const realPaths = allPaths.filter(p =>
+    !p.trail.some(id => components.find(c => c.id === id)?.type === 'voltmeter')
+  )
+  let foundPath: QItem | null = null
+  if (realPaths.length > 0) {
+    foundPath = realPaths.reduce((best, p) => (p.pathR < best.pathR ? p : best), realPaths[0])
+  } else if (allPaths.length > 0) {
+    foundPath = allPaths.reduce((best, p) => (p.pathR < best.pathR ? p : best), allPaths[0])
   }
 
   if (!foundPath) {
     // Check if it's because of an open switch
     const openSwitches = components.filter(c => c.type === 'switch' && !c.on)
     if (openSwitches.length > 0) {
-      return { ok: false, message: '🔘 Mạch hở — có công tắc đang MỞ. Click vào công tắc để đóng.', level: 'warn', ledStates }
+      return {
+        ok: false,
+        message: '🔘 Mạch hở — có công tắc đang MỞ. Click vào công tắc để đóng.',
+        level: 'warn', ledStates, meterReadings,
+      }
     }
-    return { ok: false, message: '⚠ Mạch chưa khép kín — chưa có đường dẫn từ + về − của pin.', level: 'warn', ledStates }
+    return {
+      ok: false,
+      message: '⚠ Mạch chưa khép kín — chưa có đường dẫn từ + về − của nguồn.',
+      level: 'warn', ledStates, meterReadings,
+    }
   }
 
   // Detect short circuit: path with R≈0 and no Vdrop (no resistor/LED in path)
   const usedCompIds = new Set(foundPath.trail)
   const hasResistor   = components.some(c => usedCompIds.has(c.id) && (c.type === 'resistor' || c.type === 'potentiometer' || c.type === 'buzzer'))
   const hasLED        = components.some(c => usedCompIds.has(c.id) && c.type.startsWith('led_'))
-  if (!hasResistor && !hasLED && foundPath.pathR < 0.5) {
+  if (!hasResistor && !hasLED && (foundPath.pathR + internalR) < 0.5 && !isEmfCell) {
     return {
       ok: false,
       message: '💥 ĐOẢN MẠCH! Pin nối trực tiếp bằng dây — nguy hiểm, hãy thêm điện trở.',
       level: 'error',
       current: 999,
       ledStates,
+      meterReadings,
     }
   }
 
-  // Apply Ohm's law: I = (V - sum_Vdrop) / R_total
+  // Apply Ohm's law: I = (V - sum_Vdrop) / (R_total + internal R)
   const effectiveV = V - foundPath.pathV
   if (effectiveV <= 0) {
     // Forward voltage drop exceeds source — LED won't light
@@ -627,13 +793,14 @@ function simulate(
       .forEach(c => { ledStates[c.id] = 'off' })
     return {
       ok: true,
-      message: '⚠ Áp pin quá thấp so với Vf của LED — không đủ để LED phát sáng.',
+      message: '⚠ Áp nguồn quá thấp so với Vf của LED — không đủ để LED phát sáng.',
       level: 'warn',
       current: 0,
       ledStates,
+      meterReadings,
     }
   }
-  const Rtot = Math.max(foundPath.pathR, 0.01)
+  const Rtot = Math.max(foundPath.pathR + internalR, 0.01)
   const I = effectiveV / Rtot
 
   // Update LED states
@@ -651,6 +818,23 @@ function simulate(
       }
     })
 
+  // ─── Meter readings ─────────────────────────────────────────────
+  // Ammeter: I through the series circuit (if it's on the active path)
+  components.filter(c => c.type === 'ammeter').forEach(c => {
+    meterReadings[c.id] = usedCompIds.has(c.id) ? I : 0
+  })
+  // Voltmeter: voltage across its terminals.
+  // For typical SGK Bài 26: voltmeter is across the source's terminals (M ↔ N),
+  // which equals U = ξ - I·r (terminal voltage). Approximation: we assume the
+  // voltmeter is across the entire EXTERNAL circuit (everything except source + voltmeter itself).
+  components.filter(c => c.type === 'voltmeter').forEach(c => {
+    // External voltage drop = source EMF minus drop across internal resistance
+    // = I × R_external. R_external = Rtot - internalR.
+    const Rext = Rtot - internalR
+    const Uterminal = I * Rext
+    meterReadings[c.id] = Uterminal
+  })
+
   // Build message
   let message = `✓ Mạch hoàn chỉnh — Dòng điện I = ${I.toFixed(3)} A (${(I * 1000).toFixed(1)} mA)`
   let level: SimResult['level'] = 'success'
@@ -661,9 +845,265 @@ function simulate(
   } else if (I < LED_IF_MIN && hasLED) {
     message = `⚡ Dòng quá yếu (${(I * 1000).toFixed(2)} mA) — LED mờ/không sáng. Giảm điện trở.`
     level = 'warn'
+  } else if (isEmfCell) {
+    const Uterm = I * (Rtot - internalR)
+    message = `✓ Đo được: I = ${(I * 1000).toFixed(1)} mA · U = ${Uterm.toFixed(3)} V (U = ξ - I·r)`
   }
 
-  return { ok: true, message, level, current: I, ledStates }
+  return { ok: true, message, level, current: I, ledStates, meterReadings }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// SGK 11 Bài 26 — Measurement table + auto-plot panel
+// ───────────────────────────────────────────────────────────────────
+
+interface Sgk26PanelProps {
+  measurements: Array<{ R: number; U: number; I: number }>
+  regression: { slope: number; intercept: number; emf: number; rComputed: number } | null
+  r0: number
+  onRecord: () => void
+  onDelete: (idx: number) => void
+  onClear: () => void
+  hasSim: boolean
+  currentR?: number
+  currentI: number
+  currentU: number
+}
+
+function Sgk26MeasurementPanel({
+  measurements, regression, r0, onRecord, onDelete, onClear,
+  hasSim, currentR, currentI, currentU,
+}: Sgk26PanelProps) {
+  // SVG plot dims
+  const PW = 320, PH = 200
+  const PAD_L = 36, PAD_R = 12, PAD_T = 14, PAD_B = 30
+
+  const xs = measurements.map(m => m.I * 1000) // mA
+  const ys = measurements.map(m => m.U)        // V
+
+  const xMin = 0
+  const xMax = Math.max(1, ...xs) * 1.15 || 1
+  const yMin = 0
+  const yMax = Math.max(0.1, ...ys) * 1.15 || 2
+
+  const x2px = (x: number) => PAD_L + (x - xMin) / (xMax - xMin) * (PW - PAD_L - PAD_R)
+  const y2px = (y: number) => PH - PAD_B - (y - yMin) / (yMax - yMin) * (PH - PAD_T - PAD_B)
+
+  // Build regression line endpoints (in mA / V)
+  let lineX1 = 0, lineY1 = 0, lineX2 = 0, lineY2 = 0
+  if (regression) {
+    // U = intercept + slope_per_A * I_A
+    // Convert slope to per-mA for the chart: slope_mA = slope / 1000
+    const slopePerMA = regression.slope / 1000
+    lineX1 = xMin
+    lineY1 = regression.intercept + slopePerMA * xMin
+    lineX2 = xMax
+    lineY2 = regression.intercept + slopePerMA * xMax
+  }
+
+  return (
+    <div className="mt-3 rounded-xl bg-gradient-to-br from-indigo-950/40 to-zinc-950/60 border border-indigo-500/30 p-3">
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <h4 className="text-sm font-bold text-indigo-200 inline-flex items-center gap-1.5">
+          <FlaskConical className="w-4 h-4" />
+          Bảng 26.1 — Kết quả đo ξ và r pin điện hoá
+        </h4>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onRecord}
+            disabled={!hasSim}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:scale-[1.02] transition-transform shadow shadow-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-3 h-3" /> Ghi số đo hiện tại
+          </button>
+          <button
+            onClick={onClear}
+            disabled={measurements.length === 0}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-rose-500/15 border border-rose-500/40 text-rose-200 hover:bg-rose-500/25 transition disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="w-3 h-3" /> Xoá bảng
+          </button>
+        </div>
+      </div>
+
+      {/* Hint */}
+      <div className="text-[10px] text-indigo-300/80 mb-2">
+        Đổi giá trị biến trở R (chọn biến trở → đổi giá trị) → bấm "▶ Mô phỏng" → "Ghi số đo".
+        Lặp lại 5-7 lần với R khác nhau để vẽ đồ thị U vs I.
+      </div>
+
+      {/* Current readings preview */}
+      {hasSim && (
+        <div className="mb-2 px-2.5 py-1.5 rounded-md bg-zinc-900/60 border border-zinc-700/60 text-[11px] inline-flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="text-zinc-400">Số đo hiện tại:</span>
+          <span className="text-cyan-300">R = <b>{currentR ?? '—'} Ω</b></span>
+          <span className="text-emerald-300">U = <b>{currentU.toFixed(3)} V</b></span>
+          <span className="text-amber-300">I = <b>{(currentI * 1000).toFixed(2)} mA</b></span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-3">
+        {/* Table */}
+        <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 overflow-hidden">
+          <div className="max-h-[260px] overflow-y-auto">
+            <table className="w-full text-[11px]">
+              <thead className="bg-zinc-900/80 sticky top-0">
+                <tr className="text-zinc-400">
+                  <th className="px-2 py-1.5 text-left w-8">#</th>
+                  <th className="px-2 py-1.5 text-right">R (Ω)</th>
+                  <th className="px-2 py-1.5 text-right">U (V)</th>
+                  <th className="px-2 py-1.5 text-right">I (mA)</th>
+                  <th className="px-2 py-1.5 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {measurements.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-4 text-center text-zinc-500 text-[11px]">
+                      Chưa có số đo nào.<br />
+                      <span className="text-[10px]">Đổi R → mô phỏng → ghi.</span>
+                    </td>
+                  </tr>
+                ) : measurements.map((m, i) => (
+                  <tr key={i} className="border-t border-zinc-800/60 hover:bg-zinc-900/50">
+                    <td className="px-2 py-1 text-zinc-500">{i + 1}</td>
+                    <td className="px-2 py-1 text-right text-cyan-300">{m.R.toFixed(0)}</td>
+                    <td className="px-2 py-1 text-right text-emerald-300">{m.U.toFixed(3)}</td>
+                    <td className="px-2 py-1 text-right text-amber-300">{(m.I * 1000).toFixed(2)}</td>
+                    <td className="px-2 py-1 text-center">
+                      <button
+                        onClick={() => onDelete(i)}
+                        title="Xoá dòng"
+                        className="text-rose-400 hover:text-rose-300"
+                      >
+                        <Trash2 className="w-3 h-3 inline" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Plot + computed values */}
+        <div className="rounded-lg bg-zinc-950/60 border border-zinc-800 p-2.5">
+          <div className="flex items-center gap-1.5 mb-1 text-[11px] font-bold text-indigo-200">
+            <LineChart className="w-3.5 h-3.5" /> Hình 26.3 — Đồ thị U vs I
+          </div>
+          <svg viewBox={`0 0 ${PW} ${PH}`} className="w-full h-auto bg-zinc-900/40 rounded">
+            {/* Grid */}
+            {[0, 0.25, 0.5, 0.75, 1].map(t => (
+              <g key={`gy-${t}`}>
+                <line
+                  x1={PAD_L} x2={PW - PAD_R}
+                  y1={PH - PAD_B - t * (PH - PAD_T - PAD_B)}
+                  y2={PH - PAD_B - t * (PH - PAD_T - PAD_B)}
+                  stroke="#1e293b" strokeWidth={0.5}
+                />
+                <text x={PAD_L - 3} y={PH - PAD_B - t * (PH - PAD_T - PAD_B) + 3}
+                      fontSize={8} fill="#64748b" textAnchor="end">
+                  {(yMin + t * (yMax - yMin)).toFixed(1)}
+                </text>
+              </g>
+            ))}
+            {[0, 0.25, 0.5, 0.75, 1].map(t => (
+              <g key={`gx-${t}`}>
+                <line
+                  x1={PAD_L + t * (PW - PAD_L - PAD_R)}
+                  x2={PAD_L + t * (PW - PAD_L - PAD_R)}
+                  y1={PAD_T} y2={PH - PAD_B}
+                  stroke="#1e293b" strokeWidth={0.5}
+                />
+                <text x={PAD_L + t * (PW - PAD_L - PAD_R)} y={PH - PAD_B + 12}
+                      fontSize={8} fill="#64748b" textAnchor="middle">
+                  {(xMin + t * (xMax - xMin)).toFixed(0)}
+                </text>
+              </g>
+            ))}
+            {/* Axes */}
+            <line x1={PAD_L} y1={PH - PAD_B} x2={PW - PAD_R} y2={PH - PAD_B}
+                  stroke="#475569" strokeWidth={1} />
+            <line x1={PAD_L} y1={PAD_T} x2={PAD_L} y2={PH - PAD_B}
+                  stroke="#475569" strokeWidth={1} />
+            {/* Axis labels */}
+            <text x={PW - PAD_R} y={PH - 6} fontSize={9} fill="#94a3b8" textAnchor="end">
+              I (mA)
+            </text>
+            <text x={4} y={PAD_T + 4} fontSize={9} fill="#94a3b8">U (V)</text>
+
+            {/* Regression line */}
+            {regression && (
+              <line
+                x1={x2px(lineX1)} y1={y2px(lineY1)}
+                x2={x2px(lineX2)} y2={y2px(lineY2)}
+                stroke="#22d3ee" strokeWidth={1.5} strokeDasharray="3 3"
+              />
+            )}
+
+            {/* Data points */}
+            {measurements.map((m, i) => (
+              <circle
+                key={i}
+                cx={x2px(m.I * 1000)} cy={y2px(m.U)}
+                r={3.5} fill="#fbbf24" stroke="#f59e0b" strokeWidth={1}
+              />
+            ))}
+
+            {/* Intercept marker (U₀ = ξ) */}
+            {regression && (
+              <g>
+                <circle cx={x2px(0)} cy={y2px(regression.intercept)} r={4}
+                        fill="#a78bfa" stroke="#fff" strokeWidth={1} />
+                <text x={x2px(0) + 6} y={y2px(regression.intercept) - 4}
+                      fontSize={9} fill="#c4b5fd" fontWeight="bold">
+                  ξ ≈ {regression.intercept.toFixed(2)}V
+                </text>
+              </g>
+            )}
+          </svg>
+
+          {/* Computed values */}
+          <div className="mt-2 text-[11px] space-y-1">
+            {measurements.length < 2 ? (
+              <div className="text-zinc-500">Cần ≥ 2 số đo để vẽ đường hồi quy.</div>
+            ) : regression && (
+              <>
+                <div className="flex justify-between text-zinc-300">
+                  <span>Hệ số cắt (U₀, khi I=0):</span>
+                  <span className="font-bold text-purple-300">
+                    ξ = {regression.intercept.toFixed(3)} V
+                  </span>
+                </div>
+                <div className="flex justify-between text-zinc-300">
+                  <span>Hệ số góc đồ thị U(I):</span>
+                  <span className="font-bold text-cyan-300">
+                    {regression.slope.toFixed(2)} V/A
+                  </span>
+                </div>
+                <div className="flex justify-between text-zinc-300">
+                  <span>R₀ (cố định):</span>
+                  <span className="font-bold text-zinc-200">{r0} Ω</span>
+                </div>
+                <div className="flex justify-between border-t border-zinc-700 pt-1 mt-1">
+                  <span className="text-emerald-300">r = −slope − R₀:</span>
+                  <span className="font-bold text-emerald-300">
+                    {regression.rComputed >= 0
+                      ? `${regression.rComputed.toFixed(3)} Ω`
+                      : `${regression.rComputed.toFixed(3)} Ω (⚠ âm — đo lại)`}
+                  </span>
+                </div>
+                <div className="mt-1 px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-[11px]">
+                  Kết luận: ξ ≈ <b>{regression.intercept.toFixed(2)} V</b>, r ≈{' '}
+                  <b>{Math.max(0, regression.rComputed).toFixed(2)} Ω</b>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ───────────────────────────────────────────────────────────────────
@@ -682,6 +1122,8 @@ export default function AnalogCircuitBuilder(): JSX.Element {
   const [savedList, setSavedList]   = useState<SavedCircuit[]>([])
   const [hoverTermKey, setHoverTermKey] = useState<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  // Bài 26 SGK measurements table
+  const [measurements, setMeasurements] = useState<Array<{ R: number; U: number; I: number }>>([])
   const dragOffsetRef = useRef<{ dx: number; dy: number } | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
 
@@ -913,6 +1355,8 @@ export default function AnalogCircuitBuilder(): JSX.Element {
     setWires(ws)
     setSelectedId(null); setWireStart(null); setSimResult(null)
     setShowTemplates(false)
+    // Reset Bài 26 measurements when switching templates
+    setMeasurements([])
   }
 
   // ─── Edit selected value ─────────────────────────────────────────
@@ -920,6 +1364,74 @@ export default function AnalogCircuitBuilder(): JSX.Element {
   const updateValue = (id: string, value: number) => {
     setComponents(cs => cs.map(c => c.id === id ? { ...c, value } : c))
   }
+
+  // ─── Bài 26 SGK helpers ──────────────────────────────────────────
+
+  // Detect SGK Bài 26 active circuit: must have emf_cell + ammeter + voltmeter
+  const isSgk26Active = useMemo(() => (
+    components.some(c => c.type === 'emf_cell') &&
+    components.some(c => c.type === 'ammeter') &&
+    components.some(c => c.type === 'voltmeter')
+  ), [components])
+
+  // Hardcoded fixed resistor R₀ for the SGK template (used in r calculation)
+  const SGK_R0 = 10
+
+  const recordMeasurement = () => {
+    if (!simResult?.ok) {
+      alert('Hãy bấm "▶ Mô phỏng" trước khi ghi số đo.')
+      return
+    }
+    // Find variable resistor (potentiometer or resistor labelled "r_var")
+    const rVar = components.find(c => c.id === 'r_var') ??
+                 components.find(c => c.type === 'potentiometer')
+    if (!rVar) {
+      alert('Mạch chưa có biến trở để ghi giá trị R.')
+      return
+    }
+    const ammeter   = components.find(c => c.type === 'ammeter')
+    const voltmeter = components.find(c => c.type === 'voltmeter')
+    if (!ammeter || !voltmeter) {
+      alert('Mạch chưa có cả ampe kế và vôn kế.')
+      return
+    }
+    const I = simResult.meterReadings?.[ammeter.id] ?? simResult.current ?? 0
+    const U = simResult.meterReadings?.[voltmeter.id] ?? 0
+    const R = rVar.value ?? 0
+    // Avoid duplicates at the exact same R value — replace
+    setMeasurements(prev => {
+      const filtered = prev.filter(m => Math.abs(m.R - R) > 0.5)
+      return [...filtered, { R, U, I }].sort((a, b) => b.R - a.R)
+    })
+  }
+
+  const deleteMeasurement = (idx: number) => {
+    setMeasurements(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const clearMeasurements = () => {
+    if (measurements.length === 0) return
+    if (confirm('Xoá toàn bộ bảng số đo?')) setMeasurements([])
+  }
+
+  // Linear regression on (I, U) → slope, intercept (= ξ when I=0)
+  const regression = useMemo(() => {
+    const n = measurements.length
+    if (n < 2) return null
+    const xs = measurements.map(m => m.I)
+    const ys = measurements.map(m => m.U)
+    const sumX  = xs.reduce((s, x) => s + x, 0)
+    const sumY  = ys.reduce((s, y) => s + y, 0)
+    const sumXY = xs.reduce((s, x, i) => s + x * ys[i], 0)
+    const sumX2 = xs.reduce((s, x) => s + x * x, 0)
+    const denom = n * sumX2 - sumX * sumX
+    if (Math.abs(denom) < 1e-12) return null
+    const slope     = (n * sumXY - sumX * sumY) / denom
+    const intercept = (sumY - slope * sumX) / n
+    // Slope = -(R₀ + r) → r = -slope - R₀
+    const rComputed = -slope - SGK_R0
+    return { slope, intercept, emf: intercept, rComputed }
+  }, [measurements])
 
   // ─── Render ──────────────────────────────────────────────────────
 
@@ -1181,6 +1693,7 @@ export default function AnalogCircuitBuilder(): JSX.Element {
                         isLit={isBuzzerLit && c.type === 'buzzer'}
                         ledOn={isLED && ledState === 'on'}
                         ledBurnt={isLED && ledState === 'burnt'}
+                        reading={simResult?.meterReadings?.[c.id]}
                       />
                     </g>
 
@@ -1252,9 +1765,50 @@ export default function AnalogCircuitBuilder(): JSX.Element {
               </div>
               {(() => {
                 const p = PALETTE.find(it => it.type === selected.type)
+                // Special editor for EMF cell — EMF + internal R both editable
+                if (selected.type === 'emf_cell') {
+                  const emf = selected.emf ?? selected.value ?? 1.5
+                  const rIn = selected.internalR ?? 0.5
+                  return (
+                    <>
+                      <label className="flex items-center gap-1.5">
+                        <span className="text-zinc-400">ξ:</span>
+                        <input
+                          type="number"
+                          value={emf}
+                          step={0.1}
+                          min={0}
+                          onChange={e => {
+                            const v = parseFloat(e.target.value) || 0
+                            setComponents(cs => cs.map(c => c.id === selected.id
+                              ? { ...c, emf: v, value: v } : c))
+                          }}
+                          className="w-20 px-2 py-1 rounded bg-zinc-900/80 border border-border text-foreground"
+                        />
+                        <span className="text-zinc-400">V</span>
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        <span className="text-zinc-400">r:</span>
+                        <input
+                          type="number"
+                          value={rIn}
+                          step={0.1}
+                          min={0}
+                          onChange={e => {
+                            const v = parseFloat(e.target.value) || 0
+                            setComponents(cs => cs.map(c => c.id === selected.id
+                              ? { ...c, internalR: v } : c))
+                          }}
+                          className="w-20 px-2 py-1 rounded bg-zinc-900/80 border border-border text-foreground"
+                        />
+                        <span className="text-zinc-400">Ω</span>
+                      </label>
+                    </>
+                  )
+                }
                 if (p?.defaultValue !== undefined) {
                   const step = selected.type === 'resistor' ? 10
-                    : selected.type === 'potentiometer' ? 50
+                    : selected.type === 'potentiometer' ? 10
                     : selected.type === 'capacitor' ? 10
                     : selected.type === 'inductor' ? 1
                     : 0.5
@@ -1304,6 +1858,23 @@ export default function AnalogCircuitBuilder(): JSX.Element {
                 Phím R = xoay · Delete = xoá · Esc = bỏ chọn
               </span>
             </div>
+          )}
+
+          {/* Bài 26 SGK — Measurement table + auto-plot */}
+          {isSgk26Active && (
+            <Sgk26MeasurementPanel
+              measurements={measurements}
+              regression={regression}
+              r0={SGK_R0}
+              onRecord={recordMeasurement}
+              onDelete={deleteMeasurement}
+              onClear={clearMeasurements}
+              hasSim={!!simResult?.ok}
+              currentR={(components.find(c => c.id === 'r_var')
+                ?? components.find(c => c.type === 'potentiometer'))?.value}
+              currentI={simResult?.meterReadings?.[components.find(c => c.type === 'ammeter')?.id ?? ''] ?? simResult?.current ?? 0}
+              currentU={simResult?.meterReadings?.[components.find(c => c.type === 'voltmeter')?.id ?? ''] ?? 0}
+            />
           )}
         </div>
       </div>
