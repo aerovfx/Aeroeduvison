@@ -173,6 +173,39 @@ export interface CourseVideo {
   createdAt: string
 }
 
+// ── Curriculum (Chapter → Lesson → Block) — student view ──────
+export interface StudentLessonBlock {
+  id: string
+  lessonId: string
+  type: 'video' | 'pdf' | 'text' | 'audio' | 'quiz' | 'pptx' | 'simulation' | 'lab' | 'game' | 'link' | 'embed'
+  title: string | null
+  content: string | null
+  metadata: Record<string, unknown>
+  position: number
+}
+
+export interface StudentLesson {
+  id: string
+  chapterId: string
+  title: string
+  description: string | null
+  duration: number | null
+  type: string | null
+  position: number
+  blocks: StudentLessonBlock[]
+}
+
+export interface StudentChapter {
+  id: string
+  title: string
+  description: string | null
+  duration: number | null
+  position: number
+  isPublished: boolean
+  isFree: boolean
+  lessons: StudentLesson[]
+}
+
 export interface CourseAsset {
   id: string
   courseId: string

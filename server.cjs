@@ -35474,6 +35474,85 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
     }
   });
 
+  // ── GET /api/learning/course/:courseId/curriculum ─────────
+  // Student-side full curriculum: Chapter → Lesson → LessonBlock hierarchy.
+  // Lọc metadata.referenceSnapshot khỏi lab challenge blocks (ẩn đáp án GV).
+  app.get('/api/learning/course/:courseId/curriculum', async (req, res) => {
+    try {
+      const pool = getLearnPool();
+      if (!pool) return res.json({ chapters: [] });
+      // Chapters
+      const { rows: chapters } = await pool.query(
+        `SELECT id, title, description, duration, position, "isPublished", "isFree"
+           FROM "Chapter"
+          WHERE "courseId" = $1
+          ORDER BY position ASC, "createdAt" ASC`,
+        [req.params.courseId]
+      ).catch(() => ({ rows: [] }));
+      if (chapters.length === 0) return res.json({ chapters: [] });
+      const chapterIds = chapters.map(c => c.id);
+
+      // Lessons
+      const { rows: lessons } = await pool.query(
+        `SELECT id, "chapterId", title, description, duration, type, position
+           FROM "Lesson"
+          WHERE "chapterId" = ANY($1)
+          ORDER BY position ASC, "createdAt" ASC`,
+        [chapterIds]
+      ).catch(() => ({ rows: [] }));
+
+      // Blocks (LessonBlock có thể chưa tồn tại trên DB cũ)
+      let blocks = [];
+      if (lessons.length > 0) {
+        try {
+          const lessonIds = lessons.map(l => l.id);
+          const r = await pool.query(
+            `SELECT id, "lessonId", type, title, content, metadata, position
+               FROM "LessonBlock"
+              WHERE "lessonId" = ANY($1)
+              ORDER BY "lessonId", position ASC`,
+            [lessonIds]
+          );
+          blocks = r.rows;
+        } catch (e) {
+          if (!String(e.message).includes('does not exist')) {
+            console.warn('[learning:curriculum] blocks query:', e.message);
+          }
+        }
+      }
+
+      // Group blocks by lesson, filter referenceSnapshot (security)
+      const blocksByLesson = {};
+      for (const b of blocks) {
+        const md = { ...(b.metadata || {}) };
+        if (md.referenceSnapshot) delete md.referenceSnapshot;
+        if (!blocksByLesson[b.lessonId]) blocksByLesson[b.lessonId] = [];
+        blocksByLesson[b.lessonId].push({ ...b, metadata: md });
+      }
+
+      // Group lessons by chapter
+      const lessonsByChapter = {};
+      for (const l of lessons) {
+        if (!lessonsByChapter[l.chapterId]) lessonsByChapter[l.chapterId] = [];
+        lessonsByChapter[l.chapterId].push({
+          ...l,
+          blocks: blocksByLesson[l.id] || [],
+        });
+      }
+
+      // Compose final hierarchy
+      const result = chapters.map(c => ({
+        ...c,
+        lessons: lessonsByChapter[c.id] || [],
+      }));
+
+      return res.json({ chapters: result });
+    } catch (err) {
+      console.error('[learning:curriculum]', err.message);
+      return res.json({ chapters: [] });
+    }
+  });
+
   app.get('/api/learning/course/:courseId/videos', async (req, res) => {
     try {
       const pool = getLearnPool();

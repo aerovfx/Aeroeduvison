@@ -43,8 +43,10 @@ import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
 import TranscriptPanel from '@/components/learning/TranscriptPanel'
 import PdfBookViewer from '@/components/learning/PdfBookViewer'
 import { LabChallengeAttempt, useLessonLabGate, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
+import CurriculumSidebar from '@/components/learning/CurriculumSidebar'
+import LessonBlockRenderer from '@/components/learning/LessonBlockRenderer'
 import { Lock, Target } from 'lucide-react'
-import type { CourseVideo, CourseExtras } from '@/types'
+import type { CourseVideo, CourseExtras, StudentChapter, StudentLesson } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
 function VideoPlayer({ videoUrl }: { videoUrl?: string | null }) {
@@ -471,13 +473,6 @@ export default function CoursePlayer() {
     queryKey: ['course-videos', courseId],
     queryFn: () => learningService.getCourseVideos(courseId!),
     enabled: !!courseId,
-    select: (data) => {
-      // Set first video if none selected
-      if (!currentVideo && data.length > 0) {
-        setCurrentVideo(data[0])
-      }
-      return data
-    },
   })
 
   // Fetch course info (pdfBookUrl) — ignore errors gracefully
@@ -488,9 +483,85 @@ export default function CoursePlayer() {
     staleTime: 5 * 60 * 1000,
   })
 
-  // Fetch lesson blocks (filter: lab challenges only) — gate next button
-  const { data: lessonBlocks = [] } = useQuery<LessonBlockPub[]>({
-    queryKey: ['lesson-blocks', currentVideo?.id],
+  // ── Curriculum (NEW — Chapter → Lesson → LessonBlock hierarchy) ──
+  // Khi course có curriculum chapters → ưu tiên render mục lục thay vì
+  // flat video list. Fallback CourseVideo cũ nếu chưa có curriculum.
+  const { data: curriculum = [] } = useQuery<StudentChapter[]>({
+    queryKey: ['course-curriculum', courseId],
+    queryFn: () => learningService.getCurriculum(courseId!),
+    enabled: !!courseId,
+    staleTime: 60_000,
+  })
+  const hasCurriculum = curriculum.length > 0 && curriculum.some(c => c.lessons.length > 0)
+
+  // Auto-select first video chỉ khi NO curriculum (tránh override curriculum mode)
+  useEffect(() => {
+    if (!currentVideo && videos.length > 0 && !hasCurriculum) {
+      setCurrentVideo(videos[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videos.length, hasCurriculum])
+
+  // Current lesson state (chỉ dùng khi hasCurriculum)
+  const [currentLessonId, setCurrentLessonId] = useState<string | null>(null)
+  const currentLesson: StudentLesson | null = useMemo(() => {
+    if (!hasCurriculum || !currentLessonId) return null
+    for (const c of curriculum) {
+      for (const l of c.lessons) if (l.id === currentLessonId) return l
+    }
+    return null
+  }, [hasCurriculum, currentLessonId, curriculum])
+
+  // Flatten lessons để compute prev/next
+  const allLessons = useMemo(
+    () => curriculum.flatMap(c => c.lessons),
+    [curriculum]
+  )
+  const currentLessonIdx = currentLesson ? allLessons.findIndex(l => l.id === currentLesson.id) : -1
+  const prevLesson = currentLessonIdx > 0 ? allLessons[currentLessonIdx - 1] : null
+  const nextLesson = currentLessonIdx >= 0 && currentLessonIdx < allLessons.length - 1
+    ? allLessons[currentLessonIdx + 1] : null
+
+  // Auto-select first lesson khi curriculum loaded
+  useEffect(() => {
+    if (hasCurriculum && !currentLessonId && allLessons.length > 0) {
+      setCurrentLessonId(allLessons[0].id)
+    }
+  }, [hasCurriculum, currentLessonId, allLessons])
+
+  // Track completed lessons (localStorage cho V1; future: dùng LessonHistory API)
+  const [completedLessonIds, setCompletedLessonIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!courseId) return
+    try {
+      const raw = localStorage.getItem(`completed-lessons:${courseId}`)
+      if (raw) setCompletedLessonIds(new Set(JSON.parse(raw)))
+    } catch { /* ignore */ }
+  }, [courseId])
+  const markLessonComplete = (id: string) => {
+    setCompletedLessonIds(prev => {
+      const next = new Set(prev).add(id)
+      try { localStorage.setItem(`completed-lessons:${courseId}`, JSON.stringify(Array.from(next))) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  // Blocks của lesson hiện tại (từ curriculum) hoặc fetch riêng (legacy video mode)
+  const lessonBlocks: LessonBlockPub[] = useMemo(() => {
+    if (hasCurriculum && currentLesson) {
+      return currentLesson.blocks.map(b => ({
+        id: b.id, lessonId: b.lessonId, type: b.type,
+        title: b.title, content: b.content,
+        metadata: b.metadata as { challenge?: boolean; labType?: string },
+        position: b.position,
+      }))
+    }
+    return []
+  }, [hasCurriculum, currentLesson])
+
+  // Legacy fetch blocks cho currentVideo (chỉ khi không có curriculum)
+  const { data: legacyBlocks = [] } = useQuery<LessonBlockPub[]>({
+    queryKey: ['lesson-blocks-legacy', currentVideo?.id],
     queryFn: async () => {
       if (!currentVideo?.id) return []
       try {
@@ -498,19 +569,23 @@ export default function CoursePlayer() {
         return data.blocks || []
       } catch { return [] }
     },
-    enabled: !!currentVideo?.id,
+    enabled: !!currentVideo?.id && !hasCurriculum,
     staleTime: 30_000,
   })
+  const effectiveBlocks = hasCurriculum ? lessonBlocks : legacyBlocks
 
   // Challenge blocks (lab type + metadata.challenge=true)
   const challengeBlocks = useMemo(
-    () => lessonBlocks.filter(b => b.type === 'lab' && b.metadata?.challenge),
-    [lessonBlocks]
+    () => effectiveBlocks.filter(b => b.type === 'lab' && b.metadata?.challenge),
+    [effectiveBlocks]
   )
   const challengeIds = useMemo(() => challengeBlocks.map(b => b.id), [challengeBlocks])
 
   // Gate: nếu lesson hiện tại có challenge → check user đã pass hết chưa
-  const labGate = useLessonLabGate(currentVideo?.id, challengeIds)
+  const labGate = useLessonLabGate(
+    hasCurriculum ? currentLessonId || undefined : currentVideo?.id,
+    challengeIds,
+  )
 
   // ── History logging helpers ────────────────────────────────
   const logEvent = learningService.logEvent
@@ -568,11 +643,14 @@ export default function CoursePlayer() {
     )
   }
 
-  if (videos.length === 0) {
+  if (videos.length === 0 && !hasCurriculum) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-center p-8">
         <Play className="w-16 h-16 text-muted-foreground/50" />
-        <h2 className="text-xl font-bold text-foreground">Khoá học chưa có video</h2>
+        <h2 className="text-xl font-bold text-foreground">Khoá học chưa có nội dung</h2>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Giáo viên chưa thêm video hoặc mục lục bài học. Vui lòng quay lại sau.
+        </p>
         <Link to="/student/my-courses" className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300">
           ← Quay lại khoá học
         </Link>
@@ -595,18 +673,32 @@ export default function CoursePlayer() {
             <ChevronLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-sm font-medium text-foreground truncate flex-1">
-            {currentVideo?.title || 'Đang tải...'}
+            {hasCurriculum
+              ? (currentLesson?.title || 'Chọn bài học bên sidebar')
+              : (currentVideo?.title || 'Đang tải...')}
           </h1>
 
           {/* Your progress badge (chuẩn Udemy) */}
-          {videos.length > 0 && (
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full
-                            bg-purple-500/15 border border-purple-400/30
-                            text-purple-700 dark:text-purple-200 text-xs font-bold">
-              <Award className="w-3.5 h-3.5" />
-              <span>{Math.round((videos.filter(v => v.isCompleted).length / videos.length) * 100)}%</span>
-              <span className="text-purple-600/70 dark:text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
-            </div>
+          {hasCurriculum ? (
+            allLessons.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                              bg-purple-500/15 border border-purple-400/30
+                              text-purple-700 dark:text-purple-200 text-xs font-bold">
+                <Award className="w-3.5 h-3.5" />
+                <span>{Math.round((completedLessonIds.size / allLessons.length) * 100)}%</span>
+                <span className="text-purple-600/70 dark:text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
+              </div>
+            )
+          ) : (
+            videos.length > 0 && (
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full
+                              bg-purple-500/15 border border-purple-400/30
+                              text-purple-700 dark:text-purple-200 text-xs font-bold">
+                <Award className="w-3.5 h-3.5" />
+                <span>{Math.round((videos.filter(v => v.isCompleted).length / videos.length) * 100)}%</span>
+                <span className="text-purple-600/70 dark:text-purple-300/70 font-normal hidden md:inline">tiến độ</span>
+              </div>
+            )
           )}
 
           <button
@@ -622,39 +714,116 @@ export default function CoursePlayer() {
           </button>
         </div>
 
-        {/* Video — wrap với VideoSecurityOverlay (watermark + chống quay) */}
+        {/* === Main content area: curriculum mode vs legacy video === */}
         <div className="p-4 lg:p-6">
-          {currentVideo ? (
-            <VideoSecurityOverlay videoTitle={currentVideo.title}>
-              <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as any).url} />
-            </VideoSecurityOverlay>
+          {hasCurriculum ? (
+            /* CURRICULUM MODE: render blocks của current lesson */
+            <>
+              {!currentLesson ? (
+                <div className="aspect-video bg-muted rounded-xl flex flex-col items-center justify-center gap-3 text-muted-foreground">
+                  <Play className="w-16 h-16 opacity-50" />
+                  <p className="text-sm">Chọn bài học từ mục lục bên sidebar để bắt đầu</p>
+                </div>
+              ) : effectiveBlocks.length === 0 ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
+                  <FileText className="w-12 h-12 text-amber-400/70 mx-auto mb-3" />
+                  <h3 className="font-bold text-amber-200 mb-1">Bài học này chưa có nội dung</h3>
+                  <p className="text-xs text-amber-100/70">
+                    Giáo viên chưa thêm video, tài liệu hay bài tập cho bài học này.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {/* Lesson header */}
+                  <div className="rounded-xl border bg-card/40 p-4">
+                    <h2 className="text-lg font-bold text-foreground mb-1">{currentLesson.title}</h2>
+                    {currentLesson.description && (
+                      <p className="text-sm text-muted-foreground">{currentLesson.description}</p>
+                    )}
+                    <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+                      <span>{effectiveBlocks.length} block</span>
+                      {currentLesson.duration && (
+                        <span>· {Math.ceil(currentLesson.duration / 60)} phút</span>
+                      )}
+                      {completedLessonIds.has(currentLesson.id) && (
+                        <span className="text-emerald-400">· ✓ Đã hoàn thành</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Render từng block */}
+                  {effectiveBlocks
+                    .sort((a, b) => a.position - b.position)
+                    .map(block => (
+                      <LessonBlockRenderer
+                        key={block.id}
+                        block={block as unknown as import('@/types').StudentLessonBlock}
+                        lessonId={currentLessonId || undefined}
+                        onLabPass={() => markLessonComplete(currentLessonId!)}
+                      />
+                    ))}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="aspect-video bg-muted rounded-xl flex items-center justify-center">
-              <Play className="w-16 h-16 text-muted-foreground/50" />
-            </div>
+            /* LEGACY MODE: video player */
+            <>
+              {currentVideo ? (
+                <VideoSecurityOverlay videoTitle={currentVideo.title}>
+                  <VideoPlayer videoUrl={currentVideo.videoUrl || (currentVideo as { url?: string }).url} />
+                </VideoSecurityOverlay>
+              ) : (
+                <div className="aspect-video bg-muted rounded-xl flex items-center justify-center">
+                  <Play className="w-16 h-16 text-muted-foreground/50" />
+                </div>
+              )}
+              {/* 📄 TRANSCRIPT — chỉ ở legacy video mode */}
+              <div className="mt-4">
+                <TranscriptPanel
+                  videoId={currentVideo?.id || null}
+                  videoTitle={currentVideo?.title}
+                />
+              </div>
+            </>
           )}
 
-          {/* Nav controls */}
+          {/* Nav controls — chung cho cả 2 mode */}
           <div className="flex items-center justify-between mt-4">
             <button
-              onClick={() => prevVideo && setCurrentVideo(prevVideo)}
-              disabled={!prevVideo}
+              onClick={() => {
+                if (hasCurriculum && prevLesson) setCurrentLessonId(prevLesson.id)
+                else if (!hasCurriculum && prevVideo) setCurrentVideo(prevVideo)
+              }}
+              disabled={hasCurriculum ? !prevLesson : !prevVideo}
               className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-accent text-sm text-foreground/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" /> Trước
             </button>
 
-            {currentVideo && !currentVideo.isCompleted && (
+            {/* Mark complete — different per mode */}
+            {hasCurriculum && currentLesson && !completedLessonIds.has(currentLesson.id) && (
+              <button
+                onClick={() => markLessonComplete(currentLesson.id)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/15 hover:bg-green-500/25 text-green-700 dark:text-green-400 text-sm border border-green-500/30 transition-colors"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Đánh dấu hoàn thành
+              </button>
+            )}
+            {hasCurriculum && currentLesson && completedLessonIds.has(currentLesson.id) && (
+              <span className="flex items-center gap-1 text-green-700 dark:text-green-400 text-sm">
+                <CheckCircle2 className="w-4 h-4" /> Đã hoàn thành
+              </span>
+            )}
+            {!hasCurriculum && currentVideo && !currentVideo.isCompleted && (
               <button
                 onClick={() => markComplete.mutate(currentVideo.id)}
                 disabled={markComplete.isPending}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/15 hover:bg-green-500/25 text-green-700 dark:text-green-400 text-sm border border-green-500/30 transition-colors"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                Đánh dấu hoàn thành
+                <CheckCircle2 className="w-4 h-4" /> Đánh dấu hoàn thành
               </button>
             )}
-            {currentVideo?.isCompleted && (
+            {!hasCurriculum && currentVideo?.isCompleted && (
               <span className="flex items-center gap-1 text-green-700 dark:text-green-400 text-sm">
                 <CheckCircle2 className="w-4 h-4" /> Đã hoàn thành
               </span>
@@ -666,9 +835,12 @@ export default function CoursePlayer() {
                   setActiveTab('labs')
                   return
                 }
-                if (nextVideo) setCurrentVideo(nextVideo)
+                if (hasCurriculum && nextLesson) setCurrentLessonId(nextLesson.id)
+                else if (!hasCurriculum && nextVideo) setCurrentVideo(nextVideo)
               }}
-              disabled={!nextVideo && !labGate.isLocked}
+              disabled={hasCurriculum
+                ? (!nextLesson && !labGate.isLocked)
+                : (!nextVideo && !labGate.isLocked)}
               title={labGate.isLocked
                 ? 'Hoàn thành bài tập Lab trước khi qua bài kế tiếp'
                 : undefined}
@@ -683,14 +855,6 @@ export default function CoursePlayer() {
                 ? <><Lock className="w-4 h-4" /> Làm Lab để mở</>
                 : <>Tiếp <ChevronRight className="w-4 h-4" /></>}
             </button>
-          </div>
-
-          {/* 📄 TRANSCRIPT đa ngôn ngữ — hiện ngay dưới video player */}
-          <div className="mt-4">
-            <TranscriptPanel
-              videoId={currentVideo?.id || null}
-              videoTitle={currentVideo?.title}
-            />
           </div>
         </div>
 
@@ -813,20 +977,31 @@ export default function CoursePlayer() {
               </button>
             </div>
             <div className="flex-1 overflow-hidden">
-              {courseId && (
+              {courseId && hasCurriculum ? (
+                <CurriculumSidebar
+                  chapters={curriculum}
+                  currentLessonId={currentLessonId}
+                  completedLessonIds={completedLessonIds}
+                  onSelectLesson={(lessonId) => {
+                    setCurrentLessonId(lessonId)
+                    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                      setSidebarOpen(false)
+                    }
+                  }}
+                />
+              ) : courseId ? (
                 <VideoSidebar
                   videos={videos}
                   currentVideoId={currentVideo?.id || ''}
                   onSelect={(v) => {
                     setCurrentVideo(v)
-                    // Auto-đóng sidebar trên mobile khi chọn video → user thấy player ngay
                     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
                       setSidebarOpen(false)
                     }
                   }}
                   courseId={courseId}
                 />
-              )}
+              ) : null}
             </div>
           </aside>
         </>

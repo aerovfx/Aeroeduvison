@@ -101,6 +101,12 @@ export const learningService = {
   getCourseVideos: (courseId: string) =>
     api.get<CourseVideo[]>(`/learning/course/${courseId}/videos`).then((r) => r.data),
 
+  /** GET /api/learning/course/:courseId/curriculum — Chapter→Lesson→Block hierarchy */
+  getCurriculum: (courseId: string) =>
+    api.get<{ chapters: import('@/types').StudentChapter[] }>(
+      `/learning/course/${courseId}/curriculum`
+    ).then(r => r.data.chapters).catch(() => []),
+
   /** GET /api/learning/course/:courseId/assets */
   getCourseAssets: (courseId: string) =>
     api.get<CourseAsset[]>(`/learning/course/${courseId}/assets`).then((r) => r.data),
