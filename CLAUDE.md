@@ -15,8 +15,11 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `ef8135f` (revision pixiai-00380-naz, 2026-05-21 — CoursePlayer mục lục Chapter→Lesson + ExamReports per-question analysis + LearningPathBuilder wizard khung NL GDPT 2018 + KG node học liệu liên quan + QuestionBank toggle môn)
+- Last deployed commit: `c65178c` (revision pixiai-00381-dap, 2026-05-22 — ExamPicker integrate Ngân hàng câu hỏi/Đề thi + preview cards Lab/Aura/Game + bỏ step Video gộp vào Mục lục + Fix MIME error stale chunk)
 - Commits since last deploy: `0/5`
+- Prev: `44bcd7a` — Refactor CourseEditor bỏ step Video (6→5 bước, xoá 549 dòng dead code)
+- Prev: `2a055bd` — Fix SPA MIME error "text/html is not a valid JavaScript MIME type" 3-layer defense
+- Prev: `ef8135f` → pixiai-00380-naz (CoursePlayer mục lục + ExamReports thực + LP Builder + KG resources + QB toggle)
 - Prev: `d78256b` — KG node detail panel "Học liệu liên quan" 5 nhóm
 - Prev: `1170380` — LearningPathBuilder wizard 6 bước + khung năng lực GDPT 2018 + rubric
 - Prev: `cb17d0d` — Exam Reports per-question analysis + Cronbach α (data thực)
