@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils'
 import { RichTextEditor } from './RichTextEditor'
 import { LabChallengeAuthor, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
 import LabAttemptsReviewer from '@/components/iot/LabAttemptsReviewer'
+import ExamPicker, { type ExamSummary } from '@/components/teacher/ExamPicker'
 
 /* ─── Block type registry ────────────────────────────────────────── */
 interface BlockTypeMeta {
@@ -169,6 +170,8 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
   const [title, setTitle] = useState<string>(initial?.title || '')
   const [content, setContent] = useState<string>(initial?.content || '')
   const [meta, setMeta] = useState<Record<string, any>>(initial?.metadata || {})
+  // ExamPicker modal — chỉ mở khi user click "Chọn đề thi" trong quiz block
+  const [examPickerOpen, setExamPickerOpen] = useState(false)
 
   // Re-sync when switching the active type (only when adding new — not editing)
   useEffect(() => {
@@ -377,44 +380,60 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
         </>
       )}
 
-      {type === 'quiz' && (
-        <>
-          <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">Exam ID <span className="text-red-400">*</span></label>
-            <input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="VD: exam-uuid-từ-Question-Bank"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
-            />
-            <p className="text-[10px] text-gray-500 mt-1">
-              Dán ID đề thi từ Question Bank — HS sẽ làm trực tiếp trong course player
+      {type === 'quiz' && (() => {
+        const hasExam = !!content && !!meta.examTitle
+        return (
+          <div className="space-y-3">
+            <label className="block text-xs font-medium text-gray-300 mb-1">
+              Chọn đề thi từ Ngân hàng câu hỏi <span className="text-red-400">*</span>
+            </label>
+            {hasExam ? (
+              /* Selected exam preview card */
+              <div className="rounded-xl border border-purple-500/40 bg-purple-500/5 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center flex-shrink-0">
+                    <HelpCircle className="w-5 h-5 text-purple-300" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{meta.examTitle}</div>
+                    <div className="flex items-center gap-3 text-[11px] text-zinc-400 mt-1 flex-wrap">
+                      {meta.subject && <span>{meta.subject}</span>}
+                      {meta.grade && <span>· Khối {meta.grade}</span>}
+                      {meta.questionCount !== undefined && <span>· {meta.questionCount} câu</span>}
+                      {meta.duration && <span>· {meta.duration} phút</span>}
+                      {meta.totalScore && <span>· {meta.totalScore} điểm</span>}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-1 font-mono">ID: {content}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setExamPickerOpen(true)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 text-purple-200 font-bold flex-shrink-0"
+                  >
+                    Đổi đề
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Empty state — pick button */
+              <button
+                type="button"
+                onClick={() => setExamPickerOpen(true)}
+                className="w-full p-4 rounded-xl border border-dashed border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 text-purple-200 transition-colors flex flex-col items-center gap-2"
+              >
+                <HelpCircle className="w-7 h-7" />
+                <div className="font-bold text-sm">Bấm để chọn đề thi</div>
+                <div className="text-[11px] text-purple-300/70">
+                  Liên kết với đề có sẵn trong Ngân hàng câu hỏi
+                </div>
+              </button>
+            )}
+            <p className="text-[11px] text-gray-500">
+              HS sẽ làm đề trực tiếp trong course player. Số câu + thời gian tự động đồng bộ từ đề.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1">Số câu hỏi</label>
-              <input
-                type="number" min={0}
-                value={meta.questionCount ?? ''}
-                onChange={e => meta_('questionCount', e.target.value ? Number(e.target.value) : undefined)}
-                placeholder="VD: 10"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-300 mb-1">Thời gian làm (phút)</label>
-              <input
-                type="number" min={0}
-                value={meta.duration ?? ''}
-                onChange={e => meta_('duration', e.target.value ? Number(e.target.value) : undefined)}
-                placeholder="VD: 15"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none"
-              />
-            </div>
-          </div>
-        </>
-      )}
+        )
+      })()}
 
       {type === 'pptx' && (
         <>
@@ -443,22 +462,42 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
         </>
       )}
 
-      {type === 'simulation' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-300 mb-1">Chọn sim Aura <span className="text-red-400">*</span></label>
-          <select
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
-          >
-            <option value="">— Chọn —</option>
-            {SIM_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-          </select>
-          <p className="text-[10px] text-gray-500 mt-1">
-            HS sẽ vào sim trực tiếp trong player. Sim chạy fullscreen.
-          </p>
-        </div>
-      )}
+      {type === 'simulation' && (() => {
+        const selectedSim = SIM_OPTIONS.find(s => s.id === content)
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1">Chọn sim Aura 3D <span className="text-red-400">*</span></label>
+            <select
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
+            >
+              <option value="">— Chọn —</option>
+              {SIM_OPTIONS.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+            </select>
+            {selectedSim && (
+              <div className="mt-2 flex items-center gap-3 p-2.5 rounded-lg bg-violet-500/5 border border-violet-500/20">
+                <FlaskConical className="w-4 h-4 text-violet-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-violet-200 truncate">{selectedSim.title}</div>
+                  <div className="text-[10.5px] text-zinc-500">Sim Three.js (Aura) · render fullscreen trong player</div>
+                </div>
+                <a
+                  href={`/dashboard/aura?sim=${selectedSim.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-violet-300 hover:text-violet-200 px-2 py-1 rounded border border-violet-500/30 hover:bg-violet-500/15 inline-flex items-center gap-1 flex-shrink-0"
+                >
+                  <ExternalLink className="w-3 h-3" /> Mở sim
+                </a>
+              </div>
+            )}
+            <p className="text-[10px] text-gray-500 mt-1">
+              HS sẽ vào sim trực tiếp trong player.
+            </p>
+          </div>
+        )
+      })()}
 
       {type === 'lab' && (() => {
         const selectedLab = LAB_OPTIONS.find(l => l.id === content)
@@ -493,6 +532,24 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
                 <p className="text-[11px] text-zinc-500 mt-1">
                   Lab này chưa hỗ trợ chấm tự động. Chỉ hiển thị link mở lab.
                 </p>
+              )}
+              {/* Preview card khi đã pick lab — show description + link "Mở lab" */}
+              {selectedLab && (
+                <div className="mt-2 flex items-center gap-3 p-2.5 rounded-lg bg-cyan-500/5 border border-cyan-500/20">
+                  <Beaker className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-cyan-200 truncate">{selectedLab.title}</div>
+                    <div className="text-[10.5px] text-zinc-500 font-mono truncate">{selectedLab.path}</div>
+                  </div>
+                  <a
+                    href={selectedLab.path}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-cyan-300 hover:text-cyan-200 px-2 py-1 rounded border border-cyan-500/30 hover:bg-cyan-500/15 inline-flex items-center gap-1 flex-shrink-0"
+                  >
+                    <ExternalLink className="w-3 h-3" /> Mở lab
+                  </a>
+                </div>
               )}
             </div>
 
@@ -542,23 +599,46 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
         )
       })()}
 
-      {type === 'game' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-300 mb-1">Chọn game <span className="text-red-400">*</span></label>
-          <select
-            value={content}
-            onChange={e => {
-              const g = GAME_OPTIONS.find(x => x.id === e.target.value)
-              setContent(e.target.value)
-              if (g) meta_('path', g.path)
-            }}
-            className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
-          >
-            <option value="">— Chọn —</option>
-            {GAME_OPTIONS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
-          </select>
-        </div>
-      )}
+      {type === 'game' && (() => {
+        const selectedGame = GAME_OPTIONS.find(g => g.id === content)
+        return (
+          <div>
+            <label className="block text-xs font-medium text-gray-300 mb-1">Chọn game từ Game Hub <span className="text-red-400">*</span></label>
+            <select
+              value={content}
+              onChange={e => {
+                const g = GAME_OPTIONS.find(x => x.id === e.target.value)
+                setContent(e.target.value)
+                if (g) meta_('path', g.path)
+              }}
+              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
+            >
+              <option value="">— Chọn —</option>
+              {GAME_OPTIONS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+            </select>
+            {selectedGame && (
+              <div className="mt-2 flex items-center gap-3 p-2.5 rounded-lg bg-pink-500/5 border border-pink-500/20">
+                <Gamepad2 className="w-4 h-4 text-pink-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-pink-200 truncate">{selectedGame.title}</div>
+                  <div className="text-[10.5px] text-zinc-500 font-mono truncate">{selectedGame.path}</div>
+                </div>
+                <a
+                  href={selectedGame.path}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-pink-300 hover:text-pink-200 px-2 py-1 rounded border border-pink-500/30 hover:bg-pink-500/15 inline-flex items-center gap-1 flex-shrink-0"
+                >
+                  <ExternalLink className="w-3 h-3" /> Mở game
+                </a>
+              </div>
+            )}
+            <p className="text-[10px] text-gray-500 mt-1">
+              Game học tập trong /student/games — HS hoàn thành sẽ ghi nhận điểm.
+            </p>
+          </div>
+        )
+      })()}
 
       {type === 'link' && (
         <>
@@ -627,6 +707,30 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
           {busy ? 'Đang lưu...' : initial ? 'Lưu thay đổi' : 'Thêm block'}
         </button>
       </div>
+
+      {/* ExamPicker modal — chỉ render khi quiz block + user mở picker */}
+      <ExamPicker
+        open={examPickerOpen}
+        onClose={() => setExamPickerOpen(false)}
+        currentExamId={content || null}
+        onSelect={(exam: ExamSummary) => {
+          // Sync content + meta từ exam đã chọn
+          setContent(exam.id)
+          // Auto-populate title nếu chưa có
+          if (!title.trim()) setTitle(exam.title)
+          // Sync meta fields cho preview card
+          setMeta(prev => ({
+            ...prev,
+            examTitle: exam.title,
+            subject: exam.subject || undefined,
+            grade: exam.grade || undefined,
+            questionCount: exam.totalQuestions ?? prev.questionCount,
+            duration: exam.duration ?? prev.duration,
+            totalScore: exam.totalScore ?? prev.totalScore,
+            examStatus: exam.status,
+          }))
+        }}
+      />
     </div>
   )
 }
