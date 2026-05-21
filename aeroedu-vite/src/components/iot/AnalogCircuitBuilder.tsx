@@ -12,7 +12,7 @@
  * Mọi state local — không gọi backend. Lưu localStorage cho phép save/load
  * mạch tự thiết kế. Có sẵn 5 template mạch mẫu để tải nhanh.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react'
 import {
   Zap, Plus, Trash2, Save, Play, RotateCw, MousePointer,
   Cable, FolderOpen, BookOpen, AlertTriangle, CheckCircle2,
@@ -1186,7 +1186,25 @@ function Sgk26MeasurementPanel({
 // Main component
 // ───────────────────────────────────────────────────────────────────
 
-export default function AnalogCircuitBuilder(): JSX.Element {
+/**
+ * Imperative API exposed via forwardRef → wrapper components (LabChallengeBlock)
+ * có thể đọc snapshot hiện tại + simResult để submit, hoặc load reference.
+ */
+export interface AnalogCircuitHandle {
+  getSnapshot(): { components: PlacedComponent[]; wires: Wire[]; simResult: SimResult | null }
+  loadSnapshot(snap: { components?: PlacedComponent[]; wires?: Wire[] }): void
+  runSimulation(): void
+}
+
+interface AnalogCircuitProps {
+  /** Initial state — load template/reference khi mount */
+  initialSnapshot?: { components?: PlacedComponent[]; wires?: Wire[] }
+}
+
+function AnalogCircuitBuilderInner(
+  { initialSnapshot }: AnalogCircuitProps,
+  ref: React.Ref<AnalogCircuitHandle>,
+): JSX.Element {
   const [components, setComponents] = useState<PlacedComponent[]>([])
   const [wires, setWires]           = useState<Wire[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -1215,6 +1233,29 @@ export default function AnalogCircuitBuilder(): JSX.Element {
       if (raw) setSavedList(JSON.parse(raw))
     } catch { /* ignore */ }
   }, [])
+
+  // Load initial snapshot từ prop (challenge reference) — chạy 1 lần
+  useEffect(() => {
+    if (initialSnapshot) {
+      if (Array.isArray(initialSnapshot.components)) setComponents(initialSnapshot.components)
+      if (Array.isArray(initialSnapshot.wires))      setWires(initialSnapshot.wires)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Expose imperative API cho parent (LabChallengeBlock)
+  useImperativeHandle(ref, () => ({
+    getSnapshot: () => ({ components, wires, simResult }),
+    loadSnapshot: (snap) => {
+      if (Array.isArray(snap.components)) setComponents(snap.components)
+      if (Array.isArray(snap.wires))      setWires(snap.wires)
+      setSelectedId(null); setWireStart(null); setSimResult(null)
+    },
+    runSimulation: () => {
+      const r = simulate(components, wires)
+      setSimResult(r)
+    },
+  }), [components, wires, simResult])
 
   const selected = useMemo(
     () => components.find(c => c.id === selectedId) ?? null,
@@ -2139,3 +2180,7 @@ export default function AnalogCircuitBuilder(): JSX.Element {
     </div>
   )
 }
+
+const AnalogCircuitBuilder = forwardRef<AnalogCircuitHandle, AnalogCircuitProps>(AnalogCircuitBuilderInner)
+AnalogCircuitBuilder.displayName = 'AnalogCircuitBuilder'
+export default AnalogCircuitBuilder

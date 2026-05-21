@@ -23,7 +23,7 @@ import {
   X, Plus, Trash2, Edit3, ArrowUp, ArrowDown, GripVertical, Settings,
   Video, FileText, Type, Music, HelpCircle, Presentation,
   FlaskConical, Beaker, Gamepad2, Link2, Code2, Copy,
-  ExternalLink, Clock, Save, Check, AlertCircle,
+  ExternalLink, Clock, Save, Check, AlertCircle, Target, Trophy,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import {
@@ -34,6 +34,7 @@ import {
 } from '@/services/instructor.service'
 import { cn } from '@/lib/utils'
 import { RichTextEditor } from './RichTextEditor'
+import { LabChallengeAuthor, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
 
 /* ─── Block type registry ────────────────────────────────────────── */
 interface BlockTypeMeta {
@@ -91,7 +92,8 @@ const SIM_OPTIONS: { id: string; title: string }[] = [
 ]
 
 // Labs — hardcoded list (paths đã có route trong app)
-const LAB_OPTIONS: { id: string; title: string; path: string }[] = [
+const LAB_OPTIONS: { id: string; title: string; path: string; supportsChallenge?: boolean }[] = [
+  { id: 'analog-circuit',   title: 'Mạch Analog — tự lắp ghép (hỗ trợ chấm)',  path: '/dashboard/iot-lab', supportsChallenge: true },
   { id: 'iot-lab',          title: 'IoT Lab — cảm biến + actuator',  path: '/labs/iot' },
   { id: 'circuit-lab',      title: 'Circuit Lab — mạch điện',          path: '/labs/circuit' },
   { id: 'arduino-emulator', title: 'Arduino Emulator',                  path: '/labs/arduino' },
@@ -452,23 +454,76 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
         </div>
       )}
 
-      {type === 'lab' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-300 mb-1">Chọn lab <span className="text-red-400">*</span></label>
-          <select
-            value={content}
-            onChange={e => {
-              const lab = LAB_OPTIONS.find(l => l.id === e.target.value)
-              setContent(e.target.value)
-              if (lab) meta_('path', lab.path)
-            }}
-            className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
-          >
-            <option value="">— Chọn —</option>
-            {LAB_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
-          </select>
-        </div>
-      )}
+      {type === 'lab' && (() => {
+        const selectedLab = LAB_OPTIONS.find(l => l.id === content)
+        const supportsChallenge = !!selectedLab?.supportsChallenge
+        const isChallenge = !!meta.challenge
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-300 mb-1">Chọn lab <span className="text-red-400">*</span></label>
+              <select
+                value={content}
+                onChange={e => {
+                  const lab = LAB_OPTIONS.find(l => l.id === e.target.value)
+                  setContent(e.target.value)
+                  if (lab) meta_('path', lab.path)
+                }}
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="">— Chọn —</option>
+                {LAB_OPTIONS.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
+              </select>
+              {selectedLab && !supportsChallenge && (
+                <p className="text-[11px] text-zinc-500 mt-1">
+                  Lab này chưa hỗ trợ chấm tự động. Chỉ hiển thị link mở lab.
+                </p>
+              )}
+            </div>
+
+            {/* Challenge toggle — chỉ show khi lab support */}
+            {supportsChallenge && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isChallenge}
+                    onChange={e => {
+                      meta_('challenge', e.target.checked || undefined)
+                      meta_('labType', e.target.checked ? 'analog' : undefined)
+                    }}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-amber-200 flex items-center gap-2">
+                      <Trophy className="w-4 h-4" /> Bài tập có chấm — Khoá lesson tiếp theo nếu HS chưa pass
+                    </div>
+                    <div className="text-xs text-amber-100/70 mt-1">
+                      HS phải lắp được mạch đạt yêu cầu (đúng linh kiện + LED đúng trạng thái + dòng điện đúng) mới qua được bài học sau.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Inline challenge author — show simulator + save reference */}
+            {supportsChallenge && isChallenge && (
+              <LabChallengeAuthor
+                initialMetadata={meta as Partial<LabChallengeMetadata>}
+                onSave={(md) => {
+                  // Merge metadata: keep path + selected lab, add challenge fields
+                  meta_('challenge', true)
+                  meta_('labType', md.labType)
+                  meta_('referenceSnapshot', md.referenceSnapshot)
+                  meta_('criteria', md.criteria)
+                  meta_('description', md.description)
+                  toast.success('Đã lưu đáp án vào block — bấm "Lưu thay đổi" để hoàn tất')
+                }}
+              />
+            )}
+          </div>
+        )
+      })()}
 
       {type === 'game' && (
         <div>

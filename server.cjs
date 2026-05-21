@@ -5265,6 +5265,325 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', (pathname) => {
     });
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // LAB CHALLENGE — Student nộp mạch tự lắp ghép, server chấm tự động
+  // theo BEHAVIORAL matching: đúng linh kiện + LED đúng trạng thái + current
+  // trong tolerance. HS phải pass mới unlock lesson tiếp theo.
+  //
+  // Tables:
+  //   - LabAttempt: (userId, blockId, lessonId, snapshot, success, score,
+  //                  feedback, submittedAt)
+  //
+  // Endpoints:
+  //   POST /api/labs/attempts             — HS nộp bài, server validate
+  //   GET  /api/labs/attempts/me/lesson/:lessonId  — kiểm tra đã pass chưa
+  //   GET  /api/labs/attempts/block/:blockId       — GV xem all attempts
+  // ════════════════════════════════════════════════════════════════
+  {
+    const { Pool: LabPool } = require('pg');
+    const labJwt = require('jsonwebtoken');
+    let _labPool = null;
+    function getLabPool() {
+      if (!_labPool && process.env.DATABASE_URL) {
+        _labPool = new LabPool({ connectionString: process.env.DATABASE_URL, max: 3 });
+      }
+      return _labPool;
+    }
+    const LAB_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+    function getLabUser(req) {
+      try {
+        const auth = req.headers.authorization || '';
+        if (!auth.startsWith('Bearer ')) return null;
+        const d = labJwt.verify(auth.slice(7), LAB_SECRET, { ignoreExpiration: true });
+        return { id: d.sub || d.userId || d.id || null, role: d.role || 'STUDENT' };
+      } catch { return null; }
+    }
+    let _labReady = false;
+    async function ensureLabTables() {
+      if (_labReady) return;
+      const pool = getLabPool();
+      if (!pool) return;
+      await pool.query(`CREATE TABLE IF NOT EXISTS "LabAttempt" (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        "userId"      TEXT NOT NULL,
+        "blockId"     TEXT NOT NULL,
+        "lessonId"    TEXT,
+        snapshot      JSONB NOT NULL,
+        success       BOOLEAN NOT NULL DEFAULT FALSE,
+        score         INTEGER NOT NULL DEFAULT 0,
+        feedback      JSONB,
+        "submittedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LabAttempt_user_block_idx"
+        ON "LabAttempt"("userId", "blockId", "submittedAt" DESC)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS "LabAttempt_lesson_idx"
+        ON "LabAttempt"("userId", "lessonId") WHERE success = TRUE`);
+      _labReady = true;
+    }
+
+    // ─── Validation: analog circuit BEHAVIORAL match ────────────
+    // Trả về { success, score, feedback: { checks: [{ name, pass, msg }] } }
+    function validateAnalogCircuit(studentSnap, criteria) {
+      const checks = [];
+      const sComponents = Array.isArray(studentSnap?.components) ? studentSnap.components : [];
+      const sWires      = Array.isArray(studentSnap?.wires)      ? studentSnap.wires      : [];
+
+      // CHECK 1: Required components present
+      const req = criteria?.requiredComponents || [];
+      const studentTypes = sComponents.reduce((m, c) => {
+        m[c.type] = (m[c.type] || 0) + 1; return m;
+      }, {});
+      const missing = [];
+      for (const r of req) {
+        // r có thể là string (count=1) hoặc { type, count }
+        const type = typeof r === 'string' ? r : r.type;
+        const need = typeof r === 'string' ? 1 : (r.count || 1);
+        const have = studentTypes[type] || 0;
+        if (have < need) missing.push({ type, need, have });
+      }
+      checks.push({
+        name: 'components',
+        label: 'Linh kiện đầy đủ',
+        pass: missing.length === 0,
+        msg: missing.length === 0
+          ? `Đủ ${req.length} loại linh kiện yêu cầu`
+          : `Thiếu: ${missing.map(m => `${m.type} (cần ${m.need}, có ${m.have})`).join(', ')}`,
+      });
+
+      // CHECK 2: Wires connected (basic connectivity)
+      checks.push({
+        name: 'wires',
+        label: 'Có dây nối',
+        pass: sWires.length >= (criteria?.minWires || 2),
+        msg: sWires.length >= (criteria?.minWires || 2)
+          ? `${sWires.length} dây nối`
+          : `Chỉ có ${sWires.length} dây — quá ít để tạo mạch hoàn chỉnh`,
+      });
+
+      // CHECK 3: Expected LED states (nếu criteria có)
+      // HS phải simulate được mạch → LED đúng trạng thái mong đợi.
+      // Server không chạy simulate(), TIN client gửi kèm simResult.
+      // Nếu cần strict thì re-simulate ở server (port logic JS sang).
+      const expectedLeds = criteria?.expectedLedStates || {};
+      const clientSim = studentSnap?.simResult || null;
+      if (Object.keys(expectedLeds).length > 0) {
+        const clientLedStates = clientSim?.ledStates || {};
+        const ledFailures = [];
+        // expected key = lookup theo type của LED (vì id thay đổi giữa attempts),
+        // value = 'on'|'off'|'burnt'
+        // → Validate: ÍT NHẤT 1 LED type matching phải có expected state
+        for (const [ledType, expectedState] of Object.entries(expectedLeds)) {
+          const ledIdsOfType = sComponents
+            .filter(c => c.type === ledType)
+            .map(c => c.id);
+          const hasMatch = ledIdsOfType.some(id => clientLedStates[id] === expectedState);
+          if (!hasMatch) ledFailures.push({ ledType, expected: expectedState });
+        }
+        checks.push({
+          name: 'led_states',
+          label: 'Đèn LED đúng trạng thái',
+          pass: ledFailures.length === 0 && clientSim?.ok,
+          msg: !clientSim?.ok
+            ? 'Chưa bấm "Mô phỏng" hoặc mạch chưa chạy được'
+            : ledFailures.length === 0
+              ? 'Tất cả LED đúng trạng thái yêu cầu'
+              : `LED chưa đúng: ${ledFailures.map(f => `${f.ledType}=${f.expected}`).join(', ')}`,
+        });
+      }
+
+      // CHECK 4: Current trong range (nếu criteria có)
+      const range = criteria?.currentRange; // [min, max] Amps
+      if (Array.isArray(range) && range.length === 2 && clientSim?.current !== undefined) {
+        const I = clientSim.current;
+        const [lo, hi] = range;
+        const inRange = I >= lo && I <= hi;
+        checks.push({
+          name: 'current',
+          label: 'Dòng điện đúng phạm vi',
+          pass: inRange,
+          msg: inRange
+            ? `I = ${(I * 1000).toFixed(2)}mA (mong đợi ${(lo*1000).toFixed(1)}-${(hi*1000).toFixed(1)}mA)`
+            : `I = ${(I * 1000).toFixed(2)}mA — ngoài phạm vi ${(lo*1000).toFixed(1)}-${(hi*1000).toFixed(1)}mA`,
+        });
+      }
+
+      // CHECK 5: Simulation không error/short-circuit
+      if (clientSim) {
+        checks.push({
+          name: 'no_short',
+          label: 'Không đoản mạch / cháy LED',
+          pass: clientSim.level !== 'error',
+          msg: clientSim.level === 'error'
+            ? `Mạch lỗi: ${clientSim.message}`
+            : 'An toàn',
+        });
+      }
+
+      const passed = checks.filter(c => c.pass).length;
+      const total = checks.length;
+      const score = total > 0 ? Math.round((passed / total) * 100) : 0;
+      const success = passed === total && total >= 2;
+      return { success, score, feedback: { checks, passed, total } };
+    }
+
+    // ── POST /api/labs/attempts — HS submit ─────────────────────
+    app.post('/api/labs/attempts', express.json({ limit: '256kb' }), async (req, res) => {
+      try {
+        const u = getLabUser(req);
+        if (!u?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const { blockId, lessonId, snapshot } = req.body || {};
+        if (!blockId || !snapshot) return res.status(400).json({ error: 'blockId & snapshot required' });
+
+        const pool = getLabPool();
+        if (!pool) return res.status(503).json({ error: 'DB unavailable' });
+        await ensureLabTables();
+
+        // Load block để lấy criteria từ metadata
+        const { rows: blockRows } = await pool.query(
+          `SELECT id, type, metadata, "lessonId" FROM "LessonBlock" WHERE id=$1`,
+          [blockId]
+        );
+        if (blockRows.length === 0) return res.status(404).json({ error: 'Block not found' });
+        const block = blockRows[0];
+        if (block.type !== 'lab') return res.status(400).json({ error: 'Block không phải lab' });
+        const meta = block.metadata || {};
+        if (!meta.challenge) return res.status(400).json({ error: 'Block này không phải challenge' });
+
+        const labType = meta.labType || 'analog';
+        const criteria = meta.criteria || {};
+
+        let result;
+        if (labType === 'analog') {
+          result = validateAnalogCircuit(snapshot, criteria);
+        } else {
+          // V1 chỉ support analog. Lab khác → tạm pass nếu có snapshot
+          result = { success: true, score: 100, feedback: { checks: [{ name: 'submitted', label: 'Đã nộp', pass: true, msg: 'V1: lab này chưa có chấm tự động' }], passed: 1, total: 1 } };
+        }
+
+        // Insert attempt
+        const id = require('crypto').randomBytes(8).toString('hex');
+        await pool.query(
+          `INSERT INTO "LabAttempt" (id, "userId", "blockId", "lessonId", snapshot, success, score, feedback)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [id, u.id, blockId, lessonId || block.lessonId, JSON.stringify(snapshot),
+           result.success, result.score, JSON.stringify(result.feedback)]
+        );
+
+        return res.json({
+          ok: true,
+          attemptId: id,
+          success: result.success,
+          score: result.score,
+          feedback: result.feedback,
+        });
+      } catch (err) {
+        console.error('[lab:submit]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/learning/lessons/:lessonId/blocks ──────────────
+    // Student-side endpoint: trả blocks của lesson, ẨN referenceSnapshot
+    // (HS không được xem đáp án của GV).
+    app.get('/api/learning/lessons/:lessonId/blocks', async (req, res) => {
+      try {
+        const pool = getLabPool();
+        if (!pool) return res.json({ blocks: [] });
+        const { rows } = await pool.query(
+          `SELECT id, "lessonId", type, title, content, metadata, position
+             FROM "LessonBlock" WHERE "lessonId"=$1
+            ORDER BY position ASC`,
+          [req.params.lessonId]
+        );
+        const blocks = rows.map(b => {
+          const md = { ...(b.metadata || {}) };
+          // ẨN reference snapshot khỏi student response
+          if (md.referenceSnapshot) delete md.referenceSnapshot;
+          return { ...b, metadata: md };
+        });
+        return res.json({ blocks });
+      } catch (err) {
+        // LessonBlock chưa tồn tại → trả rỗng
+        if (String(err.message).includes('does not exist')) return res.json({ blocks: [] });
+        console.error('[learning:blocks]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/labs/attempts/me/lesson/:lessonId ──────────────
+    // Trả về blockId → { hasPassed, bestScore, attemptCount, lastAttemptAt }
+    // → CoursePlayer dùng để khoá/mở lesson next.
+    app.get('/api/labs/attempts/me/lesson/:lessonId', async (req, res) => {
+      try {
+        const u = getLabUser(req);
+        if (!u?.id) return res.status(401).json({ error: 'Unauthorized' });
+        const pool = getLabPool();
+        if (!pool) return res.json({ blocks: {} });
+        await ensureLabTables();
+
+        const { rows } = await pool.query(
+          `SELECT "blockId",
+                  bool_or(success) AS has_passed,
+                  COALESCE(MAX(score) FILTER (WHERE success), MAX(score)) AS best_score,
+                  COUNT(*)::int AS attempt_count,
+                  MAX("submittedAt") AS last_attempt_at
+             FROM "LabAttempt"
+            WHERE "userId"=$1 AND "lessonId"=$2
+            GROUP BY "blockId"`,
+          [u.id, req.params.lessonId]
+        );
+        const blocks = {};
+        for (const r of rows) {
+          blocks[r.blockId] = {
+            hasPassed: r.has_passed,
+            bestScore: Number(r.best_score) || 0,
+            attemptCount: r.attempt_count,
+            lastAttemptAt: r.last_attempt_at,
+          };
+        }
+        return res.json({ blocks });
+      } catch (err) {
+        console.error('[lab:me-lesson]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+
+    // ── GET /api/labs/attempts/block/:blockId — GV xem tất cả attempts
+    app.get('/api/labs/attempts/block/:blockId', async (req, res) => {
+      try {
+        const u = getLabUser(req);
+        if (!u?.id) return res.status(401).json({ error: 'Unauthorized' });
+        // (Permission check: GV phải own block. V1 đơn giản — bất kỳ teacher
+        // role nào cũng được xem. Sau sẽ siết.)
+        if (u.role !== 'TEACHER' && u.role !== 'ADMIN') {
+          return res.status(403).json({ error: 'Chỉ giáo viên xem được' });
+        }
+        const pool = getLabPool();
+        if (!pool) return res.json({ attempts: [] });
+        await ensureLabTables();
+
+        const { rows } = await pool.query(
+          `SELECT a.id, a."userId", a.success, a.score, a.feedback, a."submittedAt",
+                  u.name AS user_name, u.email AS user_email
+             FROM "LabAttempt" a
+             LEFT JOIN "User" u ON u.id = a."userId"
+            WHERE a."blockId"=$1
+            ORDER BY a."submittedAt" DESC
+            LIMIT 200`,
+          [req.params.blockId]
+        );
+        return res.json({ attempts: rows.map(r => ({
+          id: r.id, userId: r.userId, userName: r.user_name, userEmail: r.user_email,
+          success: r.success, score: r.score, feedback: r.feedback,
+          submittedAt: r.submittedAt,
+        }))});
+      } catch (err) {
+        console.error('[lab:block-attempts]', err.message);
+        return res.status(500).json({ error: err.message });
+      }
+    });
+  }
+
   // ── Upload image endpoint (avatar / course thumbnail) ─────
   // POST /api/upload/image — DEPRECATED stub (FE đã chuyển sang client-side
   // compress + data URL). Giữ stub để không vỡ extension cũ nào còn gọi.

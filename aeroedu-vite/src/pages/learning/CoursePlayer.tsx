@@ -35,12 +35,15 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { learningService } from '@/services/learning.service'
+import { api } from '@/services/api'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { CourseHistoryTimeline } from '@/components/student/CourseHistoryTimeline'
 import VideoSecurityOverlay from '@/components/learning/VideoSecurityOverlay'
 import TranscriptPanel from '@/components/learning/TranscriptPanel'
 import PdfBookViewer from '@/components/learning/PdfBookViewer'
+import { LabChallengeAttempt, useLessonLabGate, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
+import { Lock, Target } from 'lucide-react'
 import type { CourseVideo, CourseExtras } from '@/types'
 
 // ── Video Player ────────────────────────────────────────────
@@ -293,7 +296,18 @@ function VideoSidebar({
 }
 
 // ── Tabs: Overview / Assets / Feedback / History / PDF Book / Extras ─
-type Tab = 'overview' | 'assets' | 'feedback' | 'history' | 'pdfbook' | 'extras'
+type Tab = 'overview' | 'assets' | 'feedback' | 'history' | 'pdfbook' | 'extras' | 'labs'
+
+// Lesson block from /api/learning/lessons/:id/blocks (referenceSnapshot ẩn)
+interface LessonBlockPub {
+  id: string
+  lessonId: string
+  type: string
+  title: string | null
+  content: string | null
+  metadata: Record<string, unknown> & { challenge?: boolean; labType?: string }
+  position: number
+}
 
 function OverviewTab({ overview }: { overview: string | null }) {
   return (
@@ -474,6 +488,30 @@ export default function CoursePlayer() {
     staleTime: 5 * 60 * 1000,
   })
 
+  // Fetch lesson blocks (filter: lab challenges only) — gate next button
+  const { data: lessonBlocks = [] } = useQuery<LessonBlockPub[]>({
+    queryKey: ['lesson-blocks', currentVideo?.id],
+    queryFn: async () => {
+      if (!currentVideo?.id) return []
+      try {
+        const { data } = await api.get(`/learning/lessons/${currentVideo.id}/blocks`)
+        return data.blocks || []
+      } catch { return [] }
+    },
+    enabled: !!currentVideo?.id,
+    staleTime: 30_000,
+  })
+
+  // Challenge blocks (lab type + metadata.challenge=true)
+  const challengeBlocks = useMemo(
+    () => lessonBlocks.filter(b => b.type === 'lab' && b.metadata?.challenge),
+    [lessonBlocks]
+  )
+  const challengeIds = useMemo(() => challengeBlocks.map(b => b.id), [challengeBlocks])
+
+  // Gate: nếu lesson hiện tại có challenge → check user đã pass hết chưa
+  const labGate = useLessonLabGate(currentVideo?.id, challengeIds)
+
   // ── History logging helpers ────────────────────────────────
   const logEvent = learningService.logEvent
 
@@ -623,11 +661,27 @@ export default function CoursePlayer() {
             )}
 
             <button
-              onClick={() => nextVideo && setCurrentVideo(nextVideo)}
-              disabled={!nextVideo}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg border hover:bg-accent text-sm text-foreground/85 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              onClick={() => {
+                if (labGate.isLocked) {
+                  setActiveTab('labs')
+                  return
+                }
+                if (nextVideo) setCurrentVideo(nextVideo)
+              }}
+              disabled={!nextVideo && !labGate.isLocked}
+              title={labGate.isLocked
+                ? 'Hoàn thành bài tập Lab trước khi qua bài kế tiếp'
+                : undefined}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                labGate.isLocked
+                  ? 'bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
+                  : 'border hover:bg-accent text-foreground/85'
+              )}
             >
-              Tiếp <ChevronRight className="w-4 h-4" />
+              {labGate.isLocked
+                ? <><Lock className="w-4 h-4" /> Làm Lab để mở</>
+                : <>Tiếp <ChevronRight className="w-4 h-4" /></>}
             </button>
           </div>
 
@@ -645,6 +699,7 @@ export default function CoursePlayer() {
           <div className="flex gap-1 border-b mb-6 overflow-x-auto">
             {([
               { key: 'overview', label: 'Tổng quan', icon: FileText },
+              { key: 'labs', label: `Bài tập Lab${challengeBlocks.length ? ` (${challengeBlocks.length})` : ''}`, icon: Target },
               { key: 'assets', label: 'Tài liệu', icon: Download },
               { key: 'feedback', label: 'Đánh giá', icon: MessageSquare },
               { key: 'history', label: 'Lịch sử', icon: History },
@@ -652,6 +707,7 @@ export default function CoursePlayer() {
             ] as const).map(({ key, label, icon: Icon }) => {
               const hasPdf = courseInfo?.pdfBookUrl
               if (key === 'pdfbook' && !hasPdf) return null
+              if (key === 'labs' && challengeBlocks.length === 0) return null
               return (
                 <button
                   key={key}
@@ -677,6 +733,33 @@ export default function CoursePlayer() {
 
           {activeTab === 'overview' && (
             <OverviewTab overview={null} />
+          )}
+          {activeTab === 'labs' && challengeBlocks.length > 0 && (
+            <div className="space-y-6">
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/5 p-4">
+                <div className="flex items-center gap-2 mb-1 text-cyan-200 font-bold">
+                  <Target className="w-5 h-5" /> Bài tập thực hành Lab
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Bài học này có <b>{challengeBlocks.length}</b> bài tập lab.
+                  Hãy lắp mạch theo yêu cầu, mô phỏng, rồi <b>Nộp bài</b> — bạn cần pass HẾT
+                  để mở khoá bài học tiếp theo.
+                </p>
+              </div>
+              {challengeBlocks.map(block => (
+                <div key={block.id}>
+                  {block.title && (
+                    <h3 className="text-base font-bold text-foreground mb-3">{block.title}</h3>
+                  )}
+                  <LabChallengeAttempt
+                    blockId={block.id}
+                    lessonId={currentVideo?.id}
+                    metadata={block.metadata as unknown as LabChallengeMetadata}
+                    onPass={() => qc.invalidateQueries({ queryKey: ['course-videos', courseId] })}
+                  />
+                </div>
+              ))}
+            </div>
           )}
           {activeTab === 'assets' && courseId && (
             <AssetsTab courseId={courseId} />
