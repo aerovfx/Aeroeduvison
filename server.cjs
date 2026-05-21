@@ -19888,6 +19888,188 @@ ${plan.content || '<p>(Trống)</p>'}
     }
   });
 
+  // GET /api/kg/node/:id/resources — học liệu liên quan tới node
+  // Tìm bằng ILIKE label + alias keywords trên các bảng nội dung:
+  //   - Lesson (curriculum lessons - title/description)
+  //   - LessonBlock (blocks within lessons - title/content)
+  //   - Exam (đề thi - title/subject)
+  //   - CourseVideo (videos - title/description)
+  //   - LearningPath (lộ trình - name/description)
+  //
+  // Trả về { lessons, blocks, exams, videos, paths } với link để click vào.
+  app.get('/api/kg/node/:id/resources', async (req, res) => {
+    try {
+      await ensureKgReady();
+      const kgPool = getKcPool();
+      const nq = await kgPool.query(
+        `SELECT id, label, type, description, properties, alias FROM kg_nodes WHERE id = $1`,
+        [req.params.id]
+      );
+      if (nq.rowCount === 0) return res.status(404).json({ error: 'Node not found' });
+      const node = nq.rows[0];
+
+      // Build search terms: label + aliases (nếu có) + tokens
+      const terms = new Set();
+      terms.add(String(node.label || '').trim());
+      // alias có thể là array (jsonb) hoặc string
+      if (Array.isArray(node.alias)) {
+        for (const a of node.alias) if (a) terms.add(String(a).trim());
+      } else if (typeof node.alias === 'string' && node.alias.trim()) {
+        terms.add(node.alias.trim());
+      }
+      // Properties có thể chứa keywords/aliases
+      if (node.properties && typeof node.properties === 'object') {
+        const aliases = node.properties.aliases || node.properties.keywords;
+        if (Array.isArray(aliases)) {
+          for (const a of aliases) if (a) terms.add(String(a).trim());
+        }
+      }
+      // Loại bỏ rỗng + min 3 ký tự
+      const searchTerms = Array.from(terms).filter(t => t && t.length >= 3);
+      if (searchTerms.length === 0) {
+        return res.json({
+          node: { id: node.id, label: node.label, type: node.type },
+          lessons: [], blocks: [], exams: [], videos: [], paths: [],
+        });
+      }
+
+      // Build ILIKE pattern: %term1%|%term2%|...
+      // Postgres ILIKE ANY(ARRAY[...]) là cách hiệu quả nhất
+      const patterns = searchTerms.map(t => `%${t}%`);
+      const learnPool = getLearnPool();
+
+      // Hàm helper search trên 1 bảng — bọc try/catch để bảng thiếu không break
+      async function safeQuery(sql, params, label) {
+        try {
+          const r = await learnPool.query(sql, params);
+          return r.rows;
+        } catch (e) {
+          if (!String(e.message).includes('does not exist')) {
+            console.warn(`[kg:resources:${label}]`, e.message);
+          }
+          return [];
+        }
+      }
+
+      // ── 1. Lessons (curriculum) ──
+      const lessons = await safeQuery(
+        `SELECT l.id, l.title, l.description, l.duration, l."chapterId",
+                c."courseId", co.title AS course_title
+           FROM "Lesson" l
+           LEFT JOIN "Chapter" c ON c.id = l."chapterId"
+           LEFT JOIN "Course" co ON co.id = c."courseId"
+          WHERE l.title ILIKE ANY($1)
+             OR (l.description IS NOT NULL AND l.description ILIKE ANY($1))
+          ORDER BY l.position ASC NULLS LAST
+          LIMIT 8`,
+        [patterns], 'lessons'
+      );
+
+      // ── 2. LessonBlocks (matched on title hoặc lab challenge) ──
+      const blocks = await safeQuery(
+        `SELECT lb.id, lb.type, lb.title, lb.content, lb."lessonId",
+                lb.metadata,
+                l.title AS lesson_title, l."chapterId",
+                c."courseId", co.title AS course_title
+           FROM "LessonBlock" lb
+           LEFT JOIN "Lesson" l ON l.id = lb."lessonId"
+           LEFT JOIN "Chapter" c ON c.id = l."chapterId"
+           LEFT JOIN "Course" co ON co.id = c."courseId"
+          WHERE lb.title ILIKE ANY($1)
+          ORDER BY lb.position ASC NULLS LAST
+          LIMIT 6`,
+        [patterns], 'blocks'
+      );
+
+      // ── 3. Exams ──
+      const exams = await safeQuery(
+        `SELECT id, title, "examType", duration, "totalQuestions", "totalScore", status
+           FROM "Exam"
+          WHERE title ILIKE ANY($1)
+             AND (status = 'Đang diễn ra' OR status = 'published' OR status = 'PUBLIC')
+          ORDER BY "createdAt" DESC
+          LIMIT 8`,
+        [patterns], 'exams'
+      );
+
+      // ── 4. CourseVideos ──
+      const videos = await safeQuery(
+        `SELECT id, title, "videoUrl", "thumbUrl", duration, "courseId"
+           FROM "CourseVideo"
+          WHERE title ILIKE ANY($1)
+          ORDER BY position ASC NULLS LAST
+          LIMIT 6`,
+        [patterns], 'videos'
+      );
+
+      // ── 5. Learning paths ──
+      const paths = await safeQuery(
+        `SELECT id, name, description, "totalXP", "totalDuration", "estimatedDays"
+           FROM "LearningPath"
+          WHERE name ILIKE ANY($1)
+             OR (description IS NOT NULL AND description ILIKE ANY($1))
+          ORDER BY "createdAt" DESC
+          LIMIT 5`,
+        [patterns], 'paths'
+      );
+
+      return res.json({
+        node: { id: node.id, label: node.label, type: node.type },
+        searchTerms,
+        lessons: lessons.map(l => ({
+          id: l.id, title: l.title,
+          description: l.description ? String(l.description).slice(0, 160) : null,
+          duration: l.duration,
+          courseId: l.courseId,
+          courseTitle: l.course_title,
+          link: l.courseId
+            ? `/learning/course/${l.courseId}/${l.courseId}?lesson=${l.id}`
+            : null,
+        })),
+        blocks: blocks.map(b => {
+          // Lab challenge: link tới course player với highlight block
+          const meta = b.metadata || {};
+          return {
+            id: b.id,
+            type: b.type,
+            title: b.title,
+            isChallenge: !!meta.challenge,
+            lessonId: b.lessonId,
+            lessonTitle: b.lesson_title,
+            courseId: b.courseId,
+            courseTitle: b.course_title,
+            link: b.courseId
+              ? `/learning/course/${b.courseId}/${b.courseId}?lesson=${b.lessonId}&block=${b.id}`
+              : null,
+          };
+        }),
+        exams: exams.map(e => ({
+          id: e.id,
+          title: e.title,
+          duration: e.duration,
+          totalQuestions: e.totalQuestions,
+          totalScore: e.totalScore,
+          link: `/student/exams/${e.id}`,
+        })),
+        videos: videos.map(v => ({
+          id: v.id, title: v.title, thumbUrl: v.thumbUrl, duration: v.duration,
+          courseId: v.courseId,
+          link: v.courseId ? `/learning/course/${v.courseId}/${v.courseId}` : null,
+        })),
+        paths: paths.map(p => ({
+          id: p.id, name: p.name,
+          description: p.description ? String(p.description).slice(0, 120) : null,
+          totalXP: p.totalXP,
+          estimatedDays: p.estimatedDays,
+          link: `/student/learning-paths/${p.id}`,
+        })),
+      });
+    } catch (err) {
+      console.error('[kg:resources] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // GET /api/kg/expand/:id?depth=2 — BFS traversal n-hop
   // Dùng JS BFS (đơn giản, ổn định) thay vì recursive CTE phức tạp.
   // Với graph ≤500 nodes / ≤2000 edges (typical scale của KG giáo dục),

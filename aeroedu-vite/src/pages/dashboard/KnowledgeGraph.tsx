@@ -35,6 +35,7 @@ import { lazy, Suspense } from 'react'
 // Lazy load 3D view — bundle khá lớn vì Three.js
 const KnowledgeGraph3D = lazy(() => import('@/components/kg/KnowledgeGraph3D'))
 import NodeBrainPanel from '@/components/kg/NodeBrainPanel'
+import KgNodeResources from '@/components/kg/KgNodeResources'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 import BrainSuggestions from '@/components/kg/BrainSuggestions'
 import KgRolePanel from '@/components/kg/KgRolePanel'
@@ -1711,6 +1712,14 @@ export default function KnowledgeGraph() {
                 🧠 Bộ não tri thức
               </h3>
               <NodeBrainPanel nodeId={selectedNode.node.id} nodeLabel={selectedNode.node.label} />
+            </div>
+
+            {/* Học liệu liên quan — fetch lessons/exams/videos/labs/paths theo label */}
+            <div className="mb-4">
+              <h3 className="text-[10px] uppercase font-bold text-amber-300/70 tracking-wider mb-2 inline-flex items-center gap-1">
+                📚 Học liệu để tìm hiểu
+              </h3>
+              <KgNodeResources nodeId={selectedNode.node.id} nodeLabel={selectedNode.node.label} />
             </div>
 
             <button
