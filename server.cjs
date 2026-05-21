@@ -2138,7 +2138,9 @@ function makeProxy(target, label, pathFilter) {
   });
 
   // GET /api/teacher/exams/:id/analytics
-  // Aggregate stats từ individual + group attempts
+  // Aggregate stats từ individual + group attempts.
+  // V2: thêm question_analysis (per-question difficulty/discrimination/correct%)
+  // và Cronbach alpha tính từ PracticeExam.questions[] + answers{}.
   app.get('/api/teacher/exams/:id/analytics', async (req, res) => {
     try {
       const userId = getExamUserId(req);
@@ -2153,13 +2155,16 @@ function makeProxy(target, label, pathFilter) {
       if (!own.rows.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
       const examMeta = own.rows[0];
 
-      // Pull completed PracticeExam attempts for stats
+      // Pull completed PracticeExam attempts for stats — kèm questions + answers
+      // để phân tích từng câu (per-question metrics + Cronbach alpha)
       let scores = [];
       let durations = [];
       let completed = 0, inProgress = 0;
+      let attemptsWithAnswers = []; // [{ qs, ans, totalScore }] cho per-question analysis
       try {
         const r = await pool.query(
-          `SELECT score, percentage, "completed", "createdAt", "completedAt"
+          `SELECT score, percentage, "completed", "createdAt", "completedAt",
+                  questions, answers
              FROM "PracticeExam"
             WHERE "sourceExamId" = $1`,
           [examId]
@@ -2172,6 +2177,12 @@ function makeProxy(target, label, pathFilter) {
             if (row.completedAt && row.createdAt) {
               const mins = (new Date(row.completedAt) - new Date(row.createdAt)) / 60000;
               if (mins > 0 && mins < 24 * 60) durations.push(mins);
+            }
+            // Lưu attempts có answers để phân tích từng câu
+            const qs = Array.isArray(row.questions) ? row.questions : [];
+            const ans = row.answers && typeof row.answers === 'object' ? row.answers : {};
+            if (qs.length > 0) {
+              attemptsWithAnswers.push({ qs, ans, totalScore: s });
             }
           } else {
             inProgress++;
@@ -2243,6 +2254,125 @@ function makeProxy(target, label, pathFilter) {
         slowest_completion:   Math.round(Math.max(...durations)),
       } : { average_time_minutes: 0, median_time_minutes: 0, fastest_completion: 0, slowest_completion: 0 };
 
+      // ─── Per-question analysis (V2 — real data) ──────────────
+      // Với mỗi câu hỏi trong đề, tính:
+      //  - correct_percentage = % HS trả lời đúng
+      //  - difficulty_index   = 1 - p (0=dễ, 1=khó)
+      //  - discrimination_index = upper27% correct rate - lower27% correct rate
+      //  - most_common_answer = mode of student answers
+      let question_analysis = [];
+      let cronbachAlpha = 0;
+
+      if (attemptsWithAnswers.length >= 2) {
+        // Build canonical question list từ attempt đầu tiên (giả định tất cả attempt cùng đề)
+        // Đa số đề có cùng questions[], nếu khác cấu trúc thì fallback union
+        const firstAttempt = attemptsWithAnswers[0];
+        const questionIds = firstAttempt.qs.map(q => String(q.questionId || q.id || ''));
+        // Compare answer: support nhiều format (text exact, A/B/C/D, true/false, array MC)
+        const isCorrect = (q, studentAnswer) => {
+          if (studentAnswer === undefined || studentAnswer === null) return false;
+          const correct = q.correctAnswer ?? q.correct ?? q.answer;
+          if (correct === undefined || correct === null) return false;
+          // Array of correct (multi-select)
+          if (Array.isArray(correct)) {
+            if (!Array.isArray(studentAnswer)) return false;
+            if (correct.length !== studentAnswer.length) return false;
+            const a = [...correct].map(String).sort();
+            const b = [...studentAnswer].map(String).sort();
+            return a.every((v, i) => v === b[i]);
+          }
+          // Single value — so sánh sau khi normalize
+          return String(correct).trim().toLowerCase() === String(studentAnswer).trim().toLowerCase();
+        };
+
+        // Per-question stats
+        for (let qIdx = 0; qIdx < firstAttempt.qs.length; qIdx++) {
+          const q = firstAttempt.qs[qIdx];
+          const qid = String(q.questionId || q.id || `q${qIdx + 1}`);
+          let correctCount = 0;
+          let answeredCount = 0;
+          const answerFreq = {}; // count answers for most_common_answer
+
+          for (const att of attemptsWithAnswers) {
+            const sa = att.ans[qid];
+            if (sa !== undefined && sa !== null && sa !== '') {
+              answeredCount++;
+              const key = Array.isArray(sa) ? sa.join(',') : String(sa);
+              answerFreq[key] = (answerFreq[key] || 0) + 1;
+              if (isCorrect(q, sa)) correctCount++;
+            }
+          }
+
+          const correct_percentage = answeredCount > 0
+            ? Math.round((correctCount / answeredCount) * 100)
+            : 0;
+          const difficulty_index = answeredCount > 0
+            ? Number((1 - correctCount / answeredCount).toFixed(2))
+            : 0;
+          // Most common answer
+          let most_common_answer = '—';
+          let maxFreq = 0;
+          for (const [k, v] of Object.entries(answerFreq)) {
+            if (v > maxFreq) { maxFreq = v; most_common_answer = k.slice(0, 50); }
+          }
+
+          // Discrimination index = upper27% correct rate - lower27% correct rate
+          // Sort attempts by totalScore, take top 27% + bottom 27%
+          let discrimination_index = 0;
+          if (attemptsWithAnswers.length >= 4) {
+            const sortedByScore = [...attemptsWithAnswers].sort((a, b) => b.totalScore - a.totalScore);
+            const n27 = Math.max(1, Math.floor(sortedByScore.length * 0.27));
+            const upper = sortedByScore.slice(0, n27);
+            const lower = sortedByScore.slice(-n27);
+            const upperCorrect = upper.filter(a => isCorrect(q, a.ans[qid])).length / upper.length;
+            const lowerCorrect = lower.filter(a => isCorrect(q, a.ans[qid])).length / lower.length;
+            discrimination_index = Number((upperCorrect - lowerCorrect).toFixed(2));
+          }
+
+          question_analysis.push({
+            question_id: qid,
+            question_number: qIdx + 1,
+            average_score: Number((correctCount / Math.max(1, answeredCount)).toFixed(2)),
+            difficulty_index,
+            discrimination_index,
+            most_common_answer,
+            correct_percentage,
+          });
+        }
+
+        // ─── Cronbach alpha ──────────────────────────────────
+        // α = (k / (k-1)) × (1 - Σσ²ᵢ / σ²ₜ)
+        // - k: số câu
+        // - σ²ᵢ: variance của từng câu (0/1 score)
+        // - σ²ₜ: variance của tổng điểm dichotomous
+        const k = questionIds.length;
+        if (k > 1) {
+          // Tính dichotomous matrix [N×k]
+          const matrix = attemptsWithAnswers.map(att =>
+            firstAttempt.qs.map(q => {
+              const qid = String(q.questionId || q.id);
+              return isCorrect(q, att.ans[qid]) ? 1 : 0;
+            })
+          );
+          // Variance từng item
+          let sumItemVar = 0;
+          for (let i = 0; i < k; i++) {
+            const col = matrix.map(row => row[i]);
+            const m = col.reduce((s, v) => s + v, 0) / col.length;
+            const v = col.reduce((s, x) => s + (x - m) ** 2, 0) / col.length;
+            sumItemVar += v;
+          }
+          // Variance của tổng điểm
+          const totals = matrix.map(row => row.reduce((s, v) => s + v, 0));
+          const mT = totals.reduce((s, v) => s + v, 0) / totals.length;
+          const vT = totals.reduce((s, x) => s + (x - mT) ** 2, 0) / totals.length;
+          if (vT > 0) {
+            cronbachAlpha = (k / (k - 1)) * (1 - sumItemVar / vT);
+            cronbachAlpha = Math.max(0, Math.min(1, Number(cronbachAlpha.toFixed(3))));
+          }
+        }
+      }
+
       res.json({
         overview: {
           total_submissions: total + inProgress,
@@ -2256,9 +2386,9 @@ function makeProxy(target, label, pathFilter) {
           pass_rate:     Number(passRate.toFixed(1)),
         },
         grade_distribution,
-        question_analysis: [], // Cần phân tích từ answers JSON — skip phase này
+        question_analysis,
         time_analysis,
-        reliability: { cronbach_alpha: 0 },
+        reliability: { cronbach_alpha: cronbachAlpha },
       });
     } catch (err) {
       console.error('[teacher:exams:analytics] ❌', err.message);

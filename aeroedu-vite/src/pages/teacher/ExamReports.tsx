@@ -147,30 +147,8 @@ interface AttemptsData {
   group: GroupRoom[]
 }
 
-// ── Mock fallback ─────────────────────────────────────────────────────────────
-function generateMockAnalytics(): ExamAnalytics {
-  return {
-    overview: {
-      total_submissions: 45, completed: 42, in_progress: 3,
-      average_score: 7.5, median_score: 7.8,
-      highest_score: 10.0, lowest_score: 4.2,
-      std_deviation: 1.3, pass_rate: 85.7,
-    },
-    grade_distribution: {
-      "9-10": 8, "8-8.9": 12, "7-7.9": 15, "6-6.9": 5, "5-5.9": 2, "0-4.9": 0,
-    },
-    question_analysis: [
-      { question_id: "q1", question_number: 1, average_score: 0.9, difficulty_index: 0.2, discrimination_index: 0.6, most_common_answer: "A", correct_percentage: 90 },
-      { question_id: "q2", question_number: 2, average_score: 0.7, difficulty_index: 0.5, discrimination_index: 0.4, most_common_answer: "B", correct_percentage: 70 },
-      { question_id: "q3", question_number: 3, average_score: 0.5, difficulty_index: 0.8, discrimination_index: 0.3, most_common_answer: "C", correct_percentage: 50 },
-    ],
-    time_analysis: {
-      average_time_minutes: 38, median_time_minutes: 40,
-      fastest_completion: 25, slowest_completion: 45,
-    },
-    reliability: { cronbach_alpha: 0.82 },
-  }
-}
+// V2: Bỏ generateMockAnalytics — luôn dùng dữ liệu thực từ /api/teacher/exams/:id/analytics.
+// Nếu API fail → hiển thị empty state, không che dữ liệu giả khiến user hiểu nhầm.
 
 // ── Difficulty label helper ───────────────────────────────────────────────────
 function difficultyLabel(idx: number): { text: string; color: string } {
@@ -227,7 +205,8 @@ export default function ExamReports() {
     return () => { cancelled = true }
   }, [])
 
-  // Load analytics + attempts khi đề được chọn
+  // Load analytics + attempts khi đề được chọn — DỮ LIỆU THỰC, không mock.
+  // Nếu API fail thì set null và UI sẽ hiển thị empty state với hint debug.
   useEffect(() => {
     if (!selectedExamId) { setAnalytics(null); setAttempts(null); return }
     let cancelled = false
@@ -240,8 +219,12 @@ export default function ExamReports() {
           api.get<AttemptsData>(`/teacher/exams/${selectedExamId}/attempts`),
         ])
         if (cancelled) return
-        if (aRes.status === 'fulfilled') setAnalytics(aRes.value.data)
-        else setAnalytics(generateMockAnalytics())
+        if (aRes.status === 'fulfilled') {
+          setAnalytics(aRes.value.data)
+        } else {
+          setAnalytics(null)
+          console.warn('[ExamReports] analytics API failed:', aRes.reason)
+        }
         if (atRes.status === 'fulfilled') setAttempts(atRes.value.data)
         else setAttempts(null)
       } finally {
@@ -700,7 +683,24 @@ export default function ExamReports() {
               <p style={{ fontSize: 13, color: D.muted }}>Đang tải phân tích…</p>
               <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
             </div>
-          ) : analytics ? (
+          ) : !analytics ? (
+            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
+              <AlertCircle style={{ width: 40, height: 40, color: D.amber, margin: "0 auto 12px" }} />
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: D.text, margin: 0 }}>Chưa tải được phân tích</h3>
+              <p style={{ fontSize: 13, color: D.muted, marginTop: 6 }}>
+                API analytics chưa phản hồi. Kiểm tra console hoặc thử lại sau.
+              </p>
+            </div>
+          ) : analytics.overview.total_submissions === 0 ? (
+            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
+              <Users style={{ width: 40, height: 40, color: D.muted, margin: "0 auto 12px", opacity: 0.5 }} />
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: D.text, margin: 0 }}>Đề thi chưa có lượt làm nào</h3>
+              <p style={{ fontSize: 13, color: D.muted, marginTop: 6, maxWidth: 480, marginInline: "auto" }}>
+                Khi học sinh hoàn thành bài thi (cá nhân hoặc phòng nhóm), dữ liệu sẽ tự động cập nhật ở đây.
+                Hãy chia sẻ link đề hoặc tạo phòng thi nhóm để mời học sinh tham gia.
+              </p>
+            </div>
+          ) : (
             <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, overflow: "hidden" }}>
               {/* Tab bar */}
               <div style={{ display: "flex", borderBottom: `1px solid ${D.border}`, background: D.card2 }}>
@@ -1073,18 +1073,6 @@ export default function ExamReports() {
                 )}
 
               </div>
-            </div>
-          ) : (
-            <div style={{ order: 1, background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 48, textAlign: "center" }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: "50%",
-                background: "rgba(251,146,60,0.15)", border: "1px solid rgba(251,146,60,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px",
-              }}>
-                <AlertCircle style={{ width: 28, height: 28, color: "#fb923c" }} />
-              </div>
-              <h3 style={{ fontSize: 16, fontWeight: 600, color: D.text, marginBottom: 8 }}>Không có dữ liệu phân tích</h3>
-              <p style={{ fontSize: 13, color: D.muted }}>Đề thi này chưa có dữ liệu phân tích</p>
             </div>
           )
         )}
