@@ -36232,16 +36232,34 @@ app.use('/socket.io', createProxyMiddleware({
 // ── Static files (Vite build output) ───────────────────────
 const distDir = path.join(__dirname, 'dist');
 app.use(express.static(distDir, {
-  maxAge: '1d',
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('index.html')) {
-      res.setHeader('Cache-Control', 'no-store');
+      // index.html PHẢI no-store — luôn fetch fresh để pick up asset hash mới
+      res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    } else if (/\.(js|mjs|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|ico)$/i.test(filePath)) {
+      // Asset Vite có hash trong filename → immutable forever (1 năm)
+      // Khi rebuild → filename hash đổi → browser fetch file mới.
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=3600');
     }
   },
 }));
 
-// ── SPA Fallback → index.html ───────────────────────────────
-app.use((_req, res) => {
+// ── SPA Fallback → index.html (CHỈ cho HTML navigation requests) ─────────
+// Trước đây fallback mọi request → khi user có index.html cũ + asset chunk
+// hash cũ không còn → server trả index.html (text/html) cho /assets/Foo-XYZ.js
+// → browser execute HTML như JS module → "'text/html' is not a valid JS MIME"
+// Fix: bất kỳ request có extension giống file tĩnh mà server.static không tìm
+// thấy → trả 404 thay vì index.html.
+const ASSET_EXT_RE = /\.(js|mjs|css|map|woff2?|ttf|otf|png|jpe?g|gif|svg|webp|avif|ico|mp4|webm|m4v|mp3|wav|ogg|json|xml|txt|pdf|zip|wasm)$/i;
+app.use((req, res) => {
+  if (ASSET_EXT_RE.test(req.path)) {
+    // Asset file không tồn tại → 404 plain text (KHÔNG fallback index.html)
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).type('text/plain').send('Not Found');
+  }
+  // HTML navigation request → SPA fallback OK
   res.sendFile(path.join(distDir, 'index.html'));
 });
 
