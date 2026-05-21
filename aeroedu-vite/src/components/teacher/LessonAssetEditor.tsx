@@ -37,6 +37,7 @@ import { RichTextEditor } from './RichTextEditor'
 import { LabChallengeAuthor, type LabChallengeMetadata } from '@/components/iot/LabChallengeBlock'
 import LabAttemptsReviewer from '@/components/iot/LabAttemptsReviewer'
 import ExamPicker, { type ExamSummary } from '@/components/teacher/ExamPicker'
+import VideoUploader from '@/components/teacher/VideoUploader'
 
 /* ─── Block type registry ────────────────────────────────────────── */
 interface BlockTypeMeta {
@@ -160,12 +161,13 @@ function detectVideoType(url: string): 'youtube' | 'vimeo' | 'mp4' | 'gcs' | 'un
 interface BlockFormProps {
   initialType: LessonBlockType
   initial?: LessonBlock | null
+  courseId: string                              // V2 (2026-05-22): cần cho VideoUploader signed URL
   onCancel: () => void
   onSubmit: (data: CreateLessonBlockPayload) => void
   busy: boolean
 }
 
-function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockFormProps) {
+function BlockForm({ initialType, initial, courseId, onCancel, onSubmit, busy }: BlockFormProps) {
   const [type, setType] = useState<LessonBlockType>(initial?.type || initialType)
   const [title, setTitle] = useState<string>(initial?.title || '')
   const [content, setContent] = useState<string>(initial?.content || '')
@@ -271,16 +273,64 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
       {type === 'video' && (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">URL video <span className="text-red-400">*</span></label>
-            <input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="https://youtube.com/watch?v=... | https://vimeo.com/... | https://...mp4"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
-            />
+            <label className="block text-xs font-medium text-gray-300 mb-2">
+              Nguồn video <span className="text-red-400">*</span>
+            </label>
+            {/* Tabs URL / Upload */}
+            <div className="inline-flex rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 mb-2">
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'url')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode !== 'upload'
+                    ? 'bg-purple-500/20 text-purple-200'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >
+                🔗 Dán URL
+              </button>
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'upload')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode === 'upload'
+                    ? 'bg-purple-500/20 text-purple-200'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >
+                ☁ Upload lên GCS
+              </button>
+            </div>
+            {meta.sourceMode === 'upload' ? (
+              /* Upload mode — VideoUploader handles signed URL + PUT to GCS */
+              <VideoUploader
+                courseId={courseId}
+                mediaType="video"
+                maxSizeMB={500}
+                onComplete={(info) => {
+                  setContent(info.url)
+                  meta_('fileSize', info.fileSize)
+                  meta_('originalFilename', info.filename)
+                  meta_('uploadedAt', new Date().toISOString())
+                }}
+              />
+            ) : (
+              /* URL mode — gõ tay/paste YouTube/Vimeo/MP4 URL */
+              <input
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="https://youtube.com/watch?v=... | https://vimeo.com/... | https://...mp4"
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
+              />
+            )}
             {content && (
               <p className="text-[10px] text-gray-500 mt-1">
                 Phát hiện: <span className="text-purple-300">{detectVideoType(content)}</span>
+                {meta.originalFilename && (
+                  <span className="ml-2 text-emerald-300">· File: {meta.originalFilename}</span>
+                )}
               </p>
             )}
           </div>
@@ -359,13 +409,49 @@ function BlockForm({ initialType, initial, onCancel, onSubmit, busy }: BlockForm
       {type === 'audio' && (
         <>
           <div>
-            <label className="block text-xs font-medium text-gray-300 mb-1">URL audio <span className="text-red-400">*</span></label>
-            <input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="https://.../bai-giang.mp3"
-              className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
-            />
+            <label className="block text-xs font-medium text-gray-300 mb-2">Nguồn audio <span className="text-red-400">*</span></label>
+            {/* Tabs URL / Upload — giống video block */}
+            <div className="inline-flex rounded-lg bg-zinc-900 border border-zinc-800 p-0.5 mb-2">
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'url')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode !== 'upload' ? 'bg-emerald-500/20 text-emerald-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >🔗 Dán URL</button>
+              <button
+                type="button"
+                onClick={() => meta_('sourceMode', 'upload')}
+                className={cn(
+                  'px-3 py-1.5 text-xs font-bold rounded transition-colors',
+                  meta.sourceMode === 'upload' ? 'bg-emerald-500/20 text-emerald-200' : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >☁ Upload lên GCS</button>
+            </div>
+            {meta.sourceMode === 'upload' ? (
+              <VideoUploader
+                courseId={courseId}
+                mediaType="audio"
+                maxSizeMB={100}
+                onComplete={(info) => {
+                  setContent(info.url)
+                  meta_('fileSize', info.fileSize)
+                  meta_('originalFilename', info.filename)
+                  meta_('uploadedAt', new Date().toISOString())
+                }}
+              />
+            ) : (
+              <input
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="https://.../bai-giang.mp3"
+                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none font-mono"
+              />
+            )}
+            {meta.originalFilename && (
+              <p className="text-[10px] text-emerald-300 mt-1">File: {meta.originalFilename}</p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-300 mb-1">Thời lượng (phút)</label>
@@ -906,6 +992,7 @@ export default function LessonAssetEditor({ open, lessonId, lessonTitle, courseI
           {showAddForm && (
             <BlockForm
               initialType={addingType!}
+              courseId={courseId}
               onCancel={() => setAddingType(null)}
               onSubmit={(d) => createM.mutate(d)}
               busy={createM.isPending}
@@ -917,6 +1004,7 @@ export default function LessonAssetEditor({ open, lessonId, lessonTitle, courseI
             <BlockForm
               initialType={editingBlock!.type}
               initial={editingBlock}
+              courseId={courseId}
               onCancel={() => setEditingBlock(null)}
               onSubmit={(d) => updateM.mutate({ id: editingBlock!.id, data: d })}
               busy={updateM.isPending}
