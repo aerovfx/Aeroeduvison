@@ -144,6 +144,15 @@ export default function QuestionBank() {
   const PAGE_SIZE = 50
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+  // Default ẨN subject picker để tiết kiệm không gian — chỉ hiện khi user toggle
+  const [subjectsCollapsed, setSubjectsCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('qb:subjects-collapsed') !== 'false' } catch { return true }
+  })
+  const toggleSubjectsPanel = () => {
+    const next = !subjectsCollapsed
+    setSubjectsCollapsed(next)
+    try { localStorage.setItem('qb:subjects-collapsed', String(next)) } catch { /* ignore */ }
+  }
   const [filterDifficulty, setFilterDifficulty] = useState<string>("")
   const [filterType, setFilterType] = useState<string>("")
   const [filterGrade, setFilterGrade] = useState<string>("")
@@ -518,39 +527,62 @@ export default function QuestionBank() {
 
       {/* Main Content */}
       <div className="max-w-[1800px] mx-auto px-6 py-6">
-        {/* Subject Categories */}
+        {/* Subject Categories — collapsible để tiết kiệm không gian */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-foreground">Chọn môn học</h2>
-            {selectedSubject && (
-              <button
-                onClick={() => setSelectedSubject(null)}
-                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-              >
-                Xem tất cả
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-3">
-            {SUBJECT_CATEGORIES.map((subject) => (
-              <div
-                key={subject.id}
-                onClick={() =>
-                  setSelectedSubject(selectedSubject === subject.id ? null : subject.id)
-                }
-                className={`bg-card rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
-                  selectedSubject === subject.id
-                    ? "ring-2 ring-purple-500 border-purple-700 bg-purple-950/40"
-                    : "border-border"
-                }`}
-              >
-                <div className="text-center">
-                  <h3 className="font-bold text-foreground text-sm">{subject.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-1 truncate">{subject.description}</p>
+          <button
+            type="button"
+            onClick={toggleSubjectsPanel}
+            className="w-full flex items-center justify-between gap-3 mb-3 p-3 rounded-xl border border-border bg-card hover:bg-accent/30 transition-colors"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {subjectsCollapsed
+                ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                : <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+              <h2 className="text-base font-bold text-foreground">Chọn môn học</h2>
+              {selectedSubject ? (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/40 text-purple-700 dark:text-purple-300 font-bold">
+                  {SUBJECT_CATEGORIES.find(s => s.id === selectedSubject)?.name || selectedSubject}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Tất cả {SUBJECT_CATEGORIES.length} môn</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {selectedSubject && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setSelectedSubject(null) }}
+                  className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-300 font-medium px-2 py-1 rounded hover:bg-purple-500/15 cursor-pointer"
+                >
+                  Xem tất cả
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {subjectsCollapsed ? 'Bấm để mở' : 'Bấm để ẩn'}
+              </span>
+            </div>
+          </button>
+          {!subjectsCollapsed && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+              {SUBJECT_CATEGORIES.map((subject) => (
+                <div
+                  key={subject.id}
+                  onClick={() =>
+                    setSelectedSubject(selectedSubject === subject.id ? null : subject.id)
+                  }
+                  className={`bg-card rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
+                    selectedSubject === subject.id
+                      ? "ring-2 ring-purple-500 border-purple-700 bg-purple-950/40"
+                      : "border-border"
+                  }`}
+                >
+                  <div className="text-center">
+                    <h3 className="font-bold text-foreground text-sm">{subject.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{subject.description}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Manual Create Form */}
