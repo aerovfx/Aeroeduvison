@@ -21,13 +21,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BookOpen, Image as ImageIcon, DollarSign, Clock,
   Tag, ChevronRight, ChevronLeft, Check,
-  Play, Upload, FileText, Plus, Trash2, GripVertical, Languages,
+  Play, Upload, FileText, Trash2,
   Link as LinkIcon, Eye, EyeOff, ToggleLeft, ToggleRight,
   Download, File, Save, Rocket, ArrowLeft, X,
 } from 'lucide-react'
 import { instructorService, type CreateCoursePayload } from '@/services/instructor.service'
 import { RichTextEditor } from '@/components/teacher/RichTextEditor'
-import TranscriptEditor from '@/components/teacher/TranscriptEditor'
 import CurriculumStep from '@/components/teacher/CurriculumStep'
 import CourseExtrasStep from './CourseExtrasStep'
 import { cn } from '@/lib/utils'
@@ -39,8 +38,11 @@ import type { CourseVideo, CourseAsset } from '@/types'
 // ─────────────────────────────────────────────────────────────
 
 const ACCESS_OPTS = ['Trọn đời', '1 tháng', '3 tháng', '6 tháng', '1 năm']
-const STEPS = ['Cơ bản', 'Nội dung', 'Mục lục', 'Video', 'Tài liệu', 'Tài nguyên'] as const
-type Step = 0 | 1 | 2 | 3 | 4 | 5
+// V3 (2026-05-22): Bỏ step "Video" — video/audio/PDF/quiz/lab đều add qua
+// LessonAssetEditor blocks trong "Mục lục" (Coursera/Notion-style).
+// Giảm trùng lặp + UX rõ hơn: 1 nơi duy nhất để soạn nội dung.
+const STEPS = ['Cơ bản', 'Nội dung', 'Mục lục', 'Tài liệu', 'Tài nguyên'] as const
+type Step = 0 | 1 | 2 | 3 | 4
 
 interface BasicForm {
   title: string
@@ -356,540 +358,15 @@ function ContentStep({
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// Step 3 — Quản lý video
-// ─────────────────────────────────────────────────────────────
-function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () => void; onBack: () => void }) {
-  const qc = useQueryClient()
-  const [showForm, setShowForm] = useState(false)
-  // Tab: paste URL hoặc upload file lên GCS bucket
-  const [mode, setMode] = useState<'url' | 'file'>('url')
-
-  const [groupName, setGroupName] = useState('')
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')   // mô tả ngắn cho bài học
-  const [videoUrl, setVideoUrl] = useState('')
-  const [thumbUrl, setThumbUrl] = useState('')
-  const [thumbPreview, setThumbPreview] = useState('')
-  const [serialId, setSerialId] = useState('')
-  const [isPreview, setIsPreview] = useState(false)
-  const [thumbUploading, setThumbUploading] = useState(false)
-
-  // File upload state
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadingFile, setUploadingFile] = useState(false)
-  const [uploadedGcsPath, setUploadedGcsPath] = useState<string>('')
-  // Transcript editor modal — videoId đang được sửa transcript
-  const [transcriptVideoId, setTranscriptVideoId] = useState<string | null>(null)
-
-  const { data: videos = [], isLoading } = useQuery({
-    queryKey: ['instructor-videos', courseId],
-    queryFn: () => instructorService.getVideos(courseId),
-  })
-
-  const add = useMutation({
-    mutationFn: () =>
-      instructorService.uploadVideo(courseId, {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        url: videoUrl.trim(),
-        position: videos.length + 1,
-        thumbUrl: thumbUrl || undefined,
-        isPreview,
-        groupName: groupName.trim() || undefined,
-        gcsPath: uploadedGcsPath || undefined,   // chỉ có khi upload file
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
-      toast.success(mode === 'file' ? 'Đã upload + thêm video!' : 'Đã thêm video!')
-      resetForm()
-    },
-    onError: (err: unknown) => {
-      const e = err as { response?: { data?: { error?: string } } }
-      toast.error(e.response?.data?.error || 'Lỗi, thử lại nhé.')
-    },
-  })
-
-  const del = useMutation({
-    mutationFn: (id: string) => instructorService.deleteVideo(courseId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] }),
-  })
-
-  const resetForm = () => {
-    setGroupName(''); setTitle(''); setDescription(''); setVideoUrl('')
-    setThumbUrl(''); setThumbPreview(''); setSerialId(''); setIsPreview(false)
-    setUploadFile(null); setUploadProgress(0); setUploadedGcsPath('')
-    setShowForm(false)
-  }
-
-  // Upload file → GCS qua signed URL → AUTO-SAVE metadata vào DB.
-  //
-  // UX FIX (2026-05-18): Trước đây sau khi upload, user phải bấm tiếp
-  // "Thêm bài học" để lưu vào DB. Nhiều user upload xong tưởng đã xong
-  // → đóng tab → file mồ côi trên GCS (đã thấy 3 file orphan trong bucket
-  // user 223321a8). Giờ auto-save sau upload, user chỉ cần PICK FILE.
-  const handleFileUpload = async (file: File) => {
-    if (!file.type.startsWith('video/')) {
-      toast.error('Chỉ chấp nhận file video (mp4, webm, mov)')
-      return
-    }
-    const sizeMB = file.size / 1024 / 1024
-    if (sizeMB > 500) {
-      toast.error(`File quá lớn (${sizeMB.toFixed(0)}MB). Tối đa 500MB.`)
-      return
-    }
-    setUploadFile(file)
-    setUploadingFile(true)
-    setUploadProgress(0)
-    try {
-      const { publicUrl, gcsPath } = await instructorService.uploadVideoFile(
-        courseId, file, (pct) => setUploadProgress(pct),
-      )
-      setVideoUrl(publicUrl)
-      setUploadedGcsPath(gcsPath)
-      // Auto-fill title từ filename nếu chưa nhập
-      const finalTitle = title.trim() || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
-      if (!title.trim()) setTitle(finalTitle)
-      toast.success(`📤 Upload xong (${sizeMB.toFixed(1)}MB) — đang lưu...`, { duration: 2000 })
-
-      // AUTO-SAVE: thay vì bắt user bấm thêm 1 nút, gọi luôn API tạo
-      // CourseVideo trong DB. Body dùng state hiện tại + finalTitle.
-      try {
-        await instructorService.uploadVideo(courseId, {
-          title:       finalTitle,
-          description: description.trim() || undefined,
-          url:         publicUrl,
-          position:    videos.length + 1,
-          thumbUrl:    thumbUrl || undefined,
-          isPreview,
-          groupName:   groupName.trim() || undefined,
-          gcsPath,
-        })
-        qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
-        toast.success('✅ Đã thêm video vào khoá học!')
-        resetForm()
-      } catch (saveErr: unknown) {
-        const e = saveErr as { response?: { data?: { error?: string } }; message?: string }
-        toast.error(`Upload OK nhưng lưu DB thất bại: ${e.response?.data?.error || e.message}. File ở GCS, bạn có thể edit + bấm "Thêm bài học" thủ công.`)
-        // Không reset form → user vẫn thấy form đã fill, click thủ công được
-      }
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } }; message?: string }
-      toast.error(e.response?.data?.error || e.message || 'Upload thất bại')
-      setUploadFile(null)
-    } finally {
-      setUploadingFile(false)
-    }
-  }
-
-  const handleThumbFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => setThumbPreview(e.target?.result as string)
-    reader.readAsDataURL(file)
-    setThumbUploading(true)
-    try {
-      const { url } = await instructorService.uploadImage(file)
-      setThumbUrl(url)
-    } catch {
-      toast.error('Upload thumbnail thất bại')
-    } finally {
-      setThumbUploading(false)
-    }
-  }
-
-  const isYT = (u: string) => u.includes('youtube') || u.includes('youtu.be')
-  const isVimeo = (u: string) => u.includes('vimeo')
-
-  // Group videos by group_name (displayed as section headers)
-  const grouped = videos.reduce<Record<string, typeof videos>>((acc, v) => {
-    const g = (v as any).groupName || 'Chưa phân nhóm'
-    ;(acc[g] ??= []).push(v)
-    return acc
-  }, {})
-
-  return (
-    <div className="space-y-5">
-      {/* Add button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-white">Danh sách video ({videos.length})</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Hỗ trợ YouTube, Vimeo, và URL video trực tiếp</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Thêm video
-        </button>
-      </div>
-
-      {/* Upload form */}
-      {showForm && (
-        <div className="rounded-xl bg-purple-900/20 border border-purple-500/30 p-5 space-y-4">
-          <h4 className="text-sm font-semibold text-purple-300">Thêm bài học mới</h4>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label">Nhóm bài học</label>
-              <input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="VD: Chương 1 — Động lực học"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-            <div>
-              <label className="label">Số thứ tự</label>
-              <input
-                type="number"
-                value={serialId}
-                onChange={(e) => setSerialId(e.target.value)}
-                placeholder="1, 2, 3…"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="label">Tiêu đề bài học <span className="text-red-400">*</span></label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="VD: Bài 1 — Giới thiệu định luật Newton"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-
-            {/* ── Mô tả ngắn cho bài học (NEW) — hiển thị cho HS trước khi học ── */}
-            <div className="sm:col-span-2">
-              <label className="label">
-                Mô tả bài học
-                <span className="text-gray-500 text-xs font-normal ml-1">
-                  (tùy chọn — HS sẽ thấy ở tab Tổng quan)
-                </span>
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="VD: Trong bài này, em sẽ học về 3 định luật Newton, hiểu được lực và phản lực qua các ví dụ thực tế..."
-                rows={3}
-                maxLength={5000}
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors resize-y"
-              />
-              <div className="text-[10px] text-gray-500 mt-1 text-right">
-                {description.length} / 5000 ký tự
-              </div>
-            </div>
-
-            {/* ── Tab nav: URL paste vs File upload ── */}
-            <div className="sm:col-span-2">
-              <div className="flex gap-1 mb-3 border-b border-white/10">
-                {([
-                  { key: 'url'  as const, label: 'Dán URL',     icon: LinkIcon },
-                  { key: 'file' as const, label: 'Upload file', icon: Upload   },
-                ]).map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => { setMode(key); setVideoUrl(''); setUploadFile(null); setUploadedGcsPath('') }}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 text-sm font-semibold border-b-2 transition-colors -mb-px',
-                      mode === key
-                        ? 'border-purple-500 text-purple-300'
-                        : 'border-transparent text-white/50 hover:text-white/80'
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />{label}
-                  </button>
-                ))}
-              </div>
-
-              {mode === 'url' ? (
-                <>
-                  <label className="label">URL video (YouTube / Vimeo / MP4 trực tiếp) <span className="text-red-400">*</span></label>
-                  <div className="relative">
-                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      value={videoUrl}
-                      onChange={(e) => setVideoUrl(e.target.value)}
-                      placeholder="https://youtube.com/watch?v=... hoặc https://cdn.example.com/video.mp4"
-                      className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-                    />
-                  </div>
-                  {videoUrl && (
-                    <p className={cn('text-xs mt-1', isYT(videoUrl) ? 'text-green-400' : isVimeo(videoUrl) ? 'text-blue-400' : 'text-gray-400')}>
-                      {isYT(videoUrl) ? '✓ YouTube' : isVimeo(videoUrl) ? '✓ Vimeo' : '✓ URL trực tiếp (MP4/WebM)'}
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-500 mt-1.5">
-                    💡 YouTube/Vimeo: nhúng player tự động. MP4: phát native HTML5.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <label className="label">Chọn file video từ máy <span className="text-red-400">*</span></label>
-                  {!uploadFile ? (
-                    <label className={cn(
-                      'flex flex-col items-center justify-center gap-2 h-32',
-                      'rounded-xl border-2 border-dashed border-white/20 hover:border-purple-500/40',
-                      'cursor-pointer transition-colors'
-                    )}>
-                      <Upload className="w-7 h-7 text-gray-500" />
-                      <span className="text-sm text-gray-400">Click để chọn hoặc kéo file vào đây</span>
-                      <span className="text-xs text-gray-600">MP4 / WebM / MOV — tối đa 500MB</span>
-                      <input
-                        type="file"
-                        accept="video/mp4,video/webm,video/quicktime,video/*"
-                        className="hidden"
-                        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }}
-                      />
-                    </label>
-                  ) : (
-                    <div className="rounded-xl bg-purple-500/10 border border-purple-500/30 p-4 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <Play className="w-8 h-8 text-purple-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{uploadFile.name}</p>
-                          <p className="text-xs text-gray-400">
-                            {(uploadFile.size / 1024 / 1024).toFixed(1)} MB
-                            {uploadedGcsPath && ' • ✅ Đã upload lên GCS'}
-                          </p>
-                        </div>
-                        {!uploadingFile && (
-                          <button
-                            type="button"
-                            onClick={() => { setUploadFile(null); setVideoUrl(''); setUploadedGcsPath(''); setUploadProgress(0) }}
-                            className="text-gray-400 hover:text-red-400"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                      {uploadingFile && (
-                        <div>
-                          <div className="flex items-center justify-between text-xs text-purple-300 mb-1">
-                            <span>Đang upload tới Google Cloud Storage...</span>
-                            <span className="font-mono">{uploadProgress}%</span>
-                          </div>
-                          <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all"
-                              style={{ width: `${uploadProgress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {uploadedGcsPath && !uploadingFile && (
-                        <a
-                          href={videoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-blue-400 hover:text-blue-300 truncate block"
-                        >
-                          🔗 {videoUrl}
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  <p className="text-xs text-gray-500 mt-2">
-                    💡 File upload trực tiếp từ trình duyệt → GCS bucket asia-southeast1, không qua server (nhanh + tiết kiệm bandwidth).
-                  </p>
-                </>
-              )}
-            </div>
-
-            {/* Thumbnail */}
-            <div>
-              <label className="label">Thumbnail bài học (tuỳ chọn)</label>
-              <div
-                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleThumbFile(f) }}
-                onDragOver={(e) => e.preventDefault()}
-                className={cn(
-                  'relative rounded-lg border-2 border-dashed overflow-hidden transition-colors',
-                  thumbPreview ? 'border-purple-500/40 h-28' : 'border-white/20 hover:border-purple-500/40 h-20'
-                )}
-              >
-                {thumbPreview ? (
-                  <>
-                    <img src={thumbPreview} alt="" className="w-full h-full object-cover" />
-                    {thumbUploading && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <Spin />
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => { setThumbPreview(''); setThumbUrl('') }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center"
-                    >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </>
-                ) : (
-                  <label className="flex items-center justify-center h-full gap-2 cursor-pointer">
-                    <ImageIcon className="w-5 h-5 text-gray-600" />
-                    <span className="text-xs text-gray-500">Chọn thumbnail</span>
-                    <input type="file" accept="image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleThumbFile(f) }} />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            {/* Is preview */}
-            <div className="flex items-center gap-3 self-end pb-2">
-              <button
-                type="button"
-                onClick={() => setIsPreview((v) => !v)}
-                className="flex items-center gap-2 text-sm text-gray-300"
-              >
-                {isPreview ? (
-                  <ToggleRight className="w-8 h-8 text-green-400" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-gray-600" />
-                )}
-                <span className={isPreview ? 'text-green-400' : 'text-gray-500'}>
-                  {isPreview ? 'Bài xem thử (miễn phí)' : 'Yêu cầu đăng ký'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-4 py-2 rounded-lg border border-white/20 text-gray-300 text-sm hover:border-white/40 transition-colors"
-            >
-              Huỷ
-            </button>
-            <button
-              type="button"
-              disabled={
-                !title.trim() ||
-                !videoUrl.trim() ||
-                add.isPending ||
-                thumbUploading ||
-                uploadingFile
-              }
-              onClick={() => add.mutate()}
-              className="flex items-center gap-2 px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-            >
-              {add.isPending && <Spin />}
-              {uploadingFile ? 'Đang upload...' : 'Thêm bài học'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Video list grouped */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
-        </div>
-      ) : videos.length === 0 ? (
-        <div className="rounded-xl bg-white/5 border border-dashed border-white/10 p-10 flex flex-col items-center gap-3 text-center">
-          <Play className="w-10 h-10 text-gray-600" />
-          <p className="text-gray-400 text-sm">Chưa có bài học nào. Thêm video đầu tiên!</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(grouped).map(([group, gVideos]) => (
-            <div key={group}>
-              {group !== 'Chưa phân nhóm' && (
-                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2 pl-2">
-                  {group}
-                </p>
-              )}
-              <div className="space-y-1.5">
-                {gVideos.map((v, idx) => (
-                  <div
-                    key={v.id}
-                    className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 p-3 transition-colors group"
-                  >
-                    <GripVertical className="w-4 h-4 text-gray-600 flex-shrink-0" />
-
-                    {/* Thumbnail or play icon */}
-                    <div className="w-12 h-9 rounded overflow-hidden bg-gray-800 flex-shrink-0 flex items-center justify-center">
-                      {(v as any).thumbUrl ? (
-                        <img src={(v as any).thumbUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <Play className="w-4 h-4 text-gray-500" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{v.title}</p>
-                      <p className="text-xs text-gray-500 truncate">{v.videoUrl}</p>
-                    </div>
-
-                    {(v as any).isPreview && (
-                      <span className="hidden sm:flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 flex-shrink-0">
-                        <Eye className="w-3 h-3" /> Xem thử
-                      </span>
-                    )}
-
-                    {/* Transcript button — open editor cho ngôn ngữ đa quốc gia */}
-                    <button
-                      onClick={() => setTranscriptVideoId(v.id)}
-                      title="Quản lý transcript đa ngôn ngữ"
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 flex items-center justify-center text-cyan-400 transition-all flex-shrink-0"
-                    >
-                      <Languages className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Xoá bài "${v.title}"?`)) del.mutate(v.id)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-all flex-shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex justify-between pt-2 border-t border-white/10">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-3 rounded-lg border border-white/20 hover:border-white/40 text-gray-300 text-sm transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" /> Quay lại
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          className="flex items-center gap-2 px-7 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
-        >
-          Tiếp theo → <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* TRANSCRIPT EDITOR MODAL — open khi click Languages icon trên video card */}
-      {transcriptVideoId && (() => {
-        const v = videos.find(vv => vv.id === transcriptVideoId)
-        return v ? (
-          <TranscriptEditor
-            videoId={v.id}
-            videoTitle={v.title}
-            onClose={() => setTranscriptVideoId(null)}
-          />
-        ) : null
-      })()}
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────
-// Step 4 — Tài liệu đính kèm
+// V3 (2026-05-22): VideoStep đã bỏ — video/audio/PDF/quiz/lab giờ add
+// qua LessonAssetEditor blocks trong CurriculumStep (Coursera/Notion-style).
+// Lý do: giảm trùng lặp + UX rõ hơn (1 nơi duy nhất để soạn nội dung lesson).
+// ─────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────
+// Step 3 — Tài liệu đính kèm (course-level, không phải lesson)
 // ─────────────────────────────────────────────────────────────
 function AssetStep({ courseId, onBack, onFinish }: { courseId: string; onBack: () => void; onFinish: () => void }) {
   const qc = useQueryClient()
@@ -1064,8 +541,12 @@ export default function CourseEditor() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [step, setStep] = useState<Step>(() => {
-    const s = parseInt(searchParams.get('step') || '0') as Step
-    return (s >= 0 && s <= 5) ? s : 0
+    const raw = parseInt(searchParams.get('step') || '0')
+    // V3: Step 3 cũ (Video) đã bỏ — redirect step=3 cũ về step=2 (Mục lục).
+    // Bookmark `?step=3/4/5` cũ → clamp về [0, 4] để không vỡ.
+    if (raw >= 0 && raw <= 4) return raw as Step
+    if (raw === 5) return 4  // old Tài nguyên = step 5 → giờ là 4
+    return 0
   })
 
   const [coverImage, setCoverImage] = useState({ preview: '', url: '' })
@@ -1283,32 +764,24 @@ export default function CourseEditor() {
         )}
 
         {step === 3 && courseId && (
-          <VideoStep
+          <AssetStep
             courseId={courseId}
-            onNext={() => setStep(4)}
             onBack={() => setStep(2)}
+            onFinish={() => setStep(4)}
           />
         )}
 
         {step === 4 && courseId && (
-          <AssetStep
-            courseId={courseId}
-            onBack={() => setStep(3)}
-            onFinish={() => setStep(5)}
-          />
-        )}
-
-        {step === 5 && courseId && (
           <CourseExtrasStep
             courseId={courseId}
             initialExtras={course?.extras}
-            onBack={() => setStep(4)}
+            onBack={() => setStep(3)}
             onFinish={handleFinish}
           />
         )}
 
-        {/* Step 2/3/4/5 — no courseId yet */}
-        {(step === 2 || step === 3 || step === 4 || step === 5) && !courseId && (
+        {/* Step 2/3/4 — no courseId yet */}
+        {(step === 2 || step === 3 || step === 4) && !courseId && (
           <div className="text-center py-10 text-gray-400">
             <p>Vui lòng hoàn thành bước 1 để lưu khoá học trước.</p>
             <button
