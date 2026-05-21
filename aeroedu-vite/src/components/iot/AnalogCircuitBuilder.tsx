@@ -54,12 +54,24 @@ interface PlacedComponent {
   reading?: number     // measured value for ammeter (A) / voltmeter (V)
 }
 
+interface Point2 {
+  x: number
+  y: number
+}
+
 interface Wire {
   id: string
   fromId: string
   fromTerminal: 'a' | 'b'
   toId: string
   toTerminal: 'a' | 'b'
+  /**
+   * Intermediate waypoints between fromTerminal and toTerminal.
+   * Tất cả snap vào grid 20px. Khi user click trên dây thì insert waypoint
+   * tại vị trí click; double-click waypoint để xoá; drag để di chuyển.
+   * Nếu undefined hoặc rỗng → auto Manhattan-route bằng autoRouteWaypoints().
+   */
+  waypoints?: Point2[]
 }
 
 type Mode = 'select' | 'wire' | 'delete'
@@ -184,8 +196,72 @@ function snapToGrid(v: number, grid = 20) {
   return Math.round(v / grid) * grid
 }
 
+function snapPoint(p: Point2): Point2 {
+  return { x: snapToGrid(p.x), y: snapToGrid(p.y) }
+}
+
 function newId() {
   return Math.random().toString(36).slice(2, 9)
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Wire routing — Manhattan (orthogonal) path
+// ───────────────────────────────────────────────────────────────────
+
+/**
+ * Tự sinh waypoint giữa 2 terminal tạo dáng Z vuông góc (Manhattan).
+ * Dùng khi user chưa custom waypoints — kết quả thẩm mỹ hơn line thẳng chéo.
+ */
+function autoRouteWaypoints(p1: Point2, p2: Point2): Point2[] {
+  // Đã thẳng theo trục → không cần waypoint
+  if (p1.x === p2.x || p1.y === p2.y) return []
+  const dx = Math.abs(p2.x - p1.x)
+  const dy = Math.abs(p2.y - p1.y)
+  // dx > dy → đi ngang chủ đạo, chia ở giữa theo X (Z nằm ngang)
+  // ngược lại → đi dọc chủ đạo, chia ở giữa theo Y (Z thẳng đứng)
+  if (dx >= dy) {
+    const midX = snapToGrid((p1.x + p2.x) / 2)
+    return [{ x: midX, y: p1.y }, { x: midX, y: p2.y }]
+  } else {
+    const midY = snapToGrid((p1.y + p2.y) / 2)
+    return [{ x: p1.x, y: midY }, { x: p2.x, y: midY }]
+  }
+}
+
+/**
+ * Full điểm path = [p1, ...waypoints, p2]. Mỗi đoạn giữa 2 điểm liên tiếp,
+ * nếu chưa thẳng trục thì tự thêm corner để bend 90° (horizontal-first).
+ */
+function expandOrthogonal(pts: Point2[]): Point2[] {
+  if (pts.length < 2) return pts
+  const out: Point2[] = [pts[0]]
+  for (let i = 1; i < pts.length; i++) {
+    const a = out[out.length - 1]
+    const b = pts[i]
+    if (a.x !== b.x && a.y !== b.y) {
+      // Thêm corner trung gian — horizontal first (giống bo mạch PCB)
+      out.push({ x: b.x, y: a.y })
+    }
+    out.push(b)
+  }
+  return out
+}
+
+function buildOrthogonalPath(p1: Point2, p2: Point2, waypoints: Point2[]): string {
+  const raw = [p1, ...waypoints, p2]
+  const expanded = expandOrthogonal(raw)
+  return expanded.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
+}
+
+/** Khoảng cách điểm tới đoạn thẳng — để chọn segment khi insert waypoint. */
+function distToSegment(p: Point2, a: Point2, b: Point2): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y)
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy)
 }
 
 // ───────────────────────────────────────────────────────────────────
@@ -1122,6 +1198,8 @@ export default function AnalogCircuitBuilder(): JSX.Element {
   const [savedList, setSavedList]   = useState<SavedCircuit[]>([])
   const [hoverTermKey, setHoverTermKey] = useState<string | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  // Đang kéo waypoint của dây nào, index thứ mấy
+  const [draggingWaypoint, setDraggingWaypoint] = useState<{ wireId: string; index: number } | null>(null)
   // Bài 26 SGK measurements table
   const [measurements, setMeasurements] = useState<Array<{ R: number; U: number; I: number }>>([])
   const dragOffsetRef = useRef<{ dx: number; dy: number } | null>(null)
@@ -1189,6 +1267,75 @@ export default function AnalogCircuitBuilder(): JSX.Element {
   const deleteWire = (id: string) => {
     setWires(ws => ws.filter(w => w.id !== id))
   }
+
+  // ─── Wire waypoint operations ────────────────────────────────────
+  // Convert mouse event → snapped canvas coordinates
+  const mouseToCanvas = (clientX: number, clientY: number): Point2 | null => {
+    const svg = svgRef.current
+    if (!svg) return null
+    const rect = svg.getBoundingClientRect()
+    return {
+      x: snapToGrid((clientX - rect.left) * (VIEWBOX_W / rect.width)),
+      y: snapToGrid((clientY - rect.top)  * (VIEWBOX_H / rect.height)),
+    }
+  }
+
+  /** Insert waypoint vào dây tại vị trí gần đoạn được click nhất */
+  const insertWaypointOnWire = (wireId: string, at: Point2) => {
+    setWires(ws => ws.map(w => {
+      if (w.id !== wireId) return w
+      const fromComp = components.find(c => c.id === w.fromId)
+      const toComp   = components.find(c => c.id === w.toId)
+      if (!fromComp || !toComp) return w
+      const p1 = getTerminalPos(fromComp, w.fromTerminal)
+      const p2 = getTerminalPos(toComp,   w.toTerminal)
+      const wp = w.waypoints && w.waypoints.length > 0
+        ? w.waypoints
+        : autoRouteWaypoints(p1, p2)
+      // Build full path [p1, wp[0], wp[1], ..., p2] và tìm đoạn gần điểm click nhất
+      const pts: Point2[] = [p1, ...wp, p2]
+      let bestIdx = 0
+      let bestDist = Infinity
+      for (let i = 0; i < pts.length - 1; i++) {
+        const d = distToSegment(at, pts[i], pts[i + 1])
+        if (d < bestDist) { bestDist = d; bestIdx = i }
+      }
+      // Insert waypoint vào sau index bestIdx (giữa pts[bestIdx] và pts[bestIdx+1])
+      // waypoints array tương ứng pts[1..n-2], nên insert index trong waypoints = bestIdx
+      const nextWp = [...wp]
+      nextWp.splice(bestIdx, 0, snapPoint(at))
+      return { ...w, waypoints: nextWp }
+    }))
+  }
+
+  const removeWaypoint = (wireId: string, index: number) => {
+    setWires(ws => ws.map(w => {
+      if (w.id !== wireId || !w.waypoints) return w
+      const next = w.waypoints.filter((_, i) => i !== index)
+      return { ...w, waypoints: next }
+    }))
+  }
+
+  // Drag waypoint
+  useEffect(() => {
+    if (!draggingWaypoint) return
+    const onMove = (e: MouseEvent) => {
+      const pos = mouseToCanvas(e.clientX, e.clientY)
+      if (!pos) return
+      setWires(ws => ws.map(w => {
+        if (w.id !== draggingWaypoint.wireId || !w.waypoints) return w
+        const next = w.waypoints.map((p, i) => i === draggingWaypoint.index ? pos : p)
+        return { ...w, waypoints: next }
+      }))
+    }
+    const onUp = () => setDraggingWaypoint(null)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [draggingWaypoint])
 
   const rotateSelected = () => {
     if (!selected) return
@@ -1452,7 +1599,7 @@ export default function AnalogCircuitBuilder(): JSX.Element {
               🔌 Mạch điện Analog — Tự lắp ghép
             </h3>
             <p className="text-[11px] text-zinc-400 truncate">
-              Kéo linh kiện vào canvas · Click 2 terminal để nối dây · Bấm "Mô phỏng"
+              Kéo linh kiện · Click 2 terminal nối dây · Click dây thêm node · Kéo node bẻ vuông góc · Bấm "Mô phỏng"
             </p>
           </div>
         </div>
@@ -1622,7 +1769,7 @@ export default function AnalogCircuitBuilder(): JSX.Element {
                 </g>
               )}
 
-              {/* Wires */}
+              {/* Wires — Manhattan routing với waypoints draggable */}
               {wires.map(w => {
                 const fromComp = components.find(c => c.id === w.fromId)
                 const toComp   = components.find(c => c.id === w.toId)
@@ -1631,16 +1778,71 @@ export default function AnalogCircuitBuilder(): JSX.Element {
                 const p2 = getTerminalPos(toComp,   w.toTerminal)
                 const isLive = simResult?.ok && (simResult.current ?? 0) > LED_IF_MIN
                 const color = isLive ? '#22d3ee' : '#64748b'
+                // Sử dụng waypoints custom của user, fallback sang auto Z-route
+                const wp = (w.waypoints && w.waypoints.length > 0)
+                  ? w.waypoints
+                  : autoRouteWaypoints(p1, p2)
+                const d = buildOrthogonalPath(p1, p2, wp)
                 return (
-                  <g key={w.id} className="cursor-pointer"
-                     onClick={e => { e.stopPropagation(); if (mode === 'delete') deleteWire(w.id) }}
-                  >
-                    {/* hit area */}
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                          stroke="transparent" strokeWidth={10} />
-                    <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y}
-                          stroke={color} strokeWidth={2.2}
-                          filter={isLive ? 'url(#acb-glow)' : undefined} />
+                  <g key={w.id}>
+                    {/* hit area — click để thêm waypoint (hoặc xoá nếu mode delete) */}
+                    <path
+                      d={d} fill="none" stroke="transparent" strokeWidth={12}
+                      style={{ cursor: mode === 'delete' ? 'crosshair' : 'copy' }}
+                      onClick={e => {
+                        e.stopPropagation()
+                        if (mode === 'delete') { deleteWire(w.id); return }
+                        const at = mouseToCanvas(e.clientX, e.clientY)
+                        if (at) insertWaypointOnWire(w.id, at)
+                      }}
+                    />
+                    {/* Dây hiển thị */}
+                    <path
+                      d={d} fill="none" stroke={color} strokeWidth={2.2}
+                      strokeLinejoin="round" strokeLinecap="round"
+                      filter={isLive ? 'url(#acb-glow)' : undefined}
+                      pointerEvents="none"
+                    />
+                    {/* Waypoint handles — drag để di chuyển, double-click để xoá */}
+                    {wp.map((point, idx) => {
+                      // Chỉ render handle cho waypoints user-controlled (có trong w.waypoints).
+                      // Auto-route waypoints chỉ render khi user chưa custom, sẽ thành custom
+                      // sau lần drag/click đầu tiên.
+                      const isUserWaypoint = !!(w.waypoints && w.waypoints[idx])
+                      const isDragging = draggingWaypoint?.wireId === w.id && draggingWaypoint?.index === idx
+                      return (
+                        <g key={`${w.id}-wp-${idx}`}>
+                          <rect
+                            x={point.x - 5} y={point.y - 5} width={10} height={10}
+                            rx={2}
+                            fill={isUserWaypoint ? (isDragging ? '#fbbf24' : '#22d3ee') : '#475569'}
+                            stroke={isUserWaypoint ? '#ffffff' : '#94a3b8'}
+                            strokeWidth={1.2}
+                            opacity={isUserWaypoint ? 0.95 : 0.55}
+                            style={{ cursor: 'move' }}
+                            onMouseDown={e => {
+                              e.stopPropagation()
+                              // Nếu là auto-waypoint thì commit thành user-waypoint trước khi drag
+                              if (!isUserWaypoint) {
+                                setWires(ws => ws.map(ww =>
+                                  ww.id === w.id ? { ...ww, waypoints: wp.map(p => ({ ...p })) } : ww
+                                ))
+                              }
+                              setDraggingWaypoint({ wireId: w.id, index: idx })
+                            }}
+                            onDoubleClick={e => {
+                              e.stopPropagation()
+                              if (isUserWaypoint) removeWaypoint(w.id, idx)
+                            }}
+                          >
+                            <title>{isUserWaypoint
+                              ? 'Kéo để di chuyển · Double-click để xoá'
+                              : 'Kéo để bắt đầu chỉnh tay'}
+                            </title>
+                          </rect>
+                        </g>
+                      )
+                    })}
                   </g>
                 )
               })}
