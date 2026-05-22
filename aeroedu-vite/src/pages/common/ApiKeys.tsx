@@ -71,8 +71,13 @@ function maskPrefix(prefix: string): string {
   return prefix.slice(0, 8) + '••••'
 }
 
+function getToken(): string | null {
+  // Token lưu trong sessionStorage với key __aeroedu_at__ (xem api.ts tokenStore)
+  try { return sessionStorage.getItem('__aeroedu_at__') } catch { return null }
+}
+
 async function apiFetch(path: string, opts: RequestInit = {}) {
-  const token = localStorage.getItem('auth_token')
+  const token = getToken()
   const res = await fetch(path, {
     ...opts,
     headers: {
