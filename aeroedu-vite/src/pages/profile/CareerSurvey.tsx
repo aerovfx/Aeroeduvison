@@ -126,6 +126,14 @@ const TEACHER_SKILLS: SkillItem[] = [
   { id: 'tpd-wellbeing',      label: 'Chăm sóc sức khỏe tâm lý',       description: 'Quản lý stress, phòng burnout',             category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-leadership',     label: 'Lãnh đạo nhóm & Tổ bộ môn',     description: 'Điều phối họp, mentoring GV mới',           category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-cpd-plan',       label: 'Lập kế hoạch phát triển cá nhân', description: 'IDP hàng năm, SMART goals',                category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  // V2 (2026-05-22): KỸ NĂNG MỀM — 6 skills (rose) — yếu tố then chốt
+  // ảnh hưởng tới hiệu quả truyền đạt + quan hệ với HS/phụ huynh/đồng nghiệp
+  { id: 'tss-active-listen',  label: 'Lắng nghe chủ động',              description: 'Không cắt lời, tóm tắt lại ý HS, hỏi đào sâu',   category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'tss-empathy',        label: 'Đồng cảm với học sinh',           description: 'Hiểu hoàn cảnh, cảm xúc, không phán xét',       category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'tss-public-speak',   label: 'Thuyết trình & truyền cảm hứng',  description: 'Giọng nói, body language, kể chuyện dạy học',   category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'tss-conflict',       label: 'Giải quyết xung đột',             description: 'Xung đột HS-HS, HS-GV, GV-PH một cách win-win', category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'tss-emotion-mgmt',   label: 'Quản lý cảm xúc cá nhân',         description: 'Giữ bình tĩnh khi áp lực, không trút lên HS',   category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'tss-creative',       label: 'Tư duy sáng tạo & linh hoạt',     description: 'Đổi cách dạy khi HS không hiểu, thử nghiệm mới', category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
 ]
 
 // Parent 8 tracking skills
@@ -138,6 +146,12 @@ const PARENT_SKILLS: SkillItem[] = [
   { id: 'parent-time-mgmt',       label: 'Quản lý thời gian con',           description: 'Cân bằng học - chơi - nghỉ',                category: 'Tâm lý & định hướng', catColor: 'blue', icon: Sparkles },
   { id: 'parent-career',          label: 'Hỗ trợ chọn nghề định hướng',     description: 'Khám phá sở thích, ngành nghề tương lai',   category: 'Tâm lý & định hướng', catColor: 'blue', icon: Sparkles },
   { id: 'parent-edtech',          label: 'Dùng công nghệ giáo dục',         description: 'LMS, app học, AI Tutor',                    category: 'Công nghệ', catColor: 'emerald', icon: Cpu },
+  // V2 (2026-05-22): KỸ NĂNG MỀM phụ huynh — 4 skills (rose) — quan trọng
+  // để xây dựng quan hệ tin tưởng, nuôi dạy con tự lập + có động lực
+  { id: 'parent-soft-listen',     label: 'Lắng nghe con không phán xét',    description: 'Để con kể về ngày học không bị quát/sửa ngay',  category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'parent-soft-encourage',  label: 'Khích lệ & động viên',            description: 'Khen nỗ lực thay vì kết quả, công nhận tiến bộ', category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'parent-soft-patience',   label: 'Kiên nhẫn khi con sai',           description: 'Coi lỗi là cơ hội học, không nổi nóng',         category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
+  { id: 'parent-soft-rolemodel',  label: 'Làm tấm gương cho con',           description: 'Đọc sách trước mặt con, kiểm soát điện thoại',  category: 'Kỹ năng mềm', catColor: 'rose', icon: Heart },
 ]
 
 const MOTIVATION_OPTIONS: { value: Motivation; label: string }[] = [
@@ -166,6 +180,7 @@ const CAT_COLOR_CLASSES: Record<string, { ring: string; bg: string; text: string
   emerald: { ring: 'ring-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-300', border: 'border-emerald-500/30', fill: 'bg-emerald-500' },
   amber:   { ring: 'ring-amber-500/40',   bg: 'bg-amber-500/10',   text: 'text-amber-300',   border: 'border-amber-500/30',   fill: 'bg-amber-500'   },
   pink:    { ring: 'ring-pink-500/40',    bg: 'bg-pink-500/10',    text: 'text-pink-300',    border: 'border-pink-500/30',    fill: 'bg-pink-500'    },
+  rose:    { ring: 'ring-rose-500/40',    bg: 'bg-rose-500/10',    text: 'text-rose-300',    border: 'border-rose-500/30',    fill: 'bg-rose-500'    },
 }
 
 const RATING_LABELS = ['Chưa biết', 'Mới bắt đầu', 'Đang học', 'Thành thạo', 'Chuyên gia']

@@ -9,7 +9,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Brain, Download, FileJson, TrendingUp, Award, Plus, PenLine,
-  BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu,
+  BarChart2, Sparkles, Users, BookOpen, GraduationCap, Cpu, Heart,
   Shield, Save, Clock, Lightbulb, CheckCircle2, X, MapPin, Navigation,
   ExternalLink, Target, Wrench, MessageCircle, PlayCircle,
   ChevronDown, ChevronUp, Loader2, Link2, RotateCcw,
@@ -108,6 +108,25 @@ const TEACHER_TREE: SkillCategory[] = [
       { id: 'tpd-cpd-plan',        label: 'Lập kế hoạch phát triển cá nhân', description: 'IDP hàng năm, đặt mục tiêu SMART, theo dõi tiến độ', tags: ['CPD'] },
     ],
   },
+  // V2 (2026-05-22): Kỹ năng MỀM — 6 skill rose. Đây là yếu tố cốt lõi
+  // ảnh hưởng tới hiệu quả truyền đạt + xây quan hệ với HS/PH/đồng nghiệp.
+  // KG kết nối các kỹ năng mềm này tới hoạt động cụ thể (workshop, dự giờ,
+  // group counseling) để GV có lộ trình rèn luyện rõ ràng.
+  {
+    id: 'tss',
+    label: 'Kỹ năng mềm',
+    description: 'Lắng nghe, đồng cảm, thuyết trình, quản lý cảm xúc — nền tảng cho mọi tương tác giáo dục',
+    icon: Heart,
+    color: 'rose',
+    skills: [
+      { id: 'tss-active-listen',  label: 'Lắng nghe chủ động',              description: 'Không cắt lời, tóm tắt lại ý HS, hỏi đào sâu để hiểu' },
+      { id: 'tss-empathy',        label: 'Đồng cảm với học sinh',           description: 'Hiểu hoàn cảnh, cảm xúc, không phán xét trước khi hiểu' },
+      { id: 'tss-public-speak',   label: 'Thuyết trình & truyền cảm hứng',  description: 'Giọng nói, body language, storytelling trong giảng dạy' },
+      { id: 'tss-conflict',       label: 'Giải quyết xung đột',             description: 'Xung đột HS-HS, HS-GV, GV-PH theo hướng win-win' },
+      { id: 'tss-emotion-mgmt',   label: 'Quản lý cảm xúc cá nhân',         description: 'Giữ bình tĩnh khi áp lực, không trút cảm xúc lên HS' },
+      { id: 'tss-creative',       label: 'Tư duy sáng tạo & linh hoạt',     description: 'Đổi cách dạy khi HS không hiểu, thử nghiệm phương pháp mới' },
+    ],
+  },
 ]
 
 const ADMIN_TREE: SkillCategory[] = [
@@ -187,6 +206,7 @@ const CATEGORY_COLORS: Record<string, {
   blue:   { header: 'from-blue-600   to-blue-700',   bar: 'bg-blue-500',    badge: 'bg-blue-100   text-blue-700',   border: 'border-blue-200',   icon: 'text-blue-600',   hex: '#3b82f6', abbr: 'SP' },
   emerald:{ header: 'from-emerald-600 to-emerald-700',bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700',border: 'border-emerald-200',icon: 'text-emerald-600',hex: '#10b981', abbr: 'KS' },
   amber:  { header: 'from-amber-500  to-amber-600',   bar: 'bg-amber-500',   badge: 'bg-amber-100  text-amber-700',  border: 'border-amber-200',  icon: 'text-amber-600',  hex: '#f59e0b', abbr: 'PN' },
+  rose:   { header: 'from-rose-500   to-rose-600',    bar: 'bg-rose-500',    badge: 'bg-rose-100   text-rose-700',   border: 'border-rose-200',   icon: 'text-rose-600',   hex: '#f43f5e', abbr: 'KM' },
 }
 
 // ── Career milestones ──────────────────────────────────────────────────────────

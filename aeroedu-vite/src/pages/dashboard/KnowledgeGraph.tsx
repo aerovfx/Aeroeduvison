@@ -39,6 +39,7 @@ import KgNodeResources from '@/components/kg/KgNodeResources'
 import KgHistoryTrail, { useKgHistory } from '@/components/kg/KgHistoryTrail'
 import BrainSuggestions from '@/components/kg/BrainSuggestions'
 import KgRolePanel from '@/components/kg/KgRolePanel'
+import SoftSkillsPanel from '@/components/kg/SoftSkillsPanel'
 import NodeExplorer from '@/components/kg/NodeExplorer'
 import KgAudioPlayer from '@/components/kg/KgAudioPlayer'
 import { sfxBubblePop, sfxChime } from '@/lib/kgAudio'
@@ -1106,6 +1107,12 @@ export default function KnowledgeGraph() {
                 + GV gửi recommendation đúng node đang xem. */}
             <div className="mt-3">
               <KgRolePanel onNodeClick={onNavigateNode} currentNodeId={selectedNode?.node.id || null} />
+            </div>
+
+            {/* 💝 KỸ NĂNG MỀM — 21st century skills song hành với kiến thức hàn lâm.
+                Self-assess + activities gợi ý → KG tự +mastery khi user tham gia */}
+            <div className="mt-3">
+              <SoftSkillsPanel role="STUDENT" userId={null} />
             </div>
 
             {/* 🌿 Đường mòn tri thức (always visible nếu có history) */}
