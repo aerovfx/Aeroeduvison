@@ -6223,6 +6223,7 @@ if (USE_NODEJS_QUESTIONS) {
 
   const { Pool: QPool } = require('pg');
   const { randomUUID } = require('crypto');
+  const qJwt = require('jsonwebtoken');
 
   let _qpool = null;
   function getQPool() {
@@ -6233,6 +6234,35 @@ if (USE_NODEJS_QUESTIONS) {
         idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
     }
     return _qpool;
+  }
+
+  // V2 (2026-05-22): Decode JWT → { id, role } để check ownership question.
+  // GV chỉ được xoá/sửa câu hỏi do CHÍNH MÌNH tạo (createdBy = userId).
+  // ADMIN bypass, có thể sửa/xoá mọi câu hỏi.
+  const Q_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'dev-secret-fallback-change-in-production!!';
+  function getQUser(req) {
+    try {
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Bearer ')) return null;
+      const d = qJwt.verify(auth.slice(7), Q_SECRET, { ignoreExpiration: true });
+      return { id: d.sub || d.userId || d.id || null, role: d.role || 'STUDENT' };
+    } catch { return null; }
+  }
+  /** Verify quyền sửa/xoá: ADMIN → mọi case, else phải = createdBy */
+  async function assertQuestionOwnership(req, res, questionId) {
+    const u = getQUser(req);
+    if (!u?.id) { res.status(401).json({ success: false, error: 'Đăng nhập trước' }); return null; }
+    if (u.role === 'ADMIN') return u;  // ADMIN bypass
+    const pool = getQPool();
+    const { rows } = await pool.query(`SELECT "createdBy" FROM "Question" WHERE id=$1 LIMIT 1`, [questionId]);
+    if (rows.length === 0) { res.status(404).json({ success: false, error: 'Không tìm thấy câu hỏi' }); return null; }
+    const owner = rows[0].createdBy;
+    if (owner && owner === u.id) return u;
+    res.status(403).json({
+      success: false,
+      error: 'Bạn chỉ được sửa/xoá câu hỏi do chính bạn tạo. Liên hệ admin nếu cần xử lý câu hỏi của người khác.',
+    });
+    return null;
   }
 
   // ── Lazy migration: thêm cột chapter + lesson cho taxonomy ────
@@ -6354,6 +6384,9 @@ if (USE_NODEJS_QUESTIONS) {
         ? [...new Set(keywords.map(k => String(k).trim()).filter(Boolean))].slice(0, 20)
         : [];
 
+      // V2 (2026-05-22): lưu createdBy = actual userId từ JWT để ownership check
+      // hoạt động ở PUT/DELETE. Fallback 'teacher' nếu chưa đăng nhập (test mode).
+      const createdBy = getQUser(req)?.id || 'teacher'
       const { rows } = await pool.query(
         `INSERT INTO "Question"
            (id, topic, chapter, lesson, subject, grade, "questionType", difficulty, content, options,
@@ -6366,10 +6399,10 @@ if (USE_NODEJS_QUESTIONS) {
          lesson ? String(lesson).trim().slice(0, 200) : null,
          subject, grade, questionType, difficulty, content,
          options, correctAnswer, explanation, learningObjectives, cleanKeywords, allTags,
-         status, 'teacher', now, now]
+         status, createdBy, now, now]
       );
 
-      console.log(`[questions:create] ✅ ${id}`);
+      console.log(`[questions:create] ✅ ${id} by ${createdBy.slice(0,8)}`);
       return res.status(201).json({ success: true, data: { question: rows[0] } });
     } catch (err) {
       console.error('[questions:create] ❌', err.message);
@@ -6388,6 +6421,8 @@ if (USE_NODEJS_QUESTIONS) {
 
       await ensureQuestionTaxonomy();
       const now = new Date();
+      // V2: lưu createdBy = actual userId từ JWT cho mỗi câu trong batch
+      const createdBy = getQUser(req)?.id || 'teacher'
       let inserted = 0;
       for (const q of questions) {
         if (!q.content) continue;
@@ -6410,7 +6445,7 @@ if (USE_NODEJS_QUESTIONS) {
            q.grade || 'Khối 12', q.questionType || 'MCQ', q.difficulty || 'MEDIUM',
            q.content, q.options || [], q.correctAnswer || '', q.explanation || '',
            q.learningObjectives || [], kwds, tags, q.status || 'Hoạt động',
-           'teacher', now, now]
+           createdBy, now, now]
         ).catch(() => {});
         inserted++;
       }
@@ -6429,6 +6464,9 @@ if (USE_NODEJS_QUESTIONS) {
       const pool = getQPool();
       await ensureQuestionTaxonomy();
       const { id } = req.params;
+      // V2: enforce ownership — TEACHER chỉ được sửa câu hỏi của chính mình
+      const user = await assertQuestionOwnership(req, res, id);
+      if (!user) return;  // response đã sent (401/403/404)
       const {
         content, questionType, subject, grade, difficulty, topic,
         chapter, lesson, keywords,
@@ -6614,7 +6652,11 @@ if (USE_NODEJS_QUESTIONS) {
   app.delete('/api/questions/:id', async (req, res) => {
     try {
       const pool = getQPool();
+      // V2: enforce ownership — TEACHER chỉ được xoá câu hỏi của chính mình
+      const user = await assertQuestionOwnership(req, res, req.params.id);
+      if (!user) return;
       await pool.query(`DELETE FROM "Question" WHERE id=$1`, [req.params.id]);
+      console.log(`[questions:delete] ${req.params.id} by ${user.role}/${user.id?.slice(0,8)}`);
       return res.json({ success: true });
     } catch (err) {
       console.error('[questions:delete] ❌', err.message);

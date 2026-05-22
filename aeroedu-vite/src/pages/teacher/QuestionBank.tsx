@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   Plus, Upload, Sparkles, Database,
   Search, CheckCircle2, ChevronDown, ChevronUp, Edit2,
   Save, X, Loader2, Trash2, PenLine, PlusCircle, Check,
-  Wand2, BookOpen, Hash, Tag,
+  Wand2, BookOpen, Hash, Tag, Lock,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { BulkGenerateModal } from "@/components/question-bank/BulkGenerateModal"
@@ -32,6 +32,8 @@ interface Question {
   lesson?: string | null
   keywords?: string[]
   tags?: string[]
+  // V2 (2026-05-22): ownership cho edit/delete check
+  createdBy?: string | null
 }
 
 interface TaxonomyResp {
@@ -134,6 +136,18 @@ const INITIAL_FORM = {
 }
 
 export default function QuestionBank() {
+  // V2 (2026-05-22): GV chỉ được xoá/sửa câu hỏi do CHÍNH MÌNH tạo.
+  // Đọc user từ localStorage để compute isOwner cho mỗi QuestionCard.
+  // ADMIN bypass — có quyền sửa/xoá tất cả.
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user')
+      if (!raw) return null
+      const u = JSON.parse(raw)
+      return { id: u.id || null, role: (u.role || 'TEACHER').toUpperCase() }
+    } catch { return null }
+  }, [])
+
   const [generateOpen, setGenerateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [totalQuestions, setTotalQuestions] = useState(0)
@@ -1143,17 +1157,25 @@ export default function QuestionBank() {
                 )}
               </div>
             ) : (
-              filteredQuestions.map((question, index) => (
-                <QuestionCard
-                  key={question.id}
-                  question={question}
-                  index={index}
-                  isExpanded={expandedRows.has(question.id)}
-                  onToggle={() => toggleRow(question.id)}
-                  onSave={(updates) => handleSaveEdit(question.id, updates)}
-                  onDelete={() => handleDelete(question.id)}
-                />
-              ))
+              filteredQuestions.map((question, index) => {
+                // V2: GV chỉ được sửa/xoá câu hỏi do CHÍNH MÌNH tạo. ADMIN bypass.
+                const canEdit = !!currentUser && (
+                  currentUser.role === 'ADMIN' ||
+                  (question.createdBy != null && question.createdBy === currentUser.id)
+                )
+                return (
+                  <QuestionCard
+                    key={question.id}
+                    question={question}
+                    index={index}
+                    isExpanded={expandedRows.has(question.id)}
+                    canEdit={canEdit}
+                    onToggle={() => toggleRow(question.id)}
+                    onSave={(updates) => handleSaveEdit(question.id, updates)}
+                    onDelete={() => handleDelete(question.id)}
+                  />
+                )
+              })
             )}
           </div>
         </div>
@@ -1197,6 +1219,7 @@ function QuestionCard({
   question,
   index,
   isExpanded,
+  canEdit,
   onToggle,
   onSave,
   onDelete,
@@ -1204,6 +1227,8 @@ function QuestionCard({
   question: Question
   index: number
   isExpanded: boolean
+  /** V2: GV chỉ được sửa/xoá câu hỏi do CHÍNH MÌNH tạo. */
+  canEdit: boolean
   onToggle: () => void
   onSave: (updates: Partial<Question>) => void
   onDelete: () => void
@@ -1309,20 +1334,32 @@ function QuestionCard({
             )}
 
             <div className="flex items-center gap-2 mt-3">
-              <button
-                onClick={() => { setIsEditing(true); onToggle() }}
-                className="px-3 py-1.5 border border-border text-foreground/80 rounded-lg text-xs hover:bg-secondary flex items-center gap-1"
-              >
-                <Edit2 className="w-3 h-3" />
-                Sửa nhanh
-              </button>
-              <button
-                onClick={onDelete}
-                className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded-lg text-xs flex items-center gap-1"
-              >
-                <Trash2 className="w-3 h-3" />
-                Xóa
-              </button>
+              {canEdit ? (
+                <>
+                  <button
+                    onClick={() => { setIsEditing(true); onToggle() }}
+                    className="px-3 py-1.5 border border-border text-foreground/80 rounded-lg text-xs hover:bg-secondary flex items-center gap-1"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Sửa nhanh
+                  </button>
+                  <button
+                    onClick={onDelete}
+                    className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded-lg text-xs flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Xóa
+                  </button>
+                </>
+              ) : (
+                <span
+                  title="Bạn không phải tác giả câu hỏi này — chỉ có thể xem và dùng trong đề thi."
+                  className="px-2.5 py-1 rounded text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1"
+                >
+                  <Lock className="w-3 h-3" />
+                  Của GV khác · Chỉ xem
+                </span>
+              )}
             </div>
           </div>
         </div>
