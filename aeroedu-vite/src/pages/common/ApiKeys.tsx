@@ -73,15 +73,14 @@ function maskPrefix(prefix: string): string {
 }
 
 // Dùng api instance từ @/services/api — tự inject Bearer token đúng cách
+// api instance đã có baseURL='/api' — path phải bỏ prefix /api
 async function apiFetch(path: string, opts: { method?: string; body?: unknown } = {}) {
+  // /api/user/api-keys → /user/api-keys
+  const p = path.replace(/^\/api\//, '/')
   const method = (opts.method ?? 'GET').toLowerCase() as 'get' | 'post' | 'delete'
-  if (method === 'get') {
-    return api.get(path).then(r => r.data)
-  }
-  if (method === 'delete') {
-    return api.delete(path).then(r => r.data)
-  }
-  return api.post(path, opts.body).then(r => r.data)
+  if (method === 'get')    return api.get(p).then(r => r.data)
+  if (method === 'delete') return api.delete(p).then(r => r.data)
+  return api.post(p, opts.body).then(r => r.data)
 }
 
 /* ─────────────────────────── Copy button ─────────────────────────── */
