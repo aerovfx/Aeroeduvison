@@ -17,7 +17,9 @@
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `957561f` (revision pixiai-00385-sah, 2026-05-22 — Free pedagogy course + plan Đậu Lém + AI prompts LaTeX + Question Bank ownership + Career Survey skip + Soft skills KG + Fix curriculum blocks)
 - Last deployed commit: `6f00a99` (revision pixiai-00386-rix, 2026-05-22 — MCP v0.2: 10 tools SDK v1.x, KG tools + audit log)
-- Commits since last deploy: `1/5`
+- Commits since last deploy: `4/5`
+- Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
+- Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools
 - Prev: `6f00a99` — MCP v0.2: SDK v1.x McpServer + 5 KG tools + audit log + evaluations
 - Prev: `94f28f3` — MVP @aeroedu/mcp-hub MCP server (5 tools `aeroedu_course_*`)
