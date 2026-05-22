@@ -4784,6 +4784,83 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 // Phải đăng ký TRƯỚC catch-all aero-backend proxy bên dưới.
 app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
 
+// ── API Keys (MCP) — PHẢI trước catch-all /api proxy ────────
+// Xử lý /api/user/api-keys và /api/auth/validate-key tại đây (Node.js).
+// Không được proxy lên Rust backend vì backend không có các routes này.
+
+app.post('/api/user/api-keys', async (req, res) => {
+  try {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+    const { name = 'MCP Key' } = req.body || {};
+    const { randomBytes, randomUUID } = require('crypto');
+    const rawKey = 'AERO-' + randomBytes(16).toString('hex');
+    const prefix = rawKey.slice(0, 12);
+    const hash = await bcrypt.hash(rawKey, 10);
+    const id = randomUUID();
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO user_api_keys(id, user_id, key_prefix, key_hash, name) VALUES($1,$2,$3,$4,$5)`,
+      [id, decoded.sub, prefix, hash, String(name).slice(0, 200)]
+    );
+    return res.json({ ok: true, id, key: rawKey, prefix, name });
+  } catch (e) { console.error('[api-keys:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo API key' }); }
+});
+
+app.get('/api/user/api-keys', async (req, res) => {
+  try {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT id, key_prefix, name, created_at, last_used_at, revoked FROM user_api_keys WHERE user_id=$1 ORDER BY created_at DESC`,
+      [decoded.sub]
+    );
+    return res.json({ ok: true, keys: rows });
+  } catch (e) { console.error('[api-keys:list]', e.message); return res.status(500).json({ error: 'Lỗi lấy danh sách key' }); }
+});
+
+app.delete('/api/user/api-keys/:id', async (req, res) => {
+  try {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+    let decoded;
+    try { decoded = jwt.verify(auth.slice(7), JWT_SECRET); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+    const pool = getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE user_api_keys SET revoked=true WHERE id=$1 AND user_id=$2`,
+      [req.params.id, decoded.sub]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Key không tồn tại' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[api-keys:revoke]', e.message); return res.status(500).json({ error: 'Lỗi xoá key' }); }
+});
+
+app.post('/api/auth/validate-key', async (req, res) => {
+  try {
+    const { key } = req.body || {};
+    if (!key || !String(key).startsWith('AERO-')) return res.status(401).json({ ok: false, error: 'Invalid key format' });
+    const prefix = String(key).slice(0, 12);
+    const pool = getPool();
+    const { rows } = await pool.query(
+      `SELECT k.*, u.role, u.name, u.email FROM user_api_keys k JOIN "User" u ON u.id=k.user_id WHERE k.key_prefix=$1 AND k.revoked=false`,
+      [prefix]
+    );
+    for (const row of rows) {
+      const valid = await bcrypt.compare(key, row.key_hash);
+      if (valid) {
+        pool.query('UPDATE user_api_keys SET last_used_at=NOW() WHERE id=$1', [row.id]).catch(() => {});
+        return res.json({ ok: true, userId: row.user_id, role: row.role, name: row.name, email: row.email });
+      }
+    }
+    return res.status(401).json({ ok: false, error: 'Key không hợp lệ hoặc đã bị thu hồi' });
+  } catch (e) { console.error('[api-keys:validate]', e.message); return res.status(500).json({ error: 'Lỗi xác thực key' }); }
+});
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 
