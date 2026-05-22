@@ -45,6 +45,8 @@ const LandingPage      = lazy(() => import('@/pages/marketing/Landing'))
 const FreeAiCoursePage = lazy(() => import('@/pages/marketing/FreeAiCourse'))
 const LLMVisualizerPage = lazy(() => import('@/pages/marketing/LLMVisualizer'))
 const PedagogyCoursePage = lazy(() => import('@/pages/marketing/PedagogyCourse'))
+const AeroKidsPage = lazy(() => import('@/pages/kids/AeroKids'))
+const AeroEpisodePlayerPage = lazy(() => import('@/pages/kids/AeroEpisodePlayer'))
 const TermsPage        = lazy(() => import('@/pages/legal/Terms'))
 const PrivacyPage      = lazy(() => import('@/pages/legal/Privacy'))
 const ContactSalesPage = lazy(() => import('@/pages/legal/ContactSales'))
@@ -263,6 +265,9 @@ export function AppRouter() {
         <Route path="/free-courses/llm-mastery" element={<FreeAiCoursePage />} />
         <Route path="/free-courses/llm-mastery/visualize" element={<LLMVisualizerPage />} />
         <Route path="/free-courses/pedagogy" element={<PedagogyCoursePage />} />
+        {/* AeroKids — series game mầm non + tiểu học (Đậu Lém-inspired) */}
+        <Route path="/kids/aero"             element={<AeroKidsPage />} />
+        <Route path="/kids/aero/:episodeId"  element={<AeroEpisodePlayerPage />} />
         <Route path="/pricing"          element={<PricingPage2 />} />
         <Route path="/payment/:orderId" element={<PaymentDetailPage />} />
         <Route path="/activate"         element={<ActivatePage />} />

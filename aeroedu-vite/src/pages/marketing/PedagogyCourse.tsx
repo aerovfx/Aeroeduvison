@@ -310,6 +310,14 @@ export default function PedagogyCourse() {
             }}>
               Xem khoá AI/LLM cho HS <ChevronRight size={14} />
             </Link>
+            <Link to="/kids/aero" style={{
+              padding: '10px 22px', borderRadius: 10,
+              background: 'linear-gradient(135deg, #fbbf24, #ec4899)',
+              color: '#fff', fontSize: 14, fontWeight: 700,
+              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              🐭 AeroKids — Game mẫu giáo <ChevronRight size={14} />
+            </Link>
           </div>
         </div>
       </main>
