@@ -86,6 +86,8 @@ export const translations: Record<Language, Record<string, string>> = {
     routeEnvironment:   'Môi trường',
     routeCalendar:      'Lịch trình',
     routeApiKeys:       'API Keys',
+    routeProfKG:        'Cây tri thức GV',
+    routeKnowledgeGraph:'Cây tri thức',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Tổng quan',
@@ -401,6 +403,8 @@ export const translations: Record<Language, Record<string, string>> = {
     routeEnvironment:   'Environment',
     routeCalendar:      'Calendar',
     routeApiKeys:       'API Keys',
+    routeProfKG:        'Cây tri thức GV',
+    routeKnowledgeGraph:'Cây tri thức',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Overview',
