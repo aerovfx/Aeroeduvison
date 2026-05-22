@@ -35865,17 +35865,42 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
   // ── GET /api/learning/course/:courseId/curriculum ─────────
   // Student-side full curriculum: Chapter → Lesson → LessonBlock hierarchy.
   // Lọc metadata.referenceSnapshot khỏi lab challenge blocks (ẩn đáp án GV).
+  //
+  // V2 (2026-05-22): Defensive table-create + diagnostic logging vì user
+  // báo "videos không xuất hiện" — trước đây silent fail nếu table thiếu.
   app.get('/api/learning/course/:courseId/curriculum', async (req, res) => {
+    const courseId = req.params.courseId;
     try {
       const pool = getLearnPool();
       if (!pool) return res.json({ chapters: [] });
+
+      // Defensive: ensure LessonBlock table tồn tại (lazy create để student
+      // có thể truy cập trước khi teacher endpoint chạy lần đầu).
+      try {
+        await pool.query(`CREATE TABLE IF NOT EXISTS "LessonBlock" (
+          id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+          "lessonId"  TEXT NOT NULL,
+          type        TEXT NOT NULL,
+          title       TEXT,
+          content     TEXT,
+          metadata    JSONB DEFAULT '{}'::jsonb,
+          position    INTEGER NOT NULL DEFAULT 0,
+          "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+          "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+        )`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS "LessonBlock_lessonId_idx"
+          ON "LessonBlock"("lessonId", position ASC)`);
+      } catch (e) {
+        console.warn('[learning:curriculum] ensure table:', e.message);
+      }
+
       // Chapters
       const { rows: chapters } = await pool.query(
         `SELECT id, title, description, duration, position, "isPublished", "isFree"
            FROM "Chapter"
           WHERE "courseId" = $1
           ORDER BY position ASC, "createdAt" ASC`,
-        [req.params.courseId]
+        [courseId]
       ).catch(() => ({ rows: [] }));
       if (chapters.length === 0) return res.json({ chapters: [] });
       const chapterIds = chapters.map(c => c.id);
@@ -35889,7 +35914,7 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
         [chapterIds]
       ).catch(() => ({ rows: [] }));
 
-      // Blocks (LessonBlock có thể chưa tồn tại trên DB cũ)
+      // Blocks
       let blocks = [];
       if (lessons.length > 0) {
         try {
@@ -35897,17 +35922,18 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
           const r = await pool.query(
             `SELECT id, "lessonId", type, title, content, metadata, position
                FROM "LessonBlock"
-              WHERE "lessonId" = ANY($1)
+              WHERE "lessonId" = ANY($1::text[])
               ORDER BY "lessonId", position ASC`,
             [lessonIds]
           );
           blocks = r.rows;
         } catch (e) {
-          if (!String(e.message).includes('does not exist')) {
-            console.warn('[learning:curriculum] blocks query:', e.message);
-          }
+          console.warn(`[learning:curriculum] blocks query for course=${courseId.slice(0,8)}:`, e.message);
         }
       }
+
+      // Diagnostic log để debug "videos không xuất hiện"
+      console.log(`[learning:curriculum] course=${courseId.slice(0,8)} chapters=${chapters.length} lessons=${lessons.length} blocks=${blocks.length}`);
 
       // Group blocks by lesson, filter referenceSnapshot (security)
       const blocksByLesson = {};

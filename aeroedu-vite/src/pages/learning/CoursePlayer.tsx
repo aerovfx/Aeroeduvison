@@ -486,11 +486,14 @@ export default function CoursePlayer() {
   // ── Curriculum (NEW — Chapter → Lesson → LessonBlock hierarchy) ──
   // Khi course có curriculum chapters → ưu tiên render mục lục thay vì
   // flat video list. Fallback CourseVideo cũ nếu chưa có curriculum.
-  const { data: curriculum = [] } = useQuery<StudentChapter[]>({
+  const { data: curriculum = [], refetch: refetchCurriculum } = useQuery<StudentChapter[]>({
     queryKey: ['course-curriculum', courseId],
     queryFn: () => learningService.getCurriculum(courseId!),
     enabled: !!courseId,
-    staleTime: 60_000,
+    // V2 (2026-05-22): giảm staleTime 60s→10s vì GV thường add block xong
+    // chuyển sang xem ngay với role HS — cần thấy update sớm.
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
   })
   const hasCurriculum = curriculum.length > 0 && curriculum.some(c => c.lessons.length > 0)
 
@@ -728,9 +731,16 @@ export default function CoursePlayer() {
                 <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-8 text-center">
                   <FileText className="w-12 h-12 text-amber-400/70 mx-auto mb-3" />
                   <h3 className="font-bold text-amber-200 mb-1">Bài học này chưa có nội dung</h3>
-                  <p className="text-xs text-amber-100/70">
+                  <p className="text-xs text-amber-100/70 mb-3">
                     Giáo viên chưa thêm video, tài liệu hay bài tập cho bài học này.
+                    Nếu GV vừa thêm xong, bấm "Tải lại" để cập nhật.
                   </p>
+                  <button
+                    onClick={() => refetchCurriculum()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-xs font-bold"
+                  >
+                    🔄 Tải lại mục lục
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-5">
