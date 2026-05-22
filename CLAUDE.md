@@ -15,8 +15,11 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `3beccfb` (revision pixiai-00382-xeh, 2026-05-22 — VideoUploader: video/audio upload trực tiếp lên GCS bucket trong LessonAssetEditor với 2 tabs URL/Upload + progress tracking)
+- Last deployed commit: `dcb047b` (revision pixiai-00383-jur, 2026-05-22 — LaTeX templates đáp án \\underline{} auto-detect + PDF split-view khi nhập đáp án + 3 careers mới + 4 UX fixes + camera quick-add)
 - Commits since last deploy: `0/5`
+- Prev: `13204eb` — Teacher camera quick-add 2 mode (lớp/nhà) + hướng dẫn
+- Prev: `0adcb3e` — 4 UX fixes (input contrast + multi-grade + phản tư + 3 careers hiện đại)
+- Prev: `3beccfb` → pixiai-00382-xeh (VideoUploader: video/audio upload GCS bucket với progress tracking)
 - Prev: `c65178c` → pixiai-00381-dap (ExamPicker integrate Ngân hàng câu hỏi/Đề thi + preview cards Lab/Aura/Game + bỏ step Video gộp vào Mục lục + Fix MIME error stale chunk)
 - Prev: `44bcd7a` — Refactor CourseEditor bỏ step Video (6→5 bước, xoá 549 dòng dead code)
 - Prev: `2a055bd` — Fix SPA MIME error "text/html is not a valid JavaScript MIME type" 3-layer defense
