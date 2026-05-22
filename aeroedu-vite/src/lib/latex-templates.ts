@@ -2489,6 +2489,663 @@ b) Điện trở của điện trở thứ hai.\\\\[40pt]
   },
 );
 
+// ═══════════════════════════════════════════════════════════════
+// V3 (2026-05-22): 6 mẫu hướng dẫn AI thêm theo yêu cầu user
+// "thêm nhiều mẫu hướng dẫn khác Hướng dẫn dùng AI tạo văn bản LaTeX"
+// ═══════════════════════════════════════════════════════════════
+
+LATEX_TEMPLATES.push(
+  {
+    id: "de-thi-hoc-ky-4-phan-da-gach-chan",
+    name: "🎯 Đề thi học kỳ 4 phần (đáp án gạch chân — AI sinh từ ý)",
+    description: "AI sinh đề thi học kỳ chuẩn BGD 2025 từ chỉ vài keyword chương + dạng bài. Đáp án ĐÚNG được auto-gạch chân để system tự nhận diện.",
+    category: "exam",
+    audience: "GV THCS/THPT",
+    tags: ["đề thi", "học kỳ", "4 phần", "đáp án gạch chân", "AI sinh tự động"],
+    aiPrompt: `Tôi cần soạn đề thi học kỳ chuẩn BGD 2025 — 4 phần — với đáp án ĐÚNG được gạch chân tự động bằng \\underline{} để hệ thống parser tự nhận diện đáp án.
+
+THÔNG TIN ĐỀ:
+- Môn: [VD: Vật lí]
+- Khối: [VD: 11]
+- Học kỳ: [I/II]
+- Thời gian: [VD: 45 phút / 90 phút]
+- Tỉ lệ điểm: 4-2-2-2 (đúng theo BGD)
+- Trường: [Tên trường]
+- Mã đề: 456 (hoặc bạn tự đặt)
+
+NỘI DUNG TÔI MUỐN ĐỀ KIỂM TRA (chỉ cần liệt kê chương + dạng bài chính):
+[VD:
+- Chương 1 Dòng điện không đổi: định luật Ohm cho toàn mạch, ghép nguồn nối tiếp/song song
+- Chương 2 Điện trường: tụ điện, năng lượng tụ
+- Chương 3 Dòng điện trong môi trường: bán dẫn, điện phân
+- Câu tự luận: Mạch hỗn hợp + Định lý Kirchhoff
+]
+
+CẤU TRÚC BẮT BUỘC:
+PHẦN I (4,0đ): 16 câu trắc nghiệm 4 lựa chọn (mỗi câu 0.25đ)
+  → Đáp án ĐÚNG wrap \\textbf{\\underline{X.}}~ (X = A/B/C/D)
+  → Phân bổ: 8 câu Nhận biết-Hiểu, 6 câu Vận dụng, 2 câu Vận dụng cao
+  → Đa dạng chương (5-6 câu/chương)
+
+PHẦN II (2,0đ): 4 câu trắc nghiệm Đúng/Sai 4 mệnh đề (mỗi mệnh đề 0.125đ)
+  → Phát biểu ĐÚNG wrap \\underline{...} cả dòng
+  → Phát biểu SAI để nguyên
+  → Mỗi câu nên có 2-3 mệnh đề Đúng và 1-2 mệnh đề Sai
+
+PHẦN III (2,0đ): 6 câu trả lời ngắn (số / biểu thức)
+  → KHÔNG gạch chân đáp án (GV sẽ nhập tay phiếu)
+  → Mỗi câu kết quả là 1 con số có đơn vị SI
+
+PHẦN IV (2,0đ): 4 câu tự luận
+  → Câu 1-2 (0.5đ mỗi câu): Giải bài toán có sẵn cách
+  → Câu 3 (1.0đ): Vận dụng nguyên lý
+  → KHÔNG cần đáp án (GV sẽ chấm rubric)
+
+YÊU CẦU TECHNICAL LATEX:
+- Header 2 cột chuẩn BGD: SỞ GD + Trường // Đề thi + Năm học + Môn + Mã đề
+- Bookmark: \\usepackage{geometry,enumitem,amsmath,amssymb,siunitx,tabularx,fancyhdr}
+- \\geometry{a4paper,total={170mm,257mm},left=20mm,right=20mm,top=18mm,bottom=20mm}
+- Font 12pt, parskip 4pt
+- Đánh số trang chân trang giữa
+- Cuối có "--- HẾT ---"
+- Hỗ trợ tiếng Việt: babel vietnamese, inputenc utf8
+
+XUẤT RA: 1 file LaTeX hoàn chỉnh từ \\documentclass đến \\end{document},
+KHÔNG kèm giải thích, KHÔNG markdown code fence.
+
+Sau khi nhận code, tôi sẽ paste vào /teacher/latex-documents → bấm
+"📄 Tạo đề PDF" → hệ thống tự detect đáp án PHẦN I + II từ \\underline{}
+và pre-fill phiếu đáp án (giảm 90% thao tác thủ công).`,
+    body: `% Template này CHỈ là khung — dùng AI prompt để sinh đề đầy đủ
+\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb,siunitx,enumitem,geometry,tabularx,fancyhdr}
+\\geometry{a4paper,total={170mm,257mm},left=20mm,right=20mm,top=18mm,bottom=20mm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\pagestyle{fancy}\\fancyhf{}\\fancyfoot[C]{\\thepage}\\renewcommand{\\headrulewidth}{0pt}
+
+\\begin{document}
+\\begin{center}
+\\textbf{[TRƯỜNG / SỞ GD]}\\\\
+\\textbf{KIỂM TRA HỌC KỲ [I/II] -- NĂM HỌC 2025--2026}\\\\
+\\textbf{Môn: [...]} \\quad Khối: [...] \\quad Thời gian: [...] phút
+\\end{center}
+
+\\vspace{4pt}\\hrule\\vspace{8pt}
+
+\\section*{Phần I. Trắc nghiệm (4,0 điểm)}
+
+\\begin{enumerate}[leftmargin=1.15cm,label=\\textbf{Câu \\arabic*.}]
+  \\item [Câu hỏi 1 ...]\\\\
+    \\textbf{A.}~Đáp án A \\quad
+    \\textbf{\\underline{B.}}~Đáp án B \\quad
+    \\textbf{C.}~Đáp án C \\quad
+    \\textbf{D.}~Đáp án D
+  % Thêm 15 câu nữa qua AI prompt
+\\end{enumerate}
+
+% ── PHẦN II/III/IV xem trong AI prompt ──
+
+\\vspace{8pt}\\hrule
+\\begin{center}\\textit{--- HẾT ---}\\end{center}
+\\end{document}
+`,
+  },
+  {
+    id: "so-ke-hoach-hoat-dong",
+    name: "📅 Sổ kế hoạch hoạt động (sự kiện / ngoại khoá)",
+    description: "Sổ tay lập kế hoạch chi tiết cho 1 hoạt động: mục tiêu, ngân sách, timeline, phân công, rủi ro. Dùng cho ngày hội STEM, dã ngoại, văn nghệ...",
+    category: "admin",
+    audience: "GV chủ nhiệm / Đoàn / TPT",
+    tags: ["kế hoạch", "hoạt động", "sự kiện", "ngoại khoá", "STEM"],
+    aiPrompt: `Hãy giúp tôi viết Sổ kế hoạch cho một hoạt động bằng LaTeX, theo chuẩn văn bản hành chính NĐ 30/2020.
+
+THÔNG TIN HOẠT ĐỘNG:
+- Tên hoạt động: [VD: "Ngày hội STEM 2026 — Khám phá AI và Robot"]
+- Đơn vị tổ chức: [Trường THPT XYZ + Tổ Lý-Hoá-Tin]
+- Ngày tổ chức: [DD/MM/YYYY]
+- Địa điểm: [Sân trường / Hội trường / Online]
+- Đối tượng tham gia: [Số lượng + lớp/khối]
+- Mục tiêu chính: [2-3 mục tiêu rõ ràng, đo được]
+
+CẤU TRÚC SỔ KẾ HOẠCH (BẮT BUỘC 8 mục):
+
+1. MỤC ĐÍCH - YÊU CẦU
+   - Mục đích: 2-3 ý chính
+   - Yêu cầu cụ thể (đo được): VD "100% HS khối 10-11 tham gia"
+
+2. THỜI GIAN, ĐỊA ĐIỂM, ĐỐI TƯỢNG
+   - Bảng cụ thể
+
+3. NỘI DUNG CHƯƠNG TRÌNH (BẢNG TIMELINE chi tiết theo giờ)
+   - VD: 7:30-8:00 Đón tiếp + check-in
+         8:00-8:30 Khai mạc + văn nghệ chào mừng
+         8:30-10:00 Vòng thi sơ loại 5 đội (4 phòng song song)
+         10:00-10:15 Giải lao
+         ... đến hết hoạt động
+
+4. PHÂN CÔNG NHIỆM VỤ (BẢNG: TT | Họ tên | Chức vụ | Nhiệm vụ | Deadline)
+   - Tối thiểu 8-12 người trong ban tổ chức
+
+5. DỰ TRÙ KINH PHÍ (BẢNG: TT | Nội dung | Số lượng | Đơn giá | Thành tiền)
+   - Bao gồm: vật tư, giải thưởng, ăn nhẹ, marketing, dự phòng 10%
+   - Tổng cộng + ghi rõ nguồn (kinh phí trường / xã hội hoá / phụ huynh tài trợ)
+
+6. CƠ SỞ VẬT CHẤT - TRANG THIẾT BỊ (Liệt kê: âm thanh, máy chiếu, bàn ghế, sân...)
+
+7. AN TOÀN - RỦI RO (BẢNG: Rủi ro | Mức độ | Biện pháp phòng ngừa | Xử lý khi xảy ra)
+   - VD: Mưa - Trung bình - Có lều bạt dự phòng - Chuyển hoạt động vào hội trường
+   - VD: HS bị thương - Thấp - Có y tế trực - Sơ cứu + báo PH ngay
+
+8. ĐÁNH GIÁ - TỔNG KẾT
+   - Hình thức: khảo sát Google Form sau sự kiện
+   - Tiêu chí đánh giá: số HS tham gia, mức độ hài lòng (≥4/5), số sản phẩm ra mắt
+
+YÊU CẦU LATEX:
+- Lề chuẩn NĐ 30: top=2cm, bottom=2cm, left=3cm, right=2cm
+- Linespread 1.5, font 13pt
+- Quốc hiệu Tiêu ngữ trên cùng + Số văn bản (.../KH-[viết tắt])
+- Có chỗ ký Hiệu trưởng + Tổ trưởng + Người lập kế hoạch
+- \\usepackage{geometry,array,tabularx,booktabs,longtable,xcolor}
+- Bảng tabularx full-width cho timeline + phân công + ngân sách
+
+XUẤT RA: code LaTeX hoàn chỉnh, KHÔNG kèm giải thích.`,
+    body: `\\documentclass[13pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry,array,tabularx,booktabs,longtable}
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
+\\setlength{\\parindent}{1.27cm}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\noindent\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textbf{TRƯỜNG THPT [...]}\\\\
+\\textbf{TỔ [...]}\\\\\\rule{4cm}{0.4pt}\\\\
+\\textit{Số: ...../KH-[...]}
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textbf{CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM}\\\\
+\\textbf{Độc lập -- Tự do -- Hạnh phúc}\\\\\\rule{4cm}{0.4pt}\\\\
+\\textit{[Địa danh], ngày .... tháng .... năm 20....}
+\\end{minipage}
+
+\\vspace{18pt}
+\\begin{center}\\Large\\textbf{KẾ HOẠCH}\\\\\\large\\textit{Tổ chức [TÊN HOẠT ĐỘNG]}\\end{center}
+
+\\vspace{6pt}
+
+\\section*{I. MỤC ĐÍCH -- YÊU CẦU}
+\\textbf{1. Mục đích:} [Ý 1...] [Ý 2...] [Ý 3...]\\\\
+\\textbf{2. Yêu cầu:} [Yêu cầu đo được 1...] [Yêu cầu 2...]
+
+\\section*{II. THỜI GIAN, ĐỊA ĐIỂM, ĐỐI TƯỢNG}
+\\begin{itemize}
+  \\item \\textbf{Thời gian:} ngày ....../....../20.....
+  \\item \\textbf{Địa điểm:} [...]
+  \\item \\textbf{Đối tượng:} [Số lượng + lớp]
+\\end{itemize}
+
+\\section*{III. NỘI DUNG CHƯƠNG TRÌNH}
+\\begin{tabularx}{\\linewidth}{|c|c|X|c|}
+\\hline
+\\textbf{TT} & \\textbf{Thời gian} & \\textbf{Nội dung} & \\textbf{Phụ trách}\\\\\\hline
+1 & 7:30 -- 8:00 & Đón tiếp + check-in & [Tên]\\\\\\hline
+2 & 8:00 -- 8:30 & Khai mạc & [Tên]\\\\\\hline
+% AI sẽ điền tiếp...
+\\end{tabularx}
+
+\\section*{IV. PHÂN CÔNG NHIỆM VỤ}
+% AI sẽ tạo bảng
+
+\\section*{V. DỰ TRÙ KINH PHÍ}
+% AI sẽ tạo bảng
+
+\\section*{VI. CƠ SỞ VẬT CHẤT}
+% Liệt kê
+
+\\section*{VII. AN TOÀN -- RỦI RO}
+% Bảng phân tích
+
+\\section*{VIII. ĐÁNH GIÁ -- TỔNG KẾT}
+% Tiêu chí đo
+
+\\vspace{20pt}
+\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textbf{HIỆU TRƯỞNG}\\\\(Phê duyệt)\\\\[60pt][Họ tên]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textbf{NGƯỜI LẬP KẾ HOẠCH}\\\\(Ký, ghi rõ họ tên)\\\\[60pt][Họ tên]
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+  {
+    id: "phieu-danh-gia-tt22",
+    name: "✅ Phiếu đánh giá HS theo TT22/2021",
+    description: "Phiếu đánh giá HS theo Thông tư 22/2021: phẩm chất + năng lực + nhận xét chi tiết. Dùng cuối kỳ/cuối năm.",
+    category: "admin",
+    audience: "GV chủ nhiệm",
+    tags: ["đánh giá", "TT22", "học bạ", "chủ nhiệm"],
+    aiPrompt: `Tạo Phiếu đánh giá học sinh theo Thông tư 22/2021/TT-BGDĐT bằng LaTeX.
+
+THÔNG TIN HS:
+- Họ tên: [...]
+- Lớp: [...]
+- Học kỳ: [I/II], năm học [20.... -- 20....]
+- GV chủ nhiệm: [...]
+
+CẤU TRÚC PHIẾU (theo TT22/2021):
+
+PHẦN A. ĐÁNH GIÁ PHẨM CHẤT CHỦ YẾU (5 phẩm chất, mỗi cái 3 mức: Tốt/Đạt/Cần cố gắng)
+1. Yêu nước
+2. Nhân ái
+3. Chăm chỉ
+4. Trung thực
+5. Trách nhiệm
+
+PHẦN B. ĐÁNH GIÁ NĂNG LỰC (3 NL chung + 7 NL chuyên môn)
+NL Chung:
+1. Tự chủ và tự học
+2. Giao tiếp và hợp tác
+3. Giải quyết vấn đề và sáng tạo
+
+NL Chuyên môn (chọn các môn HS học):
+4. NL Ngôn ngữ
+5. NL Tính toán
+6. NL Khoa học
+7. NL Công nghệ
+8. NL Tin học
+9. NL Thẩm mỹ
+10. NL Thể chất
+
+PHẦN C. ĐIỂM TỔNG KẾT CÁC MÔN HỌC (BẢNG: Môn | Điểm TBm HKI | Điểm TBm HKII | Điểm TBm Cả năm | Xếp loại)
+- Tự sinh 12 môn THPT chuẩn: Toán, Lý, Hoá, Sinh, Văn, Sử, Địa, GDCD, Tin, CN, Anh, GDQP
+
+PHẦN D. KẾT QUẢ RÈN LUYỆN
+- Hạnh kiểm: Tốt/Khá/TB/Yếu
+- Học lực: Giỏi/Khá/TB/Yếu/Kém
+- Danh hiệu: HS Giỏi/HS Tiên tiến/...
+
+PHẦN E. NHẬN XÉT CỦA GV CHỦ NHIỆM (3-5 dòng nhận xét tích cực + 1-2 ý cần cải thiện)
+
+PHẦN F. CHỮ KÝ
+- HS, GVCN, Hiệu trưởng, Phụ huynh
+
+YÊU CẦU LATEX:
+- Lề chuẩn NĐ 30
+- Có ô tick (\\Box / \\CheckedBox) cho 3 mức Tốt/Đạt/Cần cố gắng
+- Bảng điểm tabularx full-width
+- Phù hợp in A4 1 trang (compact font 11-12pt)
+- Header có logo trường (placeholder) + tên trường + năm học
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[11pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry,array,tabularx,booktabs,wasysym}
+\\geometry{top=1.5cm,bottom=1.5cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{3pt}
+
+\\begin{document}
+
+\\begin{center}
+\\textbf{SỞ GD\\&ĐT [...]} \\quad \\textbf{TRƯỜNG THPT [...]}\\\\[4pt]
+\\Large\\textbf{PHIẾU ĐÁNH GIÁ HỌC SINH}\\\\
+\\normalsize\\textit{(Theo Thông tư 22/2021/TT-BGDĐT)}\\\\
+\\textit{Học kỳ [I/II] -- Năm học 20.... -- 20....}
+\\end{center}
+
+\\vspace{6pt}
+\\noindent\\textbf{Họ và tên:} [...] \\hfill \\textbf{Lớp:} [...] \\hfill \\textbf{GVCN:} [...]
+
+\\section*{A. ĐÁNH GIÁ PHẨM CHẤT CHỦ YẾU}
+\\begin{tabularx}{\\linewidth}{|X|c|c|c|}\\hline
+\\textbf{Phẩm chất} & \\textbf{Tốt} & \\textbf{Đạt} & \\textbf{Cần cố gắng}\\\\\\hline
+1. Yêu nước     & $\\Box$ & $\\Box$ & $\\Box$\\\\\\hline
+2. Nhân ái      & $\\Box$ & $\\Box$ & $\\Box$\\\\\\hline
+3. Chăm chỉ     & $\\Box$ & $\\Box$ & $\\Box$\\\\\\hline
+4. Trung thực   & $\\Box$ & $\\Box$ & $\\Box$\\\\\\hline
+5. Trách nhiệm  & $\\Box$ & $\\Box$ & $\\Box$\\\\\\hline
+\\end{tabularx}
+
+% AI sẽ generate phần B/C/D/E/F theo yêu cầu
+
+\\end{document}
+`,
+  },
+  {
+    id: "noi-quy-lop-hoc",
+    name: "📋 Nội quy lớp học (GVCN)",
+    description: "Nội quy lớp học chuẩn — 10 quy định + cam kết HS + hình thức xử lý vi phạm",
+    category: "admin",
+    audience: "GV chủ nhiệm",
+    tags: ["nội quy", "chủ nhiệm", "lớp học"],
+    aiPrompt: `Soạn Nội quy lớp học bằng LaTeX, ngắn gọn 1-2 trang, phù hợp dán bảng tin lớp.
+
+THÔNG TIN:
+- Lớp: [VD: 11A1]
+- Trường: [Tên trường]
+- GVCN: [Tên]
+- Năm học: 20.... -- 20....
+
+YÊU CẦU NỘI QUY (10 điều, ngôn ngữ HS dễ hiểu):
+
+1. ĐI HỌC
+   - Đến đúng giờ (trước 7h sáng)
+   - Nghỉ học phải có đơn + chữ ký PH
+   - Mặc đồng phục theo quy định
+
+2. HỌC TẬP
+   - Mang đủ sách vở + dụng cụ
+   - Làm bài tập + chuẩn bị bài trước khi đến lớp
+   - Phát biểu xây dựng bài, không nói chuyện riêng
+
+3. KỶ LUẬT TRONG LỚP
+   - Tôn trọng GV + bạn bè
+   - Không sử dụng điện thoại trong giờ học (trừ khi GV yêu cầu)
+   - Không ăn quà vặt trong giờ
+
+4. AN TOÀN
+   - Không chạy đùa hành lang/cầu thang
+   - Không mang vật dụng nguy hiểm
+   - Báo ngay GV khi bị thương / có sự cố
+
+5. VỆ SINH
+   - Trực nhật đúng lịch
+   - Không xả rác bừa
+   - Bảo quản tài sản chung lớp
+
+6. ĐOÀN KẾT
+   - Giúp đỡ bạn học yếu hơn
+   - Không bắt nạt / kỳ thị
+   - Hoà nhập với bạn mới
+
+7. HOẠT ĐỘNG NGOẠI KHOÁ
+   - Tham gia đầy đủ
+   - Có thái độ tích cực
+   - Đại diện danh dự lớp khi thi đấu
+
+8. SỬ DỤNG INTERNET / AI
+   - Dùng có trách nhiệm
+   - Không gian lận khi làm bài
+   - Không chia sẻ tài liệu mật
+
+9. QUAN HỆ VỚI PH + GV
+   - Trung thực khi báo cáo kết quả
+   - Tích cực phản hồi feedback
+   - Cùng PH tham dự họp lớp
+
+10. CAM KẾT CÁ NHÂN
+    - Mỗi HS cam kết tuân thủ và ký tên vào cuối nội quy
+
+HÌNH THỨC XỬ LÝ VI PHẠM (3 mức):
+- Lần 1: Nhắc nhở
+- Lần 2: Cảnh cáo + báo PH
+- Lần 3: Hạ hạnh kiểm + báo BGH
+
+YÊU CẦU LATEX:
+- 1-2 trang A4, font 12pt readable
+- Mỗi điều có icon emoji đầu dòng để vui mắt
+- Hộp tô màu (\\fbox / tcolorbox) cho phần cam kết
+- Cuối có chỗ ký GVCN + Lớp trưởng + 30 dòng cho HS ký
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry,enumitem,tcolorbox}
+\\geometry{top=1.5cm,bottom=1.5cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\begin{center}
+\\textbf{TRƯỜNG THPT [...]}\\\\
+\\Large\\textbf{NỘI QUY LỚP HỌC}\\\\
+\\normalsize\\textit{Lớp [11A1] -- Năm học 20....--20....}\\\\
+\\textit{GVCN: [...]}
+\\end{center}
+
+\\vspace{8pt}\\hrule\\vspace{8pt}
+
+\\begin{enumerate}[label=\\textbf{Điều \\arabic*.}]
+  \\item 🕐 \\textbf{Đi học đúng giờ} -- Có mặt trước 7h00, mặc đồng phục.
+  \\item 📚 \\textbf{Học tập nghiêm túc} -- Đủ sách vở, làm bài tập, phát biểu xây dựng.
+  % AI sẽ generate 8 điều còn lại theo prompt
+\\end{enumerate}
+
+\\begin{tcolorbox}[colback=red!5,colframe=red!50!black,title=Hình thức xử lý vi phạm]
+\\begin{itemize}
+  \\item Lần 1: Nhắc nhở
+  \\item Lần 2: Cảnh cáo + báo PH
+  \\item Lần 3: Hạ hạnh kiểm + báo BGH
+\\end{itemize}
+\\end{tcolorbox}
+
+\\vspace{14pt}
+\\begin{tcolorbox}[colback=blue!5,colframe=blue!50!black,title=Cam kết của học sinh]
+Tôi cam kết tuân thủ đầy đủ 10 điều nội quy trên và chịu trách nhiệm trước GVCN, BGH nhà trường về mọi hành vi của mình.
+
+\\vspace{8pt}
+\\textbf{Người cam kết}\\\\(Họ tên + chữ ký)\\\\\\rule{6cm}{0.4pt}
+\\end{tcolorbox}
+
+\\end{document}
+`,
+  },
+  {
+    id: "bao-cao-thuc-tap-su-pham",
+    name: "📖 Báo cáo thực tập sư phạm (SV)",
+    description: "Báo cáo thực tập 8 tuần dành cho SV sư phạm — đầy đủ phần A-H + chữ ký GV hướng dẫn",
+    category: "research",
+    audience: "Sinh viên sư phạm",
+    tags: ["thực tập", "sư phạm", "sinh viên", "báo cáo"],
+    aiPrompt: `Viết Báo cáo thực tập sư phạm cuối khoá bằng LaTeX cho SV ngành sư phạm.
+
+THÔNG TIN SV:
+- Họ tên: [...]
+- MSSV: [...]
+- Khoa: [...] (VD: Sư phạm Vật lí)
+- Trường ĐH: [...]
+- Năm 4 - Khoá [...]
+
+ĐỊA ĐIỂM THỰC TẬP:
+- Trường: [...]
+- Lớp thực tập: [...]
+- GV hướng dẫn (giáo viên ở trường THPT): [...]
+- Thời gian thực tập: từ DD/MM đến DD/MM (8 tuần)
+
+NỘI DUNG BÁO CÁO (8 phần A-H):
+
+A. LỜI CẢM ƠN (1 đoạn ngắn)
+
+B. ĐẶC ĐIỂM TÌNH HÌNH NHÀ TRƯỜNG
+- Quy mô, đội ngũ, cơ sở vật chất
+- Truyền thống, thành tích nổi bật
+
+C. KẾ HOẠCH THỰC TẬP CHI TIẾT
+- Tuần 1: Làm quen + dự giờ
+- Tuần 2-4: Dự giờ + chuẩn bị bài
+- Tuần 5-7: Dạy thử + dạy chính thức
+- Tuần 8: Tổng kết
+
+D. NỘI DUNG GIẢNG DẠY
+Bảng các tiết đã dạy:
+| Tuần | Lớp | Bài | Loại tiết | GV dự giờ | Điểm |
+
+E. CÔNG TÁC CHỦ NHIỆM
+- Tổ chức sinh hoạt lớp
+- Tham gia hoạt động ngoại khoá
+- Liên hệ với phụ huynh
+
+F. NHỮNG BÀI HỌC KINH NGHIỆM (chia 3 mục):
+1. Về chuyên môn (5 ý)
+2. Về phương pháp sư phạm (5 ý)
+3. Về xử lý tình huống (3 case study cụ thể)
+
+G. KIẾN NGHỊ
+- Với nhà trường thực tập
+- Với khoa/trường ĐH
+- Với bản thân
+
+H. ĐÁNH GIÁ TỔNG KẾT
+- Điểm rèn luyện: [tự đánh giá]
+- Điểm chuyên môn: [...]
+- Xếp loại: Giỏi/Khá/TB
+
+YÊU CẦU LATEX:
+- 20-30 trang, font 13pt, linespread 1.5
+- Có \\tableofcontents + đánh số trang
+- Bảng dạy + bảng dự giờ chi tiết
+- Phụ lục: photo ảnh chứng nhận + giáo án mẫu
+- Chữ ký: SV + GV hướng dẫn THPT + Hiệu trưởng + Cán bộ chỉ đạo ĐH
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[13pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry,tabularx,booktabs,enumitem}
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
+\\setlength{\\parindent}{1.27cm}
+
+\\begin{document}
+
+\\begin{center}
+\\textbf{TRƯỜNG ĐẠI HỌC [...]}\\\\
+\\textbf{KHOA [SƯ PHẠM ...]}\\\\[20pt]
+{\\Huge\\textbf{BÁO CÁO THỰC TẬP SƯ PHẠM}}\\\\[8pt]
+\\Large\\textbf{Năm học 20.... -- 20....}\\\\[30pt]
+
+\\begin{tabular}{rl}
+SV thực hiện: & [...]\\\\
+MSSV: & [...]\\\\
+Khoa: & [...]\\\\
+Trường thực tập: & [...]\\\\
+GVHD ở trường: & [...]\\\\
+GVHD ở khoa: & [...]
+\\end{tabular}
+\\end{center}
+
+\\vfill\\begin{center}[Địa danh], tháng .... năm 20....\\end{center}
+\\newpage
+\\tableofcontents
+\\newpage
+
+% AI sẽ sinh đầy đủ 8 phần A-H theo prompt
+
+\\end{document}
+`,
+  },
+  {
+    id: "ke-hoach-chu-nhiem-thang",
+    name: "📅 Kế hoạch chủ nhiệm tháng (GVCN)",
+    description: "Kế hoạch tháng cho GVCN: hoạt động tuần × HS cá biệt × tổ chức ngoại khoá × kết nối PH",
+    category: "admin",
+    audience: "GV chủ nhiệm",
+    tags: ["chủ nhiệm", "kế hoạch tháng", "GVCN"],
+    aiPrompt: `Soạn Kế hoạch chủ nhiệm tháng [Tháng X/20YY] bằng LaTeX cho GVCN.
+
+THÔNG TIN:
+- GVCN: [...]
+- Lớp: [...]
+- Tháng: [VD: 10/2025]
+- Năm học: 2025-2026
+
+NỘI DUNG KH (6 mục):
+
+I. ĐÁNH GIÁ THÁNG TRƯỚC
+- Ưu điểm (3 ý)
+- Hạn chế (2 ý)
+- Bài học rút ra (2 ý)
+
+II. MỤC TIÊU THÁNG NÀY (SMART)
+- Học tập: [đo được, VD "ĐTBm lớp ≥ 7.2"]
+- Hạnh kiểm: [VD "≤ 2 HS bị nhắc nhở/tháng"]
+- Hoạt động: [VD "100% HS tham gia ngày hội STEM 15/10"]
+
+III. KẾ HOẠCH HOẠT ĐỘNG THEO TUẦN (Bảng: Tuần | Hoạt động chính | Người phụ trách | Kết quả mong đợi)
+- 4-5 tuần trong tháng
+
+IV. THEO DÕI HỌC SINH CẦN QUAN TÂM (Bảng cá biệt)
+- HS yếu học tập (3-5 em): tên + điểm yếu + biện pháp
+- HS có hành vi cần điều chỉnh (1-3 em): tên + biểu hiện + hướng xử lý
+- HS xuất sắc cần phát huy (3-5 em): tên + thế mạnh + bồi dưỡng
+
+V. KẾT NỐI PHỤ HUYNH
+- Lịch họp PH: [...]
+- Báo cáo tuần qua nhóm Zalo PH
+- Cá nhân: liên hệ PH của HS cá biệt
+
+VI. KIỂM TRA - ĐÁNH GIÁ
+- Kiểm tra giữa tháng: [Ngày + cách]
+- Tổng kết cuối tháng: tự đánh giá + báo cáo TBM
+
+YÊU CẦU LATEX:
+- A4, font 12pt, lề NĐ 30
+- 3 bảng tabularx full-width cho mục III, IV
+- Có chỗ ký GVCN + Tổ trưởng + BGH
+- Compact 2-3 trang max
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry,tabularx,booktabs,enumitem}
+\\geometry{top=1.8cm,bottom=1.8cm,left=2.5cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{5pt}
+
+\\begin{document}
+
+\\begin{center}
+\\textbf{TRƯỜNG THPT [...]}\\\\
+\\Large\\textbf{KẾ HOẠCH CHỦ NHIỆM THÁNG [.../20....]}\\\\
+\\normalsize\\textit{Lớp [...] -- GVCN: [...]}
+\\end{center}
+
+\\section*{I. ĐÁNH GIÁ THÁNG TRƯỚC}
+% AI generate
+
+\\section*{II. MỤC TIÊU THÁNG NÀY}
+% AI generate
+
+\\section*{III. KẾ HOẠCH THEO TUẦN}
+\\begin{tabularx}{\\linewidth}{|c|X|c|c|}\\hline
+\\textbf{Tuần} & \\textbf{Hoạt động} & \\textbf{Phụ trách} & \\textbf{KQ mong đợi}\\\\\\hline
+% AI fill 4-5 rows
+\\end{tabularx}
+
+\\section*{IV. HỌC SINH CẦN QUAN TÂM}
+% Bảng cá biệt
+
+\\section*{V. KẾT NỐI PHỤ HUYNH}
+% List
+
+\\section*{VI. KIỂM TRA -- ĐÁNH GIÁ}
+% Lịch + cách
+
+\\vspace{16pt}
+\\noindent\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textit{Duyệt Tổ trưởng}\\\\[40pt][Tên]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}\\centering
+\\textbf{GVCN}\\\\[40pt][Tên]
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+);
+
 export function getTemplateById(id: string): LatexTemplateOption | undefined {
   return LATEX_TEMPLATES.find((t) => t.id === id);
 }
