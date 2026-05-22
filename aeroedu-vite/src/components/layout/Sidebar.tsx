@@ -11,7 +11,7 @@ import {
   Calendar, Shield, AlertTriangle, Activity, Settings, Upload,
   Grid3x3, HelpCircle, CheckSquare, BookOpenCheck, Compass,
   Camera, MonitorPlay, Thermometer, Cpu, Mic, ChevronLeft, ChevronRight, Tag,
-  CircuitBoard, FunctionSquare,
+  CircuitBoard, FunctionSquare, KeyRound,
   type LucideIcon
 } from 'lucide-react'
 import { useCurrentRole } from '@/hooks/useCurrentUser'
@@ -132,6 +132,7 @@ const teacherSections: RouteSection[] = [
       { icon: Thermometer,  labelKey: 'routeEnvironment', href: '/teacher/environment-monitoring', badge: 'IoT' },
       { icon: FileEdit,     labelKey: 'routeAssignments', href: '/teacher/assignments' },
       { icon: Calendar,     labelKey: 'routeCalendar',    href: '/teacher/calendar' },
+      { icon: KeyRound,     labelKey: 'routeApiKeys',     href: '/teacher/api-keys', badge: 'MCP' },
     ],
   },
 ]
@@ -163,6 +164,7 @@ const adminSections: RouteSection[] = [
       { icon: Shield,   labelKey: 'routeOperations',   href: '/admin/operations' },
       { icon: Brain,    labelKey: 'routeModels',        href: '/admin/models' },
       { icon: Settings, labelKey: 'routeAdminSettings', href: '/admin/settings' },
+      { icon: KeyRound, labelKey: 'routeApiKeys',       href: '/admin/api-keys', badge: 'MCP' },
     ],
   },
 ]

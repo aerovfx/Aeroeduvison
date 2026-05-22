@@ -85,6 +85,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeCameraClass:   'Camera lớp',
     routeEnvironment:   'Môi trường',
     routeCalendar:      'Lịch trình',
+    routeApiKeys:       'API Keys',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Tổng quan',
@@ -399,6 +400,7 @@ export const translations: Record<Language, Record<string, string>> = {
     routeCameraClass:   'Class Cameras',
     routeEnvironment:   'Environment',
     routeCalendar:      'Calendar',
+    routeApiKeys:       'API Keys',
 
     // ── Sidebar — Admin routes ────────────────────────────────
     routeAdminOverview: 'Overview',

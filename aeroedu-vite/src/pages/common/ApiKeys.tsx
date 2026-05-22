@@ -1,0 +1,689 @@
+/**
+ * ApiKeys — Trang quản lý API Key cho Teacher / Parent / Admin
+ *
+ * Cho phép người dùng tạo, xem, thu hồi API key để kết nối
+ * Claude Desktop / Cursor với AeroEdu qua MCP server.
+ *
+ * API:
+ *   GET    /api/user/api-keys           → { keys: [{id, key_prefix, name, created_at, last_used_at, revoked}] }
+ *   POST   /api/user/api-keys           body {name} → { ok, id, key, prefix, name }
+ *   DELETE /api/user/api-keys/:id       → { ok }
+ */
+
+import { useState, useEffect, useCallback } from 'react'
+import {
+  Key,
+  Plus,
+  Trash2,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Terminal,
+  Zap,
+  Monitor,
+  Shield,
+  RefreshCw,
+  X,
+} from 'lucide-react'
+
+/* ─────────────────────────── Types ─────────────────────────── */
+
+interface ApiKey {
+  id: string
+  key_prefix: string
+  name: string
+  created_at: string
+  last_used_at: string | null
+  revoked: boolean
+}
+
+interface NewKeyResult {
+  id: string
+  key: string
+  prefix: string
+  name: string
+}
+
+/* ─────────────────────────── Helpers ─────────────────────────── */
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function maskPrefix(prefix: string): string {
+  // e.g. "AERO-a1b2c3" → "AERO-a1b2••••"
+  const parts = prefix.split('-')
+  if (parts.length >= 2) {
+    const visible = parts[1].slice(0, 4)
+    return `${parts[0]}-${visible}••••`
+  }
+  return prefix.slice(0, 8) + '••••'
+}
+
+async function apiFetch(path: string, opts: RequestInit = {}) {
+  const token = localStorage.getItem('auth_token')
+  const res = await fetch(path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error ?? `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+/* ─────────────────────────── Copy button ─────────────────────────── */
+
+function CopyButton({ text, className = '' }: { text: string; className?: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      title="Sao chép"
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all
+        ${copied
+          ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+          : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border border-border'
+        } ${className}`}
+    >
+      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+      {copied ? 'Đã chép' : 'Sao chép'}
+    </button>
+  )
+}
+
+/* ─────────────────────────── One-time reveal modal ─────────────────────────── */
+
+function NewKeyModal({ result, onClose }: { result: NewKeyResult; onClose: () => void }) {
+  const [visible, setVisible] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl p-6 space-y-5 animate-fade-in">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20">
+              <Key className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">API Key đã tạo!</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">{result.name}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Warning */}
+        <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-300/90 leading-relaxed">
+            <strong className="font-semibold">Lưu key này ngay — sẽ không hiển thị lại.</strong>{' '}
+            Nếu bạn mất key, hãy thu hồi và tạo key mới.
+          </p>
+        </div>
+
+        {/* Key display */}
+        <div className="space-y-2">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            API Key của bạn
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <code className={`block w-full px-3 py-2.5 rounded-lg bg-muted/40 border border-border text-sm font-mono text-foreground break-all select-all ${!visible ? 'tracking-widest' : ''}`}>
+                {visible ? result.key : '•'.repeat(Math.min(result.key.length, 40))}
+              </code>
+            </div>
+            <button
+              onClick={() => setVisible(v => !v)}
+              className="p-2 rounded-lg bg-muted/40 border border-border text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+              title={visible ? 'Ẩn' : 'Hiện'}
+            >
+              {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <CopyButton text={result.key} className="flex-shrink-0" />
+            <span className="text-xs text-muted-foreground">Nhấn để sao chép toàn bộ key</span>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors"
+        >
+          Đã lưu, đóng lại
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────── Setup guide ─────────────────────────── */
+
+const CLAUDE_CONFIG_JSON = `{
+  "mcpServers": {
+    "aeroedu": {
+      "command": "node",
+      "args": ["/path/to/mcp-server/dist/index.js"],
+      "env": {
+        "AEROEDU_API_KEY": "AERO-your-key-here"
+      }
+    }
+  }
+}`
+
+interface Step {
+  icon: React.ReactNode
+  title: string
+  body: React.ReactNode
+}
+
+function SetupGuide() {
+  const [open, setOpen] = useState(false)
+
+  const steps: Step[] = [
+    {
+      icon: <Terminal className="w-4 h-4 text-blue-400" />,
+      title: 'Bước 1 — Tải MCP server',
+      body: (
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>Clone hoặc tải bản build từ repository chính thức:</p>
+          <div className="relative">
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto">
+{`git clone https://github.com/aeroedu/mcp-hub.git
+cd mcp-hub && npm install && npm run build`}
+            </pre>
+            <CopyButton
+              text={`git clone https://github.com/aeroedu/mcp-hub.git\ncd mcp-hub && npm install && npm run build`}
+              className="absolute top-2 right-2"
+            />
+          </div>
+          <p className="text-xs">Yêu cầu: Node.js ≥ 18. Sau khi build xong, ghi nhớ đường dẫn tới <code className="font-mono bg-muted/60 px-1 rounded">dist/index.js</code>.</p>
+        </div>
+      ),
+    },
+    {
+      icon: <Key className="w-4 h-4 text-purple-400" />,
+      title: 'Bước 2 — Sao chép API Key',
+      body: (
+        <p className="text-sm text-muted-foreground">
+          Tạo key mới (hoặc dùng key có sẵn) ở bảng phía trên. Sao chép toàn bộ chuỗi <code className="font-mono bg-muted/60 px-1 rounded text-xs">AERO-...</code> vào clipboard.
+        </p>
+      ),
+    },
+    {
+      icon: <Monitor className="w-4 h-4 text-green-400" />,
+      title: 'Bước 3 — Cấu hình Claude Desktop',
+      body: (
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            Mở file cấu hình Claude Desktop tại{' '}
+            <code className="font-mono bg-muted/60 px-1 rounded text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</code>{' '}
+            (macOS) hoặc <code className="font-mono bg-muted/60 px-1 rounded text-xs">%APPDATA%\Claude\claude_desktop_config.json</code> (Windows), rồi thêm đoạn JSON sau:
+          </p>
+          <div className="relative">
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground overflow-x-auto whitespace-pre-wrap break-words">
+              {CLAUDE_CONFIG_JSON}
+            </pre>
+            <CopyButton text={CLAUDE_CONFIG_JSON} className="absolute top-2 right-2" />
+          </div>
+          <p className="text-xs">Thay <code className="font-mono bg-muted/60 px-1 rounded">/path/to/mcp-server/dist/index.js</code> bằng đường dẫn thực và <code className="font-mono bg-muted/60 px-1 rounded">AERO-your-key-here</code> bằng key của bạn.</p>
+        </div>
+      ),
+    },
+    {
+      icon: <Zap className="w-4 h-4 text-amber-400" />,
+      title: 'Bước 4 — Khởi động & kiểm tra',
+      body: (
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>Khởi động lại Claude Desktop. Trong cửa sổ chat mới, gõ:</p>
+          <div className="relative">
+            <pre className="bg-muted/40 border border-border rounded-lg px-4 py-3 text-xs font-mono text-foreground">
+              {`/tools list`}
+            </pre>
+            <CopyButton text="/tools list" className="absolute top-2 right-2" />
+          </div>
+          <p>Bạn sẽ thấy danh sách 24 MCP tools của AeroEdu (aeroedu_course_list, aeroedu_kg_query, …). Nếu không thấy, kiểm tra lại đường dẫn và API key.</p>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <Terminal className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="text-left">
+            <p className="font-medium text-foreground text-sm">Hướng dẫn cài đặt MCP</p>
+            <p className="text-xs text-muted-foreground">Kết nối Claude Desktop / Cursor với AeroEdu (4 bước)</p>
+          </div>
+        </div>
+        {open ? (
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        )}
+      </button>
+
+      {open && (
+        <div className="border-t border-border divide-y divide-border">
+          {steps.map((step, idx) => (
+            <StepRow key={idx} step={step} index={idx} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StepRow({ step, index }: { step: Step; index: number }) {
+  const [open, setOpen] = useState(index === 0)
+
+  return (
+    <div className="px-5">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between py-3.5 gap-3 text-left group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-muted/40 border border-border flex-shrink-0">
+            {step.icon}
+          </div>
+          <span className="text-sm font-medium text-foreground group-hover:text-foreground/80 transition-colors">
+            {step.title}
+          </span>
+        </div>
+        {open ? (
+          <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        )}
+      </button>
+      {open && <div className="pb-4">{step.body}</div>}
+    </div>
+  )
+}
+
+/* ─────────────────────────── Main page ─────────────────────────── */
+
+export default function ApiKeys() {
+  const [keys, setKeys] = useState<ApiKey[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [revealedKey, setRevealedKey] = useState<NewKeyResult | null>(null)
+  const [revoking, setRevoking] = useState<string | null>(null)
+
+  const loadKeys = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await apiFetch('/api/user/api-keys')
+      setKeys(data.keys ?? [])
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Không tải được danh sách key')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadKeys()
+  }, [loadKeys])
+
+  const handleCreate = async () => {
+    const name = newKeyName.trim()
+    if (!name) return
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const data = await apiFetch('/api/user/api-keys', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      })
+      setRevealedKey({ id: data.id, key: data.key, prefix: data.prefix, name: data.name })
+      setNewKeyName('')
+      await loadKeys()
+    } catch (e: unknown) {
+      setCreateError(e instanceof Error ? e.message : 'Tạo key thất bại')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRevoke = async (id: string) => {
+    if (!confirm('Thu hồi key này? Hành động không thể hoàn tác.')) return
+    setRevoking(id)
+    try {
+      await apiFetch(`/api/user/api-keys/${id}`, { method: 'DELETE' })
+      await loadKeys()
+    } catch {
+      /* ignore */
+    } finally {
+      setRevoking(null)
+    }
+  }
+
+  const activeKeys = keys.filter(k => !k.revoked)
+
+  /* ── Stats ── */
+  const stats = [
+    {
+      icon: <Zap className="w-5 h-5 text-blue-400" />,
+      bg: 'bg-blue-500/10 border-blue-500/20',
+      label: 'MCP Tools',
+      value: '24',
+    },
+    {
+      icon: <Monitor className="w-5 h-5 text-purple-400" />,
+      bg: 'bg-purple-500/10 border-purple-500/20',
+      label: 'Thiết bị',
+      value: 'Không giới hạn',
+    },
+    {
+      icon: <Key className="w-5 h-5 text-green-400" />,
+      bg: 'bg-green-500/10 border-green-500/20',
+      label: 'Hoạt động',
+      value: loading ? '…' : `${activeKeys.length} key`,
+    },
+    {
+      icon: <Shield className="w-5 h-5 text-amber-400" />,
+      bg: 'bg-amber-500/10 border-amber-500/20',
+      label: 'Hết hạn',
+      value: 'Không',
+    },
+  ]
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fade-in">
+      {/* Header */}
+      <div className="space-y-1">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 border border-primary/20">
+            <Key className="w-5 h-5 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground">API Keys</h1>
+        </div>
+        <p className="text-sm text-muted-foreground pl-[52px]">
+          Kết nối Claude Desktop / Cursor với AeroEdu qua MCP server
+        </p>
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {stats.map(s => (
+          <div
+            key={s.label}
+            className="flex flex-col gap-2 px-4 py-3.5 rounded-xl bg-card border border-border"
+          >
+            <div className={`flex items-center justify-center w-8 h-8 rounded-lg border ${s.bg}`}>
+              {s.icon}
+            </div>
+            <div>
+              <p className="text-lg font-bold text-foreground leading-tight">{s.value}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Create key */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Plus className="w-4 h-4 text-primary" />
+          <h2 className="font-semibold text-foreground text-sm">Tạo API Key mới</h2>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newKeyName}
+            onChange={e => setNewKeyName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            placeholder="Tên key, vd: Laptop cá nhân, Cursor IDE…"
+            maxLength={80}
+            disabled={creating}
+            className="flex-1 px-3 py-2 rounded-xl border border-border bg-muted/30 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-50 transition-all"
+          />
+          <button
+            onClick={handleCreate}
+            disabled={creating || !newKeyName.trim()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex-shrink-0"
+          >
+            {creating ? (
+              <RefreshCw className="w-4 h-4 animate-spin" />
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
+            {creating ? 'Đang tạo…' : 'Tạo API Key'}
+          </button>
+        </div>
+        {createError && (
+          <p className="text-xs text-red-400 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            {createError}
+          </p>
+        )}
+      </div>
+
+      {/* Key list */}
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <h2 className="font-semibold text-foreground text-sm flex items-center gap-2">
+            <Key className="w-4 h-4 text-muted-foreground" />
+            Danh sách API Key
+          </h2>
+          <button
+            onClick={loadKeys}
+            disabled={loading}
+            className="p-1.5 rounded-lg hover:bg-muted/60 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40"
+            title="Tải lại"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="flex items-center gap-2 px-5 py-4 text-sm text-red-400 bg-red-500/5">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && !error && (
+          <div className="divide-y divide-border">
+            {[1, 2].map(i => (
+              <div key={i} className="flex items-center gap-4 px-5 py-4 animate-pulse">
+                <div className="w-28 h-5 bg-muted/50 rounded" />
+                <div className="flex-1 h-4 bg-muted/40 rounded" />
+                <div className="w-24 h-4 bg-muted/30 rounded" />
+                <div className="w-16 h-4 bg-muted/30 rounded" />
+                <div className="w-8 h-8 bg-muted/30 rounded-lg" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && !error && keys.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 text-center px-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-muted/40 border border-border">
+              <Key className="w-6 h-6 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">Chưa có API Key nào. Tạo key đầu tiên của bạn!</p>
+          </div>
+        )}
+
+        {/* Key rows */}
+        {!loading && !error && keys.length > 0 && (
+          <>
+            {/* Table header — hidden on mobile */}
+            <div className="hidden sm:grid grid-cols-[180px_1fr_160px_160px_44px] gap-3 px-5 py-2 border-b border-border bg-muted/20">
+              {['Key', 'Tên', 'Tạo lúc', 'Dùng gần nhất', ''].map((h, i) => (
+                <span key={i} className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {h}
+                </span>
+              ))}
+            </div>
+
+            <div className="divide-y divide-border">
+              {keys.map(k => (
+                <KeyRow
+                  key={k.id}
+                  apiKey={k}
+                  onRevoke={handleRevoke}
+                  revoking={revoking === k.id}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Setup guide */}
+      <SetupGuide />
+
+      {/* One-time reveal modal */}
+      {revealedKey && (
+        <NewKeyModal result={revealedKey} onClose={() => setRevealedKey(null)} />
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────── Key row ─────────────────────────── */
+
+function KeyRow({
+  apiKey,
+  onRevoke,
+  revoking,
+}: {
+  apiKey: ApiKey
+  onRevoke: (id: string) => void
+  revoking: boolean
+}) {
+  return (
+    <div
+      className={`px-5 py-3.5 transition-colors ${
+        apiKey.revoked ? 'opacity-40' : 'hover:bg-muted/20'
+      }`}
+    >
+      {/* Desktop grid */}
+      <div className="hidden sm:grid grid-cols-[180px_1fr_160px_160px_44px] gap-3 items-center">
+        {/* Prefix */}
+        <code className="font-mono text-xs text-foreground bg-muted/40 border border-border px-2 py-1 rounded-lg truncate">
+          {maskPrefix(apiKey.key_prefix)}
+        </code>
+
+        {/* Name */}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-sm text-foreground truncate">{apiKey.name}</span>
+          {apiKey.revoked && (
+            <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">
+              Thu hồi
+            </span>
+          )}
+        </div>
+
+        {/* Created */}
+        <span className="text-xs text-muted-foreground">{fmtDate(apiKey.created_at)}</span>
+
+        {/* Last used */}
+        <span className="text-xs text-muted-foreground">{fmtDate(apiKey.last_used_at)}</span>
+
+        {/* Revoke */}
+        {!apiKey.revoked && (
+          <button
+            onClick={() => onRevoke(apiKey.id)}
+            disabled={revoking}
+            title="Thu hồi key này"
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 disabled:opacity-40 transition-all"
+          >
+            {revoking ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Mobile card */}
+      <div className="sm:hidden space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <code className="font-mono text-xs text-foreground bg-muted/40 border border-border px-2 py-1 rounded-lg">
+            {maskPrefix(apiKey.key_prefix)}
+          </code>
+          {apiKey.revoked ? (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 border border-red-500/20">
+              Thu hồi
+            </span>
+          ) : (
+            <button
+              onClick={() => onRevoke(apiKey.id)}
+              disabled={revoking}
+              title="Thu hồi key này"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 disabled:opacity-40 transition-all"
+            >
+              {revoking ? (
+                <RefreshCw className="w-3 h-3 animate-spin" />
+              ) : (
+                <Trash2 className="w-3 h-3" />
+              )}
+              Thu hồi
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-foreground font-medium">{apiKey.name}</p>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>Tạo: {fmtDate(apiKey.created_at)}</span>
+          {apiKey.last_used_at && (
+            <span>Dùng: {fmtDate(apiKey.last_used_at)}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

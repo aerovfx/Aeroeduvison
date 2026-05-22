@@ -164,6 +164,9 @@ const CoursePlayerPage = lazy(() => import('@/pages/learning/CoursePlayer'))
 const ProfileBasicInfoPage = lazy(() => import('@/pages/profile/BasicInfo'))
 const ProfilePhotoPage     = lazy(() => import('@/pages/profile/Photo'))
 
+// ── Common Pages ─────────────────────────────────────────────
+const ApiKeysPage           = lazy(() => import('@/pages/common/ApiKeys'))
+
 // ── Admin Pages (đã port) ────────────────────────────────────
 const AdminOverview         = lazy(() => import('@/pages/admin/Overview'))
 const AdminStudents         = lazy(() => import('@/pages/admin/Students'))
@@ -414,6 +417,7 @@ export function AppRouter() {
               <Route path="/teacher/transcript/recording"          element={<PageFallback />} />
               <Route path="/teacher/transcript/upload"             element={<PageFallback />} />
               <Route path="/teacher/vision/object-detection"       element={<PageFallback />} />
+              <Route path="/teacher/api-keys"                     element={<ApiKeysPage />} />
             </Route>
 
             {/* ══════════════════════════════════════════════
@@ -429,6 +433,7 @@ export function AppRouter() {
               <Route path="/admin/iot-management"      element={<AdminIoTManagement />} />
               <Route path="/admin/models"              element={<AdminModels />} />
               <Route path="/admin/settings"            element={<AdminSettings />} />
+              <Route path="/admin/api-keys"            element={<ApiKeysPage />} />
 
               {/* Chưa port → PageFallback */}
               <Route path="/admin/agents"              element={<PageFallback />} />
