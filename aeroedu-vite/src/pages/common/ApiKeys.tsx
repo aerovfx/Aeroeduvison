@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import api from '@/services/api'
 import {
   Key,
   Plus,
@@ -71,26 +72,16 @@ function maskPrefix(prefix: string): string {
   return prefix.slice(0, 8) + '••••'
 }
 
-function getToken(): string | null {
-  // Token lưu trong sessionStorage với key __aeroedu_at__ (xem api.ts tokenStore)
-  try { return sessionStorage.getItem('__aeroedu_at__') } catch { return null }
-}
-
-async function apiFetch(path: string, opts: RequestInit = {}) {
-  const token = getToken()
-  const res = await fetch(path, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(opts.headers ?? {}),
-    },
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.error ?? `HTTP ${res.status}`)
+// Dùng api instance từ @/services/api — tự inject Bearer token đúng cách
+async function apiFetch(path: string, opts: { method?: string; body?: unknown } = {}) {
+  const method = (opts.method ?? 'GET').toLowerCase() as 'get' | 'post' | 'delete'
+  if (method === 'get') {
+    return api.get(path).then(r => r.data)
   }
-  return res.json()
+  if (method === 'delete') {
+    return api.delete(path).then(r => r.data)
+  }
+  return api.post(path, opts.body).then(r => r.data)
 }
 
 /* ─────────────────────────── Copy button ─────────────────────────── */
@@ -385,7 +376,7 @@ export default function ApiKeys() {
     try {
       const data = await apiFetch('/api/user/api-keys', {
         method: 'POST',
-        body: JSON.stringify({ name }),
+        body: { name },
       })
       setRevealedKey({ id: data.id, key: data.key, prefix: data.prefix, name: data.name })
       setNewKeyName('')
