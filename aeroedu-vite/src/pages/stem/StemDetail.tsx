@@ -28,9 +28,14 @@ import {
 import {
   loadProjects,
   saveProjects,
+  addMilestone,
+  updateMilestoneFields,
+  deleteMilestone,
+  moveMilestone,
   type STEMProject,
   type Milestone,
 } from './stemStore'
+import StemScrumBoard from '../../components/stem/StemScrumBoard'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -555,6 +560,34 @@ export default function StemDetail() {
           </div>
         </div>
       </div>
+
+      {/* ── Scrum Board — full width, đồng bộ với timeline ── */}
+      {id && (
+        <div className="max-w-7xl mx-auto px-6 pb-10">
+          <div className="rounded-2xl bg-[hsl(260,30%,10%)] border border-white/[0.06] p-5">
+            <StemScrumBoard
+              projectId={id}
+              milestones={project.milestones}
+              onAdd={(m) => {
+                const updated = addMilestone(id, m)
+                if (updated) setProject(updated)
+              }}
+              onUpdate={(milestoneId, fields) => {
+                const updated = updateMilestoneFields(id, milestoneId, fields)
+                if (updated) setProject(updated)
+              }}
+              onDelete={(milestoneId) => {
+                const updated = deleteMilestone(id, milestoneId)
+                if (updated) setProject(updated)
+              }}
+              onMove={(milestoneId, direction) => {
+                const updated = moveMilestone(id, milestoneId, direction)
+                if (updated) setProject(updated)
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Milestone modal ── */}
       {selectedMilestone && (

@@ -153,7 +153,7 @@ function StudentCard({ student, onAction }: { student: Student; onAction: (id: s
   }
 
   return (
-    <div className="bg-[hsl(225,15%,11%)] rounded-2xl border border-white/[0.07] p-4 hover:border-white/15 transition-all">
+    <div className="bg-card rounded-2xl border border-white/[0.07] p-4 hover:border-white/15 transition-all">
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
           <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${student.avatarColor} flex items-center justify-center text-lg font-bold text-white`}>
@@ -249,7 +249,7 @@ export default function ContactsPage() {
   const ALL_SUBJECTS = ['Vật lý', 'Toán học', 'Hóa học', 'Sinh học', 'Lập trình']
 
   return (
-    <div className="min-h-screen bg-[hsl(225,15%,8%)] text-white">
+    <div className="min-h-screen bg-background text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {/* Header */}
@@ -325,7 +325,7 @@ export default function ContactsPage() {
           /* Groups */
           <div className="space-y-3">
             {groups.map(g => (
-              <div key={g.id} className="flex items-center gap-4 p-4 bg-[hsl(225,15%,11%)] rounded-2xl border border-white/[0.07] hover:border-white/15 transition-all">
+              <div key={g.id} className="flex items-center gap-4 p-4 bg-card rounded-2xl border border-white/[0.07] hover:border-white/15 transition-all">
                 <div className={`p-3 rounded-xl border ${g.bg} ${g.color} shrink-0`}>{g.icon}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-white/85 truncate">{g.name}</p>

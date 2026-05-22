@@ -3,10 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, Users, Trash2, UserPlus,
   BarChart3, Calendar, GraduationCap, Loader2, School, X,
-  Upload, FileSpreadsheet, CheckCircle2, AlertCircle,
+  Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Download,
+  Building2, BookOpenCheck,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import * as XLSX from 'xlsx'
+import { api } from '@/services/api'
+
+/** SCHOOL = lớp tại trường chính thức | CENTER = lớp tại trung tâm */
+type ContextType = 'SCHOOL' | 'CENTER'
 
 interface Class {
   id: string
@@ -16,6 +21,10 @@ interface Class {
   description?: string
   studentCount: number
   createdAt: string
+  /** context_type phân biệt trường học / trung tâm (2026-05-20) */
+  context_type?: ContextType
+  /** Tên trường hoặc tên trung tâm */
+  institution_name?: string
 }
 
 interface Student {
@@ -33,10 +42,17 @@ interface ImportStudent {
 }
 
 interface ImportResult {
-  created: number
-  existing: number
-  enrolled: number
+  inserted: number
+  updated: number
   skipped: number
+  total: number
+}
+interface ImportResponse {
+  success?: boolean
+  message?: string
+  results?: ImportResult
+  /** Tối đa 3 ví dụ lỗi đầu tiên (debug) */
+  errors?: string[]
 }
 
 // ── Mini components ──────────────────────────────────────────
@@ -56,6 +72,24 @@ function StatusBadge({
   return (
     <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold border ${cls}`}>
       {children}
+    </span>
+  )
+}
+
+/** Badge phân biệt trường học vs trung tâm */
+function ContextBadge({ type }: { type?: ContextType }) {
+  if (!type || type === 'SCHOOL') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+        <School className="w-3 h-3" />
+        Trường
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-200">
+      <Building2 className="w-3 h-3" />
+      Trung tâm
     </span>
   )
 }
@@ -89,7 +123,14 @@ function Modal({
   )
 }
 
-// ── AddStudentsModal (inline replacement) ───────────────────
+// ── AddStudentsModal ─────────────────────────────────────────
+// Thêm HS thủ công (1 hoặc nhiều dòng). Trước đây dùng /api/users?role=STUDENT
+// + POST /classes/:id/students nhưng cả 2 endpoint đều 503 (proxy về aero-backend
+// không còn tồn tại) → modal hiện "Không tìm thấy học sinh" mãi mãi, click "Thêm"
+// cũng fail.
+//
+// Giờ: 2 mode — "Form" (gõ từng HS) và "Dán" (paste từ Word/Excel, tự tách dòng/cột).
+// POST tới endpoint import đang chạy /classes/:id/students/import → reuse hạ tầng có sẵn.
 function AddStudentsModal({
   open,
   onClose,
@@ -101,91 +142,230 @@ function AddStudentsModal({
   classId: string
   onAdded: () => void
 }) {
-  const [students, setStudents] = useState<Student[]>([])
-  const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
+  const [mode, setMode] = useState<'form' | 'paste'>('form')
+  const [rows, setRows] = useState<ImportStudent[]>([
+    { stt: 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' },
+  ])
+  const [pasteText, setPasteText] = useState('')
   const [adding, setAdding] = useState(false)
 
+  // Reset state khi đóng/mở modal
   useEffect(() => {
     if (!open) return
-    setLoading(true)
-    fetch('/api/users?role=STUDENT')
-      .then(r => r.json())
-      .then(d => setStudents(d.users || d || []))
-      .catch(() => setStudents([]))
-      .finally(() => setLoading(false))
+    setMode('form')
+    setRows([{ stt: 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' }])
+    setPasteText('')
+    setAdding(false)
   }, [open])
 
-  const filtered = students.filter(
-    s =>
-      s.name?.toLowerCase().includes(search.toLowerCase()) ||
-      s.email?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const addRow = () => setRows(r => [
+    ...r,
+    { stt: r.length + 1, hoTen: '', ngaySinh: '', gioiTinh: 'Nam', maDinhDanh: '' },
+  ])
+  const removeRow = (i: number) => setRows(r => r.filter((_, idx) => idx !== i).map((x, idx) => ({ ...x, stt: idx + 1 })))
+  const updateRow = (i: number, patch: Partial<ImportStudent>) =>
+    setRows(r => r.map((x, idx) => (idx === i ? { ...x, ...patch } : x)))
 
-  const toggle = (id: string) =>
-    setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  // Parse paste: mỗi dòng = 1 HS, cột phân tách bằng tab/dấu phẩy/dấu chấm phẩy
+  // Format: [stt] hoTen [maDinhDanh] [ngaySinh] [gioiTinh]
+  //   - 1 cột → chỉ hoTen
+  //   - 2 cột → hoTen + maDinhDanh
+  //   - 4-5 cột → STT + maDinhDanh + hoTen + ngaySinh [+ gioiTinh]  (TT58 order)
+  const parsePaste = (): ImportStudent[] => {
+    const lines = pasteText.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    const out: ImportStudent[] = []
+    let stt = 1
+    for (const line of lines) {
+      const cols = line.split(/\t|,(?! )|;/).map(c => c.trim()).filter(Boolean)
+      let row: Partial<ImportStudent> = { stt }
+      if (cols.length === 1) {
+        row.hoTen = cols[0]
+      } else if (cols.length === 2) {
+        row.hoTen = cols[0]
+        row.maDinhDanh = cols[1]
+      } else if (cols.length >= 4) {
+        // TT58 layout: stt | maDinhDanh | hoTen | ngaySinh | [gioiTinh]
+        const c0Num = Number(cols[0])
+        if (!isNaN(c0Num) && c0Num > 0 && c0Num < 10000) {
+          row.stt = c0Num
+          row.maDinhDanh = cols[1]
+          row.hoTen = cols[2]
+          row.ngaySinh = cols[3]
+          row.gioiTinh = cols[4] || 'Nam'
+        } else {
+          // Không có STT đầu dòng → maDinhDanh | hoTen | ngaySinh | gioiTinh
+          row.maDinhDanh = cols[0]
+          row.hoTen = cols[1]
+          row.ngaySinh = cols[2]
+          row.gioiTinh = cols[3] || 'Nam'
+        }
+      } else {
+        // 3 cột: hoTen | maDinhDanh | ngaySinh
+        row.hoTen = cols[0]
+        row.maDinhDanh = cols[1] || ''
+        row.ngaySinh = cols[2] || ''
+      }
+      if (!row.hoTen) continue
+      out.push({
+        stt: row.stt!,
+        hoTen: row.hoTen,
+        maDinhDanh: row.maDinhDanh || '',
+        ngaySinh: row.ngaySinh || '',
+        gioiTinh: row.gioiTinh || 'Nam',
+      })
+      stt = (row.stt || stt) + 1
+    }
+    return out
+  }
 
   const handleAdd = async () => {
-    if (!selected.length) return
+    const students = mode === 'paste' ? parsePaste() : rows.filter(r => r.hoTen.trim())
+    if (students.length === 0) {
+      toast.error(mode === 'paste' ? 'Không parse được học sinh từ text dán vào' : 'Vui lòng nhập ít nhất 1 học sinh')
+      return
+    }
     setAdding(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentIds: selected }),
-      })
-      if (!res.ok) throw new Error('Failed')
-      toast.success(`Đã thêm ${selected.length} học sinh vào lớp`)
+      const res = await api.post<{ message?: string; results?: ImportResult }>(
+        `/classes/${classId}/students/import`,
+        { students },
+      )
+      toast.success(res.data?.message || `Đã thêm ${students.length} học sinh`)
       onAdded()
-    } catch {
-      toast.error('Không thể thêm học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể thêm học sinh')
     } finally {
       setAdding(false)
     }
   }
 
+  if (!open) return null
   return (
-    <Modal open={open} onClose={onClose} title="Thêm học sinh vào lớp">
-      <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Tìm học sinh..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-          />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl z-10 max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-purple-600" />
+            Thêm học sinh thủ công
+          </h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div className="max-h-64 overflow-y-auto space-y-2">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <p className="text-center text-gray-500 py-8 text-sm">Không tìm thấy học sinh</p>
-          ) : (
-            filtered.map(s => (
-              <label
-                key={s.id}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(s.id)}
-                  onChange={() => toggle(s.id)}
-                  className="w-4 h-4 rounded text-purple-600"
-                />
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{s.name}</p>
-                  <p className="text-xs text-gray-500">{s.email}</p>
+
+        {/* Mode tabs */}
+        <div className="px-6 pt-4 flex gap-2 border-b border-gray-100">
+          {([
+            { key: 'form'  as const, label: 'Nhập từng dòng' },
+            { key: 'paste' as const, label: 'Dán từ Word/Excel' },
+          ]).map(t => (
+            <button
+              key={t.key}
+              onClick={() => setMode(t.key)}
+              className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                mode === t.key
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body — scrollable */}
+        <div className="px-6 py-4 overflow-y-auto flex-1">
+          {mode === 'form' ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide px-2">
+                <div className="col-span-1">STT</div>
+                <div className="col-span-4">Họ và tên *</div>
+                <div className="col-span-3">Mã định danh</div>
+                <div className="col-span-2">Ngày sinh</div>
+                <div className="col-span-1">G.tính</div>
+                <div className="col-span-1"></div>
+              </div>
+              {rows.map((row, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <input
+                    type="number"
+                    value={row.stt}
+                    onChange={e => updateRow(i, { stt: Number(e.target.value) || i + 1 })}
+                    className="col-span-1 px-2 py-1.5 border border-gray-200 rounded text-sm text-center"
+                  />
+                  <input
+                    type="text"
+                    value={row.hoTen}
+                    onChange={e => updateRow(i, { hoTen: e.target.value })}
+                    placeholder="Nguyễn Văn A"
+                    className="col-span-4 px-2 py-1.5 border border-gray-200 rounded text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={row.maDinhDanh}
+                    onChange={e => updateRow(i, { maDinhDanh: e.target.value })}
+                    placeholder="7727940812"
+                    className="col-span-3 px-2 py-1.5 border border-gray-200 rounded text-sm font-mono"
+                  />
+                  <input
+                    type="text"
+                    value={row.ngaySinh}
+                    onChange={e => updateRow(i, { ngaySinh: e.target.value })}
+                    placeholder="dd/mm/yyyy"
+                    className="col-span-2 px-2 py-1.5 border border-gray-200 rounded text-sm"
+                  />
+                  <select
+                    value={row.gioiTinh}
+                    onChange={e => updateRow(i, { gioiTinh: e.target.value })}
+                    className="col-span-1 px-1 py-1.5 border border-gray-200 rounded text-sm bg-white"
+                  >
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                  <button
+                    onClick={() => removeRow(i)}
+                    disabled={rows.length === 1}
+                    className="col-span-1 w-8 h-8 flex items-center justify-center text-red-500 hover:bg-red-50 rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </label>
-            ))
+              ))}
+              <button
+                onClick={addRow}
+                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 border border-dashed border-purple-300 rounded-lg hover:bg-purple-50 w-full justify-center"
+              >
+                <Plus className="w-4 h-4" />
+                Thêm dòng
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-gray-500 mb-2">
+                Dán danh sách từ Word/Excel — mỗi học sinh 1 dòng, cột phân tách bằng <b>Tab</b>, <b>dấu phẩy</b>, hoặc <b>chấm phẩy</b>.
+                Hỗ trợ format: <code className="bg-gray-100 px-1 py-0.5 rounded">STT, Mã định danh, Họ tên, Ngày sinh, Giới tính</code>
+              </p>
+              <textarea
+                value={pasteText}
+                onChange={e => setPasteText(e.target.value)}
+                placeholder={`1\t7727940812\tNguyễn Văn An\t15/03/2010\tNam\n2\t7727940813\tTrần Thị Bình\t22/07/2010\tNữ\n...`}
+                rows={10}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+              {pasteText && (
+                <p className="mt-2 text-xs text-purple-600">
+                  Sẽ thêm <b>{parsePaste().length}</b> học sinh
+                </p>
+              )}
+            </div>
           )}
         </div>
-        <div className="flex gap-2 pt-2">
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-2">
           <button
             onClick={onClose}
             className="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -194,16 +374,113 @@ function AddStudentsModal({
           </button>
           <button
             onClick={handleAdd}
-            disabled={!selected.length || adding}
-            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={adding}
+            className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {adding && <Loader2 className="w-4 h-4 animate-spin" />}
-            Thêm ({selected.length})
+            Thêm vào lớp
           </button>
         </div>
       </div>
-    </Modal>
+    </div>
   )
+}
+
+// ── Excel template generator ─────────────────────────────────
+// Sinh file mẫu khớp 100% với layout TT58 (Thông tư 58/2011 sửa đổi 22/2021):
+//   Rows 1-5: Thông tin trường/năm/môn (giáo viên điền tay)
+//   Row 7  : Tiêu đề cột — STT, Mã định danh BộGD&ĐT, Họ tên, Ngày sinh,
+//            Giới tính, ĐĐGtx (5 cột), ĐĐGgk, ĐĐGck
+//   Row 8  : Sub-header (1,2,3,4,5 cho 5 cột ĐĐGtx)
+//   Row 9+ : 3 dòng học sinh mẫu (xoá đi rồi điền danh sách thật)
+// → Khi giáo viên download → điền vào → upload lại, parseExcelStudents()
+//   match đúng "STT" ở cột A và bắt đầu đọc data từ row 9.
+function downloadClassImportTemplate(opts?: {
+  className?: string
+  schoolName?: string
+  schoolYear?: string
+  semester?: string
+  subject?: string
+  teacherName?: string
+}) {
+  const cls       = opts?.className   || '10A1'
+  const subject   = opts?.subject     || 'VẬT LÍ'
+  const school    = opts?.schoolName  || 'TRƯỜNG THPT ___________'
+  const year      = opts?.schoolYear  || '2025-2026'
+  const semester  = opts?.semester    || 'I'
+  const teacher   = opts?.teacherName || '___________'
+
+  // 2D array tới sheet — mỗi inner array là 1 row
+  const aoa: (string | number | Date | null)[][] = [
+    ['SỞ GIÁO DỤC VÀ ĐÀO TẠO ___________'],                                 // row 1
+    [school],                                                               // row 2
+    ['BẢNG ĐIỂM HỌC KỲ'],                                                   // row 3
+    [`Năm học: ${year} - Học kỳ: ${semester}`],                             // row 4
+    [`Môn học: ${subject} - GV: ${teacher}`],                               // row 5
+    [],                                                                     // row 6 (blank)
+    [
+      'STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Ngày sinh', 'Giới tính',
+      'ĐĐGtx', null, null, null, null, 'ĐĐGgk', 'ĐĐGck',                    // row 7
+    ],
+    [null, null, null, null, null, 1, 2, 3, 4, 5],                          // row 8 (sub-header)
+    // Sample students (xoá đi điền lại):
+    [1, '7727940812', 'Nguyễn Văn An',     '15/03/2010', 'Nam'],            // row 9
+    [2, '7727940813', 'Trần Thị Bình',     '22/07/2010', 'Nữ'],             // row 10
+    [3, '7727940814', 'Lê Hoàng Cường',    '08/11/2010', 'Nam'],            // row 11
+  ]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Column widths để dễ nhìn khi mở Excel
+  ws['!cols'] = [
+    { wch: 5  },  // STT
+    { wch: 18 },  // Mã định danh
+    { wch: 28 },  // Họ và tên
+    { wch: 12 },  // Ngày sinh
+    { wch: 9  },  // Giới tính
+    { wch: 6  }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 6 },  // ĐĐGtx 1-5
+    { wch: 7  },  // ĐĐGgk
+    { wch: 7  },  // ĐĐGck
+  ]
+
+  // Merge cells cho 4 dòng tiêu đề trên (cosmetic — span 12 cột)
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 11 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 11 } },
+    { s: { r: 2, c: 0 }, e: { r: 2, c: 11 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: 11 } },
+    { s: { r: 4, c: 0 }, e: { r: 4, c: 11 } },
+    { s: { r: 6, c: 5 }, e: { r: 6, c: 9 } },   // "ĐĐGtx" merge 5 cột
+  ]
+
+  // Sheet name dùng làm class name khi import → đặt theo "<Lớp> <Môn>"
+  // VD "10A1 Vat li" → parser auto-suy ra "Lớp 10A1"
+  const sheetName = `${cls} ${subject.replace(/Í/g,'i').replace(/Ậ/g,'a').toLowerCase().slice(0,20)}`
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName)
+
+  // Hướng dẫn ngắn ở sheet thứ 2
+  const helpRows = [
+    ['HƯỚNG DẪN ĐIỀN'],
+    [],
+    ['1. Sheet "' + sheetName + '" là sheet chính — KHÔNG đổi tên sheet.'],
+    ['2. Sửa thông tin lớp/trường ở rows 1-5 cho khớp thực tế.'],
+    ['3. Cột bắt buộc khi import: STT, Mã định danh, Họ và tên.'],
+    ['4. Mã định danh Bộ GD&ĐT: 10 chữ số do Bộ cấp khi đăng ký HS.'],
+    ['5. Ngày sinh: định dạng dd/mm/yyyy (vd 15/03/2010).'],
+    ['6. Giới tính: viết "Nam" hoặc "Nữ" (có dấu).'],
+    ['7. Các cột ĐĐGtx/gk/ck (điểm) KHÔNG cần điền khi import danh sách —'],
+    ['   chỉ dùng khi xuất bảng điểm sau này.'],
+    ['8. Xoá 3 dòng học sinh mẫu (rows 9-11) trước khi điền danh sách thật.'],
+    [],
+    ['Mọi thắc mắc → liên hệ admin@inphysic.com'],
+  ]
+  const helpWs = XLSX.utils.aoa_to_sheet(helpRows)
+  helpWs['!cols'] = [{ wch: 80 }]
+  XLSX.utils.book_append_sheet(wb, helpWs, 'Hướng dẫn')
+
+  // Trigger download
+  const fileName = `mau-import-lop-${cls}.xlsx`
+  XLSX.writeFile(wb, fileName)
 }
 
 // ── Excel parser ─────────────────────────────────────────────
@@ -273,11 +550,12 @@ function ImportModal({
   const [classYear, setClassYear] = useState('2025-2026')
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
+  const [errors, setErrors] = useState<string[]>([])
 
   const reset = () => {
     setParsed(null); setFileName(''); setClassId('')
     setClassGrade('Khối 10'); setClassYear('2025-2026')
-    setImporting(false); setResult(null)
+    setImporting(false); setResult(null); setErrors([])
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -308,35 +586,33 @@ function ImportModal({
       let targetClassId = classId
       // Create class if no existing class selected
       if (!targetClassId) {
-        const res = await fetch('/api/classes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: parsed.className,
-            grade: classGrade,
-            schoolYear: classYear,
-            description: `Import từ file ${fileName}`,
-          }),
+        const res = await api.post('/classes', {
+          name: parsed.className,
+          grade: classGrade,
+          schoolYear: classYear,
+          description: `Import từ file ${fileName}`,
         })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Không thể tạo lớp')
-        targetClassId = data.class?.id || data.id
+        targetClassId = res.data.class?.id || res.data.id
       }
 
       // Call bulk import API
-      const importRes = await fetch(`/api/classes/${targetClassId}/students/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ students: parsed.students }),
-      })
-      const importData = await importRes.json()
-      if (!importRes.ok) throw new Error(importData.error || 'Import thất bại')
-
-      setResult(importData.results)
-      toast.success(importData.message || 'Import thành công!')
+      const importRes = await api.post<ImportResponse>(
+        `/classes/${targetClassId}/students/import`,
+        { students: parsed.students }
+      )
+      const data = importRes.data
+      setResult(data.results || null)
+      setErrors(data.errors || [])
+      // Toast: success nếu có HS được thêm/cập nhật, else error
+      const r = data.results
+      if (r && (r.inserted > 0 || r.updated > 0)) {
+        toast.success(data.message || 'Import thành công!')
+      } else {
+        toast.error(data.message || 'Không import được HS nào — xem chi tiết lỗi bên dưới')
+      }
       onDone()
     } catch (err: any) {
-      toast.error(err.message)
+      toast.error(err?.response?.data?.error || err.message)
     } finally {
       setImporting(false)
     }
@@ -366,44 +642,113 @@ function ImportModal({
         <div className="p-6 space-y-5">
           {/* Drop zone */}
           {!parsed ? (
-            <div
-              onDrop={handleDrop}
-              onDragOver={e => e.preventDefault()}
-              onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/40 transition-all group"
-            >
-              <Upload className="w-10 h-10 mx-auto mb-3 text-purple-300 group-hover:text-purple-500 transition-colors" />
-              <p className="font-semibold text-gray-700 mb-1">Kéo thả file Excel vào đây</p>
-              <p className="text-sm text-gray-500">hoặc click để chọn file .xlsx</p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
-              />
-            </div>
+            <>
+              <div
+                onDrop={handleDrop}
+                onDragOver={e => e.preventDefault()}
+                onClick={() => fileRef.current?.click()}
+                className="border-2 border-dashed border-purple-200 rounded-xl p-8 text-center cursor-pointer hover:border-purple-400 hover:bg-purple-50/40 transition-all group"
+              >
+                <Upload className="w-10 h-10 mx-auto mb-3 text-purple-300 group-hover:text-purple-500 transition-colors" />
+                <p className="font-semibold text-gray-700 mb-1">Kéo thả file Excel vào đây</p>
+                <p className="text-sm text-gray-500">hoặc click để chọn file .xlsx</p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="hidden"
+                  onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+                />
+              </div>
+
+              {/* Tải file mẫu — giúp giáo viên chưa có file TT58 sẵn */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Chưa có file?</p>
+                    <p className="text-xs text-gray-600">
+                      Tải mẫu Excel chuẩn TT58 (Bộ GD&ĐT) — gồm các cột STT, Mã định
+                      danh, Họ tên, Ngày sinh, Giới tính.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    try {
+                      downloadClassImportTemplate({})
+                      toast.success('Đã tải file mẫu — mở Excel, điền danh sách rồi upload lại')
+                    } catch (err: any) {
+                      toast.error('Lỗi tạo file mẫu: ' + err.message)
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Tải mẫu
+                </button>
+              </div>
+            </>
           ) : result ? (
             /* Result */
-            <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-6 h-6 text-green-500" />
-                <h3 className="font-bold text-green-700 text-base">Import thành công!</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: 'Tài khoản mới tạo', value: result.created, color: 'text-purple-600' },
-                  { label: 'Đã tồn tại', value: result.existing, color: 'text-blue-600' },
-                  { label: 'Đăng ký vào lớp', value: result.enrolled, color: 'text-green-600' },
-                  { label: 'Đã trong lớp', value: result.skipped, color: 'text-gray-500' },
-                ].map(item => (
-                  <div key={item.label} className="bg-white rounded-lg p-3 border border-green-100">
-                    <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{item.label}</p>
+            (() => {
+              const ok = result.inserted > 0 || result.updated > 0
+              const themeBg     = ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+              const themeIcon   = ok ? 'text-green-500' : 'text-red-500'
+              const themeTitle  = ok ? 'text-green-700' : 'text-red-700'
+              const themeChip   = ok ? 'border-green-100' : 'border-red-100'
+              return (
+              <div className={`${themeBg} border rounded-xl p-5`}>
+                <div className="flex items-center gap-2 mb-4">
+                  {ok
+                    ? <CheckCircle2 className={`w-6 h-6 ${themeIcon}`} />
+                    : <AlertCircle  className={`w-6 h-6 ${themeIcon}`} />}
+                  <h3 className={`font-bold ${themeTitle} text-base`}>
+                    {ok ? 'Import thành công!' : 'Import thất bại'}
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Học sinh mới thêm', value: result.inserted, color: 'text-purple-600' },
+                    { label: 'Đã cập nhật',       value: result.updated,  color: 'text-blue-600' },
+                    { label: 'Bỏ qua (lỗi)',      value: result.skipped,  color: result.skipped > 0 ? 'text-red-600' : 'text-gray-500' },
+                    { label: 'Tổng dòng đọc',     value: result.total,    color: 'text-gray-700' },
+                  ].map(item => (
+                    <div key={item.label} className={`bg-white rounded-lg p-3 border ${themeChip}`}>
+                      <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Sample errors — giúp giáo viên (và dev) thấy nguyên nhân thật */}
+                {errors.length > 0 && (
+                  <div className="mt-4 bg-white rounded-lg p-3 border border-red-100">
+                    <p className="text-xs font-bold text-red-700 mb-2 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      Chi tiết lỗi (3 ví dụ đầu):
+                    </p>
+                    <ul className="space-y-1">
+                      {errors.map((e, i) => (
+                        <li key={i} className="text-xs text-gray-600 font-mono leading-snug">
+                          • {e}
+                        </li>
+                      ))}
+                    </ul>
+                    {!ok && result.skipped > 0 && (
+                      <p className="mt-2 text-[11px] text-red-600">
+                        Nếu thấy lỗi <code className="bg-red-50 px-1 rounded">no unique or exclusion constraint</code>,
+                        hãy báo admin để chạy migration UNIQUE constraint trên bảng ClassStudent.
+                      </p>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+              )
+            })()
           ) : (
             /* Preview */
             <div>
@@ -542,11 +887,15 @@ export default function ClassesPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [classToDelete, setClassToDelete] = useState<string | null>(null)
 
+  const [contextFilter, setContextFilter] = useState<'ALL' | ContextType>('ALL')
+
   const [newClass, setNewClass] = useState({
     name: '',
     grade: 'Khối 9',
     schoolYear: '2025-2026',
     description: '',
+    context_type: 'SCHOOL' as ContextType,
+    institution_name: '',
   })
 
   useEffect(() => {
@@ -556,17 +905,10 @@ export default function ClassesPage() {
   const fetchClasses = async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/classes')
-      if (!res.ok) throw new Error('Failed')
-      const data = await res.json()
-      setClasses(data.classes || [])
+      const res = await api.get<{ classes: Class[] }>('/classes')
+      setClasses(res.data?.classes || [])
     } catch {
-      // Demo fallback
-      setClasses([
-        { id: '1', name: 'Lớp 9A1', grade: 'Khối 9', schoolYear: '2025-2026', studentCount: 32, createdAt: new Date().toISOString() },
-        { id: '2', name: 'Lớp 10B2', grade: 'Khối 10', schoolYear: '2025-2026', studentCount: 28, createdAt: new Date().toISOString() },
-        { id: '3', name: 'Lớp 11C3', grade: 'Khối 11', schoolYear: '2025-2026', studentCount: 0, createdAt: new Date().toISOString() },
-      ])
+      setClasses([])
     } finally {
       setLoading(false)
     }
@@ -578,25 +920,20 @@ export default function ClassesPage() {
       return
     }
     try {
-      const res = await fetch('/api/classes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newClass),
-      })
-      if (!res.ok) throw new Error('Failed')
+      await api.post('/classes', newClass)
       toast.success('Đã tạo lớp học thành công')
       setCreateOpen(false)
-      setNewClass({ name: '', grade: 'Khối 9', schoolYear: '2025-2026', description: '' })
+      setNewClass({ name: '', grade: 'Khối 9', schoolYear: '2025-2026', description: '', context_type: 'SCHOOL', institution_name: '' })
       fetchClasses()
-    } catch {
-      toast.error('Không thể tạo lớp học')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể tạo lớp học')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/classes/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed')
+      await api.delete(`/classes/${id}`)
       toast.success('Đã xóa lớp học')
       setDeleteOpen(false)
       setClassToDelete(null)
@@ -606,12 +943,20 @@ export default function ClassesPage() {
     }
   }
 
-  const filtered = classes.filter(
-    c =>
+  const filtered = classes.filter(c => {
+    const matchSearch =
       !searchQuery ||
       c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.grade.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+      c.grade.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.institution_name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const matchCtx =
+      contextFilter === 'ALL' ||
+      (c.context_type || 'SCHOOL') === contextFilter
+    return matchSearch && matchCtx
+  })
+
+  const schoolCount = classes.filter(c => (c.context_type || 'SCHOOL') === 'SCHOOL').length
+  const centerCount = classes.filter(c => c.context_type === 'CENTER').length
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-purple-50/30 px-4 sm:px-6 lg:px-8 py-8">
@@ -648,16 +993,40 @@ export default function ClassesPage() {
             </button>
           </div>
         </div>
-        <div className="max-w-md">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Tìm kiếm lớp học..."
+              placeholder="Tìm kiếm lớp, khối, tên trường..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+              className="w-full sm:w-80 pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
             />
+          </div>
+          {/* Context filter tabs */}
+          <div className="flex items-center gap-1.5 bg-gray-100 rounded-xl p-1">
+            {([
+              { key: 'ALL',    label: 'Tất cả',    count: classes.length },
+              { key: 'SCHOOL', label: 'Trường',    count: schoolCount, icon: <School className="w-3.5 h-3.5" /> },
+              { key: 'CENTER', label: 'Trung tâm', count: centerCount, icon: <Building2 className="w-3.5 h-3.5" /> },
+            ] as const).map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setContextFilter(tab.key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                  contextFilter === tab.key
+                    ? 'bg-white text-purple-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {'icon' in tab && tab.icon}
+                {tab.label}
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                  contextFilter === tab.key ? 'bg-purple-100 text-purple-700' : 'bg-gray-200 text-gray-500'
+                }`}>{tab.count}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -692,7 +1061,13 @@ export default function ClassesPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-purple-600 truncate mb-3">{cls.name}</h3>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <ContextBadge type={cls.context_type} />
+                    {cls.institution_name && (
+                      <span className="text-[11px] text-gray-500 truncate">{cls.institution_name}</span>
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold text-purple-600 truncate mb-2">{cls.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap text-sm">
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 text-purple-600 border border-purple-200">
                       <GraduationCap className="h-3.5 w-3.5" />
@@ -722,11 +1097,20 @@ export default function ClassesPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => navigate(`/teacher/classes/${cls.id}`)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                  onClick={() => navigate(
+                    `/teacher/gradebook?grade=${encodeURIComponent(cls.grade)}&classId=${cls.id}&semester=HK2&ctx=${cls.context_type || 'SCHOOL'}`
+                  )}
+                  title={cls.context_type === 'CENTER' ? 'Bảng điểm trung tâm' : 'Mở sổ điểm TT58'}
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-xs font-semibold transition-colors ${
+                    cls.context_type === 'CENTER'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
                 >
-                  <BarChart3 className="h-3.5 w-3.5" />
-                  Xem chi tiết
+                  {cls.context_type === 'CENTER'
+                    ? <><BookOpenCheck className="h-3.5 w-3.5" />Bảng điểm</>
+                    : <><FileSpreadsheet className="h-3.5 w-3.5" />Sổ điểm</>
+                  }
                 </button>
                 <button
                   onClick={() => {
@@ -737,6 +1121,13 @@ export default function ClassesPage() {
                 >
                   <UserPlus className="h-3.5 w-3.5" />
                   Thêm HS
+                </button>
+                <button
+                  onClick={() => navigate(`/teacher/classes/${cls.id}`)}
+                  title="Xem chi tiết"
+                  className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => {
@@ -763,6 +1154,65 @@ export default function ClassesPage() {
       {/* Create Modal */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Tạo lớp học mới">
         <div className="space-y-4">
+          {/* Context type: SCHOOL vs CENTER */}
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-2 block">
+              Loại lớp học <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: 'SCHOOL', label: 'Lớp trường học', desc: 'Chấm điểm theo TT58', icon: School, color: 'blue' },
+                { value: 'CENTER', label: 'Lớp trung tâm', desc: 'Đánh giá linh hoạt',  icon: Building2, color: 'emerald' },
+              ] as const).map(opt => {
+                const Icon = opt.icon
+                const isSelected = newClass.context_type === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setNewClass({ ...newClass, context_type: opt.value })}
+                    className={`flex items-start gap-2 p-3 rounded-xl border-2 text-left transition-all ${
+                      isSelected
+                        ? opt.color === 'blue'
+                          ? 'border-blue-400 bg-blue-50'
+                          : 'border-emerald-400 bg-emerald-50'
+                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${
+                      isSelected
+                        ? opt.color === 'blue' ? 'text-blue-600' : 'text-emerald-600'
+                        : 'text-gray-400'
+                    }`} />
+                    <div>
+                      <p className={`text-sm font-semibold ${
+                        isSelected
+                          ? opt.color === 'blue' ? 'text-blue-700' : 'text-emerald-700'
+                          : 'text-gray-700'
+                      }`}>{opt.label}</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">{opt.desc}</p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Institution name */}
+          <div>
+            <label className="text-sm font-bold text-gray-700 mb-1.5 block">
+              {newClass.context_type === 'CENTER' ? 'Tên trung tâm' : 'Tên trường học'}
+              <span className="ml-1 font-normal text-gray-400 text-xs">(tùy chọn)</span>
+            </label>
+            <input
+              type="text"
+              value={newClass.institution_name}
+              onChange={e => setNewClass({ ...newClass, institution_name: e.target.value })}
+              placeholder={newClass.context_type === 'CENTER' ? 'Ví dụ: Trung tâm Gia sư ABC' : 'Ví dụ: THPT Nguyễn Bỉnh Khiêm'}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+
           <div>
             <label className="text-sm font-bold text-gray-700 mb-1.5 block">
               Tên lớp <span className="text-red-500">*</span>

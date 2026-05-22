@@ -8,8 +8,11 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
+import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
+import { recommendationService as rs, getRsTypeMeta } from '@/services/recommendation.service'
 import {
   Users, Brain, TrendingUp, AlertTriangle, Sparkles,
   BarChart3, Heart, Zap, Target, Clock, Award, Eye,
@@ -19,29 +22,37 @@ import {
   Cpu, Lightbulb, ArrowUpRight,
 } from 'lucide-react'
 
-/* ─── Dark palette ─────────────────────────────────────────────── */
 const D = {
-  bg:     '#0d0e17',
-  card:   '#10111e',
-  card2:  '#161728',
-  border: 'rgba(255,255,255,0.07)',
-  text:   '#f1f5f9',
-  muted:  '#94a3b8',
-  purple: '#7c3aed',
-  purpleL:'#a78bfa',
-  cyan:   '#22d3ee',
-  green:  '#10b981',
-  amber:  '#f59e0b',
-  red:    '#ef4444',
-  blue:   '#3b82f6',
-  pink:   '#e879f9',
-  white: (a: number) => `rgba(255,255,255,${a})`,
-  purpleA:(a: number) => `rgba(124,58,237,${a})`,
-  greenA: (a: number) => `rgba(16,185,129,${a})`,
-  redA:   (a: number) => `rgba(239,68,68,${a})`,
-  cyanA:  (a: number) => `rgba(34,211,238,${a})`,
-  blueA:  (a: number) => `rgba(59,130,246,${a})`,
-}
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
+} as const
+
 
 /* ─── Types ─────────────────────────────────────────────────────── */
 interface Student {
@@ -714,6 +725,9 @@ export default function TeacherDashboard() {
         {/* ── Right column (320px) ── */}
         <div style={{ width: 308, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+          {/* Reco card — HS cần hỗ trợ + tự khảo sát */}
+          <TeacherRecoCard D={D} />
+
           {/* AI Co-Teacher panel */}
           <div style={{ background: D.card, border: `1px solid ${D.purpleA(0.25)}`, borderRadius: 14, overflow: 'hidden' }}>
             {/* Header */}
@@ -836,6 +850,132 @@ export default function TeacherDashboard() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* ════ LIVE LEADERBOARD — top học sinh dẫn đầu thời gian thực ════ */}
+      <div style={{ maxWidth: 1400, margin: '24px auto 0', padding: '0 24px 32px' }}>
+        <LiveLeaderboard />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * TeacherRecoCard — Hiển thị gợi ý cho GV trên dashboard:
+ *   - 🆘 HS cần hỗ trợ (mastery yếu)
+ *   - 🛣 HS vừa tự khảo sát lộ trình
+ *
+ * Refetch 5 phút. Click → navigate tới link tương ứng.
+ */
+function TeacherRecoCard({ D }: { D: any }) {
+  const { data: feed } = useQuery({
+    queryKey: ['reco-feed-teacher-dashboard'],
+    queryFn: () => rs.getFeed('teacher', 6),
+    staleTime: 5 * 60_000,
+  })
+
+  if (!feed || feed.items.length === 0) return null
+
+  return (
+    <div style={{
+      background: D.card,
+      border: `1px solid ${D.purpleA(0.25)}`,
+      borderRadius: 14,
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        padding: '14px 16px',
+        background: `linear-gradient(135deg, rgba(34,211,238,0.2), rgba(34,211,238,0.05))`,
+        borderBottom: `1px solid rgba(34,211,238,0.2)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 30, height: 30, borderRadius: 8,
+            background: `linear-gradient(135deg, #22d3ee, #3b82f6)`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: `0 2px 10px rgba(34,211,238,0.5)`,
+          }}>
+            <span style={{ fontSize: 14 }}>✨</span>
+          </div>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 700, color: D.text, margin: 0 }}>Gợi ý cho bạn</p>
+            <p style={{ fontSize: 10, color: '#67e8f9', margin: 0 }}>{feed.count} item · AI cá nhân hoá</p>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {feed.items.map((item) => {
+          const meta = getRsTypeMeta(item.type)
+          return (
+            <Link
+              key={`${item.type}-${item.id}`}
+              to={item.link}
+              onClick={() => rs.track({
+                action: 'click',
+                targetType: item.type,
+                targetId: item.id,
+                metadata: { source: 'teacher-dashboard' },
+              })}
+              style={{
+                display: 'block',
+                padding: '8px 10px',
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.03)',
+                border: `1px solid ${D.border}`,
+                borderLeftWidth: 3,
+                borderLeftColor: meta.accent,
+                textDecoration: 'none',
+                transition: 'background .15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <span style={{ fontSize: 12 }}>{meta.emoji}</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: 0.5, color: meta.accent,
+                }}>
+                  {meta.label}
+                </span>
+              </div>
+              <p style={{
+                fontSize: 12, fontWeight: 600, color: D.text, margin: 0,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {item.title}
+              </p>
+              {item.subtitle && (
+                <p style={{
+                  fontSize: 10, color: D.muted, margin: 0, marginTop: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {item.subtitle}
+                </p>
+              )}
+            </Link>
+          )
+        })}
+        {/* CTA tới Sprint Dashboard — RS Phase 7 UI */}
+        <Link
+          to="/teacher/sprint"
+          onClick={() => rs.track({
+            action: 'click',
+            targetType: 'sprint_dashboard',
+            targetId: 'teacher-sprint',
+            metadata: { source: 'teacher-dashboard-cta' },
+          })}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '8px 10px', borderRadius: 8, marginTop: 4,
+            background: 'linear-gradient(135deg, rgba(34,211,238,0.12), rgba(168,85,247,0.12))',
+            border: `1px dashed ${D.purpleA(0.45)}`,
+            textDecoration: 'none', color: '#a5f3fc', fontSize: 11, fontWeight: 700,
+          }}
+        >
+          ⚡ Mở Sprint Dashboard đầy đủ →
+        </Link>
       </div>
     </div>
   )

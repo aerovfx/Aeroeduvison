@@ -9,15 +9,36 @@ import type { TranscriptSegment } from '@/lib/transcript/soniox-client'
 
 /* ── Dark palette ── */
 const D = {
-  bg: '#0d0e17',
-  card: '#10111e',
-  card2: '#161728',
-  border: '#1e2033',
-  border2: '#2a2b3d',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
 } as const
+
 
 const LANGUAGES = [
   { value: 'auto', label: '🌐 Tự động phát hiện' },
@@ -194,9 +215,9 @@ export default function TranscriptPage() {
             </div>
             <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
               {([
-                { Icon: Mic,       color: '#a78bfa', label: 'Ghi âm',   desc: 'Transcribe trực tiếp', path: '/teacher/transcript/recording' },
+                { Icon: Mic,       color: '#a78bfa', label: 'Ghi âm',   desc: 'Transcribe trực tiếp', path: '/teacher/transcript' },
                 { Icon: Upload,    color: '#60a5fa', label: 'Upload',   desc: 'Từ file audio/video',  path: '/teacher/transcript/upload' },
-                { Icon: FileVideo, color: '#4ade80', label: 'Thư viện', desc: 'Quản lý transcript',   path: '/teacher/transcript/library' },
+                { Icon: FileVideo, color: '#4ade80', label: 'Thư viện', desc: 'Quản lý transcript',   path: '/teacher/transcript/recording' },
               ]).map(({ Icon, color, label, desc, path }) => (
                 <div
                   key={label}
@@ -229,9 +250,9 @@ export default function TranscriptPage() {
               <div>
                 <span style={labelStyle}>Model</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {modeBtn('local', '🖥️ MLX Local')}
+                  {modeBtn('local', '⚡ fal.ai Whisper')}
                   {modeBtn('soniox', '☁️ Soniox')}
-                  {modeBtn('elevenlabs', '⚡ ElevenLabs')}
+                  {modeBtn('elevenlabs', '🎙️ ElevenLabs')}
                 </div>
                 {translationMode === 'soniox' && !apiKey && (
                   <p style={{ color: '#f59e0b', fontSize: 11, marginTop: 4 }}>⚠ Nhập API Key trong Cài đặt</p>
@@ -424,12 +445,12 @@ export default function TranscriptPage() {
                   onChange={e => setTranslationMode(e.target.value as RecorderTranslationMode)}
                   style={selectStyle}
                 >
-                  <option value="local">🖥️ MLX Local (mặc định — offline, miễn phí)</option>
+                  <option value="local">⚡ fal.ai Whisper large-v3 (mặc định — server-side, không cần key)</option>
                   <option value="soniox">☁️ Soniox (Real-time — cần API Key)</option>
-                  <option value="elevenlabs">⚡ ElevenLabs (API Key)</option>
+                  <option value="elevenlabs">🎙️ ElevenLabs (đang phát triển)</option>
                 </select>
                 <p style={{ color: D.muted, fontSize: 11, marginTop: 5 }}>
-                  Mặc định: MLX Local. Chọn Soniox hoặc ElevenLabs nếu cần cloud model.
+                  Mặc định: fal.ai Whisper qua server (Vietnamese OK). Chọn Soniox nếu cần real-time.
                 </p>
               </div>
 

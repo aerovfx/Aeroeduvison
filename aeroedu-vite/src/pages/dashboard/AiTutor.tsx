@@ -11,6 +11,8 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import api from '@/services/api'
+import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
+import { MathText } from '@/components/common/MathText'
 
 interface Message {
   id: string
@@ -28,6 +30,18 @@ const QUICK_PROMPTS = [
 ]
 
 export default function AiTutorPage() {
+  return (
+    <AiSubscriptionGate
+      feature="ai_tutor"
+      featureLabel="AI Tutor"
+      description="AI Tutor là gia sư AI 24/7 — giải thích bài tập, hướng dẫn từng bước, hỗ trợ mọi môn học."
+    >
+      <AiTutorPageInner />
+    </AiSubscriptionGate>
+  )
+}
+
+function AiTutorPageInner() {
   const { user } = useAuth()
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -182,15 +196,15 @@ export default function AiTutorPage() {
                   : 'bg-[hsl(262,83%,58%)] text-white rounded-tr-sm',
               )}
             >
-              <div className="whitespace-pre-wrap leading-relaxed">
-                {msg.content}
+              <div className="leading-relaxed">
+                <MathText as="span">{msg.content}</MathText>
                 {msg.isStreaming && (
                   <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse rounded-sm" />
                 )}
               </div>
               {msg.type === 'bot' && !msg.isStreaming && msg.content && (
                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border">
-                  <button className="text-muted-foreground hover:text-[hsl(142,76%,36%)] transition">
+                  <button className="text-muted-foreground hover:text-emerald-600 transition">
                     <ThumbsUp className="w-3.5 h-3.5" />
                   </button>
                   <button className="text-muted-foreground hover:text-destructive transition">
@@ -211,7 +225,7 @@ export default function AiTutorPage() {
             <button
               key={prompt}
               onClick={() => sendMessage(prompt)}
-              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-full px-3 py-1.5 hover:border-[hsl(262,83%,58%)]/50 hover:text-[hsl(262,83%,58%)] transition"
+              className="flex items-center gap-1.5 text-xs bg-card border border-border rounded-full px-3 py-1.5 hover:border-indigo-500/50 hover:text-indigo-500 transition"
             >
               <Lightbulb className="w-3 h-3" />
               {prompt}

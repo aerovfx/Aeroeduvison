@@ -158,6 +158,31 @@ export interface CompileResult {
   compileTime?: number;
 }
 
+async function commandExists(command: string): Promise<boolean> {
+  try {
+    await execFileAsync(command, ["--version"], {
+      timeout: 5_000,
+      maxBuffer: 128 * 1024,
+      env: getTexEnv(),
+    });
+    return true;
+  } catch (err: any) {
+    if (err?.code === "ENOENT") return false;
+    return true;
+  }
+}
+
+function getInstallHint(): string {
+  const os = platform();
+  if (os === "darwin") {
+    return "macOS: brew install --cask mactex (or basictex) or brew install tectonic";
+  }
+  if (os === "linux") {
+    return "Linux: sudo apt install texlive-xetex texlive-latex-extra — or cargo install tectonic";
+  }
+  return "Install TeX Live (xelatex) or Tectonic (cargo install tectonic)";
+}
+
 async function runInDir(
   cwd: string,
   command: string,
@@ -288,8 +313,19 @@ async function compileWithCache(content: string): Promise<CompileResult> {
   // Use shared temp directory
   const tmpBase = join(tmpdir(), "latex-compile");
   const tmpDir = join(tmpBase, `${Date.now()}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
-  
+
   try {
+    const [hasXelatex, hasTectonic] = await Promise.all([
+      commandExists("xelatex"),
+      commandExists("tectonic"),
+    ]);
+    if (!hasXelatex && !hasTectonic) {
+      return {
+        error: `Compile LaTeX server-side chưa khả dụng. LaTeX engine chưa được cài đặt. ${getInstallHint()}`,
+        code: "COMPILE_NOT_AVAILABLE",
+      };
+    }
+
     await mkdir(tmpDir, { recursive: true });
     const mainPath = join(tmpDir, "main.tex");
     const outPath = join(tmpDir, "main.pdf");
@@ -334,7 +370,7 @@ async function compileWithCache(content: string): Promise<CompileResult> {
       return { pdf, log, compileTime: Date.now() - startTime };
     } catch {
       return {
-        error: "Compilation failed. Install TeX Live or Tectonic.",
+        error: "Compilation failed. XeLaTeX/Tectonic is available but the document has compile errors.",
         code: "COMPILE_ERROR",
         log,
       };

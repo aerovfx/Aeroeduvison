@@ -24,13 +24,23 @@ interface SimEntry {
   title: string
   description: string
   icon: React.FC<{ className?: string; style?: React.CSSProperties }>
-  category: 'basics' | 'chemistry' | 'physics' | 'astronomy' | 'interactive' | 'shaders' | 'biology' | 'procedural' | 'performance'
+  category: 'basics' | 'chemistry' | 'physics' | 'astronomy' | 'interactive' | 'shaders' | 'biology' | 'procedural' | 'performance' | 'fpv'
   color: string
   difficulty: 'Beginner' | 'Intermediate' | 'Advanced'
   standalone?: boolean
 }
 
 const SIMULATIONS: SimEntry[] = [
+  // ── ⭐ FEATURED — FPV Drone Sandbox + WebXR (đặt đầu trang) ──
+  {
+    id: 'fpv-drone-vr',
+    title: '🚁 FPV Drone Sandbox + VR',
+    description: 'Bay quadcopter trong môi trường procedural với race gates, địa hình đồi núi, rừng cây, tòa nhà, hangar, water tower. Hỗ trợ tay cầm FPV/RC TX (USB joystick mode), gamepad chuẩn, joystick ảo trên điện thoại, hoặc bàn phím. Vào VR qua WebXR cho Meta Quest/Vision Pro.',
+    icon: Wind,
+    category: 'fpv',
+    color: '#ec4899',
+    difficulty: 'Advanced',
+  },
   {
     id: 'interactive-box',
     title: 'Interactive Shapes',
@@ -334,6 +344,26 @@ const SIMULATIONS: SimEntry[] = [
     color: '#818cf8',
     difficulty: 'Advanced',
   },
+  // ── 🌑 Eclipse Simulations ──────────────────────────────────
+  {
+    id: 'solar-eclipse',
+    title: '🌑 Nhật Thực (Solar Eclipse)',
+    description: 'Giả lập hiện tượng nhật thực: Mặt Trăng che khuất Mặt Trời khi đi qua giữa Trái Đất và Mặt Trời. Quan sát các giai đoạn: bán phần, toàn phần (corona vành nhật hoa), rồi trở lại bình thường.',
+    icon: CircleDot,
+    category: 'astronomy',
+    color: '#f59e0b',
+    difficulty: 'Intermediate',
+  },
+  {
+    id: 'lunar-eclipse',
+    title: '🌕 Nguyệt Thực (Lunar Eclipse)',
+    description: 'Giả lập hiện tượng nguyệt thực: Trái Đất che khuất ánh sáng Mặt Trời chiếu vào Mặt Trăng. Mặt Trăng chuyển sang màu đỏ cam (Blood Moon) khi đi vào vùng bóng tối hoàn toàn (umbra). Có nhãn bán ảnh / bóng tối.',
+    icon: Globe,
+    category: 'astronomy',
+    color: '#ef4444',
+    difficulty: 'Intermediate',
+  },
+  // (FPV entry moved to top of array — featured)
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -346,6 +376,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   biology: '#ec4899',
   procedural: '#22c55e',
   performance: '#f97316',
+  fpv: '#ec4899',         // pink hồng cho FPV/VR sandbox
 }
 
 // ─────────────────────────────────────────────
@@ -492,9 +523,9 @@ function UserSandboxEditor({
   saved: boolean
 }) {
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
       {/* Top bar */}
-      <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+      <div className="px-4 py-3 border-b flex items-center justify-between">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
@@ -510,14 +541,14 @@ function UserSandboxEditor({
           )}
           <button
             onClick={onDownload}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 bg-muted dark:bg-white/[0.04] hover:bg-accent border transition-all"
           >
             <Download className="h-3 w-3" />
             Export
           </button>
           <button
             onClick={onSave}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/80 bg-cyan-600/80 hover:bg-cyan-500 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/80 bg-cyan-600 hover:bg-cyan-700 dark:bg-cyan-600/80 dark:hover:bg-cyan-500 transition-all"
           >
             <Save className="h-3 w-3" />
             Save
@@ -645,8 +676,8 @@ export default function AuraPage() {
     if (currentSim) {
       const SimComponent = ALL_SIMS[activeSim]
       return (
-        <div className="min-h-screen bg-[#0a0a0f] text-white flex flex-col">
-          <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 flex items-center gap-4">
+        <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white flex flex-col">
+          <div className="px-4 py-3 border-b shrink-0 flex items-center gap-4">
             <button
               onClick={() => setActiveSim(null)}
               className="flex items-center gap-2 text-sm text-white/40 hover:text-white/70 transition-colors"
@@ -688,7 +719,7 @@ export default function AuraPage() {
 
   // ── CATALOG VIEW ──
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
+    <div className="min-h-screen bg-background text-foreground dark:bg-[#0a0a0f] dark:text-white">
       {/* Header */}
       <div className="px-6 pt-8 pb-6">
         <div className="flex items-center gap-3 mb-2">
@@ -702,6 +733,75 @@ export default function AuraPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* ── ⭐ FEATURED — FPV Drone Sandbox + VR (hero card) ── */}
+      <div className="px-6 pb-6">
+        <h2 className="text-sm font-semibold text-pink-700 dark:text-pink-400/80 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span>★</span> Featured Sandbox
+        </h2>
+        <button
+          onClick={() => setActiveSim('fpv-drone-vr')}
+          className="group w-full text-left rounded-2xl overflow-hidden relative transition-all duration-300 hover:scale-[1.005]"
+          style={{
+            background: 'linear-gradient(135deg, rgba(236,72,153,0.18) 0%, rgba(139,92,246,0.18) 50%, rgba(6,182,212,0.18) 100%)',
+            border: '1px solid rgba(236,72,153,0.4)',
+            boxShadow: '0 8px 32px rgba(236,72,153,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
+          }}
+        >
+          {/* Animated glow lines */}
+          <div className="absolute inset-0 opacity-30 pointer-events-none" style={{
+            background: 'radial-gradient(ellipse at top right, rgba(236,72,153,0.3), transparent 60%), radial-gradient(ellipse at bottom left, rgba(6,182,212,0.25), transparent 60%)',
+          }} />
+          <div className="relative p-6 md:p-8 flex flex-col md:flex-row gap-6 items-start md:items-center">
+            {/* Left: Icon + giant emoji */}
+            <div className="flex-shrink-0 flex items-center gap-4">
+              <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-5xl"
+                style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.3), rgba(139,92,246,0.3))', border: '1px solid rgba(236,72,153,0.5)' }}>
+                🚁
+              </div>
+              <div className="hidden md:block w-px h-16 bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+            </div>
+            {/* Middle: Title + description */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h3 className="text-xl md:text-2xl font-bold text-white">FPV Drone Sandbox + VR</h3>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)' }}>
+                  ⭐ Featured
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#a78bfa', background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.4)' }}>
+                  WebXR VR
+                </span>
+                <span className="px-2 py-0.5 rounded-md text-[0.65rem] font-bold uppercase tracking-wider"
+                  style={{ color: '#10b981', background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.4)' }}>
+                  📱 Mobile
+                </span>
+              </div>
+              <p className="text-sm text-white/70 leading-relaxed mb-3">
+                Bay quadcopter trong môi trường procedural — đồi núi, rừng cây, tòa nhà, hangar, water tower,
+                billboards, scaffolds. 5 cấp độ tăng dần từ hover cơ bản đến full course pro.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap text-xs text-white/50">
+                <span>🎮 Tay cầm RC TX</span>
+                <span>•</span>
+                <span>📱 Joystick ảo</span>
+                <span>•</span>
+                <span>⌨️ Bàn phím</span>
+                <span>•</span>
+                <span>🥽 Meta Quest / Vision Pro</span>
+              </div>
+            </div>
+            {/* Right: CTA */}
+            <div className="flex-shrink-0">
+              <div className="px-5 py-3 rounded-xl text-white font-bold text-sm flex items-center gap-2 transition-transform group-hover:translate-x-1"
+                style={{ background: 'linear-gradient(135deg, #ec4899, #8b5cf6)', boxShadow: '0 4px 16px rgba(236,72,153,0.4)' }}>
+                Bắt đầu bay →
+              </div>
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* ── Your Sandboxes ── */}
@@ -768,7 +868,7 @@ export default function AuraPage() {
       <div className="px-6 pb-8">
         <h2 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-3">Built-in Simulations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {SIMULATIONS.map(sim => {
+          {SIMULATIONS.filter(s => s.id !== 'fpv-drone-vr').map(sim => {
             const Icon = sim.icon
             return (
               <button

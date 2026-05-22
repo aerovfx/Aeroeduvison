@@ -95,6 +95,25 @@ function buildQrUrl(url: string, size: number) {
   )}`
 }
 
+/** Tải ảnh cross-origin về máy dùng fetch → blob → object URL.
+ *  Fallback: mở tab mới nếu CORS thất bại. */
+async function downloadQrImage(src: string, filename: string) {
+  try {
+    const resp = await fetch(src)
+    const blob = await resp.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 1500)
+  } catch {
+    window.open(src, '_blank', 'noopener')
+  }
+}
+
 export function QuickScanQr({
   targetUrl,
   title = 'Mở nhanh trên điện thoại',
@@ -205,14 +224,14 @@ export function QuickScanQr({
                   <QrCode className="h-3.5 w-3.5" />
                   Phóng to
                 </button>
-                <a
-                  href={qrHires}
-                  download={downloadName}
+                <button
+                  type="button"
+                  onClick={() => downloadQrImage(qrHires, downloadName)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.1] text-xs text-white/70 hover:bg-white/[0.1] transition-all"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Tải PNG
-                </a>
+                </button>
               </div>
             </div>
           </div>
@@ -299,14 +318,14 @@ function QrZoomModal({
             <ExternalLink className="h-3.5 w-3.5" />
             Mở trong tab mới
           </a>
-          <a
-            href={qrHires}
-            download={downloadName}
+          <button
+            type="button"
+            onClick={() => downloadQrImage(qrHires, downloadName)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs transition-all ${a.btn}`}
           >
             <Download className="h-3.5 w-3.5" />
             Tải PNG in giấy
-          </a>
+          </button>
         </div>
       </div>
     </div>

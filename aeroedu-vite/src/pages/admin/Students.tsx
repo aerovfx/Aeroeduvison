@@ -1,9 +1,14 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search, Users, TrendingUp, TrendingDown, Minus,
   AlertTriangle, CheckCircle, Brain, Heart, Zap,
   Eye, MessageSquare, ChevronRight, Activity, Award, Target, Clock,
+  Lock,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
+import { adminUsersService, type AdminUser } from '@/services/adminUsers.service'
 
 /* ────────────────────────────────────────────────
    Types
@@ -387,21 +392,79 @@ function StudentDetailView({ student, onBack }: { student: Student; onBack: () =
 }
 
 /* ────────────────────────────────────────────────
+   Real data mapping
+──────────────────────────────────────────────── */
+
+/**
+ * Map AdminUser (từ DB) → Student (interface UI cũ).
+ * Các field analytics (XP, mastery, emotion) chưa có ở backend → tạm
+ * dùng placeholder hợp lý (0 / 'Chưa có dữ liệu'). Khi backend bổ sung
+ * /api/admin/users/:id/stats → cập nhật mapping thực.
+ */
+function mapUserToStudent(u: AdminUser): Student {
+  // Avatar: 2 chữ đầu của tên
+  const initials = (u.name || u.email).split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  // Last active: dựa vào lastLoginAt
+  let lastActive = 'Chưa đăng nhập'
+  if (u.lastLoginAt) {
+    const diffH = (Date.now() - new Date(u.lastLoginAt).getTime()) / (1000 * 60 * 60)
+    if (diffH < 1)        lastActive = 'Vừa xong'
+    else if (diffH < 24)  lastActive = `${Math.floor(diffH)} giờ trước`
+    else if (diffH < 168) lastActive = `${Math.floor(diffH / 24)} ngày trước`
+    else                  lastActive = `${Math.floor(diffH / 168)} tuần trước`
+  }
+  // Risk: nếu banned → critical, mới đăng ký + chưa login → high, có login → low (placeholder)
+  const riskLevel: Student['riskLevel'] =
+    u.banned ? 'critical' :
+    !u.lastLoginAt ? 'high' :
+    'low'
+  return {
+    id: u.id,
+    name: u.name || u.email.split('@')[0],
+    email: u.email,
+    avatar: initials,
+    class: 'Chưa phân lớp',  // TODO: backend trả về class từ ClassStudent
+    currentXP: 0,
+    xpChange: 0,
+    masteryPercentage: 0,
+    emotionScore: 0,
+    riskLevel,
+    lastActive,
+  }
+}
+
+/* ────────────────────────────────────────────────
    Main Page
 ──────────────────────────────────────────────── */
 export default function Students() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedClass, setSelectedClass] = useState('all')
   const [selectedRisk, setSelectedRisk] = useState('all')
-  const [students] = useState<Student[]>(MOCK_STUDENTS)
+  const [students, setStudents] = useState<Student[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list')
+  const [totalCount, setTotalCount] = useState(0)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Simulate loading
+  // ── Fetch real students từ /api/admin/users ────────────────────────────
+  // Khác mock cũ: data thật từ DB, không có XP/mastery/emotion → tạm
+  // placeholder vì các field này chưa được tính trên backend.
+  // Lớp = lấy từ ClassStudent (nếu có) hoặc 'Chưa phân lớp'.
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 600)
-    return () => clearTimeout(t)
+    setIsLoading(true)
+    setLoadError(null)
+    adminUsersService.list({ accountType: 'STUDENT', limit: 500, sortBy: 'createdAt', sortOrder: 'desc' })
+      .then(({ users, total }) => {
+        setTotalCount(total)
+        const mapped: Student[] = users.map(u => mapUserToStudent(u))
+        setStudents(mapped)
+      })
+      .catch(err => {
+        console.error('[admin:students] load failed', err)
+        setLoadError(err?.response?.data?.error || 'Không tải được danh sách học sinh')
+      })
+      .finally(() => setIsLoading(false))
   }, [])
 
   const filtered = useMemo(() => {
@@ -413,6 +476,66 @@ export default function Students() {
       return matchSearch && matchClass && matchRisk
     })
   }, [students, searchTerm, selectedClass, selectedRisk])
+
+  /** Build export sheets — main list + breakdown by class + by risk + XP distribution */
+  const getStudentsSheets = useCallback((): SheetData[] => {
+    if (filtered.length === 0) return []
+    const sheets: SheetData[] = []
+    sheets.push({
+      name: `Danh sách HS (${filtered.length})`,
+      columns: [
+        { key: 'name',               label: 'Họ tên' },
+        { key: 'email',              label: 'Email' },
+        { key: 'class',              label: 'Lớp' },
+        { key: 'currentXP',          label: 'XP hiện tại',   type: 'number' },
+        { key: 'xpChange',           label: 'XP thay đổi',   type: 'number' },
+        { key: 'masteryPercentage',  label: 'Mastery %',     type: 'number' },
+        { key: 'emotionScore',       label: 'Cảm xúc (1-10)', type: 'number' },
+        { key: 'riskLevel',          label: 'Mức rủi ro' },
+        { key: 'lastActive',         label: 'Hoạt động gần đây' },
+      ],
+      rows: filtered,
+    })
+    // Breakdown by class
+    const byClass = new Map<string, { count: number; avgXP: number; avgMastery: number }>()
+    for (const s of filtered) {
+      const c = byClass.get(s.class) || { count: 0, avgXP: 0, avgMastery: 0 }
+      c.count++
+      c.avgXP += s.currentXP
+      c.avgMastery += s.masteryPercentage
+      byClass.set(s.class, c)
+    }
+    sheets.push({
+      name: 'Theo lớp',
+      columns: [
+        { key: 'class',      label: 'Lớp' },
+        { key: 'count',      label: 'Số HS',     type: 'number' },
+        { key: 'avgXP',      label: 'XP trung bình',   type: 'number' },
+        { key: 'avgMastery', label: 'Mastery TB %',    type: 'number' },
+      ],
+      rows: Array.from(byClass.entries()).map(([cls, v]) => ({
+        class: cls,
+        count: v.count,
+        avgXP: Math.round(v.avgXP / v.count),
+        avgMastery: Math.round(v.avgMastery / v.count),
+      })),
+    })
+    // Breakdown by risk level
+    const byRisk = new Map<string, number>()
+    for (const s of filtered) byRisk.set(s.riskLevel, (byRisk.get(s.riskLevel) || 0) + 1)
+    sheets.push({
+      name: 'Theo mức rủi ro',
+      columns: [
+        { key: 'level', label: 'Mức' },
+        { key: 'count', label: 'Số HS', type: 'number' },
+        { key: 'pct',   label: 'Tỉ lệ', type: 'percent' },
+      ],
+      rows: Array.from(byRisk.entries()).map(([level, count]) => ({
+        level, count, pct: count / filtered.length,
+      })),
+    })
+    return sheets
+  }, [filtered])
 
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student)
@@ -434,18 +557,46 @@ export default function Students() {
     <div className="p-6 md:p-8 min-h-screen bg-[hsl(260,30%,8%)]">
 
       {/* Header */}
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-          <Users className="w-10 h-10 text-violet-400" />
-          <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent"
-            style={{ letterSpacing: '-1px' }}>
-            Student Insights Hub
-          </span>
-        </h1>
-        <p className="text-white/50 font-medium">
-          Track student behavior, emotions, and progress in real-time
-        </p>
+      <div className="mb-10 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+            <Users className="w-10 h-10 text-violet-400" />
+            <span className="bg-gradient-to-r from-violet-400 to-purple-300 bg-clip-text text-transparent"
+              style={{ letterSpacing: '-1px' }}>
+              Student Insights Hub
+            </span>
+          </h1>
+          <p className="text-white/50 font-medium">
+            Dữ liệu thật từ DB · Tổng <span className="text-violet-300 font-bold">{totalCount}</span> học sinh đăng ký
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/admin/users?accountType=STUDENT"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-bold hover:bg-violet-500/25 transition"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            Quản lý (ban/reset)
+          </Link>
+          <ExportMenu
+            filename={`students-${new Date().toISOString().slice(0, 10)}`}
+            getSheets={getStudentsSheets}
+            meta={{
+              title: 'Danh sách Học sinh',
+              subtitle: `Xuất sau khi filter (${filtered.length} HS) — AeroEduVision`,
+              authorName: 'Admin Dashboard',
+            }}
+          />
+        </div>
       </div>
+
+      {/* Error banner */}
+      {loadError && (
+        <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-300 text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4" />
+          {loadError}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="rounded-2xl bg-white/[0.03] border border-white/[0.07] p-6 mb-8">

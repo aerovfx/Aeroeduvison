@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
+import { adminUsersService, type AdminUser } from '@/services/adminUsers.service'
 import {
   Users, Award, Calendar, TrendingUp, Sparkles, BarChart3,
   Bell, Search, Plus, Edit, Trash2, Eye, Mail, Phone,
   Briefcase, GraduationCap, Star, Clock, CheckCircle, AlertCircle,
-  Download, UserCheck,
+  Download, UserCheck, Lock,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────────────────────
@@ -498,6 +502,45 @@ function AnalyticsTab({ teachers }: { teachers: Teacher[] }) {
 }
 
 /* ─────────────────────────────────────────────────────────────
+   Real data mapping
+───────────────────────────────────────────────────────────── */
+
+/**
+ * Map AdminUser (từ DB) → Teacher (interface UI cũ).
+ * Field analytics (totalStudents, avgXPGain, feedbackScore...) chưa có
+ * trên backend → placeholder. Sprint sau bổ sung endpoint
+ * /api/admin/teachers/:id/stats để tính thực.
+ */
+function mapUserToTeacher(u: AdminUser): Teacher {
+  // Status: banned → inactive, không login >30 ngày → on_leave, default active
+  let status: Teacher['status'] = 'active'
+  if (u.banned) status = 'inactive'
+  else if (u.lastLoginAt) {
+    const days = (Date.now() - new Date(u.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24)
+    if (days > 30) status = 'on_leave'
+  } else if (!u.lastLoginAt) {
+    // Chưa đăng nhập bao giờ — có thể vừa đăng ký xong
+    status = 'inactive'
+  }
+  return {
+    id: u.id,
+    name: u.name || u.email.split('@')[0],
+    email: u.email,
+    phone: '',                          // backend chưa lưu phone
+    department: 'Chưa cập nhật',        // sẽ lấy từ CareerSurvey.primarySubject sau
+    specialization: 'Chưa cập nhật',
+    position: 'Giáo viên',
+    status,
+    hireDate: u.createdAt.slice(0, 10),
+    totalStudents: 0,
+    avgXPGain: 0,
+    feedbackScore: 0,
+    responseTime: 0,
+    interventions: 0,
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
    Main page
 ───────────────────────────────────────────────────────────── */
 export default function Teachers() {
@@ -509,32 +552,17 @@ export default function Teachers() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setTeachers([
-      {
-        id: 't1', name: 'Nguyễn Thị Lan', email: 'lan.nguyen@aeroedu.vn', phone: '+84 123-456-7890',
-        department: 'Toán học', specialization: 'Đại số & Giải tích', position: 'Giáo viên chính',
-        status: 'active', hireDate: '2020-09-01', totalStudents: 120, avgXPGain: 245,
-        feedbackScore: 9.2, responseTime: 2.3, interventions: 12,
-      },
-      {
-        id: 't2', name: 'Trần Văn Minh', email: 'minh.tran@aeroedu.vn', phone: '+84 123-456-7891',
-        department: 'Vật lý', specialization: 'Cơ học & Điện tử', position: 'Tổ trưởng',
-        status: 'active', hireDate: '2019-09-01', totalStudents: 95, avgXPGain: 198,
-        feedbackScore: 8.5, responseTime: 4.5, interventions: 8,
-      },
-      {
-        id: 't3', name: 'Lê Thị Hoa', email: 'hoa.le@aeroedu.vn', phone: '+84 123-456-7892',
-        department: 'Hóa học', specialization: 'Hóa hữu cơ', position: 'Giáo viên chính',
-        status: 'active', hireDate: '2021-09-01', totalStudents: 110, avgXPGain: 278,
-        feedbackScore: 9.5, responseTime: 1.8, interventions: 15,
-      },
-      {
-        id: 't4', name: 'Phạm Văn Đức', email: 'duc.pham@aeroedu.vn', phone: '+84 123-456-7893',
-        department: 'Ngữ văn', specialization: 'Văn học Việt Nam', position: 'Giáo viên',
-        status: 'on_leave', hireDate: '2022-09-01', totalStudents: 85, avgXPGain: 165,
-        feedbackScore: 7.8, responseTime: 6.2, interventions: 5,
-      },
-    ])
+    // Fetch GV thật từ /api/admin/users — chỉ accountType=TEACHER (loại trừ PARENT)
+    setLoading(true)
+    adminUsersService.list({ accountType: 'TEACHER', limit: 500, sortBy: 'createdAt', sortOrder: 'desc' })
+      .then(({ users }) => {
+        const mapped: Teacher[] = users.map(u => mapUserToTeacher(u))
+        setTeachers(mapped)
+      })
+      .catch(err => {
+        console.error('[admin:teachers] load failed', err)
+      })
+      .finally(() => setLoading(false))
 
     setLicenses([
       {
@@ -564,9 +592,68 @@ export default function Teachers() {
         shift: 'afternoon', classes: ['11C1', '12D1', '10B2', '9A3'], isOverloaded: true,
       },
     ])
-
-    setTimeout(() => setLoading(false), 400)
+    // Licenses + Schedules vẫn dùng mock (chưa có endpoint backend) —
+    // sẽ migrate sang real data trong sprint sau.
   }, [])
+
+  /** Build export sheets — 3 dataset chính */
+  const getTeachersSheets = useCallback((): SheetData[] => {
+    const sheets: SheetData[] = []
+    if (teachers.length > 0) {
+      sheets.push({
+        name: `Hồ sơ GV (${teachers.length})`,
+        columns: [
+          { key: 'name',            label: 'Họ tên' },
+          { key: 'email',           label: 'Email' },
+          { key: 'phone',           label: 'Số điện thoại' },
+          { key: 'department',      label: 'Bộ môn' },
+          { key: 'specialization',  label: 'Chuyên môn' },
+          { key: 'position',        label: 'Vị trí' },
+          { key: 'status',          label: 'Trạng thái' },
+          { key: 'hireDate',        label: 'Ngày vào',     type: 'date' },
+          { key: 'totalStudents',   label: 'Số HS phụ trách', type: 'number' },
+          { key: 'avgXPGain',       label: 'XP gain TB',   type: 'number' },
+          { key: 'feedbackScore',   label: 'Điểm phản hồi', type: 'number' },
+          { key: 'responseTime',    label: 'Time phản hồi (h)', type: 'number' },
+          { key: 'interventions',   label: 'Lượt can thiệp', type: 'number' },
+        ],
+        rows: teachers,
+      })
+    }
+    if (licenses.length > 0) {
+      sheets.push({
+        name: 'Chứng chỉ',
+        columns: [
+          { key: 'teacherName',      label: 'GV' },
+          { key: 'type',             label: 'Loại' },
+          { key: 'name',             label: 'Tên chứng chỉ' },
+          { key: 'issuingAuthority', label: 'Đơn vị cấp' },
+          { key: 'issueDate',        label: 'Ngày cấp',  type: 'date' },
+          { key: 'expiryDate',       label: 'Ngày hết hạn', type: 'date' },
+          { key: 'status',           label: 'Trạng thái' },
+        ],
+        rows: licenses,
+      })
+    }
+    if (schedules.length > 0) {
+      sheets.push({
+        name: 'Lịch dạy',
+        columns: [
+          { key: 'teacherName',  label: 'GV' },
+          { key: 'date',         label: 'Ngày',     type: 'date' },
+          { key: 'shift',        label: 'Ca' },
+          { key: 'classes',      label: 'Lớp dạy' },
+          { key: 'isOverloaded', label: 'Quá tải' },
+        ],
+        rows: schedules.map(s => ({
+          ...s,
+          classes: Array.isArray(s.classes) ? s.classes.join(', ') : s.classes,
+          isOverloaded: s.isOverloaded ? 'Có' : 'Không',
+        })),
+      })
+    }
+    return sheets
+  }, [teachers, licenses, schedules])
 
   const TABS: { id: TeacherTab; label: string; icon: React.ElementType; description: string }[] = [
     { id: 'profiles',          label: 'Hồ Sơ Giáo Viên',      icon: Users,     description: 'Quản lý thông tin, năng lực, lịch sử công tác' },
@@ -595,7 +682,9 @@ export default function Teachers() {
                 style={{ letterSpacing: '-0.5px' }}>
                 Quản Lý Nhân Sự Giáo Viên
               </h1>
-              <p className="text-sm text-white/40">AeroEdu HRM – Teacher Management System</p>
+              <p className="text-sm text-white/40">
+                Dữ liệu thật từ DB · {teachers.length} GV đã đăng ký · {teachers.filter(t => t.status === 'inactive').length} bị khoá / chưa active
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -606,13 +695,22 @@ export default function Teachers() {
                 <span className="text-sm text-white/40">Giáo viên</span>
               </div>
             </div>
-            <div className="px-4 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08]">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-orange-400" />
-                <span className="text-lg font-bold text-white/90">3</span>
-                <span className="text-sm text-white/40">Cảnh báo</span>
-              </div>
-            </div>
+            <Link
+              to="/admin/users?accountType=TEACHER"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-bold hover:bg-violet-500/25 transition"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              Quản lý (ban/reset)
+            </Link>
+            <ExportMenu
+              filename={`teachers-${new Date().toISOString().slice(0, 10)}`}
+              getSheets={getTeachersSheets}
+              meta={{
+                title: 'Quản lý Nhân sự Giáo viên',
+                subtitle: `Profiles + Licenses + Schedules — AeroEduVision`,
+                authorName: 'Admin HRM',
+              }}
+            />
           </div>
         </div>
       </div>

@@ -40,8 +40,10 @@ aero-agent-os/
 transcript-video/
 
 # === Documentation & guides ===
-Guide/
-docs/
+# Anchor "/docs/" + "/Guide/" về root để KHÔNG match
+# aeroedu-vite/src/pages/docs/* (frontend UI module).
+/Guide/
+/docs/
 *.md
 
 # === Scripts & tooling ===

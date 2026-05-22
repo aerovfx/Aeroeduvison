@@ -2173,6 +2173,217 @@ export const careerDetails: Record<string, CareerDetail> = {
       analysis: 'AI hỗ trợ surveillance (nhận diện khuôn mặt, phân tích dữ liệu tội phạm, drone tuần tra) nhưng không thể thay thế con người trong bắt giữ, tuần tra thực địa, quyết định chiến thuật. An ninh mạng là lĩnh vực mới cần nhiều nhân lực.',
     },
   },
+
+  // ─────────────────────────────────────────────────────────────────
+  // V3 (2026-05-22): Thêm 3 nghề hiện đại theo xu thế Industry 4.0
+  // - Kỹ sư Robot / Tự động hoá (NL Robotics + IoT bùng nổ ở VN)
+  // - Nhà Ngôn ngữ học (NLP, dịch máy, Computational Linguistics)
+  // - Chuyên gia An ninh mạng (Cybersecurity — thiếu hụt nghiêm trọng)
+  // ─────────────────────────────────────────────────────────────────
+
+  'ky-su-robot': {
+    id: 'ky-su-robot',
+    name: 'Kỹ sư Robot & Tự động hoá',
+    icon: '🤖',
+    category: 'Công nghệ - Kỹ thuật',
+    shortDescription: 'Thiết kế, lập trình, vận hành robot công nghiệp + hệ thống tự động hoá nhà máy thông minh',
+    fullDescription: 'Kỹ sư robot xây dựng các hệ thống tự động hoá kết hợp cơ khí, điện tử và phần mềm — từ cánh tay robot lắp ráp ô tô, drone, robot phẫu thuật đến AGV tự hành kho thông minh. Đây là nghề mũi nhọn của Industry 4.0, đang được FPT, Vingroup, VinFast, Samsung Việt Nam tuyển dụng mạnh.',
+    education: {
+      minimumDegree: 'Đại học',
+      recommendedMajors: ['Cơ điện tử (Mechatronics)', 'Tự động hoá', 'Robotics', 'Kỹ thuật điều khiển'],
+      topUniversities: [
+        { name: 'ĐH Bách khoa Hà Nội', location: 'Hà Nội', ranking: 'Top 1 VN' },
+        { name: 'ĐH Bách khoa TP.HCM', location: 'TP.HCM', ranking: 'Top 2 VN' },
+        { name: 'ĐH Sư phạm Kỹ thuật TP.HCM', location: 'TP.HCM' },
+      ],
+      certifications: ['ROS Industrial', 'PLC Siemens S7', 'FANUC Robot Operator'],
+    },
+    skills: {
+      technical: [
+        { name: 'Lập trình C++/Python', level: 'Nâng cao' },
+        { name: 'ROS (Robot Operating System)', level: 'Nâng cao' },
+        { name: 'PLC + SCADA', level: 'Trung bình' },
+        { name: 'Computer Vision (OpenCV)', level: 'Trung bình' },
+        { name: 'Cơ học + Động lực học', level: 'Nâng cao' },
+      ],
+      soft: ['Tư duy hệ thống', 'Giải quyết vấn đề', 'Làm việc nhóm liên ngành', 'Cẩn thận'],
+      tools: ['ROS', 'MATLAB/Simulink', 'SolidWorks', 'Arduino/Raspberry Pi', 'Gazebo (mô phỏng)'],
+    },
+    market: {
+      demandLevel: 'Rất cao',
+      salaryRange: { entry: '15-25 triệu/tháng', mid: '30-50 triệu/tháng', senior: '60-120 triệu/tháng' },
+      growthRate: '+35% trong 5 năm (xu hướng nhà máy thông minh)',
+      totalJobs: '~8,000 vị trí tại VN, sẽ tăng gấp 3 vào 2030',
+      topEmployers: ['VinFast', 'Samsung Việt Nam', 'Bosch', 'FPT Software', 'Viettel'],
+      workEnvironment: ['Nhà máy', 'Lab nghiên cứu', 'Văn phòng thiết kế', 'Hybrid'],
+    },
+    roadmap: [
+      { stage: 'Năm 1-2', title: 'Kỹ sư Robot Junior', duration: '2 năm', description: 'Lập trình cánh tay robot, bảo trì hệ thống auto', salary: '15-20 triệu' },
+      { stage: 'Năm 3-5', title: 'Kỹ sư Senior', duration: '3 năm', description: 'Thiết kế hệ thống tự động hoá toàn dây chuyền', salary: '30-45 triệu' },
+      { stage: 'Năm 6-10', title: 'Lead Robotics Engineer', duration: '5 năm', description: 'Lãnh đạo team, kiến trúc giải pháp', salary: '60-100 triệu' },
+    ],
+    pros: ['Lương cao + thị trường thiếu hụt', 'Công việc thú vị (kết hợp HW+SW)', 'Cơ hội xuất khẩu lao động (Nhật, Đức)', 'Tương lai Industry 4.0'],
+    cons: ['Học khó (cần cả cơ + điện + lập trình)', 'Phải vào nhà máy (môi trường công nghiệp)', 'Cập nhật công nghệ liên tục', 'Đầu tư thiết bị thí nghiệm tốn kém'],
+    suitablePersonalities: ['INTJ', 'INTP', 'ISTJ', 'ENTJ'],
+    suitableHolland: ['R', 'I'],
+    relatedCareers: ['ky-su-co-khi', 'ky-su-phan-mem', 'nha-nghien-cuu-ai'],
+    importantSubjects: [
+      { name: 'Toán', importance: 'Rất quan trọng' },
+      { name: 'Vật lý', importance: 'Rất quan trọng' },
+      { name: 'Tin học', importance: 'Rất quan trọng' },
+      { name: 'Công nghệ', importance: 'Quan trọng' },
+      { name: 'Tiếng Anh', importance: 'Quan trọng' },
+    ],
+    dailyLife: [
+      '8:00 - Đọc log robot đêm qua, kiểm tra trạng thái',
+      '9:00 - Debug code Python điều khiển cánh tay',
+      '10:30 - Stand-up meeting với team production',
+      '13:00 - Test giải pháp computer vision mới',
+      '15:00 - Soạn tài liệu vận hành cho operator',
+      '17:00 - Tổng hợp KPI hiệu suất robot',
+    ],
+    aiExposure: {
+      score: 3,
+      trend: 'Ổn định',
+      analysis: 'AI/ML là CÔNG CỤ của kỹ sư robot (vision, motion planning), không thay thế. Robot vật lý vẫn cần con người thiết kế, lắp đặt, bảo trì. Ngành đang BÙNG NỔ nhờ AI giúp robot thông minh hơn → nhu cầu kỹ sư tăng mạnh.',
+    },
+  },
+
+  'nha-ngon-ngu-hoc': {
+    id: 'nha-ngon-ngu-hoc',
+    name: 'Nhà Ngôn ngữ học & Chuyên gia NLP',
+    icon: '📖',
+    category: 'Khoa học - Nghiên cứu',
+    shortDescription: 'Nghiên cứu cấu trúc ngôn ngữ, xây dựng hệ thống xử lý ngôn ngữ tự nhiên cho AI/dịch máy',
+    fullDescription: 'Ngôn ngữ học hiện đại không chỉ nghiên cứu ngữ pháp/từ vựng mà còn kết hợp với AI để xây dựng chatbot, dịch máy, voice assistant. Việt Nam đang thiếu chuyên gia ngôn ngữ học có thể làm việc với LLM (Claude, GPT) — vai trò Prompt Engineer + Linguistic Data Annotator được trả lương rất cao.',
+    education: {
+      minimumDegree: 'Đại học',
+      recommendedMajors: ['Ngôn ngữ học', 'Việt Nam học', 'Computational Linguistics', 'Tiếng Anh chuyên ngành'],
+      topUniversities: [
+        { name: 'ĐH KHXH&NV Hà Nội', location: 'Hà Nội', ranking: 'Top 1 ngành Ngôn ngữ' },
+        { name: 'ĐH KHXH&NV TP.HCM', location: 'TP.HCM' },
+        { name: 'ĐH Hà Nội (HANU)', location: 'Hà Nội' },
+        { name: 'ĐH Ngoại ngữ — ĐHQG HN', location: 'Hà Nội' },
+      ],
+      certifications: ['DELE/TOEIC/IELTS 7.0+', 'HSK 5+', 'Google Cloud NLP'],
+    },
+    skills: {
+      technical: [
+        { name: 'Phân tích cú pháp + ngữ nghĩa', level: 'Chuyên gia' },
+        { name: 'NLP (NLTK, spaCy)', level: 'Trung bình' },
+        { name: 'Python cơ bản', level: 'Cơ bản' },
+        { name: 'Prompt Engineering (LLM)', level: 'Nâng cao' },
+        { name: 'Annotation + Corpus building', level: 'Nâng cao' },
+      ],
+      soft: ['Tư duy phân tích', 'Tỉ mỉ', 'Kiên nhẫn', 'Đa văn hoá'],
+      tools: ['Praat (phân tích âm)', 'ELAN', 'Anthropic Claude / OpenAI Playground', 'Excel/Google Sheets', 'Anki'],
+    },
+    market: {
+      demandLevel: 'Cao',
+      salaryRange: { entry: '10-18 triệu/tháng', mid: '20-40 triệu/tháng', senior: '50-100 triệu/tháng (NLP)' },
+      growthRate: '+40% nhờ AI/LLM boom — Prompt Engineer + Data Annotator',
+      totalJobs: '~5,000 vị trí ngôn ngữ thuần + ~3,000 vị trí NLP',
+      topEmployers: ['VinAI', 'Zalo AI', 'FPT.AI', 'Viện Ngôn ngữ học', 'Đại học (giảng dạy)', 'Anthropic/OpenAI (remote)'],
+      workEnvironment: ['Văn phòng AI lab', 'Viện nghiên cứu', 'Đại học', 'Remote (annotation/dịch)'],
+    },
+    roadmap: [
+      { stage: 'Năm 1-2', title: 'Data Annotator / Trợ giảng', duration: '2 năm', description: 'Gắn nhãn corpus, dịch, hỗ trợ nghiên cứu', salary: '10-15 triệu' },
+      { stage: 'Năm 3-5', title: 'Linguistic Researcher / NLP Engineer Junior', duration: '3 năm', description: 'Xây pipeline NLP, fine-tune model, viết bài báo', salary: '20-35 triệu' },
+      { stage: 'Năm 6+', title: 'Senior Computational Linguist', duration: '5+ năm', description: 'Lead NLP team hoặc giảng viên ĐH', salary: '50-100 triệu' },
+    ],
+    pros: ['Kết hợp humanities + tech (độc đáo)', 'Nhu cầu AI boom', 'Có thể remote (annotation/dịch)', 'Đóng góp cho tiếng Việt số hoá'],
+    cons: ['Lương khởi điểm thấp nếu thuần ngôn ngữ', 'Cần học thêm CS để vào NLP', 'Việc làm thuần ngôn ngữ ít', 'Áp lực xuất bản (nếu academic)'],
+    suitablePersonalities: ['INFJ', 'INTJ', 'INFP', 'ISFJ'],
+    suitableHolland: ['I', 'A', 'S'],
+    relatedCareers: ['nha-nghien-cuu-ai', 'content-creator', 'nha-van', 'giao-vien'],
+    importantSubjects: [
+      { name: 'Văn', importance: 'Rất quan trọng' },
+      { name: 'Tiếng Anh', importance: 'Rất quan trọng' },
+      { name: 'Tin học', importance: 'Quan trọng' },
+      { name: 'Toán', importance: 'Hữu ích' },
+    ],
+    dailyLife: [
+      '8:30 - Đọc paper NLP mới (ACL/EMNLP)',
+      '9:30 - Phân tích cú pháp 200 câu tiếng Việt khó',
+      '11:00 - Họp với engineer team về prompt template',
+      '14:00 - Annotate dataset 500 câu cho fine-tuning',
+      '15:30 - Viết báo cáo phương ngữ Nam Bộ',
+      '17:00 - Review bài dịch máy + ghi note lỗi',
+    ],
+    aiExposure: {
+      score: 6,
+      trend: 'Tăng',
+      analysis: 'AI thay được PHẦN dịch + tóm tắt cơ bản, NHƯNG cần ngôn ngữ học để: (1) thiết kế dataset training (2) đánh giá chất lượng LLM (3) xử lý phương ngữ + ngôn ngữ thiểu số (4) Prompt Engineering. Đây là nghề "cộng sinh với AI" — không bị thay thế mà được nâng tầm.',
+    },
+  },
+
+  'chuyen-gia-an-ninh-mang': {
+    id: 'chuyen-gia-an-ninh-mang',
+    name: 'Chuyên gia An ninh mạng',
+    icon: '🛡',
+    category: 'Công nghệ - Kỹ thuật',
+    shortDescription: 'Bảo vệ hệ thống IT khỏi tấn công mạng, phát hiện lỗ hổng, ứng cứu sự cố',
+    fullDescription: 'Chuyên gia an ninh mạng (Cybersecurity) bảo vệ tài sản số của doanh nghiệp — từ pentest tìm lỗ hổng, threat hunting, ứng cứu sự cố ransomware, đến tuân thủ ISO 27001/PCI DSS. Việt Nam thiếu hụt ~50,000 nhân lực ngành này — lương cao nhất ngành IT.',
+    education: {
+      minimumDegree: 'Đại học',
+      recommendedMajors: ['An toàn thông tin', 'Khoa học máy tính', 'Mạng máy tính', 'Hệ thống thông tin'],
+      topUniversities: [
+        { name: 'Học viện Kỹ thuật Mật mã', location: 'Hà Nội', ranking: 'Chuyên ngành An ninh #1' },
+        { name: 'ĐH Bách khoa Hà Nội', location: 'Hà Nội' },
+        { name: 'ĐH FPT', location: 'Toàn quốc' },
+        { name: 'PTIT', location: 'Hà Nội + TP.HCM' },
+      ],
+      certifications: ['CEH (Certified Ethical Hacker)', 'OSCP', 'CISSP', 'CompTIA Security+', 'Google Cybersecurity Cert'],
+    },
+    skills: {
+      technical: [
+        { name: 'Network Security + TCP/IP', level: 'Chuyên gia' },
+        { name: 'Penetration Testing', level: 'Nâng cao' },
+        { name: 'Python + Bash scripting', level: 'Nâng cao' },
+        { name: 'SIEM (Splunk/Elastic)', level: 'Trung bình' },
+        { name: 'Cryptography', level: 'Trung bình' },
+      ],
+      soft: ['Tư duy "kẻ tấn công"', 'Tỉ mỉ', 'Đạo đức nghề nghiệp', 'Học liên tục'],
+      tools: ['Burp Suite', 'Metasploit', 'Wireshark', 'Nmap', 'Kali Linux', 'Splunk'],
+    },
+    market: {
+      demandLevel: 'Rất cao',
+      salaryRange: { entry: '18-30 triệu/tháng', mid: '40-70 triệu/tháng', senior: '80-200 triệu/tháng' },
+      growthRate: '+50% trong 5 năm — thiếu hụt nghiêm trọng',
+      totalJobs: '~15,000 vị trí hiện tại, cần ~50,000 vào 2030',
+      topEmployers: ['Viettel Cyber Security', 'VNPT-IT', 'CMC Cyber', 'BKAV', 'Ngân hàng (Vietcombank, MB)', 'NCS', 'VinCSS'],
+      workEnvironment: ['Văn phòng SOC 24/7', 'Hybrid', 'Remote (bug bounty)'],
+    },
+    roadmap: [
+      { stage: 'Năm 1-2', title: 'SOC Analyst / Junior Pentester', duration: '2 năm', description: 'Monitor SIEM, phản hồi alert, scan vuln', salary: '18-25 triệu' },
+      { stage: 'Năm 3-5', title: 'Senior Pentester / Threat Hunter', duration: '3 năm', description: 'Red team, viết report cho CIO, lead pentest', salary: '40-60 triệu' },
+      { stage: 'Năm 6-10', title: 'CISO / Security Architect', duration: '4-5 năm', description: 'Định hướng chiến lược security toàn DN', salary: '100-200 triệu' },
+    ],
+    pros: ['Lương CAO NHẤT ngành IT', 'Thị trường THIẾU HỤT (job dễ tìm)', 'Bug bounty kiếm thêm $$', 'Tự do (làm remote/freelance được)'],
+    cons: ['Áp lực 24/7 (incident có thể đến giữa đêm)', 'Học không ngừng (lỗ hổng mới hằng tuần)', 'Trách nhiệm pháp lý cao', 'Burnout cao'],
+    suitablePersonalities: ['INTJ', 'INTP', 'ISTJ', 'ENTP'],
+    suitableHolland: ['I', 'R', 'C'],
+    relatedCareers: ['ky-su-phan-mem', 'nha-khoa-hoc-du-lieu', 'nha-nghien-cuu-ai'],
+    importantSubjects: [
+      { name: 'Tin học', importance: 'Rất quan trọng' },
+      { name: 'Toán', importance: 'Rất quan trọng' },
+      { name: 'Tiếng Anh', importance: 'Rất quan trọng' },
+      { name: 'Vật lý', importance: 'Hữu ích' },
+    ],
+    dailyLife: [
+      '8:00 - Check SIEM dashboard, đọc threat intel',
+      '9:30 - Triage 50+ security alerts',
+      '11:00 - Pentest web app khách hàng',
+      '14:00 - Viết PoC + báo cáo lỗ hổng',
+      '16:00 - Họp với dev team về vá CVE',
+      '18:00 - Theo dõi bug bounty platforms',
+    ],
+    aiExposure: {
+      score: 4,
+      trend: 'Tăng',
+      analysis: 'AI là CON DAO HAI LƯỠI: hacker dùng AI tấn công nhanh hơn → cần thêm AI defender. AI Copilot (Microsoft Security Copilot, Anthropic) giúp analyst phân tích log nhanh, NHƯNG quyết định cuối + sáng tạo trong pentest vẫn cần con người. Nghề này CÀNG cần thiết khi AI bùng nổ.',
+    },
+  },
 }
 
 // Helper function để tìm kiếm career theo tên (fuzzy match)

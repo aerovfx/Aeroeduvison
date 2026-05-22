@@ -18,24 +18,29 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   User, Lock, Bell, Palette, Shield, Check, AlertCircle, X,
   Eye, EyeOff, Save, ChevronRight, Moon, Sun, Monitor,
-  Volume2, Mail, Smartphone, Globe,
-  GraduationCap, Trophy, Zap, LogOut,
+  Volume2, Mail, Smartphone, Globe, Send,
+  GraduationCap, Trophy, Zap, LogOut, ExternalLink, Loader2, Sparkles,
+  Crown, Ticket, CheckCircle2, Calendar, Copy,
 } from 'lucide-react'
+import { api } from '@/services/api'
 import { toast } from 'react-hot-toast'
 import { useAuth } from '@/hooks/useAuth'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useLanguage } from '@/contexts/LanguageContext'
 import { learningService } from '@/services/learning.service'
 import { authService } from '@/services/auth.service'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
 // ─────────────────────────────────────────────────────────────────
 // Types & constants
 // ─────────────────────────────────────────────────────────────────
-type TabKey = 'profile' | 'password' | 'notifications' | 'appearance' | 'privacy'
+type TabKey = 'profile' | 'password' | 'subscription' | 'activation' | 'notifications' | 'appearance' | 'privacy'
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'profile',       label: 'Hồ sơ',          icon: <User className="w-4 h-4" /> },
   { key: 'password',      label: 'Bảo mật',         icon: <Lock className="w-4 h-4" /> },
+  { key: 'subscription',  label: 'Gói đăng ký',     icon: <Crown className="w-4 h-4" /> },
+  { key: 'activation',    label: 'Mã kích hoạt',    icon: <Ticket className="w-4 h-4" /> },
   { key: 'notifications', label: 'Thông báo',       icon: <Bell className="w-4 h-4" /> },
   { key: 'appearance',    label: 'Giao diện',       icon: <Palette className="w-4 h-4" /> },
   { key: 'privacy',       label: 'Quyền riêng tư',  icon: <Shield className="w-4 h-4" /> },
@@ -429,6 +434,9 @@ interface NotifTabProps {
 function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
   return (
     <div className="space-y-6 max-w-xl">
+      {/* RS-Phase 8: Multi-channel digest preferences (server-side) */}
+      <DigestPrefsSection />
+
       <Section icon={<Mail className="w-4 h-4" />} title="Email">
         <Toggle checked={state.emailLessons}      onChange={() => onToggle('emailLessons')}      label="Bài học mới"        desc="Thông báo khi có bài học AI gợi ý" />
         <Toggle checked={state.emailAchievements} onChange={() => onToggle('emailAchievements')} label="Thành tích"          desc="Khi bạn mở khóa huy hiệu mới" />
@@ -444,6 +452,10 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
         <Toggle checked={state.sound}     onChange={() => onToggle('sound')}     label="Hiệu ứng âm thanh" />
         <Toggle checked={state.vibration} onChange={() => onToggle('vibration')} label="Rung khi thông báo" />
       </Section>
+
+      {/* RS-Phase 10: edit cold-start onboarding prefs */}
+      <OnboardingPrefsSection />
+
       <button
         type="button"
         onClick={onSave}
@@ -452,6 +464,304 @@ function NotificationsTab({ state, onToggle, onSave }: NotifTabProps) {
         <Save className="w-4 h-4" /> Lưu cài đặt
       </button>
     </div>
+  )
+}
+
+/**
+ * RS-Phase 10: panel xem + chỉnh cold-start onboarding prefs anytime.
+ * Hiện current subject/grade/topics, có nút "Chỉnh sửa" mở modal lại.
+ */
+function OnboardingPrefsSection() {
+  const [prefs, setPrefs] = useState<import('@/services/recommendation.service').RsOnboardingPrefs | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState(false)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await rs.getOnboardingPrefs()
+      setPrefs(r.prefs)
+    } catch {} finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
+
+  // Lazy import để giảm bundle khi modal không cần
+  const [OnboardingModal, setOnboardingModal] = useState<any>(null)
+  useEffect(() => {
+    if (editing && !OnboardingModal) {
+      import('@/components/reco/OnboardingModal').then(m => setOnboardingModal(() => m.default))
+    }
+  }, [editing, OnboardingModal])
+
+  return (
+    <Section icon={<GraduationCap className="w-4 h-4 text-emerald-400" />} title="Sở thích học">
+      <div className="text-xs text-white/50 mb-3 -mt-2">
+        AI dùng thông tin này để gợi ý chính xác hơn — môn / khối lớp / chủ đề quan tâm.
+      </div>
+      {loading ? (
+        <p className="text-xs text-white/40 inline-flex items-center gap-2">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Đang tải…
+        </p>
+      ) : (
+        <div className="space-y-2 text-sm">
+          {prefs?.subject ? (
+            <p><span className="text-white/40">Môn:</span> <span className="text-emerald-200 font-bold">{prefs.subject}</span></p>
+          ) : (
+            <p className="text-white/40">Chưa chọn môn học</p>
+          )}
+          {prefs?.grade && (
+            <p><span className="text-white/40">Khối/Giai đoạn:</span> <span className="text-purple-200 font-bold">{prefs.grade}</span></p>
+          )}
+          {prefs?.interestedTopics && prefs.interestedTopics.length > 0 && (
+            <div>
+              <span className="text-white/40 text-xs">Chủ đề quan tâm:</span>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {prefs.interestedTopics.map((t, i) => (
+                  <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-200 border border-amber-500/30">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {prefs?.skipped && (
+            <p className="text-[11px] text-white/30">⊘ Bạn đã bỏ qua onboarding — bấm "Cá nhân hoá" để chọn lại</p>
+          )}
+          <button
+            onClick={() => setEditing(true)}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg
+                       bg-emerald-500/15 hover:bg-emerald-500/25
+                       border border-emerald-500/30 text-emerald-300 text-xs font-bold transition"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {prefs?.subject ? 'Chỉnh sửa sở thích' : 'Cá nhân hoá ngay'}
+          </button>
+        </div>
+      )}
+      {editing && OnboardingModal && (
+        <OnboardingModal
+          onComplete={() => { setEditing(false); reload() }}
+          onSkip={() => { setEditing(false); reload() }}
+        />
+      )}
+    </Section>
+  )
+}
+
+/** Format ISO timestamp → "5 phút trước" / "2 giờ trước" / "hôm qua" / dd/MM HH:mm */
+function formatRelativeVi(iso: string): string {
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return 'vừa xong'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} phút trước`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} giờ trước`
+  if (diff < 2 * 86_400_000) return 'hôm qua'
+  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} ngày trước`
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * RS-Phase 8 multi-channel digest preferences panel.
+ * State persisted server-side qua /api/reco/digest/preferences.
+ * Channels: In-app (bell) · Email · Telegram (cần link bot).
+ */
+function DigestPrefsSection() {
+  const [loading, setLoading]   = useState(true)
+  const [saving, setSaving]     = useState<keyof { inApp:1; email:1; telegram:1 } | null>(null)
+  const [testing, setTesting]   = useState(false)
+  const [channels, setChannels] = useState({ inApp: true, email: false, telegram: false })
+  const [emailOnAccount, setEmailOnAccount] = useState<string | null>(null)
+  const [telegramLinked, setTelegramLinked] = useState(false)
+  const [telegramPreview, setTelegramPreview] = useState<string | null>(null)
+  const [telegramDeepLink, setTelegramDeepLink] = useState('')
+  const [lastSentAt, setLastSentAt] = useState<string | null>(null)
+  const [lastSentItemsCount, setLastSentItemsCount] = useState<number | null>(null)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await rs.getDigestPrefs()
+      setChannels(r.channels)
+      setEmailOnAccount(r.emailOnAccount)
+      setTelegramLinked(r.telegramLinked)
+      setTelegramPreview(r.telegramChatIdPreview)
+      setTelegramDeepLink(r.telegramDeepLink)
+      setLastSentAt(r.lastSentAt)
+      setLastSentItemsCount(r.lastSentItemsCount)
+    } catch (e: any) {
+      toast.error(`Không tải được cài đặt: ${e?.message || 'lỗi'}`)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
+
+  const updateChannel = useCallback(async (k: 'inApp' | 'email' | 'telegram', value: boolean) => {
+    // Edge: bật telegram khi chưa link → guide user
+    if (k === 'telegram' && value && !telegramLinked) {
+      toast('Hãy liên kết Telegram trước đã 🔗', { icon: 'ℹ️' })
+      return
+    }
+    setSaving(k)
+    const prev = { ...channels }
+    const next = { ...channels, [k]: value }
+    setChannels(next)
+    try {
+      const r = await rs.updateDigestPrefs(next)
+      setChannels(r.channels)
+      toast.success('Đã lưu cài đặt')
+    } catch (e: any) {
+      setChannels(prev)
+      toast.error(`Lỗi lưu: ${e?.message || 'thử lại'}`)
+    } finally {
+      setSaving(null)
+    }
+  }, [channels, telegramLinked])
+
+  const handleTest = useCallback(async () => {
+    setTesting(true)
+    try {
+      const r = await rs.sendDigestTest()
+      if (!r.sent) {
+        toast.error(`Không gửi được: ${r.reason || 'unknown'}`)
+        return
+      }
+      const lines: string[] = []
+      if (r.deliveries?.inApp?.ok)    lines.push('✓ In-app bell')
+      if (r.deliveries?.email?.ok)    lines.push(`✓ Email (${r.deliveries.email.provider})`)
+      if (r.deliveries?.telegram?.ok) lines.push('✓ Telegram')
+      const failed = Object.entries(r.deliveries || {})
+        .filter(([_, v]) => v && !v.ok)
+        .map(([k, v]) => `✗ ${k}: ${(v as any).error}`)
+      toast.success(`Test digest gửi xong (${r.itemsCount} mục)\n${[...lines, ...failed].join('\n')}`, { duration: 5000 })
+      // Refresh để cập nhật lastSentAt + cho user xác nhận trực quan
+      reload()
+    } catch (e: any) {
+      toast.error(`Lỗi test: ${e?.message || 'thử lại'}`)
+    } finally {
+      setTesting(false)
+    }
+  }, [reload])
+
+  const handleUnlinkTelegram = useCallback(async () => {
+    if (!confirm('Bạn chắc muốn huỷ liên kết Telegram?')) return
+    try {
+      await rs.unlinkTelegram()
+      toast.success('Đã huỷ liên kết Telegram')
+      await reload()
+    } catch (e: any) {
+      toast.error(`Lỗi: ${e?.message || 'thử lại'}`)
+    }
+  }, [reload])
+
+  return (
+    <Section
+      icon={<Sparkles className="w-4 h-4 text-cyan-400" />}
+      title="Gợi ý AI hàng ngày"
+    >
+      <div className="text-xs text-white/50 mb-3 -mt-2">
+        Mỗi ngày AI tổng hợp 3 mục cá nhân hoá nhất cho bạn — bạn chọn nhận qua đâu.
+        <br />
+        <span className="text-white/40">
+          HS nhận gợi ý học (điểm yếu / LP từ GV / hot). GV nhận việc cần xử lý (lớp đang yếu / HS cần hỗ trợ / LP HS vừa tạo).
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-3 text-white/40 text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Đang tải cài đặt…
+        </div>
+      ) : (
+        <>
+          {/* In-app */}
+          <Toggle
+            checked={channels.inApp}
+            onChange={() => updateChannel('inApp', !channels.inApp)}
+            label="🔔 Thông báo trong app"
+            desc={saving === 'inApp' ? 'Đang lưu…' : 'Xuất hiện trong notification bell'}
+          />
+
+          {/* Email */}
+          <Toggle
+            checked={channels.email}
+            onChange={() => updateChannel('email', !channels.email)}
+            label="📧 Email"
+            desc={
+              saving === 'email' ? 'Đang lưu…'
+                : emailOnAccount ? `Gửi đến ${emailOnAccount}`
+                : 'Tài khoản chưa có email — cập nhật trong tab Hồ sơ'
+            }
+          />
+
+          {/* Telegram */}
+          <div className="space-y-2">
+            <Toggle
+              checked={channels.telegram}
+              onChange={() => updateChannel('telegram', !channels.telegram)}
+              label="💬 Telegram"
+              desc={
+                saving === 'telegram' ? 'Đang lưu…'
+                  : telegramLinked ? `Đã liên kết (chat ${telegramPreview})`
+                  : 'Chưa liên kết — bấm nút bên dưới'
+              }
+            />
+            {telegramLinked ? (
+              <button
+                type="button"
+                onClick={handleUnlinkTelegram}
+                className="text-[11px] text-rose-300 hover:text-rose-200 underline ml-12"
+              >
+                Huỷ liên kết Telegram
+              </button>
+            ) : (
+              telegramDeepLink && (
+                <a
+                  href={telegramDeepLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 ml-12 px-3 py-1.5 rounded-lg
+                             bg-gradient-to-r from-cyan-500/15 to-blue-500/15
+                             border border-cyan-500/30 text-cyan-300 text-xs font-bold
+                             hover:from-cyan-500/25 hover:to-blue-500/25 transition"
+                >
+                  <ExternalLink className="w-3 h-3" /> Liên kết Telegram bot →
+                </a>
+              )
+            )}
+          </div>
+
+          {/* Test button + last sent stamp */}
+          <div className="pt-3 mt-3 border-t border-white/[0.06] space-y-2">
+            <button
+              type="button"
+              onClick={handleTest}
+              disabled={testing}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg
+                         bg-cyan-500/15 hover:bg-cyan-500/25
+                         border border-cyan-500/30 text-cyan-300 text-xs font-bold
+                         disabled:opacity-50 transition"
+            >
+              {testing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              {testing ? 'Đang gửi test…' : 'Gửi digest test ngay'}
+            </button>
+            <p className="text-[10px] text-white/30">
+              Verify từng kênh hoạt động (bypass giới hạn 1/ngày).
+            </p>
+            {lastSentAt && (
+              <p className="text-[11px] text-emerald-300/80 inline-flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Digest cuối: {formatRelativeVi(lastSentAt)}
+                {lastSentItemsCount !== null && (
+                  <span className="text-white/40"> ({lastSentItemsCount} mục)</span>
+                )}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </Section>
   )
 }
 
@@ -776,6 +1086,12 @@ export default function SettingsPage() {
         saving={passwordSaving}
       />
     ),
+    subscription: (
+      <SubscriptionTab />
+    ),
+    activation: (
+      <ActivationTab />
+    ),
     notifications: (
       <NotificationsTab
         state={notif}
@@ -812,7 +1128,7 @@ export default function SettingsPage() {
   ])
 
   return (
-    <div className="min-h-screen bg-[hsl(225,15%,8%)] text-white">
+    <div className="min-h-screen bg-background text-white">
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {/* Header */}
@@ -883,3 +1199,327 @@ export default function SettingsPage() {
 // Đảm bảo các icon dùng nội bộ không bị tree-shaker xoá nhầm
 // (import-only guard — không ảnh hưởng runtime)
 void X
+
+// ─────────────────────────────────────────────────────────────────
+// SubscriptionTab — Hiển thị các gói đăng ký đang hoạt động
+// GET /api/entitlements/me — danh sách entitlements (active + expired)
+// ─────────────────────────────────────────────────────────────────
+interface Entitlement {
+  id?: string
+  features: string[]
+  plan?: string
+  code?: string
+  expiresAt?: string | null
+  activatedAt?: string | null
+  status?: 'active' | 'expired' | string
+}
+
+function SubscriptionTab() {
+  const [loading, setLoading] = useState(true)
+  const [entitlements, setEntitlements] = useState<Entitlement[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await api.get<{ entitlements: Entitlement[] }>('/entitlements/me')
+        if (!cancelled) setEntitlements(data.entitlements || [])
+      } catch (err: unknown) {
+        const e = err as { response?: { data?: { error?: string } } }
+        if (!cancelled) setError(e.response?.data?.error || 'Không tải được danh sách gói')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const now = Date.now()
+  const active = entitlements.filter(e =>
+    !e.expiresAt || new Date(e.expiresAt).getTime() > now
+  )
+  const expired = entitlements.filter(e =>
+    e.expiresAt && new Date(e.expiresAt).getTime() <= now
+  )
+
+  if (loading) {
+    return (
+      <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-8 text-center text-white/55">
+        Đang tải danh sách gói…
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-white mb-1">Gói đăng ký của bạn</h2>
+        <p className="text-sm text-white/55">
+          Theo dõi các gói &amp; quyền truy cập tính năng AI đang hoạt động.
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-300 flex gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          {error}
+        </div>
+      )}
+
+      {/* Active */}
+      <div>
+        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Crown className="w-4 h-4 text-amber-400" />
+          Đang hoạt động ({active.length})
+        </h3>
+        {active.length === 0 ? (
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6 text-center">
+            <Crown className="w-10 h-10 text-white/15 mx-auto mb-2" />
+            <p className="text-white/55 text-sm mb-3">
+              Bạn chưa có gói trả phí nào.
+            </p>
+            <a
+              href="/pricing"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-semibold hover:scale-[1.02] transition-transform"
+            >
+              Xem các gói <ChevronRight className="w-4 h-4" />
+            </a>
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {active.map((e, i) => (
+              <EntitlementCard key={e.id || e.code || i} ent={e} active />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* Expired */}
+      {expired.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-white/55 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-white/35" />
+            Đã hết hạn ({expired.length})
+          </h3>
+          <ul className="space-y-2 opacity-60">
+            {expired.map((e, i) => (
+              <EntitlementCard key={e.id || e.code || i} ent={e} active={false} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EntitlementCard({ ent, active }: { ent: Entitlement; active: boolean }) {
+  const exp = ent.expiresAt ? new Date(ent.expiresAt) : null
+  const daysLeft = exp ? Math.max(0, Math.ceil((exp.getTime() - Date.now()) / 86400_000)) : null
+  return (
+    <li className={`rounded-xl border p-4 ${active ? 'bg-gradient-to-br from-amber-500/10 to-purple-500/10 border-amber-500/30' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div>
+          <p className="font-bold text-white text-base">
+            {ent.plan || 'Gói Premium'}
+          </p>
+          {ent.code && (
+            <p className="text-xs text-white/55 font-mono mt-0.5">Mã: {ent.code}</p>
+          )}
+        </div>
+        {active && daysLeft != null && (
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+            daysLeft <= 7 ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/20 text-emerald-300'
+          }`}>
+            Còn {daysLeft} ngày
+          </span>
+        )}
+      </div>
+      {ent.features && ent.features.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {ent.features.map((f) => (
+            <span
+              key={f}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md bg-white/[0.05] text-white/75"
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+              {f}
+            </span>
+          ))}
+        </div>
+      )}
+      {ent.activatedAt && (
+        <p className="text-[11px] text-white/40 mt-2">
+          Kích hoạt: {new Date(ent.activatedAt).toLocaleDateString('vi-VN')}
+          {exp && ` · Hết hạn: ${exp.toLocaleDateString('vi-VN')}`}
+        </p>
+      )}
+    </li>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ActivationTab — Nhập mã + xem mã đã kích hoạt
+// POST /api/entitlements/activate { code } — kích hoạt
+// GET /api/entitlements/me — danh sách (tái sử dụng)
+// ─────────────────────────────────────────────────────────────────
+function ActivationTab() {
+  const [code, setCode] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [activated, setActivated] = useState<Entitlement[]>([])
+  const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const loadActivated = useCallback(async () => {
+    try {
+      const { data } = await api.get<{ entitlements: Entitlement[] }>('/entitlements/me')
+      // Sort: mới nhất trước
+      const list = (data.entitlements || []).slice().sort((a, b) => {
+        const ta = a.activatedAt ? new Date(a.activatedAt).getTime() : 0
+        const tb = b.activatedAt ? new Date(b.activatedAt).getTime() : 0
+        return tb - ta
+      })
+      setActivated(list)
+    } catch {
+      setActivated([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadActivated() }, [loadActivated])
+
+  const onActivate = async () => {
+    const c = code.trim().toUpperCase()
+    if (!c) { toast.error('Hãy nhập mã'); return }
+    setSubmitting(true)
+    try {
+      await api.post('/entitlements/activate', { code: c })
+      toast.success(`✅ Đã kích hoạt mã ${c}`)
+      setCode('')
+      loadActivated()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Mã không hợp lệ hoặc đã dùng')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const copyCode = async (c: string) => {
+    try {
+      await navigator.clipboard.writeText(c)
+      setCopied(c)
+      setTimeout(() => setCopied(null), 1500)
+    } catch { /* noop */ }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h2 className="text-xl font-bold text-white mb-1">Mã kích hoạt</h2>
+        <p className="text-sm text-white/55">
+          Nhập mã `AERO-XXXXXX` từ email/Telegram sau khi thanh toán để mở khoá tính năng.
+        </p>
+      </div>
+
+      {/* Input + activate */}
+      <div className="rounded-2xl bg-gradient-to-br from-purple-500/10 to-amber-500/5 border border-purple-500/25 p-5">
+        <label className="block text-sm font-semibold text-white mb-2">
+          Nhập mã kích hoạt
+        </label>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') onActivate() }}
+            placeholder="AERO-XXXXXX"
+            className="flex-1 px-4 py-3 rounded-xl bg-black/30 border border-white/[0.1] text-white text-base font-mono tracking-wider focus:outline-none focus:border-purple-400"
+          />
+          <button
+            onClick={onActivate}
+            disabled={submitting || !code.trim()}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
+          >
+            {submitting ? 'Đang kích hoạt…' : 'Kích hoạt'}
+          </button>
+        </div>
+        <p className="text-xs text-white/55 mt-2">
+          💡 Mã hợp lệ sẽ mở tính năng AI tương ứng ngay lập tức.
+          Cần mua gói? <a href="/pricing" className="text-purple-300 underline">Xem các gói →</a>
+        </p>
+      </div>
+
+      {/* Lịch sử mã đã kích hoạt */}
+      <div>
+        <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Ticket className="w-4 h-4 text-purple-400" />
+          Mã đã kích hoạt ({activated.length})
+        </h3>
+        {loading ? (
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-6 text-center text-white/55 text-sm">
+            Đang tải…
+          </div>
+        ) : activated.length === 0 ? (
+          <div className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-6 text-center text-white/55 text-sm">
+            Bạn chưa kích hoạt mã nào.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {activated.map((e, i) => {
+              const exp = e.expiresAt ? new Date(e.expiresAt) : null
+              const isExpired = exp && exp.getTime() <= Date.now()
+              return (
+                <li
+                  key={e.id || e.code || i}
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
+                    isExpired
+                      ? 'bg-white/[0.02] border-white/[0.06] opacity-60'
+                      : 'bg-emerald-500/5 border-emerald-500/20'
+                  }`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <button
+                        onClick={() => e.code && copyCode(e.code)}
+                        className="font-mono text-sm font-bold text-white hover:text-purple-300 transition inline-flex items-center gap-1"
+                        title="Sao chép mã"
+                      >
+                        {e.code || '(không rõ mã)'}
+                        {copied === e.code ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 opacity-50" />
+                        )}
+                      </button>
+                      {isExpired ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.08] text-white/55 font-semibold uppercase">
+                          Hết hạn
+                        </span>
+                      ) : (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold uppercase">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-white/55">
+                      {e.plan || 'Gói Premium'}
+                      {e.features?.length ? ` · ${e.features.length} tính năng` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right text-[11px] text-white/45 flex-shrink-0">
+                    {e.activatedAt && (
+                      <div>KH: {new Date(e.activatedAt).toLocaleDateString('vi-VN')}</div>
+                    )}
+                    {exp && <div>HH: {exp.toLocaleDateString('vi-VN')}</div>}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}

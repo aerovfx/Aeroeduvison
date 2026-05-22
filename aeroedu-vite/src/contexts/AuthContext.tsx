@@ -9,15 +9,24 @@ import { authService } from '@/services/auth.service'
 import { tokenStore } from '@/services/api'
 import type { User } from '@/types'
 
+/** Kết quả gọi login: success (user logged in) hoặc require 2FA (tempToken trả về) */
+export type LoginOutcome =
+  | { kind: 'success' }
+  | { kind: 'require2FA'; tempToken: string }
+
 interface AuthContextValue {
   user: User | null
   isLoading: boolean
   isAuthenticated: boolean
 
-  login: (email: string, password: string) => Promise<void>
-  register: (name: string, email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<LoginOutcome>
+  register: (name: string, email: string, password: string, role?: 'STUDENT' | 'TEACHER', accountType?: 'STUDENT' | 'TEACHER' | 'PARENT') => Promise<void>
   googleLogin: (credential: string) => Promise<void>
+  /** Sau khi user nhập mã 2FA hợp lệ → set user state */
+  complete2FALogin: (user: User) => void
   logout: () => Promise<void>
+  /** Refetch user từ /api/auth/me — gọi sau khi update profile để UI reflect */
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -60,13 +69,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     restoreSession()
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { user } = await authService.login({ email, password })
+  const login = useCallback(async (email: string, password: string): Promise<LoginOutcome> => {
+    const result = await authService.login({ email, password })
+    if (result.kind === 'require2FA') {
+      // UI sẽ render màn nhập mã 2FA và gọi complete2FALogin sau khi verify thành công
+      return { kind: 'require2FA', tempToken: result.tempToken }
+    }
+    setUser(result.user)
+    return { kind: 'success' }
+  }, [])
+
+  /** Gọi từ Login.tsx sau khi user nhập mã 2FA hợp lệ → set user state để route */
+  const complete2FALogin = useCallback((user: User) => {
     setUser(user)
   }, [])
 
-  const register = useCallback(async (name: string, email: string, password: string) => {
-    const { user } = await authService.register({ name, email, password })
+  const register = useCallback(async (
+    name: string, email: string, password: string,
+    role: 'STUDENT' | 'TEACHER' = 'STUDENT',
+    accountType?: 'STUDENT' | 'TEACHER' | 'PARENT',
+  ) => {
+    const { user } = await authService.register({ name, email, password, role, accountType })
     setUser(user)
   }, [])
 
@@ -82,7 +105,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await authService.logout()
+    try { localStorage.removeItem('userSubType') } catch { /* ignore */ }
     setUser(null)
+  }, [])
+
+  // Refetch user — gọi sau khi update profile để Navbar/Sidebar/etc. cập nhật
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await authService.getMe()
+      setUser(me)
+    } catch (err) {
+      // Im lặng — nếu fail giữ user cũ, không kick logout
+      if (import.meta.env.DEV) console.warn('[refreshUser] fail:', err)
+    }
   }, [])
 
   return (
@@ -94,7 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         googleLogin,
+        complete2FALogin,
         logout,
+        refreshUser,
       }}
     >
       {children}

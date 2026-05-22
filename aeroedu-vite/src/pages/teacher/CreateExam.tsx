@@ -5,7 +5,8 @@
  * Tab 1 — Tạo thủ công  (form cũ)
  * Tab 2 — Nhập từ PDF   (upload PDF + phiếu trả lời tương tác)
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { useDraftPersistence } from '@/hooks/useDraftPersistence'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Clock, BookOpen, AlignLeft,
@@ -15,16 +16,16 @@ import {
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 
-// ── Dark palette ───────────────────────────────────────────────
+// ── Theme-aware palette (CSS variables auto-flip light/dark) ───
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  purple:  '#7c3aed',
+  bg:      'var(--td-bg)',
+  card:    'var(--td-card)',
+  card2:   'var(--td-card2)',
+  border:  'var(--td-border)',
+  border2: 'var(--td-border2)',
+  text:    'var(--td-text)',
+  muted:   'var(--td-muted)',
+  purple:  'var(--td-purple)',
 } as const
 
 // ─────────────────────────────────────────────────────────────
@@ -307,12 +308,14 @@ function ShortGrid({
 // PDF IMPORT TAB
 // ─────────────────────────────────────────────────────────────
 function PdfImportTab({
-  baseForm, onSaved,
+  baseForm, onSaved, onStepChange,
 }: {
   baseForm: CreateExamForm
   onSaved: (examId: string) => void
+  onStepChange?: (step: 'upload' | 'config' | 'answers') => void
 }) {
   const [step, setStep] = useState<'upload' | 'config' | 'answers'>('upload')
+  const goStep = (s: 'upload' | 'config' | 'answers') => { setStep(s); onStepChange?.(s) }
 
   // PDF file state
   const [pdfFile, setPdfFile] = useState<File | null>(null)
@@ -330,6 +333,7 @@ function PdfImportTab({
   const [shortAnswers, setShortAnswers]  = useState<string[]>(() => Array(20).fill(''))
 
   const [saving, setSaving] = useState(false)
+  const [showPdf, setShowPdf] = useState(true)   // PDF panel visibility at step 3
 
   // ── Upload handlers ──────────────────────────────────────
   const handleFile = useCallback((file: File) => {
@@ -350,7 +354,7 @@ function PdfImportTab({
   const removePdf = () => {
     if (pdfUrl) URL.revokeObjectURL(pdfUrl)
     setPdfFile(null); setPdfUrl(null)
-    setStep('upload')
+    goStep('upload')
   }
 
   // ── Answer mutations ─────────────────────────────────────
@@ -573,7 +577,7 @@ function PdfImportTab({
                 />
                 <div style={{
                   position: 'absolute', bottom: 12, right: 12,
-                  background: 'rgba(0,0,0,0.6)', borderRadius: 8,
+                  background: 'rgba(var(--td-overlay-rgb), 0.6)', borderRadius: 8,
                   padding: '4px 10px', color: '#fff', fontSize: 12,
                   display: 'flex', alignItems: 'center', gap: 5,
                 }}>
@@ -585,7 +589,7 @@ function PdfImportTab({
 
           {pdfFile && (
             <button
-              onClick={() => setStep('config')}
+              onClick={() => goStep('config')}
               style={{
                 marginTop: 16, width: '100%', background: D.purple, color: '#fff',
                 border: 'none', borderRadius: 10, padding: '12px 0',
@@ -699,7 +703,7 @@ function PdfImportTab({
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setStep('upload')} style={{
+            <button onClick={() => goStep('upload')} style={{
               flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
               color: D.muted, borderRadius: 10, padding: '11px 0',
               fontWeight: 600, fontSize: 14, cursor: 'pointer',
@@ -707,7 +711,7 @@ function PdfImportTab({
               ← Quay lại
             </button>
             <button
-              onClick={() => setStep('answers')}
+              onClick={() => goStep('answers')}
               disabled={cfg.mcqCount + cfg.tfCount + cfg.shortCount === 0}
               style={{
                 flex: 2, background: D.purple, color: '#fff', border: 'none',
@@ -724,91 +728,151 @@ function PdfImportTab({
 
       {/* ── STEP 3: Answers ────────────────────────────────── */}
       {step === 'answers' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Progress bar */}
-          <div style={{
-            background: D.card, border: `1px solid ${D.border}`, borderRadius: 10, padding: '12px 16px',
-            display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-          }}>
-            <span style={{ fontSize: 13, color: D.muted }}>Đã điền:</span>
-            {cfg.mcqCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: mcqFilled === cfg.mcqCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần I: {mcqFilled}/{cfg.mcqCount}
-              </span>
-            )}
-            {cfg.tfCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: tfFilled === tfTotal ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${tfFilled === tfTotal ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: tfFilled === tfTotal ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần II: {tfFilled}/{tfTotal}
-              </span>
-            )}
-            {cfg.shortCount > 0 && (
-              <span style={{
-                padding: '3px 10px', borderRadius: 20,
-                background: shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
-                border: `1px solid ${shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
-                color: shortFilled === cfg.shortCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
-              }}>
-                Phần III: {shortFilled}/{cfg.shortCount}
-              </span>
-            )}
-          </div>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
 
-          {/* Scrollable answer sheet */}
-          <div style={{
-            overflowX: 'auto', display: 'flex', flexDirection: 'column', gap: 16,
-          }}>
-            {cfg.mcqCount > 0 && (
-              <McqGrid count={cfg.mcqCount} answers={mcqAnswers} onChange={setMcq} />
-            )}
-            {cfg.tfCount > 0 && (
-              <TfGrid count={cfg.tfCount} answers={tfAnswers} onChange={setTf} />
-            )}
-            {cfg.shortCount > 0 && (
-              <ShortGrid count={cfg.shortCount} answers={shortAnswers} onChange={setShort} />
-            )}
-          </div>
-
-          {/* Buttons */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => setStep('config')} style={{
-              flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
-              color: D.muted, borderRadius: 10, padding: '11px 0',
-              fontWeight: 600, fontSize: 14, cursor: 'pointer',
+          {/* ── LEFT: PDF reference panel ──────────────────── */}
+          {pdfUrl && showPdf && (
+            <div style={{
+              flex: '0 0 46%', position: 'sticky', top: 80,
+              background: D.card, border: `1px solid ${D.border}`,
+              borderRadius: 12, overflow: 'hidden',
+              height: 'calc(100vh - 160px)',
+              display: 'flex', flexDirection: 'column',
             }}>
-              ← Quay lại
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving || !baseForm.title.trim()}
-              style={{
-                flex: 2, background: '#22c55e', color: '#fff', border: 'none',
-                borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 15,
-                cursor: saving ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: saving || !baseForm.title.trim() ? 0.65 : 1,
-              }}
-            >
-              {saving
-                ? <><Loader2 size={18} className="animate-spin" /> Đang lưu...</>
-                : <><CheckCircle2 size={18} /> Tạo đề thi & lưu đáp án</>
-              }
-            </button>
-          </div>
-          {!baseForm.title.trim() && (
-            <p style={{ fontSize: 12, color: '#f87171', textAlign: 'center', margin: '-10px 0 0' }}>
-              ⚠ Hãy nhập tiêu đề đề thi ở tab "Tạo thủ công" trước khi lưu.
-            </p>
+              {/* PDF panel header */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 12px', background: D.card2,
+                borderBottom: `1px solid ${D.border}`, flexShrink: 0,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Eye size={14} style={{ color: D.purple }} />
+                  <span style={{ fontSize: 12, fontWeight: 600, color: D.text, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {pdfFile?.name ?? 'Đề thi PDF'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setShowPdf(false)}
+                  title="Ẩn đề"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: D.muted, padding: 4, borderRadius: 6,
+                    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12,
+                  }}
+                >
+                  <X size={13} /> Ẩn đề
+                </button>
+              </div>
+              {/* PDF embed */}
+              <iframe
+                src={pdfUrl + '#toolbar=1&navpanes=0&scrollbar=1&view=FitH'}
+                title="PDF đề thi"
+                style={{ flex: 1, width: '100%', border: 'none' }}
+              />
+            </div>
           )}
+
+          {/* ── RIGHT: Answer inputs ───────────────────────── */}
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* Show-PDF toggle (when panel hidden) */}
+            {pdfUrl && !showPdf && (
+              <button
+                onClick={() => setShowPdf(true)}
+                style={{
+                  alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)',
+                  color: '#a78bfa', borderRadius: 8, padding: '6px 12px',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <Eye size={14} /> Hiện đề PDF
+              </button>
+            )}
+
+            {/* Progress bar */}
+            <div style={{
+              background: D.card, border: `1px solid ${D.border}`, borderRadius: 10, padding: '12px 16px',
+              display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 13, color: D.muted }}>Đã điền:</span>
+              {cfg.mcqCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${mcqFilled === cfg.mcqCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: mcqFilled === cfg.mcqCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần I: {mcqFilled}/{cfg.mcqCount}
+                </span>
+              )}
+              {cfg.tfCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: tfFilled === tfTotal ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${tfFilled === tfTotal ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: tfFilled === tfTotal ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần II: {tfFilled}/{tfTotal}
+                </span>
+              )}
+              {cfg.shortCount > 0 && (
+                <span style={{
+                  padding: '3px 10px', borderRadius: 20,
+                  background: shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.15)' : 'rgba(217,79,79,0.1)',
+                  border: `1px solid ${shortFilled === cfg.shortCount ? 'rgba(34,197,94,0.4)' : 'rgba(217,79,79,0.3)'}`,
+                  color: shortFilled === cfg.shortCount ? '#4ade80' : '#f87171', fontSize: 12, fontWeight: 600,
+                }}>
+                  Phần III: {shortFilled}/{cfg.shortCount}
+                </span>
+              )}
+            </div>
+
+            {/* Scrollable answer sheet */}
+            <div style={{ overflowX: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {cfg.mcqCount > 0 && (
+                <McqGrid count={cfg.mcqCount} answers={mcqAnswers} onChange={setMcq} />
+              )}
+              {cfg.tfCount > 0 && (
+                <TfGrid count={cfg.tfCount} answers={tfAnswers} onChange={setTf} />
+              )}
+              {cfg.shortCount > 0 && (
+                <ShortGrid count={cfg.shortCount} answers={shortAnswers} onChange={setShort} />
+              )}
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => goStep('config')} style={{
+                flex: 1, background: D.card2, border: `1px solid ${D.border2}`,
+                color: D.muted, borderRadius: 10, padding: '11px 0',
+                fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              }}>
+                ← Quay lại
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !baseForm.title.trim()}
+                style={{
+                  flex: 2, background: '#22c55e', color: '#fff', border: 'none',
+                  borderRadius: 10, padding: '11px 0', fontWeight: 700, fontSize: 15,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  opacity: saving || !baseForm.title.trim() ? 0.65 : 1,
+                }}
+              >
+                {saving
+                  ? <><Loader2 size={18} className="animate-spin" /> Đang lưu...</>
+                  : <><CheckCircle2 size={18} /> Tạo đề thi & lưu đáp án</>
+                }
+              </button>
+            </div>
+            {!baseForm.title.trim() && (
+              <p style={{ fontSize: 12, color: '#f87171', textAlign: 'center', margin: '-10px 0 0' }}>
+                ⚠ Hãy nhập tiêu đề đề thi ở tab "Tạo thủ công" trước khi lưu.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -821,7 +885,74 @@ function PdfImportTab({
 export default function CreateExamPage() {
   const navigate = useNavigate()
 
-  const [activeTab, setActiveTab] = useState<'manual' | 'pdf'>('manual')
+  const [activeTab, setActiveTab] = useState<'manual' | 'matrix' | 'pdf'>('manual')
+  const [pdfStep, setPdfStep] = useState<'upload' | 'config' | 'answers'>('upload')
+
+  // ── Matrix tab state ──────────────────────────────────
+  const [matrices, setMatrices] = useState<Array<{ id: string; name: string; subject?: string; grade?: string; totalQuestions?: number }>>([])
+  const [matricesLoading, setMatricesLoading] = useState(false)
+  const [selectedMatrixId, setSelectedMatrixId] = useState<string | null>(null)
+  const [matrixTitle, setMatrixTitle] = useState('')
+  const [useAIForMissing, setUseAIForMissing] = useState(true)
+  const [generatingFromMatrix, setGeneratingFromMatrix] = useState(false)
+
+  // ── Draft persistence (cross-tab + cross-refresh) ─────
+  // Bundle các field draftable thành 1 object để hook auto-sync localStorage.
+  // Loại trừ pdfFile/Blob (không serialize được).
+  type DraftBundle = {
+    activeTab: 'manual' | 'matrix' | 'pdf'
+    selectedMatrixId: string | null
+    matrixTitle: string
+    useAIForMissing: boolean
+  }
+  const draftBundle: DraftBundle = {
+    activeTab, selectedMatrixId, matrixTitle, useAIForMissing,
+  }
+  const setDraftBundle = (next: DraftBundle) => {
+    setActiveTab(next.activeTab)
+    setSelectedMatrixId(next.selectedMatrixId)
+    setMatrixTitle(next.matrixTitle)
+    setUseAIForMissing(next.useAIForMissing)
+  }
+  const tabsDraft = useDraftPersistence<DraftBundle>(
+    'aero_create_exam_tabs_v1',
+    draftBundle,
+    setDraftBundle,
+  )
+
+  // Load matrices khi switch sang tab matrix
+  useEffect(() => {
+    if (activeTab !== 'matrix' || matrices.length > 0) return
+    setMatricesLoading(true)
+    api.get<{ matrices: typeof matrices }>('/exam-matrices')
+      .then(r => setMatrices(r.data?.matrices || []))
+      .catch(() => toast.error('Không tải được danh sách ma trận'))
+      .finally(() => setMatricesLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  const generateFromMatrix = async () => {
+    if (!selectedMatrixId) { toast.error('Chọn 1 ma trận trước'); return }
+    setGeneratingFromMatrix(true)
+    const t = toast.loading('Đang sinh đề từ ma trận (có thể mất 30-90s)…')
+    try {
+      const r = await api.post<{ data: { examId: string; totalQuestions: number; aiAdded: number } }>(
+        '/exams/generate-from-matrix',
+        { matrixId: selectedMatrixId, title: matrixTitle.trim() || undefined, useAIForMissing }
+      )
+      const d = r.data.data
+      toast.success(
+        `✅ Đã tạo đề ${d.totalQuestions} câu${d.aiAdded > 0 ? ` (AI bổ sung ${d.aiAdded})` : ''}`,
+        { id: t, duration: 4000 }
+      )
+      // Xoá draft tabs sau khi tạo thành công
+      tabsDraft.clear()
+      setTimeout(() => navigate(`/teacher/exams/${d.examId}/edit`), 600)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Lỗi sinh đề', { id: t })
+    } finally { setGeneratingFromMatrix(false) }
+  }
 
   const [form, setForm] = useState<CreateExamForm>({
     title:          '',
@@ -834,6 +965,13 @@ export default function CreateExamPage() {
     shuffle:        false,
   })
   const [saving, setSaving] = useState(false)
+
+  // Draft cho manual form (title/subject/examType/...)
+  const formDraft = useDraftPersistence<CreateExamForm>(
+    'aero_create_exam_manual_v1',
+    form,
+    setForm,
+  )
 
   const set = <K extends keyof CreateExamForm>(key: K, val: CreateExamForm[K]) =>
     setForm(f => ({ ...f, [key]: val }))
@@ -855,6 +993,9 @@ export default function CreateExamPage() {
         status:         'Nháp',
       })
       toast.success('Đã tạo đề thi thành công!')
+      // Xoá draft sau khi tạo thành công
+      formDraft.clear()
+      tabsDraft.clear()
       const examId = data?.id ?? data?.exam?.id
       navigate(examId ? `/teacher/exams/${examId}` : '/teacher/exams')
     } catch (err: unknown) {
@@ -895,6 +1036,26 @@ export default function CreateExamPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Draft indicator — hiện thị khi đã có nháp lưu trữ */}
+            {(formDraft.hasDraft || tabsDraft.hasDraft) && (
+              <DraftIndicator
+                lastSavedAt={Math.max(formDraft.lastSavedAt || 0, tabsDraft.lastSavedAt || 0)}
+                onClear={() => {
+                  if (!confirm('Xoá toàn bộ nháp đang lưu? Form sẽ về trạng thái mặc định.')) return
+                  formDraft.clear()
+                  tabsDraft.clear()
+                  // Reset state về default
+                  setForm({
+                    title: '', subject: 'Vật lý', examType: 'Trắc nghiệm', duration: 45,
+                    description: '', totalQuestions: 40, passingScore: 50, shuffle: false,
+                  })
+                  setActiveTab('manual')
+                  setSelectedMatrixId(null)
+                  setMatrixTitle('')
+                  setUseAIForMissing(true)
+                }}
+              />
+            )}
             <button type="button" onClick={() => navigate('/teacher/exams')}
               className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
               style={{ background: 'transparent', border: `1px solid ${D.border2}`, color: D.muted }}
@@ -926,6 +1087,7 @@ export default function CreateExamPage() {
         }}>
           {([
             { key: 'manual', label: '✏️  Tạo thủ công' },
+            { key: 'matrix', label: '📐  Từ ma trận + ngân hàng' },
             { key: 'pdf',    label: '📄  Nhập từ PDF' },
           ] as const).map(tab => (
             <button
@@ -945,7 +1107,7 @@ export default function CreateExamPage() {
       </div>
 
       {/* ── Body ─────────────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-6 py-6">
+      <div className={activeTab === 'pdf' && pdfStep === 'answers' ? 'px-4 py-6' : 'max-w-5xl mx-auto px-6 py-6'}>
 
         {/* ═══ TAB 1: Manual ═══════════════════════════════════ */}
         {activeTab === 'manual' && (
@@ -1119,9 +1281,110 @@ export default function CreateExamPage() {
         )}
 
         {/* ═══ TAB 2: PDF Import ═══════════════════════════════ */}
+        {/* ═══ TAB 2: From Matrix + Bank ═══════════════════════ */}
+        {activeTab === 'matrix' && (
+          <div className="grid grid-cols-12 gap-6">
+            {/* LEFT: Matrix selector */}
+            <div className="col-span-12 lg:col-span-8">
+              <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 20 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: D.text }}>
+                  Chọn ma trận đề
+                </h3>
+                <p style={{ fontSize: 12, color: D.muted, marginBottom: 16 }}>
+                  Đề thi sẽ được sinh tự động từ ngân hàng theo cấu trúc topics + difficulty của ma trận.
+                  Câu thiếu sẽ được AI bổ sung và lưu vào ngân hàng.
+                </p>
+
+                {matricesLoading ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: D.muted }}>
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                    Đang tải ma trận…
+                  </div>
+                ) : matrices.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40 }}>
+                    <p style={{ color: D.muted, fontSize: 14, marginBottom: 12 }}>
+                      Bạn chưa có ma trận đề nào.
+                    </p>
+                    <button onClick={() => navigate('/teacher/exam-matrix/create')}
+                      style={{
+                        padding: '8px 18px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                        background: D.purple, color: '#fff', fontWeight: 600, fontSize: 13,
+                      }}>
+                      Tạo ma trận đầu tiên →
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto' }}>
+                    {matrices.map(m => (
+                      <button key={m.id} type="button"
+                        onClick={() => setSelectedMatrixId(m.id)}
+                        style={{
+                          textAlign: 'left', padding: 12, borderRadius: 10, cursor: 'pointer',
+                          background: selectedMatrixId === m.id ? 'rgba(124,58,237,0.15)' : 'transparent',
+                          border: `2px solid ${selectedMatrixId === m.id ? D.purple : D.border}`,
+                          transition: 'all 0.15s',
+                        }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: D.text, marginBottom: 4 }}>{m.name}</div>
+                        <div style={{ fontSize: 11, color: D.muted }}>
+                          {m.subject || '—'} · {m.grade || '—'} · {m.totalQuestions ?? 0} câu
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* RIGHT: Config + generate */}
+            <div className="col-span-12 lg:col-span-4">
+              <div style={{ background: D.card, border: `1px solid ${D.border}`, borderRadius: 14, padding: 20, position: 'sticky', top: 90 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12, color: D.text }}>
+                  Tuỳ chọn
+                </h3>
+
+                <label style={{ fontSize: 12, color: D.muted, display: 'block', marginBottom: 4 }}>
+                  Tiêu đề đề thi (không bắt buộc)
+                </label>
+                <input type="text" value={matrixTitle}
+                  onChange={e => setMatrixTitle(e.target.value)}
+                  placeholder="Tự động: {tên ma trận} — Đề thi"
+                  style={{
+                    width: '100%', padding: 8, fontSize: 13,
+                    background: D.bg, border: `1px solid ${D.border}`, borderRadius: 6,
+                    color: D.text, marginBottom: 12,
+                  }} />
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: D.text, cursor: 'pointer', marginBottom: 16 }}>
+                  <input type="checkbox" checked={useAIForMissing}
+                    onChange={e => setUseAIForMissing(e.target.checked)} />
+                  <span>AI bổ sung câu thiếu trong ngân hàng</span>
+                </label>
+
+                <button onClick={generateFromMatrix}
+                  disabled={!selectedMatrixId || generatingFromMatrix}
+                  style={{
+                    width: '100%', padding: '10px 16px', borderRadius: 10, border: 'none',
+                    background: !selectedMatrixId ? D.border : 'linear-gradient(90deg, #ec4899, #a855f7)',
+                    color: '#fff', fontWeight: 700, fontSize: 14, cursor: !selectedMatrixId ? 'not-allowed' : 'pointer',
+                    opacity: generatingFromMatrix ? 0.7 : 1,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}>
+                  {generatingFromMatrix
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Đang sinh đề…</>
+                    : '✨ Sinh đề từ ma trận'}
+                </button>
+
+                <p style={{ fontSize: 11, color: D.muted, marginTop: 12, textAlign: 'center', lineHeight: 1.4 }}>
+                  💡 Sau khi tạo, bạn có thể thêm câu thủ công + sửa từng câu trong trang chi tiết đề.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'pdf' && (
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-8">
+            <div className={pdfStep === 'answers' ? 'col-span-12' : 'col-span-12 lg:col-span-8'}>
 
               {/* Info banner */}
               {!form.title.trim() && (
@@ -1137,11 +1400,12 @@ export default function CreateExamPage() {
               <PdfImportTab
                 baseForm={form}
                 onSaved={examId => navigate(examId ? `/teacher/exams/${examId}` : '/teacher/exams')}
+                onStepChange={setPdfStep}
               />
             </div>
 
-            {/* Right: instructions */}
-            <div className="col-span-12 lg:col-span-4">
+            {/* Right: instructions — hidden at answers step (PDF panel takes that role) */}
+            <div className={pdfStep === 'answers' ? 'hidden' : 'col-span-12 lg:col-span-4'}>
               <div style={{
                 background: D.card, border: `1px solid ${D.border}`, borderRadius: 12,
                 padding: 20, position: 'sticky', top: 90,
@@ -1183,6 +1447,46 @@ export default function CreateExamPage() {
         )}
 
       </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   DraftIndicator — "Đã lưu nháp N giây trước" + "Xoá"
+   ───────────────────────────────────────────────────── */
+function DraftIndicator({
+  lastSavedAt, onClear,
+}: { lastSavedAt: number; onClear: () => void }) {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(t)
+  }, [])
+  const ago = Math.max(0, Math.round((now - lastSavedAt) / 1000))
+  const text = ago < 5
+    ? 'Vừa lưu'
+    : ago < 60
+      ? `${ago}s trước`
+      : ago < 3600
+        ? `${Math.round(ago / 60)} phút trước`
+        : `${Math.round(ago / 3600)} giờ trước`
+  return (
+    <div className="flex items-center gap-2 text-[11px]" style={{ color: D.muted }}>
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md"
+        style={{ background: 'rgba(34,197,94,0.10)', border: '1px solid rgba(34,197,94,0.30)', color: '#34d399' }}>
+        💾 Đã lưu nháp · {text}
+      </span>
+      <button
+        type="button"
+        onClick={onClear}
+        className="px-2 py-1 rounded-md text-[10px] font-medium transition-colors"
+        style={{ background: 'transparent', border: `1px solid ${D.border2}`, color: D.muted }}
+        onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
+        onMouseLeave={e => (e.currentTarget.style.color = D.muted)}
+        title="Xoá nháp đang lưu"
+      >
+        Xoá
+      </button>
     </div>
   )
 }

@@ -1,9 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { ExportMenu } from '@/components/common/ExportMenu'
+import type { SheetData } from '@/lib/exportReport'
+import { api } from '@/services/api'
+import { Link } from 'react-router-dom'
 import {
   AlertTriangle, TrendingDown, TrendingUp, Minus,
   Brain, Play, CheckCircle, Clock, XCircle,
   Users, Filter, ChevronDown, ChevronUp, Eye,
-  MessageSquare, UserCheck, Zap,
+  MessageSquare, UserCheck, Zap, Loader2, RefreshCw,
+  GraduationCap, Briefcase, Heart, Shield,
 } from 'lucide-react'
 
 /* ─────────────────────────────────────────────────────────────
@@ -36,6 +41,42 @@ interface AtRiskStudent {
   lastActive: string
   emotionTag: string
 }
+
+/* ── Teacher-view types (from /api/admin/at-risk/teachers) ── */
+interface TeacherAtRiskStudentItem {
+  id: string
+  name: string
+  email: string
+  riskScore: number
+  riskLevel: 'critical' | 'high' | 'medium' | 'low'
+  lastActive: string
+}
+
+interface AtRiskTeacher {
+  id: string
+  name: string
+  email: string
+  image: string | null
+  lastLoginAt: string | null
+  teacherStatus: 'active' | 'inactive' | 'banned'
+  studentsTotal: number
+  studentsActive: number
+  studentsInactive: number
+  studentsAtRisk: number
+  studentsCritical: number
+  studentsHigh: number
+  averageStudentRiskScore: number
+  atRiskStudents: TeacherAtRiskStudentItem[]
+}
+
+interface AtRiskTeacherSummary {
+  totalTeachers: number
+  teachersWithAtRiskStudents: number
+  totalStudentsManaged: number
+  totalAtRiskStudents: number
+}
+
+type AtRiskTab = 'students' | 'teachers'
 
 /* ─────────────────────────────────────────────────────────────
    Mock data  (same shape as API, enriched)
@@ -340,50 +381,415 @@ function StudentCard({ student }: { student: AtRiskStudent }) {
    Main page
 ───────────────────────────────────────────────────────────── */
 export default function AtRisk() {
+  const [activeTab, setActiveTab] = useState<AtRiskTab>('students')
   const [filterLevel, setFilterLevel] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [students, setStudents] = useState<AtRiskStudent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [totalScanned, setTotalScanned] = useState(0)
+
+  // Teacher view state
+  const [teachers, setTeachers] = useState<AtRiskTeacher[]>([])
+  const [teacherSummary, setTeacherSummary] = useState<AtRiskTeacherSummary | null>(null)
+  const [teacherLoading, setTeacherLoading] = useState(false)
+  const [teacherError, setTeacherError] = useState<string | null>(null)
+  const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null)
+  const [teacherSearch, setTeacherSearch] = useState('')
+
+  // ── Fetch real at-risk data từ /api/admin/at-risk ──────────────
+  // Compute risk score dựa trên lastLoginAt, LessonHistory, banned, email-verified
+  const loadAtRisk = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const { data } = await api.get<{ students: AtRiskStudent[]; total: number; breakdown: Record<string, number> }>('/admin/at-risk?limit=200')
+      setStudents(data.students || [])
+      setTotalScanned(data.total || 0)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string }
+      setLoadError(e.response?.data?.error || e.message || 'Không tải được danh sách HS rủi ro')
+      setStudents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // ── Fetch teacher-level aggregates từ /api/admin/at-risk/teachers ──
+  const loadTeacherAtRisk = useCallback(async () => {
+    setTeacherLoading(true)
+    setTeacherError(null)
+    try {
+      const { data } = await api.get<{ teachers: AtRiskTeacher[]; summary: AtRiskTeacherSummary }>('/admin/at-risk/teachers')
+      setTeachers(data.teachers || [])
+      setTeacherSummary(data.summary || null)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } }; message?: string }
+      setTeacherError(e.response?.data?.error || e.message || 'Không tải được danh sách GV')
+      setTeachers([])
+    } finally {
+      setTeacherLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadAtRisk() }, [loadAtRisk])
+
+  // Lazy-load teacher view khi user click tab lần đầu
+  useEffect(() => {
+    if (activeTab === 'teachers' && teachers.length === 0 && !teacherLoading && !teacherError) {
+      loadTeacherAtRisk()
+    }
+  }, [activeTab, teachers.length, teacherLoading, teacherError, loadTeacherAtRisk])
 
   const counts = {
-    critical: MOCK_STUDENTS.filter(s => s.riskLevel === 'critical').length,
-    high:     MOCK_STUDENTS.filter(s => s.riskLevel === 'high').length,
-    medium:   MOCK_STUDENTS.filter(s => s.riskLevel === 'medium').length,
-    resolved: MOCK_STUDENTS.filter(s => s.status === 'resolved').length,
+    critical: students.filter(s => s.riskLevel === 'critical').length,
+    high:     students.filter(s => s.riskLevel === 'high').length,
+    medium:   students.filter(s => s.riskLevel === 'medium').length,
+    resolved: students.filter(s => s.status === 'resolved').length,
   }
 
   const filtered = useMemo(() => {
-    return MOCK_STUDENTS.filter(s => {
+    return students.filter(s => {
       const lvlOk = filterLevel === 'all' || s.riskLevel === filterLevel
       const stOk  = filterStatus === 'all' || s.status === filterStatus
       return lvlOk && stOk
     }).sort((a, b) => b.riskScore - a.riskScore)
-  }, [filterLevel, filterStatus])
+  }, [students, filterLevel, filterStatus])
+
+  const getAtRiskSheets = useCallback((): SheetData[] => {
+    if (filtered.length === 0) return []
+    return [
+      {
+        name: `HS rủi ro (${filtered.length})`,
+        columns: [
+          { key: 'studentName', label: 'Họ tên' },
+          { key: 'class',       label: 'Lớp' },
+          { key: 'riskScore',   label: 'Điểm rủi ro', type: 'number' },
+          { key: 'riskLevel',   label: 'Mức rủi ro' },
+          { key: 'status',      label: 'Trạng thái' },
+          { key: 'assignedTo',  label: 'GV phụ trách' },
+          { key: 'emotionTag',  label: 'Cảm xúc' },
+          { key: 'lastActive',  label: 'Hoạt động cuối' },
+          { key: 'createdAt',   label: 'Phát hiện lúc', type: 'date' },
+          { key: 'topFactor',   label: 'Yếu tố chính' },
+          { key: 'topRecommendation', label: 'Khuyến nghị #1' },
+        ],
+        rows: filtered.map(s => ({
+          ...s,
+          topFactor: s.factors[0]?.factor || '',
+          topRecommendation: s.recommendations[0]?.title || '',
+        })),
+      },
+      {
+        name: 'Tổng kết',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value', label: 'Giá trị', type: 'number' },
+        ],
+        rows: [
+          { metric: 'Nghiêm trọng',  value: counts.critical },
+          { metric: 'Cao',           value: counts.high },
+          { metric: 'Trung bình',    value: counts.medium },
+          { metric: 'Đã giải quyết', value: counts.resolved },
+        ],
+      },
+    ]
+  }, [filtered, counts])
 
   return (
     <div className="min-h-screen bg-[hsl(260,30%,8%)] p-6 md:p-8">
 
       {/* ── Header ── */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/30">
-            <AlertTriangle className="w-7 h-7 text-red-400" />
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/30">
+              <AlertTriangle className="w-7 h-7 text-red-400" />
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-300 bg-clip-text text-transparent"
+              style={{ letterSpacing: '-1px' }}>
+              At-Risk &amp; Intervention Manager
+            </h1>
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-red-400 to-orange-300 bg-clip-text text-transparent"
-            style={{ letterSpacing: '-1px' }}>
-            At-Risk &amp; Intervention Manager
-          </h1>
+          <p className="text-white/45 font-medium ml-1">
+            Dữ liệu THẬT từ DB · phát hiện HS có nguy cơ qua login activity, LessonHistory, banned status
+          </p>
         </div>
-        <p className="text-white/45 font-medium ml-1">
-          Hệ thống can thiệp sớm tích hợp AI – phát hiện và hỗ trợ học sinh có nguy cơ
-        </p>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              if (activeTab === 'students') loadAtRisk()
+              else loadTeacherAtRisk()
+            }}
+            disabled={activeTab === 'students' ? loading : teacherLoading}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-300 text-xs font-bold hover:bg-violet-500/25 transition disabled:opacity-50"
+            title="Quét lại danh sách"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${(activeTab === 'students' ? loading : teacherLoading) ? 'animate-spin' : ''}`} />
+            Quét lại
+          </button>
+          <Link
+            to="/admin/users"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/70 text-xs font-bold hover:bg-white/[0.08] transition"
+            title="Quản lý user (ban/reset)"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            Quản lý
+          </Link>
+          <ExportMenu
+            filename={`at-risk-students-${new Date().toISOString().slice(0, 10)}`}
+            getSheets={getAtRiskSheets}
+            meta={{
+              title: 'Báo cáo HS có nguy cơ (At-Risk)',
+              subtitle: `${filtered.length} HS — AeroEduVision`,
+              authorName: 'Admin Intervention',
+            }}
+          />
+        </div>
       </div>
 
-      {/* ── Summary stat cards ── */}
+      {/* ── Tab selector ── */}
+      <div className="flex flex-wrap gap-2 mb-5">
+        <button
+          onClick={() => setActiveTab('students')}
+          className={`group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all ${
+            activeTab === 'students'
+              ? 'border-transparent bg-gradient-to-r from-red-500/80 to-orange-500/80 text-white shadow-lg shadow-red-500/30'
+              : 'border-white/[0.08] bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white/85'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          Học sinh rủi ro
+          <span className={`text-[11px] font-extrabold px-1.5 py-0.5 rounded ${
+            activeTab === 'students' ? 'bg-white/25 text-white' : 'bg-white/[0.06] text-white/55'
+          }`}>
+            {students.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveTab('teachers')}
+          className={`group inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold transition-all ${
+            activeTab === 'teachers'
+              ? 'border-transparent bg-gradient-to-r from-emerald-500/80 to-teal-500/80 text-white shadow-lg shadow-emerald-500/30'
+              : 'border-white/[0.08] bg-white/[0.03] text-white/60 hover:border-white/20 hover:text-white/85'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4" />
+          Theo Giáo viên
+          <span className={`text-[11px] font-extrabold px-1.5 py-0.5 rounded ${
+            activeTab === 'teachers' ? 'bg-white/25 text-white' : 'bg-white/[0.06] text-white/55'
+          }`}>
+            {teacherSummary?.teachersWithAtRiskStudents ?? '—'}
+          </span>
+        </button>
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════
+          TAB 1: STUDENT VIEW
+         ════════════════════════════════════════════════════════════ */}
+      {activeTab === 'students' && (
+        <>
+          {/* Error banner */}
+          {loadError && (
+            <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-300 text-sm flex items-center gap-2">
+              <XCircle className="w-4 h-4" />
+              {loadError}
+            </div>
+          )}
+
+          {/* Loading */}
+          {loading && !students.length && (
+            <div className="mb-6 rounded-xl bg-white/[0.03] border border-white/[0.07] p-10 flex flex-col items-center gap-3">
+              <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+              <p className="text-white/60 text-sm">Đang phân tích dữ liệu...</p>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !loadError && students.length === 0 && (
+            <div className="mb-6 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-10 text-center">
+              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-emerald-300 mb-1">Không có học sinh rủi ro</h3>
+              <p className="text-sm text-white/60">Tất cả HS đăng ký đều có hoạt động bình thường.</p>
+            </div>
+          )}
+
+          {/* ── Summary stat cards ── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Nghiêm trọng', value: counts.critical, color: 'text-red-400',    icon: XCircle,      bg: 'bg-red-500/10 border-red-500/20' },
+              { label: 'Cao',         value: counts.high,     color: 'text-orange-400',  icon: AlertTriangle, bg: 'bg-orange-400/10 border-orange-400/20' },
+              { label: 'Trung bình',  value: counts.medium,   color: 'text-yellow-300',  icon: Clock,        bg: 'bg-yellow-400/10 border-yellow-400/20' },
+              { label: 'Đã giải quyết hôm nay', value: counts.resolved, color: 'text-green-400', icon: CheckCircle, bg: 'bg-green-500/10 border-green-500/20' },
+            ].map((s, i) => (
+              <div key={i} className={`rounded-2xl border p-5 transition-all ${s.bg}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm text-white/50 font-medium">{s.label}</p>
+                  <s.icon className={`w-5 h-5 ${s.color}`} />
+                </div>
+                <p className={`text-4xl font-black ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Filter bar ── */}
+          <div className="flex items-center gap-3 mb-6 flex-wrap">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white/50">
+              <Filter className="w-4 h-4" />
+              <span className="text-sm font-medium">Lọc:</span>
+            </div>
+
+            {/* Level pills */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 'all',      label: 'Tất cả',     cls: 'bg-white/[0.05] text-white/60 border-white/[0.08] hover:border-white/20' },
+                { value: 'critical', label: 'Nghiêm trọng', cls: 'bg-red-500/10 text-red-300 border-red-500/25 hover:bg-red-500/20' },
+                { value: 'high',     label: 'Cao',         cls: 'bg-orange-400/10 text-orange-300 border-orange-400/25 hover:bg-orange-400/20' },
+                { value: 'medium',   label: 'Trung bình',  cls: 'bg-yellow-400/10 text-yellow-300 border-yellow-400/25 hover:bg-yellow-400/20' },
+                { value: 'low',      label: 'Thấp',        cls: 'bg-green-500/10 text-green-300 border-green-500/25 hover:bg-green-500/20' },
+              ].map(p => (
+                <button
+                  key={p.value}
+                  onClick={() => setFilterLevel(p.value)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${p.cls}
+                    ${filterLevel === p.value ? 'ring-2 ring-white/20' : ''}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="w-px h-5 bg-white/[0.08]" />
+
+            {/* Status pills */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 'all',        label: 'Tất cả trạng thái' },
+                { value: 'new',        label: 'Mới' },
+                { value: 'in_progress',label: 'Đang xử lý' },
+                { value: 'resolved',   label: 'Đã giải quyết' },
+              ].map(p => (
+                <button
+                  key={p.value}
+                  onClick={() => setFilterStatus(p.value)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all
+                    bg-white/[0.03] border-white/[0.08] text-white/55 hover:text-white/80 hover:bg-white/[0.07]
+                    ${filterStatus === p.value ? 'ring-2 ring-violet-500/40 text-violet-300 border-violet-500/30' : ''}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            <span className="ml-auto text-xs text-white/30 font-medium">
+              {filtered.length} / {totalScanned} học sinh ({students.length} đang rủi ro)
+            </span>
+          </div>
+
+          {/* ── AI alert banner (critical only) ── */}
+          {counts.critical > 0 && filterLevel !== 'low' && filterLevel !== 'medium' && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl border border-red-500/30 bg-red-500/[0.06] mb-6">
+              <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-bold text-red-300 mb-0.5">
+                  🚨 {counts.critical} học sinh ở mức NGHIÊM TRỌNG cần can thiệp ngay
+                </p>
+                <p className="text-xs text-white/45">
+                  AI phát hiện nguy cơ cao dựa trên XP, cảm xúc, và hành vi học tập. Hãy xem đề xuất và hành động ngay.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Student cards ── */}
+          <div className="space-y-4">
+            {filtered.map(student => (
+              <StudentCard key={student.id} student={student} />
+            ))}
+
+            {filtered.length === 0 && students.length > 0 && (
+              <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+                <Users className="w-16 h-16 text-white/15 mb-4" />
+                <p className="text-white/50 font-semibold text-lg">Không có học sinh phù hợp</p>
+                <p className="text-white/30 text-sm mt-1">Thử thay đổi bộ lọc</p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════
+          TAB 2: TEACHER VIEW
+         ════════════════════════════════════════════════════════════ */}
+      {activeTab === 'teachers' && (
+        <TeacherView
+          teachers={teachers}
+          summary={teacherSummary}
+          loading={teacherLoading}
+          error={teacherError}
+          search={teacherSearch}
+          setSearch={setTeacherSearch}
+          expandedId={expandedTeacherId}
+          setExpandedId={setExpandedTeacherId}
+        />
+      )}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Teacher View — danh sách GV + HS at-risk của họ
+───────────────────────────────────────────────────────────── */
+function TeacherView({
+  teachers, summary, loading, error,
+  search, setSearch,
+  expandedId, setExpandedId,
+}: {
+  teachers: AtRiskTeacher[]
+  summary: AtRiskTeacherSummary | null
+  loading: boolean
+  error: string | null
+  search: string
+  setSearch: (s: string) => void
+  expandedId: string | null
+  setExpandedId: (s: string | null) => void
+}) {
+  const filteredTeachers = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return teachers
+    return teachers.filter(t =>
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.email || '').toLowerCase().includes(q)
+    )
+  }, [teachers, search])
+
+  if (loading && teachers.length === 0) {
+    return (
+      <div className="rounded-xl bg-white/[0.03] border border-white/[0.07] p-10 flex flex-col items-center gap-3">
+        <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
+        <p className="text-white/60 text-sm">Đang tổng hợp danh sách GV...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-red-500/10 border border-red-500/30 px-4 py-3 text-red-300 text-sm flex items-center gap-2">
+        <XCircle className="w-4 h-4" />
+        {error}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Nghiêm trọng', value: counts.critical, color: 'text-red-400',    icon: XCircle,      bg: 'bg-red-500/10 border-red-500/20' },
-          { label: 'Cao',         value: counts.high,     color: 'text-orange-400',  icon: AlertTriangle, bg: 'bg-orange-400/10 border-orange-400/20' },
-          { label: 'Trung bình',  value: counts.medium,   color: 'text-yellow-300',  icon: Clock,        bg: 'bg-yellow-400/10 border-yellow-400/20' },
-          { label: 'Đã giải quyết hôm nay', value: counts.resolved, color: 'text-green-400', icon: CheckCircle, bg: 'bg-green-500/10 border-green-500/20' },
+          { label: 'Tổng giáo viên',     value: summary?.totalTeachers ?? 0,             color: 'text-emerald-400', icon: Briefcase,    bg: 'bg-emerald-500/10 border-emerald-500/20' },
+          { label: 'GV có HS rủi ro',    value: summary?.teachersWithAtRiskStudents ?? 0, color: 'text-orange-400',  icon: AlertTriangle, bg: 'bg-orange-400/10 border-orange-400/20' },
+          { label: 'Tổng HS quản lý',    value: summary?.totalStudentsManaged ?? 0,       color: 'text-sky-400',     icon: Users,        bg: 'bg-sky-500/10 border-sky-500/20' },
+          { label: 'HS rủi ro toàn hệ thống', value: summary?.totalAtRiskStudents ?? 0,   color: 'text-red-400',     icon: Heart,        bg: 'bg-red-500/10 border-red-500/20' },
         ].map((s, i) => (
           <div key={i} className={`rounded-2xl border p-5 transition-all ${s.bg}`}>
             <div className="flex items-center justify-between mb-2">
@@ -395,89 +801,255 @@ export default function AtRisk() {
         ))}
       </div>
 
-      {/* ── Filter bar ── */}
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.07] text-white/50">
-          <Filter className="w-4 h-4" />
-          <span className="text-sm font-medium">Lọc:</span>
+      {/* Search bar */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex-1 min-w-[240px] relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <input
+            type="text"
+            placeholder="Tìm GV theo tên hoặc email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-sm text-white/85 placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500/40"
+          />
         </div>
-
-        {/* Level pills */}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { value: 'all',      label: 'Tất cả',     cls: 'bg-white/[0.05] text-white/60 border-white/[0.08] hover:border-white/20' },
-            { value: 'critical', label: 'Nghiêm trọng', cls: 'bg-red-500/10 text-red-300 border-red-500/25 hover:bg-red-500/20' },
-            { value: 'high',     label: 'Cao',         cls: 'bg-orange-400/10 text-orange-300 border-orange-400/25 hover:bg-orange-400/20' },
-            { value: 'medium',   label: 'Trung bình',  cls: 'bg-yellow-400/10 text-yellow-300 border-yellow-400/25 hover:bg-yellow-400/20' },
-            { value: 'low',      label: 'Thấp',        cls: 'bg-green-500/10 text-green-300 border-green-500/25 hover:bg-green-500/20' },
-          ].map(p => (
-            <button
-              key={p.value}
-              onClick={() => setFilterLevel(p.value)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${p.cls}
-                ${filterLevel === p.value ? 'ring-2 ring-white/20' : ''}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-px h-5 bg-white/[0.08]" />
-
-        {/* Status pills */}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { value: 'all',        label: 'Tất cả trạng thái' },
-            { value: 'new',        label: 'Mới' },
-            { value: 'in_progress',label: 'Đang xử lý' },
-            { value: 'resolved',   label: 'Đã giải quyết' },
-          ].map(p => (
-            <button
-              key={p.value}
-              onClick={() => setFilterStatus(p.value)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition-all
-                bg-white/[0.03] border-white/[0.08] text-white/55 hover:text-white/80 hover:bg-white/[0.07]
-                ${filterStatus === p.value ? 'ring-2 ring-violet-500/40 text-violet-300 border-violet-500/30' : ''}`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <span className="ml-auto text-xs text-white/30 font-medium">
-          {filtered.length} / {MOCK_STUDENTS.length} học sinh
+        <span className="text-xs text-white/30 font-medium">
+          {filteredTeachers.length} / {teachers.length} GV
         </span>
       </div>
 
-      {/* ── AI alert banner (critical only) ── */}
-      {counts.critical > 0 && filterLevel !== 'low' && filterLevel !== 'medium' && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl border border-red-500/30 bg-red-500/[0.06] mb-6">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-bold text-red-300 mb-0.5">
-              🚨 {counts.critical} học sinh ở mức NGHIÊM TRỌNG cần can thiệp ngay
-            </p>
-            <p className="text-xs text-white/45">
-              AI phát hiện nguy cơ cao dựa trên XP, cảm xúc, và hành vi học tập. Hãy xem đề xuất và hành động ngay.
-            </p>
-          </div>
+      {/* Empty state */}
+      {filteredTeachers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-white/[0.06] bg-white/[0.02]">
+          <GraduationCap className="w-16 h-16 text-white/15 mb-4" />
+          <p className="text-white/50 font-semibold text-lg">
+            {teachers.length === 0 ? 'Chưa có giáo viên nào' : 'Không có GV nào khớp'}
+          </p>
+          <p className="text-white/30 text-sm mt-1">
+            {teachers.length === 0 ? 'Hệ thống chưa có GV được khai báo' : 'Thử đổi từ khoá tìm kiếm'}
+          </p>
         </div>
       )}
 
-      {/* ── Student cards ── */}
-      <div className="space-y-4">
-        {filtered.map(student => (
-          <StudentCard key={student.id} student={student} />
-        ))}
-
-        {filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 rounded-2xl border border-white/[0.06] bg-white/[0.02]">
-            <Users className="w-16 h-16 text-white/15 mb-4" />
-            <p className="text-white/50 font-semibold text-lg">Không có học sinh phù hợp</p>
-            <p className="text-white/30 text-sm mt-1">Thử thay đổi bộ lọc</p>
+      {/* Teacher table */}
+      {filteredTeachers.length > 0 && (
+        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/[0.06] bg-white/[0.03] text-[11px] uppercase tracking-wider text-white/40">
+                  <th className="text-left px-4 py-3 font-semibold">Giáo viên</th>
+                  <th className="text-left px-4 py-3 font-semibold hidden md:table-cell">Trạng thái</th>
+                  <th className="text-center px-4 py-3 font-semibold w-24">Tổng HS</th>
+                  <th className="text-center px-4 py-3 font-semibold w-32 hidden lg:table-cell">Hoạt động</th>
+                  <th className="text-center px-4 py-3 font-semibold w-24">Rủi ro</th>
+                  <th className="text-left px-4 py-3 font-semibold hidden xl:table-cell w-32">Đăng nhập cuối</th>
+                  <th className="text-right px-4 py-3 font-semibold w-20">Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTeachers.map(t => (
+                  <TeacherRow
+                    key={t.id}
+                    teacher={t}
+                    expanded={expandedId === t.id}
+                    onToggle={() => setExpandedId(expandedId === t.id ? null : t.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/* ── TeacherRow + expanded student list ── */
+function TeacherRow({
+  teacher, expanded, onToggle,
+}: {
+  teacher: AtRiskTeacher
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const initials = (teacher.name || teacher.email || '?')
+    .split(/\s+/)
+    .slice(-2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
+  // Status badge config
+  const statusCfg =
+    teacher.teacherStatus === 'banned' ? { label: 'Bị khoá', cls: 'bg-red-500/15 text-red-300 border-red-500/30' }
+    : teacher.teacherStatus === 'inactive' ? { label: 'Không hoạt động', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
+    : { label: 'Active', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' }
+
+  // Risk badge color
+  const riskCls =
+    teacher.studentsCritical > 0 ? 'bg-red-500/15 text-red-300 border-red-500/30'
+    : teacher.studentsHigh > 0 ? 'bg-orange-400/15 text-orange-300 border-orange-400/30'
+    : teacher.studentsAtRisk > 0 ? 'bg-yellow-400/15 text-yellow-200 border-yellow-400/30'
+    : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+
+  // Last login label
+  let lastLoginLabel = 'Chưa đăng nhập'
+  if (teacher.lastLoginAt) {
+    const days = (Date.now() - new Date(teacher.lastLoginAt).getTime()) / 86400_000
+    if (days < 1) lastLoginLabel = 'Hôm nay'
+    else if (days < 2) lastLoginLabel = 'Hôm qua'
+    else if (days < 30) lastLoginLabel = `${Math.floor(days)} ngày trước`
+    else lastLoginLabel = `${Math.floor(days / 30)} tháng trước`
+  }
+
+  const activePct = teacher.studentsTotal > 0
+    ? Math.round((teacher.studentsActive / teacher.studentsTotal) * 100)
+    : 0
+
+  return (
+    <>
+      <tr className={`border-b border-white/[0.04] hover:bg-white/[0.025] transition-colors ${expanded ? 'bg-white/[0.025]' : ''}`}>
+        {/* Teacher cell */}
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-3">
+            {teacher.image ? (
+              <img src={teacher.image} alt="" className="w-9 h-9 rounded-full object-cover border border-white/10" />
+            ) : (
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold border border-white/10"
+                style={{ background: 'linear-gradient(135deg,#10b981 0%,#0d9488 100%)' }}
+              >
+                {initials}
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="font-semibold text-white/85 truncate">{teacher.name || '(chưa đặt tên)'}</div>
+              <div className="text-xs text-white/40 truncate">{teacher.email}</div>
+            </div>
+          </div>
+        </td>
+
+        {/* Status */}
+        <td className="px-4 py-3 hidden md:table-cell">
+          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md border ${statusCfg.cls}`}>
+            <Shield className="w-3 h-3" />
+            {statusCfg.label}
+          </span>
+        </td>
+
+        {/* Total students */}
+        <td className="px-4 py-3 text-center">
+          <span className="inline-flex items-center gap-1 text-sm font-bold text-white/85">
+            <Users className="w-3.5 h-3.5 text-white/40" />
+            {teacher.studentsTotal}
+          </span>
+        </td>
+
+        {/* Active / inactive */}
+        <td className="px-4 py-3 text-center hidden lg:table-cell">
+          <div className="text-sm text-white/85 font-semibold">
+            <span className="text-emerald-300">{teacher.studentsActive}</span>
+            <span className="text-white/30">/{teacher.studentsTotal}</span>
+            <span className="ml-1 text-xs text-white/40">({activePct}%)</span>
+          </div>
+        </td>
+
+        {/* At-risk count */}
+        <td className="px-4 py-3 text-center">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${riskCls}`}>
+            {teacher.studentsCritical > 0 && <AlertTriangle className="w-3 h-3" />}
+            {teacher.studentsAtRisk}
+          </span>
+        </td>
+
+        {/* Last login */}
+        <td className="px-4 py-3 hidden xl:table-cell">
+          <div className="text-xs text-white/50 inline-flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {lastLoginLabel}
+          </div>
+        </td>
+
+        {/* Toggle */}
+        <td className="px-4 py-3 text-right">
+          <button
+            onClick={onToggle}
+            disabled={teacher.studentsAtRisk === 0}
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white/[0.04] border border-white/[0.08] text-white/60 hover:text-white/85 hover:bg-white/[0.08] transition disabled:opacity-30 disabled:cursor-not-allowed"
+            title={teacher.studentsAtRisk === 0 ? 'GV này không có HS rủi ro' : (expanded ? 'Thu gọn' : 'Xem HS rủi ro')}
+          >
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </td>
+      </tr>
+
+      {/* Expanded panel: at-risk students of this teacher */}
+      {expanded && teacher.atRiskStudents.length > 0 && (
+        <tr className="bg-black/30">
+          <td colSpan={7} className="px-4 py-4">
+            <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
+              <h4 className="text-sm font-bold text-white/85 inline-flex items-center gap-2">
+                <Brain className="w-4 h-4 text-orange-400" />
+                {teacher.studentsAtRisk} HS rủi ro thuộc GV {teacher.name || teacher.email}
+              </h4>
+              <div className="flex items-center gap-2 text-xs">
+                {teacher.studentsCritical > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-red-500/15 text-red-300 border border-red-500/30 font-semibold">
+                    {teacher.studentsCritical} nghiêm trọng
+                  </span>
+                )}
+                {teacher.studentsHigh > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-orange-400/15 text-orange-300 border border-orange-400/30 font-semibold">
+                    {teacher.studentsHigh} cao
+                  </span>
+                )}
+                <span className="text-white/40">
+                  Điểm rủi ro TB: <span className="font-bold text-white/70">{teacher.averageStudentRiskScore}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {teacher.atRiskStudents.map(st => {
+                const stCls = riskStyle(st.riskLevel)
+                return (
+                  <div key={st.id} className={`rounded-xl border p-3 flex items-center gap-3 ${stCls.ring}`}>
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg,#667eea 0%,#764ba2 100%)' }}
+                    >
+                      {(st.name || st.email).split(/\s+/).slice(-2).map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-white/90 truncate">{st.name}</div>
+                      <div className="text-[11px] text-white/40 truncate">{st.email}</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-lg font-black ${stCls.score}`}>{st.riskScore}</div>
+                      <div className={`text-[10px] font-bold uppercase ${stCls.score}`}>
+                        {st.riskLevel}
+                      </div>
+                    </div>
+                    <Link
+                      to="/admin/users"
+                      className="p-1.5 rounded-lg bg-white/[0.05] border border-white/[0.08] text-white/50 hover:text-white/85 hover:bg-white/[0.10] transition"
+                      title="Mở chi tiết user"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Link>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="mt-3 text-xs text-white/30 italic">
+              Hoạt động cuối, factor chi tiết → xem ở tab "Học sinh rủi ro"
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }

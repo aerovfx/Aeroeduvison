@@ -3,22 +3,44 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Plus, FileText, Eye, Edit, Trash2, Copy,
-  Grid3x3, Search, BarChart3, Sparkles, Loader2,
+  Grid3x3, Search, BarChart3, Sparkles, Loader2, Swords,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { api } from "@/services/api"
+import { TeacherHelpDrawer } from '@/components/help/TeacherHelpDrawer'
 
 // ── Dark palette ──────────────────────────────────────────────
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  purple:  '#7c3aed',
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
 } as const
+
 
 // ── Types ─────────────────────────────────────────────────────
 interface Exam {
@@ -72,6 +94,7 @@ export default function ExamsPage() {
   const [exportingLatexId, setExportingLatexId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [addingToGameId, setAddingToGameId] = useState<string | null>(null)
 
   useEffect(() => { loadExams() }, [subjectFilter])
 
@@ -120,6 +143,25 @@ export default function ExamsPage() {
       toast.error('Không thể xóa đề thi')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const handleAddToGameCatalog = async (exam: Exam) => {
+    if (addingToGameId) return
+    setAddingToGameId(exam.id)
+    try {
+      await api.post('/games/catalog', {
+        examId: exam.id,
+        examTitle: exam.title,
+        subject: exam.subject,
+        questionCount: exam.totalQuestions,
+        gameType: 'keo-co',
+      })
+      toast.success(`Đã thêm "${exam.title}" vào danh mục trò chơi Kéo Co ⚔️`)
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || 'Không thể thêm vào danh mục trò chơi')
+    } finally {
+      setAddingToGameId(null)
     }
   }
 
@@ -176,6 +218,8 @@ export default function ExamsPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: D.bg }}>
+      {/* Floating help button — opens drawer với hướng dẫn module này */}
+      <TeacherHelpDrawer moduleKey="exams-list" />
 
       {/* ── Top bar ─────────────────────────────────────────── */}
       <div style={{ background: D.card, borderBottom: `1px solid ${D.border}` }} className="sticky top-0 z-10">
@@ -193,13 +237,13 @@ export default function ExamsPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate('/teacher/wayground')}
+                onClick={() => navigate('/teacher/taodethi')}
                 className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg transition-all"
                 style={{
                   background: 'linear-gradient(90deg,#ec4899,#db2777)',
                   color: '#fff', boxShadow: '0 4px 12px rgba(236,72,153,0.35)',
                 }}
-                title="Tạo đề từ PDF bằng fal.ai (Wayground-style)"
+                title="Tạo đề từ PDF bằng AI (Wayground-style)"
               >
                 <Plus className="w-4 h-4" />
                 Tạo đề bằng AI
@@ -391,6 +435,21 @@ export default function ExamsPage() {
                                 {exportingLatexId === exam.id
                                   ? <Loader2 className="w-4 h-4 animate-spin" />
                                   : <Sparkles className="w-4 h-4" />
+                                }
+                              </button>
+                              {/* Add to game catalog (Kéo Co) */}
+                              <button
+                                onClick={() => handleAddToGameCatalog(exam)}
+                                title="Thêm vào danh mục trò chơi thi đấu đối kháng (Kéo Co)"
+                                disabled={addingToGameId === exam.id}
+                                className="p-2 rounded-lg transition-colors disabled:opacity-50"
+                                style={{ color: '#f59e0b' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(245,158,11,0.15)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                              >
+                                {addingToGameId === exam.id
+                                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                                  : <Swords className="w-4 h-4" />
                                 }
                               </button>
                               {/* Delete */}

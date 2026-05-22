@@ -6,6 +6,7 @@ import {
   FileText, Image, Camera, RotateCcw, Download, ZoomIn, Search, Filter,
   ArrowUpDown, Printer, ClipboardCheck, BarChart3, AlertCircle
 } from 'lucide-react';
+import { api } from '@/services/api';
 
 // ===================== HEIC CONVERSION =====================
 
@@ -2642,13 +2643,9 @@ export default function ScanGrading(props: ScanGradingProps) {
         };
       });
 
-      const res = await fetch('/api/grading/graded-sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheets: payload }),
-      });
-
-      if (!res.ok) throw new Error('Failed to save');
+      // Bug fix: dùng api (axios) để có Authorization Bearer header
+      // — raw fetch() không attach token → BE 401
+      await api.post('/grading/graded-sheets', { sheets: payload });
       setSaveStatus('saved');
     } catch (err) {
       console.error('Failed to save graded results:', err);
@@ -2685,6 +2682,24 @@ export default function ScanGrading(props: ScanGradingProps) {
       }
 
       if (processedFiles.length === 0) return;
+
+      // ── Compress images > 500KB trước khi upload ──
+      // Tiết kiệm 60-90% dung lượng ảnh chụp điện thoại (4-12MB → 0.5-2MB).
+      // Dùng canvas resize max 1920px + JPEG q=0.85, không gửi qua server.
+      try {
+        const { compressImageBatch, formatSize } = await import('@/lib/imageCompression');
+        const result = await compressImageBatch(processedFiles, { maxWidth: 1920, quality: 0.85 });
+        if (result.compressedCount > 0) {
+          const { default: toast } = await import('react-hot-toast');
+          toast.success(
+            `🗜 Đã nén ${result.compressedCount} ảnh — tiết kiệm ${formatSize(result.savedKB)}`,
+            { duration: 3000 }
+          );
+        }
+        processedFiles = result.files;
+      } catch (e) {
+        console.warn('[scan] image compression skipped:', e);
+      }
 
       const newSheets: ScannedSheet[] = processedFiles.map(file => ({
         id: Math.random().toString(36),
@@ -2836,22 +2851,28 @@ export default function ScanGrading(props: ScanGradingProps) {
           try {
             const file = processedFiles.find(f => f.name === newSheet.fileName);
             if (file) {
-              const ocrForm = new FormData();
-              ocrForm.append('image', file);
-              ocrForm.append('mode', 'ocr');
-              const ocrResp = await fetch('/api/grading/ocr', {
-                method: 'POST',
-                body: ocrForm,
+              // Convert file → base64 (strip data: prefix), gửi JSON tới backend
+              // /api/grading/ocr (Vision AI extract student_name/id/exam_code).
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.onerror = () => reject(new Error('FileReader fail'));
+                reader.readAsDataURL(file);
               });
-              if (ocrResp.ok) {
-                const ocrData = await ocrResp.json();
+              const base64 = dataUrl.replace(/^data:[^,]+,/, '');
+              try {
+                const ocrResp = await api.post<{
+                  success: boolean
+                  exam_info?: { student_name?: string; student_id?: string; exam_code?: string }
+                }>('/grading/ocr', { image: base64, mimeType: file.type || 'image/jpeg' });
+                const ocrData = ocrResp.data;
                 if (ocrData.success && ocrData.exam_info) {
                   ocrStudentName = ocrData.exam_info.student_name || '';
-                  ocrStudentId = ocrData.exam_info.student_id || '';
-                  ocrExamCode = ocrData.exam_info.exam_code || '';
+                  ocrStudentId   = ocrData.exam_info.student_id   || '';
+                  ocrExamCode    = ocrData.exam_info.exam_code    || '';
                   console.log('[OCR] Extracted:', ocrData.exam_info);
                 }
-              }
+              } catch (e) { /* silent — không block scanning flow nếu OCR fail */ }
             }
           } catch (ocrErr) {
             console.warn('[OCR] Service unavailable, skipping text recognition:', ocrErr);

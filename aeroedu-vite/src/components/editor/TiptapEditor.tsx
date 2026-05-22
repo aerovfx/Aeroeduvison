@@ -74,7 +74,10 @@ export default function TiptapEditor({
         orderedList: { HTMLAttributes: { class: 'tiptap-ol' } },
         listItem: { HTMLAttributes: { class: 'tiptap-li' } },
         heading: { levels: [2, 3] },
-      }),
+        // StarterKit 3.x đã include Underline → disable để không trùng
+        // với @tiptap/extension-underline thêm bên dưới.
+        underline: false,
+      } as any),
       Underline,
       Placeholder.configure({ placeholder }),
     ],

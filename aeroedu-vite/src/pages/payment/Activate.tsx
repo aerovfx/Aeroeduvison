@@ -4,7 +4,7 @@
  *
  * Sau khi POST /api/entitlements/activate thành công:
  *   - Hiển thị danh sách feature đã unlock + ngày hết hạn
- *   - CTA "Vào Wayground" → /teacher/wayground
+ *   - CTA "Tạo đề ngay" → /teacher/taodethi
  */
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -190,7 +190,7 @@ export default function ActivatePage() {
               }}>
                 Vào Dashboard
               </button>
-              <button onClick={() => navigate('/teacher/wayground')} style={{
+              <button onClick={() => navigate('/teacher/taodethi')} style={{
                 flex: 1, background: 'linear-gradient(90deg, #ec4899, #db2777)',
                 color: '#fff', border: 'none', borderRadius: 10, padding: '11px 0',
                 fontWeight: 700, fontSize: 14, cursor: 'pointer',

@@ -1,22 +1,49 @@
 import { useState, useEffect, useCallback } from "react"
+import { api } from "@/services/api"
+import { ExportMenu } from "@/components/common/ExportMenu"
+import type { SheetData } from "@/lib/exportReport"
 import {
   CheckCircle2, Clock, FileText, Sparkles,
   ScanLine, ListChecks, Camera, RotateCcw,
   Plus, Trash2, BookOpen, ChevronDown, ChevronUp, GripVertical,
 } from "lucide-react"
 import ScanGrading, { type AnswerKey, type EssayQuestion } from "@/components/exam-grading/ScanGrading"
+import { PdfRefViewer } from "@/components/exam-grading/PdfRefViewer"
+import { BulkGrading } from "@/components/exam-grading/BulkGrading"
+import { Layers } from "lucide-react"
 
 // ── Dark palette ─────────────────────────────────────────────────────────────
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  purple:  '#7c3aed',
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
 } as const
+
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function newAnswerKey(): AnswerKey {
@@ -238,22 +265,79 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 
   const keysWithSheets = Array.from(new Set(rows.map(r => r.answerKeyId)))
 
+  /** Export sheets — bảng điểm + summary stats */
+  const getGradedSheets = (): SheetData[] => {
+    if (rows.length === 0) return []
+    const avg = rows.reduce((s, r) => s + r.percentage, 0) / rows.length
+    const max = Math.max(...rows.map(r => r.totalScore))
+    const min = Math.min(...rows.map(r => r.totalScore))
+    return [
+      {
+        name: `Bảng điểm (${rows.length})`,
+        columns: [
+          { key: 'studentName', label: 'Họ tên' },
+          { key: 'studentId',   label: 'SBD' },
+          { key: 'totalScore',  label: 'Điểm',     type: 'number' },
+          { key: 'maxScore',    label: 'Tối đa',   type: 'number' },
+          { key: 'percentage',  label: '%',        type: 'number' },
+          { key: 'gradeLabel',  label: 'Loại' },
+          { key: 'reviewed',    label: 'Đã review' },
+          { key: 'published',   label: 'Đã công bố' },
+          { key: 'createdAt',   label: 'Chấm lúc', type: 'date' },
+          { key: 'examName',    label: 'Đề thi' },
+        ],
+        rows: rows.map(r => ({
+          ...r,
+          reviewed: r.reviewed ? 'Có' : 'Chưa',
+          published: r.published ? 'Có' : 'Chưa',
+          examName: keyName(r.answerKeyId),
+        })),
+      },
+      {
+        name: 'Thống kê',
+        columns: [
+          { key: 'metric', label: 'Chỉ số' },
+          { key: 'value',  label: 'Giá trị' },
+        ],
+        rows: [
+          { metric: 'Bài đã chấm',  value: rows.length },
+          { metric: 'TB điểm (%)',  value: avg.toFixed(1) },
+          { metric: 'Cao nhất',     value: max },
+          { metric: 'Thấp nhất',    value: min },
+          { metric: 'Số đề thi',    value: keysWithSheets.length },
+        ],
+      },
+    ]
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Filter */}
-      {keysWithSheets.length > 1 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>Lọc theo đề:</span>
-          <select
-            value={filterKeyId}
-            onChange={e => setFilterKeyId(e.target.value)}
-            style={{ fontSize: 13, border: `1px solid ${D.border2}`, borderRadius: 8, padding: "6px 12px", background: D.card2, color: D.text, outline: "none" }}
-          >
-            <option value="all">Tất cả ({rows.length})</option>
-            {keysWithSheets.map(kId => <option key={kId} value={kId}>{keyName(kId)}</option>)}
-          </select>
-        </div>
-      )}
+      {/* Filter + Export */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, justifyContent: "space-between", flexWrap: "wrap" }}>
+        {keysWithSheets.length > 1 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: D.muted }}>Lọc theo đề:</span>
+            <select
+              value={filterKeyId}
+              onChange={e => setFilterKeyId(e.target.value)}
+              style={{ fontSize: 13, border: `1px solid ${D.border2}`, borderRadius: 8, padding: "6px 12px", background: D.card2, color: D.text, outline: "none" }}
+            >
+              <option value="all">Tất cả ({rows.length})</option>
+              {keysWithSheets.map(kId => <option key={kId} value={kId}>{keyName(kId)}</option>)}
+            </select>
+          </div>
+        ) : <div />}
+        <ExportMenu
+          variant="compact"
+          filename={`bang-diem-${new Date().toISOString().slice(0, 10)}`}
+          getSheets={getGradedSheets}
+          meta={{
+            title: 'Bảng điểm — Đã chấm',
+            subtitle: `Tổng ${rows.length} bài · ${keysWithSheets.length} đề`,
+            authorName: 'GV',
+          }}
+        />
+      </div>
 
       {/* Summary stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
@@ -317,9 +401,9 @@ function GradedResults({ savedKeys }: { savedKeys: AnswerKey[] }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ExamGrading() {
-  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "graded">("answerkey")
+  const [activeTab, setActiveTab_] = useState<"scan" | "answerkey" | "bulk" | "graded" | "library">("answerkey")
   const [gradedRefreshKey, setGradedRefreshKey] = useState(0)
-  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "graded") => {
+  const setActiveTab = useCallback((tab: "scan" | "answerkey" | "bulk" | "graded" | "library") => {
     setActiveTab_(tab)
     if (tab === "graded") setGradedRefreshKey(k => k + 1)
   }, [])
@@ -331,13 +415,14 @@ export default function ExamGrading() {
   const [loadingKeys, setLoadingKeys]       = useState(true)
 
   // Load saved answer keys
+  // Bug fix: trước dùng raw fetch() → không có Authorization Bearer header
+  // → BE trả 401. Đổi sang `api` (axios với interceptor) để token tự attach.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch("/api/grading/answer-keys")
-        if (!res.ok) throw new Error("Failed to load")
-        const { keys } = await res.json()
+        const res = await api.get<{ keys: any[] }>("/grading/answer-keys")
+        const { keys } = res.data
         if (cancelled) return
         const mapped: AnswerKey[] = (keys ?? []).map((k: any) => ({
           dbId: k.id,
@@ -368,13 +453,11 @@ export default function ExamGrading() {
   const handleSaveKey = useCallback(async () => {
     setSavingKey(true)
     try {
-      const res = await fetch("/api/grading/answer-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draftKey),
-      })
-      if (!res.ok) throw new Error("Save failed")
-      const { key } = await res.json()
+      const res = await api.post<{ ok: boolean; key: { id: string } }>(
+        "/grading/answer-keys",
+        draftKey,
+      )
+      const { key } = res.data
       const saved: AnswerKey = { ...draftKey, dbId: key.id }
       setSavedKeys(prev => {
         const next = [...prev, saved]
@@ -397,11 +480,9 @@ export default function ExamGrading() {
     if (!confirm(`Xoá đáp án "${key.examName || `Đề #${idx + 1}`}"?`)) return
     if (key.dbId) {
       try {
-        await fetch("/api/grading/answer-keys", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: key.dbId }),
-        })
+        // BE handler: DELETE /api/grading/answer-keys/:id (id trong URL path,
+        // KHÔNG phải body). Trước đây gửi body {id} → 404 vì missing :id param.
+        await api.delete(`/grading/answer-keys/${encodeURIComponent(key.dbId)}`)
       } catch (err) {
         console.error("Failed to delete answer key:", err)
       }
@@ -414,9 +495,11 @@ export default function ExamGrading() {
   }, [savedKeys, selectedKeyIdx])
 
   const TABS = [
-    { key: "answerkey" as const, label: "① Nhập đáp án", Icon: ListChecks },
-    { key: "scan"      as const, label: "② Quét & Chấm", Icon: ScanLine   },
-    { key: "graded"    as const, label: "③ Đã chấm",     Icon: Clock      },
+    { key: "answerkey" as const, label: "① Nhập đáp án",    Icon: ListChecks },
+    { key: "scan"      as const, label: "② Quét 1 phiếu",   Icon: ScanLine   },
+    { key: "bulk"      as const, label: "③ Chấm hàng loạt", Icon: Layers     },
+    { key: "graded"    as const, label: "④ Đã chấm",        Icon: Clock      },
+    { key: "library"   as const, label: "⑤ Thư viện",       Icon: FileText   },
   ]
 
   return (
@@ -457,8 +540,12 @@ export default function ExamGrading() {
         </div>
       </div>
 
-      {/* ── Main ── */}
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* ── Main ── (max-w wider khi activeTab=answerkey để có chỗ cho cột PDF) */}
+      <div style={{
+        maxWidth: activeTab === "answerkey" ? 1600 : 1280,
+        margin: "0 auto", padding: 24,
+        display: "flex", flexDirection: "column", gap: 20,
+      }}>
 
         {/* Stats row */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
@@ -513,9 +600,28 @@ export default function ExamGrading() {
           )
         )}
 
-        {/* ── Tab: Nhập đáp án ── */}
+        {/* ── Tab: Chấm hàng loạt (≤ 100 phiếu cùng lúc) ── */}
+        {activeTab === "bulk" && (
+          <BulkGrading
+            savedKeys={savedKeys.map(k => ({ id: k.dbId, key: k }))}
+            selectedKeyIdx={selectedKeyIdx}
+            setSelectedKeyIdx={setSelectedKeyIdx}
+            onSwitchToAnswerKey={() => setActiveTab("answerkey")}
+          />
+        )}
+
+        {/* ── Tab: Nhập đáp án ── (2-col layout: PDF tham chiếu | Form nhập đáp án) */}
         {activeTab === "answerkey" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,_1fr)_minmax(520px,_1fr)] gap-5">
+
+            {/* ═══ CỘT TRÁI: PDF tham chiếu (sticky on desktop) ═══
+                storageKey="exam-grading-ref" → PDF persist qua F5 trong IndexedDB */}
+            <div className="lg:sticky lg:top-24 lg:self-start" style={{ height: 'calc(100vh - 8rem)' }}>
+              <PdfRefViewer hint="đề thi gốc" storageKey="exam-grading-ref" />
+            </div>
+
+            {/* ═══ CỘT PHẢI: Form nhập đáp án ═══ */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* Thông tin đề */}
             <div style={{ background: D.card, borderRadius: 12, border: `1px solid ${D.border}`, padding: 20 }}>
@@ -913,6 +1019,8 @@ export default function ExamGrading() {
                 </div>
               )}
             </div>
+            {/* ═══ ĐÓNG CỘT PHẢI ═══ */}
+            </div>
           </div>
         )}
 
@@ -920,7 +1028,169 @@ export default function ExamGrading() {
         {activeTab === "graded" && (
           <GradedResults key={`graded-${gradedRefreshKey}`} savedKeys={savedKeys} />
         )}
+
+        {/* ── Tab: Thư viện đề (archive theo năm) ── */}
+        {activeTab === "library" && (
+          <LibrarySection
+            savedKeys={savedKeys}
+            onPickKey={(idx) => {
+              setSelectedKeyIdx(idx)
+              setActiveTab("scan")
+            }}
+          />
+        )}
       </div>
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────
+   LibrarySection — Thư viện đề chấm theo năm
+   Group savedKeys theo năm (parse từ examDate hoặc createdAt)
+   ───────────────────────────────────────────────────── */
+function LibrarySection({
+  savedKeys, onPickKey,
+}: {
+  savedKeys: AnswerKey[]
+  onPickKey: (idx: number) => void
+}) {
+  // Parse year từ examDate "DD/MM/YYYY" hoặc fallback createdAt
+  const parseYear = (k: AnswerKey): string => {
+    const m = (k.examDate || '').match(/(\d{4})/)
+    if (m) return m[1]
+    if (k.createdAt) {
+      const y = new Date(k.createdAt).getFullYear()
+      if (!isNaN(y)) return String(y)
+    }
+    return 'Khác'
+  }
+
+  // Group by year DESC, mỗi nhóm sort theo examDate DESC
+  const byYear = new Map<string, { idx: number; key: AnswerKey }[]>()
+  savedKeys.forEach((k, idx) => {
+    const y = parseYear(k)
+    if (!byYear.has(y)) byYear.set(y, [])
+    byYear.get(y)!.push({ idx, key: k })
+  })
+  const years = Array.from(byYear.keys()).sort((a, b) => b.localeCompare(a))
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Hero card */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(124,58,237,0.10), rgba(168,85,247,0.05))',
+        border: `1px solid rgba(168,85,247,0.30)`,
+        borderRadius: 14, padding: 20,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+          <FileText style={{ width: 28, height: 28, color: '#a78bfa' }} />
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: D.text, margin: 0 }}>Thư viện bài chấm</h2>
+        </div>
+        <p style={{ fontSize: 13, color: D.muted, margin: 0 }}>
+          Lưu trữ tất cả đáp án đã tạo, nhóm theo năm để tham khảo cho các kỳ thi sau.
+          Bấm vào một đề để dùng lại đáp án và quét bài.
+        </p>
+      </div>
+
+      {savedKeys.length === 0 ? (
+        <div style={{
+          background: D.card, borderRadius: 12, border: `1px solid ${D.border}`,
+          padding: 48, textAlign: 'center',
+        }}>
+          <FileText style={{ width: 48, height: 48, color: D.muted, margin: '0 auto 12px', opacity: 0.4 }} />
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: D.text, marginBottom: 6 }}>
+            Thư viện trống
+          </h3>
+          <p style={{ fontSize: 13, color: D.muted }}>
+            Tạo đáp án ở tab "① Nhập đáp án" để xây dựng thư viện. Mỗi đề tự động xếp theo năm thi.
+          </p>
+        </div>
+      ) : (
+        years.map(year => {
+          const items = byYear.get(year)!
+          return (
+            <div key={year}>
+              <div style={{
+                display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10,
+                padding: '0 4px',
+              }}>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: D.text, margin: 0 }}>
+                  {year === 'Khác' ? 'Không rõ năm' : `Năm ${year}`}
+                </h3>
+                <span style={{ fontSize: 12, color: D.muted }}>
+                  · {items.length} đề
+                </span>
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12,
+              }}>
+                {items.map(({ idx, key }) => {
+                  const part1Count = Object.values(key.part1 || {}).filter(v => v != null).length
+                  const part2Count = Object.values(key.part2 || {}).filter(v => v != null).length
+                  const part3Count = Object.values(key.part3 || {}).filter(v => v != null).length
+                  return (
+                    <button
+                      key={key.id || idx}
+                      onClick={() => onPickKey(idx)}
+                      style={{
+                        background: D.card, border: `1px solid ${D.border}`,
+                        borderRadius: 12, padding: 16, textAlign: 'left',
+                        cursor: 'pointer', transition: 'all 0.15s',
+                        color: D.text,
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = 'rgba(168,85,247,0.4)'
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = D.border
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: D.text, marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {key.examName || 'Đề chưa đặt tên'}
+                          </p>
+                          <p style={{ fontSize: 11, color: D.muted, margin: 0 }}>
+                            {key.examCode ? `Mã ${key.examCode} · ` : ''}
+                            {key.examDate || (key.createdAt ? new Date(key.createdAt).toLocaleDateString('vi-VN') : 'N/A')}
+                          </p>
+                        </div>
+                      </div>
+                      {key.examSite && (
+                        <p style={{ fontSize: 11, color: D.muted, marginBottom: 10, opacity: 0.8 }}>
+                          📍 {key.examSite}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {part1Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(159,18,57,0.15)', color: '#fb7185', fontWeight: 600,
+                          }}>I · {part1Count} câu</span>
+                        )}
+                        {part2Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(245,158,11,0.15)', color: '#fbbf24', fontWeight: 600,
+                          }}>II · {part2Count} câu</span>
+                        )}
+                        {part3Count > 0 && (
+                          <span style={{
+                            fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                            background: 'rgba(124,58,237,0.15)', color: '#c4b5fd', fontWeight: 600,
+                          }}>III · {part3Count} câu</span>
+                        )}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })
+      )}
     </div>
   )
 }

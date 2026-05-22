@@ -1,12 +1,18 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import {
   Plus, Upload, Sparkles, Database,
   Search, CheckCircle2, ChevronDown, ChevronUp, Edit2,
   Save, X, Loader2, Trash2, PenLine, PlusCircle, Check,
+  Wand2, BookOpen, Hash, Tag, Lock,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { BulkGenerateModal } from "@/components/question-bank/BulkGenerateModal"
 import { ImportModal } from "@/components/question-bank/ImportModal"
+import { api } from "@/services/api"
+import { MathText } from "@/components/common/MathText"
+import QuestionRichEditor, { QuestionContentView } from "@/components/exam/QuestionRichEditor"
+import { KnowledgeUnitPicker } from "@/components/question-bank/KnowledgeUnitPicker"
+import { getCatalogStats } from "@/lib/knowledge-units-catalog"
 
 interface Question {
   id: string
@@ -20,6 +26,22 @@ interface Question {
   explanation: string
   status: string
   aiGenerated: boolean
+  // Taxonomy fields (2026-05-19)
+  topic?: string
+  chapter?: string | null
+  lesson?: string | null
+  keywords?: string[]
+  tags?: string[]
+  // V2 (2026-05-22): ownership cho edit/delete check
+  createdBy?: string | null
+}
+
+interface TaxonomyResp {
+  subjects: Array<{ name: string; count: number }>
+  grades: Array<{ name: string; count: number }>
+  chapters: Array<{ name: string; count: number }>
+  lessons: Array<{ name: string; count: number }>
+  topKeywords: Array<{ name: string; count: number }>
 }
 
 interface SubjectCategory {
@@ -102,6 +124,11 @@ const INITIAL_FORM = {
   grade: "",
   difficulty: "MEDIUM",
   topic: "",
+  chapter: "",
+  lesson: "",
+  /* 2026-05-19: thêm unitCode để link với danh mục đơn vị KT chuẩn */
+  unitCode: "",
+  keywords: [] as string[],
   explanation: "",
   options: ["", "", "", ""],
   correctAnswer: "",
@@ -109,6 +136,18 @@ const INITIAL_FORM = {
 }
 
 export default function QuestionBank() {
+  // V2 (2026-05-22): GV chỉ được xoá/sửa câu hỏi do CHÍNH MÌNH tạo.
+  // Đọc user từ localStorage để compute isOwner cho mỗi QuestionCard.
+  // ADMIN bypass — có quyền sửa/xoá tất cả.
+  const currentUser = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('user')
+      if (!raw) return null
+      const u = JSON.parse(raw)
+      return { id: u.id || null, role: (u.role || 'TEACHER').toUpperCase() }
+    } catch { return null }
+  }, [])
+
   const [generateOpen, setGenerateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [totalQuestions, setTotalQuestions] = useState(0)
@@ -119,9 +158,24 @@ export default function QuestionBank() {
   const PAGE_SIZE = 50
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null)
+  // Default ẨN subject picker để tiết kiệm không gian — chỉ hiện khi user toggle
+  const [subjectsCollapsed, setSubjectsCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('qb:subjects-collapsed') !== 'false' } catch { return true }
+  })
+  const toggleSubjectsPanel = () => {
+    const next = !subjectsCollapsed
+    setSubjectsCollapsed(next)
+    try { localStorage.setItem('qb:subjects-collapsed', String(next)) } catch { /* ignore */ }
+  }
   const [filterDifficulty, setFilterDifficulty] = useState<string>("")
   const [filterType, setFilterType] = useState<string>("")
   const [filterGrade, setFilterGrade] = useState<string>("")
+  // 2026-05-19: chuẩn hoá danh mục — thêm Chương/Bài/Từ khoá filter
+  const [filterChapter, setFilterChapter] = useState<string>("")
+  const [filterLesson, setFilterLesson] = useState<string>("")
+  const [filterKeyword, setFilterKeyword] = useState<string>("")
+  const [taxonomy, setTaxonomy] = useState<TaxonomyResp | null>(null)
+  const [fixingLatex, setFixingLatex] = useState(false)
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "difficulty">("newest")
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
 
@@ -223,13 +277,66 @@ export default function QuestionBank() {
   const expandAll = () => setExpandedRows(new Set(questions.map((q) => q.id)))
   const collapseAll = () => setExpandedRows(new Set())
 
+  // Load taxonomy (subjects, chapters, lessons, top keywords) — auto refresh khi đổi môn
+  const loadTaxonomy = useCallback(async () => {
+    try {
+      const subjectDb = selectedSubject ? getSubjectDbValue(selectedSubject) : ''
+      const params: Record<string, string> = {}
+      if (subjectDb) params.subject = subjectDb
+      const r = await api.get<{ data: TaxonomyResp }>('/questions/taxonomy', { params })
+      setTaxonomy(r.data?.data || null)
+    } catch {
+      setTaxonomy(null)
+    }
+  }, [selectedSubject])
+  useEffect(() => { loadTaxonomy() }, [loadTaxonomy])
+
+  // Reset chapter/lesson khi đổi môn (vì chapter list khác)
+  useEffect(() => {
+    setFilterChapter('')
+    setFilterLesson('')
+  }, [selectedSubject])
+
+  // Handler: 1-click fix LaTeX errors
+  const handleFixLatex = async () => {
+    if (!confirm('Quét + sửa lỗi LaTeX phổ biến (smart quotes, unicode minus, typos \\fra→\\frac, ...) trên toàn bộ ngân hàng đề?\n\nThao tác này KHÔNG thể hoàn tác.')) return
+    setFixingLatex(true)
+    try {
+      const r = await api.post<{ data: { scanned: number; fixed: number } }>('/questions/fix-latex', {
+        limit: 1000,
+        subject: selectedSubject ? getSubjectDbValue(selectedSubject) : undefined,
+      })
+      const { scanned, fixed } = r.data?.data || { scanned: 0, fixed: 0 }
+      toast.success(`Đã quét ${scanned} câu, sửa ${fixed} câu có lỗi LaTeX`)
+      if (fixed > 0) {
+        // Reload danh sách để xem kết quả
+        setPage(1)
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Lỗi fix LaTeX')
+    } finally {
+      setFixingLatex(false)
+    }
+  }
+
   const filteredQuestions = questions
     .filter((q) => {
-      if (searchQuery && !q.content.toLowerCase().includes(searchQuery.toLowerCase()) &&
-          !q.subject.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      const sq = searchQuery.trim().toLowerCase()
+      if (sq) {
+        const inContent = q.content.toLowerCase().includes(sq)
+        const inSubject = q.subject.toLowerCase().includes(sq)
+        const inChapter = (q.chapter || '').toLowerCase().includes(sq)
+        const inLesson  = (q.lesson  || '').toLowerCase().includes(sq)
+        const inTopic   = (q.topic   || '').toLowerCase().includes(sq)
+        const inKw      = (q.keywords || []).some(k => k.toLowerCase().includes(sq))
+        if (!inContent && !inSubject && !inChapter && !inLesson && !inTopic && !inKw) return false
+      }
       if (filterDifficulty && q.difficulty !== filterDifficulty) return false
       if (filterType && q.questionType !== filterType) return false
       if (filterGrade && q.grade !== filterGrade) return false
+      if (filterChapter && (q.chapter || '').toLowerCase() !== filterChapter.toLowerCase()) return false
+      if (filterLesson && (q.lesson || '').toLowerCase() !== filterLesson.toLowerCase()) return false
+      if (filterKeyword && !(q.keywords || []).some(k => k.toLowerCase() === filterKeyword.toLowerCase())) return false
       return true
     })
     .sort((a, b) => {
@@ -240,7 +347,7 @@ export default function QuestionBank() {
       return 0 // newest/oldest depend on API ordering
     })
 
-  const activeFilterCount = [filterDifficulty, filterType, filterGrade].filter(Boolean).length
+  const activeFilterCount = [filterDifficulty, filterType, filterGrade, filterChapter, filterLesson, filterKeyword].filter(Boolean).length
 
   // Manual creation handlers
   const updateForm = (field: string, value: unknown) =>
@@ -282,7 +389,11 @@ export default function QuestionBank() {
   }
 
   const handleCreateQuestion = async (keepFormOpen = false): Promise<boolean> => {
-    if (!form.content.trim()) { toast.error("Vui lòng nhập nội dung câu hỏi"); return false }
+    /* Content giờ là HTML từ RichTextEditor — strip tags trước khi check empty.
+       Editor trả '<p></p>' khi user xoá hết → trim() không bắt được. */
+    const stripHtml = (html: string) =>
+      html.replace(/<[^>]*>/g, '').replace(/&nbsp;|&amp;|&lt;|&gt;/g, ' ').trim()
+    if (!stripHtml(form.content)) { toast.error("Vui lòng nhập nội dung câu hỏi"); return false }
     if (!form.questionType) { toast.error("Vui lòng chọn loại câu hỏi"); return false }
     if (!form.subject) { toast.error("Vui lòng chọn môn học"); return false }
     if (!form.grade) { toast.error("Vui lòng chọn khối"); return false }
@@ -333,11 +444,17 @@ export default function QuestionBank() {
           grade: form.grade,
           difficulty: form.difficulty,
           topic: form.topic.trim() || form.subject,
+          /* 2026-05-19: gửi đủ taxonomy 4 cấp về backend cho phân loại */
+          chapter: form.chapter || null,        // code chương VD "VL-G11-CH1"
+          lesson: form.lesson || null,          // code bài VD "VL-G11-CH1-B1"
+          unitCode: form.unitCode || null,      // code đơn vị KT VD "VL-G11-CH1-B1-DV1"
           explanation: form.explanation.trim(),
           options,
           correctAnswer,
           learningObjectives: [form.topic.trim() || form.subject],
-          keywords: [form.topic.trim() || form.subject, form.subject],
+          keywords: [form.topic.trim() || form.subject, form.subject].concat(
+            form.unitCode ? [form.unitCode] : []
+          ),
         }),
       })
 
@@ -371,9 +488,9 @@ export default function QuestionBank() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0d0e17' }}>
+    <div className="min-h-screen" style={{ background: 'var(--td-bg)' }}>
       {/* Top Bar */}
-      <div className="sticky top-0 z-10" style={{ background: '#10111e', borderBottom: '1px solid #1e2033' }}>
+      <div className="sticky top-0 z-10" style={{ background: 'var(--td-card)', borderBottom: '1px solid #1e2033' }}>
         <div className="max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -381,8 +498,14 @@ export default function QuestionBank() {
                 <Database className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-100">Ngân Hàng Câu Hỏi</h1>
-                <p className="text-sm text-slate-400">{totalQuestions} câu hỏi</p>
+                <h1 className="text-xl font-bold text-foreground">Ngân Hàng Câu Hỏi</h1>
+                <p className="text-sm text-muted-foreground">
+                  {totalQuestions} câu hỏi
+                  {(() => {
+                    const s = getCatalogStats()
+                    return ` · Danh mục: ${s.subjects} môn · ${s.chapters} chương · ${s.lessons} bài · ${s.units} đơn vị KT`
+                  })()}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -391,7 +514,7 @@ export default function QuestionBank() {
                 className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
                   showCreateForm
                     ? "bg-purple-950/40 text-purple-300 border border-purple-700"
-                    : "border border-[#2a2b3d] text-slate-300 hover:bg-[#161728]"
+                    : "border border-border text-foreground/80 hover:bg-secondary"
                 }`}
               >
                 <PenLine className="w-4 h-4" />
@@ -399,7 +522,7 @@ export default function QuestionBank() {
               </button>
               <button
                 onClick={() => setImportOpen(true)}
-                className="px-4 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg hover:bg-[#161728] transition-colors flex items-center gap-2 text-sm font-medium"
+                className="px-4 py-2 border border-border text-foreground/80 rounded-lg hover:bg-secondary transition-colors flex items-center gap-2 text-sm font-medium"
               >
                 <Upload className="w-4 h-4" />
                 Import
@@ -418,66 +541,89 @@ export default function QuestionBank() {
 
       {/* Main Content */}
       <div className="max-w-[1800px] mx-auto px-6 py-6">
-        {/* Subject Categories */}
+        {/* Subject Categories — collapsible để tiết kiệm không gian */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-slate-100">Chọn môn học</h2>
-            {selectedSubject && (
-              <button
-                onClick={() => setSelectedSubject(null)}
-                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-              >
-                Xem tất cả
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-3">
-            {SUBJECT_CATEGORIES.map((subject) => (
-              <div
-                key={subject.id}
-                onClick={() =>
-                  setSelectedSubject(selectedSubject === subject.id ? null : subject.id)
-                }
-                className={`bg-[#10111e] rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
-                  selectedSubject === subject.id
-                    ? "ring-2 ring-purple-500 border-purple-700 bg-purple-950/40"
-                    : "border-[#1e2033]"
-                }`}
-              >
-                <div className="text-center">
-                  <h3 className="font-bold text-slate-100 text-sm">{subject.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1 truncate">{subject.description}</p>
+          <button
+            type="button"
+            onClick={toggleSubjectsPanel}
+            className="w-full flex items-center justify-between gap-3 mb-3 p-3 rounded-xl border border-border bg-card hover:bg-accent/30 transition-colors"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              {subjectsCollapsed
+                ? <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                : <ChevronUp className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
+              <h2 className="text-base font-bold text-foreground">Chọn môn học</h2>
+              {selectedSubject ? (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/40 text-purple-700 dark:text-purple-300 font-bold">
+                  {SUBJECT_CATEGORIES.find(s => s.id === selectedSubject)?.name || selectedSubject}
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground">Tất cả {SUBJECT_CATEGORIES.length} môn</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {selectedSubject && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setSelectedSubject(null) }}
+                  className="text-xs text-purple-600 hover:text-purple-700 dark:text-purple-300 font-medium px-2 py-1 rounded hover:bg-purple-500/15 cursor-pointer"
+                >
+                  Xem tất cả
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                {subjectsCollapsed ? 'Bấm để mở' : 'Bấm để ẩn'}
+              </span>
+            </div>
+          </button>
+          {!subjectsCollapsed && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-3 animate-in fade-in slide-in-from-top-2 duration-200">
+              {SUBJECT_CATEGORIES.map((subject) => (
+                <div
+                  key={subject.id}
+                  onClick={() =>
+                    setSelectedSubject(selectedSubject === subject.id ? null : subject.id)
+                  }
+                  className={`bg-card rounded-xl shadow-sm border p-3 cursor-pointer transition-all hover:shadow-md ${
+                    selectedSubject === subject.id
+                      ? "ring-2 ring-purple-500 border-purple-700 bg-purple-950/40"
+                      : "border-border"
+                  }`}
+                >
+                  <div className="text-center">
+                    <h3 className="font-bold text-foreground text-sm">{subject.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{subject.description}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Manual Create Form */}
         {showCreateForm && (
-          <div className="mb-6 bg-[#10111e] rounded-xl shadow-sm border border-purple-700 overflow-hidden">
-            <div className="px-6 py-4 bg-[#161728] border-b border-[#1e2033] flex items-center justify-between">
+          <div className="mb-6 bg-card rounded-xl shadow-sm border border-purple-700 overflow-hidden">
+            <div className="px-6 py-4 bg-secondary border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-purple-600 flex items-center justify-center">
                   <PlusCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-100">Tạo câu hỏi thủ công</h3>
-                  <p className="text-xs text-slate-500">Chọn loại câu hỏi, nhập nội dung và đáp án</p>
+                  <h3 className="font-bold text-foreground">Tạo câu hỏi thủ công</h3>
+                  <p className="text-xs text-muted-foreground">Chọn loại câu hỏi, nhập nội dung và đáp án</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowCreateForm(false)}
-                className="p-2 hover:bg-[#2a2b3d] rounded-lg transition-colors"
+                className="p-2 hover:bg-accent rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               {/* Step 1: Question Type */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-3">
+                <label className="block text-sm font-semibold text-foreground/80 mb-3">
                   1. Chọn loại câu hỏi *
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -499,13 +645,13 @@ export default function QuestionBank() {
                       className={`p-4 rounded-xl border-2 text-left transition-all ${
                         form.questionType === qt.value
                           ? "border-purple-500 bg-purple-950/40 shadow-sm"
-                          : "border-[#1e2033] hover:border-[#2a2b3d] bg-[#10111e]"
+                          : "border-border hover:border-border bg-card"
                       }`}
                     >
                       <span className="text-2xl block mb-1">{qt.icon}</span>
                       <span
                         className={`text-sm font-semibold ${
-                          form.questionType === qt.value ? "text-purple-700" : "text-slate-300"
+                          form.questionType === qt.value ? "text-purple-700" : "text-foreground/80"
                         }`}
                       >
                         {qt.label}
@@ -517,16 +663,16 @@ export default function QuestionBank() {
 
               {/* Step 2: Classification */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-3">
+                <label className="block text-sm font-semibold text-foreground/80 mb-3">
                   2. Thông tin phân loại
                 </label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Môn học *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Môn học *</label>
                     <select
                       value={form.subject}
                       onChange={(e) => updateForm("subject", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       <option value="">Chọn môn</option>
                       {SUBJECT_CATEGORIES.map((s) => (
@@ -535,11 +681,11 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Khối *</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Khối *</label>
                     <select
                       value={form.grade}
                       onChange={(e) => updateForm("grade", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       <option value="">Chọn khối</option>
                       {GRADE_OPTIONS.map((g) => (
@@ -548,11 +694,11 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Độ khó</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Độ khó</label>
                     <select
                       value={form.difficulty}
                       onChange={(e) => updateForm("difficulty", e.target.value)}
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500 bg-[#161728]"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground bg-secondary"
                     >
                       {DIFFICULTY_OPTIONS.map((d) => (
                         <option key={d.value} value={d.value}>{d.label}</option>
@@ -560,35 +706,59 @@ export default function QuestionBank() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Chủ đề</label>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">Chủ đề (text-free)</label>
                     <input
                       value={form.topic}
                       onChange={(e) => updateForm("topic", e.target.value)}
-                      placeholder="VD: Dao động cơ"
-                      className="w-full px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500"
+                      placeholder="VD: Dao động cơ — tự fill khi chọn đơn vị KT bên dưới"
+                      className="w-full px-3 py-2.5 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground"
                     />
                   </div>
                 </div>
+
+                {/* 🌳 Danh mục đơn vị KT — cascade Chương → Bài → Đơn vị
+                    Tự fill chapter/lesson/topic về form, đảm bảo metadata
+                    thống nhất với chuẩn Bộ GD&ĐT 2018. */}
+                {form.subject && form.grade && (
+                  <div className="mt-3">
+                    <KnowledgeUnitPicker
+                      subject={form.subject}
+                      grade={form.grade}
+                      chapter={form.chapter}
+                      lesson={form.lesson}
+                      unitCode={form.unitCode}
+                      onChange={(v) => {
+                        setForm(prev => ({
+                          ...prev,
+                          chapter: v.chapter,
+                          lesson: v.lesson,
+                          unitCode: v.unitCode || '',
+                          // Auto-fill topic nếu chưa nhập, hoặc nếu match label cũ (avoid overwrite custom)
+                          topic: (!prev.topic || prev.topic === '') ? v.topic : prev.topic,
+                        }))
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Step 3: Content */}
+              {/* Step 3: Content — Word-like editor + LaTeX */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  3. Nội dung câu hỏi *
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                  3. Nội dung câu hỏi * <span className="text-purple-600 dark:text-purple-400 text-xs font-normal">(Word-like editor + LaTeX: $x^2$, $$\\int...$$ )</span>
                 </label>
-                <textarea
+                <QuestionRichEditor
                   value={form.content}
-                  onChange={(e) => updateForm("content", e.target.value)}
-                  placeholder="Nhập nội dung câu hỏi..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-[#2a2b3d] rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-[#161728] text-slate-200 placeholder-slate-500"
+                  onChange={(html) => updateForm("content", html)}
+                  placeholder="VD: Cho hàm số $f(x) = \\left(\\dfrac{1}{\\pi}\\right)^{-x} + \\pi x + 1$. Xét tính đúng sai..."
+                  minHeight={200}
                 />
               </div>
 
               {/* Step 4: Answers */}
               {form.questionType && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-3">4. Đáp án</label>
+                  <label className="block text-sm font-semibold text-foreground/80 mb-3">4. Đáp án</label>
 
                   {/* MCQ */}
                   {form.questionType === "MCQ" && (
@@ -604,7 +774,7 @@ export default function QuestionBank() {
                               className={`w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
                                 isCorrect
                                   ? "bg-green-600 text-white shadow-sm"
-                                  : "bg-[#1e2033] text-slate-300 hover:bg-[#2a2b3d]"
+                                  : "bg-border text-foreground/80 hover:bg-accent"
                               }`}
                               title={isCorrect ? "Đáp án đúng" : "Chọn làm đáp án đúng"}
                             >
@@ -614,14 +784,14 @@ export default function QuestionBank() {
                               value={opt}
                               onChange={(e) => updateOption(idx, e.target.value)}
                               placeholder={`Phương án ${letter}`}
-                              className={`flex-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 ${
-                                isCorrect ? "border-green-600 bg-green-900/20" : "border-[#2a2b3d]"
+                              className={`flex-1 px-3 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground ${
+                                isCorrect ? "border-green-600 bg-green-900/20" : "border-border"
                               }`}
                             />
                             {form.options.length > 2 && (
                               <button
                                 onClick={() => removeOption(idx)}
-                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                className="p-2 text-muted-foreground hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -631,7 +801,7 @@ export default function QuestionBank() {
                       })}
                       <button
                         onClick={addOption}
-                        className="w-full py-2.5 border-2 border-dashed border-[#2a2b3d] rounded-lg text-sm text-slate-500 hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" />
                         Thêm phương án
@@ -656,7 +826,7 @@ export default function QuestionBank() {
                               ? val === "Đúng"
                                 ? "border-green-500 bg-green-900/30 text-green-400"
                                 : "border-red-500 bg-red-900/30 text-red-400"
-                              : "border-[#1e2033] text-slate-400 hover:border-[#2a2b3d]"
+                              : "border-border text-muted-foreground hover:border-border"
                           }`}
                         >
                           {val === "Đúng" ? "✓ " : "✗ "}
@@ -666,40 +836,55 @@ export default function QuestionBank() {
                     </div>
                   )}
 
-                  {/* Multiple True/False */}
+                  {/* Multiple True/False — như câu Đúng/Sai 4 mệnh đề Bộ GD&ĐT */}
                   {form.questionType === "MULTIPLE_TF" && (
                     <div className="space-y-3">
-                      <p className="text-xs text-slate-500">Nhập từng phát biểu và chọn Đúng / Sai cho mỗi ý</p>
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-purple-50 dark:bg-purple-900/15 border border-purple-300 dark:border-purple-700/40">
+                        <span className="text-base">💡</span>
+                        <div className="text-xs text-foreground/85 leading-relaxed">
+                          <strong>Đúng/Sai nhiều ý</strong> — nhập 4 phát biểu (a, b, c, d), chọn <span className="text-green-700 dark:text-green-400 font-bold">Đúng</span> hoặc <span className="text-red-700 dark:text-red-400 font-bold">Sai</span> cho mỗi ý.
+                          <br />Hỗ trợ LaTeX trong phát biểu: <code className="px-1 rounded bg-muted">$y = f(x)$</code> render công thức inline.
+                        </div>
+                      </div>
                       {form.options.map((opt, idx) => {
                         const label = String.fromCharCode(97 + idx) // a, b, c, d
                         const isTrue = form.mtfAnswers[idx] === "Đúng"
                         return (
-                          <div key={idx} className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-slate-400 w-5 shrink-0">{label})</span>
-                            <input
-                              value={opt}
-                              onChange={(e) => updateOption(idx, e.target.value)}
-                              placeholder={`Phát biểu ${label}...`}
-                              className="flex-1 px-3 py-2.5 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleMtfAnswer(idx)}
-                              className={`px-4 py-2.5 rounded-lg text-sm font-semibold shrink-0 border-2 transition-all ${
-                                isTrue
-                                  ? "border-green-500 bg-green-900/30 text-green-400"
-                                  : "border-red-500 bg-red-900/30 text-red-400"
-                              }`}
-                            >
-                              {isTrue ? "✓ Đúng" : "✗ Sai"}
-                            </button>
-                            {form.options.length > 2 && (
+                          <div key={idx} className="space-y-1.5">
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-bold text-foreground w-6 shrink-0">{label})</span>
+                              <input
+                                value={opt}
+                                onChange={(e) => updateOption(idx, e.target.value)}
+                                placeholder={`Phát biểu ${label} (gõ $x^2$ cho LaTeX)`}
+                                className="flex-1 px-3 py-2.5 border border-border rounded-lg text-sm bg-card text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
                               <button
-                                onClick={() => removeOption(idx)}
-                                className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-900/30 rounded-lg transition-colors"
+                                type="button"
+                                onClick={() => toggleMtfAnswer(idx)}
+                                className={`px-4 py-2.5 rounded-lg text-sm font-semibold shrink-0 border-2 transition-all ${
+                                  isTrue
+                                    ? "border-green-500 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                                    : "border-red-500 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+                                }`}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                {isTrue ? "✓ Đúng" : "✗ Sai"}
                               </button>
+                              {form.options.length > 2 && (
+                                <button
+                                  onClick={() => removeOption(idx)}
+                                  className="p-2 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                            {/* LaTeX preview cho phát biểu có $...$ */}
+                            {opt.includes('$') && (
+                              <div className="ml-9 px-3 py-1.5 rounded-md bg-muted/50 border text-xs text-muted-foreground">
+                                <span className="font-semibold mr-2">Preview:</span>
+                                <MathText as="span">{opt}</MathText>
+                              </div>
                             )}
                           </div>
                         )
@@ -707,7 +892,7 @@ export default function QuestionBank() {
                       {form.options.length < 6 && (
                         <button
                           onClick={addOption}
-                          className="w-full py-2.5 border-2 border-dashed border-[#2a2b3d] rounded-lg text-sm text-slate-500 hover:border-purple-600 hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2.5 border-2 border-dashed border-border rounded-lg text-sm text-muted-foreground hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center justify-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
                           Thêm phát biểu
@@ -733,26 +918,25 @@ export default function QuestionBank() {
                 </div>
               )}
 
-              {/* Explanation */}
+              {/* Explanation — Word-like editor + LaTeX */}
               <div>
-                <label className="block text-sm font-semibold text-slate-300 mb-2">
-                  Giải thích{" "}
-                  <span className="text-slate-600 font-normal">(tùy chọn)</span>
+                <label className="block text-sm font-semibold text-foreground/80 mb-2">
+                  Giải thích <span className="text-muted-foreground font-normal">(tùy chọn)</span>{" "}
+                  <span className="text-purple-600 dark:text-purple-400 text-xs font-normal">(LaTeX hỗ trợ)</span>
                 </label>
-                <textarea
+                <QuestionRichEditor
                   value={form.explanation}
-                  onChange={(e) => updateForm("explanation", e.target.value)}
-                  placeholder="Giải thích chi tiết cho đáp án..."
-                  rows={2}
-                  className="w-full px-4 py-3 border border-[#2a2b3d] rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-y bg-[#161728] text-slate-200 placeholder-slate-500"
+                  onChange={(html) => updateForm("explanation", html)}
+                  placeholder="Giải thích cách giải. VD: TXĐ là $\\mathbb{R}$ vì $\\dfrac{1}{\\pi} > 0$..."
+                  minHeight={140}
                 />
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-[#1e2033]">
+              <div className="flex items-center justify-between pt-4 border-t border-border">
                 <button
                   onClick={resetForm}
-                  className="px-4 py-2.5 text-sm text-slate-400 hover:text-slate-100 hover:bg-[#1e2033] rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-sm text-muted-foreground hover:text-foreground hover:bg-border rounded-lg transition-colors"
                 >
                   Hủy
                 </button>
@@ -787,7 +971,7 @@ export default function QuestionBank() {
         {!loading && questions.length > 0 && (
           <div className="mb-4 flex items-center gap-3 flex-wrap">
             {[
-              { label: "Tổng", count: questions.length, cls: "text-slate-300 bg-white/[0.05] border-white/[0.08]" },
+              { label: "Tổng", count: questions.length, cls: "text-foreground/80 bg-white/[0.05] border-white/[0.08]" },
               { label: "Dễ",   count: questions.filter(q => q.difficulty === "EASY").length,   cls: "text-green-400 bg-green-900/20 border-green-700/30" },
               { label: "TB",   count: questions.filter(q => q.difficulty === "MEDIUM").length, cls: "text-yellow-400 bg-yellow-900/20 border-yellow-700/30" },
               { label: "Khó",  count: questions.filter(q => q.difficulty === "HARD").length,   cls: "text-red-400 bg-red-900/20 border-red-700/30" },
@@ -803,8 +987,8 @@ export default function QuestionBank() {
               const cnt = questions.filter(q => q.questionType === type).length
               if (cnt === 0) return null
               return (
-                <div key={type} className="text-xs text-slate-500 bg-[#161728] border border-[#2a2b3d] px-2 py-1 rounded">
-                  {label}: <span className="text-slate-300 font-semibold">{cnt}</span>
+                <div key={type} className="text-xs text-muted-foreground bg-secondary border border-border px-2 py-1 rounded">
+                  {label}: <span className="text-foreground/80 font-semibold">{cnt}</span>
                 </div>
               )
             })}
@@ -820,21 +1004,21 @@ export default function QuestionBank() {
               placeholder="Tìm kiếm câu hỏi..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border border-[#2a2b3d] rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-[#161728] text-slate-200 placeholder-slate-500"
+              className="w-full pl-12 pr-4 py-3 border border-border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-secondary text-foreground placeholder-muted-foreground"
             />
           </div>
           {questions.length > 0 && (
             <div className="flex items-center gap-2">
               <button
                 onClick={expandAll}
-                className="px-3 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-1"
+                className="px-3 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-1"
               >
                 <ChevronDown className="w-4 h-4" />
                 Mở tất cả
               </button>
               <button
                 onClick={collapseAll}
-                className="px-3 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-1"
+                className="px-3 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-1"
               >
                 <ChevronUp className="w-4 h-4" />
                 Thu gọn
@@ -848,7 +1032,7 @@ export default function QuestionBank() {
           <select
             value={filterDifficulty}
             onChange={(e) => setFilterDifficulty(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Độ khó</option>
             {DIFFICULTY_OPTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
@@ -856,7 +1040,7 @@ export default function QuestionBank() {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Loại câu hỏi</option>
             {QUESTION_TYPE_OPTIONS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -864,15 +1048,57 @@ export default function QuestionBank() {
           <select
             value={filterGrade}
             onChange={(e) => setFilterGrade(e.target.value)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="">Khối lớp</option>
             {GRADE_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+          {/* Chương dropdown — auto populate từ taxonomy theo môn */}
+          {taxonomy && taxonomy.chapters.length > 0 && (
+            <select
+              value={filterChapter}
+              onChange={(e) => setFilterChapter(e.target.value)}
+              title="Lọc theo Chương"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">📖 Chương</option>
+              {taxonomy.chapters.slice(0, 50).map(c => (
+                <option key={c.name} value={c.name}>{c.name} ({c.count})</option>
+              ))}
+            </select>
+          )}
+          {/* Bài dropdown — depend chương */}
+          {taxonomy && taxonomy.lessons.length > 0 && (
+            <select
+              value={filterLesson}
+              onChange={(e) => setFilterLesson(e.target.value)}
+              title="Lọc theo Bài"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">📝 Bài</option>
+              {taxonomy.lessons.slice(0, 80).map(l => (
+                <option key={l.name} value={l.name}>{l.name} ({l.count})</option>
+              ))}
+            </select>
+          )}
+          {/* Từ khoá dropdown — chỉ show nếu có data */}
+          {taxonomy && taxonomy.topKeywords.length > 0 && (
+            <select
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
+              title="Lọc theo Từ khoá"
+              className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="">🏷️ Từ khoá</option>
+              {taxonomy.topKeywords.slice(0, 50).map(k => (
+                <option key={k.name} value={k.name}>{k.name} ({k.count})</option>
+              ))}
+            </select>
+          )}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-            className="px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm bg-[#161728] text-slate-300 focus:ring-2 focus:ring-purple-500"
+            className="px-3 py-2 border border-border rounded-lg text-sm bg-secondary text-foreground/80 focus:ring-2 focus:ring-purple-500"
           >
             <option value="newest">Mới nhất</option>
             <option value="oldest">Cũ nhất</option>
@@ -880,22 +1106,35 @@ export default function QuestionBank() {
           </select>
           {activeFilterCount > 0 && (
             <button
-              onClick={() => { setFilterDifficulty(""); setFilterType(""); setFilterGrade("") }}
+              onClick={() => {
+                setFilterDifficulty(""); setFilterType(""); setFilterGrade("")
+                setFilterChapter(""); setFilterLesson(""); setFilterKeyword("")
+              }}
               className="px-3 py-2 text-sm text-purple-400 hover:text-purple-300 border border-purple-700/50 rounded-lg hover:bg-purple-900/20 flex items-center gap-1.5 transition-colors"
             >
               <X className="w-3.5 h-3.5" />
               Xóa bộ lọc ({activeFilterCount})
             </button>
           )}
+          {/* Fix LaTeX errors button */}
+          <button
+            onClick={handleFixLatex}
+            disabled={fixingLatex}
+            title="Quét + sửa lỗi LaTeX phổ biến trong toàn bộ ngân hàng (smart quotes, unicode minus, typos \\fra→\\frac, ...)"
+            className="px-3 py-2 text-sm text-amber-400 hover:text-amber-300 border border-amber-700/50 rounded-lg hover:bg-amber-900/20 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+          >
+            {fixingLatex ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+            {fixingLatex ? 'Đang fix...' : 'Fix LaTeX'}
+          </button>
           {filteredQuestions.length !== questions.length && (
-            <span className="text-xs text-slate-500 ml-auto">
+            <span className="text-xs text-muted-foreground ml-auto">
               Hiển thị {filteredQuestions.length} / {questions.length} câu hỏi
             </span>
           )}
         </div>
 
         {/* Questions List */}
-        <div className="rounded-xl overflow-hidden" style={{ background: '#10111e', border: '1px solid #1e2033' }}>
+        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--td-card)', border: '1px solid #1e2033' }}>
           <div className="space-y-2 p-4">
             {loading ? (
               <div className="flex items-center justify-center py-12">
@@ -904,7 +1143,7 @@ export default function QuestionBank() {
             ) : filteredQuestions.length === 0 ? (
               <div className="text-center py-12">
                 <Database className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-                <p className="text-slate-400 font-medium">Chưa có câu hỏi nào</p>
+                <p className="text-muted-foreground font-medium">Chưa có câu hỏi nào</p>
                 <p className="text-slate-600 text-sm mt-1">
                   {activeFilterCount > 0 ? "Thử thay đổi bộ lọc để xem thêm câu hỏi" : "Tạo câu hỏi thủ công, import file hoặc sinh AI"}
                 </p>
@@ -918,17 +1157,25 @@ export default function QuestionBank() {
                 )}
               </div>
             ) : (
-              filteredQuestions.map((question, index) => (
-                <QuestionCard
-                  key={question.id}
-                  question={question}
-                  index={index}
-                  isExpanded={expandedRows.has(question.id)}
-                  onToggle={() => toggleRow(question.id)}
-                  onSave={(updates) => handleSaveEdit(question.id, updates)}
-                  onDelete={() => handleDelete(question.id)}
-                />
-              ))
+              filteredQuestions.map((question, index) => {
+                // V2: GV chỉ được sửa/xoá câu hỏi do CHÍNH MÌNH tạo. ADMIN bypass.
+                const canEdit = !!currentUser && (
+                  currentUser.role === 'ADMIN' ||
+                  (question.createdBy != null && question.createdBy === currentUser.id)
+                )
+                return (
+                  <QuestionCard
+                    key={question.id}
+                    question={question}
+                    index={index}
+                    isExpanded={expandedRows.has(question.id)}
+                    canEdit={canEdit}
+                    onToggle={() => toggleRow(question.id)}
+                    onSave={(updates) => handleSaveEdit(question.id, updates)}
+                    onDelete={() => handleDelete(question.id)}
+                  />
+                )
+              })
             )}
           </div>
         </div>
@@ -939,7 +1186,7 @@ export default function QuestionBank() {
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="px-6 py-3 border border-[#2a2b3d] text-slate-300 rounded-xl hover:bg-[#161728] transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
+              className="px-6 py-3 border border-border text-foreground/80 rounded-xl hover:bg-secondary transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50"
             >
               {loadingMore ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Đang tải...</>
@@ -972,6 +1219,7 @@ function QuestionCard({
   question,
   index,
   isExpanded,
+  canEdit,
   onToggle,
   onSave,
   onDelete,
@@ -979,6 +1227,8 @@ function QuestionCard({
   question: Question
   index: number
   isExpanded: boolean
+  /** V2: GV chỉ được sửa/xoá câu hỏi do CHÍNH MÌNH tạo. */
+  canEdit: boolean
   onToggle: () => void
   onSave: (updates: Partial<Question>) => void
   onDelete: () => void
@@ -1013,7 +1263,7 @@ function QuestionCard({
       className={`border rounded-xl transition-all ${
         isExpanded
           ? "border-purple-700 bg-purple-950/30 shadow-md"
-          : "border-[#1e2033] bg-[#10111e] hover:border-[#2a2b3d]"
+          : "border-border bg-card hover:border-border"
       }`}
     >
       {/* Collapsed View */}
@@ -1021,12 +1271,12 @@ function QuestionCard({
         <div className="flex items-start gap-4">
           <button
             onClick={onToggle}
-            className="mt-1 p-1 hover:bg-[#2a2b3d] rounded transition-colors"
+            className="mt-1 p-1 hover:bg-accent rounded transition-colors"
           >
             {isExpanded ? (
-              <ChevronUp className="w-5 h-5 text-slate-400" />
+              <ChevronUp className="w-5 h-5 text-muted-foreground" />
             ) : (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
+              <ChevronDown className="w-5 h-5 text-muted-foreground" />
             )}
           </button>
 
@@ -1035,10 +1285,10 @@ function QuestionCard({
               <span className="text-xs font-bold text-purple-400 bg-purple-900/30 px-2 py-1 rounded">
                 Câu {index + 1}
               </span>
-              <span className="text-xs text-slate-400 bg-[#1e2033] px-2 py-1 rounded">
+              <span className="text-xs text-muted-foreground bg-border px-2 py-1 rounded">
                 {question.subject}
               </span>
-              <span className="text-xs text-slate-400 bg-[#1e2033] px-2 py-1 rounded">
+              <span className="text-xs text-muted-foreground bg-border px-2 py-1 rounded">
                 {question.grade}
               </span>
               <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded">
@@ -1057,7 +1307,13 @@ function QuestionCard({
               </span>
             </div>
 
-            <p className="text-slate-200 font-medium line-clamp-2">{question.content}</p>
+            {/* Preview: strip HTML để line-clamp-2 hoạt động đúng + LaTeX render */}
+            <div className="text-foreground font-medium line-clamp-2">
+              {(() => {
+                const txt = question.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+                return <MathText as="span">{txt}</MathText>
+              })()}
+            </div>
 
             {question.options.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-3 max-w-2xl">
@@ -1067,7 +1323,7 @@ function QuestionCard({
                     className={`px-3 py-2 rounded-lg text-sm border ${
                       String.fromCharCode(65 + idx) === question.correctAnswer
                         ? "bg-green-900/20 border-green-700 text-green-400 font-semibold"
-                        : "bg-[#161728] border-[#1e2033] text-slate-300"
+                        : "bg-secondary border-border text-foreground/80"
                     }`}
                   >
                     <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span>
@@ -1078,20 +1334,32 @@ function QuestionCard({
             )}
 
             <div className="flex items-center gap-2 mt-3">
-              <button
-                onClick={() => { setIsEditing(true); onToggle() }}
-                className="px-3 py-1.5 border border-[#2a2b3d] text-slate-300 rounded-lg text-xs hover:bg-[#161728] flex items-center gap-1"
-              >
-                <Edit2 className="w-3 h-3" />
-                Sửa nhanh
-              </button>
-              <button
-                onClick={onDelete}
-                className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded-lg text-xs flex items-center gap-1"
-              >
-                <Trash2 className="w-3 h-3" />
-                Xóa
-              </button>
+              {canEdit ? (
+                <>
+                  <button
+                    onClick={() => { setIsEditing(true); onToggle() }}
+                    className="px-3 py-1.5 border border-border text-foreground/80 rounded-lg text-xs hover:bg-secondary flex items-center gap-1"
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    Sửa nhanh
+                  </button>
+                  <button
+                    onClick={onDelete}
+                    className="px-3 py-1.5 text-red-400 hover:bg-red-900/30 rounded-lg text-xs flex items-center gap-1"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Xóa
+                  </button>
+                </>
+              ) : (
+                <span
+                  title="Bạn không phải tác giả câu hỏi này — chỉ có thể xem và dùng trong đề thi."
+                  className="px-2.5 py-1 rounded text-[11px] font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1"
+                >
+                  <Lock className="w-3 h-3" />
+                  Của GV khác · Chỉ xem
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -1103,20 +1371,20 @@ function QuestionCard({
           {isEditing ? (
             <>
               <div>
-                <label className="text-sm font-semibold text-slate-300 mb-2 block">
+                <label className="text-sm font-semibold text-foreground/80 mb-2 block">
                   Nội dung câu hỏi
                 </label>
                 <textarea
                   value={editedContent}
                   onChange={(e) => setEditedContent(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-[#161728] text-slate-200"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
                   rows={3}
                 />
               </div>
 
               {editedOptions.length > 0 && (
                 <div>
-                  <label className="text-sm font-semibold text-slate-300 mb-2 block">
+                  <label className="text-sm font-semibold text-foreground/80 mb-2 block">
                     Phương án trả lời
                   </label>
                   <div className="grid grid-cols-2 gap-3">
@@ -1127,7 +1395,7 @@ function QuestionCard({
                           className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors ${
                             String.fromCharCode(65 + idx) === editedCorrectAnswer
                               ? "bg-green-500 text-white"
-                              : "bg-[#2a2b3d] text-slate-300 hover:bg-[#2a2b3d]"
+                              : "bg-accent text-foreground/80 hover:bg-accent"
                           }`}
                           title="Chọn làm đáp án đúng"
                         >
@@ -1140,10 +1408,10 @@ function QuestionCard({
                         <input
                           value={option}
                           onChange={(e) => handleOptionChange(idx, e.target.value)}
-                          className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-[#161728] text-slate-200 ${
+                          className={`flex-1 px-3 py-2 border rounded-lg text-sm bg-secondary text-foreground ${
                             String.fromCharCode(65 + idx) === editedCorrectAnswer
                               ? "border-green-600 bg-green-900/20"
-                              : "border-[#2a2b3d]"
+                              : "border-border"
                           }`}
                         />
                       </div>
@@ -1153,11 +1421,11 @@ function QuestionCard({
               )}
 
               <div>
-                <label className="text-sm font-semibold text-slate-300 mb-2 block">Giải thích</label>
+                <label className="text-sm font-semibold text-foreground/80 mb-2 block">Giải thích</label>
                 <textarea
                   value={editedExplanation}
                   onChange={(e) => setEditedExplanation(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#2a2b3d] rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-[#161728] text-slate-200"
+                  className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-secondary text-foreground"
                   rows={2}
                   placeholder="Giải thích chi tiết (tùy chọn)..."
                 />
@@ -1166,7 +1434,7 @@ function QuestionCard({
               <div className="flex items-center justify-end gap-2 pt-4 border-t">
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 border border-[#2a2b3d] text-slate-300 rounded-lg text-sm hover:bg-[#161728] flex items-center gap-2"
+                  className="px-4 py-2 border border-border text-foreground/80 rounded-lg text-sm hover:bg-secondary flex items-center gap-2"
                 >
                   <X className="w-4 h-4" />
                   Hủy
@@ -1186,29 +1454,45 @@ function QuestionCard({
             </>
           ) : (
             <div className="space-y-4">
-              {/* Full question content */}
+              {/* Full question content — render HTML/LaTeX */}
               <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Nội dung đầy đủ</p>
-                <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">{question.content}</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Nội dung đầy đủ</p>
+                <div className="text-foreground text-sm leading-relaxed">
+                  <QuestionContentView content={question.content} />
+                </div>
               </div>
 
-              {/* MULTIPLE_TF display */}
+              {/* MULTIPLE_TF display — table-style như đề Bộ GD&ĐT */}
               {question.questionType === "MULTIPLE_TF" && question.options.length > 0 && (() => {
                 const answers = question.correctAnswer.split(",")
                 return (
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Các phát biểu</p>
-                    <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Các phát biểu (Đúng/Sai)</p>
+                    <div className="rounded-lg border overflow-hidden">
                       {question.options.map((opt, idx) => {
                         const ans = answers[idx] || "?"
+                        const isTrue = ans === "Đúng"
                         return (
-                          <div key={idx} className={`flex items-start gap-3 px-3 py-2 rounded-lg border text-sm ${
-                            ans === "Đúng" ? "border-green-700/40 bg-green-900/15 text-green-300" : "border-red-700/40 bg-red-900/15 text-red-300"
-                          }`}>
-                            <span className="font-bold shrink-0 text-xs mt-0.5">{String.fromCharCode(97 + idx)})</span>
-                            <span className="flex-1 text-slate-200">{opt}</span>
-                            <span className={`text-xs font-bold shrink-0 px-2 py-0.5 rounded ${ans === "Đúng" ? "bg-green-900/40 text-green-400" : "bg-red-900/40 text-red-400"}`}>
-                              {ans === "Đúng" ? "✓ Đúng" : "✗ Sai"}
+                          <div
+                            key={idx}
+                            className={`flex items-start gap-3 px-3 py-2.5 text-sm border-b last:border-b-0 ${
+                              isTrue
+                                ? "bg-green-50 dark:bg-green-900/15 border-green-200 dark:border-green-700/40"
+                                : "bg-red-50 dark:bg-red-900/15 border-red-200 dark:border-red-700/40"
+                            }`}
+                          >
+                            <span className="font-bold shrink-0 text-foreground mt-0.5">{String.fromCharCode(97 + idx)})</span>
+                            <div className="flex-1 text-foreground leading-relaxed">
+                              <QuestionContentView content={opt} as="span" />
+                            </div>
+                            <span
+                              className={`text-xs font-bold shrink-0 px-2.5 py-1 rounded ${
+                                isTrue
+                                  ? "bg-green-200 dark:bg-green-900/40 text-green-800 dark:text-green-300"
+                                  : "bg-red-200 dark:bg-red-900/40 text-red-800 dark:text-red-300"
+                              }`}
+                            >
+                              {isTrue ? "✓ Đúng" : "✗ Sai"}
                             </span>
                           </div>
                         )
@@ -1218,11 +1502,13 @@ function QuestionCard({
                 )
               })()}
 
-              {/* Explanation */}
+              {/* Explanation — render HTML/LaTeX */}
               {question.explanation && (
-                <div className="bg-amber-900/15 border border-amber-700/30 rounded-lg p-3">
-                  <p className="text-xs font-semibold text-amber-400 mb-1">💡 Giải thích</p>
-                  <p className="text-sm text-slate-300 leading-relaxed">{question.explanation}</p>
+                <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-700/30 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">💡 Giải thích</p>
+                  <div className="text-sm text-foreground/85 leading-relaxed">
+                    <QuestionContentView content={question.explanation} />
+                  </div>
                 </div>
               )}
 

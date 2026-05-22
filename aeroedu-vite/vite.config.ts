@@ -153,6 +153,8 @@ export default defineConfig(({ mode }) => {
             'state-vendor': ['zustand'],
             // socket.io-client — chỉ load khi vào Chat / OnlineExamRoom (lazy)
             'socket-vendor': ['socket.io-client'],
+            // pdfjs — chỉ load khi mở PdfBookViewer
+            'pdf-vendor': ['pdfjs-dist'],
           },
         },
       },
@@ -180,6 +182,9 @@ export default defineConfig(({ mode }) => {
       exclude: [
         // mediapipe has its own CJS bundle via alias — keep excluded
         '@mediapipe/tasks-vision',
+        // pdfjs worker loaded via CDN — do NOT pre-bundle main package either
+        // (dynamic import handles it via manualChunks)
+        'pdfjs-dist',
       ],
     },
   }

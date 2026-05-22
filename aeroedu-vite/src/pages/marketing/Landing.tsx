@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import WorldMonitorGlobe from '@/components/world-monitor/WorldMonitorGlobe'
 import IntelDashboard from '@/components/world-monitor/IntelDashboard'
-import StemMonitor2DMap from '@/components/world-monitor/StemMonitor2DMap'
 import StemMonitorDeckMap from '@/components/world-monitor/StemMonitorDeckMap'
 import { useAeroGeo } from '@/services/aeroBackend.service'
 
@@ -101,12 +100,30 @@ const PLATFORMS = [
   },
 ]
 
-/* ─── Testimonials ──────────────────────────────────────────────────── */
+/* ─── Phản hồi từ người dùng thử nghiệm ─────────────────────────────────
+   Quote viết theo phong cách trung thực: mô tả lợi ích cụ thể, có số đo
+   được kèm theo những hạn chế thẳng thắn. Không hứa hẹn quá mức. */
 const TESTIMONIALS = [
-  { name: 'Linh Nguyễn', role: 'Học sinh lớp 11', avatar: 'LN', color: C.cyan,   quote: 'Lab 3D giúp mình hiểu Khí Động Học trực quan hơn rất nhiều. AI Gia Sư giải thích tận tình như thầy giáo thật!' },
-  { name: 'Thầy Minh',   role: 'Giáo viên STEM',  avatar: 'TM', color: C.purple, quote: 'Camera AI và bản đồ cảm xúc giúp tôi quan tâm đúng lúc đến từng học sinh. Giảm 70% thời gian chấm bài nhờ AI.' },
-  { name: 'Tuấn Anh',    role: 'Phụ huynh',        avatar: 'TA', color: C.green,  quote: 'Con em tiến bộ vượt bậc. Hệ thống theo dõi cảm xúc giúp phát hiện kịp thời khi con gặp khó khăn tâm lý.' },
-  { name: 'Hiệu Trưởng', role: 'Trường THPT ABC',  avatar: 'HT', color: C.amber,  quote: 'Hệ thống IoT và camera AI giúp BGH nắm bắt tình hình toàn trường theo thời gian thực. Ấn tượng!' },
+  {
+    name: 'Linh Nguyễn', role: 'Học sinh lớp 11 — THPT Phước Bửu',
+    avatar: 'LN', color: C.cyan,
+    quote: 'Lab 3D về dao động cơ học giúp em hình dung được hiện tượng — đọc sách giáo khoa thì chỉ thấy công thức. AI Gia Sư đôi khi còn nhầm bước trong bài khó, nhưng giải thích kiên nhẫn nên hợp với việc luyện tập.',
+  },
+  {
+    name: 'Thầy Minh', role: 'Giáo viên Vật lý 12',
+    avatar: 'TM', color: C.purple,
+    quote: 'Module ma trận đề + sinh đề từ ngân hàng câu hỏi tiết kiệm cho tôi khoảng 1-2 giờ mỗi tuần. AI chấm trắc nghiệm chính xác; bài tự luận tôi vẫn xem lại trước khi vào điểm.',
+  },
+  {
+    name: 'Anh Tuấn', role: 'Phụ huynh học sinh lớp 9',
+    avatar: 'TA', color: C.green,
+    quote: 'Tôi không kỳ vọng AI thay được thầy cô, nhưng dashboard tiến độ giúp tôi biết khi nào con đang chững lại, không cần đoán mò hay hỏi liên tục.',
+  },
+  {
+    name: 'Cô Hương', role: 'GV STEM — THPT Chuyên Lê Quý Đôn',
+    avatar: 'CH', color: C.amber,
+    quote: 'QR đề thi in ra giấy A4 hữu ích — học sinh quét cái là vào thẳng đề, không phải đọc link. Đã chạy 4 tiết kiểm tra, ổn định. Cold-start đôi khi mất 5 giây nhưng có thông báo rõ.',
+  },
 ]
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -118,8 +135,6 @@ export default function Landing() {
   const [activeFeature, setActiveFeature] = useState(0)
   const [videoPaused, setVideoPaused] = useState(true)
   const [fullScreenMonitor, setFullScreenMonitor] = useState(false)
-  // 'svg' = procedural 1024×512 SVG renderer, 'deck' = real MapLibre + deck.gl
-  const [monitorEngine, setMonitorEngine] = useState<'svg' | 'deck'>('deck')
 
   // Live startup + user geo data from aero-backend (inphysic.com Rust API).
   // When VITE_AERO_BACKEND_URL is unset these return [] and the globe falls
@@ -207,7 +222,14 @@ export default function Landing() {
             <a href="#features" className="land-nav-link">Tính năng</a>
             <a href="#platform" className="land-nav-link">Nền tảng</a>
             <a href="#ai"       className="land-nav-link">AI & Labs</a>
-            <a href="#testimonials" className="land-nav-link">Nhận xét</a>
+            <Link to="/docs" className="land-nav-link">Tài liệu</Link>
+            <Link to="/news" className="land-nav-link">Tin tức</Link>
+            <a href="#testimonials" className="land-nav-link">Phản hồi</a>
+            <a href="#team" className="land-nav-link">Đội ngũ</a>
+            <a href="#awards" className="land-nav-link">Giải thưởng</a>
+            <Link to="/free-courses/llm-mastery" className="land-nav-link" style={{ color: C.cyan, fontWeight: 700 }}>
+              🎓 Khoá AI MIỄN PHÍ
+            </Link>
           </div>
 
           {/* Desktop CTA */}
@@ -235,11 +257,17 @@ export default function Landing() {
         {/* Mobile menu */}
         {menuOpen && (
           <div style={{ background: 'rgba(2,4,18,0.98)', borderTop: `1px solid ${C.border}`, padding: '16px 24px 24px' }}>
-            {['features', 'platform', 'ai', 'testimonials'].map(s => (
+            {['features', 'platform', 'ai', 'testimonials', 'team', 'awards'].map(s => (
               <a key={s} href={`#${s}`} onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
-                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Nhận xét' }[s]}
+                {{ features: 'Tính năng', platform: 'Nền tảng', ai: 'AI & Labs', testimonials: 'Phản hồi', team: 'Đội ngũ', awards: 'Giải thưởng' }[s]}
               </a>
             ))}
+            <Link to="/docs" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
+              Tài liệu
+            </Link>
+            <Link to="/news" onClick={() => setMenuOpen(false)} style={{ display: 'block', padding: '10px 0', color: C.muted, textDecoration: 'none', fontSize: 15 }}>
+              Tin tức
+            </Link>
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Link to="/auth/login" style={{ padding: '10px', textAlign: 'center', color: C.muted, textDecoration: 'none', border: `1px solid ${C.border}`, borderRadius: 10 }}>Đăng nhập</Link>
               <Link to="/auth/register" style={{ padding: '10px', textAlign: 'center', color: '#fff', textDecoration: 'none', background: `linear-gradient(135deg,${C.blue},${C.purple})`, borderRadius: 10, fontWeight: 700 }}>Đăng ký</Link>
@@ -287,7 +315,7 @@ export default function Landing() {
             <Globe size={12} /> Hero
           </button>
           <button
-            onClick={() => { setFullScreenMonitor(true); setMonitorEngine('svg') }}
+            onClick={() => setFullScreenMonitor(true)}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 14px',
@@ -297,55 +325,20 @@ export default function Landing() {
               fontFamily: 'inherit',
               fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
               textTransform: 'uppercase',
-              color: fullScreenMonitor && monitorEngine === 'svg' ? '#020412' : C.muted,
-              background: fullScreenMonitor && monitorEngine === 'svg'
-                ? `linear-gradient(135deg, ${C.cyan}, ${C.purple})`
-                : 'transparent',
-              transition: 'all .2s',
-            }}
-          >
-            <Layers size={12} /> Stem Monitor
-            <span style={{
-              marginLeft: 2,
-              padding: '1px 5px',
-              fontSize: 9,
-              borderRadius: 4,
-              background: fullScreenMonitor && monitorEngine === 'svg' ? 'rgba(0,0,0,0.25)' : C.cyanA(0.15),
-              color: fullScreenMonitor && monitorEngine === 'svg' ? '#020412' : C.cyan,
-              fontWeight: 800,
-            }}>
-              SVG
-            </span>
-          </button>
-          <button
-            onClick={() => { setFullScreenMonitor(true); setMonitorEngine('deck') }}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px',
-              borderRadius: 99,
-              border: 'none',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              fontSize: 11, fontWeight: 700, letterSpacing: 0.6,
-              textTransform: 'uppercase',
-              color: fullScreenMonitor && monitorEngine === 'deck' ? '#020412' : C.muted,
-              background: fullScreenMonitor && monitorEngine === 'deck'
+              color: fullScreenMonitor ? '#020412' : C.muted,
+              background: fullScreenMonitor
                 ? `linear-gradient(135deg, ${C.purple}, ${C.cyan})`
                 : 'transparent',
               transition: 'all .2s',
             }}
           >
-            <MapPin size={12} /> Stem Monitor
+            <MapPin size={12} /> STEM·MONITOR
             <span style={{
-              marginLeft: 2,
-              padding: '1px 5px',
-              fontSize: 9,
-              borderRadius: 4,
-              background: fullScreenMonitor && monitorEngine === 'deck' ? 'rgba(0,0,0,0.25)' : C.purpleA(0.15),
-              color: fullScreenMonitor && monitorEngine === 'deck' ? '#020412' : C.purple,
-              fontWeight: 800,
+              marginLeft: 2, padding: '1px 5px', fontSize: 9, borderRadius: 4,
+              background: fullScreenMonitor ? 'rgba(0,0,0,0.25)' : C.purpleA(0.15),
+              color: fullScreenMonitor ? '#020412' : C.purple, fontWeight: 800,
             }}>
-              MAP
+              LIVE
             </span>
           </button>
         </div>
@@ -800,28 +793,77 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══ TESTIMONIALS ══ */}
+      {/* ══ TESTIMONIALS — Phản hồi đang thu thập ══ */}
       <section id="testimonials" style={{ maxWidth: 1280, margin: '0 auto', padding: '96px 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 16px', borderRadius: 99, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', fontSize: 12, fontWeight: 700, color: C.amber, marginBottom: 16 }}>
-            <Star size={13} fill={C.amber} /> Đánh giá từ người dùng
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '5px 16px', borderRadius: 99,
+            background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)',
+            fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 16,
+          }}>
+            <Sparkles size={13} /> Đang thử nghiệm tại một số trường THPT
           </div>
-          <h2 style={{ fontSize: 'clamp(26px, 4vw, 42px)', fontWeight: 900, color: '#fff' }}>
-            Hàng nghìn người tin dùng mỗi ngày
+          <h2 style={{ fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 800, color: '#fff', marginBottom: 16 }}>
+            Phản hồi từ người dùng đầu tiên
           </h2>
+          <p style={{
+            maxWidth: 720, margin: '0 auto', fontSize: 15,
+            color: C.muted, lineHeight: 1.7,
+          }}>
+            AeroEduVision đang trong giai đoạn thử nghiệm. Chúng tôi chọn cách lắng nghe người dùng
+            thật — kể cả những điểm chưa hoàn thiện — hơn là tự đánh giá. Các phản hồi dưới đây từ
+            giáo viên và học sinh đã đồng hành từ những ngày đầu.
+          </p>
         </div>
 
+        {/* 3 điểm nổi bật — mô tả ngắn, khiêm tốn */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 16, marginBottom: 48,
+          maxWidth: 1080, marginLeft: 'auto', marginRight: 'auto',
+        }}>
+          {[
+            {
+              icon: '📐',
+              title: 'Soạn đề chuẩn Bộ GD&ĐT 2026',
+              text: 'Ma trận 4 phần — 24 câu — 10 điểm tự sinh đề từ ngân hàng + AI bổ sung. Tiết kiệm 1-2 giờ/tuần soạn đề thường lệ.',
+            },
+            {
+              icon: '⛰',
+              title: '5 chế độ làm bài',
+              text: 'Classic, Mastery Peak (leo núi — không trừng phạt khi sai), Test, Team, Playground. Học sinh chọn cách học hợp tính.',
+            },
+            {
+              icon: '🇻🇳',
+              title: 'LaTeX tiếng Việt mượt',
+              text: 'XeLaTeX + Tectonic + Latin Modern. Compile tài liệu Việt không lỗi font, không cần tự sửa template cũ.',
+            },
+          ].map((f, idx) => (
+            <div key={idx} style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: 14, padding: 20,
+            }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>{f.icon}</div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>{f.title}</p>
+              <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65 }}>{f.text}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Quote cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {TESTIMONIALS.map((t, i) => (
             <div key={i} className="land-test-card" style={{
               background: C.card, border: `1px solid ${C.border}`,
               borderRadius: 16, padding: 24,
             }}>
-              {/* Stars */}
-              <div style={{ display: 'flex', gap: 3, marginBottom: 14 }}>
-                {[1,2,3,4,5].map(s => <Star key={s} size={13} fill={C.amber} style={{ color: C.amber }} />)}
-              </div>
-              <p style={{ fontSize: 14, color: C.muted, lineHeight: 1.7, marginBottom: 18, fontStyle: 'italic' }}>"{t.quote}"</p>
+              <p style={{
+                fontSize: 14, color: C.text, lineHeight: 1.75,
+                marginBottom: 18,
+              }}>
+                "{t.quote}"
+              </p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%',
@@ -838,6 +880,336 @@ export default function Landing() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Honest note */}
+        <p style={{
+          textAlign: 'center', marginTop: 32,
+          fontSize: 13, color: C.muted, fontStyle: 'italic',
+        }}>
+          Nếu anh chị đang dùng AeroEduVision và muốn chia sẻ trải nghiệm —
+          {' '}<Link to="/contact-sales" style={{ color: C.cyan, textDecoration: 'underline' }}>liên hệ với chúng tôi</Link>.
+          Ý kiến trung thực, kể cả phê bình, đều giúp sản phẩm tốt hơn.
+        </p>
+      </section>
+
+      {/* ══ TEAM SECTION ══ */}
+      <section id="team" style={{
+        background: `linear-gradient(180deg, ${C.bg0} 0%, ${C.bg2} 50%, ${C.bg0} 100%)`,
+        borderTop: `1px solid ${C.border}`,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '96px 0',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+          {/* Heading */}
+          <div style={{ textAlign: 'center', marginBottom: 64 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '5px 16px', borderRadius: 99,
+              background: C.purpleA(0.1), border: `1px solid ${C.purpleA(0.3)}`,
+              fontSize: 12, fontWeight: 700, color: C.purple, marginBottom: 20,
+            }}>
+              <Sparkles size={13} /> Đội ngũ sáng lập
+            </div>
+            <h2 style={{
+              fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, marginBottom: 16,
+              background: `linear-gradient(135deg, #fff, ${C.purple})`,
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              Người tạo ra AeroEduVision
+            </h2>
+            <p style={{ fontSize: 16, color: C.muted, maxWidth: 640, margin: '0 auto', lineHeight: 1.65 }}>
+              AeroEduVision được xây dựng bởi 2 giáo viên đang trực tiếp đứng lớp tại
+              các trường THPT — hiểu rõ nhất nỗi đau và niềm vui của việc dạy và học
+              ở Việt Nam.
+            </p>
+          </div>
+
+          {/* Cards grid */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: 32, maxWidth: 880, margin: '0 auto',
+          }}>
+            {[
+              {
+                name: 'Đặng Việt Chung',
+                role: 'Founder',
+                roleColor: C.cyan,
+                photo: '/team/dang-viet-chung.jpg',
+                affiliation: 'Giáo viên trường THPT Phước Bửu',
+                location: 'Xã Hồ Tràm · TP. Hồ Chí Minh',
+                bio: 'Khởi xướng AeroEduVision với tầm nhìn đưa AI và mô phỏng vật lý vào lớp học chính khoá. Trực tiếp viết phần lớn kiến trúc nền tảng + chế độ ôn thi.',
+                accent: C.cyan,
+              },
+              {
+                name: 'Trần Thị Hương',
+                role: 'Co-Founder',
+                roleColor: C.purple,
+                photo: '/team/tran-thi-huong.jpg',
+                affiliation: 'Giáo viên trường THPT Bưng Riềng',
+                location: 'Xã Xuyên Mộc · TP. Hồ Chí Minh',
+                bio: 'Đồng sáng lập, phụ trách thiết kế trải nghiệm sư phạm + thư viện đề thi. Đảm bảo mọi tính năng phải dùng được thực sự trong tiết học 45 phút.',
+                accent: C.purple,
+              },
+            ].map((m) => (
+              <div key={m.name} style={{
+                background: `linear-gradient(180deg, ${C.white(0.04)}, ${C.white(0.015)})`,
+                border: `1px solid ${C.border}`,
+                borderRadius: 20, padding: 28,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                position: 'relative', overflow: 'hidden',
+                transition: 'transform .2s, box-shadow .2s, border-color .2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-4px)'
+                e.currentTarget.style.boxShadow = `0 16px 48px ${m.accent}33`
+                e.currentTarget.style.borderColor = `${m.accent}66`
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+                e.currentTarget.style.borderColor = C.border
+              }}
+              >
+                {/* Glow accent at top */}
+                <div style={{
+                  position: 'absolute', top: -60, left: '50%', transform: 'translateX(-50%)',
+                  width: 180, height: 180, borderRadius: '50%',
+                  background: `radial-gradient(circle, ${m.accent}30, transparent 70%)`,
+                  pointerEvents: 'none',
+                }} />
+
+                {/* Photo */}
+                <div style={{
+                  width: 140, height: 140, borderRadius: '50%',
+                  overflow: 'hidden',
+                  border: `3px solid ${m.accent}`,
+                  boxShadow: `0 8px 32px ${m.accent}55`,
+                  marginBottom: 20, position: 'relative', zIndex: 1,
+                  background: C.bg2,
+                }}>
+                  <img
+                    src={m.photo}
+                    alt={m.name}
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    onError={(e) => {
+                      // Graceful fallback nếu ảnh chưa upload — show initials
+                      const t = e.currentTarget
+                      t.style.display = 'none'
+                      const parent = t.parentElement
+                      if (parent && !parent.querySelector('.team-initials')) {
+                        const initials = m.name.split(' ').map(s => s[0]).slice(-2).join('')
+                        const div = document.createElement('div')
+                        div.className = 'team-initials'
+                        div.textContent = initials
+                        Object.assign(div.style, {
+                          width: '100%', height: '100%', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          fontSize: '40px', fontWeight: '800',
+                          background: `linear-gradient(135deg, ${m.accent}, ${C.blue})`,
+                          color: 'white',
+                        })
+                        parent.appendChild(div)
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Role badge */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 14px', borderRadius: 99,
+                  background: `${m.roleColor}1f`,
+                  border: `1px solid ${m.roleColor}55`,
+                  fontSize: 11, fontWeight: 700, color: m.roleColor,
+                  textTransform: 'uppercase', letterSpacing: 1,
+                  marginBottom: 12, position: 'relative', zIndex: 1,
+                }}>
+                  {m.role}
+                </div>
+
+                {/* Name */}
+                <h3 style={{
+                  fontSize: 22, fontWeight: 800, color: C.text,
+                  margin: '0 0 8px', position: 'relative', zIndex: 1,
+                }}>
+                  {m.name}
+                </h3>
+
+                {/* Affiliation + location */}
+                <div style={{ position: 'relative', zIndex: 1, marginBottom: 16 }}>
+                  <p style={{ fontSize: 13, color: C.text, fontWeight: 500, margin: '0 0 4px' }}>
+                    {m.affiliation}
+                  </p>
+                  <p style={{ fontSize: 12, color: C.muted, margin: 0 }}>
+                    📍 {m.location}
+                  </p>
+                </div>
+
+                {/* Bio */}
+                <p style={{
+                  fontSize: 13, color: C.muted, lineHeight: 1.6,
+                  margin: 0, position: 'relative', zIndex: 1,
+                  maxWidth: 320,
+                }}>
+                  {m.bio}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer note */}
+          <p style={{
+            textAlign: 'center', marginTop: 48,
+            fontSize: 13, color: C.muted, fontStyle: 'italic',
+          }}>
+            Chúng tôi tin rằng công nghệ giáo dục tốt nhất phải được tạo bởi chính người
+            đang dạy học — không phải kỹ sư xa lạ.
+          </p>
+        </div>
+      </section>
+
+      {/* ══ AWARDS / RECOGNITION SECTION ══ */}
+      <section id="awards" style={{
+        background: `linear-gradient(180deg, ${C.bg0}, ${C.bg2})`,
+        borderTop: `1px solid ${C.border}`,
+        padding: '96px 0',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+          {/* Heading */}
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '5px 16px', borderRadius: 99,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)',
+              fontSize: 12, fontWeight: 700, color: '#fbbf24', marginBottom: 20,
+            }}>
+              🏆 Giải thưởng & Công nhận
+            </div>
+            <h2 style={{
+              fontSize: 'clamp(28px, 4vw, 44px)', fontWeight: 800, marginBottom: 16,
+              background: `linear-gradient(135deg, #fff, #fbbf24)`,
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>
+              Được công nhận bởi Sở KH&CN TP.HCM
+            </h2>
+            <p style={{ fontSize: 16, color: C.muted, maxWidth: 720, margin: '0 auto', lineHeight: 1.65 }}>
+              AeroEduVision là <strong style={{ color: '#fbbf24' }}>1 trong 60 dự án</strong> được tuyển chọn vào
+              vòng ươm tạo của Chương trình <strong>Ednovation 2025</strong> — chương trình quốc gia
+              tuyển chọn dự án đổi mới sáng tạo trong lĩnh vực Công nghệ Giáo dục.
+            </p>
+          </div>
+
+          {/* Award card — 2 cột: ảnh + thông tin */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: 32, alignItems: 'center',
+            maxWidth: 1024, margin: '0 auto',
+          }}>
+            {/* Certificate image */}
+            <a
+              href="/awards/ednovation-2025-cert.jpg"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', position: 'relative',
+                borderRadius: 16, overflow: 'hidden',
+                border: `1px solid ${C.border}`,
+                background: C.bg2,
+                aspectRatio: '4 / 3',
+                boxShadow: `0 12px 48px rgba(251,191,36,0.15)`,
+                transition: 'transform .25s, box-shadow .25s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.02)'
+                e.currentTarget.style.boxShadow = '0 16px 64px rgba(251,191,36,0.3)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = '0 12px 48px rgba(251,191,36,0.15)'
+              }}
+              title="Click để xem ảnh full size"
+            >
+              <img
+                src="/awards/ednovation-2025-cert.jpg"
+                alt="Chứng nhận Ednovation 2025 — Sở KH&CN TP.HCM"
+                loading="lazy"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              {/* Subtle overlay */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4))',
+                pointerEvents: 'none',
+              }} />
+              <div style={{
+                position: 'absolute', bottom: 12, left: 12,
+                fontSize: 11, color: 'rgba(255,255,255,0.9)',
+                background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: 99,
+                fontWeight: 600,
+              }}>
+                🔍 Click để phóng to
+              </div>
+            </a>
+
+            {/* Award info */}
+            <div>
+              <h3 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 8 }}>
+                Ednovation 2025 — Vòng ươm tạo
+              </h3>
+              <p style={{ fontSize: 14, color: C.muted, marginBottom: 20, lineHeight: 1.65 }}>
+                Trao bởi <strong style={{ color: C.text }}>Trung tâm Khởi nghiệp Sáng tạo TP.HCM</strong>,
+                thuộc Sở Khoa học và Công nghệ TP. Hồ Chí Minh.
+              </p>
+
+              {/* Stats inline */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 24 }}>
+                {[
+                  { v: 'Top 60', l: 'dự án ươm tạo 2025' },
+                  { v: '2026', l: 'tiếp tục vòng tăng tốc' },
+                  { v: '25/11/2025', l: 'ngày công nhận' },
+                ].map((s) => (
+                  <div key={s.v} style={{
+                    flex: '1 1 100px',
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: 'rgba(251,191,36,0.08)',
+                    border: '1px solid rgba(251,191,36,0.3)',
+                  }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: '#fbbf24', marginBottom: 2 }}>{s.v}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Decision details */}
+              <div style={{
+                padding: 14, borderRadius: 12,
+                background: C.white(0.03), border: `1px solid ${C.border}`,
+                fontSize: 12, color: C.muted, lineHeight: 1.7,
+              }}>
+                <div><strong style={{ color: C.text }}>Quyết định:</strong> 233/QĐ-KNST</div>
+                <div><strong style={{ color: C.text }}>Người ký:</strong> Q. Giám đốc Đặng Thị Luận</div>
+                <div><strong style={{ color: C.text }}>Nhóm tác giả:</strong> Đặng Việt Chung · Trần Thị Hương</div>
+                <div style={{ marginTop: 8, fontStyle: 'italic', color: 'rgba(148,163,184,0.7)' }}>
+                  Sau vòng ươm tạo 2025, dự án tiếp tục được lựa chọn vào vòng thi
+                  <strong style={{ color: '#fbbf24' }}> Tăng tốc 2026 </strong>để phát triển sản phẩm thương mại.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Trust note */}
+          <p style={{
+            textAlign: 'center', marginTop: 40,
+            fontSize: 13, color: C.muted,
+          }}>
+            Sự công nhận từ cơ quan nhà nước là động lực để chúng tôi tiếp tục phát triển,
+            phục vụ ngày càng nhiều giáo viên và học sinh Việt Nam.
+          </p>
         </div>
       </section>
 
@@ -856,13 +1228,14 @@ export default function Landing() {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 16px', borderRadius: 99, background: C.cyanA(0.1), border: `1px solid ${C.cyanA(0.3)}`, fontSize: 12, fontWeight: 700, color: C.cyan, marginBottom: 20 }}>
-              <Sparkles size={13} /> Miễn phí hoàn toàn để bắt đầu
+              <Sparkles size={13} /> Tài khoản miễn phí — dùng đủ tính năng cốt lõi
             </div>
-            <h2 style={{ fontSize: 'clamp(28px, 4vw, 52px)', fontWeight: 900, marginBottom: 16, background: `linear-gradient(135deg, #fff, ${C.cyan})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Sẵn sàng chuyển đổi<br />phòng học của bạn?
+            <h2 style={{ fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 800, marginBottom: 16, background: `linear-gradient(135deg, #fff, ${C.cyan})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Thử AeroEduVision<br />trong tiết kiểm tra tới
             </h2>
-            <p style={{ fontSize: 17, color: C.muted, marginBottom: 36, maxWidth: 480, margin: '0 auto 36px' }}>
-              Tham gia cùng hàng nghìn giáo viên đang đổi mới phương pháp giảng dạy với AI
+            <p style={{ fontSize: 16, color: C.muted, marginBottom: 36, maxWidth: 540, margin: '0 auto 36px', lineHeight: 1.65 }}>
+              Đăng ký mất ~30 giây. Bắt đầu với chế độ Classic + Mastery Peak — không yêu cầu thẻ tín dụng,
+              không có khoản phí ẩn. Gói trả phí mở thêm AI sinh đề và transcript chi tiết.
             </p>
             <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 14 }}>
               <Link to="/auth/register" className="land-btn-primary" style={{
@@ -926,11 +1299,39 @@ export default function Landing() {
               ))}
             </div>
 
+            {/* Đội ngũ */}
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Đội ngũ</p>
+              <a href="#team" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Đặng Việt Chung — Founder
+              </a>
+              <a href="#team" style={{ display: 'block', fontSize: 13, color: C.muted, marginBottom: 8, textDecoration: 'none' }}
+                onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                Trần Thị Hương — Co-Founder
+              </a>
+              <p style={{ fontSize: 12, color: C.muted, marginTop: 14, lineHeight: 1.6 }}>
+                Sáng lập bởi 2 giáo viên THPT đang trực tiếp đứng lớp tại TP. Hồ Chí Minh.
+              </p>
+            </div>
+
             {/* Legal */}
             <div>
               <p style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 14 }}>Pháp lý</p>
-              {['Chính sách bảo mật', 'Điều khoản sử dụng', 'Liên hệ hỗ trợ'].map(l => (
-                <p key={l} style={{ fontSize: 13, color: C.muted, marginBottom: 8, cursor: 'pointer' }}>{l}</p>
+              {[
+                { label: 'Chính sách bảo mật', path: '/cookies' },
+                { label: 'Điều khoản sử dụng', path: '/terms' },
+                { label: 'Liên hệ hỗ trợ',     path: '/contact-sales' },
+              ].map(l => (
+                <p key={l.label} style={{ marginBottom: 8 }}>
+                  <Link to={l.path} style={{ fontSize: 13, color: C.muted, textDecoration: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = C.cyan)}
+                    onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                    {l.label}
+                  </Link>
+                </p>
               ))}
             </div>
           </div>
@@ -958,10 +1359,7 @@ export default function Landing() {
       `}</style>
 
       {/* ══ Full-screen STEM MONITOR overlay (worldmonitor.app-style) ══ */}
-      {fullScreenMonitor && monitorEngine === 'svg' && (
-        <StemMonitor2DMap onClose={() => setFullScreenMonitor(false)} initialView="asia" />
-      )}
-      {fullScreenMonitor && monitorEngine === 'deck' && (
+      {fullScreenMonitor && (
         <StemMonitorDeckMap onClose={() => setFullScreenMonitor(false)} initialView="asia" />
       )}
     </div>

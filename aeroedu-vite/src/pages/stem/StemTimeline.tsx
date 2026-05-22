@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Edit, AlertCircle, CheckCircle2, Clock, Users, Settings, Zap } from 'lucide-react'
-import { loadProjects, type STEMProject } from './stemStore'
+import {
+  ArrowLeft, Edit, AlertCircle, CheckCircle2, Clock, Users, Settings, Zap,
+  Plus, FileText, AlertTriangle, BookOpen, TrendingUp, Info, ListTodo,
+} from 'lucide-react'
+import { loadProjects, saveProjects, type STEMProject, type ProgressLog } from './stemStore'
 
 function formatDate(dateString: string): string {
   try {
@@ -77,12 +80,60 @@ export default function StemTimeline() {
   const [project, setProject] = useState<STEMProject | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Progress log form state
+  const [newLog, setNewLog] = useState({ content: '', hours: 0, photoUrl: '' })
+
   useEffect(() => {
     const projects = loadProjects()
     const found = projects.find((p) => p.id === id)
     setProject(found || null)
     setLoading(false)
   }, [id])
+
+  const addProgressLog = () => {
+    if (!project || !newLog.content.trim()) return
+    const log: ProgressLog = {
+      id: `log_${Date.now()}`,
+      date: new Date().toISOString(),
+      author: project.teamMembers[0]?.name || 'Tôi',
+      content: newLog.content.trim(),
+      hours: Number(newLog.hours) || undefined,
+      photoUrl: newLog.photoUrl.trim() || undefined,
+    }
+    const logs = [...(project.progressLogs || []), log]
+    const totalHours = logs.reduce((s, l) => s + (l.hours || 0), 0)
+    const updated = {
+      ...project,
+      progressLogs: logs,
+      totalHoursSpent: totalHours,
+      lastWorkedAt: log.date,
+      updatedAt: new Date().toISOString(),
+    }
+    setProject(updated)
+    // persist
+    const all = loadProjects()
+    const idx = all.findIndex(p => p.id === id)
+    if (idx >= 0) {
+      all[idx] = updated
+      saveProjects(all)
+    }
+    setNewLog({ content: '', hours: 0, photoUrl: '' })
+  }
+
+  const removeLog = (logId: string) => {
+    if (!project) return
+    if (!confirm('Xoá log này?')) return
+    const logs = (project.progressLogs || []).filter(l => l.id !== logId)
+    const totalHours = logs.reduce((s, l) => s + (l.hours || 0), 0)
+    const updated = { ...project, progressLogs: logs, totalHoursSpent: totalHours }
+    setProject(updated)
+    const all = loadProjects()
+    const idx = all.findIndex(p => p.id === id)
+    if (idx >= 0) {
+      all[idx] = updated
+      saveProjects(all)
+    }
+  }
 
   if (loading) {
     return (
@@ -151,6 +202,29 @@ export default function StemTimeline() {
       <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Scrum-Timeline sync banner */}
+          <div className="rounded-xl bg-indigo-500/[0.06] border border-indigo-500/20 p-4 flex items-start gap-3">
+            <Info className="w-5 h-5 text-indigo-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-indigo-300 mb-1">
+                Timeline đồng bộ tự động từ Scrum Board
+              </p>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Để thêm/sửa/xóa giai đoạn (milestone), quay lại trang dự án và dùng
+                <span className="text-indigo-300 font-semibold"> Bảng Scrum</span>.
+                Timeline ở đây chỉ hiển thị — mọi thay đổi trên Scrum sẽ cập nhật ngay.
+              </p>
+              <Link
+                to={`/dashboard/stem/${id}`}
+                className="inline-flex items-center gap-1 mt-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition"
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Mở Scrum Board
+                <ListTodo className="w-3 h-3 ml-1" />
+              </Link>
+            </div>
+          </div>
+
           {/* Overall progress card */}
           <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
             <div className="flex items-center justify-between mb-4">
@@ -163,6 +237,129 @@ export default function StemTimeline() {
                 style={{ width: `${project.progress}%` }}
               />
             </div>
+            {/* Quick stats từ progressLogs */}
+            {(project.progressLogs || []).length > 0 && (
+              <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/[0.06]">
+                <div className="text-center">
+                  <div className="text-xl font-bold text-emerald-400">{(project.progressLogs || []).length}</div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Lần cập nhật</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-bold text-blue-400">{project.totalHoursSpent || 0}h</div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Đã làm</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-bold text-purple-400">
+                    {project.lastWorkedAt
+                      ? new Date(project.lastWorkedAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+                      : '—'}
+                  </div>
+                  <div className="text-[10px] text-white/40 uppercase tracking-wider">Lần cuối</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ───────── Nhật ký tiến độ (NEW) ───────── */}
+          <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="w-5 h-5 text-emerald-400" />
+              <h3 className="text-lg font-bold">Nhật ký cập nhật</h3>
+              <span className="text-xs text-white/40 ml-auto">
+                {(project.progressLogs || []).length} log
+              </span>
+            </div>
+
+            {/* Quick add form */}
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 mb-4 space-y-3">
+              <textarea
+                value={newLog.content}
+                onChange={e => setNewLog({ ...newLog, content: e.target.value })}
+                rows={2}
+                placeholder="Hôm nay đã làm gì? (vd: Lắp xong mạch trung gian, test cảm biến OK, gặp lỗi noise khi đo...)"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-white/85 text-sm focus:outline-none focus:border-emerald-500/50 resize-none"
+              />
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-3">
+                  <label className="text-[10px] text-white/40 block mb-1">Số giờ làm</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    value={newLog.hours || ''}
+                    onChange={e => setNewLog({ ...newLog, hours: Number(e.target.value) || 0 })}
+                    placeholder="0.5"
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-white/85 text-sm focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+                <div className="col-span-7">
+                  <label className="text-[10px] text-white/40 block mb-1">URL ảnh tiến độ (optional)</label>
+                  <input
+                    type="url"
+                    value={newLog.photoUrl}
+                    onChange={e => setNewLog({ ...newLog, photoUrl: e.target.value })}
+                    placeholder="https://i.imgur.com/..."
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-white/85 text-sm font-mono focus:outline-none focus:border-emerald-500/50"
+                  />
+                </div>
+                <div className="col-span-2 flex items-end">
+                  <button
+                    onClick={addProgressLog}
+                    disabled={!newLog.content.trim()}
+                    className="w-full px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-lg text-sm font-semibold text-white"
+                  >
+                    <Plus className="w-3.5 h-3.5 inline" />Log
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Logs list — newest first */}
+            {(project.progressLogs || []).length === 0 ? (
+              <p className="text-center text-white/40 text-sm py-4">
+                Chưa có log nào. Cập nhật ngay sau mỗi lần làm việc để theo dõi tiến độ chi tiết.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {[...(project.progressLogs || [])].reverse().map(log => (
+                  <div key={log.id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      </div>
+                    </div>
+                    <div className="flex-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-3">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="font-semibold text-white/85">{log.author}</span>
+                          <span className="text-white/40">•</span>
+                          <span className="text-white/50">
+                            {new Date(log.date).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                          </span>
+                          {log.hours && (
+                            <span className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 text-[10px] font-semibold">
+                              {log.hours}h
+                            </span>
+                          )}
+                        </div>
+                        <button onClick={() => removeLog(log.id)} className="text-white/30 hover:text-red-400 text-sm">×</button>
+                      </div>
+                      <p className="text-sm text-white/80 whitespace-pre-wrap">{log.content}</p>
+                      {log.photoUrl && (
+                        <a href={log.photoUrl} target="_blank" rel="noreferrer" className="block mt-2">
+                          <img
+                            src={log.photoUrl}
+                            alt="Tiến độ"
+                            className="max-h-40 rounded-lg border border-white/10"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Milestones timeline */}
@@ -292,8 +489,114 @@ export default function StemTimeline() {
                   <p className="text-white/85">{formatDate(project.dueDate)}</p>
                 </div>
               )}
+              {project.subject && (
+                <div>
+                  <p className="text-white/50 mb-1">Môn học</p>
+                  <p className="text-white/85">{project.subject}</p>
+                </div>
+              )}
+              {project.objective && (
+                <div>
+                  <p className="text-white/50 mb-1">Mục tiêu</p>
+                  <p className="text-white/85 text-xs leading-relaxed line-clamp-3">{project.objective}</p>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Issues card (NEW) */}
+          {(project.issues || []).length > 0 && (
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                <h3 className="text-lg font-bold">Vấn đề ({(project.issues || []).length})</h3>
+              </div>
+              <div className="space-y-2">
+                {(project.issues || []).slice(0, 5).map(iss => (
+                  <div
+                    key={iss.id}
+                    className={`p-2.5 rounded-lg border text-xs ${iss.status === 'resolved'
+                      ? 'bg-emerald-500/5 border-emerald-500/20 opacity-60'
+                      : 'bg-yellow-500/5 border-yellow-500/20'}`}
+                  >
+                    <div className={`font-semibold ${iss.status === 'resolved' ? 'text-white/60 line-through' : 'text-white/85'}`}>
+                      {iss.title}
+                    </div>
+                    {iss.status === 'resolved' && iss.resolution && (
+                      <div className="text-emerald-400 text-[10px] mt-1">✓ {iss.resolution}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Link
+                to={`/dashboard/stem/${id}/edit`}
+                className="block text-center text-xs text-yellow-400 hover:text-yellow-300 mt-3"
+              >
+                Quản lý tất cả vấn đề →
+              </Link>
+            </div>
+          )}
+
+          {/* Resources card (NEW) */}
+          {(project.resources || []).length > 0 && (
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <BookOpen className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-lg font-bold">Tài nguyên</h3>
+              </div>
+              <div className="space-y-1.5">
+                {(project.resources || []).map(r => (
+                  <a
+                    key={r.id}
+                    href={r.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] text-xs"
+                  >
+                    <span className="px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 text-[9px] font-semibold uppercase">
+                      {r.type}
+                    </span>
+                    <span className="text-white/80 truncate">{r.title}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* BOM summary card (NEW) */}
+          {(project.bom || []).length > 0 && (
+            <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="w-5 h-5 text-blue-400" />
+                <h3 className="text-lg font-bold">BOM & Ngân sách</h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/50">Số linh kiện</span>
+                  <span className="text-white/85 font-semibold">{(project.bom || []).length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/50">Đã về</span>
+                  <span className="text-emerald-300 font-semibold">
+                    {(project.bom || []).filter(b => b.status === 'received' || b.status === 'used').length}
+                    /{(project.bom || []).length}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-white/[0.06]">
+                  <span className="text-white/50">Tổng tiền</span>
+                  <span className="text-blue-300 font-bold">
+                    {(project.bom || []).reduce((s, b) => s + b.qty * b.unitPrice, 0).toLocaleString('vi-VN')}đ
+                  </span>
+                </div>
+                {project.budgetTotal != null && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-white/50">Ngân sách</span>
+                    <span className="text-white/85">{project.budgetTotal.toLocaleString('vi-VN')}đ</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

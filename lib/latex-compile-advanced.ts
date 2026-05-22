@@ -226,6 +226,18 @@ async function compileInWorker(content: string): Promise<CompileResult> {
     return { pdf: cached.pdf, log: cached.log, cached: true, compileTime: 0 };
   }
 
+  // Detect if any LaTeX engine is installed before running
+  const [hasXelatex, hasTectonic] = await Promise.all([
+    binaryExists('xelatex'),
+    binaryExists('tectonic'),
+  ]);
+  if (!hasXelatex && !hasTectonic) {
+    return {
+      error: 'Compile LaTeX server-side chưa khả dụng. LaTeX engine chưa được cài đặt trên server.',
+      code: 'COMPILE_NOT_AVAILABLE',
+    };
+  }
+
   // Create temp directory
   const tmpDir = join(tmpdir(), `latex-${process.pid}-${Date.now()}`);
   await mkdir(tmpDir, { recursive: true });
@@ -282,6 +294,21 @@ async function compileInWorker(content: string): Promise<CompileResult> {
   } finally {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+async function binaryExists(command: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const proc = spawn(command, ['--version'], { stdio: 'ignore' });
+    const timer = setTimeout(() => { proc.kill('SIGKILL'); resolve(false); }, 5_000);
+    proc.on('error', (err: NodeJS.ErrnoException) => {
+      clearTimeout(timer);
+      resolve(err.code !== 'ENOENT');
+    });
+    proc.on('exit', () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
 }
 
 async function runXelatex(cwd: string, useFormat = false): Promise<{ success: boolean; output: string; timedOut: boolean }> {

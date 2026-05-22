@@ -1,726 +1,634 @@
 /**
- * Student Progress — Dashboard Học Tập
- * Mapping từ: app/(dashboard)/(routes)/student/progress/page.tsx
+ * Student Progress — Dashboard Học Tập v3 (2026-05-16)
+ *
+ * Đã rewrite hoàn toàn:
+ *   - Drop Math.random mock data + relative fetch() URLs
+ *   - Dùng @/services/api qua studentProgressService
+ *   - Honest empty states ("Chưa có dữ liệu") thay vì fake values
+ *   - Tích hợp localStorage stats cho features client-side:
+ *     · Scrumboard tasks done
+ *     · Pixel Odyssey save (chapter, star cores, level)
+ *     · Digital Logic Lab last circuit
+ *   - Backend /api/student/progress-overview cho exam/streak/weekly/KG/KeoCo
+ *   - 4 sections: Overview · Activities · Games & Labs · Recommendations
  */
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  BookOpen, Target, TrendingUp, TrendingDown, Clock,
-  CheckCircle, AlertTriangle, AlertCircle, Zap, Flame,
-  BarChart3, Activity, Calendar, Brain, Star,
-  ArrowUpRight, ArrowDownRight,
-  GraduationCap, Trophy, Sparkles, Timer, Eye,
-  Layers, PieChart, LineChart
+  BookOpen, Target, TrendingUp, Clock, Trophy,
+  Brain, Flame, BarChart3, Calendar, Star,
+  GraduationCap, Cpu, Sparkles, RefreshCw,
+  Layers, Activity, ArrowRight, AlertCircle, Award,
+  Gamepad2, Network, Zap, MessageSquare, CheckCircle,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import {
+  studentProgressService as svc,
+  type ProgressOverview,
+} from '@/services/student-progress.service'
 
-// ===== TYPES =====
-interface ProgressData {
-  completionRate: number
-  accuracyTrend: number[]
-  timeSpent: number
-  engagementScore: number
-  riskLevel: 'low' | 'medium' | 'high'
-  predictedScore: number
-  struggleTopics: string[]
+// ─── Utils ─────────────────────────────────────────────────────────
+function fmtNumber(n: number): string {
+  return n.toLocaleString('vi-VN')
 }
 
-interface CourseProgress {
-  id: string
-  title: string
-  chaptersCompleted: number
-  totalChapters: number
-  lastAccessed: string
+function fmtScore(s: number): string {
+  if (s === 0) return '—'
+  return s.toFixed(1)
 }
 
-interface DailyStats {
-  totalXP: number
-  completedLessons: number
-  timeSpent: number
-  subjects: string[]
-  activities: any[]
-}
-
-interface WeekDay {
-  label: string
-  active: boolean
-  xp: number
-}
-
-// ===== HELPER FUNCTIONS =====
-const formatTime = (seconds: number) => {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
-}
-
-const formatTimeCompact = (seconds: number) => {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h`
-  return `${minutes}m`
-}
-
-// ===== INLINE BADGE =====
-function Badge({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+// ─── Small reusable components ─────────────────────────────────────
+function StatCard({
+  icon: Icon, label, value, sub, color = '#22d3ee', trend,
+}: {
+  icon: any; label: string; value: string | number; sub?: string
+  color?: string; trend?: 'up' | 'down' | null
+}) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
-      {children}
-    </span>
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4 hover:border-white/[0.12] transition-colors">
+      <div className="flex items-start justify-between mb-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}20`, color }}>
+          <Icon className="h-4 w-4" />
+        </div>
+        {trend && (
+          <TrendingUp className={`h-3.5 w-3.5 ${trend === 'up' ? 'text-emerald-400' : 'text-rose-400 rotate-180'}`} />
+        )}
+      </div>
+      <div className="text-2xl font-bold text-white/90 mb-0.5">{value}</div>
+      <div className="text-[10px] uppercase text-white/40 font-bold tracking-wider">{label}</div>
+      {sub && <div className="text-[11px] text-white/50 mt-1">{sub}</div>}
+    </div>
   )
 }
 
-// ===== SVG RADIAL PROGRESS =====
-function RadialProgress({ value, size = 120, strokeWidth = 8, color = 'hsl(175,80%,50%)', sublabel, icon: Icon }: {
-  value: number
-  size?: number
-  strokeWidth?: number
-  color?: string
-  label?: string
-  sublabel?: string
-  icon?: any
+function Section({ title, icon: Icon, children, action }: {
+  title: string; icon: any; children: React.ReactNode; action?: React.ReactNode
 }) {
-  const radius = (size - strokeWidth) / 2
-  const circumference = radius * 2 * Math.PI
-  const offset = circumference - (value / 100) * circumference
-
   return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} className="text-foreground/[0.06]" />
-        <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth={strokeWidth}
-          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
-          style={{ filter: `drop-shadow(0 0 6px ${color}40)` }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {Icon && <Icon className="h-4 w-4 mb-1" style={{ color }} />}
-        <span className="text-lg font-bold text-white/90">{value}%</span>
-        {sublabel && <span className="text-[0.55rem] text-white/30 mt-0.5">{sublabel}</span>}
+    <section className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <Icon className="w-4 h-4 text-cyan-400" />
+        <h2 className="text-sm font-semibold text-white/70 uppercase tracking-wider">{title}</h2>
+        {action && <div className="ml-auto">{action}</div>}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function EmptyHint({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-white/[0.08] bg-white/[0.01] p-4 text-center text-xs text-white/40">
+      {children}
+    </div>
+  )
+}
+
+// ─── Weekly heatmap ───────────────────────────────────────────────
+function WeeklyHeatmap({ data }: { data: ProgressOverview['weekly'] }) {
+  if (!data || data.length === 0) return null
+  const max = Math.max(1, ...data.map(d => d.xp))
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-bold text-white/70 uppercase tracking-wider flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5 text-emerald-400" /> Hoạt động 7 ngày qua
+        </h3>
+        <span className="text-[10px] text-white/40">XP earned từ exam attempts</span>
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {data.map(d => {
+          const intensity = d.xp / max
+          const isToday = d.date === new Date().toISOString().slice(0, 10)
+          return (
+            <div key={d.date} className="text-center">
+              <div className="text-[10px] text-white/40 mb-1.5">{d.label}</div>
+              <div
+                className={`aspect-square rounded-lg border ${isToday ? 'border-cyan-400/60' : 'border-white/[0.06]'} flex flex-col items-center justify-center gap-0.5 transition-all`}
+                style={{
+                  background: d.xp > 0
+                    ? `rgba(34,211,238,${0.15 + intensity * 0.55})`
+                    : 'rgba(255,255,255,0.02)',
+                }}
+                title={`${d.date}: ${d.xp} XP · ${d.activities} hoạt động`}
+              >
+                <div className={`text-xs font-bold ${d.xp > 0 ? 'text-cyan-200' : 'text-white/20'}`}>
+                  {d.xp}
+                </div>
+                {d.activities > 0 && (
+                  <div className="text-[9px] text-white/50">{d.activities}h</div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-between mt-3 text-[10px] text-white/40">
+        <span>Tổng tuần: <strong className="text-white/70">{data.reduce((s, d) => s + d.xp, 0)} XP</strong></span>
+        <span>Hôm nay: <strong className="text-cyan-300">{data[data.length - 1]?.xp || 0} XP</strong></span>
       </div>
     </div>
   )
 }
 
-// ===== MINI SPARKLINE =====
-function Sparkline({ data, color = 'hsl(175,80%,50%)', height = 40, width = 120 }: {
-  data: number[]
-  color?: string
-  height?: number
-  width?: number
-}) {
-  if (!data || data.length < 2) return null
-  const min = Math.min(...data)
-  const max = Math.max(...data)
-  const range = max - min || 1
-  const step = width / (data.length - 1)
-  const points = data.map((v, i) => `${i * step},${height - ((v - min) / range) * (height - 4) - 2}`).join(' ')
-  const areaPoints = `0,${height} ${points} ${width},${height}`
-  const gradId = `sparkGrad-${color.replace(/[^a-z0-9]/gi, '')}`
-
+// ─── Streak card ──────────────────────────────────────────────────
+function StreakCard({ streak }: { streak: ProgressOverview['streak'] | null }) {
+  const cur = streak?.current || 0
+  const longest = streak?.longest || 0
   return (
-    <svg width={width} height={height} className="overflow-visible">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={areaPoints} fill={`url(#${gradId})`} />
-      <polyline points={points} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={width} cy={parseFloat(points.split(' ').pop()?.split(',')[1] || '0')} r="3" fill={color} />
-    </svg>
-  )
-}
-
-// ===== BAR CHART =====
-function BarChart({ data, labels, height = 120, colors }: {
-  data: number[]
-  labels: string[]
-  height?: number
-  colors?: string[]
-}) {
-  const max = Math.max(...data, 1)
-  const defaultColors = ['hsl(175,80%,50%)', 'hsl(210,90%,60%)', 'hsl(245,85%,65%)', 'hsl(280,75%,60%)', 'hsl(35,90%,55%)', 'hsl(0,70%,55%)', 'hsl(145,70%,45%)']
-
-  return (
-    <div className="flex items-end gap-1.5" style={{ height }}>
-      {data.map((val, i) => {
-        const h = (val / max) * (height - 20)
-        const c = colors?.[i] || defaultColors[i % defaultColors.length]
-        return (
-          <div key={i} className="flex-1 flex flex-col items-center gap-1 group">
-            <span className="text-[0.5rem] text-white/30 opacity-0 group-hover:opacity-100 transition-opacity">
-              {val >= 85 ? '🔥' : val >= 70 ? '✓' : '⚠'}
-            </span>
-            <div className="w-full relative">
-              <div
-                className="w-full rounded-t-md transition-all duration-500 hover:brightness-125 cursor-default"
-                style={{
-                  height: Math.max(h, 4),
-                  background: `linear-gradient(to top, ${c}80, ${c})`,
-                  boxShadow: `0 0 8px ${c}30`
-                }}
-              />
-            </div>
-            <span className="text-[0.5rem] text-white/25 truncate max-w-full">{labels[i]}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ===== HEATMAP CALENDAR (Weekly) =====
-function WeeklyHeatmap({ days }: { days: WeekDay[] }) {
-  return (
-    <div className="flex gap-1.5">
-      {days.map((day, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-          <span className="text-[0.55rem] text-white/30">{day.label}</span>
-          <div
-            className={`w-full aspect-square rounded-lg transition-all ${day.active ? 'hover:scale-110' : ''}`}
-            style={{
-              backgroundColor: !day.active ? 'rgba(255,255,255,0.03)' :
-                day.xp >= 100 ? 'hsla(175,80%,50%,0.6)' :
-                day.xp >= 50 ? 'hsla(175,80%,50%,0.35)' :
-                day.xp > 0 ? 'hsla(175,80%,50%,0.15)' :
-                'rgba(255,255,255,0.05)',
-              border: day.active ? '1px solid hsla(175,80%,50%,0.2)' : '1px solid rgba(255,255,255,0.06)'
-            }}
-          />
-          <span className="text-[0.5rem] text-white/20">{day.xp > 0 ? `${day.xp}xp` : ''}</span>
+    <div className="rounded-2xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-rose-500/5 p-5">
+      <div className="flex items-start gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 flex items-center justify-center flex-shrink-0">
+          <Flame className="h-7 w-7 text-white" />
         </div>
-      ))}
+        <div className="flex-1">
+          <div className="text-3xl font-bold text-orange-300 leading-none mb-1">
+            {cur} <span className="text-base text-orange-200/70 font-medium">ngày</span>
+          </div>
+          <div className="text-xs text-white/60">
+            {cur === 0 ? 'Hãy bắt đầu chuỗi học hôm nay!' : 'Streak hiện tại'}
+          </div>
+          <div className="text-[10px] text-white/40 mt-1">
+            Kỷ lục: <strong className="text-orange-200/80">{longest} ngày</strong>
+            {streak?.lastActive && ` · Lần gần nhất: ${new Date(streak.lastActive).toLocaleDateString('vi-VN')}`}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
 
-// ===== MAIN PAGE =====
+// ─── Exam stats card ──────────────────────────────────────────────
+function ExamStatsCard({ stats }: { stats: ProgressOverview['examStats'] | null }) {
+  if (!stats || stats.count === 0) {
+    return (
+      <EmptyHint>
+        🎯 Chưa làm đề thi nào. <Link to="/student/exam-modes" className="text-cyan-300 hover:underline">Thử ngay 5 chế độ thi</Link>
+      </EmptyHint>
+    )
+  }
+  return (
+    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <div className="text-3xl font-bold text-cyan-300">{stats.count}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Bài đã làm</div>
+        </div>
+        <div>
+          <div className="text-3xl font-bold text-yellow-300">{fmtScore(stats.avgScore)}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Điểm trung bình</div>
+        </div>
+      </div>
+      {stats.recent.length > 0 && (
+        <div className="border-t border-white/[0.06] pt-3">
+          <div className="text-[10px] uppercase text-white/40 font-bold tracking-wider mb-2">5 lần gần nhất</div>
+          <div className="space-y-1.5">
+            {stats.recent.map(r => (
+              <div key={r.id} className="flex items-center gap-2 text-xs">
+                <CheckCircle className="w-3 h-3 text-emerald-400 flex-shrink-0" />
+                <span className="text-white/80 truncate flex-1">{r.title || 'Đề thi'}</span>
+                <span className={`font-mono font-bold ${r.score >= 8 ? 'text-emerald-300' : r.score >= 5 ? 'text-yellow-300' : 'text-rose-300'}`}>
+                  {fmtScore(r.score)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Game stats card ─────────────────────────────────────────────
+function GamesCard({ keoco, odyssey }: {
+  keoco: ProgressOverview['keocoStats'] | null
+  odyssey: ReturnType<typeof svc.readPixelOdysseyStats>
+}) {
+  const winRate = keoco && keoco.totalPlayed > 0
+    ? Math.round((keoco.wins / keoco.totalPlayed) * 100)
+    : 0
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Pixel Odyssey */}
+      <Link to="/dashboard/games/pixel-odyssey"
+        className="block rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-600/10 to-pink-600/5 p-4 hover:border-purple-400/40 transition-colors group">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">🌟</span>
+          <div className="flex-1">
+            <div className="text-xs font-bold text-purple-200">Pixel Odyssey</div>
+            <div className="text-[10px] text-white/40">RPG · Hành Trình Ánh Sao</div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-purple-300" />
+        </div>
+        {odyssey.hasSave ? (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-lg font-bold text-purple-200">Ch.{odyssey.chapter}</div>
+              <div className="text-[9px] text-white/40 uppercase">Chương</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-yellow-200">⭐{odyssey.starCores}</div>
+              <div className="text-[9px] text-white/40 uppercase">Star Core</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-cyan-200">Lv.{odyssey.level}</div>
+              <div className="text-[9px] text-white/40 uppercase">{odyssey.mapName}</div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-white/40 italic">Chưa bắt đầu — bấm để vào game</div>
+        )}
+      </Link>
+
+      {/* KeoCo */}
+      <Link to="/dashboard/games/keo-co"
+        className="block rounded-2xl border border-rose-500/20 bg-gradient-to-br from-rose-600/10 to-amber-600/5 p-4 hover:border-rose-400/40 transition-colors group">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">🪢</span>
+          <div className="flex-1">
+            <div className="text-xs font-bold text-rose-200">Kéo Co Kiến Thức</div>
+            <div className="text-[10px] text-white/40">Quiz đối kháng</div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-rose-300" />
+        </div>
+        {keoco && keoco.totalPlayed > 0 ? (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <div className="text-lg font-bold text-rose-200">🏆{keoco.wins}</div>
+              <div className="text-[9px] text-white/40 uppercase">Thắng</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-amber-200">{keoco.totalPlayed}</div>
+              <div className="text-[9px] text-white/40 uppercase">Tổng trận</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-cyan-200">{winRate}%</div>
+              <div className="text-[9px] text-white/40 uppercase">Win rate</div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-white/40 italic">Chưa chơi trận nào — bấm để join</div>
+        )}
+      </Link>
+    </div>
+  )
+}
+
+// ─── Labs card ─────────────────────────────────────────────────────
+function LabsCard({ digitalLogic }: {
+  digitalLogic: ReturnType<typeof svc.readDigitalLogicStats>
+}) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {/* Digital Logic Lab */}
+      <Link to="/dashboard/labtwin/labs/digital-logic-lab"
+        className="block rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-600/10 to-blue-600/5 p-4 hover:border-cyan-400/40 transition-colors group">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">⚙️</span>
+          <div className="flex-1">
+            <div className="text-xs font-bold text-cyan-200">Digital Logic Lab</div>
+            <div className="text-[10px] text-white/40">Cổng logic · Bảng chân lý</div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-cyan-300" />
+        </div>
+        {digitalLogic.hasCircuit && digitalLogic.gateCount > 0 ? (
+          <div className="text-xs text-white/70">
+            Mạch hiện tại: <strong className="text-cyan-200">"{digitalLogic.name}"</strong>
+            <div className="text-[10px] text-white/50 mt-1">
+              {digitalLogic.gateCount} cổng · {digitalLogic.wireCount} dây
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-white/40 italic">Chưa có mạch nào — bấm để thiết kế</div>
+        )}
+      </Link>
+
+      {/* Arduino Emulator */}
+      <Link to="/dashboard/iot-lab/emulator"
+        className="block rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-600/10 to-cyan-600/5 p-4 hover:border-emerald-400/40 transition-colors group">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-2xl">⚡</span>
+          <div className="flex-1">
+            <div className="text-xs font-bold text-emerald-200">Arduino Emulator</div>
+            <div className="text-[10px] text-white/40">Viết code C++ chạy realtime</div>
+          </div>
+          <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-emerald-300" />
+        </div>
+        <div className="text-[11px] text-white/40 italic">6 sketch mẫu sẵn sàng — bấm thử</div>
+      </Link>
+    </div>
+  )
+}
+
+// ─── Knowledge Graph card ─────────────────────────────────────────
+function KgCard({ stats }: { stats: ProgressOverview['kgStats'] | null }) {
+  return (
+    <Link to="/dashboard/knowledge-graph"
+      className="block rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-600/10 to-cyan-600/5 p-5 hover:border-violet-400/40 transition-colors group">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+          <Network className="h-5 w-5 text-white" />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-bold text-violet-200">Đồ thị Tri thức</div>
+          <div className="text-[11px] text-white/50">Khám phá mạng lưới khái niệm + công thức + nghề nghiệp</div>
+        </div>
+        <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-violet-300" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <div className="text-xl font-bold text-violet-200">{stats?.topicsExplored || 0}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Topics</div>
+        </div>
+        <div>
+          <div className="text-xl font-bold text-cyan-200">{stats?.votesGiven || 0}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Bình chọn</div>
+        </div>
+        <div>
+          <div className="text-xl font-bold text-pink-200">{stats?.feedbackPosted || 0}</div>
+          <div className="text-[10px] text-white/40 uppercase tracking-wider">Góp ý</div>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// ─── Scrumboard card ─────────────────────────────────────────────
+function ScrumboardCard({ stats }: { stats: ReturnType<typeof svc.readScrumboardStats> }) {
+  return (
+    <Link to="/dashboard/scrumboard"
+      className="block rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-600/10 to-indigo-600/5 p-4 hover:border-blue-400/40 transition-colors group">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
+          <Layers className="h-4 w-4 text-blue-300" />
+        </div>
+        <div className="flex-1">
+          <div className="text-xs font-bold text-blue-200">Scrumboard cá nhân</div>
+          <div className="text-[10px] text-white/40">Kanban quản lý task học tập</div>
+        </div>
+        <ArrowRight className="w-3.5 h-3.5 text-white/30 group-hover:text-blue-300" />
+      </div>
+      {stats.total > 0 ? (
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div>
+            <div className="text-lg font-bold text-blue-200">{stats.total}</div>
+            <div className="text-[9px] text-white/40 uppercase">Tổng</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-emerald-200">{stats.done}</div>
+            <div className="text-[9px] text-white/40 uppercase">Xong</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-amber-200">{stats.inProgress}</div>
+            <div className="text-[9px] text-white/40 uppercase">Đang làm</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold text-yellow-200">⚡{stats.totalXp}</div>
+            <div className="text-[9px] text-white/40 uppercase">XP earned</div>
+          </div>
+        </div>
+      ) : (
+        <div className="text-[11px] text-white/40 italic">Chưa có task nào — bấm để tạo</div>
+      )}
+    </Link>
+  )
+}
+
+// ─── Recommendations ─────────────────────────────────────────────
+function RecommendationsCard({ overview, odyssey, scrum }: {
+  overview: ProgressOverview | null
+  odyssey: ReturnType<typeof svc.readPixelOdysseyStats>
+  scrum: ReturnType<typeof svc.readScrumboardStats>
+}) {
+  const recs: Array<{ icon: any; text: string; link: string; color: string }> = []
+
+  if (!overview || overview.examStats.count === 0) {
+    recs.push({
+      icon: Target, text: 'Bắt đầu với 1 đề thi để track tiến độ',
+      link: '/student/exam-modes', color: '#22d3ee'
+    })
+  } else if (overview.examStats.avgScore < 6) {
+    recs.push({
+      icon: AlertCircle, text: `Điểm TB ${fmtScore(overview.examStats.avgScore)} — hãy ôn lại các topic yếu`,
+      link: '/student/exam-mastery', color: '#f87171'
+    })
+  }
+
+  if (scrum.total === 0) {
+    recs.push({
+      icon: Layers, text: 'Tạo Scrumboard để quản lý task học tập',
+      link: '/dashboard/scrumboard', color: '#60a5fa'
+    })
+  }
+
+  if (!odyssey.hasSave) {
+    recs.push({
+      icon: Sparkles, text: 'Trải nghiệm Pixel Odyssey — RPG có cốt truyện 4 chương',
+      link: '/dashboard/games/pixel-odyssey', color: '#a78bfa'
+    })
+  }
+
+  if (overview && overview.kgStats.topicsExplored === 0) {
+    recs.push({
+      icon: Network, text: 'Khám phá Đồ thị Tri thức — gõ "động lượng" để bắt đầu',
+      link: '/dashboard/knowledge-graph', color: '#22d3ee'
+    })
+  }
+
+  recs.push({
+    icon: Cpu, text: 'Thử Arduino Emulator — viết code C++ chạy realtime',
+    link: '/dashboard/iot-lab/emulator', color: '#10b981'
+  })
+
+  if (recs.length === 0) return null
+  return (
+    <div className="rounded-2xl border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 to-orange-500/5 p-5">
+      <div className="flex items-center gap-2 mb-3">
+        <Sparkles className="h-4 w-4 text-yellow-400" />
+        <h3 className="text-xs font-bold text-yellow-200 uppercase tracking-wider">Gợi ý cho bạn</h3>
+      </div>
+      <div className="space-y-2">
+        {recs.slice(0, 5).map((r, i) => (
+          <Link key={i} to={r.link}
+            className="flex items-center gap-3 p-2.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] border border-transparent hover:border-white/[0.1] transition-all group">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: `${r.color}20`, color: r.color }}>
+              <r.icon className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-xs text-white/75 flex-1">{r.text}</span>
+            <ArrowRight className="w-3 h-3 text-white/30 group-hover:text-white/70 group-hover:translate-x-1 transition-all" />
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Page ────────────────────────────────────────────────────
 export default function StudentProgress() {
-  const [progress, setProgress] = useState<ProgressData | null>(null)
-  const [courses, setCourses] = useState<CourseProgress[]>([])
-  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null)
+  const [overview, setOverview] = useState<ProgressOverview | null>(null)
   const [loading, setLoading] = useState(true)
-  const [totalCourses, setTotalCourses] = useState(0)
-  const [totalChapters, setTotalChapters] = useState(0)
-  const [completedChapters, setCompletedChapters] = useState(0)
-  const [examCount, setExamCount] = useState(0)
-  const [avgScore, setAvgScore] = useState(0)
-  const [streak, setStreak] = useState(0)
-  const [weeklyData, setWeeklyData] = useState<WeekDay[]>([])
-  const [personalityType, setPersonalityType] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      setLoading(true)
-      try {
-        const [progressRes, dailyRes, coursesRes, examRes, personalityRes] = await Promise.allSettled([
-          fetch('/api/agents/progress-tracker'),
-          fetch('/api/update-learning-progress'),
-          fetch('/api/courses-progress'),
-          fetch('/api/exam-stats'),
-          fetch('/api/personality-test?type=latest'),
-        ])
+  // Client-side stats (localStorage)
+  const [scrum, setScrum] = useState(svc.readScrumboardStats())
+  const [odyssey, setOdyssey] = useState(svc.readPixelOdysseyStats())
+  const [digital, setDigital] = useState(svc.readDigitalLogicStats())
 
-        if (progressRes.status === 'fulfilled' && progressRes.value.ok) {
-          const data = await progressRes.value.json()
-          if (data.success) setProgress(data.data.progress)
-        }
-
-        if (dailyRes.status === 'fulfilled' && dailyRes.value.ok) {
-          const data = await dailyRes.value.json()
-          if (data.success) setDailyStats(data.dailyStats)
-        }
-
-        if (coursesRes.status === 'fulfilled' && coursesRes.value.ok) {
-          const data = await coursesRes.value.json()
-          if (data.courses) {
-            setCourses(data.courses)
-            setTotalCourses(data.courses.length)
-            const tc = data.courses.reduce((s: number, c: any) => s + (c.totalChapters || 0), 0)
-            const cc = data.courses.reduce((s: number, c: any) => s + (c.chaptersCompleted || 0), 0)
-            setTotalChapters(tc)
-            setCompletedChapters(cc)
-          }
-        }
-
-        if (examRes.status === 'fulfilled' && examRes.value.ok) {
-          const data = await examRes.value.json()
-          if (data.count !== undefined) setExamCount(data.count)
-          if (data.avgScore !== undefined) setAvgScore(data.avgScore)
-        }
-
-        if (personalityRes.status === 'fulfilled' && personalityRes.value.ok) {
-          const data = await personalityRes.value.json()
-          if (data.result?.mbtiType) setPersonalityType(data.result.mbtiType)
-        }
-      } catch (err) {
-        console.error('Dashboard fetch error:', err)
-      }
-
-      // Generate weekly heatmap (mock)
-      const dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
-      const today = new Date().getDay()
-      const todayIdx = today === 0 ? 6 : today - 1
-      setWeeklyData(dayLabels.map((label, i) => ({
-        label,
-        active: i <= todayIdx,
-        xp: i <= todayIdx ? Math.floor(Math.random() * 150) + 20 : 0,
-      })))
-
-      setStreak(Math.floor(Math.random() * 7) + 1)
+  const loadAll = async (showToast = false) => {
+    if (showToast) setRefreshing(true)
+    try {
+      const data = await svc.getOverview()
+      setOverview(data)
+      setScrum(svc.readScrumboardStats())
+      setOdyssey(svc.readPixelOdysseyStats())
+      setDigital(svc.readDigitalLogicStats())
+      if (showToast) toast.success('Đã cập nhật dữ liệu')
+    } catch (e: any) {
+      console.warn('[progress] load failed', e?.message)
+    } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }
 
-    fetchAll()
-  }, [])
-
-  // Derived metrics
-  const overallCompletion = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0
-  const accuracyLatest = progress?.accuracyTrend?.length ? progress.accuracyTrend[progress.accuracyTrend.length - 1] : 0
-  const accuracyTrendUp = progress?.accuracyTrend && progress.accuracyTrend.length >= 2
-    ? progress.accuracyTrend[progress.accuracyTrend.length - 1] > progress.accuracyTrend[0]
-    : true
-  const xpToday = dailyStats?.totalXP || 0
+  useEffect(() => { loadAll(false) }, [])
 
   if (loading) {
     return (
       <div className="flex flex-col h-full min-h-screen items-center justify-center gap-4">
-        <div className="relative w-16 h-16">
+        <div className="relative w-12 h-12">
           <div className="absolute inset-0 rounded-full border-2 border-white/[0.06]" />
-          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[hsl(175,80%,50%)] animate-spin" />
+          <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-cyan-400 animate-spin" />
         </div>
-        <p className="text-sm text-white/30 animate-pulse">Đang tải dữ liệu học tập...</p>
+        <p className="text-sm text-white/40">Đang tải dữ liệu học tập…</p>
       </div>
     )
   }
 
+  // Compute aggregated XP
+  const weeklyXp = overview?.weekly.reduce((s, d) => s + d.xp, 0) || 0
+  const totalXp = (overview?.profile.totalXp || 0) + scrum.totalXp + (odyssey.starCores * 50)
+
   return (
-    <div className="flex flex-col h-full min-h-screen">
-      {/* ===== COMPACT HEADER ===== */}
-      <div className="px-6 pt-6 pb-2">
-        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+    <div className="min-h-screen px-4 sm:px-6 py-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* ─── Header ─── */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(245,85%,65%)] to-[hsl(175,80%,50%)] flex items-center justify-center shadow-[0_0_16px_rgba(100,200,200,0.2)]">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500 to-violet-500 flex items-center justify-center shadow-lg shadow-cyan-500/30">
               <BarChart3 className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white/90">Dashboard Học Tập</h1>
-              <p className="text-[0.65rem] text-white/30">Tổng quan tiến độ • {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+              <h1 className="text-xl font-bold text-white/95">Dashboard Học Tập</h1>
+              <p className="text-xs text-white/40">
+                Tổng quan tiến độ · {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {personalityType && (
-              <div className="hidden md:flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-1.5">
-                <Brain className="h-3.5 w-3.5 text-[hsl(280,75%,65%)]" />
-                <span className="text-xs text-white/50">{personalityType}</span>
+          <div className="flex items-center gap-2">
+            {overview?.profile.mbtiType && (
+              <div className="hidden md:flex items-center gap-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg px-2.5 py-1.5">
+                <Brain className="h-3 w-3 text-violet-400" />
+                <span className="text-[11px] text-white/60">MBTI: <strong className="text-violet-300">{overview.profile.mbtiType}</strong></span>
               </div>
             )}
-            <div className="flex items-center gap-1.5 bg-gradient-to-r from-[hsl(35,90%,55%)]/10 to-[hsl(35,90%,55%)]/5 border border-[hsl(35,90%,55%)]/15 rounded-xl px-3 py-1.5">
-              <Flame className="h-3.5 w-3.5 text-[hsl(35,90%,55%)]" />
-              <span className="text-xs font-semibold text-[hsl(35,90%,60%)]">{streak} ngày</span>
-            </div>
+            <button
+              onClick={() => loadAll(true)}
+              disabled={refreshing}
+              className="px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] text-xs text-white/70 inline-flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* ===== MAIN DASHBOARD GRID ===== */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-[1600px] mx-auto px-6 py-4 space-y-4">
+        {/* ─── LAYER 1: Headline stats ─── */}
+        <section>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard
+              icon={Trophy}
+              label="Tổng XP"
+              value={fmtNumber(totalXp)}
+              sub={weeklyXp > 0 ? `+${weeklyXp} XP tuần này` : 'Tuần này: 0 XP'}
+              color="#fbbf24"
+              trend={weeklyXp > 0 ? 'up' : null}
+            />
+            <StatCard
+              icon={Target}
+              label="Bài thi đã làm"
+              value={overview?.examStats.count || 0}
+              sub={overview?.examStats.count ? `TB: ${fmtScore(overview.examStats.avgScore)}/10` : 'Chưa có'}
+              color="#22d3ee"
+            />
+            <StatCard
+              icon={Flame}
+              label="Chuỗi học"
+              value={overview?.streak.current || 0}
+              sub={overview?.streak.longest ? `Kỷ lục ${overview.streak.longest} ngày` : 'Bắt đầu hôm nay!'}
+              color="#fb923c"
+            />
+            <StatCard
+              icon={Layers}
+              label="Task scrumboard"
+              value={scrum.done}
+              sub={`${scrum.total} tổng · ${scrum.inProgress} đang làm`}
+              color="#60a5fa"
+            />
+          </div>
+        </section>
 
-          {/* ---- ROW 1: KPI CARDS (5 cols) ---- */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {/* Hoàn thành */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-4 group hover:bg-white/[0.04] hover:border-[hsl(175,80%,50%)]/15 transition-all cursor-default">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[hsl(175,80%,50%)]/10 flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 text-[hsl(175,80%,55%)]" />
-                </div>
-                <span className={`text-[0.6rem] font-medium px-1.5 py-0.5 rounded-md ${
-                  overallCompletion >= 70 ? 'bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)]' : 'bg-[hsl(35,90%,55%)]/10 text-[hsl(35,90%,65%)]'
-                }`}>
-                  {overallCompletion >= 70 ? 'Tốt' : 'Đang tiến bộ'}
-                </span>
-              </div>
-              <div className="text-2xl font-bold text-white/90">{overallCompletion}%</div>
-              <div className="text-[0.6rem] text-white/30 mt-1">Hoàn thành khóa học</div>
-              <div className="w-full h-1 rounded-full bg-white/[0.06] mt-2 overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-[hsl(175,80%,50%)] to-[hsl(210,90%,60%)] transition-all duration-1000" style={{ width: `${overallCompletion}%` }} />
-              </div>
-            </div>
-
-            {/* Độ chính xác */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-4 group hover:bg-white/[0.04] hover:border-[hsl(210,90%,60%)]/15 transition-all cursor-default">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[hsl(210,90%,60%)]/10 flex items-center justify-center">
-                  <Target className="h-4 w-4 text-[hsl(210,90%,65%)]" />
-                </div>
-                <div className={`flex items-center gap-0.5 text-[0.6rem] font-medium ${accuracyTrendUp ? 'text-[hsl(175,80%,55%)]' : 'text-[hsl(0,70%,60%)]'}`}>
-                  {accuracyTrendUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                  {accuracyTrendUp ? '+' : ''}{progress?.accuracyTrend && progress.accuracyTrend.length >= 2 ? Math.round(progress.accuracyTrend[progress.accuracyTrend.length - 1] - progress.accuracyTrend[0]) : 0}%
-                </div>
-              </div>
-              <div className="text-2xl font-bold text-white/90">{Math.round(accuracyLatest)}%</div>
-              <div className="text-[0.6rem] text-white/30 mt-1">Độ chính xác</div>
-              <div className="mt-2">
-                <Sparkline data={progress?.accuracyTrend || []} color="hsl(210,90%,60%)" height={24} width={100} />
-              </div>
-            </div>
-
-            {/* Thời gian học */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-4 group hover:bg-white/[0.04] hover:border-[hsl(245,85%,65%)]/15 transition-all cursor-default">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[hsl(245,85%,65%)]/10 flex items-center justify-center">
-                  <Timer className="h-4 w-4 text-[hsl(245,85%,70%)]" />
-                </div>
-                <Clock className="h-3 w-3 text-white/20" />
-              </div>
-              <div className="text-2xl font-bold text-white/90">{formatTime(progress?.timeSpent || 0)}</div>
-              <div className="text-[0.6rem] text-white/30 mt-1">Thời gian tuần này</div>
-              <div className="text-[0.55rem] text-white/20 mt-2">~{formatTimeCompact(Math.round((progress?.timeSpent || 0) / 7))}/ngày</div>
-            </div>
-
-            {/* XP Hôm nay */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-4 group hover:bg-white/[0.04] hover:border-[hsl(35,90%,55%)]/15 transition-all cursor-default">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[hsl(35,90%,55%)]/10 flex items-center justify-center">
-                  <Zap className="h-4 w-4 text-[hsl(35,90%,60%)]" />
-                </div>
-                <Sparkles className="h-3 w-3 text-[hsl(35,90%,55%)]/40" />
-              </div>
-              <div className="text-2xl font-bold text-white/90">{xpToday}</div>
-              <div className="text-[0.6rem] text-white/30 mt-1">XP hôm nay</div>
-              <div className="text-[0.55rem] text-[hsl(35,90%,60%)] mt-2">{dailyStats?.completedLessons || 0} bài hoàn thành</div>
-            </div>
-
-            {/* Bài kiểm tra */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-4 group hover:bg-white/[0.04] hover:border-[hsl(280,75%,60%)]/15 transition-all cursor-default col-span-2 md:col-span-1">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-lg bg-[hsl(280,75%,60%)]/10 flex items-center justify-center">
-                  <GraduationCap className="h-4 w-4 text-[hsl(280,75%,65%)]" />
-                </div>
-                <span className="text-[0.6rem] text-white/20">TB: {avgScore.toFixed(1)}</span>
-              </div>
-              <div className="text-2xl font-bold text-white/90">{examCount}</div>
-              <div className="text-[0.6rem] text-white/30 mt-1">Bài kiểm tra đã nộp</div>
-              <div className="w-full h-1 rounded-full bg-white/[0.06] mt-2 overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-[hsl(280,75%,60%)] to-[hsl(245,85%,65%)]" style={{ width: `${Math.min(avgScore * 10, 100)}%` }} />
-              </div>
+        {/* ─── LAYER 2: Streak + Heatmap ─── */}
+        <Section title="Hoạt động gần đây" icon={Activity}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <StreakCard streak={overview?.streak || null} />
+            <div className="lg:col-span-2">
+              <WeeklyHeatmap data={overview?.weekly || []} />
             </div>
           </div>
+        </Section>
 
-          {/* ---- ROW 2: Risk + Radials + Weekly Heatmap ---- */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-            {/* Risk Level + Predicted Score */}
-            <div className={`rounded-2xl border p-5 ${
-              progress?.riskLevel === 'high' ? 'bg-[hsl(0,70%,50%)]/[0.04] border-[hsl(0,70%,50%)]/15' :
-              progress?.riskLevel === 'medium' ? 'bg-[hsl(35,90%,55%)]/[0.04] border-[hsl(35,90%,55%)]/15' :
-              'bg-[hsl(175,80%,50%)]/[0.04] border-[hsl(175,80%,50%)]/15'
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                  {progress?.riskLevel === 'high' ? <AlertCircle className="h-4 w-4 text-[hsl(0,70%,60%)]" /> :
-                   progress?.riskLevel === 'medium' ? <AlertTriangle className="h-4 w-4 text-[hsl(35,90%,60%)]" /> :
-                   <CheckCircle className="h-4 w-4 text-[hsl(175,80%,55%)]" />}
-                  Đánh Giá Tình Trạng
-                </h3>
-                <Badge className={`text-[0.6rem] border ${
-                  progress?.riskLevel === 'high' ? 'bg-[hsl(0,70%,50%)]/10 text-[hsl(0,70%,65%)] border-[hsl(0,70%,50%)]/20' :
-                  progress?.riskLevel === 'medium' ? 'bg-[hsl(35,90%,55%)]/10 text-[hsl(35,90%,65%)] border-[hsl(35,90%,55%)]/20' :
-                  'bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)] border-[hsl(175,80%,50%)]/20'
-                }`}>
-                  {progress?.riskLevel === 'high' ? 'Nguy cơ cao' : progress?.riskLevel === 'medium' ? 'Cần cải thiện' : 'Ổn định'}
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-6">
-                <div className="text-center">
-                  <div className={`text-4xl font-bold ${
-                    progress?.riskLevel === 'high' ? 'text-[hsl(0,70%,65%)]' :
-                    progress?.riskLevel === 'medium' ? 'text-[hsl(35,90%,65%)]' :
-                    'text-[hsl(175,80%,55%)]'
-                  }`}>
-                    {progress?.predictedScore?.toFixed(1) || '—'}
-                  </div>
-                  <div className="text-[0.55rem] text-white/25 mt-1">Điểm dự đoán /10</div>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <div className="text-xs text-white/40">
-                    {progress?.riskLevel === 'high'
-                      ? 'Bạn cần tăng cường học tập để bắt kịp tiến độ.'
-                      : progress?.riskLevel === 'medium'
-                      ? 'Hãy duy trì đều đặn để cải thiện thêm.'
-                      : 'Tiến độ tốt! Hãy tiếp tục phát huy.'}
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-1000 ${
-                      progress?.riskLevel === 'high' ? 'bg-gradient-to-r from-[hsl(0,70%,50%)] to-[hsl(35,90%,55%)]' :
-                      progress?.riskLevel === 'medium' ? 'bg-gradient-to-r from-[hsl(35,90%,55%)] to-[hsl(175,80%,50%)]' :
-                      'bg-gradient-to-r from-[hsl(175,80%,50%)] to-[hsl(210,90%,60%)]'
-                    }`} style={{ width: `${(progress?.predictedScore || 0) * 10}%` }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Struggle Topics */}
-              {progress?.struggleTopics && progress.struggleTopics.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-white/[0.06]">
-                  <div className="text-[0.6rem] text-white/30 mb-2 uppercase tracking-wider">Chủ đề cần ôn tập</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {progress.struggleTopics.map((t, i) => (
-                      <span key={i} className="text-[0.6rem] px-2 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/50">{t}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Radial Progress Cards */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white/80 mb-4 flex items-center gap-2">
-                <PieChart className="h-4 w-4 text-[hsl(210,90%,60%)]" />
-                Chỉ Số Tổng Quan
-              </h3>
-              <div className="flex items-center justify-around">
-                <div className="flex flex-col items-center gap-2">
-                  <RadialProgress value={overallCompletion} size={100} color="hsl(175,80%,50%)" icon={BookOpen} sublabel="Hoàn thành" />
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <RadialProgress value={Math.round(accuracyLatest)} size={100} color="hsl(210,90%,60%)" icon={Target} sublabel="Chính xác" />
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <RadialProgress value={progress?.engagementScore || 0} size={100} color="hsl(280,75%,60%)" icon={Activity} sublabel="Tương tác" />
-                </div>
-              </div>
-            </div>
-
-            {/* Weekly Activity Heatmap */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-[hsl(35,90%,55%)]" />
-                  Hoạt Động Tuần Này
-                </h3>
-                <div className="flex items-center gap-1">
-                  <Flame className="h-3.5 w-3.5 text-[hsl(35,90%,55%)]" />
-                  <span className="text-xs font-semibold text-[hsl(35,90%,60%)]">{streak} ngày liên tục</span>
-                </div>
-              </div>
-              <WeeklyHeatmap days={weeklyData} />
-              <div className="mt-4 pt-3 border-t border-white/[0.06] flex items-center justify-between">
-                <div className="text-[0.6rem] text-white/25">
-                  Tổng XP tuần: <span className="text-white/50 font-semibold">{weeklyData.reduce((s, d) => s + d.xp, 0)}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-[hsl(175,80%,50%)]/15" />
-                    <span className="text-[0.5rem] text-white/20">Ít</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-[hsl(175,80%,50%)]/35" />
-                    <span className="text-[0.5rem] text-white/20">TB</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-[hsl(175,80%,50%)]/60" />
-                    <span className="text-[0.5rem] text-white/20">Nhiều</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* ─── LAYER 3: Exams + KG ─── */}
+        <Section title="Học tập" icon={GraduationCap}
+          action={
+            <Link to="/student/exam-modes" className="text-[11px] text-cyan-300 hover:underline">
+              Xem tất cả →
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <ExamStatsCard stats={overview?.examStats || null} />
+            <KgCard stats={overview?.kgStats || null} />
           </div>
+        </Section>
 
-          {/* ---- ROW 3: Accuracy Chart + Course Progress ---- */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* ─── LAYER 4: Games + Labs ─── */}
+        <Section title="Trò chơi & Lab" icon={Gamepad2}
+          action={
+            <Link to="/dashboard/games" className="text-[11px] text-purple-300 hover:underline">
+              Game Hub →
+            </Link>
+          }
+        >
+          <GamesCard keoco={overview?.keocoStats || null} odyssey={odyssey} />
+          <LabsCard digitalLogic={digital} />
+        </Section>
 
-            {/* Accuracy Trend Chart (7 days) */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                  <LineChart className="h-4 w-4 text-[hsl(175,80%,55%)]" />
-                  Xu Hướng Chính Xác (7 ngày)
-                </h3>
-                <div className={`flex items-center gap-1 text-xs font-medium ${accuracyTrendUp ? 'text-[hsl(175,80%,55%)]' : 'text-[hsl(0,70%,60%)]'}`}>
-                  {accuracyTrendUp ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                  {accuracyTrendUp ? 'Tăng' : 'Giảm'}
-                </div>
-              </div>
-              <BarChart
-                data={(progress?.accuracyTrend || []).map(v => Math.round(v))}
-                labels={['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']}
-                height={140}
-                colors={progress?.accuracyTrend?.map(v =>
-                  v >= 85 ? 'hsl(175,80%,50%)' : v >= 70 ? 'hsl(210,90%,60%)' : 'hsl(35,90%,55%)'
-                )}
-              />
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/[0.06]">
-                <div className="text-[0.6rem] text-white/25">
-                  Trung bình: <span className="text-white/50 font-semibold">
-                    {progress?.accuracyTrend ? Math.round(progress.accuracyTrend.reduce((a, b) => a + b, 0) / progress.accuracyTrend.length) : 0}%
-                  </span>
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-[hsl(175,80%,50%)]" />
-                    <span className="text-[0.5rem] text-white/20">≥85%</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-[hsl(210,90%,60%)]" />
-                    <span className="text-[0.5rem] text-white/20">70-85%</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-[hsl(35,90%,55%)]" />
-                    <span className="text-[0.5rem] text-white/20">&lt;70%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* ─── LAYER 5: Productivity ─── */}
+        <Section title="Năng suất cá nhân" icon={Zap}>
+          <ScrumboardCard stats={scrum} />
+        </Section>
 
-            {/* Course Progress List */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-[hsl(245,85%,65%)]" />
-                  Tiến Độ Khóa Học
-                </h3>
-                <span className="text-[0.6rem] text-white/25">{totalCourses} khóa học</span>
-              </div>
+        {/* ─── LAYER 6: Recommendations ─── */}
+        <Section title="Gợi ý tiếp theo" icon={Sparkles}>
+          <RecommendationsCard overview={overview} odyssey={odyssey} scrum={scrum} />
+        </Section>
 
-              {courses.length === 0 ? (
-                <div className="text-center py-8">
-                  <BookOpen className="h-8 w-8 text-white/10 mx-auto mb-2" />
-                  <p className="text-xs text-white/30">Chưa đăng ký khóa học nào</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
-                  {courses.slice(0, 8).map((course) => {
-                    const pct = course.totalChapters > 0 ? Math.round((course.chaptersCompleted / course.totalChapters) * 100) : 0
-                    const isComplete = pct === 100
-                    return (
-                      <div key={course.id} className="group flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/[0.03] transition-all cursor-default">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
-                          isComplete ? 'bg-[hsl(175,80%,50%)]/10' : 'bg-white/[0.04]'
-                        }`}>
-                          {isComplete ? <Trophy className="h-4 w-4 text-[hsl(175,80%,55%)]" /> : <BookOpen className="h-4 w-4 text-white/30" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium text-white/70 truncate">{course.title}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  isComplete ? 'bg-[hsl(175,80%,50%)]' : pct >= 50 ? 'bg-[hsl(210,90%,60%)]' : 'bg-[hsl(245,85%,65%)]'
-                                }`}
-                                style={{ width: `${pct}%` }}
-                              />
-                            </div>
-                            <span className="text-[0.55rem] text-white/30 shrink-0">{pct}%</span>
-                          </div>
-                        </div>
-                        <div className="text-[0.55rem] text-white/20 shrink-0">
-                          {course.chaptersCompleted}/{course.totalChapters}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ---- ROW 4: Engagement Score + Today's Activity ---- */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-8">
-
-            {/* Engagement Breakdown */}
-            <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <h3 className="text-sm font-semibold text-white/80 mb-4 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[hsl(280,75%,60%)]" />
-                Mức Độ Tương Tác
-              </h3>
-              <div className="flex items-center justify-center mb-4">
-                <RadialProgress value={progress?.engagementScore || 0} size={140} strokeWidth={10} color="hsl(280,75%,60%)" icon={Star} sublabel="Engagement" />
-              </div>
-              <div className="space-y-2">
-                {[
-                  { label: 'Bài hoàn thành', value: completedChapters, max: totalChapters || 1, color: 'hsl(175,80%,50%)' },
-                  { label: 'Bài kiểm tra', value: examCount, max: Math.max(examCount, 10), color: 'hsl(210,90%,60%)' },
-                  { label: 'Thời gian trung bình', value: Math.round((progress?.timeSpent || 0) / 7 / 60), max: 120, color: 'hsl(245,85%,65%)' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className="text-[0.6rem] text-white/30 w-28 truncate">{item.label}</span>
-                    <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
-                      <div className="h-full rounded-full transition-all duration-700" style={{
-                        width: `${Math.min((item.value / item.max) * 100, 100)}%`,
-                        backgroundColor: item.color
-                      }} />
-                    </div>
-                    <span className="text-[0.55rem] text-white/30 w-8 text-right">{item.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Today's Activities */}
-            <div className="lg:col-span-2 bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-white/80 flex items-center gap-2">
-                  <Eye className="h-4 w-4 text-[hsl(175,80%,55%)]" />
-                  Hoạt Động Hôm Nay
-                </h3>
-                <div className="flex items-center gap-2">
-                  <Zap className="h-3.5 w-3.5 text-[hsl(35,90%,55%)]" />
-                  <span className="text-xs text-[hsl(35,90%,60%)] font-semibold">{xpToday} XP</span>
-                </div>
-              </div>
-
-              {(!dailyStats?.activities || dailyStats.activities.length === 0) ? (
-                <div className="text-center py-10">
-                  <div className="w-14 h-14 rounded-2xl bg-white/[0.03] flex items-center justify-center mx-auto mb-3">
-                    <BookOpen className="h-6 w-6 text-white/10" />
-                  </div>
-                  <p className="text-sm text-white/30 mb-1">Chưa có hoạt động hôm nay</p>
-                  <p className="text-[0.65rem] text-white/20">Bắt đầu học để tích lũy XP!</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
-                  {dailyStats.activities.map((act: any, i: number) => (
-                    <div key={i} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/[0.015] border border-white/[0.04] hover:bg-white/[0.03] transition-all">
-                      <div className="w-8 h-8 rounded-lg bg-[hsl(175,80%,50%)]/10 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-3.5 w-3.5 text-[hsl(175,80%,55%)]" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-medium text-white/60 truncate">{act.lesson_title || 'Bài học'}</div>
-                        <div className="text-[0.55rem] text-white/25 mt-0.5">{act.subject || 'Chưa phân loại'}</div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-[0.6rem] text-[hsl(35,90%,60%)] font-medium">+{act.earned_xp || 0} XP</span>
-                        <span className="text-[0.55rem] text-white/20">{formatTimeCompact(act.time_spent || 0)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Quick stats footer */}
-              <div className="mt-4 pt-3 border-t border-white/[0.06] grid grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-xs font-semibold text-white/60">{dailyStats?.completedLessons || 0}</div>
-                  <div className="text-[0.55rem] text-white/25">Bài đã xong</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs font-semibold text-white/60">{formatTime(dailyStats?.timeSpent || 0)}</div>
-                  <div className="text-[0.55rem] text-white/25">Thời gian</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs font-semibold text-white/60">{dailyStats?.subjects?.length || 0}</div>
-                  <div className="text-[0.55rem] text-white/25">Môn học</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        {/* Footer note */}
+        <div className="text-center text-[10px] text-white/30 pt-4 border-t border-white/[0.04]">
+          Dữ liệu cập nhật từ DB + localStorage · Backend: {overview ? '✅ live' : '⚠ chưa ready'}
+          {overview && ` · Sinh lúc ${new Date(overview.generatedAt).toLocaleTimeString('vi-VN')}`}
         </div>
       </div>
     </div>

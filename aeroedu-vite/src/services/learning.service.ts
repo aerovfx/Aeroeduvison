@@ -28,11 +28,39 @@ export interface LogEventPayload {
   metadata?: Record<string, unknown> | null
 }
 
+// Minimal shape cho khoá học public (GET /api/courses)
+export interface PublicCourse {
+  id: string
+  title: string
+  description: string | null
+  imageUrl: string | null
+  image: string | null
+  price: number
+  isFree?: boolean
+  lessons: number
+  duration: string | null
+  slug?: string
+  user: { id: string; name: string } | null
+}
+
 export const learningService = {
   // ── My Courses ──────────────────────────────────────────
   /** GET /api/learning/my-courses — danh sách khoá học đã đăng ký */
   getMyCourses: () =>
     api.get<Enrollment[]>('/learning/my-courses').then((r) => r.data),
+
+  /** GET /api/courses — lấy khoá học public miễn phí (price = 0 hoặc isFree = true).
+   *  Dùng để hiển thị gợi ý cho học sinh chưa đăng ký khoá nào. */
+  getFreeCourses: () =>
+    api
+      .get<{ courses?: PublicCourse[]; items?: PublicCourse[] }>('/courses', {
+        params: { limit: 24 },
+      })
+      .then((r) => {
+        const all = r.data.courses ?? r.data.items ?? []
+        return all.filter((c) => Number(c.price ?? 0) === 0 || !!c.isFree)
+      })
+      .catch(() => [] as PublicCourse[]),
 
   // ── Purchase History ────────────────────────────────────
   /** GET /api/learning/purchase-history */
@@ -58,9 +86,26 @@ export const learningService = {
     api.get<Certificate>(`/learning/certificate/${courseId}`).then((r) => r.data),
 
   // ── Course Player ───────────────────────────────────────
+  /** GET /api/learning/course/:courseId — thông tin khoá học (title, pdfBookUrl, extras, …) */
+  getCourseInfo: (courseId: string) =>
+    api.get<{
+      id: string
+      title: string
+      pdfBookUrl?: string | null
+      extras?: import('@/types').CourseExtras
+    }>(
+      `/learning/course/${courseId}`
+    ).then((r) => r.data).catch(() => null as null),
+
   /** GET /api/learning/course/:courseId/videos */
   getCourseVideos: (courseId: string) =>
     api.get<CourseVideo[]>(`/learning/course/${courseId}/videos`).then((r) => r.data),
+
+  /** GET /api/learning/course/:courseId/curriculum — Chapter→Lesson→Block hierarchy */
+  getCurriculum: (courseId: string) =>
+    api.get<{ chapters: import('@/types').StudentChapter[] }>(
+      `/learning/course/${courseId}/curriculum`
+    ).then(r => r.data.chapters).catch(() => []),
 
   /** GET /api/learning/course/:courseId/assets */
   getCourseAssets: (courseId: string) =>

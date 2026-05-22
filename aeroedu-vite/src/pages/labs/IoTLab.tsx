@@ -16,7 +16,11 @@ import {
   Wrench, Sigma, FileCode2, Plug, Upload, AlertTriangle,
 } from 'lucide-react'
 import CircuitBuilder from './CircuitBuilder'
+import CircuitPresets from './CircuitPresets'
 import SemiconductorLab from './SemiconductorLab'
+import CustomWokwiBoard from './CustomWokwiBoard'
+import AnalogCircuitBuilder from '@/components/iot/AnalogCircuitBuilder'
+import usePageTitle from '@/hooks/usePageTitle'
 
 // ───────────────────────────────────────────────────────────────────
 // Types
@@ -872,7 +876,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }}
-      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition"
+      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary hover:bg-accent text-foreground transition"
       title="Sao chép code"
     >
       {copied
@@ -944,7 +948,7 @@ function Schematic({ circuit, tMs }: { circuit: Circuit; tMs: number }) {
             fontSize={13} fontWeight={700} textAnchor="middle" fontFamily="sans-serif">
         {boardLabel}
       </text>
-      <text x={boardX + boardW / 2} y={boardY + 40} fill="#94a3b8"
+      <text x={boardX + boardW / 2} y={boardY + 40} fill='var(--td-muted)'
             fontSize={9} textAnchor="middle" fontFamily="monospace">
         {isESP ? 'DevKit v4 · 38-pin' : 'R3 · ATmega328P'}
       </text>
@@ -1077,7 +1081,7 @@ function Schematic({ circuit, tMs }: { circuit: Circuit; tMs: number }) {
               PCF8574 · 0x27 · I²C
             </text>
             {/* Title */}
-            <text x={lcdX + lcdW / 2} y={lcdY - 6} fill="#94a3b8"
+            <text x={lcdX + lcdW / 2} y={lcdY - 6} fill='var(--td-muted)'
                   fontSize={9} textAnchor="middle" fontFamily="monospace">
               LCD 1602
             </text>
@@ -1123,8 +1127,8 @@ function SerialMonitor({ circuit, tMs, running }: { circuit: Circuit; tMs: numbe
   }, [tMs, circuit])
 
   return (
-    <div className="bg-black/80 border border-zinc-800 rounded-lg p-3 font-mono text-xs text-emerald-300 h-48 overflow-y-auto">
-      <div className="flex items-center justify-between mb-2 pb-2 border-b border-zinc-800 text-zinc-500">
+    <div className="bg-zinc-900 dark:bg-black/80 border border-border rounded-lg p-3 font-mono text-xs text-emerald-300 h-48 overflow-y-auto">
+      <div className="flex items-center justify-between mb-2 pb-2 border-b border-border text-zinc-500">
         <span className="flex items-center gap-1.5">
           <Activity className={`w-3 h-3 ${running ? 'text-emerald-400 animate-pulse' : ''}`} />
           Serial Monitor · {circuit.board === 'ESP32' ? '115200' : '9600'} baud
@@ -1283,7 +1287,9 @@ function generateCodeFromDiagram(d: ParsedDiagram): string {
 }
 
 export default function IoTLab() {
-  const [mode, setMode] = useState<'arduino' | 'analog' | 'semi'>('arduino')
+  usePageTitle('IoT Lab — Mạch điện & Arduino')
+  const [mode, setMode] = useState<'arduino' | 'analog' | 'semi' | 'custom'>('arduino')
+  const [analogTab, setAnalogTab] = useState<'builder' | 'presets' | 'assembly'>('assembly')
   const [activeId, setActiveId] = useState<string>(CIRCUITS[0].id)
   const [running, setRunning] = useState(true)
   const [tMs, setTMs] = useState(0)
@@ -1390,15 +1396,25 @@ export default function IoTLab() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-950 via-slate-950 to-zinc-950 text-zinc-100">
+    <div className="min-h-screen bg-background dark:bg-gradient-to-b dark:from-zinc-950 dark:via-slate-950 dark:to-zinc-950 text-foreground">
       {/* Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-zinc-100 mb-4"
-        >
-          <ChevronLeft className="w-4 h-4" /> Dashboard
-        </Link>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <Link
+            to="/dashboard"
+            className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-foreground"
+          >
+            <ChevronLeft className="w-4 h-4" /> Dashboard
+          </Link>
+          <Link
+            to="/dashboard/iot-lab/emulator"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-emerald-500 to-cyan-500 text-white inline-flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 hover:scale-[1.02] transition-transform"
+            title="Viết code Arduino C++ → chạy real-time trong browser"
+          >
+            <Zap className="w-3.5 h-3.5" /> Arduino Emulator
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-white/15 ml-1">⚡ NEW</span>
+          </Link>
+        </div>
 
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
           <div>
@@ -1420,12 +1436,15 @@ export default function IoTLab() {
               {mode === 'semi' && (
                 <>Phòng thí nghiệm bán dẫn &amp; tín hiệu: Diode I-V, Zener, LED · NE555 astable/monostable · Op-Amp 7 topology (inverting, non-inverting, Schmitt…). Phase 2 &amp; 3 sẽ bổ sung BJT, MOSFET, Filter, Oscillator, Function Generator.</>
               )}
+              {mode === 'custom' && (
+                <>Thiết kế mạch <strong>tự do kiểu Wokwi</strong> + <strong>💾 lưu vào thư viện cá nhân</strong> với 10 danh mục (LED, Cảm biến, Hiển thị, Game…) → có thể chia sẻ công khai cho cộng đồng. Sẵn 8 template (Simon Says, Servo+POT, DHT22+LCD, HC-SR04, LDR…). Hover part = highlight dây. Click = chi tiết pin. Export <code>.json</code> + <code>.ino</code> tương thích Wokwi.com.</>
+              )}
             </p>
           </div>
 
           {/* Filter (Arduino mode only) */}
           {mode === 'arduino' && (
-            <div className="flex items-center gap-1 bg-zinc-900/60 border border-zinc-800 rounded-lg p-1">
+            <div className="flex items-center gap-1 bg-card dark:bg-zinc-900/60 border border-border rounded-lg p-1">
               {(['all', 'Arduino UNO', 'ESP32'] as const).map(b => (
                 <button
                   key={b}
@@ -1433,7 +1452,7 @@ export default function IoTLab() {
                   className={`px-3 py-1.5 text-xs rounded-md transition ${
                     filterBoard === b
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                      : 'text-zinc-400 hover:text-zinc-200'
+                      : 'text-zinc-400 hover:text-foreground'
                   }`}
                 >
                   {b === 'all' ? 'Tất cả' : b}
@@ -1444,13 +1463,13 @@ export default function IoTLab() {
         </div>
 
         {/* Mode tabs */}
-        <div className="flex items-center gap-1 bg-zinc-900/60 border border-zinc-800 rounded-xl p-1 mb-6 w-fit">
+        <div className="flex items-center gap-1 bg-card dark:bg-zinc-900/60 border border-border rounded-xl p-1 mb-6 w-fit">
           <button
             onClick={() => setMode('arduino')}
             className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition font-medium ${
               mode === 'arduino'
                 ? 'bg-gradient-to-r from-cyan-500/25 to-blue-500/25 text-cyan-200 border border-cyan-500/40 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-400 hover:text-foreground'
             }`}
           >
             <Cpu className="w-4 h-4" /> Arduino / ESP32
@@ -1460,7 +1479,7 @@ export default function IoTLab() {
             className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition font-medium ${
               mode === 'analog'
                 ? 'bg-gradient-to-r from-amber-500/25 to-orange-500/25 text-amber-200 border border-amber-500/40 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-400 hover:text-foreground'
             }`}
           >
             <Wrench className="w-4 h-4" /> Mạch điện Analog
@@ -1470,21 +1489,88 @@ export default function IoTLab() {
             className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition font-medium ${
               mode === 'semi'
                 ? 'bg-gradient-to-r from-purple-500/25 to-indigo-500/25 text-purple-200 border border-purple-500/40 shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-400 hover:text-foreground'
             }`}
           >
             <Sigma className="w-4 h-4" /> Bán dẫn & Tín hiệu
           </button>
+          <button
+            onClick={() => setMode('custom')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition font-medium ${
+              mode === 'custom'
+                ? 'bg-gradient-to-r from-pink-500/25 to-rose-500/25 text-pink-200 border border-pink-500/40 shadow-sm'
+                : 'text-zinc-400 hover:text-foreground'
+            }`}
+          >
+            <Plug className="w-4 h-4" /> Mạch Custom
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-pink-500/30 ml-1">NEW</span>
+          </button>
         </div>
 
-        {mode === 'analog' && <CircuitBuilder />}
+        {mode === 'analog' && (
+          <>
+            {/* Banner — NEW feature highlight */}
+            {analogTab === 'assembly' && (
+              <div className="rounded-2xl bg-gradient-to-r from-cyan-500/[0.10] to-blue-500/[0.10] border border-cyan-500/30 p-5 mb-4">
+                <h2 className="text-xl font-bold text-cyan-300 mb-2 flex items-center gap-2">
+                  🔌 Mạch điện Analog — Tự lắp ghép
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-500/30 text-cyan-100 font-bold ml-1">MỚI</span>
+                </h2>
+                <p className="text-sm text-white/70">
+                  Tự lắp ghép mạch điện với linh kiện có sẵn (pin, LED, điện trở, công tắc, biến trở,
+                  tụ điện, cuộn cảm, buzzer…). Kéo-thả vào canvas, nối dây, bấm "Mô phỏng" để xem mạch
+                  chạy. Không cần lập trình — học vật lý mạch điện cơ bản.
+                </p>
+              </div>
+            )}
+
+            {/* Sub-tabs: 3 chế độ analog */}
+            <div className="flex items-center gap-1 bg-card dark:bg-zinc-900/60 border border-border rounded-lg p-1 mb-4 w-fit flex-wrap">
+              <button
+                onClick={() => setAnalogTab('assembly')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'assembly'
+                    ? 'bg-cyan-500/20 text-cyan-200 border border-cyan-500/40'
+                    : 'text-zinc-400 hover:text-foreground'
+                }`}
+              >
+                🔌 Tự lắp ghép
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/30 ml-1">NEW</span>
+              </button>
+              <button
+                onClick={() => setAnalogTab('presets')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'presets'
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40'
+                    : 'text-zinc-400 hover:text-foreground'
+                }`}
+              >
+                📚 Mạch mẫu (8 topology)
+              </button>
+              <button
+                onClick={() => setAnalogTab('builder')}
+                className={`px-3 py-1.5 text-xs rounded-md transition ${
+                  analogTab === 'builder'
+                    ? 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40'
+                    : 'text-zinc-400 hover:text-foreground'
+                }`}
+              >
+                ⚙ Mô phỏng nối tiếp 3-slot
+              </button>
+            </div>
+            {analogTab === 'assembly' && <AnalogCircuitBuilder />}
+            {analogTab === 'presets'  && <CircuitPresets />}
+            {analogTab === 'builder'  && <CircuitBuilder />}
+          </>
+        )}
         {mode === 'semi' && <SemiconductorLab />}
+        {mode === 'custom' && <CustomWokwiBoard />}
 
         {/* Two-pane layout (Arduino mode) */}
         {mode === 'arduino' && (
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
           {/* Sidebar — circuit list */}
-          <aside className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-3 h-fit sticky top-4">
+          <aside className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-3 h-fit sticky top-4">
             <div className="text-[10px] uppercase tracking-wider text-zinc-500 px-2 py-1">
               {filtered.length} mạch
             </div>
@@ -1498,7 +1584,7 @@ export default function IoTLab() {
                     className={`w-full text-left rounded-lg px-3 py-2 transition border ${
                       isActive
                         ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-100'
-                        : 'border-transparent hover:bg-zinc-800/60 text-zinc-300'
+                        : 'border-transparent hover:bg-accent dark:hover:bg-zinc-800/60 text-foreground/80'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-0.5">
@@ -1520,7 +1606,7 @@ export default function IoTLab() {
           {/* Main content */}
           <main className="space-y-4">
             {/* Info + controls */}
-            <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5">
+            <div className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-5">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -1538,7 +1624,7 @@ export default function IoTLab() {
                       {active.board}
                     </span>
                     {active.tags.map(t => (
-                      <span key={t} className="px-1.5 py-0.5 bg-zinc-800 rounded text-[10px]">
+                      <span key={t} className="px-1.5 py-0.5 bg-secondary rounded text-[10px]">
                         {t}
                       </span>
                     ))}
@@ -1560,7 +1646,7 @@ export default function IoTLab() {
                   </button>
                   <button
                     onClick={() => setTMs(0)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 hover:bg-zinc-700 border border-zinc-700"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary hover:bg-accent border border-border"
                     title="Reset thời gian"
                   >
                     <RotateCcw className="w-3.5 h-3.5" /> Reset
@@ -1568,21 +1654,21 @@ export default function IoTLab() {
                 </div>
               </div>
 
-              <p className="text-sm text-zinc-300 leading-relaxed">
+              <p className="text-sm text-foreground/80 leading-relaxed">
                 {active.description}
               </p>
             </div>
 
             {/* Schematic + pins */}
             <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-4">
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
+              <div className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-4">
                 <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-1.5">
                   <Radio className="w-3.5 h-3.5" /> Schematic (mô phỏng)
                 </h3>
                 <Schematic circuit={active} tMs={tMs} />
               </div>
 
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
+              <div className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-4">
                 <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-3">
                   Sơ đồ chân
                 </h3>
@@ -1592,7 +1678,7 @@ export default function IoTLab() {
                       <span className="font-mono px-2 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shrink-0 min-w-[60px] text-center">
                         {pin}
                       </span>
-                      <span className="text-zinc-300 leading-relaxed">{usage}</span>
+                      <span className="text-foreground/80 leading-relaxed">{usage}</span>
                     </div>
                   ))}
                 </div>
@@ -1600,7 +1686,7 @@ export default function IoTLab() {
                 <h3 className="text-xs uppercase tracking-wider text-zinc-500 mt-4 mb-2">
                   Linh kiện
                 </h3>
-                <ul className="text-xs text-zinc-300 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-foreground/80 space-y-1 list-disc list-inside">
                   {active.components.map(c => <li key={c}>{c}</li>)}
                 </ul>
               </div>
@@ -1608,7 +1694,7 @@ export default function IoTLab() {
 
             {/* Code editor + Serial */}
             <div className="grid grid-cols-1 md:grid-cols-[1fr_360px] gap-4">
-              <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
+              <div className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                   <h3 className="text-xs uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
                     <FileCode2 className="w-3.5 h-3.5" />
@@ -1625,7 +1711,7 @@ export default function IoTLab() {
                       className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition border ${
                         showDiagramPanel
                           ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/40'
-                          : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border-zinc-700'
+                          : 'bg-secondary hover:bg-accent text-foreground border-border'
                       }`}
                       title="Dán diagram.json từ Wokwi để import nhanh"
                     >
@@ -1634,7 +1720,7 @@ export default function IoTLab() {
                     {isEdited && (
                       <button
                         onClick={resetCurrentCode}
-                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition border border-zinc-700"
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary hover:bg-accent text-foreground transition border border-border"
                         title="Khôi phục code gốc của mạch này"
                       >
                         <RotateCcw className="w-3.5 h-3.5" /> Reset code
@@ -1643,7 +1729,7 @@ export default function IoTLab() {
                     <CopyButton text={currentCode} />
                     <button
                       onClick={downloadIno}
-                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition"
+                      className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary hover:bg-accent text-foreground transition"
                       title="Tải file .ino"
                     >
                       <Download className="w-3.5 h-3.5" /> .ino
@@ -1652,7 +1738,7 @@ export default function IoTLab() {
                 </div>
 
                 {showDiagramPanel && (
-                  <div className="mb-3 bg-zinc-950/60 border border-cyan-500/30 rounded-lg p-3">
+                  <div className="mb-3 bg-muted dark:bg-zinc-950/60 border border-cyan-500/30 rounded-lg p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="text-[11px] uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
                         <Upload className="w-3.5 h-3.5" /> Thiết bị nhanh — dán diagram.json (Wokwi)
@@ -1666,7 +1752,7 @@ export default function IoTLab() {
                         </button>
                         <button
                           onClick={() => { setDiagramText(''); setDiagramParsed(null); setDiagramError(null) }}
-                          className="text-[11px] px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
+                          className="text-[11px] px-2 py-1 rounded bg-secondary hover:bg-accent text-foreground/80 border border-border"
                         >
                           Xóa
                         </button>
@@ -1677,7 +1763,7 @@ export default function IoTLab() {
                       onChange={e => setDiagramText(e.target.value)}
                       spellCheck={false}
                       placeholder={'Dán nội dung diagram.json từ Wokwi vào đây (bao gồm parts & connections)…'}
-                      className="w-full h-28 bg-black/70 border border-zinc-800 rounded-md p-2 text-[11px] font-mono text-zinc-200 placeholder-zinc-600 resize-y focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+                      className="w-full h-28 bg-zinc-900 dark:bg-black/70 border border-border rounded-md p-2 text-[11px] font-mono text-zinc-100 placeholder:text-zinc-500 resize-y focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
                     />
                     {diagramError && (
                       <div className="mt-2 text-[11px] text-rose-300 flex items-center gap-1.5">
@@ -1692,7 +1778,7 @@ export default function IoTLab() {
                             {diagramParsed.leds.map(l => (
                               <span
                                 key={l.id}
-                                className="text-[10px] px-1.5 py-0.5 rounded border border-zinc-700 bg-zinc-900 text-zinc-300"
+                                className="text-[10px] px-1.5 py-0.5 rounded border border-border bg-card text-foreground/80"
                               >
                                 {l.id} · {l.color}{l.pin !== null ? ` → GPIO${l.pin}` : ' · ?'}
                               </span>
@@ -1732,7 +1818,9 @@ export default function IoTLab() {
                   onChange={e => setCurrentCode(e.target.value)}
                   onKeyDown={handleCodeKeyDown}
                   spellCheck={false}
-                  className="w-full bg-black/60 border border-zinc-800 rounded-lg p-3 text-[11px] text-zinc-200 leading-relaxed font-mono min-h-[420px] max-h-[620px] resize-y focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
+                  /* Code editor giữ dark terminal aesthetic ở cả 2 themes;
+                     text-zinc-100 forced light vì bg luôn dark. */
+                  className="w-full bg-zinc-900 dark:bg-black/60 border border-border rounded-lg p-3 text-[11px] text-zinc-100 placeholder:text-zinc-500 leading-relaxed font-mono min-h-[420px] max-h-[620px] resize-y focus:outline-none focus:ring-1 focus:ring-cyan-500/60"
                   style={{ tabSize: 2 }}
                 />
                 <div className="text-[10px] text-zinc-500 mt-1.5">
@@ -1743,11 +1831,11 @@ export default function IoTLab() {
               <div className="space-y-4">
                 <SerialMonitor circuit={active} tMs={tMs} running={running} />
 
-                <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-4">
+                <div className="bg-card dark:bg-zinc-900/40 border border-border rounded-xl p-4">
                   <h3 className="text-xs uppercase tracking-wider text-zinc-500 mb-2 flex items-center gap-1.5">
                     <BookOpen className="w-3.5 h-3.5" /> Mục tiêu học tập
                   </h3>
-                  <ul className="text-xs text-zinc-300 space-y-1.5">
+                  <ul className="text-xs text-foreground/80 space-y-1.5">
                     {active.objectives.map((o, i) => (
                       <li key={i} className="flex items-start gap-2">
                         <span className="text-cyan-400 mt-0.5">▸</span>

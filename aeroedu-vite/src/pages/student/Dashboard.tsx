@@ -1,38 +1,142 @@
 /**
  * Student Dashboard — trang tổng quan của học sinh
- * Mapping từ: app/(dashboard)/(routes)/dashboard/page.tsx
+ *
+ * Dữ liệu thật từ:
+ *   - studentLearningPathService.getMine()      → lộ trình GV đã giao
+ *   - GET /api/student/exam-rooms               → phòng thi (active + upcoming)
+ *   - GET /api/student/learning-paths           → đếm path đang học
+ *
+ * Fallback an toàn: nếu API lỗi/empty → hiển thị placeholder thân thiện
+ * có CTA dẫn HS đến /student/teachers (kết nối GV) thay vì demo data sai.
  */
 import { useQuery } from '@tanstack/react-query'
-import { BookOpen, CheckCircle2, Clock, TrendingUp, Award, Brain } from 'lucide-react'
+import {
+  BookOpen, CheckCircle2, Clock, TrendingUp, Award, Brain, FileText,
+  ArrowRight, Calendar, Loader2, Radio,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { LiveLeaderboard } from '@/components/dashboard/LiveLeaderboard'
+import { ConnectTeacherBanner } from '@/pages/student/MyTeachers'
+import { recommendationService as rs, getRsTypeMeta } from '@/services/recommendation.service'
+import { Sparkles, ChevronRight as ArrowRightSquare } from 'lucide-react'
+import { studentLearningPathService, type StudentLearningPath } from '@/services/studentLearningPath.service'
+import { api } from '@/services/api'
+import usePageTitle from '@/hooks/usePageTitle'
 
-const DEMO_STATS = [
-  { label: 'Khóa học đang học', value: 4, icon: BookOpen, color: 'bg-blue-100 text-blue-600' },
-  { label: 'Bài tập hoàn thành', value: 23, icon: CheckCircle2, color: 'bg-green-100 text-green-600' },
-  { label: 'Bài tập chờ nộp', value: 3, icon: Clock, color: 'bg-orange-100 text-orange-600' },
-  { label: 'Điểm trung bình', value: '8.1/10', icon: TrendingUp, color: 'bg-purple-100 text-purple-600' },
-]
+// ─── Types ────────────────────────────────────────────────────────
+interface StudentExamRoomLite {
+  id: string
+  name: string
+  status: 'draft' | 'active' | 'completed' | 'cancelled'
+  startTime: string
+  endTime: string
+  Exam: { id: string; title: string; examType: string } | null
+  Teacher: { id: string; name: string } | null
+  _count: { participants: number; questions: number }
+  myParticipant: { score: number | null; completed: boolean } | null
+}
 
-const DEMO_RECENT = [
-  { id: 1, title: 'Vật Lý - Chương 3: Dao động', progress: 72, subject: 'Vật Lý' },
-  { id: 2, title: 'Toán - Tích phân', progress: 45, subject: 'Toán' },
-  { id: 3, title: 'Hóa - Phản ứng Oxi hóa khử', progress: 88, subject: 'Hóa' },
-]
+// ─── Helpers ──────────────────────────────────────────────────────
+function formatRelative(iso: string): string {
+  const d = new Date(iso)
+  const now = new Date()
+  const diffMs = d.getTime() - now.getTime()
+  const diffH = diffMs / 36e5
+  if (diffH < 0 && diffH > -24) return `${Math.round(-diffH)} giờ trước`
+  if (diffH < 24 && diffH > 0) return `Trong ${Math.round(diffH)} giờ`
+  return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-const DEMO_UPCOMING = [
-  { id: 1, title: 'Kiểm tra Vật Lý - Chương 3', date: '10/04/2026', type: 'exam' },
-  { id: 2, title: 'Nộp bài tập Toán tuần 14', date: '12/04/2026', type: 'assignment' },
-  { id: 3, title: 'Lab: Con lắc đơn', date: '14/04/2026', type: 'lab' },
-]
+function progressOf(path: StudentLearningPath): number {
+  if (typeof path.progressPct === 'number') return Math.round(path.progressPct)
+  if (!path.modules?.length) return 0
+  const done = Object.values(path.moduleStatus || {}).filter(s => s === 'completed').length
+  return Math.round((done / path.modules.length) * 100)
+}
 
+// ─── Main component ───────────────────────────────────────────────
 export default function StudentDashboard() {
+  usePageTitle('Tổng quan học tập')
   const { user } = useAuth()
-  const { data: stats = DEMO_STATS } = useQuery({
-    queryKey: ['student-stats', user?.id],
-    queryFn: async () => DEMO_STATS,
-    staleTime: 1000 * 60 * 5,
+
+  // Real learning paths from teachers
+  const { data: paths = [], isLoading: pathsLoading } = useQuery({
+    queryKey: ['student-learning-paths-dashboard'],
+    queryFn: () => studentLearningPathService.getMine(),
+    staleTime: 60_000,
   })
+
+  // Real exam rooms (active + upcoming)
+  const { data: examData, isLoading: examsLoading } = useQuery({
+    queryKey: ['student-exam-rooms-dashboard'],
+    queryFn: async () => {
+      const r = await api.get<{ rooms: StudentExamRoomLite[] }>('/student/exam-rooms')
+      return r.data?.rooms ?? []
+    },
+    staleTime: 60_000,
+  })
+
+  const examRooms = examData ?? []
+  const now = new Date()
+
+  const activeExams = examRooms.filter(r => r.status === 'active')
+  const upcomingExams = examRooms
+    .filter(r => r.status === 'draft' && new Date(r.startTime) > now)
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+
+  // In-progress paths (có progress > 0, < 100)
+  const inProgressPaths = paths
+    .filter(p => {
+      const pct = progressOf(p)
+      return pct > 0 && pct < 100
+    })
+    .sort((a, b) => progressOf(b) - progressOf(a))
+
+  const completedPaths = paths.filter(p => progressOf(p) === 100).length
+  const completedExams = examRooms.filter(r => r.myParticipant?.completed).length
+
+  // Average score from completed exams
+  const examScores = examRooms
+    .map(r => r.myParticipant?.score)
+    .filter((s): s is number => typeof s === 'number')
+  const avgScore = examScores.length > 0
+    ? (examScores.reduce((a, b) => a + b, 0) / examScores.length).toFixed(1)
+    : null
+
+  // Pending: active exams not yet submitted
+  const pendingExamCount = activeExams.filter(r => !r.myParticipant?.completed).length
+
+  const stats = [
+    {
+      label: 'Lộ trình đang học',
+      value: paths.length,
+      icon: BookOpen,
+      color: 'bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300',
+      link: '/learning-paths',
+    },
+    {
+      label: 'Bài thi đã hoàn thành',
+      value: completedExams + completedPaths,
+      icon: CheckCircle2,
+      color: 'bg-green-100 text-green-600 dark:bg-green-500/20 dark:text-green-300',
+      link: '/student/exams',
+    },
+    {
+      label: 'Bài thi đang chờ',
+      value: pendingExamCount,
+      icon: Clock,
+      color: 'bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300',
+      link: '/student/exams',
+    },
+    {
+      label: 'Điểm trung bình',
+      value: avgScore ? `${avgScore}/10` : '—',
+      icon: TrendingUp,
+      color: 'bg-purple-100 text-purple-600 dark:bg-purple-500/20 dark:text-purple-300',
+      link: '/student/progress',
+    },
+  ]
 
   return (
     <div className="p-6 space-y-6">
@@ -44,10 +148,17 @@ export default function StudentDashboard() {
         <p className="text-muted-foreground mt-1">Đây là tổng quan học tập của bạn hôm nay.</p>
       </div>
 
+      {/* Banner nhắc kết nối GV nếu chưa có link nào */}
+      <ConnectTeacherBanner />
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="rounded-xl border bg-card p-4 flex items-center gap-3">
+          <Link
+            key={stat.label}
+            to={stat.link}
+            className="rounded-xl border bg-card p-4 flex items-center gap-3 hover:bg-muted/40 transition-colors"
+          >
             <div className={`p-2 rounded-lg ${stat.color}`}>
               <stat.icon className="w-5 h-5" />
             </div>
@@ -55,77 +166,224 @@ export default function StudentDashboard() {
               <p className="text-2xl font-bold">{stat.value}</p>
               <p className="text-xs text-muted-foreground">{stat.label}</p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Tiếp tục học */}
+        {/* Tiếp tục học — lộ trình thật từ GV */}
         <div className="rounded-xl border bg-card p-5">
-          <h2 className="font-semibold mb-4 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-blue-500" /> Tiếp tục học
-          </h2>
-          <div className="space-y-3">
-            {DEMO_RECENT.map((course) => (
-              <Link
-                key={course.id}
-                to={`/dashboard/courses`}
-                className="block rounded-lg border p-3 hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm font-medium">{course.title}</p>
-                  <span className="text-xs text-muted-foreground">{course.progress}%</span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full transition-all"
-                    style={{ width: `${course.progress}%` }}
-                  />
-                </div>
-              </Link>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-blue-500" /> Tiếp tục học
+            </h2>
+            <Link to="/learning-paths" className="text-xs text-blue-600 hover:underline inline-flex items-center gap-0.5">
+              Xem tất cả <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
+
+          {pathsLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 opacity-60" />
+              Đang tải lộ trình…
+            </div>
+          ) : inProgressPaths.length === 0 ? (
+            <div className="py-5 text-center text-sm text-muted-foreground space-y-2">
+              <p>Chưa có lộ trình nào đang học dở.</p>
+              {paths.length === 0 ? (
+                <Link to="/student/teachers" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  Kết nối với GV để nhận lộ trình <ArrowRight className="w-3 h-3" />
+                </Link>
+              ) : (
+                <Link to="/learning-paths" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline">
+                  Bắt đầu lộ trình mới <ArrowRight className="w-3 h-3" />
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {inProgressPaths.slice(0, 3).map((path) => {
+                const pct = progressOf(path)
+                return (
+                  <Link
+                    key={path.assignmentId}
+                    to="/learning-paths"
+                    className="block rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex justify-between items-start mb-2 gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{path.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {path.teacher?.name ? `GV: ${path.teacher.name}` : path.subject || 'Lộ trình học'}
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Sắp tới */}
+        {/* Sắp tới — phòng thi thật + active exam */}
         <div className="rounded-xl border bg-card p-5">
-          <h2 className="font-semibold mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-orange-500" /> Sắp đến hạn
-          </h2>
-          <div className="space-y-3">
-            {DEMO_UPCOMING.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <div className={`p-1.5 rounded-md text-white text-xs ${
-                  item.type === 'exam' ? 'bg-red-500' :
-                  item.type === 'lab' ? 'bg-purple-500' : 'bg-blue-500'
-                }`}>
-                  {item.type === 'exam' ? 'KT' : item.type === 'lab' ? 'Lab' : 'BT'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.date}</p>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-orange-500" /> Sắp đến hạn
+            </h2>
+            <Link to="/student/exams" className="text-xs text-orange-600 hover:underline inline-flex items-center gap-0.5">
+              Xem tất cả <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
+
+          {examsLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2 opacity-60" />
+              Đang tải phòng thi…
+            </div>
+          ) : activeExams.length === 0 && upcomingExams.length === 0 ? (
+            <div className="py-5 text-center text-sm text-muted-foreground">
+              <p>Không có phòng thi nào sắp tới.</p>
+              <p className="text-xs mt-1 opacity-70">GV sẽ tạo phòng thi khi đến lịch.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Active exams first (HS có thể vào ngay) */}
+              {activeExams.slice(0, 2).map((room) => (
+                <Link
+                  key={room.id}
+                  to="/student/exams"
+                  className="flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 hover:bg-emerald-500/10 transition-colors"
+                >
+                  <div className="p-1.5 rounded-md text-white text-xs bg-emerald-500 inline-flex items-center gap-1">
+                    <Radio className="w-3 h-3" /> LIVE
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{room.Exam?.title || room.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {room.Teacher?.name ?? 'GV'} · {room._count.questions} câu · đang mở
+                    </p>
+                  </div>
+                </Link>
+              ))}
+              {upcomingExams.slice(0, Math.max(1, 3 - activeExams.length)).map((room) => (
+                <div key={room.id} className="flex items-center gap-3 rounded-lg border p-3">
+                  <div className="p-1.5 rounded-md text-white text-xs bg-blue-500 inline-flex items-center gap-1">
+                    <Calendar className="w-3 h-3" /> THI
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{room.Exam?.title || room.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatRelative(room.startTime)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* For You preview — top 3 reco gợi ý */}
+      <StudentRecoPreview />
+
+      {/* LIVE Leaderboard — real-time top học sinh dẫn đầu */}
+      <LiveLeaderboard highlightUserId={user?.id} />
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
         <Link to="/ai-tutor"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors text-sm font-medium">
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-50 dark:bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-500/25 transition-colors text-sm font-medium">
           <Brain className="w-4 h-4" /> AI Tutor
         </Link>
+        <Link to="/student/exams"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-500/25 transition-colors text-sm font-medium">
+          <FileText className="w-4 h-4" /> Phòng thi Live
+        </Link>
         <Link to="/dashboard/labtwin"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm font-medium">
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/25 transition-colors text-sm font-medium">
           <Award className="w-4 h-4" /> Phòng Lab
         </Link>
         <Link to="/dashboard/assignments"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors text-sm font-medium">
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-50 dark:bg-green-500/15 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-500/25 transition-colors text-sm font-medium">
           <CheckCircle2 className="w-4 h-4" /> Bài tập
         </Link>
       </div>
+    </div>
+  )
+}
+
+/**
+ * StudentRecoPreview — Top 3 gợi ý cá nhân hoá hiển thị trên Dashboard
+ * để dẫn HS tới /student/for-you nếu muốn xem full feed.
+ */
+function StudentRecoPreview() {
+  const { data: feed } = useQuery({
+    queryKey: ['reco-feed-student-dashboard'],
+    queryFn: () => rs.getFeed('student', 3),
+    staleTime: 5 * 60_000, // 5 phút
+  })
+
+  if (!feed || feed.items.length === 0) return null
+
+  return (
+    <div className="rounded-xl border bg-card p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-cyan-500" /> Gợi ý cho bạn
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-600 font-normal">AI</span>
+        </h2>
+        <Link to="/student/for-you" className="text-xs text-cyan-600 hover:underline inline-flex items-center gap-0.5">
+          Xem tất cả <ArrowRightSquare className="w-3 h-3" />
+        </Link>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        {feed.items.map((item) => {
+          const meta = getRsTypeMeta(item.type)
+          return (
+            <Link
+              key={`${item.type}-${item.id}`}
+              to={item.link}
+              onClick={() => rs.track({ action: 'click', targetType: item.type, targetId: item.id, metadata: { source: 'dashboard-preview' } })}
+              className="block rounded-lg border border-zinc-200 dark:border-border bg-zinc-50/50 dark:bg-zinc-900/40 p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors"
+              style={{ borderLeftWidth: 3, borderLeftColor: meta.accent }}
+            >
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">{meta.emoji}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: meta.accent }}>
+                  {meta.label}
+                </span>
+              </div>
+              <p className="text-sm font-semibold leading-tight line-clamp-2 mb-1">{item.title}</p>
+              {item.subtitle && (
+                <p className="text-[11px] text-muted-foreground line-clamp-1">{item.subtitle}</p>
+              )}
+            </Link>
+          )
+        })}
+      </div>
+      {/* CTA tới Daily Plan — RS Phase 7 mirror cho HS */}
+      <Link
+        to="/student/daily"
+        onClick={() => rs.track({
+          action: 'click',
+          targetType: 'daily_plan',
+          targetId: 'student-daily',
+          metadata: { source: 'student-dashboard-cta' },
+        })}
+        className="mt-3 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg
+                   bg-gradient-to-r from-cyan-500/15 via-purple-500/10 to-amber-500/15
+                   border border-dashed border-cyan-400/40
+                   text-cyan-700 dark:text-cyan-300 text-xs font-bold
+                   hover:from-cyan-500/25 hover:via-purple-500/15 hover:to-amber-500/25 transition"
+      >
+        📅 Mở Kế hoạch hôm nay (group theo việc cần làm) →
+      </Link>
     </div>
   )
 }

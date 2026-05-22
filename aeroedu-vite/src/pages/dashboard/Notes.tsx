@@ -175,7 +175,7 @@ function NoteCard({
         </button>
         {menu && (
           <div
-            className="absolute right-0 top-6 z-20 w-36 bg-[hsl(225,15%,12%)] border border-white/10 rounded-xl shadow-xl overflow-hidden"
+            className="absolute right-0 top-6 z-20 w-36 bg-card border border-white/10 rounded-xl shadow-xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <button onClick={() => { onPin(); setMenu(false) }} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-white/60 hover:bg-white/[0.06] hover:text-white transition-colors">
@@ -251,7 +251,7 @@ function NoteEditor({ note, onChange }: { note: Note; onChange: (n: Note) => voi
             {sub.icon}{sub.label}<ChevronDown className="w-3 h-3 text-white/30" />
           </button>
           {showSubjectPicker && (
-            <div className="absolute top-8 left-0 z-20 w-44 bg-[hsl(225,15%,12%)] border border-white/10 rounded-xl shadow-xl overflow-hidden">
+            <div className="absolute top-8 left-0 z-20 w-44 bg-card border border-white/10 rounded-xl shadow-xl overflow-hidden">
               {SUBJECTS.map(s => (
                 <button
                   key={s.key}
@@ -276,7 +276,7 @@ function NoteEditor({ note, onChange }: { note: Note; onChange: (n: Note) => voi
             Màu<ChevronDown className="w-3 h-3 text-white/30" />
           </button>
           {showColorPicker && (
-            <div className="absolute top-8 left-0 z-20 p-2 bg-[hsl(225,15%,12%)] border border-white/10 rounded-xl shadow-xl flex gap-1.5 flex-wrap w-48">
+            <div className="absolute top-8 left-0 z-20 p-2 bg-card border border-white/10 rounded-xl shadow-xl flex gap-1.5 flex-wrap w-48">
               {NOTE_COLORS.map(c => (
                 <button
                   key={c.key}
@@ -400,7 +400,7 @@ export default function NotesPage() {
   const pinnedCount = notes.filter(n => n.pinned).length
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[hsl(225,15%,8%)] text-white overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-background text-white overflow-hidden">
 
       {/* ── Sidebar ─────────────────────────────────────────────── */}
       <aside className="w-72 shrink-0 flex flex-col border-r border-white/[0.06]">
@@ -513,7 +513,7 @@ export default function NotesPage() {
       {/* ── Delete confirm modal ─────────────────────────────────── */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[hsl(225,15%,11%)] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <div className="bg-card border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 bg-rose-500/15 rounded-xl">
                 <Trash2 className="w-5 h-5 text-rose-400" />

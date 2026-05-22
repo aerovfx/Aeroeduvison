@@ -11,6 +11,9 @@ export interface User {
   email: string
   image: string | null
   role: UserRole
+  /** UI-level sub-type: STUDENT / TEACHER / PARENT / ADMIN. PARENT chia
+   *  chung role TEACHER nhưng accountType khác biệt để hiển thị label đúng. */
+  accountType?: 'STUDENT' | 'TEACHER' | 'PARENT' | 'ADMIN'
   isTwoFactorEnabled: boolean
   createdAt: string
   updatedAt: string
@@ -159,11 +162,48 @@ export interface CourseVideo {
   id: string
   courseId: string
   title: string
+  description?: string | null
   videoUrl: string
   position: number
   duration?: number
   isCompleted?: boolean
+  isPreview?: boolean
+  groupName?: string | null
+  thumbUrl?: string | null
   createdAt: string
+}
+
+// ── Curriculum (Chapter → Lesson → Block) — student view ──────
+export interface StudentLessonBlock {
+  id: string
+  lessonId: string
+  type: 'video' | 'pdf' | 'text' | 'audio' | 'quiz' | 'pptx' | 'simulation' | 'lab' | 'game' | 'link' | 'embed'
+  title: string | null
+  content: string | null
+  metadata: Record<string, unknown>
+  position: number
+}
+
+export interface StudentLesson {
+  id: string
+  chapterId: string
+  title: string
+  description: string | null
+  duration: number | null
+  type: string | null
+  position: number
+  blocks: StudentLessonBlock[]
+}
+
+export interface StudentChapter {
+  id: string
+  title: string
+  description: string | null
+  duration: number | null
+  position: number
+  isPublished: boolean
+  isFree: boolean
+  lessons: StudentLesson[]
 }
 
 export interface CourseAsset {
@@ -210,6 +250,48 @@ export interface Certificate {
   course: { title: string; slug: string; user: Pick<User, 'id' | 'name'> }
 }
 
+/**
+ * Tài nguyên LIÊN KẾT vào khoá học — exams/assignments/labs/aura/games
+ * Không duplicate content, chỉ lưu reference (id + title + path tuỳ loại).
+ * Persist vào Course.extras JSONB.
+ */
+export interface CourseExtraExam {
+  id: string
+  title: string
+  duration?: number
+  questionCount?: number
+}
+
+export interface CourseExtraAssignment {
+  id: string
+  title: string
+}
+
+export interface CourseExtraLab {
+  id: string
+  title: string
+  path: string  // VD: /labs/iot-lab
+}
+
+export interface CourseExtraAura {
+  id: string
+  title: string
+}
+
+export interface CourseExtraGame {
+  id: string
+  title: string
+  path: string
+}
+
+export interface CourseExtras {
+  exams?: CourseExtraExam[]
+  assignments?: CourseExtraAssignment[]
+  labs?: CourseExtraLab[]
+  auraSimulations?: CourseExtraAura[]
+  games?: CourseExtraGame[]
+}
+
 export interface InstructorCourse {
   id: string
   userId: string
@@ -232,6 +314,10 @@ export interface InstructorCourse {
   videos: CourseVideo[]
   assets: CourseAsset[]
   user: Pick<User, 'id' | 'name' | 'image'>
+  /** URL PDF sách giáo trình — hiển thị dạng sách trong CoursePlayer */
+  pdfBookUrl?: string | null
+  /** Tài nguyên liên kết: exams/assignments/labs/aura/games (không duplicate) */
+  extras?: CourseExtras
   createdAt: string
   updatedAt: string
 }
@@ -310,6 +396,8 @@ export interface CareerTestResult {
   personalityName: string
   careers: string[]
   answers?: Record<number, number>
+  /** Tên các nghề mà HS đã mở xem chi tiết trong lần làm bài này */
+  viewedCareers?: string[]
   createdAt: string
 }
 
@@ -341,6 +429,18 @@ export interface CareerCommunityStats {
     name: string
     count: number
     percentage: number
+    /** Match với danh sách Hot xu thế 2026 — nếu có thì hiện badge 🔥 */
+    trending?: {
+      label: string
+      reason: string
+      heat: number  // 1-5
+    } | null
+  }>
+  /** Danh sách ngành Hot xu thế 2026 (server cung cấp, UI hiển thị riêng) */
+  trendingCareers2026?: Array<{
+    label: string
+    reason: string
+    heat: number
   }>
   /** Người đã hoàn thành gần nhất — hiển thị để học sinh tham khảo */
   recentTakers: Array<{
@@ -421,6 +521,20 @@ export interface TeacherExam {
   totalScore: number
   createdAt: string
   user?: { name: string } | null
+  /** Học sinh đã hoàn thành đề này (recent 8, sort by earnedAt DESC).
+   *  Hiển thị stack avatar nhỏ ở dưới card cho học sinh xem ai đã làm. */
+  takers?: Array<{
+    name: string
+    percentage: number
+    earnedAt: string
+  }>
+  /** Tổng số học sinh riêng biệt đã hoàn thành đề này */
+  takerCount?: number
+  /** Học sinh được giáo viên phân công làm đề này nhưng CHƯA hoàn thành.
+   *  Hiển thị avatar gray bên cạnh takers để biết ai sắp phải làm. */
+  assignedStudents?: string[]
+  /** Tổng học sinh được phân công (bao gồm cả đã làm + chưa làm) */
+  assignedCount?: number
 }
 
 export interface ExamMatrixItem {

@@ -102,14 +102,10 @@ export function AudioRecorder({
     return () => { sonioxClient.disconnect() }
   }, [translationMode])
 
-  const stopLocalStreamSession = useCallback((sessionId: string) => {
-    if (!sessionId) return
-    fetch('/api/transcript/local/transcribe-stream', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, stop: true }),
-      keepalive: true,
-    }).catch(() => undefined)
+  const stopLocalStreamSession = useCallback((_sessionId: string) => {
+    // No-op: fal.ai không có server-side session — chunks gửi tất cả 1 lần
+    // khi dừng ghi qua /transcribe (single fetch). Loại bỏ stream POST để
+    // tránh 501/202 noise trong console.
   }, [])
 
   useEffect(() => {
@@ -371,35 +367,23 @@ export function AudioRecorder({
       chunksRef.current = []
       localStreamQueueRef.current = []
       localStreamInFlightRef.current = false
-      localStreamingActiveRef.current = translationMode === 'local'
+      // fal.ai Whisper KHÔNG support true streaming → tắt stream POST hoàn toàn,
+      // chỉ accumulate chunks rồi gửi 1 lần khi dừng ghi (qua /transcribe).
+      // Tiết kiệm 100+ network calls + tránh 501/202 noise trong console.
+      localStreamingActiveRef.current = false
       localStreamSessionIdRef.current = createStreamSessionId()
-
-      if (translationMode === 'local') {
-        fetch('/api/transcript/local/transcribe-stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: localStreamSessionIdRef.current,
-            warmup: true,
-            sourceLanguage,
-            targetLanguage,
-            mimeType: mimeType || 'audio/webm',
-          }),
-        }).catch(() => undefined)
-      }
 
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunksRef.current.push(event.data)
           if (translationMode === 'soniox') {
             event.data.arrayBuffer().then(buffer => sonioxClient.sendAudio(buffer))
-          } else if (translationMode === 'local') {
-            void enqueueLocalStreamingChunk(event.data)
           }
+          // local + elevenlabs: chỉ buffer chunks, gửi 1 lần khi stopRecording()
         }
       }
 
-      mediaRecorderRef.current.start(translationMode === 'local' ? 700 : 1000)
+      mediaRecorderRef.current.start(1000)
 
       if (translationMode === 'soniox') {
         sonioxClient.connect({ apiKey: apiKey!, sourceLanguage, targetLanguage })
@@ -485,7 +469,7 @@ export function AudioRecorder({
         segmentsRef.current = newSegments
         finalSegments = newSegments
         onSegmentsChange?.(newSegments)
-        toast.success(translationMode === 'elevenlabs' ? 'Transcribe xong (ElevenLabs)' : 'Transcribe xong (MLX Local)')
+        toast.success(translationMode === 'elevenlabs' ? 'Transcribe xong (ElevenLabs)' : 'Transcribe xong (fal.ai Whisper)')
       } catch (e) {
         toast.error(e instanceof Error ? e.message : 'Lỗi transcribe')
       } finally {

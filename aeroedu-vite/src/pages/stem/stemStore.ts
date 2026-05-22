@@ -29,6 +29,49 @@ export interface Feedback {
   type: 'suggestion' | 'approval' | 'revision'
 }
 
+// ─── Mở rộng cho hồ sơ + tiến độ chi tiết ────────────────────────────────────
+
+/** Nhật ký cập nhật hằng ngày — ghi nhận "Hôm nay đã làm gì" */
+export interface ProgressLog {
+  id: string
+  date: string                      // ISO timestamp
+  author: string                    // tên HS/GV log
+  content: string                   // nội dung cập nhật
+  hours?: number                    // số giờ làm trong session này
+  photoUrl?: string                 // URL ảnh tiến độ (optional)
+}
+
+/** Vấn đề gặp phải + giải pháp */
+export interface Issue {
+  id: string
+  date: string
+  title: string
+  description: string
+  severity: 'low' | 'medium' | 'high'
+  status: 'open' | 'resolved'
+  resolution?: string
+  resolvedAt?: string
+}
+
+/** Tài liệu/link tham khảo */
+export interface Resource {
+  id: string
+  type: 'link' | 'video' | 'paper' | 'datasheet'
+  title: string
+  url: string
+  notes?: string
+}
+
+/** BOM linh kiện với trạng thái mua sắm */
+export interface BOMItem {
+  id: string
+  name: string
+  qty: number
+  unitPrice: number                 // VND
+  status: 'planned' | 'ordered' | 'received' | 'used'
+  notes?: string
+}
+
 export interface STEMProject {
   id: string
   title: string
@@ -46,6 +89,29 @@ export interface STEMProject {
   milestones: Milestone[]
   feedback: Feedback[]
   isPublic: boolean
+
+  // ── Hồ sơ chi tiết (optional, backward compat) ──
+  objective?: string                // Mục tiêu cụ thể
+  methodology?: string              // Phương pháp khoa học áp dụng
+  expectedOutcomes?: string         // Kết quả mong đợi (sản phẩm/báo cáo/video)
+  subject?: string                  // Môn học liên kết (Vật lí/Hoá/Sinh/...)
+  schoolYear?: string               // Năm học (vd "2025-2026")
+  coverImage?: string               // URL ảnh bìa
+
+  // ── BOM + ngân sách ──
+  bom?: BOMItem[]
+  budgetTotal?: number              // Ngân sách tổng dự kiến VND
+
+  // ── Tiến độ ──
+  progressLogs?: ProgressLog[]
+  totalHoursSpent?: number          // Tự cộng dồn từ progressLogs
+  lastWorkedAt?: string
+
+  // ── Vấn đề ──
+  issues?: Issue[]
+
+  // ── Tài nguyên tham khảo ──
+  resources?: Resource[]
 }
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
@@ -288,4 +354,89 @@ export function createProject(project: Omit<STEMProject, 'id' | 'createdAt' | 'u
   projects.push(newProject)
   saveProjects(projects)
   return newProject
+}
+
+// ─── Milestone CRUD — Scrum board ⇄ Timeline sync ────────────────────────────
+//
+// Scrum board is the single source of truth for milestone state. Timeline reads
+// the same array. Project.progress recomputes on every mutation so the progress
+// bar in StemDetail/StemTimeline stays in sync automatically.
+
+/** Recompute project.progress as % of completed milestones (0 if none). */
+function recomputeProgress(milestones: Milestone[]): number {
+  if (!milestones.length) return 0
+  const done = milestones.filter((m) => m.status === 'completed').length
+  return Math.round((done / milestones.length) * 100)
+}
+
+/** Persist milestones for a project + recompute progress + bump updatedAt. */
+function withMilestones(projectId: string, mutator: (ms: Milestone[]) => Milestone[]): STEMProject | undefined {
+  const projects = loadProjects()
+  const idx = projects.findIndex((p) => p.id === projectId)
+  if (idx < 0) return undefined
+  const next = mutator(projects[idx].milestones)
+  const updated: STEMProject = {
+    ...projects[idx],
+    milestones: next,
+    progress: recomputeProgress(next),
+    updatedAt: new Date().toISOString(),
+  }
+  projects[idx] = updated
+  saveProjects(projects)
+  return updated
+}
+
+/** Append milestone — auto-generates id if missing. */
+export function addMilestone(projectId: string, m: Partial<Milestone> & { title: string }): STEMProject | undefined {
+  const milestone: Milestone = {
+    id: m.id ?? `m_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    title: m.title.trim(),
+    status: m.status ?? 'pending',
+    dueDate: m.dueDate ?? '',
+  }
+  return withMilestones(projectId, (ms) => [...ms, milestone])
+}
+
+/** Change just the status — used by [→] [←] move buttons. */
+export function updateMilestoneStatus(
+  projectId: string,
+  milestoneId: string,
+  status: Milestone['status'],
+): STEMProject | undefined {
+  return withMilestones(projectId, (ms) =>
+    ms.map((m) => (m.id === milestoneId ? { ...m, status } : m)),
+  )
+}
+
+/** Generic field patch — used by inline rename + edit modal. */
+export function updateMilestoneFields(
+  projectId: string,
+  milestoneId: string,
+  fields: Partial<Milestone>,
+): STEMProject | undefined {
+  return withMilestones(projectId, (ms) =>
+    ms.map((m) => (m.id === milestoneId ? { ...m, ...fields, id: m.id } : m)),
+  )
+}
+
+/** Remove a milestone — confirm prompt is caller's responsibility. */
+export function deleteMilestone(projectId: string, milestoneId: string): STEMProject | undefined {
+  return withMilestones(projectId, (ms) => ms.filter((m) => m.id !== milestoneId))
+}
+
+/** Reorder within column or across timeline (direction: -1 = up, +1 = down). */
+export function moveMilestone(
+  projectId: string,
+  milestoneId: string,
+  direction: -1 | 1,
+): STEMProject | undefined {
+  return withMilestones(projectId, (ms) => {
+    const idx = ms.findIndex((m) => m.id === milestoneId)
+    if (idx < 0) return ms
+    const target = idx + direction
+    if (target < 0 || target >= ms.length) return ms
+    const next = [...ms]
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    return next
+  })
 }

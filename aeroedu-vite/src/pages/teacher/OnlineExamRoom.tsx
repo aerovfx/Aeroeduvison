@@ -7,20 +7,42 @@ import {
   Loader2, FileText, Timer, Globe, Lock, LogIn,
   BookOpen, CheckCircle2, AlertTriangle, CalendarClock,
   Zap, ChevronDown, ChevronUp, CalendarPlus, Pencil, Save, X,
+  Trophy, Medal, Crown,
 } from "lucide-react"
 import toast from "react-hot-toast"
 
 // ── Dark palette ──────────────────────────────────────────────
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  purple:  '#7c3aed',
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
 } as const
+
 
 // ── Types ─────────────────────────────────────────────────────
 interface ExamRoom {
@@ -56,6 +78,45 @@ const statusLabel = (s: string) =>
   : s === "completed" ? "Kết thúc"
   : s === "cancelled" ? "Huỷ"
   : s
+
+// ── Time-phase helpers (past / ongoing / upcoming) ─────────────
+type TimePhase = 'upcoming' | 'ongoing' | 'past' | 'unscheduled'
+
+function getTimePhase(startISO?: string, endISO?: string, now: number = Date.now()): TimePhase {
+  if (!startISO || !endISO) return 'unscheduled'
+  const start = new Date(startISO).getTime()
+  const end   = new Date(endISO).getTime()
+  if (isNaN(start) || isNaN(end)) return 'unscheduled'
+  if (now < start) return 'upcoming'
+  if (now > end)   return 'past'
+  return 'ongoing'
+}
+
+// Format khoảng cách thời gian dạng "2 giờ 30 phút" / "3 ngày" / "5 phút"
+function formatRelativeDuration(ms: number): string {
+  const abs = Math.abs(ms)
+  const m = Math.floor(abs / 60_000)
+  const h = Math.floor(m / 60)
+  const d = Math.floor(h / 24)
+  if (d >= 1) return `${d} ngày${h % 24 > 0 ? ` ${h % 24}h` : ''}`
+  if (h >= 1) return `${h}h${m % 60 > 0 ? ` ${m % 60}p` : ''}`
+  if (m >= 1) return `${m} phút`
+  return 'dưới 1 phút'
+}
+
+function getTimePhaseLabel(phase: TimePhase, startISO?: string, endISO?: string, now: number = Date.now()): string {
+  if (phase === 'unscheduled') return 'Chưa đặt lịch'
+  if (phase === 'upcoming' && startISO) {
+    return `Bắt đầu sau ${formatRelativeDuration(new Date(startISO).getTime() - now)}`
+  }
+  if (phase === 'ongoing' && endISO) {
+    return `Đang diễn ra · còn ${formatRelativeDuration(new Date(endISO).getTime() - now)}`
+  }
+  if (phase === 'past' && endISO) {
+    return `Kết thúc ${formatRelativeDuration(now - new Date(endISO).getTime())} trước`
+  }
+  return ''
+}
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { bg: string; color: string }> = {
@@ -101,7 +162,13 @@ export default function OnlineExamRoomPage() {
   const [publicRooms, setPublicRooms] = useState<ExamRoom[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  // Filter theo TRẠNG THÁI (status do GV set): all/draft/active/completed/cancelled
   const [statusFilter, setStatusFilter] = useState("all")
+  // Filter theo THỜI GIAN (tính từ startTime/endTime so với now):
+  //   'all' | 'upcoming' (sẽ thi) | 'ongoing' (đang thi) | 'past' (đã thi)
+  const [phaseFilter, setPhaseFilter] = useState<'all' | TimePhase>('all')
+  // Tick mỗi 30s để countdown trên UI tự cập nhật mà không cần reload
+  const [nowTick, setNowTick] = useState(Date.now())
 
   const [joinCode, setJoinCode] = useState("")
   const [joining, setJoining] = useState<string | null>(null)
@@ -155,8 +222,12 @@ export default function OnlineExamRoomPage() {
     try {
       setLoading(true)
       const { data } = await api.get('/online-exam-room')
-      setRooms(data.examRooms || data.data?.examRooms || [])
-      setPublicRooms(data.publicRooms || data.data?.publicRooms || [])
+      // Backend trả về cả `rooms` (naming cũ) lẫn `examRooms` (naming mới) —
+      // FE check cả 2 + cả wrapper {success, data: {...}} từ Rust microservice.
+      const myRooms = data.examRooms || data.rooms || data.data?.examRooms || data.data?.rooms || []
+      const publicArr = data.publicRooms || data.data?.publicRooms || []
+      setRooms(myRooms)
+      setPublicRooms(publicArr)
     } catch (e: any) {
       const status = e?.response?.status
       if (status !== 503 && status !== 502) {
@@ -196,6 +267,28 @@ export default function OnlineExamRoomPage() {
   }, [])
 
   useEffect(() => { void loadRooms() }, [loadRooms])
+
+  // Auto-poll mỗi 30s để GV thấy ngay khi có HS tham gia phòng thi mà
+  // không phải bấm "làm mới". Pause khi tab off-focus để không tốn tài
+  // nguyên server. Tách khỏi load đầu tiên (đã chạy ở effect trên).
+  useEffect(() => {
+    const POLL_MS = 30_000
+    let timer: number | undefined
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadRooms()
+      timer = window.setTimeout(tick, POLL_MS)
+    }
+    timer = window.setTimeout(tick, POLL_MS)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void loadRooms()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [loadRooms])
+
   useEffect(() => { if (showCreate) void loadExams() }, [showCreate, loadExams])
   useEffect(() => {
     if (selectedId) {
@@ -366,12 +459,46 @@ export default function OnlineExamRoomPage() {
     } catch (e: any) { toast.error(e.response?.data?.error || "Không thể xoá") }
   }
 
+  // Tick countdown mỗi 30s cho text "còn 5 phút" / "bắt đầu sau 2h" tự cập nhật
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
   // ── Computed ───────────────────────────────────────────────
-  const filtered = rooms.filter(r => {
-    if (statusFilter !== "all" && r.status !== statusFilter) return false
-    if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    return true
-  })
+  // Đếm số phòng theo từng pha (cho badge số trên tab)
+  const phaseCounts = (() => {
+    const c = { all: rooms.length, upcoming: 0, ongoing: 0, past: 0, unscheduled: 0 }
+    for (const r of rooms) {
+      const p = getTimePhase(r.startTime, r.endTime, nowTick)
+      c[p]++
+    }
+    return c
+  })()
+
+  // Filter + sort: ongoing trước (cần monitor gấp), rồi upcoming asc theo startTime,
+  // rồi past desc theo endTime (gần nhất lên đầu).
+  const filtered = rooms
+    .filter(r => {
+      if (statusFilter !== "all" && r.status !== statusFilter) return false
+      if (phaseFilter !== "all" && getTimePhase(r.startTime, r.endTime, nowTick) !== phaseFilter) return false
+      if (searchQuery.trim() && !r.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
+      return true
+    })
+    .sort((a, b) => {
+      const pa = getTimePhase(a.startTime, a.endTime, nowTick)
+      const pb = getTimePhase(b.startTime, b.endTime, nowTick)
+      const order: Record<TimePhase, number> = { ongoing: 0, upcoming: 1, unscheduled: 2, past: 3 }
+      if (order[pa] !== order[pb]) return order[pa] - order[pb]
+      // Cùng pha: ongoing/upcoming → sort start asc, past → sort end desc
+      const aStart = new Date(a.startTime || 0).getTime()
+      const bStart = new Date(b.startTime || 0).getTime()
+      const aEnd   = new Date(a.endTime || 0).getTime()
+      const bEnd   = new Date(b.endTime || 0).getTime()
+      if (pa === 'past') return bEnd - aEnd
+      return aStart - bStart
+    })
+
   const selected = rooms.find(r => r.id === selectedId)
 
   const openCreate = () => {
@@ -399,8 +526,26 @@ export default function OnlineExamRoomPage() {
               <Timer className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold" style={{ color: D.text }}>Phòng Thi Online</h1>
-              <p className="text-xs" style={{ color: D.muted }}>Tổ chức thi trực tuyến · Công khai hoặc bí mật</p>
+              <h1 className="text-xl font-bold flex items-center gap-2" style={{ color: D.text }}>
+                Phòng Thi Online
+                <span
+                  title="Danh sách phòng + số HS tự cập nhật mỗi 30 giây"
+                  className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: 'rgba(16,185,129,0.15)',
+                    color: '#34d399',
+                    border: '1px solid rgba(16,185,129,0.35)',
+                  }}
+                >
+                  <style>{`@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: '#34d399', animation: 'pulseDot 1.5s ease-in-out infinite',
+                  }} />
+                  Live
+                </span>
+              </h1>
+              <p className="text-xs" style={{ color: D.muted }}>Tổ chức thi trực tuyến · Công khai hoặc bí mật · Cập nhật tự động</p>
             </div>
           </div>
           <button
@@ -416,6 +561,9 @@ export default function OnlineExamRoomPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+
+        {/* ── Bảng vàng thành tích — top HS theo điểm + thời gian ── */}
+        <LeaderboardSection exams={exams} />
 
         {/* ── Public rooms ────────────────────────────────── */}
         {publicRooms.length > 0 && (
@@ -646,6 +794,42 @@ export default function OnlineExamRoomPage() {
 
           {/* Left col */}
           <div className="col-span-12 lg:col-span-8 space-y-4">
+
+            {/* ── Time-phase tabs (Sắp diễn ra / Đang diễn ra / Đã thi) ── */}
+            <div className="flex items-center gap-1 flex-wrap rounded-xl p-1"
+              style={{ background: D.card2, border: `1px solid ${D.border}` }}>
+              {([
+                { v: 'all',      l: 'Tất cả',        c: phaseCounts.all,      icon: CalendarClock, color: D.text },
+                { v: 'ongoing',  l: 'Đang diễn ra',  c: phaseCounts.ongoing,  icon: Zap,           color: '#34d399' },
+                { v: 'upcoming', l: 'Sắp diễn ra',   c: phaseCounts.upcoming, icon: CalendarPlus,  color: '#60a5fa' },
+                { v: 'past',     l: 'Đã kết thúc',   c: phaseCounts.past,     icon: CheckCircle2,  color: '#94a3b8' },
+              ] as const).map(t => {
+                const sel = phaseFilter === t.v
+                const Icon = t.icon
+                const isPulse = t.v === 'ongoing' && phaseCounts.ongoing > 0
+                return (
+                  <button key={t.v} onClick={() => setPhaseFilter(t.v)}
+                    className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all"
+                    style={{
+                      background: sel ? (t.v === 'ongoing' ? 'rgba(5,150,105,0.18)' : t.v === 'upcoming' ? 'rgba(37,99,235,0.18)' : t.v === 'past' ? 'rgba(148,163,184,0.18)' : 'rgba(124,58,237,0.18)') : 'transparent',
+                      color: sel ? t.color : D.muted,
+                      border: `1px solid ${sel ? t.color : 'transparent'}`,
+                    }}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isPulse ? 'animate-pulse' : ''}`} />
+                    <span>{t.l}</span>
+                    {t.c > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                        style={{
+                          background: sel ? t.color + '33' : D.card,
+                          color: sel ? t.color : D.muted2,
+                        }}>{t.c}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 min-w-[180px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: D.muted }} />
@@ -678,30 +862,105 @@ export default function OnlineExamRoomPage() {
             ) : filtered.length === 0 ? (
               <div className="text-center py-12">
                 <Clock className="w-10 h-10 mx-auto mb-3" style={{ color: 'rgba(148,163,184,0.3)' }} />
-                <p className="font-medium" style={{ color: D.muted }}>Chưa có phòng thi nào</p>
+                <p className="font-medium" style={{ color: D.muted }}>
+                  {phaseFilter === 'ongoing'  ? 'Không có phòng nào đang diễn ra' :
+                   phaseFilter === 'upcoming' ? 'Không có phòng nào sắp diễn ra' :
+                   phaseFilter === 'past'     ? 'Chưa có phòng nào đã kết thúc' :
+                   'Chưa có phòng thi nào'}
+                </p>
+                {phaseFilter !== 'all' && (
+                  <button onClick={() => setPhaseFilter('all')}
+                    className="mt-3 text-xs underline" style={{ color: '#a78bfa' }}>
+                    Xem tất cả phòng
+                  </button>
+                )}
               </div>
             ) : (
-              <div className="space-y-2">
-                {filtered.map(room => (
+              <div className="space-y-5">
+                {/* GROUPED BY PHASE — luôn hiển thị 3 sections (nếu phaseFilter=all)
+                    để user thấy đồng thời các phòng đã/đang/sẽ thi. Khi user chọn
+                    tab cụ thể → chỉ hiện section đó. */}
+                {(['ongoing', 'upcoming', 'past', 'unscheduled'] as TimePhase[]).map(sectionPhase => {
+                  // Khi user filter 1 phase cụ thể → chỉ render section đó
+                  if (phaseFilter !== 'all' && phaseFilter !== sectionPhase) return null
+                  const sectionRooms = filtered.filter(r =>
+                    getTimePhase(r.startTime, r.endTime, nowTick) === sectionPhase
+                  )
+                  if (sectionRooms.length === 0) return null
+
+                  const sectionMeta = sectionPhase === 'ongoing'
+                    ? { label: '🟢 Đang diễn ra', color: '#34d399', desc: 'Cần monitor gấp' }
+                    : sectionPhase === 'upcoming'
+                    ? { label: '🔵 Sắp diễn ra', color: '#60a5fa', desc: 'Sẵn sàng cho thi sắp tới' }
+                    : sectionPhase === 'past'
+                    ? { label: '⚪ Đã kết thúc', color: '#94a3b8', desc: 'Xem kết quả + bảng điểm' }
+                    : { label: '🕒 Chưa đặt lịch', color: '#fbbf24', desc: 'Phòng nháp chưa có thời gian' }
+
+                  return (
+                    <div key={sectionPhase} className="space-y-2">
+                      <div className="flex items-center justify-between px-1 py-1 sticky top-0 z-10"
+                           style={{ background: D.bg }}>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold" style={{ color: sectionMeta.color }}>
+                            {sectionMeta.label}
+                          </h3>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-bold"
+                                style={{ background: sectionMeta.color + '22', color: sectionMeta.color }}>
+                            {sectionRooms.length}
+                          </span>
+                          <span className="text-[10px]" style={{ color: D.muted2 }}>
+                            · {sectionMeta.desc}
+                          </span>
+                        </div>
+                      </div>
+                      {sectionRooms.map(room => {
+                  const phase = getTimePhase(room.startTime, room.endTime, nowTick)
+                  const phaseLabel = getTimePhaseLabel(phase, room.startTime, room.endTime, nowTick)
+                  const phaseStyle =
+                    phase === 'ongoing'  ? { bg: 'rgba(5,150,105,0.18)',   color: '#34d399', icon: Zap } :
+                    phase === 'upcoming' ? { bg: 'rgba(37,99,235,0.18)',   color: '#60a5fa', icon: CalendarClock } :
+                    phase === 'past'     ? { bg: 'rgba(148,163,184,0.18)', color: '#94a3b8', icon: CheckCircle2 } :
+                                           { bg: 'rgba(245,158,11,0.18)',  color: '#fbbf24', icon: AlertTriangle }
+                  const PhaseIcon = phaseStyle.icon
+                  return (
                   <div key={room.id} onClick={() => setSelectedId(room.id)}
                     className="rounded-xl p-4 cursor-pointer transition-all"
                     style={{
-                      border: `1px solid ${selectedId === room.id ? 'rgba(124,58,237,0.6)' : D.border}`,
+                      border: `1px solid ${selectedId === room.id ? 'rgba(124,58,237,0.6)' : (phase === 'ongoing' ? 'rgba(5,150,105,0.35)' : D.border)}`,
                       background: selectedId === room.id ? 'rgba(124,58,237,0.08)' : D.card,
                     }}
                     onMouseEnter={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = 'rgba(124,58,237,0.3)' }}
-                    onMouseLeave={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = D.border }}
+                    onMouseLeave={e => { if (selectedId !== room.id) e.currentTarget.style.borderColor = phase === 'ongoing' ? 'rgba(5,150,105,0.35)' : D.border }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           {room.isPublic
                             ? <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: '#34d399' }} />
                             : <Lock className="w-3.5 h-3.5 shrink-0" style={{ color: '#a78bfa' }} />
                           }
                           <h3 className="font-semibold truncate" style={{ color: D.text }}>{room.name}</h3>
                           <StatusBadge status={room.status} />
+                          {/* Time-phase badge với countdown */}
+                          {phase !== 'unscheduled' && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold"
+                              style={{ background: phaseStyle.bg, color: phaseStyle.color, whiteSpace: 'nowrap' }}>
+                              <PhaseIcon className={`w-2.5 h-2.5 ${phase === 'ongoing' ? 'animate-pulse' : ''}`} />
+                              {phaseLabel}
+                            </span>
+                          )}
                         </div>
+                        {/* Lịch thi (ngày giờ) — hiển thị compact */}
+                        {room.startTime && room.endTime && (
+                          <div className="flex items-center gap-1.5 text-[11px] mb-1" style={{ color: D.muted2 }}>
+                            <CalendarClock className="w-3 h-3" />
+                            <span>
+                              {new Date(room.startTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              {' → '}
+                              {new Date(room.endTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-4 text-xs" style={{ color: D.muted }}>
                           <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {room.duration}p</span>
                           <span className="flex items-center gap-1"><Users className="w-3 h-3" /> {room._count?.participants || 0}</span>
@@ -750,7 +1009,11 @@ export default function OnlineExamRoomPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -766,13 +1029,26 @@ export default function OnlineExamRoomPage() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  { l: "Tổng phòng", v: rooms.length,                              bg: 'rgba(124,58,237,0.2)',  c: '#a78bfa' },
-                  { l: "Đang thi",   v: rooms.filter(r => r.status==="active").length, bg: 'rgba(5,150,105,0.2)',  c: '#34d399' },
-                  { l: "Công khai",  v: rooms.filter(r => r.isPublic).length,       bg: 'rgba(20,184,166,0.2)', c: '#2dd4bf' },
-                  { l: "Bí mật",    v: rooms.filter(r => !r.isPublic).length,       bg: 'rgba(139,92,246,0.2)', c: '#c4b5fd' },
+                  { l: "Tổng phòng",   v: rooms.length,           bg: 'rgba(124,58,237,0.2)',  c: '#a78bfa', click: () => setPhaseFilter('all') },
+                  { l: "Đang diễn ra", v: phaseCounts.ongoing,    bg: 'rgba(5,150,105,0.2)',   c: '#34d399', click: () => setPhaseFilter('ongoing') },
+                  { l: "Sắp diễn ra",  v: phaseCounts.upcoming,   bg: 'rgba(37,99,235,0.2)',   c: '#60a5fa', click: () => setPhaseFilter('upcoming') },
+                  { l: "Đã kết thúc",  v: phaseCounts.past,       bg: 'rgba(148,163,184,0.2)', c: '#94a3b8', click: () => setPhaseFilter('past') },
                 ].map(s => (
-                  <div key={s.l} className="rounded-lg p-3" style={{ background: s.bg }}>
+                  <button key={s.l} onClick={s.click}
+                    className="rounded-lg p-3 text-left hover:brightness-110 transition-all"
+                    style={{ background: s.bg, border: '1px solid transparent' }}>
                     <p className="text-2xl font-black" style={{ color: s.c }}>{s.v}</p>
+                    <p className="text-[10px] font-medium" style={{ color: s.c, opacity: 0.75 }}>{s.l}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: D.border }}>
+                {[
+                  { l: "Công khai",  v: rooms.filter(r => r.isPublic).length,  bg: 'rgba(20,184,166,0.15)', c: '#2dd4bf' },
+                  { l: "Bí mật",    v: rooms.filter(r => !r.isPublic).length, bg: 'rgba(139,92,246,0.15)', c: '#c4b5fd' },
+                ].map(s => (
+                  <div key={s.l} className="rounded-lg p-2.5" style={{ background: s.bg }}>
+                    <p className="text-lg font-bold" style={{ color: s.c }}>{s.v}</p>
                     <p className="text-[10px] font-medium" style={{ color: s.c, opacity: 0.75 }}>{s.l}</p>
                   </div>
                 ))}
@@ -1147,6 +1423,237 @@ export default function OnlineExamRoomPage() {
           </div>{/* /right col */}
         </div>{/* /grid */}
       </div>{/* /main */}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────
+// LeaderboardSection — Bảng vàng thành tích
+// Lấy data từ GET /api/teacher/leaderboard?examId=...
+// Hiển thị: podium top 3 + table top 4-20
+// ──────────────────────────────────────────────────────────────────
+interface LbEntry {
+  rank: number
+  id: string
+  studentName: string
+  studentImage?: string | null
+  score: number
+  percentage: number
+  durationSec: number | null
+  completedAt: string | null
+  examTitle: string
+  examId: string
+  source: 'individual' | 'group'
+}
+
+function LeaderboardSection({
+  exams,
+}: {
+  exams: { id: string; title: string; totalQuestions: number; examType: string }[]
+}) {
+  const [items, setItems] = useState<LbEntry[]>([])
+  const [loading, setLoading] = useState(false)
+  const [filter, setFilter] = useState<string>('')   // '' = tất cả
+  const [collapsed, setCollapsed] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (filter) params.set('examId', filter)
+      params.set('limit', '20')
+      const { data } = await api.get<{ items: LbEntry[] }>(`/teacher/leaderboard?${params.toString()}`)
+      setItems(data.items || [])
+    } catch {
+      setItems([])
+    } finally {
+      setLoading(false)
+    }
+  }, [filter])
+
+  useEffect(() => { load() }, [load])
+
+  const top3 = items.slice(0, 3)
+  const rest = items.slice(3, 20)
+
+  const fmtDur = (s: number | null) => {
+    if (!s) return '—'
+    const m = Math.floor(s / 60)
+    const ss = s % 60
+    if (m === 0) return `${ss}s`
+    return `${m}p${ss > 0 ? ` ${ss}s` : ''}`
+  }
+
+  const rankIcon = (rank: number) => {
+    if (rank === 1) return <Crown className="w-5 h-5" style={{ color: '#fbbf24' }} />
+    if (rank === 2) return <Medal className="w-5 h-5" style={{ color: '#cbd5e1' }} />
+    if (rank === 3) return <Medal className="w-5 h-5" style={{ color: '#fb923c' }} />
+    return <span style={{ color: D.muted, fontSize: 13, fontWeight: 700 }}>#{rank}</span>
+  }
+  const podiumStyle = (rank: number): React.CSSProperties => {
+    if (rank === 1) return {
+      background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.08))',
+      border: '2px solid rgba(251,191,36,0.5)', transform: 'scale(1.05)',
+    }
+    if (rank === 2) return {
+      background: 'linear-gradient(135deg, rgba(203,213,225,0.15), rgba(148,163,184,0.05))',
+      border: '2px solid rgba(203,213,225,0.4)',
+    }
+    return {
+      background: 'linear-gradient(135deg, rgba(251,146,60,0.15), rgba(234,88,12,0.05))',
+      border: '2px solid rgba(251,146,60,0.4)',
+    }
+  }
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{
+      background: 'linear-gradient(180deg, rgba(251,191,36,0.08), transparent)',
+      border: '1px solid rgba(251,191,36,0.25)',
+    }}>
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center justify-between px-5 py-4 cursor-pointer transition-colors hover:bg-white/[0.02]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #fbbf24, #f59e0b)' }}>
+            <Trophy className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-left">
+            <h2 className="font-bold text-base" style={{ color: D.text }}>
+              🏆 Bảng vàng thành tích
+            </h2>
+            <p className="text-xs" style={{ color: D.muted }}>
+              {items.length > 0
+                ? `Top ${items.length} học sinh xuất sắc · Sắp xếp theo điểm + thời gian`
+                : 'Chưa có dữ liệu — học sinh sẽ xuất hiện sau khi nộp bài'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!collapsed && (
+            <select
+              value={filter}
+              onChange={(e) => { e.stopPropagation(); setFilter(e.target.value) }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: D.card2, border: `1px solid ${D.border2}`,
+                color: D.text, padding: '6px 10px', borderRadius: 8,
+                fontSize: 12, minWidth: 180,
+              }}
+            >
+              <option value="">Tất cả đề thi</option>
+              {exams.map(ex => (
+                <option key={ex.id} value={ex.id}>{ex.title}</option>
+              ))}
+            </select>
+          )}
+          {collapsed ? <ChevronDown className="w-4 h-4" style={{ color: D.muted }} /> : <ChevronUp className="w-4 h-4" style={{ color: D.muted }} />}
+        </div>
+      </button>
+
+      {/* Body */}
+      {!collapsed && (
+        <div className="px-5 pb-5">
+          {loading ? (
+            <div className="py-12 text-center" style={{ color: D.muted }}>
+              <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Đang tải bảng vàng…</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-12 text-center" style={{ color: D.muted }}>
+              <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p className="text-sm">Chưa có học sinh nào làm bài. Khi có kết quả, bảng vàng sẽ xuất hiện.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {/* Podium top 3 */}
+              {top3.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  {/* Re-order: rank 2 (left), rank 1 (center, scaled), rank 3 (right) */}
+                  {[top3[1], top3[0], top3[2]].filter(Boolean).map(p => (
+                    <div
+                      key={p.id}
+                      className="rounded-xl p-4 text-center"
+                      style={podiumStyle(p.rank)}
+                    >
+                      <div className="flex justify-center mb-2">{rankIcon(p.rank)}</div>
+                      <div className="text-3xl font-black mb-1" style={{
+                        color: p.rank === 1 ? '#fbbf24' : p.rank === 2 ? '#cbd5e1' : '#fb923c',
+                      }}>
+                        {p.score.toFixed(1)}
+                      </div>
+                      <p className="font-bold text-sm mb-0.5 truncate" style={{ color: D.text }}>
+                        {p.studentName}
+                      </p>
+                      <p className="text-[11px] truncate" style={{ color: D.muted }}>{p.examTitle}</p>
+                      <div className="mt-2 flex items-center justify-center gap-3 text-[11px]" style={{ color: D.muted }}>
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> {fmtDur(p.durationSec)}
+                        </span>
+                        <span>·</span>
+                        <span>{p.source === 'group' ? 'Phòng live' : 'Cá nhân'}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Rest as a table */}
+              {rest.length > 0 && (
+                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.border}` }}>
+                  <div className="grid grid-cols-[36px_1fr_140px_70px_90px_110px] gap-2 px-3 py-2 text-[10px] font-bold uppercase"
+                    style={{ background: D.card2, color: D.muted, letterSpacing: '0.05em' }}>
+                    <div>#</div>
+                    <div>Học sinh</div>
+                    <div>Đề thi</div>
+                    <div className="text-right">Điểm</div>
+                    <div className="text-right">Thời gian</div>
+                    <div className="text-right">Nguồn</div>
+                  </div>
+                  {rest.map(p => (
+                    <div
+                      key={p.id}
+                      className="grid grid-cols-[36px_1fr_140px_70px_90px_110px] gap-2 px-3 py-2 items-center border-t"
+                      style={{ borderColor: D.border, color: D.text }}
+                    >
+                      <div className="text-xs font-bold" style={{ color: D.muted }}>#{p.rank}</div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {p.studentImage ? (
+                          <img src={p.studentImage} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                            {p.studentName.slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="text-sm truncate">{p.studentName}</span>
+                      </div>
+                      <div className="text-xs truncate" style={{ color: D.muted }}>{p.examTitle}</div>
+                      <div className={`text-right text-sm font-bold ${
+                        p.score >= 8 ? 'text-emerald-400' : p.score >= 5 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>
+                        {p.score.toFixed(1)}
+                      </div>
+                      <div className="text-right text-xs" style={{ color: D.muted }}>{fmtDur(p.durationSec)}</div>
+                      <div className="text-right">
+                        <span className="inline-block text-[10px] px-2 py-0.5 rounded-md"
+                          style={{
+                            background: p.source === 'group' ? 'rgba(124,58,237,0.15)' : 'rgba(34,197,94,0.12)',
+                            color: p.source === 'group' ? '#a78bfa' : '#34d399',
+                          }}>
+                          {p.source === 'group' ? 'Phòng live' : 'Cá nhân'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

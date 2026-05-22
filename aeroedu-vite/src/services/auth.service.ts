@@ -26,6 +26,10 @@ export interface RegisterInput {
   name: string
   email: string
   password: string
+  role?: 'STUDENT' | 'TEACHER'
+  /** UI-only sub-type: STUDENT / TEACHER / PARENT. PARENT lưu vào UserProfile
+   *  trên server để bền qua các thiết bị (không chỉ localStorage). */
+  accountType?: 'STUDENT' | 'TEACHER' | 'PARENT'
 }
 
 export interface ForgotPasswordInput {
@@ -45,6 +49,19 @@ interface AuthResponse {
   }
 }
 
+/**
+ * Khi user đã bật 2FA: /auth/login trả về tempToken (5 phút) thay vì accessToken.
+ * UI phải gọi twoFactorService.verifyLogin(tempToken, code) để hoàn tất.
+ */
+interface TwoFactorPendingResponse {
+  require2FA: true
+  tempToken: string
+}
+
+export type LoginResult =
+  | { kind: 'success'; user: User }
+  | { kind: 'require2FA'; tempToken: string }
+
 export const authService = {
   /**
    * Google OAuth — nhận credential (ID token) từ Google GSI
@@ -56,10 +73,15 @@ export const authService = {
     return { user: data.user }
   },
 
-  login: async (input: LoginInput): Promise<{ user: User }> => {
-    const { data } = await api.post<AuthResponse>('/auth/login', input)
-    tokenStore.setAccessToken(data.tokens.accessToken)
-    return { user: data.user }
+  login: async (input: LoginInput): Promise<LoginResult> => {
+    const { data } = await api.post<AuthResponse | TwoFactorPendingResponse>('/auth/login', input)
+    // Server trả require2FA → UI phải nhập mã 2FA + gọi verify-login
+    if ('require2FA' in data && data.require2FA) {
+      return { kind: 'require2FA', tempToken: data.tempToken }
+    }
+    const auth = data as AuthResponse
+    tokenStore.setAccessToken(auth.tokens.accessToken)
+    return { kind: 'success', user: auth.user }
   },
 
   register: async (input: RegisterInput): Promise<{ user: User }> => {

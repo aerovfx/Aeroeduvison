@@ -1,22 +1,44 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download } from 'lucide-react'
+import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download, BookOpenCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
+import AiTemplateGuideModal from '@/components/latex-editor/AiTemplateGuideModal'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
 
 /* ── Dark palette ── */
 const D = {
-  bg: '#0d0e17',
-  card: '#10111e',
-  card2: '#161728',
-  border: '#1e2033',
-  border2: '#2a2b3d',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
 } as const
+
 
 interface LatexProject {
   id: string
@@ -35,6 +57,8 @@ export default function LaTeXEditorPage() {
   const [creating, setCreating] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
   const [aiCreating, setAiCreating] = useState(false)
+  // V2 (2026-05-22): modal hướng dẫn dùng AI tạo văn bản LaTeX
+  const [guideOpen, setGuideOpen] = useState(false)
 
   useEffect(() => { fetchProjects() }, [])
 
@@ -120,6 +144,23 @@ export default function LaTeXEditorPage() {
           <p style={{ color: D.muted, fontSize: 14, margin: '6px 0 0' }}>Soạn thảo, sinh đề bằng AI và xuất PDF chuyên nghiệp</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {/* V2 (2026-05-22): Nút hướng dẫn dùng AI (ChatGPT/Gemini/Claude)
+              để tự tạo văn bản LaTeX với prompt mẫu — đặt ĐẦU TIÊN cho dễ thấy */}
+          <button
+            onClick={() => setGuideOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+              border: 'none', borderRadius: 10,
+              color: '#fff', cursor: 'pointer',
+              fontWeight: 700, fontSize: 14, padding: '10px 20px',
+              boxShadow: '0 0 18px rgba(239,68,68,0.35)',
+            }}
+            title="Hướng dẫn dùng ChatGPT/Gemini/Claude tạo văn bản LaTeX với prompt mẫu"
+          >
+            <BookOpenCheck size={16} />
+            Hướng dẫn AI
+          </button>
           <button
             onClick={() => setAiDialogOpen(true)}
             disabled={aiCreating}
@@ -434,6 +475,12 @@ export default function LaTeXEditorPage() {
           </div>
         </div>
       )}
+
+      {/* V2: Hướng dẫn AI tạo văn bản LaTeX với prompt mẫu */}
+      <AiTemplateGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+      />
     </div>
   )
 }

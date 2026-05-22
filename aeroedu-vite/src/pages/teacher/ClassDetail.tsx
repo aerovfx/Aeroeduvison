@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { api } from '@/services/api'
 import {
   ArrowLeft, UserPlus, Search, Trash2, BarChart3,
   TrendingUp, Award, Users, Loader2, CheckCircle,
-  GraduationCap, X, AlertTriangle,
+  GraduationCap, X, AlertTriangle, Download,
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import * as XLSX from 'xlsx'
 
 // ── Dark palette ───────────────────────────────────────────────
 const D = {
@@ -94,9 +96,10 @@ function AddStudentsModal({ open, onClose, classId, onAdded }: {
   useEffect(() => {
     if (!open) { setSelected([]); setSearch(''); return }
     setLoading(true)
-    fetch('/api/users?role=STUDENT')
-      .then(r => r.json())
-      .then(d => setAll(d.users || d || []))
+    // Bug fix: dùng /users/search có sẵn (api có Bearer auth) thay vì
+    // /api/users?role=STUDENT (endpoint không tồn tại → 503).
+    api.get('/users/search', { params: { q: '@', role: 'STUDENT' } })
+      .then(r => setAll(r.data?.users || []))
       .catch(() => setAll([]))
       .finally(() => setLoading(false))
   }, [open])
@@ -113,16 +116,25 @@ function AddStudentsModal({ open, onClose, classId, onAdded }: {
     if (!selected.length) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentIds: selected }),
+      // Convert User picks → ClassStudent rows qua endpoint import có sẵn
+      // (mỗi User → 1 row với name+email từ thông tin user).
+      const picked = all.filter(u => selected.includes(u.id))
+      await api.post(`/classes/${classId}/students/import`, {
+        students: picked.map((u, i) => ({
+          stt:       i + 1,
+          hoTen:     u.name,
+          maDinhDanh: '',
+          ngaySinh:  '',
+          gioiTinh:  '',
+          // chú ý: BE import handler chấp nhận field email qua row riêng?
+          // hiện tại chỉ name+mssv được lưu. Email bỏ qua, sau dùng /users để link.
+        })),
       })
-      if (!res.ok) throw new Error('Failed')
       toast.success(`Đã thêm ${selected.length} học sinh vào lớp`)
       onAdded()
-    } catch {
-      toast.error('Không thể thêm học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể thêm học sinh')
     } finally { setSaving(false) }
   }
 
@@ -326,14 +338,14 @@ export default function ClassDetailPage() {
   const [removeTarget, setRemoveTarget] = useState<StudentRecord | null>(null)
   const [removing, setRemoving] = useState(false)
 
+  // Bug fix: dùng api (axios + Bearer interceptor) thay vì raw fetch (không có
+  // auth header → 401). Đồng thời BE GET /students giờ trả nested student object.
   const fetchClass = useCallback(async () => {
     if (!classId) return
     setClassLoading(true)
     try {
-      const res = await fetch(`/api/classes/${classId}`)
-      if (!res.ok) throw new Error()
-      const d = await res.json()
-      setClassData(d.class || d)
+      const res = await api.get(`/classes/${classId}`)
+      setClassData(res.data?.class || res.data)
     } catch {
       toast.error('Không thể tải thông tin lớp học')
     } finally { setClassLoading(false) }
@@ -343,10 +355,8 @@ export default function ClassDetailPage() {
     if (!classId) return
     setStudentsLoading(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students`)
-      if (!res.ok) throw new Error()
-      const d = await res.json()
-      setStudents(d.students || [])
+      const res = await api.get(`/classes/${classId}/students`)
+      setStudents(res.data?.students || [])
     } catch {
       setStudents([])
     } finally { setStudentsLoading(false) }
@@ -358,13 +368,13 @@ export default function ClassDetailPage() {
     if (!removeTarget || !classId) return
     setRemoving(true)
     try {
-      const res = await fetch(`/api/classes/${classId}/students/${removeTarget.studentId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
+      await api.delete(`/classes/${classId}/students/${removeTarget.studentId}`)
       toast.success(`Đã xóa ${removeTarget.student.name} khỏi lớp`)
       setRemoveTarget(null)
       fetchStudents()
-    } catch {
-      toast.error('Không thể xóa học sinh')
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không thể xóa học sinh')
     } finally { setRemoving(false) }
   }
 
@@ -372,8 +382,58 @@ export default function ClassDetailPage() {
     !search ||
     s.student.name?.toLowerCase().includes(search.toLowerCase()) ||
     s.student.email?.toLowerCase().includes(search.toLowerCase()) ||
-    s.student.idNumber?.includes(search),
+    s.student.idNumber?.includes(search),  // search by idNumber được, nhưng KHÔNG hiển thị
   )
+
+  // Export danh sách HS ra xlsx — CHỈ trong file export mới có cột "Mã định danh"
+  const handleExport = useCallback(() => {
+    if (!classData || students.length === 0) {
+      toast.error('Không có dữ liệu để xuất')
+      return
+    }
+    const headerRow = [
+      'STT', 'Mã định danh Bộ GD&ĐT', 'Họ và tên', 'Email',
+      'Ngày sinh', 'Giới tính', 'Điểm TB', 'Tỷ lệ tham gia (%)',
+      'XP', 'Trạng thái',
+    ]
+    const dataRows = students.map((s, i) => [
+      i + 1,
+      s.student.idNumber || '',
+      s.student.name || '',
+      s.student.email || '',
+      s.student.dateOfBirth ? new Date(s.student.dateOfBirth).toLocaleDateString('vi-VN') : '',
+      s.student.gender || '',
+      s.averageScore != null ? Number(s.averageScore.toFixed(2)) : '',
+      s.attendanceRate != null ? Math.round(s.attendanceRate) : '',
+      s.totalXP ?? 0,
+      s.status === 'active' ? 'Đang học' : 'Nghỉ',
+    ])
+    const aoa = [
+      [`Danh sách lớp: ${classData.name} — ${classData.grade} — ${classData.schoolYear}`],
+      [`Xuất ngày: ${new Date().toLocaleString('vi-VN')}`],
+      [`⚠ File này chứa MÃ ĐỊNH DANH CÁ NHÂN — vui lòng bảo mật theo Luật ATTT`],
+      [],
+      headerRow,
+      ...dataRows,
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [
+      { wch: 5 }, { wch: 22 }, { wch: 28 }, { wch: 28 }, { wch: 12 },
+      { wch: 10 }, { wch: 10 }, { wch: 18 }, { wch: 8 }, { wch: 14 },
+    ]
+    // Merge tiêu đề + ngày + cảnh báo
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } },
+    ]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Danh sách HS')
+    const safeName = classData.name.replace(/[^\w\d-]+/g, '_')
+    const dateStr = new Date().toISOString().slice(0, 10)
+    XLSX.writeFile(wb, `DanhSach_${safeName}_${dateStr}.xlsx`)
+    toast.success(`Đã xuất ${students.length} học sinh ra Excel`)
+  }, [classData, students])
 
   const activeCount = students.filter(s => s.status === 'active').length
   const avgScore    = avg(students.map(s => s.averageScore))
@@ -432,13 +492,24 @@ export default function ClassDetailPage() {
               </div>
             </div>
           </div>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
-          >
-            <UserPlus className="w-4 h-4" />
-            Thêm học sinh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExport}
+              disabled={students.length === 0}
+              title="Xuất Excel — file export sẽ kèm cột Mã định danh"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              Xuất Excel
+            </button>
+            <button
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" />
+              Thêm học sinh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -523,7 +594,8 @@ export default function ClassDetailPage() {
                     {[
                       { label: 'STT',          cls: 'w-14 text-center' },
                       { label: 'Họ và tên',    cls: '' },
-                      { label: 'Mã định danh', cls: '' },
+                      // Cột "Mã định danh" đã ẨN — chỉ xuất hiện trong file Excel khi
+                      // teacher bấm nút "Xuất Excel" ở header. Tránh lộ PII trong UI.
                       { label: 'Ngày sinh',    cls: '' },
                       { label: 'Giới tính',    cls: '' },
                       { label: 'Điểm TB',      cls: '' },
@@ -554,10 +626,7 @@ export default function ClassDetailPage() {
                         <div style={{ color: D.text }} className="font-semibold whitespace-nowrap">{s.student.name}</div>
                         <div style={{ color: D.muted2 }} className="text-xs">{s.student.email}</div>
                       </td>
-                      {/* Mã định danh */}
-                      <td style={{ color: D.muted }} className="px-4 py-3 font-mono text-sm whitespace-nowrap">
-                        {s.student.idNumber || '—'}
-                      </td>
+                      {/* Mã định danh — ẨN khỏi UI (PII), chỉ trong file Excel export */}
                       {/* Ngày sinh */}
                       <td style={{ color: D.muted }} className="px-4 py-3 text-sm whitespace-nowrap">
                         {fmtDate(s.student.dateOfBirth)}

@@ -1,71 +1,196 @@
-# =============================================
-# inphysic.com — Robots.txt
-# =============================================
-# Allow Google, block aggressive/unwanted bots
-# to reduce server load on Cloud Run demo
+# AeroEduVision — anti-AI-training crawler policy
+# Updated: 2026-05-21
+# Reference: https://platform.openai.com/docs/bots, https://darkvisitors.com
+#
+# Layer-1 of 5 defense (robots.txt advisory only — see HTTP UA middleware
+# in server.cjs for actual enforcement against bots that ignore this file).
 
-# Google — full access
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 5
-
-# Bing — allowed with delay
-User-agent: Bingbot
-Allow: /
-Crawl-delay: 10
-
-# Baidu — block (heavy crawler, not target audience)
-User-agent: Baiduspider
-Disallow: /
-
-# Yandex — block
-User-agent: YandexBot
-Disallow: /
-
-# Semrush — block
-User-agent: SemrushBot
-Disallow: /
-
-# Ahrefs — block
-User-agent: AhrefsBot
-Disallow: /
-
-# MJ12 — block
-User-agent: MJ12bot
-Disallow: /
-
-# DotBot — block
-User-agent: DotBot
-Disallow: /
-
-# PetalBot (Huawei) — block
-User-agent: PetalBot
-Disallow: /
-
-# GPTBot (OpenAI) — block
+# === BLOCK: AI training bots ===
 User-agent: GPTBot
 Disallow: /
 
-# CCBot (Common Crawl) — block
-User-agent: CCBot
+User-agent: ChatGPT-User
 Disallow: /
 
-# ByteSpider (TikTok) — block
+User-agent: OAI-SearchBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: GoogleOther
+Disallow: /
+
+User-agent: PerplexityBot
+Disallow: /
+
+User-agent: Perplexity-User
+Disallow: /
+
 User-agent: Bytespider
 Disallow: /
 
-# All other bots — limited access
-User-agent: *
-Allow: /
-Crawl-delay: 10
-Disallow: /api/
+User-agent: ByteDance
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: FacebookBot
+Disallow: /
+
+User-agent: Meta-ExternalAgent
+Disallow: /
+
+User-agent: Meta-ExternalFetcher
+Disallow: /
+
+User-agent: ImagesiftBot
+Disallow: /
+
+User-agent: img2dataset
+Disallow: /
+
+User-agent: omgili
+Disallow: /
+
+User-agent: omgilibot
+Disallow: /
+
+User-agent: peer39_crawler
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: Webzio-Extended
+Disallow: /
+
+User-agent: YouBot
+Disallow: /
+
+User-agent: Timpibot
+Disallow: /
+
+User-agent: Velen Crawler
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: scrapy
+Disallow: /
+
+User-agent: python-requests
+Disallow: /
+
+User-agent: HeadlessChrome
+Disallow: /
+
+User-agent: PhantomJS
+Disallow: /
+
+User-agent: Selenium
+Disallow: /
+
+User-agent: Puppeteer
+Disallow: /
+
+User-agent: Playwright
+Disallow: /
+
+# === BLOCK: SEO scrapers (heavy load, no value) ===
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# === ALLOW: Real search engines (no AI training) ===
+User-agent: Googlebot
 Disallow: /admin/
-Disallow: /dashboard/
+Disallow: /api/
+Disallow: /auth/
 Disallow: /teacher/
 Disallow: /student/
-Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /profile/
+Disallow: /labs/
 Disallow: /debug-auth/
 Disallow: /clear-session/
+Allow: /
+Allow: /free-courses/
+Allow: /news/
+Allow: /docs/
+Crawl-delay: 5
 
-# Sitemap
+User-agent: Bingbot
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /teacher/
+Disallow: /student/
+Disallow: /dashboard/
+Allow: /
+Crawl-delay: 10
+
+User-agent: DuckDuckBot
+Disallow: /admin/
+Disallow: /api/
+Allow: /
+
+User-agent: Yandex
+Disallow: /admin/
+Disallow: /api/
+Allow: /
+
+# === Default — deny private routes for unknown agents ===
+User-agent: *
+Disallow: /admin/
+Disallow: /api/
+Disallow: /auth/
+Disallow: /teacher/
+Disallow: /student/
+Disallow: /dashboard/
+Disallow: /profile/
+Disallow: /labs/
+Disallow: /debug-auth/
+Disallow: /clear-session/
+Disallow: /honeypot-ai-trap
+Allow: /
+Allow: /free-courses/
+Allow: /news/
+Allow: /docs/
+Crawl-delay: 10
+
 Sitemap: https://inphysic.com/sitemap.xml

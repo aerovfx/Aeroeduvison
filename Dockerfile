@@ -70,6 +70,23 @@ RUN set -eu; \
 FROM node:20-slim AS runner
 WORKDIR /app
 
+# ── Tectonic (LaTeX engine) — single binary ~30MB, lazy-fetch packages từ CTAN.
+# An toàn: nội dung LaTeX của user compile in-house, không gửi ra service ngoài.
+# Cài kèm:
+#   - fontconfig: XeLaTeX cần để tìm font theo NAME (vd "Latin Modern Roman")
+#   - fonts-lmodern + fonts-noto + fonts-noto-cjk: bộ font Unicode đầy đủ
+#     hỗ trợ Vietnamese diacritics (ổ, ố, ự, ỗ...)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates curl xz-utils \
+      fontconfig fonts-lmodern fonts-noto-core && \
+    curl -fsSL "https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%400.15.0/tectonic-0.15.0-x86_64-unknown-linux-musl.tar.gz" \
+      | tar xz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/tectonic && \
+    fc-cache -fv && \
+    apt-get purge -y curl xz-utils && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir -p /var/cache/tectonic
+
 # Copy Express server + lib modules (auth, payment, telegram, fal.ai, email)
 # Built-in Node.js handlers cần các module này — không có sẽ crash startup.
 COPY server.cjs ./
@@ -84,17 +101,38 @@ RUN npm config set fetch-timeout 600000 && \
       bcryptjs \
       jsonwebtoken \
       hash-wasm \
-      pdf-parse \
-      nodemailer
+      pdf-parse@1.1.4 \
+      nodemailer@6 \
+      multer@1 \
+      @google-cloud/storage@7 \
+      otplib@13
 
 # Copy Vite build output
 COPY --from=vite-builder /app/dist ./dist
 
-# Non-root user
+# Non-root user — tạo HOME thực sự để tectonic có chỗ cache.
+# Tectonic 0.15 lookup cache theo $HOME/.cache/Tectonic (Linux convention).
 RUN groupadd --system --gid 1001 appuser && \
-    useradd --system --uid 1001 --gid appuser appuser && \
-    chown -R appuser:appuser /app
+    useradd --system --create-home --home-dir /home/appuser \
+            --uid 1001 --gid appuser appuser && \
+    mkdir -p /home/appuser/.cache/Tectonic && \
+    chown -R appuser:appuser /app /home/appuser /var/cache/tectonic
+
+# Tectonic cache (env var cho V2 commands; HOME-based path cho V1 fallback)
+ENV TECTONIC_CACHE_DIR=/home/appuser/.cache/Tectonic \
+    HOME=/home/appuser
+
 USER appuser
+
+# Prewarm tectonic cache (~5MB packages từ CTAN) — chạy AFTER USER switch
+# để cache đúng thuộc owner appuser. Fail soft: nếu network/CTAN down lúc
+# build thì skip, runtime sẽ lazy-fetch lần đầu (chậm hơn nhưng vẫn work).
+RUN set -eu; \
+    echo '\documentclass{article}\begin{document}prewarm\end{document}' \
+      > /tmp/prewarm.tex && \
+    (tectonic --outdir /tmp /tmp/prewarm.tex 2>&1 || \
+      echo "⚠ prewarm skipped — runtime will lazy-fetch") && \
+    rm -f /tmp/prewarm.tex /tmp/prewarm.pdf /tmp/prewarm.log
 
 EXPOSE 8080
 

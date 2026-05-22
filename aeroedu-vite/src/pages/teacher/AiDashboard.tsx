@@ -1,21 +1,37 @@
 /**
  * AI-Driven Teacher Dashboard
- * Port từ Next.js → Vite
  *
- * Thay thế:
- *   useRouter (next/navigation)  → useNavigate (react-router-dom)
- *   useSession (next-auth)       → useAuthContext
- *   updateButtonHandlers         → inline navigate / toast
+ * v2 — wire to REAL data from /api/teacher/leaderboard.
+ * Trước đây fetch /api/plg/student_1 + /api/xp/analyze/student_1 (3 fake IDs)
+ * vào 2 stub endpoint trả {} → render 3 ô zero "Student student_1". Vô dụng.
+ *
+ * Giờ:
+ *  1. GET /teacher/leaderboard?limit=50 → tất cả attempt của học sinh trên các
+ *     đề thi của giáo viên (có user.id).
+ *  2. Group theo studentId, dedupe, aggregate:
+ *       totalXP        = Σ percentage * 5      (≈500/đề full điểm)
+ *       level          = floor(totalXP / 500) + 1
+ *       averageScore   = mean(percentage)
+ *       capability.*   = derived từ avg + tần suất
+ *       motivation     = số attempt trong 30 ngày (cap 100)
+ *       trends.atRisk  = avg < 50%
+ *       trends.overall = so 3 attempt mới nhất vs 3 đầu
+ *       streak         = số ngày liên tiếp có attempt (rough)
+ *       lastActive     = max(completedAt)
+ *       currentEmotion = derived từ điểm mới nhất
+ *  3. Empty state khi chưa có data thay vì 3 student giả.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Users, Brain, AlertTriangle, Sparkles,
+  Users, Brain, AlertTriangle,
   BarChart3, Heart, Activity,
-  Settings, Search, Bell, Trophy
+  Settings, Search, Bell, Trophy,
 } from 'lucide-react'
 
+import { api } from '@/services/api'
+import { useAuth } from '@/hooks/useAuth'
 import ClassOverview     from '@/components/teacher/ClassOverview'
 import StudentList       from '@/components/teacher/StudentList'
 import AICoTeacherPanel  from '@/components/teacher/AICoTeacherPanel'
@@ -24,11 +40,29 @@ import EmotionTimeline   from '@/components/teacher/EmotionTimeline'
 import QuickActions      from '@/components/teacher/QuickActions'
 
 // ── Types ──────────────────────────────────────────────────────
+interface RosterStudent {
+  id: string
+  userId: string | null
+  name: string
+  email: string
+  avatar: string | null
+  classNames: string[]
+  isLinked: boolean
+}
+
+interface RosterMeta {
+  fromClassStudent: number
+  fromTSL: number
+}
+
 interface StudentWithAnalytics {
   id: string
   name: string
   email: string
   avatar?: string
+  classNames: string[]               // lớp HS đang học (dạy bởi GV)
+  isLinked: boolean                  // có User account đã kết nối hay chưa
+  hasAttempts: boolean               // đã làm bài kiểm tra hay chưa
   totalXP: number
   level: number
   xpSignal: {
@@ -46,67 +80,237 @@ interface StudentWithAnalytics {
   averageScore: number
 }
 
+interface LeaderboardEntry {
+  id: string
+  studentId: string | null
+  studentName: string
+  studentImage?: string | null
+  score: number
+  percentage: number
+  durationSec: number | null
+  completedAt: string | null
+  examTitle: string
+  examId: string | null
+  source: 'individual' | 'group'
+}
+
+// ── Aggregation helpers ────────────────────────────────────────
+function emotionFromScore(pct: number): { emotion: string; intensity: number } {
+  if (pct >= 85) return { emotion: 'happy',      intensity: 0.9 }
+  if (pct >= 70) return { emotion: 'confident',  intensity: 0.75 }
+  if (pct >= 50) return { emotion: 'neutral',    intensity: 0.5 }
+  if (pct >= 30) return { emotion: 'frustrated', intensity: 0.7 }
+  return            { emotion: 'sad',         intensity: 0.85 }
+}
+
+function trendFromAttempts(attemptsAsc: LeaderboardEntry[]): string {
+  if (attemptsAsc.length < 4) return 'stable'
+  const head = attemptsAsc.slice(0, 3).reduce((s, a) => s + a.percentage, 0) / 3
+  const tail = attemptsAsc.slice(-3).reduce((s, a) => s + a.percentage, 0) / 3
+  if (tail > head + 5) return 'improving'
+  if (tail < head - 5) return 'declining'
+  return 'stable'
+}
+
+function streakDays(attemptsAsc: LeaderboardEntry[]): number {
+  // Count distinct calendar days with at least one attempt, descending
+  // streak = số ngày liên tiếp tính từ ngày gần nhất có làm bài
+  const days = new Set(
+    attemptsAsc
+      .map(a => a.completedAt && new Date(a.completedAt).toISOString().slice(0, 10))
+      .filter(Boolean) as string[],
+  )
+  if (days.size === 0) return 0
+  const sorted = Array.from(days).sort().reverse()  // newest first YYYY-MM-DD
+  let streak = 1
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(sorted[i - 1])
+    const cur  = new Date(sorted[i])
+    const dayDiff = Math.round((prev.getTime() - cur.getTime()) / (24 * 3600 * 1000))
+    if (dayDiff === 1) streak++
+    else break
+  }
+  return streak
+}
+
+/** Tạo XP signal cho 1 HS (có hoặc không có attempts).
+ * Khi attempts=[] (HS chưa làm bài) → trả zero state với atRisk=true,
+ * riskFactor="Chưa làm bài kiểm tra nào".
+ */
+function buildAnalyticsForStudent(
+  roster: RosterStudent,
+  attempts: LeaderboardEntry[],
+): StudentWithAnalytics {
+  const sorted = [...attempts].sort((a, b) => {
+    const ta = a.completedAt ? new Date(a.completedAt).getTime() : 0
+    const tb = b.completedAt ? new Date(b.completedAt).getTime() : 0
+    return ta - tb
+  })
+  const hasAttempts = sorted.length > 0
+  const latest = hasAttempts ? sorted[sorted.length - 1] : null
+  const avgPct = hasAttempts ? attempts.reduce((s, a) => s + a.percentage, 0) / attempts.length : 0
+  const totalXP = hasAttempts ? Math.round(attempts.reduce((s, a) => s + a.percentage * 5, 0)) : 0
+  const level = Math.floor(totalXP / 500) + 1
+
+  const now = Date.now()
+  const THIRTY_D = 30 * 24 * 3600 * 1000
+  const last30 = hasAttempts ? attempts.filter(a => {
+    if (!a.completedAt) return false
+    return now - new Date(a.completedAt).getTime() < THIRTY_D
+  }).length : 0
+
+  const motivation = Math.min(100, last30 * 12)
+  const overall = hasAttempts ? trendFromAttempts(sorted) : 'stable'
+  const atRisk = !hasAttempts || avgPct < 50
+  const riskFactors: string[] = []
+  if (!hasAttempts) {
+    riskFactors.push('Chưa làm bài kiểm tra nào')
+    if (!roster.isLinked) riskFactors.push('Chưa kết nối tài khoản')
+  } else {
+    if (avgPct < 50) riskFactors.push('Điểm trung bình dưới 50%')
+    if (last30 === 0) riskFactors.push('Không hoạt động trong 30 ngày')
+    if (overall === 'declining') riskFactors.push('Điểm có xu hướng giảm')
+  }
+
+  const { emotion, intensity } = hasAttempts
+    ? emotionFromScore(latest!.percentage)
+    : { emotion: 'neutral', intensity: 0.3 }
+  const uniqExams = hasAttempts ? new Set(attempts.map(a => a.examId).filter(Boolean)).size : 0
+
+  // Capability scores
+  const accuracyScore  = avgPct
+  const diversityBonus = Math.min(20, uniqExams * 5)
+  const cognitive      = Math.min(100, Math.round(accuracyScore + diversityBonus * 0.3))
+  const metacognitive  = Math.min(100, Math.round(motivation * 0.6 + accuracyScore * 0.4))
+  const behavioral     = Math.min(100, Math.round(streakDays(sorted) * 8 + last30 * 3))
+  const overallScore   = Math.round((cognitive + metacognitive + behavioral) / 3)
+
+  const totalSec = sorted.reduce((s, a) => s + (a.durationSec || 0), 0)
+  const xpPerHour = totalSec > 0 ? Math.round((totalXP / totalSec) * 3600) : 0
+  const optimalPace = xpPerHour > 200 ? 'fast' : xpPerHour > 80 ? 'normal' : 'slow'
+
+  return {
+    id: roster.id,
+    name: roster.name,
+    email: roster.email,
+    avatar: roster.avatar || undefined,
+    classNames: roster.classNames,
+    isLinked: roster.isLinked,
+    hasAttempts,
+    totalXP,
+    level,
+    xpSignal: {
+      capability:    { overallScore, cognitive, metacognitive, behavioral },
+      learningSpeed: { xpPerHour, optimalPace },
+      motivation:    { score: motivation, trend: overall },
+      trends:        { overall, atRisk, riskFactors },
+    },
+    currentEmotion:   emotion,
+    emotionIntensity: intensity,
+    streak:           hasAttempts ? streakDays(sorted) : 0,
+    lastActive:       latest?.completedAt ? new Date(latest.completedAt) : new Date(0),
+    progress:         Math.round(avgPct),
+    completedLessons: uniqExams,
+    averageScore:     Math.round(avgPct),
+  }
+}
+
+/** Match roster student → leaderboard entries.
+ * Primary: studentId == roster.userId (chính xác khi HS đã link account)
+ * Secondary: studentName lowercase match roster.name (best-effort cho HS chỉ
+ * có trong ClassStudent, chưa link)
+ */
+function mergeRosterWithLeaderboard(
+  roster: RosterStudent[],
+  entries: LeaderboardEntry[],
+): StudentWithAnalytics[] {
+  const byUserId = new Map<string, LeaderboardEntry[]>()
+  const byNameLower = new Map<string, LeaderboardEntry[]>()
+  for (const e of entries) {
+    if (e.studentId) {
+      const arr = byUserId.get(e.studentId) || []
+      arr.push(e); byUserId.set(e.studentId, arr)
+    }
+    const nk = String(e.studentName || '').toLowerCase().trim()
+    if (nk) {
+      const arr = byNameLower.get(nk) || []
+      arr.push(e); byNameLower.set(nk, arr)
+    }
+  }
+
+  const out: StudentWithAnalytics[] = roster.map(r => {
+    let attempts: LeaderboardEntry[] = []
+    if (r.userId && byUserId.has(r.userId)) {
+      attempts = byUserId.get(r.userId)!
+    } else {
+      const nk = String(r.name || '').toLowerCase().trim()
+      attempts = byNameLower.get(nk) || []
+    }
+    return buildAnalyticsForStudent(r, attempts)
+  })
+
+  // Sort: at-risk lên đầu, rồi theo XP DESC
+  out.sort((a, b) => {
+    if (a.xpSignal.trends.atRisk !== b.xpSignal.trends.atRisk) {
+      return a.xpSignal.trends.atRisk ? -1 : 1
+    }
+    return b.totalXP - a.totalXP
+  })
+  return out
+}
+
 // ── Component ──────────────────────────────────────────────────
 export default function AiDashboard() {
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   const [students,      setStudents]      = useState<StudentWithAnalytics[]>([])
+  const [rosterMeta,    setRosterMeta]    = useState<RosterMeta | null>(null)
   const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState<string | null>(null)
   const [selectedView,  setSelectedView]  = useState<'overview' | 'heatmap' | 'emotions'>('overview')
   const [timeRange,     setTimeRange]     = useState<'today' | 'week' | 'month'>('week')
   const [searchQuery,   setSearchQuery]   = useState('')
-  const [filterStatus,  setFilterStatus]  = useState<'all' | 'at-risk' | 'excelling'>('all')
+  const [filterStatus,  setFilterStatus]  = useState<'all' | 'at-risk' | 'excelling' | 'no-attempts'>('all')
+  const [filterClass,   setFilterClass]   = useState<string>('')   // '' = tất cả lớp
 
-  useEffect(() => {
-    loadStudentsWithAnalytics()
-  }, [])
+  useEffect(() => { loadStudents() }, [])
 
-  const loadStudentsWithAnalytics = async () => {
+  /** Load 2 nguồn data song song:
+   *  1. Roster HS từ ClassStudent + TSL approved (HS GV quản lý)
+   *  2. Leaderboard top 200 attempts (điểm thật từ exams)
+   * Merge: mỗi HS roster ghép với attempts (by userId hoặc by name).
+   * HS chưa làm bài → vẫn hiển thị với atRisk=true + riskFactor phù hợp.
+   */
+  async function loadStudents() {
     try {
       setLoading(true)
-      const studentIds = ['student_1', 'student_2', 'student_3']
-
-      const studentsData = await Promise.all(
-        studentIds.map(async (id) => {
-          try {
-            const [plgRes, xpRes] = await Promise.all([
-              fetch(`/api/plg/${id}`),
-              fetch(`/api/xp/analyze/${id}`),
-            ])
-            const plgData = await plgRes.json()
-            const xpData  = await xpRes.json()
-
-            return {
-              id,
-              name:  `Student ${id}`,
-              email: `${id}@example.com`,
-              totalXP:        xpData.data?.totalXP   || 0,
-              level:          xpData.data?.level      || 1,
-              xpSignal:       xpData.data             || {},
-              currentEmotion: plgData.data?.currentEmotion?.primary   || 'neutral',
-              emotionIntensity: plgData.data?.currentEmotion?.intensity || 0.5,
-              streak:           plgData.data?.streaks?.current           || 0,
-              lastActive:       new Date(plgData.data?.lastActive || Date.now()),
-              progress:         0,
-              completedLessons: plgData.data?.streaks?.streakHistory?.length || 0,
-              averageScore:     xpData.data?.capability?.recentPerformance    || 0,
-            } as StudentWithAnalytics
-          } catch {
-            return null
-          }
-        })
-      )
-
-      setStudents(studentsData.filter(Boolean) as StudentWithAnalytics[])
-    } catch (err) {
-      console.error('Error loading students:', err)
+      setError(null)
+      const [rosterRes, leaderboardRes] = await Promise.all([
+        api.get<{ students: RosterStudent[]; meta: RosterMeta }>('/teacher/roster')
+          .catch(e => { console.warn('[ai-dashboard:roster]', e?.response?.data || e.message); return { data: { students: [], meta: { fromClassStudent: 0, fromTSL: 0 } } } }),
+        api.get<{ items: LeaderboardEntry[] }>('/teacher/leaderboard?limit=200')
+          .catch(e => { console.warn('[ai-dashboard:leaderboard]', e?.response?.data || e.message); return { data: { items: [] } } }),
+      ])
+      const roster = Array.isArray(rosterRes.data?.students) ? rosterRes.data.students : []
+      const items = Array.isArray(leaderboardRes.data?.items) ? leaderboardRes.data.items : []
+      setRosterMeta(rosterRes.data?.meta || null)
+      setStudents(mergeRosterWithLeaderboard(roster, items))
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { error?: string } } }
+      if (e.response?.status === 401) {
+        setError('Vui lòng đăng nhập với tài khoản giáo viên để xem dashboard.')
+      } else {
+        setError(e.response?.data?.error || 'Không tải được dữ liệu học sinh')
+      }
+      setStudents([])
     } finally {
       setLoading(false)
     }
   }
 
   // ── Derived stats ──────────────────────────────────────────
-  const classStats = {
+  const classStats = useMemo(() => ({
     totalStudents:     students.length,
     averageXP:         students.reduce((s, st) => s + st.totalXP, 0) / (students.length || 1),
     averageCapability: students.reduce((s, st) => s + (st.xpSignal.capability?.overallScore || 0), 0) / (students.length || 1),
@@ -116,14 +320,56 @@ export default function AiDashboard() {
       s.xpSignal.trends?.overall === 'improving' &&
       (s.xpSignal.capability?.overallScore || 0) >= 80
     ).length,
-  }
+  }), [students])
 
-  const filteredStudents = students.filter(student => {
+  const filteredStudents = useMemo(() => students.filter(student => {
     if (searchQuery && !student.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
-    if (filterStatus === 'at-risk'    && !student.xpSignal.trends?.atRisk) return false
-    if (filterStatus === 'excelling'  && student.xpSignal.trends?.overall !== 'improving') return false
+    if (filterStatus === 'at-risk'     && !student.xpSignal.trends?.atRisk) return false
+    if (filterStatus === 'excelling'   && !(student.xpSignal.trends?.overall === 'improving' && (student.xpSignal.capability?.overallScore || 0) >= 80)) return false
+    if (filterStatus === 'no-attempts' && student.hasAttempts) return false
+    // Filter theo lớp: '' = tất cả; có giá trị → chỉ HS trong lớp đó
+    if (filterClass && !student.classNames.includes(filterClass)) return false
     return true
-  })
+  }), [students, searchQuery, filterStatus, filterClass])
+
+  const studentsNoAttempts = students.filter(s => !s.hasAttempts).length
+
+  /**
+   * Aggregate students theo lớp (classNames có thể nhiều — 1 HS ở nhiều lớp).
+   * Mỗi class card: tổng HS + avg score + at-risk count + excelling count.
+   * Sort theo studentCount DESC để lớp đông hiện trước.
+   */
+  const classGroups = useMemo(() => {
+    const map = new Map<string, {
+      name: string
+      students: StudentWithAnalytics[]
+      atRiskCount: number
+      excellingCount: number
+      avgScore: number
+      noAttemptsCount: number
+    }>()
+    for (const s of students) {
+      // HS có thể thuộc nhiều class (Toán + Lý 11A1)
+      const names = s.classNames.length ? s.classNames : ['(Chưa phân lớp)']
+      for (const cn of names) {
+        if (!map.has(cn)) {
+          map.set(cn, { name: cn, students: [], atRiskCount: 0, excellingCount: 0, avgScore: 0, noAttemptsCount: 0 })
+        }
+        const g = map.get(cn)!
+        g.students.push(s)
+        if (s.xpSignal.trends?.atRisk) g.atRiskCount++
+        if (s.xpSignal.trends?.overall === 'improving' && (s.xpSignal.capability?.overallScore || 0) >= 80) g.excellingCount++
+        if (!s.hasAttempts) g.noAttemptsCount++
+      }
+    }
+    // Tính avg score sau khi đã tích lũy
+    for (const g of map.values()) {
+      g.avgScore = Math.round(
+        g.students.reduce((s, st) => s + (st.xpSignal.capability?.overallScore || 0), 0) / (g.students.length || 1)
+      )
+    }
+    return Array.from(map.values()).sort((a, b) => b.students.length - a.students.length)
+  }, [students])
 
   // ── Loading state ──────────────────────────────────────────
   if (loading) {
@@ -131,7 +377,7 @@ export default function AiDashboard() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-600">Đang tải dữ liệu học sinh...</p>
+          <p className="text-gray-600">Đang phân tích dữ liệu học sinh...</p>
         </div>
       </div>
     )
@@ -152,7 +398,9 @@ export default function AiDashboard() {
                 <Brain className="w-6 h-6 mr-2 text-purple-600" />
                 AI Teacher Dashboard
               </h1>
-              <p className="text-sm text-gray-600">Lớp 12A1 - Toán học</p>
+              <p className="text-sm text-gray-600">
+                {user?.name ? `${user.name} — ` : ''}{students.length} học sinh đang được theo dõi
+              </p>
             </div>
 
             {/* Time range */}
@@ -174,7 +422,11 @@ export default function AiDashboard() {
 
             {/* Action icons */}
             <div className="flex items-center space-x-3">
-              <button className="p-2 hover:bg-gray-100 rounded-lg relative">
+              <button
+                onClick={loadStudents}
+                title="Tải lại dữ liệu"
+                className="p-2 hover:bg-gray-100 rounded-lg relative"
+              >
                 <Bell className="w-5 h-5 text-gray-600" />
                 {classStats.atRiskCount > 0 && (
                   <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
@@ -210,6 +462,7 @@ export default function AiDashboard() {
               <option value="all">Tất cả ({students.length})</option>
               <option value="at-risk">Cần hỗ trợ ({classStats.atRiskCount})</option>
               <option value="excelling">Xuất sắc ({classStats.excellingCount})</option>
+              <option value="no-attempts">Chưa làm bài ({studentsNoAttempts})</option>
             </select>
 
             <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
@@ -233,7 +486,142 @@ export default function AiDashboard() {
         </div>
       </div>
 
+      {/* ── Data source banner ─────────────────────────────── */}
+      {rosterMeta && students.length > 0 && (
+        <div className="max-w-7xl mx-auto px-6 pt-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800 text-xs flex items-center gap-2">
+            <Brain className="w-4 h-4 flex-shrink-0" />
+            <span>
+              Đồng bộ dữ liệu thật từ <b>{rosterMeta.fromClassStudent}</b> HS trong lớp bạn quản lý
+              {rosterMeta.fromTSL > 0 && <> + <b>{rosterMeta.fromTSL}</b> HS đã kết nối tài khoản</>}
+              {studentsNoAttempts > 0 && <> · <b>{studentsNoAttempts}</b> HS chưa làm bài kiểm tra nào</>}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── LỚP HỌC tôi quản lí ─────────────────────────────────
+          Cards mô tả từng lớp: tổng HS + avg score + at-risk + excelling.
+          Click 1 card → filter danh sách HS theo lớp đó. */}
+      {classGroups.length > 0 && (
+        <div className="max-w-7xl mx-auto px-6 pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold text-gray-800 inline-flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              Lớp tôi quản lí ({classGroups.length})
+            </h2>
+            {filterClass && (
+              <button
+                onClick={() => setFilterClass('')}
+                className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+              >
+                ✕ Bỏ lọc lớp
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
+            {classGroups.map(cls => {
+              const active = filterClass === cls.name
+              const avgColor = cls.avgScore >= 70 ? 'text-emerald-600' : cls.avgScore >= 50 ? 'text-amber-600' : 'text-rose-600'
+              return (
+                <button
+                  key={cls.name}
+                  onClick={() => setFilterClass(active ? '' : cls.name)}
+                  style={{ touchAction: 'manipulation' }}
+                  className={`text-left p-3 rounded-xl border-2 transition-all hover:scale-[1.02] ${
+                    active
+                      ? 'bg-purple-50 border-purple-500 shadow-md ring-2 ring-purple-200'
+                      : 'bg-white border-gray-200 hover:border-purple-300 hover:shadow'
+                  }`}
+                >
+                  <div className="flex items-start gap-1.5 mb-1.5">
+                    <span className="text-base">📚</span>
+                    <h3 className="text-xs font-bold text-gray-800 leading-tight line-clamp-2 flex-1">
+                      {cls.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-baseline gap-1 mb-1">
+                    <span className={`text-2xl font-bold ${avgColor}`}>{cls.avgScore}</span>
+                    <span className="text-[10px] text-gray-500">điểm TB</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    <div className="text-gray-600">
+                      <div className="font-bold text-gray-800">{cls.students.length}</div>
+                      <div>HS</div>
+                    </div>
+                    {cls.atRiskCount > 0 && (
+                      <div className="text-rose-600">
+                        <div className="font-bold">{cls.atRiskCount}</div>
+                        <div>cảnh báo</div>
+                      </div>
+                    )}
+                    {cls.excellingCount > 0 && (
+                      <div className="text-emerald-600">
+                        <div className="font-bold">{cls.excellingCount}</div>
+                        <div>xuất sắc</div>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+          {filterClass && (
+            <div className="mt-3 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-800 inline-flex items-center gap-1.5">
+              🎯 Đang xem: <strong>{filterClass}</strong>
+              <span className="text-purple-600">— {filteredStudents.length} HS</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Error banner ─────────────────────────────────────── */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-6 pt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm flex items-center justify-between">
+            <span>⚠️ {error}</span>
+            <button
+              onClick={loadStudents}
+              className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-xs font-medium"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty state ─────────────────────────────────────── */}
+      {!error && students.length === 0 && (
+        <div className="max-w-3xl mx-auto px-6 py-16 text-center">
+          <div className="w-20 h-20 mx-auto rounded-full bg-purple-100 flex items-center justify-center mb-4">
+            <Brain className="w-10 h-10 text-purple-600" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Chưa có dữ liệu học sinh để phân tích
+          </h2>
+          <p className="text-gray-600 max-w-md mx-auto mb-6">
+            Dashboard sẽ hiển thị phân tích AI khi có học sinh hoàn thành ít nhất một bài thi
+            của bạn (cá nhân hoặc qua phòng thi live).
+          </p>
+          <div className="flex items-center justify-center space-x-3">
+            <button
+              onClick={() => navigate('/teacher/exams')}
+              className="px-5 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+            >
+              Xem đề thi của tôi
+            </button>
+            <button
+              onClick={() => navigate('/teacher/online-exam-room')}
+              className="px-5 py-2.5 bg-white text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 font-medium"
+            >
+              Tạo phòng thi mới
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Main Content ─────────────────────────────────────── */}
+      {students.length > 0 && (
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="grid grid-cols-12 gap-6">
 
@@ -243,7 +631,7 @@ export default function AiDashboard() {
             <div className="grid grid-cols-4 gap-4">
               {[
                 { icon: <Users        className="w-8 h-8 text-blue-500" />,   value: classStats.totalStudents,                    label: 'Học sinh',      color: 'text-gray-900'   },
-                { icon: <Trophy       className="w-8 h-8 text-yellow-500" />, value: Math.round(classStats.averageXP),             label: 'Trung bình XP', color: 'text-gray-900'   },
+                { icon: <Trophy       className="w-8 h-8 text-yellow-500" />, value: Math.round(classStats.averageXP),             label: 'XP trung bình', color: 'text-gray-900'   },
                 { icon: <Brain        className="w-8 h-8 text-purple-500" />, value: `${Math.round(classStats.averageCapability)}%`, label: 'Năng lực TB',  color: 'text-gray-900'   },
                 {
                   icon:  <AlertTriangle className={`w-8 h-8 ${classStats.atRiskCount > 0 ? 'text-red-500' : 'text-green-500'}`} />,
@@ -285,6 +673,7 @@ export default function AiDashboard() {
 
         </div>
       </div>
+      )}
     </div>
   )
 }

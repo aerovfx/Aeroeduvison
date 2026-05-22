@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { api } from '@/services/api'
 import {
   Upload, Plus, Search, FileText, Grid3x3, Eye, Edit, Trash2,
   Copy, Loader2, CheckCircle2, XCircle, AlertCircle,
@@ -9,17 +10,36 @@ import toast from 'react-hot-toast'
 
 // ─── Dark palette ────────────────────────────────────────────────────────────
 const D = {
-  bg:      '#0d0e17',
-  card:    '#10111e',
-  card2:   '#161728',
-  border:  '#1e2033',
-  border2: '#2a2b3d',
-  text:    '#f1f5f9',
-  muted:   '#94a3b8',
-  muted2:  '#64748b',
-  purple:  '#9333ea',
-  purpleHover: '#7e22ce',
-}
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  wall:        'var(--td-wall)',
+  topbar:      'var(--td-topbar)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  divider:     'var(--td-divider)',
+  grid:        'var(--td-grid)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  muted2:      'var(--td-muted2)',
+  purple:      'var(--td-purple)',
+  purpleL:     'var(--td-purple-l)',
+  purpleHover: 'var(--td-purple-hover)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  rose:        'var(--td-rose)',
+  blue:        'var(--td-blue)',
+  pink:        'var(--td-pink)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+  greenA:  (a: number) => `rgba(var(--td-green-rgb), ${a})`,
+  redA:    (a: number) => `rgba(var(--td-red-rgb), ${a})`,
+  cyanA:   (a: number) => `rgba(var(--td-cyan-rgb), ${a})`,
+  blueA:   (a: number) => `rgba(var(--td-blue-rgb), ${a})`,
+} as const
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type MatrixStatus = 'Tất cả' | 'Hàng đợi' | 'Đang xử lý' | 'Hoàn tất' | 'Lỗi'
@@ -95,9 +115,8 @@ function DigitizeModal({ onClose, onSuccess }: DigitizeModalProps) {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch('/api/exam-matrices/digitize', { method: 'POST', body: fd })
-      if (!res.ok) throw new Error((await res.json()).message || 'Upload thất bại')
-      const data = await res.json()
+      const res = await api.post('/exam-matrices/digitize', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      const data = res.data
       toast.success('Đã tải lên. Hệ thống đang trích xuất nội dung...')
       handleRemove()
       onSuccess()
@@ -236,10 +255,8 @@ function GenerateExamModal({ matrixId, matrixName, onClose }: GenerateExamModalP
     const load = async () => {
       try {
         setPreviewLoading(true)
-        const res = await fetch(`/api/exams/generate-from-matrix?matrixId=${matrixId}`)
-        if (!res.ok) throw new Error()
-        const data = await res.json()
-        if (data.success) setPreviewData(data.data)
+        const res = await api.get(`/exams/generate-from-matrix?matrixId=${matrixId}`)
+        if (res.data?.success) setPreviewData(res.data.data)
       } catch { toast.error('Không thể tải preview') }
       finally { setPreviewLoading(false) }
     }
@@ -250,44 +267,29 @@ function GenerateExamModal({ matrixId, matrixName, onClose }: GenerateExamModalP
     if (!title.trim()) { toast.error('Vui lòng nhập tên đề thi'); return }
     setGenerating(true)
     try {
-      const res = await fetch('/api/exams/generate-from-matrix', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matrixId, title, description, useAIForMissing: false }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error?.message || err.error || 'Không thể tạo đề thi')
-      }
-      const data = await res.json()
+      const res = await api.post('/exams/generate-from-matrix', { matrixId, title, description, useAIForMissing: false })
+      const data = res.data
       if (data.success && data.data) {
         toast.success('Đã tạo đề thi từ ma trận!')
         onClose()
         if (data.data.examId && window.confirm('Bạn có muốn mở Soạn LaTeX với đề vừa tạo không?')) {
           try {
-            const r = await fetch('/api/latex-projects/export-from-exam', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ examId: data.data.examId }),
-            })
-            if (r.ok) { const d = await r.json(); navigate(`/teacher/latex-documents/${d.id}`); return }
+            const r = await api.post('/latex-projects/export-from-exam', { examId: data.data.examId })
+            if (r.data?.id) { navigate(`/teacher/latex-documents/${r.data.id}`); return }
           } catch {}
         }
         navigate('/teacher/exams')
       }
     } catch (e: any) {
-      toast.error(e.message || 'Không thể tạo đề thi')
+      toast.error(e?.response?.data?.error?.message || e?.response?.data?.error || e.message || 'Không thể tạo đề thi')
     } finally { setGenerating(false) }
   }
 
   const handleExportLatex = async () => {
     setExportingLatex(true)
     try {
-      const res = await fetch('/api/latex-projects/export-from-matrix', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ matrixId }),
-      })
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Xuất thất bại')
-      const data = await res.json()
+      const res = await api.post('/latex-projects/export-from-matrix', { matrixId })
+      const data = res.data
       toast.success('Đã tạo tài liệu LaTeX')
       onClose()
       navigate(`/teacher/latex-documents/${data.id}`)
@@ -497,10 +499,8 @@ export default function ExamMatrixPage() {
       const params = new URLSearchParams()
       if (selectedStatus !== 'Tất cả') params.append('status', selectedStatus)
       if (examTypeFilter !== 'Tất cả loại đề') params.append('examType', examTypeFilter)
-      const res = await fetch(`/api/exam-matrices?${params}`)
-      if (!res.ok) throw new Error('Không thể tải danh sách ma trận')
-      const data = await res.json()
-      setMatrices(data.matrices || [])
+      const res = await api.get(`/exam-matrices?${params}`)
+      setMatrices(res.data?.matrices || [])
     } catch (e: any) {
       toast.error(e.message || 'Không thể tải danh sách ma trận')
     } finally {
@@ -514,7 +514,7 @@ export default function ExamMatrixPage() {
     if (!deleteDialog) return
     setDeleting(true)
     try {
-      await fetch(`/api/exam-matrices/${deleteDialog}`, { method: 'DELETE' })
+      await api.delete(`/exam-matrices/${deleteDialog}`)
       toast.success('Đã xóa ma trận')
       if (selectedId === deleteDialog) setSelectedId(null)
       setDeleteDialog(null)
@@ -528,8 +528,7 @@ export default function ExamMatrixPage() {
 
   const handleDuplicate = async (id: string) => {
     try {
-      const res = await fetch(`/api/exam-matrices/${id}/duplicate`, { method: 'POST' })
-      if (!res.ok) throw new Error()
+      await api.post(`/exam-matrices/${id}/duplicate`)
       toast.success('Đã nhân bản ma trận')
       fetchMatrices()
     } catch {

@@ -31,7 +31,7 @@ export interface ThemeContextType {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'themeSettings';
-const DEFAULT_SETTINGS: ThemeSettings = { mode: 'system' };
+const DEFAULT_SETTINGS: ThemeSettings = { mode: 'dark' };
 
 function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   if (mode === 'system') {

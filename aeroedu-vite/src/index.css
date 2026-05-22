@@ -4,6 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🌞 LIGHT MODE GLOBAL — mobile-first, high contrast, large text.
+ * Import SAU @tailwind utilities để có thể override với specificity
+ * `html:not(.dark) .xxx`. Xem file để biết 20 rule sets. */
+@import './styles/light-mode.css';
+
+/* 📱 MOBILE RWD GLOBAL — Responsive Web Design fixes platform-wide.
+ * Touch targets, iOS no-zoom inputs, safe-area-inset, modal fullscreen
+ * mobile, table horizontal scroll, grid stack ≤640px, etc. */
+@import './styles/mobile.css';
+
 /* ============================================================
  * AI NATIVE DESIGN SYSTEM — globals.css
  * Light: flat white cards, bg-slate-50, pill tabs, purple accent
@@ -17,20 +27,22 @@
 :root {
   /* Nền sáng + chữ đậm hơn để đạt tương phản tốt (WCAG) */
   --background:           210 40% 98%;
-  --foreground:           222 47% 8%;
+  --foreground:           222 47% 4%;
   --card:                 0 0% 100%;
-  --card-foreground:      222 47% 8%;
+  --card-foreground:      222 47% 4%;
   --popover:              0 0% 100%;
-  --popover-foreground:   222 47% 8%;
+  --popover-foreground:   222 47% 4%;
   --primary:              262 83% 58%;
   --primary-foreground:   210 40% 98%;
   --secondary:            210 40% 96%;
-  --secondary-foreground: 222 47% 8%;
+  --secondary-foreground: 222 47% 4%;
   --muted:                210 40% 96%;
-  /* Phụ đề: đậm hơn (trước ~47% L → ~36%) so với nền trắng/card */
-  --muted-foreground:     222 14% 36%;
+  /* Phụ đề: đậm hơn nữa (2026-05-19 v3: 26% → 18% L = slate-800) —
+     user vẫn report "chữ ban ngày chưa rõ" lần 2. Mục tiêu contrast
+     ≥ 10:1 (well above WCAG AAA 7:1) trên nền trắng cho ALL text. */
+  --muted-foreground:     222 18% 18%;
   --accent:               210 40% 96%;
-  --accent-foreground:    222 47% 8%;
+  --accent-foreground:    222 47% 4%;
   --destructive:          0 84% 60%;
   --destructive-foreground: 210 40% 98%;
   --success:              142 76% 36%;
@@ -65,7 +77,7 @@
   --ai-accent:            #7c3aed;
   --ai-accent-hover:      #6d28d9;
   --ai-divider:           #e2e8f0;
-  --ai-muted-text:        #52525b;
+  --ai-muted-text:        #1f2937;  /* 2026-05-19 v3: zinc-700 → slate-800 — chữ ban ngày cần đậm hơn */
 
   /* Light-mode glass & gradient for .neu-container / glass-panel (override neumorphic dark-first) */
   --glass-bg:             rgba(0,0,0,0.03);
@@ -168,6 +180,51 @@ body {
 ::selection {
   background: hsl(var(--primary) / 0.20);
   color: hsl(var(--foreground));
+}
+
+/* ============================================================
+ * CONTENT PROTECTION — bảo vệ bản quyền cho khoá học/bài học
+ * Áp dụng .protected-content cho element bao bọc nội dung nhạy cảm
+ * → không cho copy/select/print/save
+ * ============================================================ */
+.protected-content {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.protected-content img,
+.protected-content video {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  pointer-events: auto;
+}
+.protected-content input,
+.protected-content textarea,
+.protected-content [contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+}
+/* Khi in (Ctrl+P) → trang trắng + warning thay vì content thực */
+@media print {
+  body { visibility: hidden !important; }
+  body::before {
+    content: '⚠ Tài liệu này được bảo vệ bản quyền · Không được in/lưu trữ · inphysic.com';
+    visibility: visible;
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 20px;
+    color: #cc0000;
+    text-align: center;
+    width: 80%;
+  }
 }
 
 /* ============================================================
@@ -407,6 +464,110 @@ main  { contain: layout; }
 /* ============================================================
  * DARK MODE OVERRIDES — all as  .dark .selector {}
  * ============================================================ */
+
+/* ── Form inputs (text/email/password/number/date/.../select/textarea) ──
+ * Browser default cho input là white background — invisible trong dark mode.
+ * Override: dark surface + light text + viền mờ. Chỉ apply cho input nhập
+ * dữ liệu, KHÔNG cho checkbox/radio/range/file/color/submit/button/reset
+ * (những loại có UI riêng).
+ * ─────────────────────────────────────────────────────────────── */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]),
+.dark textarea,
+.dark select {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color-scheme: dark;
+}
+
+/* Placeholder dim hơn để dễ phân biệt với text user nhập */
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: rgba(255, 255, 255, 0.32) !important;
+  opacity: 1;
+}
+
+/* Focus state — accent purple ring + bg sáng hơn nhẹ */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]):focus,
+.dark textarea:focus,
+.dark select:focus {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  border-color: hsl(262 83% 58%) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px hsl(262 83% 58% / 0.15) !important;
+}
+
+/* Disabled state — mờ */
+.dark input:disabled,
+.dark textarea:disabled,
+.dark select:disabled {
+  background-color: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.30) !important;
+  cursor: not-allowed;
+}
+
+/* Select <option> — browser dùng system colors → ép dark cho dropdown list */
+.dark select option,
+.dark select optgroup {
+  background-color: #1e293b !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+/* Autofill background fix (Chrome/Safari override) */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: rgba(255, 255, 255, 0.92) !important;
+  -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+  caret-color: rgba(255, 255, 255, 0.92) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Native date picker icon trắng cho dễ thấy */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="month"]::-webkit-calendar-picker-indicator,
+.dark input[type="week"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(0.85);
+  cursor: pointer;
+}
+
+/* Search input clear button */
+.dark input[type="search"]::-webkit-search-cancel-button {
+  filter: invert(1) brightness(0.7);
+  cursor: pointer;
+}
+
+/* Number input spinner buttons */
+.dark input[type="number"]::-webkit-inner-spin-button,
+.dark input[type="number"]::-webkit-outer-spin-button {
+  filter: invert(1) brightness(0.7);
+}
+
+/* Override khi explicit class bg-white được đặt trên input
+ * (existing .dark .bg-white = 0.02 alpha quá mờ cho input cần contrast hơn) */
+.dark input.bg-white,
+.dark textarea.bg-white,
+.dark select.bg-white {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Override các text color phổ biến đặt trên input/textarea trong light theme
+ * (text-gray-700/800/900) — ép sang light cho dark mode */
+.dark input.text-gray-700,
+.dark input.text-gray-800,
+.dark input.text-gray-900,
+.dark textarea.text-gray-700,
+.dark textarea.text-gray-800,
+.dark textarea.text-gray-900,
+.dark select.text-gray-700,
+.dark select.text-gray-800,
+.dark select.text-gray-900 {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
 
 /* ── Backgrounds ──────────────────────────────────────────── */
 .dark .bg-white             { background: rgba(255,255,255,0.02) !important; }
@@ -690,17 +851,38 @@ main  { contain: layout; }
  * as a dark-first design. These overrides flip them for light.
  * ============================================================ */
 
-/* ── Text: white opacity → foreground opacity ──────────────── */
-html:not(.dark) .text-white\/90  { color: hsl(var(--foreground) / 0.90) !important; }
-html:not(.dark) .text-white\/80  { color: hsl(var(--foreground) / 0.80) !important; }
-html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.70) !important; }
-html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.40) !important; }
-html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.35) !important; }
-html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.30) !important; }
-html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.25) !important; }
-html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.15) !important; }
+/* ── Text: white opacity → foreground opacity ────────────────
+ * 2026-05-19 RETUNED v2 — pages dùng text-white/40, /30, /25 cho meta
+ * text (xs, font-weight 500). Trên dark bg, opacity 30-40% white vẫn
+ * readable. Nhưng trên light bg, opacity 30-40% dark text = nearly
+ * invisible (light gray on white). Bump opacity của low-end variants
+ * để duy trì contrast ≥ 4.5:1 WCAG AA.
+ *
+ * Lý do bất đối xứng: low-opacity DARK text + WHITE bg = very low
+ * contrast (color blends fast với bg); low-opacity WHITE text + DARK
+ * bg vẫn readable vì human eye nhạy với điểm sáng. */
+/* 2026-05-19 v3: BUMP MẠNH thêm 1 lượt — user vẫn report "chữ ban
+ * ngày cần đậm hơn" sau v2. Strategy: high-end opacity = SOLID (1.0)
+ * vì text-white/70..95 đáng lẽ là body text; mid 50-60 = 0.95..0.92;
+ * low 10-40 = 0.85..0.70 (meta text vẫn cần readable, không faint). */
+html:not(.dark) .text-white\/95  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/90  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/85  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/80  { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-white\/75  { color: hsl(var(--foreground) / 0.98) !important; }
+html:not(.dark) .text-white\/70  { color: hsl(var(--foreground) / 0.96) !important; }
+html:not(.dark) .text-white\/65  { color: hsl(var(--foreground) / 0.94) !important; }
+html:not(.dark) .text-white\/60  { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-white\/55  { color: hsl(var(--foreground) / 0.90) !important; }
+html:not(.dark) .text-white\/50  { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-white\/45  { color: hsl(var(--foreground) / 0.85) !important; }
+html:not(.dark) .text-white\/40  { color: hsl(var(--foreground) / 0.82) !important; }
+html:not(.dark) .text-white\/35  { color: hsl(var(--foreground) / 0.78) !important; }
+html:not(.dark) .text-white\/30  { color: hsl(var(--foreground) / 0.75) !important; }
+html:not(.dark) .text-white\/25  { color: hsl(var(--foreground) / 0.72) !important; }
+html:not(.dark) .text-white\/20  { color: hsl(var(--foreground) / 0.68) !important; }
+html:not(.dark) .text-white\/15  { color: hsl(var(--foreground) / 0.62) !important; }
+html:not(.dark) .text-white\/10  { color: hsl(var(--foreground) / 0.55) !important; }
 /* NOTE: plain .text-white is NOT overridden — it is widely used on colored
    backgrounds (buttons, badges, gradient CTAs) where dark text would be wrong.
    Only text-white/XX opacity variants (common in dark-first glass panels)
@@ -741,19 +923,150 @@ html:not(.dark) circle[stroke="rgba(255,255,255,0.04)"] { stroke: rgba(0,0,0,0.0
 /* ── Loader border overrides ───────────────────────────────── */
 html:not(.dark) .border-white\/\[0\.06\] { border-color: rgba(0,0,0,0.08) !important; }
 
-/* ── Light gray/slate text → dark foreground ─────────────────
- * These are used across 110+ files as dark-theme text. In light
- * mode they become invisible on white backgrounds.             */
-html:not(.dark) .text-gray-50   { color: hsl(var(--foreground) / 0.92) !important; }
-html:not(.dark) .text-gray-100  { color: hsl(var(--foreground) / 0.88) !important; }
-html:not(.dark) .text-gray-200  { color: hsl(var(--foreground) / 0.75) !important; }
-html:not(.dark) .text-gray-300  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-gray-400  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-slate-50  { color: hsl(var(--foreground) / 0.92) !important; }
-html:not(.dark) .text-slate-100 { color: hsl(var(--foreground) / 0.88) !important; }
-html:not(.dark) .text-slate-200 { color: hsl(var(--foreground) / 0.75) !important; }
-html:not(.dark) .text-slate-300 { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-slate-400 { color: hsl(var(--foreground) / 0.50) !important; }
+/* ──────────────────────────────────────────────────────────────
+ * TEACHER DASHBOARD PALETTE (--td-*)
+ * Auto-flip light/dark cho 14 teacher pages dùng module-level
+ * `const D = { bg: 'var(--td-bg)', ... }`. Toàn bộ inline styles
+ * như `<div style={{ background: D.bg }}>` tự đổi màu khi user
+ * toggle theme — KHÔNG cần React re-render hay JS state.
+ *
+ * Alpha helpers (D.white, D.purpleA, ...) dùng modern syntax:
+ *   `rgba(var(--td-overlay-rgb), 0.5)` với --td-overlay-rgb là
+ *   "255, 255, 255" (dark) hoặc "0, 0, 0" (light).
+ *
+ * Pages: Dashboard, EmotionMap, ExamMatrix, Exams, OnlineExamRoom,
+ *        ExamGrading, ExamReports, DocumentDigitization, LaTeXEditor,
+ *        Transcript, LearningPathBuilder, CameraManagement,
+ *        EnvironmentMonitoring, Assignments
+ * ────────────────────────────────────────────────────────────── */
+
+/* LIGHT mode (default) */
+:root {
+  --td-bg:           #f8fafc;       /* slate-50 — page bg */
+  --td-card:         #ffffff;       /* white card */
+  --td-card2:        #f1f5f9;       /* slate-100 — elevated */
+  --td-wall:         #e2e8f0;       /* slate-200 — camera wall */
+  --td-topbar:       #ffffff;
+  --td-border:       rgba(0,0,0,0.08);
+  --td-border2:      rgba(0,0,0,0.14);
+  --td-divider:      rgba(0,0,0,0.08);
+  --td-grid:         #e2e8f0;       /* recharts grid */
+
+  --td-text:         #0f172a;       /* slate-900 — AAA */
+  --td-muted:        #475569;       /* slate-600 — AA+ */
+  --td-muted2:       #64748b;       /* slate-500 */
+
+  /* Accents — đậm hơn cho contrast trên trắng */
+  --td-purple:       #7c3aed;
+  --td-purple-l:     #9333ea;
+  --td-purple-hover: #6d28d9;
+  --td-cyan:         #0891b2;       /* cyan-600 */
+  --td-green:        #059669;       /* emerald-600 */
+  --td-amber:        #d97706;       /* amber-600 */
+  --td-red:          #dc2626;       /* red-600 */
+  --td-rose:         #e11d48;       /* rose-600 */
+  --td-blue:         #2563eb;       /* blue-600 */
+  --td-pink:         #db2777;       /* pink-600 */
+
+  /* RGB tuples cho rgba(var(--td-X-rgb), alpha) */
+  --td-overlay-rgb:  0, 0, 0;       /* D.white(a) → trên light = đen overlay */
+  --td-purple-rgb:   124, 58, 237;
+  --td-green-rgb:    5, 150, 105;
+  --td-red-rgb:      220, 38, 38;
+  --td-cyan-rgb:     8, 145, 178;
+  --td-blue-rgb:     37, 99, 235;
+}
+
+/* DARK mode override */
+.dark {
+  --td-bg:           #0d0e17;
+  --td-card:         #10111e;
+  --td-card2:        #161728;
+  --td-wall:         #0a0a0a;
+  --td-topbar:       #111118;
+  --td-border:       rgba(255,255,255,0.07);
+  --td-border2:      rgba(255,255,255,0.12);
+  --td-divider:      rgba(255,255,255,0.08);
+  --td-grid:         #1e2033;
+
+  --td-text:         #f1f5f9;
+  --td-muted:        #94a3b8;
+  --td-muted2:       #64748b;
+
+  --td-purple:       #7c3aed;
+  --td-purple-l:     #a78bfa;
+  --td-purple-hover: #6d28d9;
+  --td-cyan:         #22d3ee;
+  --td-green:        #10b981;
+  --td-amber:        #f59e0b;
+  --td-red:          #ef4444;
+  --td-rose:         #f43f5e;
+  --td-blue:         #3b82f6;
+  --td-pink:         #e879f9;
+
+  --td-overlay-rgb:  255, 255, 255; /* D.white(a) → trên dark = trắng overlay */
+  --td-purple-rgb:   124, 58, 237;
+  --td-green-rgb:    16, 185, 129;
+  --td-red-rgb:      239, 68, 68;
+  --td-cyan-rgb:     34, 211, 238;
+  --td-blue-rgb:     59, 130, 246;
+}
+
+/* ── Light gray/slate/zinc/neutral text → dark foreground ─────
+ * 2026-05-19 RETUNED — user reported "chữ ban ngày chưa rõ".
+ * Previous opacities (0.50, 0.60) gave low contrast on white.
+ * New scale: 50→0.95, 100→0.92, 200→0.85, 300→0.78, 400→0.72,
+ * 500→0.62 (matches darker --muted-foreground). All ≥ 4.5:1 WCAG AA.
+ * Apply to gray + slate + zinc + neutral (Tailwind's 4 gray scales). */
+html:not(.dark) .text-gray-50,
+html:not(.dark) .text-slate-50,
+html:not(.dark) .text-zinc-50,
+html:not(.dark) .text-neutral-50   { color: hsl(var(--foreground) / 0.95) !important; }
+
+html:not(.dark) .text-gray-100,
+html:not(.dark) .text-slate-100,
+html:not(.dark) .text-zinc-100,
+html:not(.dark) .text-neutral-100  { color: hsl(var(--foreground) / 0.92) !important; }
+
+html:not(.dark) .text-gray-200,
+html:not(.dark) .text-slate-200,
+html:not(.dark) .text-zinc-200,
+html:not(.dark) .text-neutral-200  { color: hsl(var(--foreground) / 0.85) !important; }
+
+html:not(.dark) .text-gray-300,
+html:not(.dark) .text-slate-300,
+html:not(.dark) .text-zinc-300,
+html:not(.dark) .text-neutral-300  { color: hsl(var(--foreground) / 0.78) !important; }
+
+html:not(.dark) .text-gray-400,
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-zinc-400,
+html:not(.dark) .text-neutral-400  { color: hsl(var(--foreground) / 0.72) !important; }
+
+html:not(.dark) .text-gray-500,
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-zinc-500,
+html:not(.dark) .text-neutral-500  { color: hsl(var(--foreground) / 0.62) !important; }
+
+html:not(.dark) .text-gray-600,
+html:not(.dark) .text-slate-600,
+html:not(.dark) .text-zinc-600,
+html:not(.dark) .text-neutral-600  { color: hsl(var(--foreground) / 0.78) !important; }
+
+html:not(.dark) .text-gray-700,
+html:not(.dark) .text-slate-700,
+html:not(.dark) .text-zinc-700,
+html:not(.dark) .text-neutral-700  { color: hsl(var(--foreground) / 0.85) !important; }
+
+html:not(.dark) .text-gray-800,
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-zinc-800,
+html:not(.dark) .text-neutral-800  { color: hsl(var(--foreground) / 0.92) !important; }
+
+html:not(.dark) .text-gray-900,
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-zinc-900,
+html:not(.dark) .text-neutral-900  { color: hsl(var(--foreground)) !important; }
 
 /* ── Placeholder text ────────────────────────────────────────── */
 html:not(.dark) .placeholder-gray-400::placeholder  { color: hsl(var(--foreground) / 0.40) !important; }
@@ -804,8 +1117,19 @@ html:not(.dark) .bg-slate-200\/20  { background-color: rgba(0,0,0,0.04) !importa
 html:not(.dark) .bg-zinc-800\/90   { background-color: rgba(255,255,255,0.90) !important; }
 html:not(.dark) .bg-zinc-900\/30   { background-color: rgba(255,255,255,0.70) !important; }
 html:not(.dark) .bg-zinc-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
+html:not(.dark) .bg-zinc-950\/95   { background-color: rgba(255,255,255,0.95) !important; }
 html:not(.dark) .bg-gray-900\/50   { background-color: rgba(255,255,255,0.80) !important; }
 html:not(.dark) .bg-gray-800\/50   { background-color: rgba(255,255,255,0.75) !important; }
+
+/* 2026-05-19: Student pages (Daily, MyCourses, Career, ForYou) thường
+ * dùng slate-900/40, slate-900/20 — bổ sung overrides cho 4 variants
+ * còn thiếu. */
+html:not(.dark) .bg-slate-900\/40  { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-slate-900\/20  { background-color: rgba(255,255,255,0.50) !important; }
+html:not(.dark) .bg-slate-900\/30  { background-color: rgba(255,255,255,0.60) !important; }
+html:not(.dark) .bg-slate-900\/10  { background-color: rgba(0,0,0,0.03) !important; }
+html:not(.dark) .bg-zinc-800\/40   { background-color: rgba(255,255,255,0.70) !important; }
+html:not(.dark) .bg-zinc-800\/60   { background-color: rgba(255,255,255,0.80) !important; }
 
 /* ── Additional border dark shades (500-600, 900) ────────────── */
 html:not(.dark) .border-slate-600  { border-color: hsl(var(--border)) !important; }
@@ -824,10 +1148,64 @@ html:not(.dark) .hover\:bg-slate-700:hover  { background-color: rgba(0,0,0,0.06)
 html:not(.dark) .hover\:bg-slate-800:hover  { background-color: rgba(0,0,0,0.06) !important; }
 html:not(.dark) .hover\:bg-slate-300:hover  { background-color: rgba(0,0,0,0.05) !important; }
 
-/* ── text-zinc variants → dark foreground ────────────────────── */
-html:not(.dark) .text-zinc-300  { color: hsl(var(--foreground) / 0.60) !important; }
-html:not(.dark) .text-zinc-400  { color: hsl(var(--foreground) / 0.50) !important; }
-html:not(.dark) .text-zinc-500  { color: hsl(var(--muted-foreground)) !important; }
+/* text-zinc-* đã được handle ở rule kết hợp gray/slate/zinc/neutral ở trên.
+ * Block này giữ trống để tránh conflict khi rebuild — sẽ xoá ở dọn dẹp sau. */
+
+/* ── Faded colored text (designed cho dark bg) → đậm hơn trong light mode ─
+ * 2026-05-19: text-amber-200/300, text-rose-300/400, text-cyan-300/400 etc.
+ * Khi page dùng dark-first design rồi switch sang light mode, các màu nhạt
+ * này biến mất trên nền trắng. Override sang shade đậm hơn của cùng hue. */
+html:not(.dark) .text-amber-200,
+html:not(.dark) .text-amber-300       { color: hsl(38 92% 38%) !important; }
+html:not(.dark) .text-amber-400       { color: hsl(38 92% 42%) !important; }
+html:not(.dark) .text-yellow-200,
+html:not(.dark) .text-yellow-300      { color: hsl(43 96% 38%) !important; }
+html:not(.dark) .text-yellow-400      { color: hsl(43 96% 42%) !important; }
+html:not(.dark) .text-rose-200,
+html:not(.dark) .text-rose-300        { color: hsl(347 77% 48%) !important; }
+html:not(.dark) .text-rose-400        { color: hsl(347 77% 52%) !important; }
+html:not(.dark) .text-red-200,
+html:not(.dark) .text-red-300         { color: hsl(0 70% 48%) !important; }
+html:not(.dark) .text-red-400         { color: hsl(0 70% 52%) !important; }
+html:not(.dark) .text-cyan-200,
+html:not(.dark) .text-cyan-300        { color: hsl(189 88% 32%) !important; }
+html:not(.dark) .text-cyan-400        { color: hsl(189 88% 36%) !important; }
+html:not(.dark) .text-emerald-200,
+html:not(.dark) .text-emerald-300     { color: hsl(160 78% 32%) !important; }
+html:not(.dark) .text-emerald-400     { color: hsl(160 78% 36%) !important; }
+html:not(.dark) .text-green-200,
+html:not(.dark) .text-green-300       { color: hsl(142 70% 32%) !important; }
+html:not(.dark) .text-green-400       { color: hsl(142 70% 36%) !important; }
+html:not(.dark) .text-blue-200,
+html:not(.dark) .text-blue-300        { color: hsl(217 88% 48%) !important; }
+html:not(.dark) .text-blue-400        { color: hsl(217 88% 52%) !important; }
+html:not(.dark) .text-indigo-200,
+html:not(.dark) .text-indigo-300      { color: hsl(238 75% 52%) !important; }
+html:not(.dark) .text-indigo-400      { color: hsl(238 75% 56%) !important; }
+html:not(.dark) .text-violet-200,
+html:not(.dark) .text-violet-300      { color: hsl(258 85% 52%) !important; }
+html:not(.dark) .text-violet-400      { color: hsl(258 85% 56%) !important; }
+html:not(.dark) .text-purple-200,
+html:not(.dark) .text-purple-300      { color: hsl(270 80% 48%) !important; }
+html:not(.dark) .text-purple-400      { color: hsl(270 80% 52%) !important; }
+html:not(.dark) .text-fuchsia-200,
+html:not(.dark) .text-fuchsia-300     { color: hsl(290 80% 48%) !important; }
+html:not(.dark) .text-fuchsia-400     { color: hsl(290 80% 52%) !important; }
+html:not(.dark) .text-pink-200,
+html:not(.dark) .text-pink-300        { color: hsl(330 75% 48%) !important; }
+html:not(.dark) .text-pink-400        { color: hsl(330 75% 52%) !important; }
+html:not(.dark) .text-teal-200,
+html:not(.dark) .text-teal-300        { color: hsl(174 75% 32%) !important; }
+html:not(.dark) .text-teal-400        { color: hsl(174 75% 36%) !important; }
+html:not(.dark) .text-sky-200,
+html:not(.dark) .text-sky-300         { color: hsl(199 88% 42%) !important; }
+html:not(.dark) .text-sky-400         { color: hsl(199 88% 46%) !important; }
+html:not(.dark) .text-orange-200,
+html:not(.dark) .text-orange-300      { color: hsl(20 88% 42%) !important; }
+html:not(.dark) .text-orange-400      { color: hsl(20 88% 46%) !important; }
+html:not(.dark) .text-lime-200,
+html:not(.dark) .text-lime-300        { color: hsl(83 75% 32%) !important; }
+html:not(.dark) .text-lime-400        { color: hsl(83 75% 36%) !important; }
 
 /* ── hover:text overrides for dark-first hover text ──────────── */
 html:not(.dark) .hover\:text-white:hover  { color: hsl(var(--foreground)) !important; }
@@ -1149,3 +1527,75 @@ html:not(.dark) .recharts-tooltip-wrapper .recharts-default-tooltip {
 .tiptap-display li { margin-bottom: 0.2rem; }
 .tiptap-display strong { font-weight: 700; }
 .tiptap-display hr { border-top: 1px solid rgba(255,255,255,0.15); margin: 0.75rem 0; }
+
+
+/* Hide scrollbar utility — for horizontal-scrolling toolbars on mobile */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Sidebar icon tooltip — slide-in từ trái sang phải */
+@keyframes sidebar-tooltip-in {
+  from { opacity: 0; transform: translateY(-50%) translateX(-6px); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0); }
+}
+
+/* ════════════════════════════════════════════════════════════
+   Trang cá nhân — Banner gradients + Avatar frames
+   Dùng cho /u/:userId (PublicProfile) và /profile/customize
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Banner gradients ───────────────────────────────────── */
+.banner-gradient-purple { background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%); }
+.banner-gradient-blue   { background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%); }
+.banner-gradient-sunset { background: linear-gradient(135deg, #f59e0b 0%, #ef4444 50%, #ec4899 100%); }
+.banner-gradient-aurora { background: linear-gradient(135deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%); }
+.banner-gradient-ocean  { background: linear-gradient(135deg, #0c4a6e 0%, #0e7490 50%, #06b6d4 100%); }
+.banner-gradient-forest { background: linear-gradient(135deg, #14532d 0%, #16a34a 50%, #84cc16 100%); }
+.banner-gradient-mono   { background: linear-gradient(135deg, #1e293b 0%, #475569 50%, #94a3b8 100%); }
+
+/* ── Avatar frames ──────────────────────────────────────── */
+.avatar-frame-gold {
+  padding: 4px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24, #ea580c);
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.4);
+}
+.avatar-frame-neon {
+  padding: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.6);
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+@keyframes avatarPulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(139, 92, 246, 0.6); }
+  50%      { box-shadow: 0 0 36px rgba(139, 92, 246, 0.9); }
+}
+.avatar-frame-polaroid {
+  padding: 8px;
+  background: white;
+  border-radius: 4px;
+  transform: rotate(-3deg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.avatar-frame-hexagon {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+.avatar-frame-animated {
+  padding: 4px;
+  border-radius: 9999px;
+  background: conic-gradient(from 0deg, #f43f5e, #f59e0b, #10b981, #06b6d4, #8b5cf6, #f43f5e);
+  animation: avatarSpin 4s linear infinite;
+}
+@keyframes avatarSpin {
+  to { transform: rotate(360deg); }
+}
+.avatar-frame-animated > * {
+  /* counter-rotate inner để ảnh đại diện không bị xoay theo */
+  animation: avatarSpin 4s linear infinite reverse;
+}

@@ -1,26 +1,32 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles, Trash2, BookOpen, Settings, Loader2 } from 'lucide-react'
+import { Send, Bot, Sparkles, Trash2, BookOpen, Settings, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { tokenStore } from '@/services/api'
+import { AiSubscriptionGate } from '@/components/common/AiSubscriptionGate'
+import { SrsReviewPanel } from '@/components/srs/SrsReviewPanel'
+import { MessageBubble, type Message } from '@/components/ai-tutor/MessageBubble'
+import type { ReviewRecord } from '@/lib/srs'
+import { recommendationService as rs } from '@/services/recommendation.service'
 
+// Theme-aware palette via CSS vars (auto light/dark switching)
 const D = {
-  bg: '#0d0e17',
-  card: '#10111e',
-  card2: '#161728',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#f1f5f9',
-  muted: '#94a3b8',
-  purple: '#7c3aed',
-  purpleL: '#a78bfa',
-}
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: Date
-}
+  bg:          'var(--td-bg)',
+  card:        'var(--td-card)',
+  card2:       'var(--td-card2)',
+  border:      'var(--td-border)',
+  border2:     'var(--td-border2)',
+  text:        'var(--td-text)',
+  muted:       'var(--td-muted)',
+  purple:      'var(--td-purple)',
+  cyan:        'var(--td-cyan)',
+  green:       'var(--td-green)',
+  amber:       'var(--td-amber)',
+  red:         'var(--td-red)',
+  blue:        'var(--td-blue)',
+  white:   (a: number) => `rgba(var(--td-overlay-rgb), ${a})`,
+  purpleA: (a: number) => `rgba(var(--td-purple-rgb), ${a})`,
+} as const
 
 interface Conversation {
   id: string
@@ -41,42 +47,19 @@ const QUICK_PROMPTS = [
   'Tạo sơ đồ tư duy',
 ]
 
-function MessageBubble({ msg }: { msg: Message }) {
-  const isUser = msg.role === 'user'
+export default function AiTutor() {
   return (
-    <div style={{ display: 'flex', gap: 12, justifyContent: isUser ? 'flex-end' : 'flex-start', marginBottom: 16 }}>
-      {!isUser && (
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed,#9333ea)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 12px rgba(124,58,237,0.3)' }}>
-          <Bot style={{ width: 18, height: 18, color: '#fff' }} />
-        </div>
-      )}
-      <div style={{
-        maxWidth: '72%',
-        padding: '12px 16px',
-        borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-        background: isUser ? 'linear-gradient(135deg,#7c3aed,#9333ea)' : D.card2,
-        border: isUser ? 'none' : `1px solid ${D.border}`,
-        color: D.text,
-        fontSize: 14,
-        lineHeight: 1.6,
-        boxShadow: isUser ? '0 0 16px rgba(124,58,237,0.2)' : 'none',
-        whiteSpace: 'pre-wrap',
-      }}>
-        {msg.content}
-        <div style={{ fontSize: 10, color: isUser ? 'rgba(255,255,255,0.5)' : D.muted, marginTop: 4, textAlign: 'right' }}>
-          {msg.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-        </div>
-      </div>
-      {isUser && (
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: D.card2, border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <User style={{ width: 18, height: 18, color: D.muted }} />
-        </div>
-      )}
-    </div>
+    <AiSubscriptionGate
+      feature="ai_tutor"
+      featureLabel="Gia Sư AI"
+      description="Gia Sư AI là trợ lý AI 24/7 — giải bài tập, giải thích khái niệm, ôn tập mọi môn học."
+    >
+      <AiTutorInner />
+    </AiSubscriptionGate>
   )
 }
 
-export default function AiTutor() {
+function AiTutorInner() {
   const navigate = useNavigate()
   
   const [messages, setMessages] = useState<Message[]>([
@@ -118,6 +101,19 @@ export default function AiTutor() {
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setSending(true)
+
+    // RS: track AI tutor message — signal mạnh về topic interest
+    // Dùng subject làm targetId để recsys hiểu user quan tâm môn nào
+    rs.track({
+      action: 'click',
+      targetType: 'ai_tutor',
+      targetId: `subject:${selectedSubject}`,
+      metadata: {
+        subject: selectedSubject,
+        questionLength: trimmed.length,
+        preview: trimmed.slice(0, 100),
+      },
+    })
 
     try {
       const headers: HeadersInit = {
@@ -203,6 +199,29 @@ export default function AiTutor() {
             >
               {SUBJECTS.map(s => <option key={s}>{s}</option>)}
             </select>
+          </div>
+
+          {/* SRS spaced-repetition panel — câu cần ôn (SM-2 từ localStorage) */}
+          <div style={{ padding: '12px 16px', borderBottom: `1px solid ${D.border}` }}>
+            <SrsReviewPanel
+              subject={selectedSubject}
+              sessionLimit={20}
+              onStartReview={(cards: ReviewRecord[]) => {
+                if (cards.length === 0) return
+                // Gom topic của các card cần ôn → seed prompt cho AI
+                const topics = Array.from(new Set(
+                  cards.map(c => c.topic).filter(Boolean),
+                )).slice(0, 5)
+                const subjectsList = Array.from(new Set(
+                  cards.map(c => c.subject).filter(Boolean),
+                ))
+                const prompt = topics.length > 0
+                  ? `Hôm nay tôi cần ôn ${cards.length} câu thuộc các chủ đề: ${topics.join(', ')}. Hãy giúp tôi hệ thống lại kiến thức trọng tâm và đưa ra 3-5 câu hỏi mẫu để kiểm tra.`
+                  : `Hôm nay tôi cần ôn ${cards.length} câu thuộc môn ${subjectsList.join(', ') || selectedSubject}. Hãy gợi ý cách ôn hiệu quả + đặt 5 câu hỏi để kiểm tra kiến thức.`
+                setInput(prompt)
+                toast.success(`Đã nạp ${cards.length} câu vào hội thoại — nhấn gửi để bắt đầu ôn`)
+              }}
+            />
           </div>
 
           {/* Conversation history */}

@@ -1,0 +1,368 @@
+/* ============================================================
+ * 🌞 LIGHT MODE GLOBAL — Mobile-first contrast & readability
+ * ============================================================
+ *
+ * Scope: chỉ áp khi <html> KHÔNG có class `.dark` (light mode)
+ * Mục tiêu:
+ *   1. Contrast ≥ WCAG AA (4.5:1 cho body, 3:1 cho large text)
+ *   2. Mobile-first: text lớn dễ đọc trên iPhone/Android
+ *   3. Touch target ≥ 44×44px (Apple HIG / WCAG 2.5.5)
+ *   4. Prevent iOS auto-zoom on input focus (font-size ≥ 16px)
+ *   5. Tap highlight subtle, focus ring rõ
+ *
+ * Import order: SAU index.css để override Tailwind utilities khi cần.
+ * ============================================================ */
+
+/* ─────────────────────────────────────────────────────────
+ * 1. ROOT — Base typography & rendering quality
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) {
+  /* iOS Safari: ngăn auto-zoom font khi orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+
+  /* Tap highlight subtle thay vì xanh dương loud mặc định iOS */
+  -webkit-tap-highlight-color: rgba(15, 23, 42, 0.08);
+
+  /* Text rendering quality cho display screens */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+
+  /* Mobile-first base size: 16px (= iOS default cho body, ngăn zoom) */
+  font-size: 16px;
+}
+
+html:not(.dark) body {
+  color: hsl(var(--foreground));
+  background: hsl(var(--background));
+  line-height: 1.55;             /* readable cho VN diacritics + dài hơi */
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 2. MOBILE TEXT SIZE BUMP (≤ 639px)
+ *    Tailwind text-* classes nhỏ trên mobile khó đọc. Bump nhẹ.
+ *    Desktop (≥ sm) giữ nguyên cho dense info layout.
+ * ───────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  /* Body text: 12 → 13, 14 → 15, 16 → 17 (Apple HIG body) */
+  html:not(.dark) .text-xs    { font-size: 0.8125rem !important; line-height: 1.25rem !important; }   /* 13/20 */
+  html:not(.dark) .text-sm    { font-size: 0.9375rem !important; line-height: 1.5rem  !important; }   /* 15/24 */
+  html:not(.dark) .text-base  { font-size: 1.0625rem !important; line-height: 1.625rem !important; }  /* 17/26 */
+  html:not(.dark) .text-lg    { font-size: 1.1875rem !important; line-height: 1.75rem  !important; }  /* 19/28 */
+
+  /* Headings: bump cho hero impact trên small screens */
+  html:not(.dark) .text-xl    { font-size: 1.375rem  !important; line-height: 1.875rem !important; }  /* 22/30 */
+  html:not(.dark) .text-2xl   { font-size: 1.625rem  !important; line-height: 2.125rem !important; }  /* 26/34 */
+  html:not(.dark) .text-3xl   { font-size: 1.875rem  !important; line-height: 2.375rem !important; }  /* 30/38 */
+
+  /* Heading tags nếu không có Tailwind class */
+  html:not(.dark) h1:where(:not([class*="text-"])) { font-size: 1.875rem !important; line-height: 1.2 !important; }
+  html:not(.dark) h2:where(:not([class*="text-"])) { font-size: 1.5rem   !important; line-height: 1.25 !important; }
+  html:not(.dark) h3:where(:not([class*="text-"])) { font-size: 1.25rem  !important; line-height: 1.3 !important; }
+
+  /* Bảng + cell — bump tránh tiny text trên phone */
+  html:not(.dark) td, html:not(.dark) th {
+    font-size: 0.9375rem;   /* 15px */
+    padding: 0.625rem 0.75rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 3. INPUT/FORM — Prevent iOS zoom + bigger touch target
+ *    iOS Safari auto-zoom khi font-size < 16px trên input focus.
+ *    Force ≥ 16px trên mobile để giữ viewport.
+ * ───────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  html:not(.dark) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  html:not(.dark) textarea,
+  html:not(.dark) select {
+    font-size: 16px !important;       /* 16px = iOS no-zoom magic number */
+    min-height: 44px;                  /* WCAG 2.5.5 touch target */
+    padding: 0.625rem 0.875rem;
+  }
+
+  /* Textarea nhiều dòng — min 88px (2 dòng text lớn) */
+  html:not(.dark) textarea { min-height: 88px; }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 4. TOUCH TARGETS — ≥ 44×44px cho mobile/tablet
+ *    Áp dụng cho pointer:coarse (touch devices)
+ * ───────────────────────────────────────────────────────── */
+@media (hover: none) and (pointer: coarse) {
+  html:not(.dark) button:not(.touch-sm):not([data-touch="sm"]),
+  html:not(.dark) a[role="button"],
+  html:not(.dark) [role="button"]:not(.touch-sm) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Icon-only buttons — đảm bảo padding để hit area đủ */
+  html:not(.dark) button:has(> svg:only-child),
+  html:not(.dark) a:has(> svg:only-child) {
+    padding: 0.625rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 5. CONTRAST FIX — Gray/zinc classes mờ trên white bg
+ *    Tailwind text-gray-400/500 contrast quá thấp với white.
+ *    Bump đậm hơn để đạt 4.5:1 WCAG AA.
+ * ───────────────────────────────────────────────────────── */
+/* 2026-05-19 v3: BUMP MẠNH (-15% L) — user vẫn report "chữ ban ngày
+ * cần đậm hơn" sau v2. Tất cả text-gray/zinc/slate/neutral-300..700
+ * giờ map sang slate-800/900 range để contrast ≥ 9:1 trên white. */
+html:not(.dark) .text-gray-300  { color: hsl(215 18% 30%) !important; }  /* slate-700 (đậm hơn nhiều so với gray-300 origin) */
+html:not(.dark) .text-gray-400  { color: hsl(215 22% 22%) !important; }  /* slate-800 */
+html:not(.dark) .text-gray-500  { color: hsl(217 25% 16%) !important; }  /* slate-900 */
+html:not(.dark) .text-gray-600  { color: hsl(222 28% 12%) !important; }  /* slate-950 */
+html:not(.dark) .text-gray-700  { color: hsl(222 30% 10%) !important; }  /* near-black */
+
+html:not(.dark) .text-zinc-300  { color: hsl(240 6% 30%) !important; }
+html:not(.dark) .text-zinc-400  { color: hsl(240 6% 22%) !important; }
+html:not(.dark) .text-zinc-500  { color: hsl(240 8% 16%) !important; }
+html:not(.dark) .text-zinc-600  { color: hsl(240 8% 12%) !important; }
+
+html:not(.dark) .text-slate-300 { color: hsl(215 22% 30%) !important; }
+html:not(.dark) .text-slate-400 { color: hsl(215 22% 22%) !important; }
+html:not(.dark) .text-slate-500 { color: hsl(217 25% 16%) !important; }
+html:not(.dark) .text-slate-600 { color: hsl(222 28% 12%) !important; }
+
+html:not(.dark) .text-neutral-300 { color: hsl(0 0% 30%) !important; }
+html:not(.dark) .text-neutral-400 { color: hsl(0 0% 22%) !important; }
+html:not(.dark) .text-neutral-500 { color: hsl(0 0% 16%) !important; }
+
+/* Muted-foreground — slate-800 ≥ 10:1 contrast */
+html:not(.dark) .text-muted-foreground {
+  color: hsl(222 28% 14%) !important;
+}
+
+/* Tailwind text-foreground/X opacity helpers — đảm bảo opacity cao */
+html:not(.dark) .text-foreground\/85 { color: hsl(var(--foreground)) !important; }
+html:not(.dark) .text-foreground\/80 { color: hsl(var(--foreground) / 0.96) !important; }
+html:not(.dark) .text-foreground\/75 { color: hsl(var(--foreground) / 0.94) !important; }
+html:not(.dark) .text-foreground\/70 { color: hsl(var(--foreground) / 0.92) !important; }
+html:not(.dark) .text-foreground\/60 { color: hsl(var(--foreground) / 0.88) !important; }
+html:not(.dark) .text-foreground\/50 { color: hsl(var(--foreground) / 0.82) !important; }
+
+/* ─────────────────────────────────────────────────────────
+ * 6. FOCUS RING — Visible cho keyboard navigation
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) *:focus-visible {
+  outline: 2px solid hsl(220 90% 56%);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+html:not(.dark) button:focus-visible,
+html:not(.dark) a:focus-visible,
+html:not(.dark) input:focus-visible,
+html:not(.dark) textarea:focus-visible,
+html:not(.dark) select:focus-visible {
+  outline-offset: 3px;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 7. CARDS — Subtle elevation thay vì chỉ border
+ *    Border alone đôi khi không đủ phân biệt khỏi page bg.
+ *    Thêm shadow nhẹ cho depth perception trên light bg.
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) .bg-card,
+html:not(.dark) [data-card] {
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04),
+              0 1px 3px 0 rgba(15, 23, 42, 0.06);
+}
+
+html:not(.dark) .bg-card:hover,
+html:not(.dark) [data-card]:hover {
+  box-shadow: 0 2px 4px 0 rgba(15, 23, 42, 0.06),
+              0 4px 12px 0 rgba(15, 23, 42, 0.08);
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 8. LINKS — Visible color + underline offset
+ *    Tránh link "ẩn" (chỉ khác màu) — gen X/elder users cần underline.
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) a:not(.btn):not([role="button"]):not(.no-style):not(.unstyled) {
+  color: hsl(220 90% 45%);
+  text-decoration-color: hsl(220 90% 45% / 0.4);
+  text-underline-offset: 2px;
+}
+
+html:not(.dark) a:not(.btn):not([role="button"]):not(.no-style):not(.unstyled):hover {
+  color: hsl(220 90% 38%);
+  text-decoration-color: currentColor;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 9. SCROLLBAR — Subtle nhưng visible (không full ẩn)
+ * ───────────────────────────────────────────────────────── */
+@media (min-width: 640px) {
+  html:not(.dark) ::-webkit-scrollbar { width: 10px; height: 10px; }
+  html:not(.dark) ::-webkit-scrollbar-track { background: hsl(210 40% 96%); }
+  html:not(.dark) ::-webkit-scrollbar-thumb {
+    background: hsl(215 16% 65%);
+    border-radius: 5px;
+    border: 2px solid hsl(210 40% 96%);
+  }
+  html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: hsl(215 19% 50%); }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 10. DISABLED STATES — Còn readable, không bị "ẩn"
+ *     opacity-50 trên light bg + foreground/0.5 = nearly invisible.
+ *     Dùng muted-foreground + cursor not-allowed thay vì faint.
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) :disabled,
+html:not(.dark) [aria-disabled="true"] {
+  opacity: 1 !important;
+  cursor: not-allowed;
+  color: hsl(215 18% 50%);
+}
+
+html:not(.dark) button:disabled,
+html:not(.dark) [role="button"][aria-disabled="true"] {
+  background: hsl(210 40% 94%) !important;
+  color: hsl(215 18% 50%) !important;
+  border-color: hsl(214 24% 88%) !important;
+  box-shadow: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 11. PLACEHOLDER — Visible nhưng phân biệt với input value
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) ::placeholder {
+  color: hsl(215 16% 55%) !important;
+  opacity: 1;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 12. SAFE AREAS — iPhone notch + bottom indicator
+ * ───────────────────────────────────────────────────────── */
+@supports (padding: max(0px)) {
+  html:not(.dark) body {
+    padding-left:  env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Sticky bottom nav respect home indicator */
+  html:not(.dark) .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 13. SELECTION — Brand color cho text highlight
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) ::selection {
+  background: hsl(245 85% 60% / 0.25);
+  color: hsl(245 85% 20%);
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 14. KBD / CODE — Inline code visible với mono font
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) :where(code, kbd):not(pre code) {
+  background: hsl(210 40% 94%);
+  color: hsl(217 25% 18%);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-size: 0.875em;
+  border: 1px solid hsl(214 24% 88%);
+}
+
+html:not(.dark) kbd {
+  box-shadow: 0 1px 0 hsl(214 24% 82%);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 15. SKELETON / LOADING — Higher contrast pulse
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) .animate-pulse {
+  background: linear-gradient(90deg,
+    hsl(210 40% 94%) 25%,
+    hsl(210 40% 88%) 50%,
+    hsl(210 40% 94%) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 16. DIVIDERS — Visible separator giữa sections
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) hr,
+html:not(.dark) .border-t,
+html:not(.dark) .border-b {
+  border-color: hsl(214 24% 88%);
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 17. MOBILE-FIRST SPACING — Tighter padding trên small,
+ *     wider trên desktop. Prevent edge-to-edge cramp.
+ * ───────────────────────────────────────────────────────── */
+@media (max-width: 639px) {
+  html:not(.dark) .container,
+  html:not(.dark) .max-w-7xl,
+  html:not(.dark) .max-w-6xl,
+  html:not(.dark) .max-w-5xl,
+  html:not(.dark) .max-w-4xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 18. ICON COLORS — Common Tailwind icon colors faded trên light
+ *     Bump cho readable cả khi icon nhỏ.
+ * ───────────────────────────────────────────────────────── */
+html:not(.dark) .text-amber-300  { color: hsl(43 96% 38%) !important; }
+html:not(.dark) .text-amber-400  { color: hsl(38 92% 35%) !important; }
+html:not(.dark) .text-yellow-300 { color: hsl(50 96% 40%) !important; }
+html:not(.dark) .text-yellow-400 { color: hsl(45 92% 38%) !important; }
+html:not(.dark) .text-cyan-300   { color: hsl(189 94% 35%) !important; }
+html:not(.dark) .text-cyan-400   { color: hsl(192 91% 32%) !important; }
+html:not(.dark) .text-emerald-300 { color: hsl(160 84% 32%) !important; }
+html:not(.dark) .text-emerald-400 { color: hsl(158 84% 30%) !important; }
+html:not(.dark) .text-rose-300   { color: hsl(350 89% 50%) !important; }
+html:not(.dark) .text-rose-400   { color: hsl(351 86% 48%) !important; }
+html:not(.dark) .text-purple-300 { color: hsl(270 85% 50%) !important; }
+html:not(.dark) .text-purple-400 { color: hsl(271 81% 48%) !important; }
+html:not(.dark) .text-pink-300   { color: hsl(330 85% 50%) !important; }
+html:not(.dark) .text-pink-400   { color: hsl(330 81% 48%) !important; }
+html:not(.dark) .text-indigo-300 { color: hsl(232 84% 50%) !important; }
+html:not(.dark) .text-indigo-400 { color: hsl(234 89% 48%) !important; }
+html:not(.dark) .text-blue-300   { color: hsl(217 91% 50%) !important; }
+html:not(.dark) .text-blue-400   { color: hsl(218 91% 48%) !important; }
+html:not(.dark) .text-green-300  { color: hsl(152 76% 35%) !important; }
+html:not(.dark) .text-green-400  { color: hsl(151 76% 32%) !important; }
+html:not(.dark) .text-red-300    { color: hsl(0 84% 50%) !important; }
+html:not(.dark) .text-red-400    { color: hsl(0 84% 48%) !important; }
+
+/* ─────────────────────────────────────────────────────────
+ * 19. ACTIVE/PRESSED — Mobile feedback visible
+ *     hover:bg-* không trigger trên touch. active:bg-* cần.
+ * ───────────────────────────────────────────────────────── */
+@media (hover: none) {
+  html:not(.dark) button:active,
+  html:not(.dark) a:active,
+  html:not(.dark) [role="button"]:active {
+    transform: scale(0.98);
+    transition: transform 0.05s ease-out;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────
+ * 20. REDUCED MOTION — Respect user preference
+ * ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.dark) *,
+  html:not(.dark) *::before,
+  html:not(.dark) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -29,6 +29,9 @@ import { careerService } from "@/services/career.service"
 import { useAuth } from "@/hooks/useAuth"
 import { formatRelativeTime } from "@/lib/utils"
 import type { CareerCommunityStats, CareerTestResult } from "@/types"
+import CareerDayPixelSim from "@/components/career/CareerDayPixelSim"
+import PixelOdyssey from "@/components/career/PixelOdyssey"
+import ScrollToTopButton from "@/components/common/ScrollToTopButton"
 
 /* ─── Inline replacements ─────────────────────────── */
 function PageHeader({
@@ -71,6 +74,13 @@ export default function CareerAdvisorPage() {
   const [selectedCareer, setSelectedCareer] = useState<CareerDetail | null>(null)
   const [history, setHistory] = useState<CareerTestResult[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  /** Nghề đã mở xem chi tiết trong lần làm bài hiện tại — auto append khi
+   *  openCareerDetail() chạy, save lại để khi xem lại lịch sử có cả info này. */
+  const [viewedCareers, setViewedCareers] = useState<string[]>([])
+  /** Khi true → đang xem lại bài đã làm cũ (read-only mode) thay vì làm mới */
+  const [reviewMode, setReviewMode] = useState(false)
+  /** Collapse trạng thái cho section "Xem lại 60 câu trả lời" */
+  const [showAnswersReview, setShowAnswersReview] = useState(false)
 
   // Cổng nhập thông tin người làm bài (tên + năm sinh) để hiển thị cho QR-scanner
   const [showTakerGate, setShowTakerGate] = useState(false)
@@ -158,7 +168,11 @@ export default function CareerAdvisorPage() {
     }, 300)
   }
 
-  const saveResult = async (res: PersonalityResult, allAnswers: Record<number, number>) => {
+  const saveResult = async (
+    res: PersonalityResult,
+    allAnswers: Record<number, number>,
+    viewed: string[] = viewedCareers,
+  ) => {
     const yobNum = parseInt(takerYob, 10)
     await careerService.saveTest({
       mbtiType: res.mbtiType,
@@ -168,6 +182,7 @@ export default function CareerAdvisorPage() {
       personalityName: res.personalityName,
       careers: res.careers,
       answers: allAnswers,
+      viewedCareers: viewed,
       userId: user?.id ?? null,
       // Ưu tiên thông tin người làm nhập thủ công (từ QR scan) — nếu không
       // có thì fallback về tài khoản đang đăng nhập.
@@ -190,6 +205,9 @@ export default function CareerAdvisorPage() {
     setAnswers({})
     setCurrentQ(0)
     setResult(null)
+    setViewedCareers([])
+    setReviewMode(false)
+    setShowAnswersReview(false)
   }
 
   const openCareerDetail = (careerName: string) => {
@@ -199,6 +217,19 @@ export default function CareerAdvisorPage() {
       const ext = getCareerExtended(career.id)
       setSelectedCareer({ ...career, ...ext })
       setView("career-detail")
+      // Track nghề đã xem — append unique. Khi review mode thì không save lại
+      // (vì là re-open bài cũ, không muốn modify lịch sử).
+      if (!reviewMode) {
+        setViewedCareers(prev => {
+          if (prev.includes(careerName)) return prev
+          const next = [...prev, careerName]
+          // Re-save với updated viewedCareers (fire-and-forget)
+          if (result && Object.keys(answers).length > 0) {
+            saveResult(result, answers, next).catch(() => {/* ignore */})
+          }
+          return next
+        })
+      }
     } else {
       toast.error("Chưa có dữ liệu chi tiết cho nghề này")
     }
@@ -217,6 +248,35 @@ export default function CareerAdvisorPage() {
     }
   }
 
+  /**
+   * Khôi phục bài đã làm cũ vào state hiện tại → chuyển sang view "result"
+   * ở read-only mode. HS có thể bấm vào từng nghề trong gợi ý để xem chi tiết,
+   * bấm vào "Xem lại 60 câu trả lời" để duyệt từng câu hỏi đã trả lời.
+   */
+  const restoreFromHistory = (item: CareerTestResult) => {
+    const restoredAnswers = (item.answers || {}) as Record<number, number>
+    const restoredViewed = item.viewedCareers || []
+    // Rebuild full PersonalityResult bằng calculateResults() từ answers gốc
+    // → có đủ personalityEmoji, description, strengths, weaknesses, learningStyle, famousPeople
+    const personality = Object.keys(restoredAnswers).length > 0
+      ? calculateResults(restoredAnswers)
+      : null
+    if (!personality) {
+      toast.error('Lần làm này thiếu dữ liệu câu trả lời — không thể mở lại')
+      return
+    }
+    setAnswers(restoredAnswers)
+    setViewedCareers(restoredViewed)
+    setResult(personality)
+    setReviewMode(true)
+    setShowAnswersReview(false)
+    setView("result")
+    const dateStr = new Date(item.createdAt).toLocaleString("vi-VN", {
+      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+    })
+    toast.success(`Đã mở lại bài làm lúc ${dateStr}`, { icon: "📂" })
+  }
+
   const currentAnswer = answers[allQuestions?.[currentQ]?.id ?? -1]
 
   // ===== INTRO VIEW =====
@@ -224,8 +284,9 @@ export default function CareerAdvisorPage() {
     return (
       <div className="flex flex-col h-full">
         <PageHeader title="Tư Vấn Hướng Nghiệp" description="Khám phá tính cách và ngành nghề phù hợp với bạn" />
+        <ScrollToTopButton containerSelector="#career-intro-scroll" />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div id="career-intro-scroll" className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {/* Hero */}
             <div className="relative bg-gradient-to-br from-[hsl(265,85%,18%)] via-[hsl(245,80%,22%)] to-[hsl(210,85%,18%)] rounded-3xl border border-white/[0.08] p-10 text-center overflow-hidden">
@@ -277,6 +338,9 @@ export default function CareerAdvisorPage() {
               </div>
             </div>
 
+            {/* Pixel Odyssey — game khám phá nghề tương tác */}
+            <PixelOdyssey />
+
             {/* What You'll Discover */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
@@ -295,7 +359,7 @@ export default function CareerAdvisorPage() {
             {/* How the test works */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2 text-sm">
-                <Lightbulb className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <Lightbulb className="h-4 w-4 text-amber-500" />
                 Cách Thực Hiện
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -306,8 +370,8 @@ export default function CareerAdvisorPage() {
                   { step: 4, title: "Nhận kết quả", desc: "Xem ngành nghề, trường ĐH và lộ trình", icon: Target },
                 ].map(({ step, title, desc, icon: Icon }) => (
                   <div key={step} className="text-center">
-                    <div className="w-12 h-12 rounded-2xl bg-[hsl(265,85%,60%)]/10 border border-[hsl(265,85%,60%)]/20 flex items-center justify-center mx-auto mb-3">
-                      <Icon className="h-5 w-5 text-[hsl(265,85%,70%)]" />
+                    <div className="w-12 h-12 rounded-2xl bg-purple-400/10 border border-purple-400/20 flex items-center justify-center mx-auto mb-3">
+                      <Icon className="h-5 w-5 text-purple-400" />
                     </div>
                     <div className="text-xs font-semibold text-white/70 mb-0.5">{title}</div>
                     <div className="text-[0.65rem] text-white/30">{desc}</div>
@@ -324,7 +388,7 @@ export default function CareerAdvisorPage() {
             />
 
             {/* Note */}
-            <div className="bg-gradient-to-r from-[hsl(175,80%,50%)]/5 to-[hsl(210,85%,55%)]/5 rounded-2xl border border-[hsl(175,80%,50%)]/10 p-5 text-center">
+            <div className="bg-gradient-to-r from-[hsl(175,80%,50%)]/5 to-[hsl(210,85%,55%)]/5 rounded-2xl border border-cyan-500/10 p-5 text-center">
               <p className="text-xs text-white/40 italic">
                 "Không có câu trả lời đúng hay sai — hãy chọn theo bản năng đầu tiên của bạn để có kết quả chính xác nhất."
               </p>
@@ -394,7 +458,7 @@ export default function CareerAdvisorPage() {
           <div className="max-w-3xl mx-auto">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
-                <SectionIcon className="h-4 w-4 text-[hsl(265,85%,65%)]" />
+                <SectionIcon className="h-4 w-4 text-purple-400" />
                 <span className="text-xs font-medium text-white/50">{sectionLabel}</span>
               </div>
               <span className="text-xs text-white/30">
@@ -423,9 +487,9 @@ export default function CareerAdvisorPage() {
             <div className="space-y-6">
               {/* Labels */}
               <div className="flex justify-between items-center px-2">
-                <span className="text-xs font-medium text-[hsl(175,80%,55%)]">Đồng ý</span>
+                <span className="text-xs font-medium text-cyan-500">Đồng ý</span>
                 <span className="text-xs text-white/25">Trung lập</span>
-                <span className="text-xs font-medium text-[hsl(280,75%,60%)]">Không đồng ý</span>
+                <span className="text-xs font-medium text-purple-400">Không đồng ý</span>
               </div>
 
               {/* Button Options */}
@@ -516,10 +580,10 @@ export default function CareerAdvisorPage() {
       return (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
-            <span className={`font-semibold ${isFirst ? "text-[hsl(175,80%,55%)]" : "text-white/40"}`}>
+            <span className={`font-semibold ${isFirst ? "text-cyan-500" : "text-white/40"}`}>
               {letter1} ({score1}%)
             </span>
-            <span className={`font-semibold ${!isFirst ? "text-[hsl(280,75%,60%)]" : "text-white/40"}`}>
+            <span className={`font-semibold ${!isFirst ? "text-purple-400" : "text-white/40"}`}>
               {letter2} ({100 - score1}%)
             </span>
           </div>
@@ -540,20 +604,44 @@ export default function CareerAdvisorPage() {
     return (
       <div className="flex flex-col h-full">
         <PageHeader
-          title="Kết Quả Tư Vấn Hướng Nghiệp"
-          description="Khám phá bản thân và ngành nghề phù hợp"
+          title={reviewMode ? "Xem Lại Bài Đã Làm" : "Kết Quả Tư Vấn Hướng Nghiệp"}
+          description={reviewMode
+            ? "Bài làm cũ — xem kết quả, câu trả lời và các nghề đã khám phá"
+            : "Khám phá bản thân và ngành nghề phù hợp"}
           actions={
-            <button
-              onClick={resetTest}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
-            >
-              <RotateCcw className="h-4 w-4" />
-              Làm Lại
-            </button>
+            <div className="flex items-center gap-2">
+              {reviewMode && (
+                <button
+                  onClick={loadHistory}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Về Lịch Sử
+                </button>
+              )}
+              <button
+                onClick={resetTest}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/70 hover:bg-white/[0.06] transition-all text-sm font-medium"
+              >
+                <RotateCcw className="h-4 w-4" />
+                {reviewMode ? "Làm Bài Mới" : "Làm Lại"}
+              </button>
+            </div>
           }
         />
+        {reviewMode && (
+          <div className="px-6 py-2 bg-purple-600/30 border-b border-purple-600/20">
+            <div className="max-w-5xl mx-auto flex items-center gap-2 text-xs text-purple-300">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>
+                Đang xem lại bài cũ ở chế độ read-only. Bấm vào nghề để xem chi tiết — KHÔNG cập nhật vào lịch sử.
+              </span>
+            </div>
+          </div>
+        )}
+        <ScrollToTopButton containerSelector="#career-results-scroll" />
 
-        <div className="flex-1 overflow-auto p-6">
+        <div id="career-results-scroll" className="flex-1 overflow-auto p-6">
           <div className="max-w-5xl mx-auto space-y-6">
 
             {/* PERSONALITY TYPE HERO */}
@@ -576,7 +664,7 @@ export default function CareerAdvisorPage() {
             {/* MBTI DIMENSIONS */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-5 flex items-center gap-2 text-sm">
-                <Brain className="h-4 w-4 text-[hsl(265,85%,65%)]" />
+                <Brain className="h-4 w-4 text-purple-400" />
                 Phân Tích Tính Cách MBTI
               </h3>
               <div className="space-y-4">
@@ -589,27 +677,27 @@ export default function CareerAdvisorPage() {
 
             {/* STRENGTHS & WEAKNESSES */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-[hsl(175,80%,50%)]/5 rounded-2xl border border-[hsl(175,80%,50%)]/10 p-6">
-                <h3 className="font-semibold text-[hsl(175,80%,55%)] mb-3 flex items-center gap-2 text-sm">
+              <div className="bg-cyan-500/5 rounded-2xl border border-cyan-500/10 p-6">
+                <h3 className="font-semibold text-cyan-500 mb-3 flex items-center gap-2 text-sm">
                   <Star className="h-4 w-4" />
                   Điểm Mạnh
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {result.strengths.map((s, i) => (
-                    <Badge key={i} className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)] border border-[hsl(175,80%,50%)]/20">
+                    <Badge key={i} className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                       {s}
                     </Badge>
                   ))}
                 </div>
               </div>
-              <div className="bg-[hsl(280,75%,55%)]/5 rounded-2xl border border-[hsl(280,75%,55%)]/10 p-6">
-                <h3 className="font-semibold text-[hsl(280,75%,60%)] mb-3 flex items-center gap-2 text-sm">
+              <div className="bg-purple-500/5 rounded-2xl border border-purple-500/10 p-6">
+                <h3 className="font-semibold text-purple-400 mb-3 flex items-center gap-2 text-sm">
                   <Heart className="h-4 w-4" />
                   Cần Cải Thiện
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {result.weaknesses.map((w, i) => (
-                    <Badge key={i} className="bg-[hsl(280,75%,55%)]/10 text-[hsl(280,75%,65%)] border border-[hsl(280,75%,55%)]/20">
+                    <Badge key={i} className="bg-purple-500/10 text-purple-400 border border-purple-500/20">
                       {w}
                     </Badge>
                   ))}
@@ -620,8 +708,8 @@ export default function CareerAdvisorPage() {
             {/* HOLLAND CAREER INTERESTS */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-5 flex items-center gap-2 text-sm">
-                <Compass className="h-4 w-4 text-[hsl(175,80%,55%)]" />
-                Sở Thích Nghề Nghiệp (Holland Code: <span className="text-[hsl(175,80%,55%)]">{result.hollandCode}</span>)
+                <Compass className="h-4 w-4 text-cyan-500" />
+                Sở Thích Nghề Nghiệp (Holland Code: <span className="text-cyan-500">{result.hollandCode}</span>)
               </h3>
 
               {/* Holland Bars */}
@@ -637,18 +725,18 @@ export default function CareerAdvisorPage() {
                         key={code}
                         className={`rounded-xl p-4 transition-all ${
                           isTop3
-                            ? "bg-[hsl(265,85%,60%)]/8 border border-[hsl(265,85%,60%)]/15"
+                            ? "bg-purple-400/8 border border-purple-400/15"
                             : "bg-white/[0.02] border border-white/[0.04]"
                         }`}
                       >
                         <div className="flex items-center gap-2 mb-2">
-                          <Icon className={`h-4 w-4 ${isTop3 ? "text-[hsl(265,85%,70%)]" : "text-white/30"}`} />
+                          <Icon className={`h-4 w-4 ${isTop3 ? "text-purple-400" : "text-white/30"}`} />
                           <span className={`text-xs font-medium ${isTop3 ? "text-white/80" : "text-white/40"}`}>
                             {info?.name}
                           </span>
                         </div>
                         <div className="flex items-end gap-2">
-                          <span className={`text-xl font-bold ${isTop3 ? "text-[hsl(265,85%,70%)]" : "text-white/30"}`}>
+                          <span className={`text-xl font-bold ${isTop3 ? "text-purple-400" : "text-white/30"}`}>
                             {score}%
                           </span>
                         </div>
@@ -673,7 +761,7 @@ export default function CareerAdvisorPage() {
                     <div key={code} className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-white/80">{info?.name}</span>
-                        <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)] border border-[hsl(175,80%,50%)]/20">
+                        <Badge className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                           {score}%
                         </Badge>
                       </div>
@@ -692,9 +780,9 @@ export default function CareerAdvisorPage() {
             </div>
 
             {/* RECOMMENDED CAREERS */}
-            <div className="bg-gradient-to-r from-[hsl(245,85%,55%)]/8 to-[hsl(175,80%,50%)]/8 rounded-2xl border border-[hsl(245,85%,60%)]/15 p-6">
+            <div className="bg-gradient-to-r from-[hsl(245,85%,55%)]/8 to-[hsl(175,80%,50%)]/8 rounded-2xl border border-indigo-400/15 p-6">
               <h3 className="font-semibold text-white/90 mb-5 flex items-center gap-2 text-sm">
-                <Briefcase className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <Briefcase className="h-4 w-4 text-amber-500" />
                 Ngành Nghề Gợi Ý Cho Bạn
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -705,9 +793,9 @@ export default function CareerAdvisorPage() {
                     className="bg-white/[0.03] rounded-xl border border-white/[0.06] p-4 text-center transition-all hover:-translate-y-0.5 hover:bg-white/[0.06] hover:border-white/[0.1] cursor-pointer group"
                   >
                     <div className={`w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center ${
-                      i === 0 ? "bg-[hsl(35,90%,55%)]/15 text-[hsl(35,90%,60%)]" :
-                      i === 1 ? "bg-[hsl(175,80%,50%)]/15 text-[hsl(175,80%,55%)]" :
-                      "bg-[hsl(265,85%,60%)]/15 text-[hsl(265,85%,70%)]"
+                      i === 0 ? "bg-amber-500/15 text-amber-400" :
+                      i === 1 ? "bg-cyan-500/15 text-cyan-500" :
+                      "bg-purple-400/15 text-purple-400"
                     }`}>
                       {i === 0 ? <Award className="h-5 w-5" /> :
                        i === 1 ? <Star className="h-5 w-5" /> :
@@ -715,9 +803,9 @@ export default function CareerAdvisorPage() {
                     </div>
                     <span className="text-sm font-medium text-white/80">{career}</span>
                     {i === 0 && (
-                      <div className="text-[0.6rem] text-[hsl(35,90%,55%)] mt-1">Phù hợp nhất</div>
+                      <div className="text-[0.6rem] text-amber-500 mt-1">Phù hợp nhất</div>
                     )}
-                    <div className="text-[0.6rem] text-white/25 mt-1 group-hover:text-[hsl(175,80%,55%)] transition-colors">
+                    <div className="text-[0.6rem] text-white/25 mt-1 group-hover:text-cyan-500 transition-colors">
                       Xem chi tiết →
                     </div>
                   </button>
@@ -728,7 +816,7 @@ export default function CareerAdvisorPage() {
             {/* LEARNING STYLE */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <BookOpen className="h-4 w-4 text-[hsl(210,90%,60%)]" />
+                <BookOpen className="h-4 w-4 text-sky-400" />
                 Phong Cách Học Tập
               </h3>
               <p className="text-sm text-white/50 leading-relaxed">{result.learningStyle}</p>
@@ -737,7 +825,7 @@ export default function CareerAdvisorPage() {
             {/* FAMOUS PEOPLE */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <Users className="h-4 w-4 text-[hsl(280,75%,60%)]" />
+                <Users className="h-4 w-4 text-purple-400" />
                 Người Nổi Tiếng Cùng Tính Cách
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -749,18 +837,133 @@ export default function CareerAdvisorPage() {
               </div>
             </div>
 
+            {/* ── NGHỀ ĐÃ XEM CHI TIẾT (chỉ hiện khi có ≥1 nghề đã click vào) ── */}
+            {viewedCareers.length > 0 && (
+              <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
+                <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
+                  <Building className="h-4 w-4 text-amber-500" />
+                  Nghề Đã Xem Chi Tiết
+                  <span className="ml-auto text-[0.7rem] text-white/35 font-normal">
+                    {viewedCareers.length} / {result.careers.length} nghề
+                  </span>
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {viewedCareers.map((name, i) => (
+                    <button
+                      key={i}
+                      onClick={() => openCareerDetail(name)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:border-amber-500/40 text-xs font-medium transition-all"
+                    >
+                      <Briefcase className="h-3 w-3" />
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[0.7rem] text-white/30 mt-3 italic">
+                  💡 Bấm vào tên nghề để xem lại trang chi tiết
+                </p>
+              </div>
+            )}
+
+            {/* ── XEM LẠI 60 CÂU TRẢ LỜI (collapsible) ── */}
+            {Object.keys(answers).length > 0 && allQuestions && (
+              <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] overflow-hidden">
+                <button
+                  onClick={() => setShowAnswersReview(prev => !prev)}
+                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
+                >
+                  <h3 className="font-semibold text-white/90 flex items-center gap-2 text-sm">
+                    <ListChecks className="h-4 w-4 text-sky-400" />
+                    Xem Lại {Object.keys(answers).length} Câu Trả Lời Đã Làm
+                  </h3>
+                  <ChevronLeft className={`h-4 w-4 text-white/40 transition-transform ${showAnswersReview ? '-rotate-90' : 'rotate-180'}`} />
+                </button>
+                {showAnswersReview && (
+                  <div className="px-6 pb-6 max-h-[600px] overflow-y-auto space-y-3">
+                    {allQuestions.map((q, idx) => {
+                      const ansValue = answers[q.id]
+                      const hasAnswer = ansValue !== undefined && ansValue !== null
+                      // Map value → label (Hoàn toàn không đồng ý → Hoàn toàn đồng ý)
+                      const SCALE_LABELS = [
+                        'Hoàn toàn không đồng ý',
+                        'Không đồng ý',
+                        'Bình thường',
+                        'Đồng ý',
+                        'Hoàn toàn đồng ý',
+                      ]
+                      const ansLabel = hasAnswer && ansValue >= 1 && ansValue <= 5
+                        ? SCALE_LABELS[ansValue - 1]
+                        : '(chưa trả lời)'
+                      const ansColor = ansValue === 5 ? 'text-emerald-300'
+                                    : ansValue === 4 ? 'text-cyan-300'
+                                    : ansValue === 3 ? 'text-white/60'
+                                    : ansValue === 2 ? 'text-orange-300'
+                                    : ansValue === 1 ? 'text-rose-300'
+                                    : 'text-white/30'
+                      return (
+                        <div
+                          key={q.id}
+                          className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3.5"
+                        >
+                          <div className="flex items-start gap-2.5 mb-2">
+                            <span className="text-[0.65rem] font-mono text-white/30 mt-0.5 flex-shrink-0">#{idx + 1}</span>
+                            <p className="text-sm text-white/80 leading-snug flex-1">{q.text}</p>
+                          </div>
+                          <div className="pl-7 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className={`h-3 w-3 ${hasAnswer ? ansColor : 'text-white/20'}`} />
+                              <span className={`text-xs font-medium ${ansColor}`}>{ansLabel}</span>
+                            </div>
+                            {hasAnswer && (
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map(v => (
+                                  <div
+                                    key={v}
+                                    className={`w-2 h-2 rounded-full ${
+                                      v === ansValue
+                                        ? 'bg-[hsl(195,85%,60%)] scale-150'
+                                        : 'bg-white/10'
+                                    } transition-all`}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* CTA */}
             <div className="bg-gradient-to-r from-[hsl(265,85%,55%)]/10 to-[hsl(175,80%,50%)]/10 rounded-2xl border border-white/[0.08] p-6 text-center">
-              <h3 className="font-semibold text-white/80 mb-2 text-sm">Muốn tìm hiểu chi tiết hơn?</h3>
-              <p className="text-xs text-white/35 mb-4">AI sẽ phân tích kết hợp tính cách với kết quả học tập để đưa ra gợi ý chính xác hơn</p>
-              <div className="flex justify-center gap-3">
+              <h3 className="font-semibold text-white/80 mb-2 text-sm">
+                {reviewMode ? "Muốn làm bài mới?" : "Muốn tìm hiểu chi tiết hơn?"}
+              </h3>
+              <p className="text-xs text-white/35 mb-4">
+                {reviewMode
+                  ? "Tính cách có thể thay đổi theo thời gian — làm lại bài để so sánh kết quả"
+                  : "AI sẽ phân tích kết hợp tính cách với kết quả học tập để đưa ra gợi ý chính xác hơn"}
+              </p>
+              <div className="flex justify-center gap-3 flex-wrap">
                 <button
                   onClick={resetTest}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/60 hover:bg-white/[0.06] transition-all text-sm font-medium"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Làm Lại Bài Test
+                  {reviewMode ? "Làm Bài Mới" : "Làm Lại Bài Test"}
                 </button>
+                {reviewMode && (
+                  <button
+                    onClick={loadHistory}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.08] text-white/60 hover:bg-white/[0.06] transition-all text-sm font-medium"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Về Lịch Sử
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -826,7 +1029,7 @@ export default function CareerAdvisorPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-white/[0.02] rounded-2xl border border-white/[0.06] p-5">
                 <div className="text-xs text-white/40 mb-1">Tăng trưởng</div>
-                <div className="text-sm font-semibold text-[hsl(175,80%,55%)]">{c.market.growthRate}</div>
+                <div className="text-sm font-semibold text-cyan-500">{c.market.growthRate}</div>
               </div>
               <div className="bg-white/[0.02] rounded-2xl border border-white/[0.06] p-5">
                 <div className="text-xs text-white/40 mb-1">Tổng vị trí tuyển dụng</div>
@@ -837,20 +1040,20 @@ export default function CareerAdvisorPage() {
             {/* AI Exposure Analysis */}
             {c.aiExposure && (
               <div className={`rounded-2xl border p-6 ${
-                c.aiExposure.score >= 7 ? "bg-[hsl(0,60%,50%)]/5 border-[hsl(0,60%,50%)]/15" :
-                c.aiExposure.score >= 4 ? "bg-[hsl(35,90%,55%)]/5 border-[hsl(35,90%,55%)]/15" :
-                "bg-[hsl(175,80%,50%)]/5 border-[hsl(175,80%,50%)]/15"
+                c.aiExposure.score >= 7 ? "bg-red-500/5 border-red-500/15" :
+                c.aiExposure.score >= 4 ? "bg-amber-500/5 border-amber-500/15" :
+                "bg-cyan-500/5 border-cyan-500/15"
               }`}>
                 <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2 text-sm">
-                  <Zap className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                  <Zap className="h-4 w-4 text-amber-500" />
                   Phân Tích Tác Động AI (Karpathy 2026)
                 </h3>
                 <div className="flex items-center gap-6 mb-4">
                   <div className="text-center">
                     <div className={`text-3xl font-bold ${
-                      c.aiExposure.score >= 7 ? "text-[hsl(0,60%,60%)]" :
-                      c.aiExposure.score >= 4 ? "text-[hsl(35,90%,60%)]" :
-                      "text-[hsl(175,80%,55%)]"
+                      c.aiExposure.score >= 7 ? "text-red-400" :
+                      c.aiExposure.score >= 4 ? "text-amber-400" :
+                      "text-cyan-500"
                     }`}>
                       {c.aiExposure.score}/10
                     </div>
@@ -871,8 +1074,8 @@ export default function CareerAdvisorPage() {
                     </div>
                   </div>
                   <Badge className={`text-xs border ${
-                    c.aiExposure.trend === "Tăng" ? "bg-[hsl(0,60%,50%)]/10 text-[hsl(0,60%,65%)] border-[hsl(0,60%,50%)]/20" :
-                    c.aiExposure.trend === "Giảm" ? "bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border-[hsl(175,80%,50%)]/20" :
+                    c.aiExposure.trend === "Tăng" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                    c.aiExposure.trend === "Giảm" ? "bg-cyan-500/10 text-cyan-500 border-cyan-500/20" :
                     "bg-white/[0.04] text-white/50 border-white/[0.08]"
                   }`}>
                     {c.aiExposure.trend === "Tăng" ? "↑" : c.aiExposure.trend === "Giảm" ? "↓" : "→"} {c.aiExposure.trend}
@@ -885,13 +1088,13 @@ export default function CareerAdvisorPage() {
             {/* Education */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2 text-sm">
-                <GraduationCap className="h-4 w-4 text-[hsl(210,90%,60%)]" />
+                <GraduationCap className="h-4 w-4 text-sky-400" />
                 Yêu Cầu Học Vấn
               </h3>
               <div className="space-y-4">
                 <div>
                   <span className="text-xs text-white/40">Bằng tối thiểu: </span>
-                  <Badge className="bg-[hsl(210,90%,60%)]/10 text-[hsl(210,90%,65%)] border border-[hsl(210,90%,60%)]/20">
+                  <Badge className="bg-sky-400/10 text-sky-400 border border-sky-400/20">
                     {c.education.minimumDegree}
                   </Badge>
                 </div>
@@ -922,7 +1125,7 @@ export default function CareerAdvisorPage() {
                     <div className="text-xs text-white/40 mb-2">Chứng chỉ quan trọng:</div>
                     <div className="flex flex-wrap gap-2">
                       {c.education.certifications.map((cert, i) => (
-                        <Badge key={i} className="bg-[hsl(35,90%,55%)]/10 text-[hsl(35,90%,60%)] border border-[hsl(35,90%,55%)]/20">{cert}</Badge>
+                        <Badge key={i} className="bg-amber-500/10 text-amber-400 border border-amber-500/20">{cert}</Badge>
                       ))}
                     </div>
                   </div>
@@ -938,7 +1141,7 @@ export default function CareerAdvisorPage() {
             {/* Skills */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-4 flex items-center gap-2 text-sm">
-                <Zap className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <Zap className="h-4 w-4 text-amber-500" />
                 Kỹ Năng Cần Có
               </h3>
               <div className="space-y-4">
@@ -964,7 +1167,7 @@ export default function CareerAdvisorPage() {
                   <div className="text-xs text-white/40 mb-2">Kỹ năng mềm:</div>
                   <div className="flex flex-wrap gap-2">
                     {c.skills.soft.map((s, i) => (
-                      <Badge key={i} className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)] border border-[hsl(175,80%,50%)]/20">{s}</Badge>
+                      <Badge key={i} className="bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{s}</Badge>
                     ))}
                   </div>
                 </div>
@@ -982,7 +1185,7 @@ export default function CareerAdvisorPage() {
             {/* Career Roadmap */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-5 flex items-center gap-2 text-sm">
-                <Target className="h-4 w-4 text-[hsl(265,85%,65%)]" />
+                <Target className="h-4 w-4 text-purple-400" />
                 Lộ Trình Phát Triển
               </h3>
               <div className="relative">
@@ -991,8 +1194,8 @@ export default function CareerAdvisorPage() {
                   {c.roadmap.map((stage, i) => (
                     <div key={i} className="flex gap-4 relative">
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 z-10 ${
-                        i === 0 ? "bg-[hsl(175,80%,50%)]/20 border border-[hsl(175,80%,50%)]/30" :
-                        i === c.roadmap.length - 1 ? "bg-[hsl(265,85%,60%)]/20 border border-[hsl(265,85%,60%)]/30" :
+                        i === 0 ? "bg-cyan-500/20 border border-cyan-500/30" :
+                        i === c.roadmap.length - 1 ? "bg-purple-400/20 border border-purple-400/30" :
                         "bg-white/[0.04] border border-white/[0.08]"
                       }`}>
                         <span className="text-xs font-bold text-white/60">{stage.stage}</span>
@@ -1006,7 +1209,7 @@ export default function CareerAdvisorPage() {
                               {stage.duration}
                             </Badge>
                             {stage.salary && (
-                              <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,50%)]/20 text-[0.6rem]">
+                              <Badge className="bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 text-[0.6rem]">
                                 {stage.salary}
                               </Badge>
                             )}
@@ -1022,29 +1225,29 @@ export default function CareerAdvisorPage() {
 
             {/* Pros & Cons */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-[hsl(175,80%,50%)]/5 rounded-2xl border border-[hsl(175,80%,50%)]/10 p-6">
-                <h3 className="font-semibold text-[hsl(175,80%,55%)] mb-3 flex items-center gap-2 text-sm">
+              <div className="bg-cyan-500/5 rounded-2xl border border-cyan-500/10 p-6">
+                <h3 className="font-semibold text-cyan-500 mb-3 flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4" />
                   Ưu Điểm
                 </h3>
                 <ul className="space-y-2">
                   {c.pros.map((p, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-white/55 leading-relaxed">
-                      <span className="text-[hsl(175,80%,50%)] mt-0.5">•</span>
+                      <span className="text-cyan-500 mt-0.5">•</span>
                       {p}
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="bg-[hsl(280,75%,55%)]/5 rounded-2xl border border-[hsl(280,75%,55%)]/10 p-6">
-                <h3 className="font-semibold text-[hsl(280,75%,60%)] mb-3 flex items-center gap-2 text-sm">
+              <div className="bg-purple-500/5 rounded-2xl border border-purple-500/10 p-6">
+                <h3 className="font-semibold text-purple-400 mb-3 flex items-center gap-2 text-sm">
                   <XCircle className="h-4 w-4" />
                   Nhược Điểm
                 </h3>
                 <ul className="space-y-2">
                   {c.cons.map((con, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs text-white/55 leading-relaxed">
-                      <span className="text-[hsl(280,75%,55%)] mt-0.5">•</span>
+                      <span className="text-purple-500 mt-0.5">•</span>
                       {con}
                     </li>
                   ))}
@@ -1055,7 +1258,7 @@ export default function CareerAdvisorPage() {
             {/* Top Employers */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <Building className="h-4 w-4 text-[hsl(210,90%,60%)]" />
+                <Building className="h-4 w-4 text-sky-400" />
                 Nhà Tuyển Dụng Hàng Đầu
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -1068,7 +1271,7 @@ export default function CareerAdvisorPage() {
             {/* Important Subjects */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <BookOpen className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <BookOpen className="h-4 w-4 text-amber-500" />
                 Môn Học Quan Trọng
               </h3>
               <div className="space-y-2">
@@ -1093,17 +1296,26 @@ export default function CareerAdvisorPage() {
               <JobTasksSection data={c.jobTasks} />
             )}
 
+            {/* Pixel sim 1 ngày — cảm hứng từ pixel-agents (github.com/pablodelucca) */}
+            {c.dailyLife && c.dailyLife.length > 0 && (
+              <CareerDayPixelSim
+                careerName={c.name}
+                category={c.category}
+                dailyLife={c.dailyLife}
+              />
+            )}
+
             {/* Daily Life */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-[hsl(175,80%,55%)]" />
+                <Clock className="h-4 w-4 text-cyan-500" />
                 Một Ngày Làm Việc Điển Hình
               </h3>
               <div className="space-y-2">
                 {c.dailyLife.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]">
-                    <div className="w-6 h-6 rounded-lg bg-[hsl(265,85%,60%)]/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[0.55rem] font-bold text-[hsl(265,85%,70%)]">{i + 1}</span>
+                    <div className="w-6 h-6 rounded-lg bg-purple-400/10 flex items-center justify-center shrink-0 mt-0.5">
+                      <span className="text-[0.55rem] font-bold text-purple-400">{i + 1}</span>
                     </div>
                     <span className="text-xs text-white/55 leading-relaxed">{item}</span>
                   </div>
@@ -1119,7 +1331,7 @@ export default function CareerAdvisorPage() {
                   {c.suitablePersonalities.map((p, i) => (
                     <Badge key={i} className={`border ${
                       result?.mbtiType === p
-                        ? "bg-[hsl(175,80%,50%)]/15 text-[hsl(175,80%,55%)] border-[hsl(175,80%,50%)]/25"
+                        ? "bg-cyan-500/15 text-cyan-500 border-cyan-500/25"
                         : "bg-white/[0.04] text-white/50 border-white/[0.08]"
                     }`}>
                       {p} {result?.mbtiType === p && "✓"}
@@ -1133,7 +1345,7 @@ export default function CareerAdvisorPage() {
                   {c.suitableHolland.map((h, i) => (
                     <Badge key={i} className={`border ${
                       result?.hollandCode?.includes(h)
-                        ? "bg-[hsl(265,85%,60%)]/15 text-[hsl(265,85%,70%)] border-[hsl(265,85%,60%)]/25"
+                        ? "bg-purple-400/15 text-purple-400 border-purple-400/25"
                         : "bg-white/[0.04] text-white/50 border-white/[0.08]"
                     }`}>
                       {h} {result?.hollandCode?.includes(h) && "✓"}
@@ -1146,7 +1358,7 @@ export default function CareerAdvisorPage() {
             {/* Related Careers */}
             <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6">
               <h3 className="font-semibold text-white/90 mb-3 flex items-center gap-2 text-sm">
-                <Compass className="h-4 w-4 text-[hsl(280,75%,60%)]" />
+                <Compass className="h-4 w-4 text-purple-400" />
                 Ngành Nghề Liên Quan
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -1217,27 +1429,45 @@ export default function CareerAdvisorPage() {
                   hour: "2-digit", minute: "2-digit"
                 })
 
+                const canReopen = Boolean(item.answers && Object.keys(item.answers).length > 0)
                 return (
                   <div
                     key={item.id ?? i}
                     className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-5 hover:bg-white/[0.04] hover:border-white/[0.1] transition-all"
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center">
+                    <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center flex-shrink-0">
                           <span className="text-lg font-bold text-white/80">{item.mbtiType}</span>
                         </div>
-                        <div>
-                          <h4 className="text-sm font-semibold text-white/85">{item.personalityName}</h4>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-semibold text-white/85 truncate">{item.personalityName}</h4>
                           <div className="flex items-center gap-2 text-[0.65rem] text-white/35">
                             <Clock className="h-3 w-3" />
                             {dateStr}
                           </div>
                         </div>
                       </div>
-                      <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,50%)]/20">
-                        Holland: {item.hollandCode}
-                      </Badge>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className="bg-cyan-500/10 text-cyan-500 border border-cyan-500/20">
+                          Holland: {item.hollandCode}
+                        </Badge>
+                        <button
+                          onClick={() => restoreFromHistory(item)}
+                          disabled={!canReopen}
+                          title={canReopen
+                            ? "Mở lại bài làm này — xem kết quả, câu trả lời và các nghề đã xem"
+                            : "Lần làm này không có dữ liệu câu trả lời để mở lại"}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                            canReopen
+                              ? 'bg-gradient-to-r from-[hsl(265,85%,60%)]/20 to-[hsl(210,85%,55%)]/20 border-white/15 text-white/85 hover:from-[hsl(265,85%,60%)]/30 hover:to-[hsl(210,85%,55%)]/30 hover:border-white/25'
+                              : 'bg-white/[0.02] border-white/[0.05] text-white/25 cursor-not-allowed'
+                          }`}
+                        >
+                          <RotateCcw className="h-3 w-3" />
+                          Xem lại từ đầu
+                        </button>
+                      </div>
                     </div>
 
                     {/* Mini dimension bars */}
@@ -1466,7 +1696,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center">
-            <BarChart3 className="h-5 w-5 text-[hsl(265,85%,70%)]" />
+            <BarChart3 className="h-5 w-5 text-purple-400" />
           </div>
           <div>
             <h3 className="font-semibold text-white/90 text-sm">
@@ -1482,7 +1712,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
             type="button"
             onClick={() => exportStatsCsv(stats)}
             disabled={!stats || stats.totalAttempts === 0}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[hsl(175,80%,50%)]/10 border border-[hsl(175,80%,50%)]/25 text-[0.7rem] text-[hsl(175,80%,65%)] hover:bg-[hsl(175,80%,50%)]/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/25 text-[0.7rem] text-cyan-400 hover:bg-cyan-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
             title="Xuất CSV tổng hợp thống kê (MBTI, Holland, năm sinh, top nghề)"
           >
             <Download className="h-3 w-3" />
@@ -1563,7 +1793,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
             {/* MBTI Distribution */}
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Brain className="h-4 w-4 text-[hsl(265,85%,70%)]" />
+                <Brain className="h-4 w-4 text-purple-400" />
                 <h4 className="text-xs font-semibold text-white/80">
                   Phân bố 16 kiểu MBTI
                 </h4>
@@ -1600,7 +1830,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
             {/* Holland Distribution */}
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Compass className="h-4 w-4 text-[hsl(210,85%,60%)]" />
+                <Compass className="h-4 w-4 text-sky-400" />
                 <h4 className="text-xs font-semibold text-white/80">
                   Phân bố 6 nhóm Holland
                 </h4>
@@ -1643,7 +1873,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
           {stats.yearOfBirthDistribution && stats.yearOfBirthDistribution.length > 0 && (
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <GraduationCap className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <GraduationCap className="h-4 w-4 text-amber-500" />
                 <h4 className="text-xs font-semibold text-white/80">
                   Phân bố theo năm sinh
                 </h4>
@@ -1672,11 +1902,43 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
             </div>
           )}
 
+          {/* Ngành Hot xu thế 2026 — predefined list từ server, hiện luôn */}
+          {stats.trendingCareers2026 && stats.trendingCareers2026.length > 0 && (
+            <div className="bg-gradient-to-br from-orange-500/[0.05] to-pink-500/[0.05] rounded-xl border border-orange-500/20 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">🔥</span>
+                <h4 className="text-xs font-semibold text-orange-300">
+                  Ngành nghề Hot xu thế 2026 — phù hợp thị trường lao động hiện tại
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {stats.trendingCareers2026.slice(0, 12).map((t) => (
+                  <div
+                    key={t.label}
+                    className="flex items-start gap-2 p-2.5 rounded-lg bg-white/[0.03] border border-white/[0.05] hover:bg-white/[0.06] transition-colors"
+                  >
+                    <div className="flex flex-col items-center min-w-[32px]">
+                      <span className="text-orange-400 text-xs font-black">{t.heat}/5</span>
+                      <span className="text-[8px] text-orange-400/60 uppercase tracking-wider">Heat</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white/85 font-medium">{t.label}</p>
+                      <p className="text-[10px] text-white/45 mt-0.5">{t.reason}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-white/35 mt-3 italic">
+                💡 Khi ngành nghề bài test gợi ý cho bạn nằm trong danh sách này, nó sẽ có badge 🔥 ở bảng dưới.
+              </p>
+            </div>
+          )}
+
           {/* Top careers */}
           {stats.topCareers.length > 0 && (
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Briefcase className="h-4 w-4 text-[hsl(35,90%,55%)]" />
+                <Briefcase className="h-4 w-4 text-amber-500" />
                 <h4 className="text-xs font-semibold text-white/80">
                   Ngành nghề được gợi ý nhiều nhất
                 </h4>
@@ -1700,7 +1962,19 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
                         <td className="py-2 text-[0.7rem] text-white/30 font-mono">
                           {i + 1}
                         </td>
-                        <td className="py-2 text-xs text-white/75">{row.name}</td>
+                        <td className="py-2 text-xs text-white/75">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span>{row.name}</span>
+                            {row.trending && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-semibold bg-orange-500/15 text-orange-300 border border-orange-500/30"
+                                title={`Hot xu thế 2026: ${row.trending.reason}`}
+                              >
+                                🔥 Hot {row.trending.heat}/5
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2 text-[0.7rem] text-white/50 text-right font-mono">
                           {row.count}
                         </td>
@@ -1729,7 +2003,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
           {stats.recentTakers.length > 0 && (
             <div className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-4">
               <div className="flex items-center gap-2 mb-3">
-                <Users className="h-4 w-4 text-[hsl(175,80%,55%)]" />
+                <Users className="h-4 w-4 text-cyan-500" />
                 <h4 className="text-xs font-semibold text-white/80">
                   Học sinh đã hoàn thành gần đây
                 </h4>
@@ -1774,7 +2048,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
                           {row.userYearOfBirth ?? '—'}
                         </td>
                         <td className="py-2">
-                          <Badge className="bg-[hsl(265,85%,60%)]/10 text-[hsl(265,85%,70%)] border border-[hsl(265,85%,60%)]/20 font-mono">
+                          <Badge className="bg-purple-400/10 text-purple-400 border border-purple-400/20 font-mono">
                             {row.mbtiType}
                           </Badge>
                         </td>
@@ -1782,7 +2056,7 @@ function CommunityStatsTable({ stats, loading, onRefresh }: CommunityStatsTableP
                           {row.personalityName}
                         </td>
                         <td className="py-2">
-                          <Badge className="bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,55%)] border border-[hsl(175,80%,50%)]/20 font-mono">
+                          <Badge className="bg-cyan-500/10 text-cyan-500 border border-cyan-500/20 font-mono">
                             {row.hollandCode}
                           </Badge>
                         </td>
@@ -1895,7 +2169,7 @@ function QrCodeCard({
         {/* Content */}
         <div className="flex-1 min-w-0 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-            <Smartphone className="h-4 w-4 text-[hsl(175,80%,55%)]" />
+            <Smartphone className="h-4 w-4 text-cyan-500" />
             <h3 className="text-sm font-semibold text-white/90">
               Làm bài trên điện thoại bằng mã QR
             </h3>
@@ -1917,7 +2191,7 @@ function QrCodeCard({
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.05] border border-white/[0.1] text-xs text-white/70 hover:bg-white/[0.1] transition-all"
               >
                 {copied ? (
-                  <CheckCircle className="h-3.5 w-3.5 text-[hsl(175,80%,55%)]" />
+                  <CheckCircle className="h-3.5 w-3.5 text-cyan-500" />
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
@@ -1926,7 +2200,7 @@ function QrCodeCard({
               <button
                 type="button"
                 onClick={onOpenFull}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[hsl(265,85%,60%)]/15 border border-[hsl(265,85%,60%)]/30 text-xs text-[hsl(265,85%,75%)] hover:bg-[hsl(265,85%,60%)]/25 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-400/15 border border-purple-400/30 text-xs text-purple-300 hover:bg-purple-400/25 transition-all"
               >
                 <QrCode className="h-3.5 w-3.5" />
                 Phóng to QR
@@ -1981,7 +2255,7 @@ function QrCodeModal({
 
         <div className="text-center mb-5">
           <div className="inline-flex items-center gap-2 mb-2">
-            <QrCode className="h-5 w-5 text-[hsl(265,85%,70%)]" />
+            <QrCode className="h-5 w-5 text-purple-400" />
             <h3 className="text-lg font-semibold text-white/90">
               Quét để làm bài trên điện thoại
             </h3>
@@ -2061,7 +2335,7 @@ function TakerInfoGate({
 
         <div className="text-center mb-5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[hsl(265,85%,60%)]/20 to-[hsl(175,80%,50%)]/20 border border-white/[0.08] flex items-center justify-center mx-auto mb-3">
-            <UserIcon className="h-5 w-5 text-[hsl(265,85%,75%)]" />
+            <UserIcon className="h-5 w-5 text-purple-300" />
           </div>
           <h3 className="text-lg font-semibold text-white/90 mb-1">
             Một chút thông tin về bạn
@@ -2074,7 +2348,7 @@ function TakerInfoGate({
         <div className="space-y-4">
           <div>
             <label className="block text-xs font-medium text-white/70 mb-1.5">
-              Họ và tên <span className="text-[hsl(280,75%,65%)]">*</span>
+              Họ và tên <span className="text-purple-400">*</span>
             </label>
             <input
               type="text"
@@ -2082,14 +2356,14 @@ function TakerInfoGate({
               onChange={(e) => onNameChange(e.target.value)}
               placeholder="Ví dụ: Nguyễn Văn A"
               autoFocus
-              className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-3 py-2.5 text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-[hsl(265,85%,60%)]/50 transition-colors"
+              className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-3 py-2.5 text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-purple-400/50 transition-colors"
               maxLength={60}
             />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-white/70 mb-1.5">
-              Năm sinh <span className="text-[hsl(280,75%,65%)]">*</span>
+              Năm sinh <span className="text-purple-400">*</span>
             </label>
             <input
               type="number"
@@ -2099,12 +2373,12 @@ function TakerInfoGate({
               min={1940}
               max={currentYear}
               inputMode="numeric"
-              className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-3 py-2.5 text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-[hsl(265,85%,60%)]/50 transition-colors"
+              className="w-full bg-black/30 border border-white/[0.1] rounded-xl px-3 py-2.5 text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-purple-400/50 transition-colors"
             />
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 text-xs text-[hsl(0,80%,70%)] bg-[hsl(0,80%,50%)]/8 border border-[hsl(0,80%,50%)]/20 rounded-lg px-3 py-2">
+            <div className="flex items-start gap-2 text-xs text-red-400 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-2">
               <XCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -2146,11 +2420,11 @@ function VnUniversitiesSection({
   const tierColor = (t: string) => {
     switch (t) {
       case "Top đầu":
-        return { bg: "bg-[hsl(265,85%,60%)]/15", text: "text-[hsl(265,85%,70%)]", border: "border-[hsl(265,85%,60%)]/25" }
+        return { bg: "bg-purple-400/15", text: "text-purple-400", border: "border-purple-400/25" }
       case "Top cao":
-        return { bg: "bg-[hsl(175,80%,50%)]/15", text: "text-[hsl(175,80%,55%)]", border: "border-[hsl(175,80%,50%)]/25" }
+        return { bg: "bg-cyan-500/15", text: "text-cyan-500", border: "border-cyan-500/25" }
       case "Khá tốt":
-        return { bg: "bg-[hsl(35,90%,55%)]/15", text: "text-[hsl(35,90%,60%)]", border: "border-[hsl(35,90%,55%)]/25" }
+        return { bg: "bg-amber-500/15", text: "text-amber-400", border: "border-amber-500/25" }
       default:
         return { bg: "bg-white/[0.05]", text: "text-white/60", border: "border-white/[0.1]" }
     }
@@ -2161,20 +2435,20 @@ function VnUniversitiesSection({
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
           <h3 className="font-semibold text-white/90 flex items-center gap-2 text-sm">
-            <GraduationCap className="h-4 w-4 text-[hsl(210,90%,60%)]" />
+            <GraduationCap className="h-4 w-4 text-sky-400" />
             Trường Đại học Việt Nam phù hợp
           </h3>
           <p className="text-[0.65rem] text-white/40 mt-1">
             Dữ liệu lực học (điểm chuẩn tham khảo) & học phí — cập nhật {data.dataYear}
           </p>
         </div>
-        <Badge className="bg-[hsl(210,90%,60%)]/10 text-[hsl(210,90%,65%)] border border-[hsl(210,90%,60%)]/20 shrink-0">
+        <Badge className="bg-sky-400/10 text-sky-400 border border-sky-400/20 shrink-0">
           Cập nhật {data.dataYear}
         </Badge>
       </div>
 
       {data.note && (
-        <div className="bg-[hsl(35,90%,55%)]/5 border border-[hsl(35,90%,55%)]/15 rounded-xl px-4 py-3 mb-4">
+        <div className="bg-amber-500/5 border border-amber-500/15 rounded-xl px-4 py-3 mb-4">
           <div className="flex items-start gap-2 text-xs text-[hsl(35,90%,70%)]/90 leading-relaxed">
             <Lightbulb className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <span>{data.note}</span>
@@ -2223,14 +2497,14 @@ function VnUniversitiesSection({
                 {s.minScore2026 && s.minScore2026.length > 0 && (
                   <div className="bg-white/[0.02] rounded-lg border border-white/[0.04] p-2.5">
                     <div className="flex items-center gap-1.5 text-[0.6rem] text-white/40 mb-1.5">
-                      <Target className="h-3 w-3 text-[hsl(175,80%,55%)]" />
+                      <Target className="h-3 w-3 text-cyan-500" />
                       Lực học (điểm chuẩn tham khảo)
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {s.minScore2026.map((ms, j) => (
                         <span
                           key={j}
-                          className="text-[0.65rem] font-mono bg-[hsl(175,80%,50%)]/10 text-[hsl(175,80%,60%)] border border-[hsl(175,80%,50%)]/20 px-1.5 py-0.5 rounded"
+                          className="text-[0.65rem] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-1.5 py-0.5 rounded"
                         >
                           {ms.block} · {ms.score.toFixed(2).replace(/\.00$/, "")}
                         </span>
@@ -2247,7 +2521,7 @@ function VnUniversitiesSection({
                 {/* Học phí 2026 */}
                 <div className="bg-white/[0.02] rounded-lg border border-white/[0.04] p-2.5">
                   <div className="flex items-center gap-1.5 text-[0.6rem] text-white/40 mb-1.5">
-                    <Coins className="h-3 w-3 text-[hsl(35,90%,55%)]" />
+                    <Coins className="h-3 w-3 text-amber-500" />
                     Học phí {data.dataYear}
                   </div>
                   <div className="text-xs text-white/75 leading-snug">{s.tuitionPerYear}</div>
@@ -2263,14 +2537,14 @@ function VnUniversitiesSection({
               {s.admissionMethods && s.admissionMethods.length > 0 && (
                 <div className="mt-2.5">
                   <div className="flex items-center gap-1.5 text-[0.6rem] text-white/40 mb-1.5">
-                    <ListChecks className="h-3 w-3 text-[hsl(210,90%,60%)]" />
+                    <ListChecks className="h-3 w-3 text-sky-400" />
                     Tiêu chí xét tuyển
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {s.admissionMethods.map((m, k) => (
                       <Badge
                         key={k}
-                        className="bg-[hsl(210,90%,60%)]/10 text-[hsl(210,90%,65%)] border border-[hsl(210,90%,60%)]/20 text-[0.6rem]"
+                        className="bg-sky-400/10 text-sky-400 border border-sky-400/20 text-[0.6rem]"
                       >
                         {m}
                       </Badge>
@@ -2282,7 +2556,7 @@ function VnUniversitiesSection({
               {/* Điểm mạnh */}
               {s.strengths && s.strengths.length > 0 && (
                 <div className="mt-2.5 text-[0.65rem] text-white/50 leading-relaxed">
-                  <span className="text-[hsl(265,85%,70%)]">✦ Điểm mạnh: </span>
+                  <span className="text-purple-400">✦ Điểm mạnh: </span>
                   {s.strengths.join(" • ")}
                 </div>
               )}
@@ -2308,7 +2582,7 @@ function JobTasksSection({
     <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] p-6 space-y-5">
       <div>
         <h3 className="font-semibold text-white/90 flex items-center gap-2 text-sm">
-          <Briefcase className="h-4 w-4 text-[hsl(265,85%,65%)]" />
+          <Briefcase className="h-4 w-4 text-purple-400" />
           Công việc cụ thể — Làm gì? Ở đâu?
         </h3>
         <p className="text-[0.65rem] text-white/40 mt-1">
@@ -2318,7 +2592,7 @@ function JobTasksSection({
 
       {/* Làm gì? */}
       <div>
-        <div className="flex items-center gap-2 text-xs text-[hsl(175,80%,60%)] mb-2">
+        <div className="flex items-center gap-2 text-xs text-cyan-400 mb-2">
           <ListChecks className="h-4 w-4" />
           <span className="font-medium">Làm gì hằng ngày?</span>
         </div>
@@ -2328,8 +2602,8 @@ function JobTasksSection({
               key={i}
               className="flex items-start gap-3 bg-white/[0.02] rounded-lg p-3 border border-white/[0.04]"
             >
-              <div className="w-5 h-5 rounded-md bg-[hsl(175,80%,50%)]/15 flex items-center justify-center shrink-0 mt-0.5">
-                <CheckCircle className="h-3 w-3 text-[hsl(175,80%,55%)]" />
+              <div className="w-5 h-5 rounded-md bg-cyan-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                <CheckCircle className="h-3 w-3 text-cyan-500" />
               </div>
               <span className="text-xs text-white/65 leading-relaxed">{r}</span>
             </div>
@@ -2339,7 +2613,7 @@ function JobTasksSection({
 
       {/* Ở đâu? */}
       <div>
-        <div className="flex items-center gap-2 text-xs text-[hsl(210,90%,65%)] mb-2">
+        <div className="flex items-center gap-2 text-xs text-sky-400 mb-2">
           <MapPin className="h-4 w-4" />
           <span className="font-medium">Làm ở đâu?</span>
         </div>
@@ -2350,7 +2624,7 @@ function JobTasksSection({
               className="bg-white/[0.02] rounded-xl border border-white/[0.05] p-3"
             >
               <div className="flex items-start gap-2 mb-2">
-                <Building className="h-3.5 w-3.5 text-[hsl(210,90%,60%)] mt-0.5 shrink-0" />
+                <Building className="h-3.5 w-3.5 text-sky-400 mt-0.5 shrink-0" />
                 <h4 className="text-xs font-medium text-white/80 leading-tight">
                   {wp.type}
                 </h4>
@@ -2378,7 +2652,7 @@ function JobTasksSection({
       {/* Chuyên môn sâu */}
       {data.specializations && data.specializations.length > 0 && (
         <div>
-          <div className="flex items-center gap-2 text-xs text-[hsl(280,75%,65%)] mb-2">
+          <div className="flex items-center gap-2 text-xs text-purple-400 mb-2">
             <Layers className="h-4 w-4" />
             <span className="font-medium">Các hướng chuyên môn sâu</span>
           </div>
@@ -2388,7 +2662,7 @@ function JobTasksSection({
                 key={i}
                 className="bg-white/[0.02] rounded-lg border border-white/[0.04] p-3"
               >
-                <div className="text-xs font-medium text-[hsl(280,75%,70%)] mb-1">
+                <div className="text-xs font-medium text-purple-400 mb-1">
                   {sp.name}
                 </div>
                 <p className="text-[0.65rem] text-white/55 leading-relaxed">

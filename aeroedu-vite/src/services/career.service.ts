@@ -28,6 +28,9 @@ interface LocalCareerEntry {
   hollandScores: Record<string, number>
   personalityName: string
   careers: string[]
+  /** Full answers + viewed careers — để re-open xem lại từ đầu */
+  answers?: Record<number, number>
+  viewedCareers?: string[]
   createdAt: string
 }
 
@@ -208,6 +211,8 @@ export interface SaveCareerPayload {
   personalityName: string
   careers: string[]
   answers: Record<number, number>
+  /** Nghề mà HS đã mở xem chi tiết trong lần làm bài này */
+  viewedCareers?: string[]
   /** Metadata người làm (gửi kèm để backend lưu gắn với user) */
   userId?: string | null
   userName?: string | null
@@ -231,6 +236,8 @@ export const careerService = {
       hollandScores: payload.hollandScores,
       personalityName: payload.personalityName,
       careers: payload.careers,
+      answers: payload.answers,
+      viewedCareers: payload.viewedCareers,
       createdAt: new Date().toISOString(),
     }
     appendLocalEntry(localEntry)
@@ -268,6 +275,8 @@ export const careerService = {
         hollandScores: e.hollandScores,
         personalityName: e.personalityName,
         careers: e.careers,
+        answers: e.answers,
+        viewedCareers: e.viewedCareers,
         createdAt: e.createdAt,
       }))
     }

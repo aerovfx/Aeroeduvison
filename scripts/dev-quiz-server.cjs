@@ -124,7 +124,47 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname === '/api/teacher/exams' && req.method === 'GET') {
-      return sendJSON(res, 200, { exams: [] });
+      return sendJSON(res, 200, { exams: [
+        { id: 'demo-1', title: 'Đề minh hoạ Vật lí 11', subject: 'Vật lí',
+          examType: 'Trắc nghiệm', duration: 45, totalScore: 10,
+          totalQuestions: 20, status: 'Đang diễn ra', userId: 'dev-teacher-1',
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+      ] });
+    }
+    // Mock GET 1 exam (cho ExamDetail.tsx)
+    if (pathname.match(/^\/api\/teacher\/exams\/[^/]+$/) && req.method === 'GET') {
+      const examId = pathname.split('/').pop();
+      return sendJSON(res, 200, {
+        exam: {
+          id: examId, title: 'Đề minh hoạ Vật lí 11 — Demo',
+          subject: 'Vật lí', examType: 'Trắc nghiệm',
+          duration: 45, totalScore: 10, totalQuestions: 3, status: 'Nháp',
+          isPublic: false, publishedAt: null,
+          createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+        },
+        questions: [
+          { id: 'q1', questionType: 'MULTIPLE_CHOICE', order: 1, points: 1,
+            content: 'Câu 1. Đơn vị đo điện trở trong hệ SI là',
+            options: ['A. Ohm (Ω)', 'B. Fara (F)', 'C. Henry (H)', 'D. Oát (W)'],
+            correctAnswer: 'A', explanation: '' },
+          { id: 'q2', questionType: 'MULTIPLE_CHOICE', order: 2, points: 1,
+            content: 'Câu 2. Khi nhiệt độ kim loại tăng thì điện trở',
+            options: ['A. tăng', 'B. giảm', 'C. không đổi', 'D. tăng rồi giảm'],
+            correctAnswer: 'A', explanation: '' },
+          { id: 'q3', questionType: 'SHORT_ANSWER', order: 3, points: 1,
+            content: 'Câu 3. Hiệu điện thế U = E·d. d=12cm, E=6800V/m. U=?',
+            options: [], correctAnswer: '816', explanation: 'Đáp án: 816 V' },
+        ],
+      });
+    }
+    // Mock PUT update + POST publish
+    if (pathname.match(/^\/api\/teacher\/exams\/[^/]+$/) && req.method === 'PUT') {
+      console.log('[mock] PUT exam', pathname, await readJSON(req));
+      return sendJSON(res, 200, { ok: true });
+    }
+    if (pathname.match(/^\/api\/teacher\/exams\/[^/]+\/publish$/) && req.method === 'POST') {
+      console.log('[mock] publish exam', pathname, await readJSON(req));
+      return sendJSON(res, 200, { ok: true, status: 'Đang diễn ra', isPublic: true });
     }
 
     // ── Mock empty endpoints (giữ trang teacher không crash khi backend chưa có)
@@ -200,8 +240,10 @@ const server = http.createServer(async (req, res) => {
       const result = mode === 'generate'
         ? await generateQuestionsFromPdf(pdfBuffer, opts)
         : await extractQuestionsFromPdf(pdfBuffer, opts);
-      console.log(`[quiz-extract] ✅ mode=${mode || 'extract'} file=${filename} questions=${result.questions.length} took=${Date.now() - t0}ms`);
-      return sendJSON(res, 200, { success: true, ...result, receivedFilename: filename || null });
+      console.log(`[quiz-extract] ✅ mode=${mode || 'extract'} file=${filename} questions=${result.questions.length} model=${result._internalModel || '?'} took=${Date.now() - t0}ms`);
+      const { _internalModel, ...publicResult } = result;
+      void _internalModel;
+      return sendJSON(res, 200, { success: true, ...publicResult, receivedFilename: filename || null });
     }
 
     if (pathname === '/api/teacher/quiz-publish' && req.method === 'POST') {

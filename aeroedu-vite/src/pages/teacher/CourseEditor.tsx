@@ -1,11 +1,13 @@
 /**
- * CourseEditor — Trình soạn khoá học (Create + Edit, 4 bước)
+ * CourseEditor — Trình soạn khoá học (Create + Edit, 6 bước)
  *
- * Workflow cloned từ elearniv LMS:
- *   Bước 1 · Cơ bản   → title, category, price, duration, cover image
- *   Bước 2 · Nội dung → overview, requirements, learn goals, target audience
- *   Bước 3 · Video    → upload nhóm video (group, title, thumbnail, is_preview)
- *   Bước 4 · Tài liệu → upload file đính kèm (PDF, DOCX, ZIP…)
+ * Workflow cloned từ elearniv LMS + Mục lục giống Udemy:
+ *   Bước 1 · Cơ bản       → title, category, price, duration, cover image
+ *   Bước 2 · Nội dung     → overview, requirements, learn goals, target audience
+ *   Bước 3 · Mục lục      → chương + bài học (curriculum builder)
+ *   Bước 4 · Video        → upload nhóm video (group, title, thumbnail, is_preview)
+ *   Bước 5 · Tài liệu     → upload file đính kèm (PDF, DOCX, ZIP…)
+ *   Bước 6 · Tài nguyên   → liên kết exams/assignments/labs/aura/games (không duplicate)
  *
  * Route:
  *   /teacher/course/create       → courseId = undefined → tạo mới
@@ -19,12 +21,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   BookOpen, Image as ImageIcon, DollarSign, Clock,
   Tag, ChevronRight, ChevronLeft, Check,
-  Play, Upload, FileText, Plus, Trash2, GripVertical,
+  Play, Upload, FileText, Trash2,
   Link as LinkIcon, Eye, EyeOff, ToggleLeft, ToggleRight,
   Download, File, Save, Rocket, ArrowLeft, X,
 } from 'lucide-react'
 import { instructorService, type CreateCoursePayload } from '@/services/instructor.service'
 import { RichTextEditor } from '@/components/teacher/RichTextEditor'
+import CurriculumStep from '@/components/teacher/CurriculumStep'
+import CourseExtrasStep from './CourseExtrasStep'
 import { cn } from '@/lib/utils'
 import { toast } from 'react-hot-toast'
 import type { CourseVideo, CourseAsset } from '@/types'
@@ -34,8 +38,11 @@ import type { CourseVideo, CourseAsset } from '@/types'
 // ─────────────────────────────────────────────────────────────
 
 const ACCESS_OPTS = ['Trọn đời', '1 tháng', '3 tháng', '6 tháng', '1 năm']
-const STEPS = ['Cơ bản', 'Nội dung', 'Video', 'Tài liệu'] as const
-type Step = 0 | 1 | 2 | 3
+// V3 (2026-05-22): Bỏ step "Video" — video/audio/PDF/quiz/lab đều add qua
+// LessonAssetEditor blocks trong "Mục lục" (Coursera/Notion-style).
+// Giảm trùng lặp + UX rõ hơn: 1 nơi duy nhất để soạn nội dung.
+const STEPS = ['Cơ bản', 'Nội dung', 'Mục lục', 'Tài liệu', 'Tài nguyên'] as const
+type Step = 0 | 1 | 2 | 3 | 4
 
 interface BasicForm {
   title: string
@@ -55,9 +62,13 @@ interface ContentForm {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Step indicator
+// Step indicator (chuẩn elearniv PageNavigation)
 // ─────────────────────────────────────────────────────────────
-function StepNav({ current, courseId }: { current: Step; courseId?: string }) {
+function StepNav({ current, courseId, onJump }: {
+  current: Step
+  courseId?: string
+  onJump: (step: Step) => void
+}) {
   return (
     <div className="flex items-center gap-0 mb-8">
       {STEPS.map((label, i) => {
@@ -69,12 +80,7 @@ function StepNav({ current, courseId }: { current: Step; courseId?: string }) {
             <button
               type="button"
               disabled={disabled}
-              onClick={() => {
-                if (!disabled && courseId) {
-                  // handled by parent
-                  document.dispatchEvent(new CustomEvent('stepto', { detail: i }))
-                }
-              }}
+              onClick={() => { if (!disabled) onJump(i as Step) }}
               className={cn(
                 'flex flex-col items-center gap-1 group',
                 disabled && 'cursor-not-allowed opacity-40'
@@ -143,7 +149,14 @@ function BasicInfoStep({
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<BasicForm>({ defaultValues })
+  } = useForm<BasicForm>({
+    // CRITICAL: `values` thay vì `defaultValues` — RHF sẽ AUTO RESET
+    // khi prop thay đổi (async load từ useQuery getCourse).
+    // Trước: `defaultValues` chỉ init lúc mount → form empty mặc dù
+    // course data đã có → user mở edit lại thấy chữ bị xoá sạch.
+    values: defaultValues as BasicForm | undefined,
+    resetOptions: { keepDirtyValues: true },  // giữ change của user nếu đang nhập
+  })
 
   const handleImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) { toast.error('Chỉ chấp nhận ảnh'); return }
@@ -292,7 +305,12 @@ function ContentStep({
   defaultValues?: Partial<ContentForm>
   isLoading: boolean
 }) {
-  const { control, handleSubmit } = useForm<ContentForm>({ defaultValues })
+  // CRITICAL: dùng `values` để form AUTO RESET khi defaultValues thay đổi
+  // (async load từ getCourse). Khắc phục bug "chữ bị xoá khi mở edit".
+  const { control, handleSubmit } = useForm<ContentForm>({
+    values: defaultValues as ContentForm | undefined,
+    resetOptions: { keepDirtyValues: true },
+  })
 
   return (
     <form onSubmit={handleSubmit(onNext)} className="space-y-5">
@@ -340,314 +358,15 @@ function ContentStep({
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// Step 3 — Quản lý video
-// ─────────────────────────────────────────────────────────────
-function VideoStep({ courseId, onNext, onBack }: { courseId: string; onNext: () => void; onBack: () => void }) {
-  const qc = useQueryClient()
-  const [showForm, setShowForm] = useState(false)
-
-  // Form fields matching elearniv UploadVideoForm
-  const [groupName, setGroupName] = useState('')
-  const [title, setTitle] = useState('')
-  const [videoUrl, setVideoUrl] = useState('')
-  const [thumbUrl, setThumbUrl] = useState('')
-  const [thumbPreview, setThumbPreview] = useState('')
-  const [serialId, setSerialId] = useState('')
-  const [isPreview, setIsPreview] = useState(false)
-  const [thumbUploading, setThumbUploading] = useState(false)
-
-  const { data: videos = [], isLoading } = useQuery({
-    queryKey: ['instructor-videos', courseId],
-    queryFn: () => instructorService.getVideos(courseId),
-  })
-
-  const add = useMutation({
-    mutationFn: () =>
-      instructorService.uploadVideo(courseId, {
-        title: title.trim(),
-        videoUrl: videoUrl.trim(),
-        position: videos.length + 1,
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] })
-      toast.success('Đã thêm video!')
-      resetForm()
-    },
-    onError: () => toast.error('Lỗi, thử lại nhé.'),
-  })
-
-  const del = useMutation({
-    mutationFn: (id: string) => instructorService.deleteVideo(courseId, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['instructor-videos', courseId] }),
-  })
-
-  const resetForm = () => {
-    setGroupName(''); setTitle(''); setVideoUrl('')
-    setThumbUrl(''); setThumbPreview(''); setSerialId(''); setIsPreview(false)
-    setShowForm(false)
-  }
-
-  const handleThumbFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => setThumbPreview(e.target?.result as string)
-    reader.readAsDataURL(file)
-    setThumbUploading(true)
-    try {
-      const { url } = await instructorService.uploadImage(file)
-      setThumbUrl(url)
-    } catch {
-      toast.error('Upload thumbnail thất bại')
-    } finally {
-      setThumbUploading(false)
-    }
-  }
-
-  const isYT = (u: string) => u.includes('youtube') || u.includes('youtu.be')
-  const isVimeo = (u: string) => u.includes('vimeo')
-
-  // Group videos by group_name (displayed as section headers)
-  const grouped = videos.reduce<Record<string, typeof videos>>((acc, v) => {
-    const g = (v as any).groupName || 'Chưa phân nhóm'
-    ;(acc[g] ??= []).push(v)
-    return acc
-  }, {})
-
-  return (
-    <div className="space-y-5">
-      {/* Add button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="font-semibold text-white">Danh sách video ({videos.length})</h3>
-          <p className="text-xs text-gray-500 mt-0.5">Hỗ trợ YouTube, Vimeo, và URL video trực tiếp</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Thêm video
-        </button>
-      </div>
-
-      {/* Upload form */}
-      {showForm && (
-        <div className="rounded-xl bg-purple-900/20 border border-purple-500/30 p-5 space-y-4">
-          <h4 className="text-sm font-semibold text-purple-300">Thêm bài học mới</h4>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="label">Nhóm bài học</label>
-              <input
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="VD: Chương 1 — Động lực học"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-            <div>
-              <label className="label">Số thứ tự</label>
-              <input
-                type="number"
-                value={serialId}
-                onChange={(e) => setSerialId(e.target.value)}
-                placeholder="1, 2, 3…"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="label">Tiêu đề bài học <span className="text-red-400">*</span></label>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="VD: Bài 1 — Giới thiệu định luật Newton"
-                className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 px-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="label">URL video (YouTube / Vimeo / MP4 trực tiếp) <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                <input
-                  value={videoUrl}
-                  onChange={(e) => setVideoUrl(e.target.value)}
-                  placeholder="https://youtube.com/watch?v=... hoặc https://cdn.example.com/video.mp4"
-                  className="w-full rounded-lg bg-white/5 border border-white/10 focus:border-purple-500 pl-9 pr-3 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
-                />
-              </div>
-              {videoUrl && (
-                <p className={cn('text-xs mt-1', isYT(videoUrl) ? 'text-green-400' : isVimeo(videoUrl) ? 'text-blue-400' : 'text-gray-400')}>
-                  {isYT(videoUrl) ? '✓ YouTube' : isVimeo(videoUrl) ? '✓ Vimeo' : '✓ URL trực tiếp'}
-                </p>
-              )}
-            </div>
-
-            {/* Thumbnail */}
-            <div>
-              <label className="label">Thumbnail bài học (tuỳ chọn)</label>
-              <div
-                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleThumbFile(f) }}
-                onDragOver={(e) => e.preventDefault()}
-                className={cn(
-                  'relative rounded-lg border-2 border-dashed overflow-hidden transition-colors',
-                  thumbPreview ? 'border-purple-500/40 h-28' : 'border-white/20 hover:border-purple-500/40 h-20'
-                )}
-              >
-                {thumbPreview ? (
-                  <>
-                    <img src={thumbPreview} alt="" className="w-full h-full object-cover" />
-                    {thumbUploading && (
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                        <Spin />
-                      </div>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => { setThumbPreview(''); setThumbUrl('') }}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 flex items-center justify-center"
-                    >
-                      <X className="w-3 h-3 text-white" />
-                    </button>
-                  </>
-                ) : (
-                  <label className="flex items-center justify-center h-full gap-2 cursor-pointer">
-                    <ImageIcon className="w-5 h-5 text-gray-600" />
-                    <span className="text-xs text-gray-500">Chọn thumbnail</span>
-                    <input type="file" accept="image/*" className="hidden"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleThumbFile(f) }} />
-                  </label>
-                )}
-              </div>
-            </div>
-
-            {/* Is preview */}
-            <div className="flex items-center gap-3 self-end pb-2">
-              <button
-                type="button"
-                onClick={() => setIsPreview((v) => !v)}
-                className="flex items-center gap-2 text-sm text-gray-300"
-              >
-                {isPreview ? (
-                  <ToggleRight className="w-8 h-8 text-green-400" />
-                ) : (
-                  <ToggleLeft className="w-8 h-8 text-gray-600" />
-                )}
-                <span className={isPreview ? 'text-green-400' : 'text-gray-500'}>
-                  {isPreview ? 'Bài xem thử (miễn phí)' : 'Yêu cầu đăng ký'}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-1">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-4 py-2 rounded-lg border border-white/20 text-gray-300 text-sm hover:border-white/40 transition-colors"
-            >
-              Huỷ
-            </button>
-            <button
-              type="button"
-              disabled={!title.trim() || !videoUrl.trim() || add.isPending || thumbUploading}
-              onClick={() => add.mutate()}
-              className="flex items-center gap-2 px-6 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-            >
-              {add.isPending && <Spin />}
-              Thêm bài học
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Video list grouped */}
-      {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3].map((i) => <div key={i} className="h-14 rounded-xl bg-white/5 animate-pulse" />)}
-        </div>
-      ) : videos.length === 0 ? (
-        <div className="rounded-xl bg-white/5 border border-dashed border-white/10 p-10 flex flex-col items-center gap-3 text-center">
-          <Play className="w-10 h-10 text-gray-600" />
-          <p className="text-gray-400 text-sm">Chưa có bài học nào. Thêm video đầu tiên!</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {Object.entries(grouped).map(([group, gVideos]) => (
-            <div key={group}>
-              {group !== 'Chưa phân nhóm' && (
-                <p className="text-xs font-semibold text-purple-400 uppercase tracking-wider mb-2 pl-2">
-                  {group}
-                </p>
-              )}
-              <div className="space-y-1.5">
-                {gVideos.map((v, idx) => (
-                  <div
-                    key={v.id}
-                    className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 p-3 transition-colors group"
-                  >
-                    <GripVertical className="w-4 h-4 text-gray-600 flex-shrink-0" />
-
-                    {/* Thumbnail or play icon */}
-                    <div className="w-12 h-9 rounded overflow-hidden bg-gray-800 flex-shrink-0 flex items-center justify-center">
-                      {(v as any).thumbUrl ? (
-                        <img src={(v as any).thumbUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <Play className="w-4 h-4 text-gray-500" />
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">{v.title}</p>
-                      <p className="text-xs text-gray-500 truncate">{v.videoUrl}</p>
-                    </div>
-
-                    {(v as any).isPreview && (
-                      <span className="hidden sm:flex items-center gap-1 text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full border border-green-500/20 flex-shrink-0">
-                        <Eye className="w-3 h-3" /> Xem thử
-                      </span>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`Xoá bài "${v.title}"?`)) del.mutate(v.id)
-                      }}
-                      className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center text-red-400 transition-all flex-shrink-0"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex justify-between pt-2 border-t border-white/10">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-2 px-5 py-3 rounded-lg border border-white/20 hover:border-white/40 text-gray-300 text-sm transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" /> Quay lại
-        </button>
-        <button
-          type="button"
-          onClick={onNext}
-          className="flex items-center gap-2 px-7 py-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold transition-colors"
-        >
-          Tiếp theo → <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  )
-}
 
 // ─────────────────────────────────────────────────────────────
-// Step 4 — Tài liệu đính kèm
+// V3 (2026-05-22): VideoStep đã bỏ — video/audio/PDF/quiz/lab giờ add
+// qua LessonAssetEditor blocks trong CurriculumStep (Coursera/Notion-style).
+// Lý do: giảm trùng lặp + UX rõ hơn (1 nơi duy nhất để soạn nội dung lesson).
+// ─────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────
+// Step 3 — Tài liệu đính kèm (course-level, không phải lesson)
 // ─────────────────────────────────────────────────────────────
 function AssetStep({ courseId, onBack, onFinish }: { courseId: string; onBack: () => void; onFinish: () => void }) {
   const qc = useQueryClient()
@@ -822,28 +541,22 @@ export default function CourseEditor() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const [step, setStep] = useState<Step>(() => {
-    const s = parseInt(searchParams.get('step') || '0') as Step
-    return (s >= 0 && s <= 3) ? s : 0
+    const raw = parseInt(searchParams.get('step') || '0')
+    // V3: Step 3 cũ (Video) đã bỏ — redirect step=3 cũ về step=2 (Mục lục).
+    // Bookmark `?step=3/4/5` cũ → clamp về [0, 4] để không vỡ.
+    if (raw >= 0 && raw <= 4) return raw as Step
+    if (raw === 5) return 4  // old Tài nguyên = step 5 → giờ là 4
+    return 0
   })
 
   const [coverImage, setCoverImage] = useState({ preview: '', url: '' })
   const [basicData, setBasicData] = useState<BasicForm | null>(null)
   const [contentData, setContentData] = useState<ContentForm | null>(null)
 
-  // Listen to step jumps from StepNav buttons
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const target = (e as CustomEvent).detail as Step
-      setStep(target)
-    }
-    document.addEventListener('stepto', handler)
-    return () => document.removeEventListener('stepto', handler)
-  }, [])
-
-  // Sync step to URL
+  // Sync step → URL (replace for clean history)
   useEffect(() => {
     setSearchParams({ step: String(step) }, { replace: true })
-  }, [step])
+  }, [step, setSearchParams])
 
   // Load existing course in edit mode
   const { data: course } = useQuery({
@@ -927,7 +640,14 @@ export default function CourseEditor() {
     navigate('/teacher/my-courses')
   }
 
-  const stepTitle = ['Thông tin cơ bản', 'Nội dung khoá học', 'Bài học & Video', 'Tài liệu đính kèm'][step]
+  const stepTitle = [
+    'Thông tin cơ bản',
+    'Nội dung khoá học',
+    'Mục lục khoá học',
+    'Bài học & Video',
+    'Tài liệu đính kèm',
+    'Tài nguyên mở rộng',
+  ][step]
 
   return (
     <div className="p-5 lg:p-8 max-w-3xl mx-auto">
@@ -979,8 +699,38 @@ export default function CourseEditor() {
         </div>
       )}
 
+      {/* Slug + preview link (chỉ hiện sau khi đã save Bước 1) */}
+      {isEditMode && course && (course.slug || course.id) && (
+        <div className="flex items-center gap-2 mb-4 px-4 py-2.5 rounded-lg bg-purple-500/5 border border-purple-500/20">
+          <LinkIcon className="w-4 h-4 text-purple-400 flex-shrink-0" />
+          <span className="text-xs text-gray-400">URL công khai:</span>
+          <code className="text-xs text-purple-300 font-mono truncate flex-1">
+            /courses/{course.slug || course.id}
+          </code>
+          <a
+            href={`/courses/${course.slug || course.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-purple-300 hover:bg-purple-500/10 transition-colors"
+          >
+            <Eye className="w-3.5 h-3.5" /> Xem trước
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/courses/${course.slug || course.id}`)
+              toast.success('Đã copy link')
+            }}
+            className="text-xs text-gray-400 hover:text-purple-300 px-2 py-1"
+            title="Copy link"
+          >
+            📋
+          </button>
+        </div>
+      )}
+
       {/* Step indicator */}
-      <StepNav current={step} courseId={courseId} />
+      <StepNav current={step} courseId={courseId} onJump={setStep} />
 
       {/* Step content */}
       <div className="rounded-2xl bg-white/[0.03] border border-white/10 p-6">
@@ -1006,10 +756,10 @@ export default function CourseEditor() {
         )}
 
         {step === 2 && courseId && (
-          <VideoStep
+          <CurriculumStep
             courseId={courseId}
-            onNext={() => setStep(3)}
             onBack={() => setStep(1)}
+            onNext={() => setStep(3)}
           />
         )}
 
@@ -1017,12 +767,21 @@ export default function CourseEditor() {
           <AssetStep
             courseId={courseId}
             onBack={() => setStep(2)}
+            onFinish={() => setStep(4)}
+          />
+        )}
+
+        {step === 4 && courseId && (
+          <CourseExtrasStep
+            courseId={courseId}
+            initialExtras={course?.extras}
+            onBack={() => setStep(3)}
             onFinish={handleFinish}
           />
         )}
 
-        {/* Step 2/3 — no courseId yet */}
-        {(step === 2 || step === 3) && !courseId && (
+        {/* Step 2/3/4 — no courseId yet */}
+        {(step === 2 || step === 3 || step === 4) && !courseId && (
           <div className="text-center py-10 text-gray-400">
             <p>Vui lòng hoàn thành bước 1 để lưu khoá học trước.</p>
             <button

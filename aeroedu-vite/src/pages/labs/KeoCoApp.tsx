@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import keocoService, {
   KcSession, KcSessionFull, KcChallenge, KcLiveMatch,
+  KcCatalogItem, KcLeaderboardEntry,
 } from '@/services/keoco.service'
 
 type Tab = 'classroom' | 'live' | 'challenge'
@@ -107,6 +108,81 @@ export default function KeoCoApp() {
    CLASSROOM TAB
 ═══════════════════════════════════════════════════════════════════════ */
 
+function Leaderboard() {
+  const [list, setList] = useState<KcLeaderboardEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    keocoService.getLeaderboard()
+      .then(r => { if (!cancelled) setList(r) })
+      .catch(e => console.warn('keoco leaderboard', e?.message))
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return null
+  if (list.length === 0) return null
+
+  return (
+    <div className="mb-6 bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-rose-500/5 border border-amber-500/25 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full p-4 flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-amber-400" />
+          <h3 className="text-sm font-bold text-amber-200 uppercase tracking-wider">
+            🏆 Bảng xếp hạng — Top {list.length} người chơi Kéo Co
+          </h3>
+        </div>
+        <span className="text-xs text-amber-300/80">{collapsed ? '▼ Mở rộng' : '▲ Thu gọn'}</span>
+      </button>
+      {!collapsed && (
+        <div className="px-4 pb-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-amber-200/60 border-b border-amber-500/20">
+                  <th className="text-left py-2 px-2 font-medium">#</th>
+                  <th className="text-left py-2 px-2 font-medium">Người chơi</th>
+                  <th className="text-right py-2 px-2 font-medium">Thắng</th>
+                  <th className="text-right py-2 px-2 font-medium">Tổng trận</th>
+                  <th className="text-right py-2 px-2 font-medium">Tỉ lệ</th>
+                  <th className="text-right py-2 px-2 font-medium">Điểm</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((e) => {
+                  const rankStyle = e.rank === 1
+                    ? 'bg-gradient-to-r from-amber-500/20 to-transparent'
+                    : e.rank === 2
+                      ? 'bg-gradient-to-r from-slate-400/15 to-transparent'
+                      : e.rank === 3
+                        ? 'bg-gradient-to-r from-orange-700/15 to-transparent'
+                        : ''
+                  const medal = e.rank === 1 ? '🥇' : e.rank === 2 ? '🥈' : e.rank === 3 ? '🥉' : `#${e.rank}`
+                  return (
+                    <tr key={e.rank} className={`border-b border-white/5 ${rankStyle}`}>
+                      <td className="py-2 px-2 text-amber-200 font-bold">{medal}</td>
+                      <td className="py-2 px-2 text-white font-medium">{e.name}</td>
+                      <td className="py-2 px-2 text-right text-emerald-300 font-bold">{e.wins}</td>
+                      <td className="py-2 px-2 text-right text-slate-300">{e.totalPlayed}</td>
+                      <td className="py-2 px-2 text-right text-cyan-300">{e.winRate}%</td>
+                      <td className="py-2 px-2 text-right text-amber-300">{e.totalScore.toLocaleString('vi-VN')}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ClassroomTab() {
   const [sessions, setSessions] = useState<KcSession[]>([])
   const [loading, setLoading] = useState(true)
@@ -129,6 +205,8 @@ function ClassroomTab() {
   const active = sessions.find((s) => s.id === activeId) || null
 
   return (
+    <>
+    <Leaderboard />
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* ── Left: session list ── */}
       <aside className="lg:col-span-4 space-y-3">
@@ -208,6 +286,7 @@ function ClassroomTab() {
         />
       )}
     </div>
+    </>
   )
 }
 
@@ -227,14 +306,43 @@ function CreateSessionModal({
   const [creating, setCreating] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // ── Exam picker (game catalog) ────────────────────────────────
+  const [catalog, setCatalog] = useState<KcCatalogItem[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [selectedExamId, setSelectedExamId] = useState<string>('')
+
+  useEffect(() => {
+    let cancelled = false
+    keocoService.listGameCatalog('keo-co')
+      .then(items => { if (!cancelled) setCatalog(items) })
+      .catch(e => console.warn('catalog load', e?.message))
+      .finally(() => { if (!cancelled) setCatalogLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Khi chọn 1 đề → auto-fill subject + topic + question count
+  function pickExam(id: string) {
+    setSelectedExamId(id)
+    if (!id) return
+    const ex = catalog.find(c => c.examId === id)
+    if (!ex) return
+    if (ex.subject) setSubject(ex.subject)
+    if (ex.examTitle) setTopic(ex.examTitle)
+    if (ex.questionCount > 0) setQuestionCount(Math.min(50, Math.max(3, ex.questionCount)))
+    if (!title || title === 'Kéo Co Kiến Thức') setTitle(`Kéo Co — ${ex.examTitle.slice(0, 40)}`)
+  }
+
   async function submit() {
     setErr(null)
     setCreating(true)
     try {
+      const ex = catalog.find(c => c.examId === selectedExamId)
       const s = await keocoService.createSession({
         title, subject, grade, difficulty: difficulty || undefined,
         topic: topic || undefined,
         questionCount, timePerQuestion, ropeMax,
+        examId: selectedExamId || undefined,
+        examTitle: ex?.examTitle,
       })
       onCreated(s)
     } catch (e: unknown) {
@@ -253,6 +361,31 @@ function CreateSessionModal({
         </div>
 
         <div className="p-5 space-y-4">
+          {/* ── Exam picker từ game catalog ── */}
+          <Field label="📋 Đề thi từ danh mục thi đấu (tuỳ chọn)">
+            {catalogLoading ? (
+              <div className="text-xs text-slate-500 italic px-3 py-2">Đang tải danh mục…</div>
+            ) : catalog.length === 0 ? (
+              <div className="text-xs text-slate-500 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+                Chưa có đề nào trong catalog. Vào{' '}
+                <Link to="/teacher/exams" className="text-rose-300 underline">/teacher/exams</Link>{' '}
+                → bấm nút ⚔️ Swords để add đề vào trò chơi đối kháng.
+              </div>
+            ) : (
+              <select
+                value={selectedExamId}
+                onChange={(e) => pickExam(e.target.value)}
+                className={selectCls}
+              >
+                <option value="">— Tự generate từ ngân hàng câu hỏi —</option>
+                {catalog.map(c => (
+                  <option key={c.id} value={c.examId}>
+                    {c.examTitle}{c.subject ? ` · ${c.subject}` : ''}{c.questionCount > 0 ? ` · ${c.questionCount} câu` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>
           <Field label="Tên cuộc thi">
             <input
               value={title}

@@ -1,12 +1,13 @@
 [package]
 name = "openfang-types"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 description = "OpenFang Core Types for Aeroeduvison"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1", features = ["v4", "serde"] }
-thiserror = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }

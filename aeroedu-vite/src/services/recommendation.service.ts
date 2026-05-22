@@ -1,0 +1,232 @@
+/**
+ * Recommendation Service — "For You" feed cho HS/GV
+ *
+ * Lấy cảm hứng từ X/Twitter For You algorithm (Home Mixer + Phoenix):
+ *   - track(): log mọi action user (view/click/complete/skip/...)
+ *   - getFeed(): rank + return mixed recommendations từ multi-source
+ *   - getHistory(): xem lại engagement của user (debug/transparency)
+ *
+ * Backend: POST /api/reco/track, GET /api/reco/feed, GET /api/reco/history
+ */
+import { api } from './api'
+
+export type RsAction =
+  | 'view' | 'click' | 'dwell_30s' | 'complete' | 'like' | 'save' | 'share'
+  | 'pass_quiz' | 'fail_quiz' | 'skip' | 'not_interested' | 'block' | 'report'
+
+export type RsTargetType =
+  | 'kg_node' | 'learning_path' | 'exam' | 'lesson' | 'course'
+  | 'video' | 'article' | 'teacher' | 'student_paths' | string
+
+export interface RsHydration {
+  /** 0-100 mastery hiện tại của user với node này (nếu là KG node) */
+  currentMastery?: number
+  /** 0-100 % prerequisites đã thông thạo ≥70% */
+  prereqStatus?: number
+  /** Tổng số prerequisites */
+  prereqCount?: number
+  /** Số prerequisites đã thông thạo */
+  prereqMastered?: number
+  /** Unique users đã tương tác trong 30 ngày */
+  popularity?: number
+  /** Phút estimate */
+  estimatedMinutes?: number
+}
+
+/** RS-Phase 5: per-action probabilities (%) từ multi-action ranker */
+export interface RsPredictions {
+  /** 0-100 probability HS sẽ hoàn thành */
+  complete: number
+  /** 0-100 probability HS đạt được (pass quiz) */
+  pass_quiz: number
+  /** 0-100 probability HS thích */
+  like: number
+  /** 0-100 probability HS đọc kỹ (dwell ≥30s) */
+  dwell_30s: number
+  /** 0-100 probability HS skip (negative — càng cao càng tệ) */
+  skip: number
+  /** 0-100 probability HS đánh dấu "không quan tâm" (negative) */
+  not_interested: number
+  /** Tổng weighted ML signal (Σ weight × P), có thể âm hoặc dương */
+  mlSignal: number
+}
+
+export interface RsFeedItem {
+  type: string
+  id: string
+  title: string
+  subtitle?: string
+  description?: string | null
+  score: number
+  source: string
+  link: string
+  meta?: Record<string, any>
+  cta?: string
+  /** RS-Phase 3: hydration signals (transparency) */
+  hydration?: RsHydration | null
+  /** Human-readable reasons array, vd. ["🎯 Bạn còn yếu", "🔥 5 HS đã tương tác"] */
+  reasons?: string[]
+  /** RS-Phase 5: multi-action predictions */
+  predictions?: RsPredictions | null
+}
+
+export interface RsFeedResponse {
+  audience: 'student' | 'teacher'
+  count: number
+  items: RsFeedItem[]
+  sources: string[]
+  /** RS-Phase 10: true nếu user mới (<5 actions) — show welcome banner */
+  isColdStart?: boolean
+}
+
+export interface RsHistoryEntry {
+  id: string
+  action: RsAction | string
+  targetType: string
+  targetId: string
+  weight: number
+  metadata?: Record<string, any>
+  createdAt: string
+}
+
+export const recommendationService = {
+  /** Log 1 action — gọi từ mọi nơi (silent, không fail UI nếu lỗi). */
+  track: (input: {
+    action: RsAction
+    targetType: RsTargetType
+    targetId: string
+    metadata?: Record<string, any>
+    weight?: number
+  }) =>
+    api.post<{ success: boolean; id: string }>('/reco/track', input)
+      .then(r => r.data)
+      .catch(() => ({ success: false, id: '' })),
+
+  /** Get For-You feed, default student. */
+  getFeed: (audience: 'student' | 'teacher' = 'student', limit: number = 20) =>
+    api.get<{ success: boolean } & RsFeedResponse>('/reco/feed', {
+      params: { audience, limit },
+    }).then(r => ({
+      audience: r.data.audience,
+      count: r.data.count,
+      items: r.data.items || [],
+      sources: r.data.sources || [],
+      isColdStart: !!r.data.isColdStart,
+    })),
+
+  /** Get user's engagement history (debug/transparency). */
+  getHistory: (limit: number = 50) =>
+    api.get<{ success: boolean; items: RsHistoryEntry[] }>('/reco/history', {
+      params: { limit },
+    }).then(r => r.data.items || []),
+
+  /** RS-Phase 8: gửi digest notification cho user hiện tại (idempotent 1/day). */
+  sendDigestMe: () =>
+    api.post<{
+      success: boolean
+      sent: boolean
+      reason?: string
+      notificationId?: string
+      itemsCount?: number
+      existingId?: string
+      channels?: RsDigestChannels
+      deliveries?: RsDigestDeliveries
+    }>('/reco/digest/me').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: load user digest preferences. */
+  getDigestPrefs: () =>
+    api.get<{
+      success: boolean
+      channels: RsDigestChannels
+      emailOnAccount: string | null
+      telegramLinked: boolean
+      telegramChatIdPreview: string | null
+      telegramDeepLink: string
+      lastSentAt: string | null
+      lastSentItemsCount: number | null
+    }>('/reco/digest/preferences').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: cập nhật preferences. */
+  updateDigestPrefs: (channels: Partial<RsDigestChannels>) =>
+    api.put<{ success: boolean; channels: RsDigestChannels }>(
+      '/reco/digest/preferences',
+      channels
+    ).then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: gửi test digest (bypass idempotency). */
+  sendDigestTest: () =>
+    api.post<{
+      success: boolean
+      sent: boolean
+      reason?: string
+      itemsCount?: number
+      channels?: RsDigestChannels
+      deliveries?: RsDigestDeliveries
+    }>('/reco/digest/test').then(r => r.data),
+
+  /** RS-Phase 8 multi-channel: huỷ liên kết Telegram. */
+  unlinkTelegram: () =>
+    api.post<{ success: boolean }>('/reco/digest/telegram/unlink').then(r => r.data),
+
+  /** RS-Phase 10 onboarding: load current cold-start prefs */
+  getOnboardingPrefs: () =>
+    api.get<{ success: boolean; prefs: RsOnboardingPrefs | null }>('/reco/onboarding/prefs')
+      .then(r => r.data),
+
+  /** RS-Phase 10 onboarding: save prefs (subject + grade + topics) */
+  updateOnboardingPrefs: (prefs: Partial<RsOnboardingPrefs>) =>
+    api.put<{ success: boolean; prefs: RsOnboardingPrefs }>('/reco/onboarding/prefs', prefs)
+      .then(r => r.data),
+
+  /** RS-Phase 10 onboarding: get available subjects + grades */
+  getOnboardingOptions: () =>
+    api.get<{ success: boolean; subjects: string[]; grades: string[] }>('/reco/onboarding/subjects')
+      .then(r => r.data),
+}
+
+/** RS-Phase 10 enhancement: cold-start user prefs */
+export interface RsOnboardingPrefs {
+  subject?: string | null
+  grade?: string | null
+  interestedTopics?: string[]
+  skipped?: boolean
+  completedAt?: string
+}
+
+/** RS-Phase 8 multi-channel digest preferences */
+export interface RsDigestChannels {
+  inApp: boolean
+  email: boolean
+  telegram: boolean
+}
+
+/** RS-Phase 8 per-channel delivery result */
+export interface RsDigestDeliveries {
+  inApp?: { ok: boolean; id?: string; error?: string } | null
+  email?: { ok: boolean; provider?: string; id?: string; error?: string } | null
+  telegram?: { ok: boolean; error?: string } | null
+}
+
+/** UI helper: mapping cho từng item type → icon + accent color */
+export function getRsTypeMeta(type: string): { emoji: string; accent: string; label: string } {
+  const map: Record<string, { emoji: string; accent: string; label: string }> = {
+    'kg_weak_topic':         { emoji: '🎯', accent: '#f43f5e', label: 'Điểm yếu' },
+    'teacher_learning_path': { emoji: '👩‍🏫', accent: '#22d3ee', label: 'GV mới tạo' },
+    'popular_exam':          { emoji: '🔥', accent: '#fb923c', label: 'Nổi bật' },
+    'curious_topic':         { emoji: '✨', accent: '#a855f7', label: 'Khám phá' },
+    'embedding_match':       { emoji: '🧠', accent: '#3b82f6', label: 'AI khớp sở thích' },
+    // RS-Phase 10: cold-start types
+    'cold_start_popular':    { emoji: '🌟', accent: '#fbbf24', label: 'Khởi đầu' },
+    'cold_start_intro':      { emoji: '🌱', accent: '#10b981', label: 'Bắt đầu khám phá' },
+    'cold_start_teacher_lp': { emoji: '🚀', accent: '#a855f7', label: 'GV của bạn' },
+    // Teacher
+    'student_needs_help':    { emoji: '🆘', accent: '#f43f5e', label: 'HS cần hỗ trợ' },
+    'student_self_path':     { emoji: '🛣',  accent: '#fbbf24', label: 'HS tự khảo sát' },
+    // RS-Phase 7: teacher trending
+    'class_trending_weak':   { emoji: '📉', accent: '#f43f5e', label: 'Lớp đang yếu' },
+    'content_gap':           { emoji: '💡', accent: '#fbbf24', label: 'Cần tạo bài' },
+  }
+  return map[type] || { emoji: '📌', accent: '#94a3b8', label: 'Khác' }
+}
+
+export default recommendationService
