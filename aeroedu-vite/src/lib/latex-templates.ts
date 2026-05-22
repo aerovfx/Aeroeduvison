@@ -1429,6 +1429,195 @@ Viết chữ viết hoa ........; viết câu ứng dụng .....................
 \\end{document}
 `,
   },
+  // ────────────────────────────────────────────────────────────────
+  // V2 (2026-05-22): Templates có đáp án GẠCH CHÂN — auto-detect
+  // Đáp án đúng được wrap trong \underline{...} → parser scan PDF
+  // text qua pdftotext + regex sẽ tự nhận biết đáp án nào đúng,
+  // giảm 90% thao tác nhập tay phiếu đáp án cho GV.
+  // ────────────────────────────────────────────────────────────────
+  {
+    id: "de-mcq-da-gach-chan",
+    name: "✅ Đề trắc nghiệm + đáp án (gạch chân)",
+    description: "Mẫu đề 4 lựa chọn ABCD với đáp án ĐÚNG được gạch chân (\\underline). Hệ thống tự nhận diện đáp án — KHÔNG cần nhập tay phiếu trả lời.",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{siunitx}
+\\geometry{a4paper, total={170mm,257mm}, left=20mm, right=20mm, top=18mm, bottom=20mm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+
+% ─── HƯỚNG DẪN GIÁO VIÊN ──────────────────────────────────────────
+% Đáp án ĐÚNG được wrap trong \\underline{...} — hệ thống tự nhận diện.
+% VD: \\textbf{\\underline{A.}}~Đáp án A.   → A là đáp án đúng
+% VD: \\textbf{B.}~Đáp án B.                → B là đáp án sai
+%
+% Sau khi biên dịch PDF + bấm "Tạo đề" → phiếu đáp án tự điền sẵn,
+% GV chỉ cần kiểm tra lại + ấn lưu.
+% ─────────────────────────────────────────────────────────────────
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{\\Large ĐỀ KIỂM TRA} \\\\[2pt]
+  \\textbf{Môn: ----- \\quad Lớp: ----- \\quad Thời gian: 45 phút}
+\\end{center}
+
+\\vspace{6pt}\\hrule\\vspace{8pt}
+
+\\textbf{Họ và tên:} \\dotfill \\quad \\textbf{SBD:} \\dotfill
+
+\\vspace{8pt}
+
+\\section*{Phần I. Trắc nghiệm 4 lựa chọn (đáp án đúng gạch chân)}
+
+\\begin{enumerate}[leftmargin=1.15cm,label=\\textbf{Câu \\arabic*.},itemsep=8pt]
+  \\item Cho hàm số $y = x^2 - 4x + 3$. Đỉnh parabol có toạ độ là?
+
+    \\textbf{A.}~$(1; 0)$ \\quad
+    \\textbf{\\underline{B.}}~$(2; -1)$ \\quad
+    \\textbf{C.}~$(-2; 1)$ \\quad
+    \\textbf{D.}~$(0; 3)$
+
+  \\item Phương trình $x^2 - 5x + 6 = 0$ có tổng các nghiệm bằng?
+
+    \\textbf{A.}~$-5$ \\quad
+    \\textbf{\\underline{B.}}~$5$ \\quad
+    \\textbf{C.}~$6$ \\quad
+    \\textbf{D.}~$-6$
+
+  \\item Đạo hàm của $f(x) = \\sin(2x)$ tại $x = \\dfrac{\\pi}{4}$ bằng?
+
+    \\textbf{A.}~$1$ \\quad
+    \\textbf{B.}~$-1$ \\quad
+    \\textbf{\\underline{C.}}~$0$ \\quad
+    \\textbf{D.}~$2$
+
+  \\item Một vật rơi tự do với $g = 9{,}8$ \\si{m/s^2}. Sau \\SI{3}{s}, vận tốc vật bằng?
+
+    \\textbf{A.}~\\SI{19{,}6}{m/s} \\quad
+    \\textbf{B.}~\\SI{14{,}7}{m/s} \\quad
+    \\textbf{C.}~\\SI{34{,}3}{m/s} \\quad
+    \\textbf{\\underline{D.}}~\\SI{29{,}4}{m/s}
+\\end{enumerate}
+
+\\vspace{12pt}\\hrule\\vspace{6pt}
+\\begin{center}\\textit{--- HẾT ---}\\end{center}
+
+\\end{document}
+`,
+  },
+  {
+    id: "bgd-2025-vatly-da-gach-chan",
+    name: "⭐✅ Đề BGD 2025 — Vật lí + đáp án gạch chân",
+    description: "Mẫu chuẩn Bộ GD 4 phần (TN ABCD · Đúng/Sai · TLN · Tự luận) với đáp án ĐÚNG được gạch chân. Hệ thống tự nhận diện đáp án PHẦN I + PHẦN II, GV chỉ điền phần III + IV thủ công.",
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{siunitx}
+\\usepackage{tabularx}
+\\usepackage{fancyhdr}
+\\geometry{a4paper, total={170mm,257mm}, left=20mm, right=20mm, top=18mm, bottom=20mm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+\\pagestyle{fancy}
+\\fancyhf{}
+\\fancyfoot[C]{\\thepage}
+\\renewcommand{\\headrulewidth}{0pt}
+
+% ─── HƯỚNG DẪN ──────────────────────────────────────────────────
+% PHẦN I — Đáp án đúng wrap \\underline{\\textbf{X.}}
+% PHẦN II — Phát biểu ĐÚNG wrap \\underline{...} cả dòng,
+%            phát biểu SAI để nguyên (không gạch chân)
+% PHẦN III + IV — gõ tay tại trang đáp án (số/biểu thức quá đa dạng)
+% ────────────────────────────────────────────────────────────────
+
+\\begin{document}
+
+\\begin{tabularx}{\\linewidth}{@{}>{\\centering\\arraybackslash}X@{\\hspace{6mm}}>{\\centering\\arraybackslash}X@{}}
+\\textbf{SỞ GD ĐT TP. HỒ CHÍ MINH} & \\textbf{KIỂM TRA CUỐI HỌC KỲ II} \\\\[2pt]
+\\textbf{TRƯỜNG THPT MINH HOẠ}     & \\textbf{NĂM HỌC 2025 -- 2026}    \\\\[2pt]
+\\textbf{ĐỀ THI MINH HOẠ}           & \\textbf{MÔN: VẬT LÍ 11}          \\\\[2pt]
+(\\textit{Đề thi có 03 trang})     & \\textit{Thời gian: 45 phút}      \\\\
+\\end{tabularx}
+
+\\vspace{4pt}\\hrule\\vspace{8pt}
+
+\\begin{tabularx}{\\linewidth}{@{}X@{\\hspace{6mm}}r@{}}
+\\textbf{Họ, tên thí sinh:} \\dotfill\\hspace{0pt} &
+\\fbox{\\rule{0pt}{12pt}\\textbf{~Mã đề: 456~}} \\\\[4pt]
+\\textbf{Số báo danh:} \\dotfill & \\\\
+\\end{tabularx}
+
+\\vspace{6pt}
+
+\\section*{Phần I. Trắc nghiệm 4 lựa chọn (4,0 điểm) — Đáp án đúng gạch chân}
+
+\\begin{enumerate}[leftmargin=1.15cm,label=\\textbf{Câu \\arabic*.},itemsep=6pt]
+  \\item Một dòng điện chạy qua dây dẫn có cường độ \\SI{2}{A} trong \\SI{5}{s}. Điện lượng đã chuyển qua tiết diện dây là?
+
+    \\textbf{A.}~\\SI{2{,}5}{C} \\quad
+    \\textbf{\\underline{B.}}~\\SI{10}{C} \\quad
+    \\textbf{C.}~\\SI{7}{C} \\quad
+    \\textbf{D.}~\\SI{3}{C}
+
+  \\item Đại lượng đặc trưng cho khả năng tích điện của tụ điện là?
+
+    \\textbf{A.}~Hiệu điện thế \\quad
+    \\textbf{\\underline{B.}}~Điện dung \\quad
+    \\textbf{C.}~Năng lượng \\quad
+    \\textbf{D.}~Điện trở
+
+  \\item Suất điện động $\\xi = \\SI{12}{V}$, điện trở trong $r = \\SI{1}{\\ohm}$, mạch ngoài $R = \\SI{5}{\\ohm}$. Cường độ dòng điện trong mạch?
+
+    \\textbf{A.}~\\SI{1{,}5}{A} \\quad
+    \\textbf{B.}~\\SI{3}{A} \\quad
+    \\textbf{\\underline{C.}}~\\SI{2}{A} \\quad
+    \\textbf{D.}~\\SI{2{,}4}{A}
+\\end{enumerate}
+
+\\section*{Phần II. Trắc nghiệm đúng/sai (2,0 điểm)}
+\\textit{Phát biểu ĐÚNG được \\underline{gạch chân}, phát biểu SAI để nguyên.}
+
+\\textbf{Câu 1.} Khi mắc song song 2 điện trở $R_1 = \\SI{6}{\\ohm}$ và $R_2 = \\SI{3}{\\ohm}$:\\\\
+a) \\underline{Điện trở tương đương $R_{td} = \\SI{2}{\\ohm}$.}\\\\
+b) Cường độ dòng qua $R_1$ lớn hơn qua $R_2$.\\\\
+c) \\underline{Hiệu điện thế trên 2 điện trở bằng nhau.}\\\\
+d) Tổng dòng điện 2 nhánh bằng dòng mạch chính khi mắc nối tiếp.\\\\
+
+\\textbf{Câu 2.} Về định luật Ohm cho toàn mạch:\\\\
+a) \\underline{Cường độ dòng tỉ lệ thuận với suất điện động.}\\\\
+b) Điện trở trong tăng làm dòng điện tăng.\\\\
+c) \\underline{Khi $R$ ngoài $= 0$, mạch bị đoản mạch.}\\\\
+d) Định luật chỉ đúng cho mạch điện một chiều có nguồn lý tưởng.\\\\
+
+\\section*{Phần III. Trả lời ngắn (2,0 điểm)}
+\\textit{Mỗi câu 0,5 điểm — GV nhập đáp án thủ công khi tạo phiếu.}
+
+\\textbf{Câu 1.} Cho mạch gồm pin $\\xi = \\SI{6}{V}$, $r = \\SI{0{,}5}{\\ohm}$ mắc với điện trở ngoài $R = \\SI{5{,}5}{\\ohm}$. Cường độ dòng điện qua mạch bằng bao nhiêu (\\si{A})?\\\\[8pt]
+
+\\textbf{Câu 2.} Một tụ điện $C = \\SI{10}{\\micro F}$ được nạp đến hiệu điện thế \\SI{20}{V}. Điện tích trên tụ là bao nhiêu (\\si{\\micro C})?\\\\[8pt]
+
+\\section*{Phần IV. Tự luận (2,0 điểm)}
+
+\\textbf{Câu 1 (1,0đ).} Một dây dẫn có điện trở \\SI{4}{\\ohm}, được mắc nối tiếp với một điện trở khác và một nguồn điện có suất điện động \\SI{9}{V}, điện trở trong \\SI{1}{\\ohm}. Biết hiệu điện thế giữa 2 đầu dây dẫn là \\SI{4}{V}. Tính:\\\\
+a) Cường độ dòng điện qua mạch.\\\\
+b) Điện trở của điện trở thứ hai.\\\\[40pt]
+
+\\textbf{Câu 2 (1,0đ).} Trình bày cấu tạo + nguyên lý hoạt động của pin Volta.\\\\[40pt]
+
+\\vspace{8pt}\\hrule\\vspace{6pt}
+\\begin{center}\\textit{--- HẾT ---}\\end{center}
+
+\\end{document}
+`,
+  },
 );
 
 export function getTemplateById(id: string): LatexTemplateOption | undefined {

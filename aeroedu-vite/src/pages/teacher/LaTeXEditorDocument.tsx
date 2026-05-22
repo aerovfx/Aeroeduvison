@@ -42,6 +42,80 @@ interface Collaborator {
 }
 
 /* ── Small helpers ── */
+
+/**
+ * Auto-detect đáp án từ LaTeX source qua pattern \underline{}.
+ *
+ * PHẦN I (MCQ ABCD): scan từng câu, tìm \underline{\textbf{X.}} → X là đáp án đúng.
+ *   Cấu trúc: `\item ... \textbf{\underline{B.}}~Đáp án`
+ *
+ * PHẦN II (Đúng/Sai 4 ý a/b/c/d): scan từng "Câu N." block, mỗi ý a-d
+ *   được wrap \underline{...} là ĐÚNG (T), không wrap là SAI (F).
+ *
+ * Trả về { phanI: ['B','D','A',...], phanII: ['TFTT', 'FTFT',...] }
+ */
+function autoDetectAnswersFromLatex(latex: string): { phanI: string[]; phanII: string[] } {
+  const phanI: string[] = []
+  const phanII: string[] = []
+  if (!latex) return { phanI, phanII }
+
+  // ── PHẦN I: split by \item rồi tìm \underline{...} đầu tiên ──
+  // Pattern: \textbf{\underline{X.}} hoặc \underline{\textbf{X.}}
+  // Limit scope đến PHẦN II hoặc PHẦN III để tránh nhầm
+  const phanIIndex = latex.search(/Phần\s*II[.\s]/i)
+  const phanISource = phanIIndex > 0 ? latex.slice(0, phanIIndex) : latex
+  const items = phanISource.split(/\\item\b/)
+  // items[0] là phần trước \item đầu tiên (preamble), bỏ qua
+  for (let i = 1; i < items.length; i++) {
+    const block = items[i]
+    // Tìm pattern \underline{...X.} hoặc \textbf{\underline{X.}}
+    const m = block.match(/\\underline\{\s*\\textbf\{\s*([A-D])\.\s*\}\s*\}|\\textbf\{\s*\\underline\{\s*([A-D])\.\s*\}\s*\}/)
+    if (m) {
+      phanI.push((m[1] || m[2]).toUpperCase())
+    } else {
+      // Có \item nhưng chưa có đáp án đúng → empty
+      phanI.push('')
+    }
+  }
+  // Trim trailing empty
+  while (phanI.length > 0 && phanI[phanI.length - 1] === '') phanI.pop()
+
+  // ── PHẦN II: split by "Câu N." trong scope PHẦN II → PHẦN III ──
+  const phan3Index = latex.search(/Phần\s*III[.\s]/i)
+  if (phanIIndex > 0) {
+    const phanIIEnd = phan3Index > phanIIndex ? phan3Index : latex.length
+    const phanIISource = latex.slice(phanIIndex, phanIIEnd)
+    // Split by `\textbf{Câu \d+.}` markers
+    const cauBlocks = phanIISource.split(/\\textbf\{\s*C[âa]u\s+\d+\.\s*\}/i)
+    for (let i = 1; i < cauBlocks.length; i++) {  // skip [0] = header
+      const block = cauBlocks[i]
+      // Tìm 4 dòng a/b/c/d và check có \underline{...} không
+      const lines = block.split(/\\\\/)  // split by \\
+      const tfArray = ['-', '-', '-', '-']  // a,b,c,d
+      let idx = 0
+      for (const line of lines) {
+        const matchLetter = line.match(/^[\s\\textbf{}]*([a-d])\)/i)
+        if (matchLetter) {
+          const letter = matchLetter[1].toLowerCase()
+          const letterIdx = letter.charCodeAt(0) - 'a'.charCodeAt(0)
+          if (letterIdx >= 0 && letterIdx < 4) {
+            // Check xem dòng có \underline{ không (= ĐÚNG)
+            tfArray[letterIdx] = /\\underline\s*\{/.test(line) ? 'T' : 'F'
+            idx = letterIdx + 1
+          }
+        }
+        if (idx >= 4) break
+      }
+      // Chỉ thêm nếu có ít nhất 1 T hoặc F
+      if (tfArray.some(x => x !== '-')) {
+        phanII.push(tfArray.join(''))
+      }
+    }
+  }
+
+  return { phanI, phanII }
+}
+
 function IconBtn({
   onClick, disabled, title, children, danger, active,
 }: {
@@ -591,9 +665,30 @@ export default function LaTeXEditorDocument() {
 
         {/* PDF-only exam — không AI extract, GV nhập đáp án thủ công */}
         <button
-          onClick={() => setPdfExamModalOpen(true)}
+          onClick={() => {
+            // V2 (2026-05-22): TỰ ĐỘNG PARSE đáp án \underline{} từ LaTeX source
+            // → pre-fill PHẦN I + II trước khi mở modal. GV chỉ cần check + submit.
+            try {
+              const detected = autoDetectAnswersFromLatex(content)
+              if (detected.phanI.length > 0) {
+                const next = Array(40).fill('')
+                detected.phanI.forEach((ans, i) => { if (i < 40) next[i] = ans })
+                setPdfExamPhanI(next)
+              }
+              if (detected.phanII.length > 0) {
+                const next = Array(detected.phanII.length).fill('----')
+                detected.phanII.forEach((ans, i) => { next[i] = ans })
+                setPdfExamPhanII(next)
+              }
+              const totalAuto = detected.phanI.length + detected.phanII.length
+              if (totalAuto > 0) {
+                toast.success(`✨ Auto-detect: ${detected.phanI.length} câu PHẦN I + ${detected.phanII.length} câu PHẦN II`)
+              }
+            } catch { /* ignore — fallback empty */ }
+            setPdfExamModalOpen(true)
+          }}
           disabled={!id || compiling}
-          title="HS xem PDF làm hình đề và tô đáp án bên phải — bạn nhập đáp án chuẩn"
+          title="Mở phiếu đáp án — tự động detect đáp án từ \\underline{} trong LaTeX"
           style={{
             background: 'linear-gradient(90deg, #f59e0b, #ef4444)',
             border: 'none', borderRadius: 8, color: '#fff',
@@ -1051,44 +1146,99 @@ export default function LaTeXEditorDocument() {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              maxWidth: 1200, width: '100%', maxHeight: '92vh', overflowY: 'auto',
+              maxWidth: '95vw', width: '100%', maxHeight: '95vh',
               background: '#fdf2f8', border: `2px solid #f9a8d4`, borderRadius: 16,
-              padding: 20, color: '#1f2937',
+              padding: 0, color: '#1f2937', display: 'flex', flexDirection: 'column',
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, textAlign: 'center', color: '#0f172a', textTransform: 'uppercase' }}>
-              Phiếu trả lời trắc nghiệm
-            </h2>
-            <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center', margin: '4px 0 18px' }}>
-              Click vào ô để chọn đáp án đúng — chính giáo viên ra đề tô vào phiếu mẫu
-            </p>
+            <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid #fbcfe8' }}>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, textAlign: 'center', color: '#0f172a', textTransform: 'uppercase' }}>
+                Phiếu trả lời trắc nghiệm
+              </h2>
+              <p style={{ fontSize: 12, color: '#64748b', textAlign: 'center', margin: '3px 0 0' }}>
+                {pdfBlobUrl
+                  ? '📄 Đề PDF bên trái · ✏ Click ô đáp án bên phải để tô — đối chiếu trực tiếp'
+                  : '⚠ Bấm "Biên dịch" trước để có đề PDF đối chiếu khi nhập đáp án'}
+              </p>
+            </div>
 
-            {/* ── PHẦN I — Trắc nghiệm A/B/C/D ── */}
-            <PhanISheet
-              answers={pdfExamPhanI}
-              onChange={setPdfExamPhanI}
-            />
+            {/* Split layout: PDF left + answer sheet right */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 1, background: '#f9a8d4' }}>
+              {/* ─── LEFT: PDF preview để đối chiếu ─── */}
+              <div style={{
+                flex: '0 0 50%', minWidth: 0, background: '#1a1a2e',
+                display: 'flex', flexDirection: 'column',
+              }}>
+                {pdfBlobUrl ? (
+                  <iframe
+                    src={pdfBlobUrl}
+                    title="Đề PDF — đối chiếu khi nhập đáp án"
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                ) : (
+                  <div style={{
+                    height: '100%', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', gap: 12,
+                    color: '#94a3b8', padding: 24, textAlign: 'center',
+                  }}>
+                    <FileCode2 size={48} style={{ opacity: 0.4 }} />
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fbcfe8' }}>
+                      Chưa có PDF để đối chiếu
+                    </div>
+                    <div style={{ fontSize: 11.5, maxWidth: 260, lineHeight: 1.5 }}>
+                      Đóng modal này, bấm <strong style={{ color: '#4ade80' }}>Biên dịch</strong> để
+                      tạo PDF trước → quay lại để xem song song với phiếu đáp án bên phải.
+                    </div>
+                    <button
+                      onClick={() => setPdfExamModalOpen(false)}
+                      style={{
+                        marginTop: 6, padding: '8px 16px', borderRadius: 8,
+                        background: '#16a34a', border: 'none', color: '#fff',
+                        fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                      }}
+                    >
+                      Đóng để biên dịch
+                    </button>
+                  </div>
+                )}
+              </div>
 
-            {/* ── PHẦN II — Đúng/Sai 4 mệnh đề ── */}
-            <PhanIISheet
-              answers={pdfExamPhanII}
-              onChange={setPdfExamPhanII}
-            />
+              {/* ─── RIGHT: Answer sheet ─── */}
+              <div style={{
+                flex: '1 1 50%', minWidth: 0, background: '#fdf2f8',
+                overflowY: 'auto', padding: 16,
+              }}>
+                {/* ── PHẦN I — Trắc nghiệm A/B/C/D ── */}
+                <PhanISheet
+                  answers={pdfExamPhanI}
+                  onChange={setPdfExamPhanI}
+                />
 
-            {/* ── PHẦN III — Trả lời ngắn ── */}
-            <PhanIIISheet
-              answers={pdfExamPhanIII}
-              onChange={setPdfExamPhanIII}
-            />
+                {/* ── PHẦN II — Đúng/Sai 4 mệnh đề ── */}
+                <PhanIISheet
+                  answers={pdfExamPhanII}
+                  onChange={setPdfExamPhanII}
+                />
 
-            {/* ── PHẦN IV — Tự luận (AI chấm) ── */}
-            <PhanIVSheet
-              questions={pdfExamPhanIV}
-              onChange={setPdfExamPhanIV}
-            />
+                {/* ── PHẦN III — Trả lời ngắn ── */}
+                <PhanIIISheet
+                  answers={pdfExamPhanIII}
+                  onChange={setPdfExamPhanIII}
+                />
 
-            {/* Submit */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 18, padding: '14px 0 0', borderTop: '1px solid #fbcfe8' }}>
+                {/* ── PHẦN IV — Tự luận (AI chấm) ── */}
+                <PhanIVSheet
+                  questions={pdfExamPhanIV}
+                  onChange={setPdfExamPhanIV}
+                />
+              </div>
+            </div>
+
+            {/* Submit — sticky footer outside split body */}
+            <div style={{
+              display: 'flex', gap: 10, padding: '12px 20px', flexShrink: 0,
+              borderTop: '1px solid #fbcfe8', background: '#fdf2f8',
+            }}>
               <button
                 onClick={() => !pdfExamSubmitting && setPdfExamModalOpen(false)}
                 style={{
