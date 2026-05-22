@@ -15,8 +15,14 @@
 - Hiển thị "📦 Commit N/5 — deploy sau Y commit nữa" sau mỗi commit để user biết tiến độ
 
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
-- Last deployed commit: `dcb047b` (revision pixiai-00383-jur, 2026-05-22 — LaTeX templates đáp án \\underline{} auto-detect + PDF split-view khi nhập đáp án + 3 careers mới + 4 UX fixes + camera quick-add)
+- Last deployed commit: `957561f` (revision pixiai-00385-sah, 2026-05-22 — Free pedagogy course + plan Đậu Lém + AI prompts LaTeX + Question Bank ownership + Career Survey skip + Soft skills KG + Fix curriculum blocks)
 - Commits since last deploy: `0/5`
+- Prev: `97a6878` — Fix curriculum: defensive table-create + reload + diagnostic log
+- Prev: `c1280eb` — Soft Skills panel cho HS/GV/PH (3 vai trò × 4-8 kỹ năng) trong KG
+- Prev: `50e979b` — Career Survey có nút "Bỏ qua" — KG tự phát triển qua hoạt động
+- Prev: `1a9bdb0` — Question Bank: GV chỉ sửa/xoá câu của chính mình (ownership check)
+- Prev: `5a0bf40` — LaTeX +6 mẫu (đơn phép/SKKN/biên bản/CV/KH tuần/đề cương) + AiTemplateGuideModal
+- Prev: `dcb047b` → pixiai-00383-jur (LaTeX templates đáp án \\underline{} auto-detect + PDF split-view + 3 careers mới + 4 UX fixes + camera quick-add)
 - Prev: `13204eb` — Teacher camera quick-add 2 mode (lớp/nhà) + hướng dẫn
 - Prev: `0adcb3e` — 4 UX fixes (input contrast + multi-grade + phản tư + 3 careers hiện đại)
 - Prev: `3beccfb` → pixiai-00382-xeh (VideoUploader: video/audio upload GCS bucket với progress tracking)
