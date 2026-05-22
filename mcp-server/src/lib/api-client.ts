@@ -1,13 +1,13 @@
 /**
- * AeroEdu API client — wrapper undici fetch tới inphysic.com với JWT auth.
+ * AeroEdu API client — undici wrapper với JWT auth + actionable errors.
  *
- * Env vars:
- *   AEROEDU_API_URL — default https://inphysic.com
- *   AEROEDU_JWT     — JWT của user (teacher/admin) lấy từ DevTools localStorage
+ * Auth (MVP): JWT từ env var AEROEDU_JWT
+ *   Lấy JWT: vào https://inphysic.com → login → DevTools Console:
+ *     copy(localStorage.getItem('auth_token'))
  *
- * Lưu ý MVP:
- *   - JWT cứng trong env. Tháng 2 sẽ chuyển sang OAuth device flow.
- *   - Mọi error đều throw ApiError để MCP server format lại cho Claude.
+ * Auth (Phase 2 — Tháng 4): OAuth 2.1 device flow
+ *   Spec backend: POST /api/oauth/device → {device_code, user_code, verification_uri}
+ *                 POST /api/oauth/token  → {access_token, refresh_token, expires_in}
  */
 
 import { request } from "undici";
@@ -32,15 +32,14 @@ export interface ApiClientOptions {
 }
 
 export class AeroEduApiClient {
-  private readonly baseUrl: string;
+  readonly baseUrl: string;
   private readonly jwt: string | undefined;
   private readonly timeoutMs: number;
 
   constructor(opts: ApiClientOptions = {}) {
-    this.baseUrl = (opts.baseUrl ?? process.env.AEROEDU_API_URL ?? DEFAULT_API_URL).replace(
-      /\/+$/,
-      "",
-    );
+    this.baseUrl = (
+      opts.baseUrl ?? process.env.AEROEDU_API_URL ?? DEFAULT_API_URL
+    ).replace(/\/+$/, "");
     this.jwt = opts.jwt ?? process.env.AEROEDU_JWT;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
@@ -49,8 +48,15 @@ export class AeroEduApiClient {
     return !!this.jwt;
   }
 
-  async get<T = unknown>(path: string): Promise<T> {
-    return this.send<T>("GET", path);
+  async get<T = unknown>(path: string, query?: Record<string, string | number | boolean>): Promise<T> {
+    let url = path;
+    if (query) {
+      const qs = new URLSearchParams(
+        Object.fromEntries(Object.entries(query).map(([k, v]) => [k, String(v)])),
+      ).toString();
+      if (qs) url = `${path}?${qs}`;
+    }
+    return this.send<T>("GET", url);
   }
 
   async post<T = unknown>(path: string, body?: unknown): Promise<T> {
@@ -68,7 +74,15 @@ export class AeroEduApiClient {
   private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
     if (!this.jwt) {
       throw new ApiError(
-        "AEROEDU_JWT chưa được thiết lập. Vào https://inphysic.com → login → DevTools → localStorage → 'auth_token' → copy giá trị → set vào env AEROEDU_JWT.",
+        [
+          "AEROEDU_JWT chưa được thiết lập.",
+          "Cách lấy JWT:",
+          "  1. Vào https://inphysic.com → đăng nhập tài khoản teacher/admin",
+          "  2. Mở DevTools (Cmd+Opt+I) → Console",
+          "  3. Chạy: copy(localStorage.getItem('auth_token'))",
+          "  4. Paste vào env var AEROEDU_JWT trong claude_desktop_config.json",
+          "  5. Restart Claude Desktop",
+        ].join("\n"),
         401,
       );
     }
@@ -76,9 +90,10 @@ export class AeroEduApiClient {
     const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.jwt}`,
-      "User-Agent": "aeroedu-mcp/0.1.0",
+      "User-Agent": "aeroedu-mcp/0.2.0",
       Accept: "application/json",
     };
+
     let payload: string | undefined;
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
@@ -94,7 +109,7 @@ export class AeroEduApiClient {
     });
 
     const text = await respBody.text();
-    let parsed: unknown = undefined;
+    let parsed: unknown;
     if (text) {
       try {
         parsed = JSON.parse(text);
@@ -104,15 +119,23 @@ export class AeroEduApiClient {
     }
 
     if (statusCode >= 400) {
-      throw new ApiError(
-        `${method} ${path} → ${statusCode}: ${
-          typeof parsed === "object" && parsed !== null && "error" in parsed
-            ? (parsed as { error: string }).error
-            : text.slice(0, 300)
-        }`,
-        statusCode,
-        parsed,
-      );
+      const msg =
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "error" in parsed
+          ? (parsed as { error: string }).error
+          : text.slice(0, 300);
+
+      const hint =
+        statusCode === 401
+          ? "\nGợi ý: JWT có thể hết hạn — login lại và copy token mới."
+          : statusCode === 403
+            ? "\nGợi ý: Tài khoản không đủ quyền (cần teacher hoặc admin)."
+            : statusCode === 404
+              ? "\nGợi ý: Resource không tồn tại — kiểm tra lại ID."
+              : "";
+
+      throw new ApiError(`[${statusCode}] ${method} ${path}: ${msg}${hint}`, statusCode, parsed);
     }
 
     return parsed as T;

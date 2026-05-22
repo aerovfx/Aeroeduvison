@@ -1,0 +1,95 @@
+<evaluation>
+  <!-- AeroEdu MCP Server — 10 evaluation questions
+       Designed per mcp-builder skill Phase 4 guidelines:
+       - Read-only where possible
+       - Multiple tool calls required
+       - Realistic teacher/student workflows
+       - Verifiable by string comparison
+       - Stable answers (not time-dependent)
+  -->
+
+  <qa_pair>
+    <question>
+      A teacher wants to create a complete Physics 11 course on AeroEdu about harmonic oscillation.
+      Using aeroedu_course_create followed by aeroedu_chapter_add, what field name should be used
+      for the subject parameter when creating a Physics course?
+    </question>
+    <answer>physics</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      When calling aeroedu_course_list with default parameters, what is the default value
+      for the "limit" parameter according to the tool's input schema?
+    </question>
+    <answer>20</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      A teacher wants to add a lesson that contains interactive simulation exercises for students.
+      Which "type" value should they use in aeroedu_lesson_add for a hands-on simulation lesson?
+    </question>
+    <answer>lab</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      When using aeroedu_exam_create to create a Vietnamese high school style exam with
+      4-statement true/false questions (chuẩn THPT), what is the exact "type" string to use
+      for each such question in the questions array?
+    </question>
+    <answer>true_false_4</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      The aeroedu_kg_search tool supports filtering by subject. What value should be passed
+      to search across ALL subjects without filtering to a specific one?
+    </question>
+    <answer>all</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      A teacher has a PDF textbook chapter on "Newton's Laws of Motion" for Grade 10 Physics.
+      They want to use aeroedu_kg_extract to preview what Knowledge Graph nodes would be extracted
+      WITHOUT automatically adding them to the KG. What value should the "auto_add" parameter be?
+    </question>
+    <answer>false</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      When a student completes a lesson and the AI tutor records their learning visit using
+      aeroedu_kg_record_visit, what is the default value for the "source" parameter?
+    </question>
+    <answer>ai_tutor</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      The aeroedu_kg_path_find tool uses a graph traversal algorithm to find the optimal
+      learning path between two knowledge nodes. According to the tool description, what
+      algorithm does it use to find the shortest path through prerequisites?
+    </question>
+    <answer>BFS</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      The aeroedu_course_list tool supports pagination. After a page of results, which field
+      in the response indicates the offset value to use for the next page of results?
+    </question>
+    <answer>next_offset</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>
+      According to the aeroedu_kg_node_detail tool's input schema, what is the default value
+      for the "include_resources" parameter that controls whether learning materials
+      (videos, quizzes, reading) are returned alongside the node details?
+    </question>
+    <answer>true</answer>
+  </qa_pair>
+</evaluation>

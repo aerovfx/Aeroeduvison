@@ -3,28 +3,41 @@
 > MCP (Model Context Protocol) server cho phép Claude Desktop / Cursor /
 > bất kỳ MCP client nào thao tác trực tiếp với **AeroEdu (inphysic.com)**.
 
-**Status**: MVP Tháng 1 — 5 core tools `aeroedu_course_*`
-**Roadmap đầy đủ**: xem `docs/mcp-aeroedu-integration-plan.md` ở repo gốc.
+**Version**: v0.2.0 — 10 tools / 2 namespaces
+**SDK**: @modelcontextprotocol/sdk v1.x (McpServer + registerTool API)
+**Roadmap**: `docs/mcp-aeroedu-integration-plan.md`
 
 ---
 
-## 1. 5 tools MVP
+## 1. 10 Tools
 
-| Tool | Mô tả | Endpoint |
-|------|-------|----------|
-| `aeroedu_course_list` | Liệt kê khoá học của teacher | `GET /api/instructor/courses` |
-| `aeroedu_course_create` | Tạo khoá học mới (draft) | `POST /api/instructor/courses` |
-| `aeroedu_chapter_add` | Thêm chương vào khoá | `POST /api/instructor/courses/:id/chapters` |
-| `aeroedu_lesson_add` | Thêm bài học (video/đọc/quiz/bài tập/lab) | `POST /api/instructor/chapters/:id/lessons` |
-| `aeroedu_exam_create` | Tạo đề thi (MCQ / Đ-S 4 mệnh đề / trả lời ngắn / tự luận) | `POST /api/instructor/exams` |
+### Namespace `aeroedu_course_*` — Quản lý khoá học
+
+| Tool | Mô tả | Read-only |
+|------|-------|-----------|
+| `aeroedu_course_list` | Liệt kê khoá học (filter + pagination) | ✓ |
+| `aeroedu_course_create` | Tạo khoá học mới (draft) | — |
+| `aeroedu_chapter_add` | Thêm chương vào khoá | — |
+| `aeroedu_lesson_add` | Thêm bài học (video/đọc/quiz/bài tập/lab) | — |
+| `aeroedu_exam_create` | Tạo đề thi (MCQ / Đ-S 4 mệnh đề / ngắn / tự luận + LaTeX) | — |
+
+### Namespace `aeroedu_kg_*` — Knowledge Graph
+
+| Tool | Mô tả | Read-only |
+|------|-------|-----------|
+| `aeroedu_kg_search` | Tìm kiếm ngữ nghĩa (AI, NL query, filter môn/lớp) | ✓ |
+| `aeroedu_kg_node_detail` | Xem chi tiết node + tài liệu + mastery stats | ✓ |
+| `aeroedu_kg_path_find` | Tìm lộ trình học tập A→B (BFS + thời gian ước tính) | ✓ |
+| `aeroedu_kg_record_visit` | Ghi nhận HS đã học node → cập nhật mastery | — |
+| `aeroedu_kg_extract` | Trích xuất KG từ văn bản/tài liệu (AI-powered) | — |
 
 ---
 
-## 2. Cài đặt
+## 2. Cài đặt & Config
 
 ### Yêu cầu
 - Node.js ≥ 18
-- Tài khoản teacher hoặc admin trên inphysic.com
+- Tài khoản teacher/admin trên inphysic.com
 - Claude Desktop (https://claude.ai/download)
 
 ### Build
@@ -32,34 +45,23 @@
 cd mcp-server
 npm install
 npm run build
+# → dist/index.js ready
 ```
 
-Sau khi build, file `dist/index.js` sẵn sàng chạy.
-
 ### Lấy JWT token
-
-1. Mở https://inphysic.com → đăng nhập tài khoản teacher
-2. Mở DevTools (Cmd+Opt+I) → tab **Console**
-3. Chạy:
-   ```js
-   copy(localStorage.getItem('auth_token'))
-   ```
-4. Token đã được copy vào clipboard (dạng `eyJhbGc...`)
+```js
+// Trong DevTools Console tại https://inphysic.com (đã đăng nhập teacher):
+copy(localStorage.getItem('auth_token'))
+```
 
 ### Config Claude Desktop
-
-Mở file:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-Thêm vào `mcpServers`:
-
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "aeroedu": {
       "command": "node",
-      "args": ["/absolute/path/to/aeroedu/mcp-server/dist/index.js"],
+      "args": ["/absolute/path/to/mcp-server/dist/index.js"],
       "env": {
         "AEROEDU_JWT": "eyJhbGciOiJIUzI1NiIs...",
         "AEROEDU_API_URL": "https://inphysic.com"
@@ -69,117 +71,131 @@ Thêm vào `mcpServers`:
 }
 ```
 
-**Lưu ý:**
-- Đổi `/absolute/path/...` thành đường dẫn thực tế trên máy bạn
-- `AEROEDU_API_URL` có thể set thành `http://localhost:3000` khi dev local
+Restart Claude Desktop → chat `@aeroedu liệt kê khoá học của tôi`.
 
-Restart Claude Desktop.
-
-### Kiểm tra hoạt động
-
-Trong Claude Desktop chat:
-```
-@aeroedu liệt kê 5 khoá học mới nhất của tôi
-```
-
-Hoặc:
-```
-@aeroedu tạo cho tôi khoá "Vật lí 11 — Dao động cơ" môn physics lớp 11 (draft, miễn phí)
-```
-
-Claude sẽ tự chọn tool phù hợp và xin xác nhận trước khi gọi.
-
----
-
-## 3. Dev locally
-
+### Dev mode
 ```bash
-# Watch mode (auto-rebuild khi sửa code)
-npm run dev
+npm run dev   # tsx watch — auto-reload khi sửa src/
+```
 
-# Test với MCP Inspector (CLI debug tool của Anthropic)
+### Test với MCP Inspector
+```bash
 npx @modelcontextprotocol/inspector node dist/index.js
-```
-
-MCP Inspector mở trình duyệt → bạn có thể call từng tool với args tuỳ ý để test.
-
----
-
-## 4. Use case ví dụ
-
-### A. Soạn nguyên 1 khoá học bằng chat
-
-```
-User → Claude Desktop:
-  "Tạo khoá 'Hoá 12 — Polymer cơ bản' lớp 12 môn chemistry. Sau đó thêm
-   3 chương: 'Polymer là gì?', 'Phản ứng trùng hợp', 'Ứng dụng'. Mỗi
-   chương 2 bài video (15 phút mỗi bài). Cuối khoá thêm đề thi 20 câu MCQ."
-
-Claude tự gọi:
-  1. aeroedu_course_create({title, subject, grade, …}) → courseId
-  2. aeroedu_chapter_add({courseId, title}) × 3 → 3 chapterIds
-  3. aeroedu_lesson_add({chapterId, title, type:'video', durationMinutes:15}) × 6
-  4. aeroedu_exam_create({title, courseId, durationMinutes:45, questions:[...]})
-
-→ Khoá hoàn chỉnh trên inphysic.com sau ~1 phút.
-```
-
-### B. Bulk-import đề thi từ Word/PDF
-
-```
-User: "Đây là file đề thi Word [paste content], hãy tạo đề trên AeroEdu."
-
-Claude tự:
-  1. Parse câu hỏi từ text
-  2. aeroedu_exam_create({title, questions:[...]}) với LaTeX preserved
+# → mở browser, call từng tool với args bất kỳ
 ```
 
 ---
 
-## 5. Roadmap
+## 3. Audit Log
 
-**Tháng 2** — thêm `aeroedu_kg_*` (Knowledge Graph 5 tools): suggest, link,
-mastery_update, search, extract_from_doc.
-
-**Tháng 3** — `creative_davinci_*` (5 tools): render video từ script bằng
-DaVinci Resolve.
-
-**Tháng 4+** — CapCut auto-edit, Photoshop batch, ElevenLabs TTS multi-voice,
-Figma component sync, OAuth device flow thay JWT cứng.
-
-Chi tiết: `docs/mcp-aeroedu-integration-plan.md` (30 tools / 5 namespaces).
+Mọi tool call được ghi vào `~/.aeroedu-mcp/audit-YYYY-MM-DD.jsonl`:
+```json
+{"ts":"2026-05-22T07:12:00Z","tool":"http.get","args":"/api/instructor/courses","ok":true,"ms":142}
+```
+- 1 file / ngày (tự rotate)
+- Sensitive values (token, password, key) bị redact tự động
+- Phase 2: sync lên backend `POST /api/mcp/audit`
 
 ---
 
-## 6. Security notes
+## 4. Use Cases
 
-- **JWT cứng trong env**: chỉ phù hợp cho 1 user / 1 máy. Tháng 4 chuyển
-  sang OAuth device flow.
-- **stdio transport**: chỉ Claude Desktop local kết nối được. Cloud Run
-  remote-MCP qua HTTP/SSE planning Tháng 5.
-- **Rate limit**: chưa có. Khi mở public, sẽ thêm bucket 100 req/phút/user.
-- **Audit log**: chưa ghi. Tháng 3 sẽ ghi mọi tool call vào `mcp_audit_log`
-  table trên Neon Postgres.
+### A. Soạn khoá học từ A-Z bằng chat
+```
+"Tạo khoá Hoá 12 — Polymer cơ bản, 3 chương, mỗi chương 2 bài video 15p,
+ cuối khoá thêm đề thi 20 câu MCQ."
+
+→ Claude tự gọi:
+  1. aeroedu_course_create → courseId
+  2. aeroedu_chapter_add × 3 → 3 chapterIds
+  3. aeroedu_lesson_add × 6 (type='video', durationMinutes=15)
+  4. aeroedu_exam_create (20 MCQ)
+→ Khoá hoàn chỉnh trong ~1 phút.
+```
+
+### B. Tìm lộ trình học tập
+```
+"Học sinh biết đại số cơ bản, muốn học đến Tích phân lớp 12. Tìm lộ trình."
+
+→ Claude:
+  1. aeroedu_kg_search("đại số cơ bản") → node A id
+  2. aeroedu_kg_search("tích phân lớp 12") → node B id
+  3. aeroedu_kg_path_find(from=A, to=B) → path 8 bước, ước tính 24h
+```
+
+### C. Mở rộng Knowledge Graph từ sách giáo khoa
+```
+"Đây là bài Sóng cơ học SGK Vật lí 11 [paste nội dung]. Trích xuất KG."
+
+→ Claude:
+  1. aeroedu_kg_extract(text, subject='physics', grade=11, auto_add=false)
+  → preview 12 node mới
+  2. (User confirm) aeroedu_kg_extract(..., auto_add=true)
+  → thêm 12 node vào KG
+```
 
 ---
 
-## 7. Troubleshooting
+## 5. Kiến trúc kỹ thuật
 
-### "AEROEDU_JWT chưa được thiết lập"
-→ Env var không set. Check lại file `claude_desktop_config.json`.
+```
+src/
+  index.ts              McpServer (SDK v1.x) + StdioTransport
+  lib/
+    api-client.ts       AeroEduApiClient (undici, JWT auth, actionable errors)
+    audit.ts            JSONL audit log (local file, daily rotation)
+  tools/
+    course.ts           5 course/exam tools với registerTool + annotations
+    kg.ts               5 KG tools với structuredContent responses
+```
 
-### "HTTP 401: Unauthorized"
-→ JWT hết hạn. Login lại, copy token mới, update config.
+**Annotations per tool** (theo MCP best practices):
+- `readOnlyHint: true` cho list/search/detail tools
+- `destructiveHint: false` cho tất cả (không xoá dữ liệu)
+- `idempotentHint: true` cho GET operations
+- `openWorldHint: false` (data bounded trong AeroEdu)
 
-### Claude Desktop không thấy tools
-→ Restart Claude Desktop. Check log:
-  - macOS: `~/Library/Logs/Claude/mcp*.log`
-
-### "Cannot find module '@modelcontextprotocol/sdk'"
-→ Chưa chạy `npm install` trong `mcp-server/`.
+**Response format**: mỗi tool trả về cả `content[text]` lẫn `structuredContent`
+→ clients cũ xài text, clients mới (Claude Desktop v2+) xài structured data.
 
 ---
 
-## 8. License
+## 6. Roadmap
+
+| Giai đoạn | Tools | Status |
+|-----------|-------|--------|
+| Tháng 1 | 5 course tools | ✅ Done |
+| Tháng 2 | +5 KG tools, audit log | ✅ Done |
+| Tháng 3 | +5 creative tools (DaVinci script-to-video) | ⏳ |
+| Tháng 4 | OAuth device flow, HTTP/SSE transport | ⏳ |
+| Tháng 5 | CapCut, Photoshop, ElevenLabs tools | ⏳ |
+| Tháng 6 | Public npm package, rate limit, admin dashboard | ⏳ |
+
+---
+
+## 7. Security
+
+- **JWT scope**: 1 user / 1 machine. OAuth device flow sẽ thay thế ở Tháng 4.
+- **stdio transport**: chỉ Claude Desktop local kết nối được (không expose ra internet).
+- **Input sanitization**: Zod validates all inputs trước khi gọi API.
+- **Audit redaction**: token/password/key fields bị redact trước khi ghi log.
+- **Rate limiting**: chưa có (planned Tháng 6 khi public).
+
+---
+
+## 8. Troubleshooting
+
+| Lỗi | Nguyên nhân | Giải pháp |
+|-----|------------|-----------|
+| `AEROEDU_JWT chưa thiết lập` | Env var missing | Xem mục "Lấy JWT" ở trên |
+| `[HTTP 401]` | JWT hết hạn | Login lại, copy token mới |
+| `[HTTP 403]` | Không đủ quyền | Dùng tài khoản teacher hoặc admin |
+| `[HTTP 404]` | ID không tồn tại | Kiểm tra lại courseId/chapterId/nodeId |
+| Claude không thấy tools | Server chưa khởi động | Restart Claude Desktop |
+| Lỗi TypeScript | SDK incompatible | `npm install @modelcontextprotocol/sdk@latest` |
+
+---
+
+## 9. License
 
 MIT © AeroEduVision (inphysic.com)
