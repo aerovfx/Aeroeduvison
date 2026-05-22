@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download } from 'lucide-react'
+import { FileCode2, Plus, Loader2, Trash2, Pencil, Search, Edit3, Sparkles, Wand2, Download, BookOpenCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/services/api'
 import { AiExamDialog } from '@/components/latex-editor/AiExamDialog'
+import AiTemplateGuideModal from '@/components/latex-editor/AiTemplateGuideModal'
 import type { GenerateResult, ExamConfig } from '@/services/latex-ai.service'
 
 /* ── Dark palette ── */
@@ -56,6 +57,8 @@ export default function LaTeXEditorPage() {
   const [creating, setCreating] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
   const [aiCreating, setAiCreating] = useState(false)
+  // V2 (2026-05-22): modal hướng dẫn dùng AI tạo văn bản LaTeX
+  const [guideOpen, setGuideOpen] = useState(false)
 
   useEffect(() => { fetchProjects() }, [])
 
@@ -141,6 +144,23 @@ export default function LaTeXEditorPage() {
           <p style={{ color: D.muted, fontSize: 14, margin: '6px 0 0' }}>Soạn thảo, sinh đề bằng AI và xuất PDF chuyên nghiệp</p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {/* V2 (2026-05-22): Nút hướng dẫn dùng AI (ChatGPT/Gemini/Claude)
+              để tự tạo văn bản LaTeX với prompt mẫu — đặt ĐẦU TIÊN cho dễ thấy */}
+          <button
+            onClick={() => setGuideOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+              border: 'none', borderRadius: 10,
+              color: '#fff', cursor: 'pointer',
+              fontWeight: 700, fontSize: 14, padding: '10px 20px',
+              boxShadow: '0 0 18px rgba(239,68,68,0.35)',
+            }}
+            title="Hướng dẫn dùng ChatGPT/Gemini/Claude tạo văn bản LaTeX với prompt mẫu"
+          >
+            <BookOpenCheck size={16} />
+            Hướng dẫn AI
+          </button>
           <button
             onClick={() => setAiDialogOpen(true)}
             disabled={aiCreating}
@@ -455,6 +475,12 @@ export default function LaTeXEditorPage() {
           </div>
         </div>
       )}
+
+      {/* V2: Hướng dẫn AI tạo văn bản LaTeX với prompt mẫu */}
+      <AiTemplateGuideModal
+        open={guideOpen}
+        onClose={() => setGuideOpen(false)}
+      />
     </div>
   )
 }

@@ -8,6 +8,18 @@ export interface LatexTemplateOption {
   name: string;
   description?: string;
   body: string;
+  /**
+   * V2 (2026-05-22): metadata mới để hỗ trợ nhóm + AI guide
+   */
+  /** Nhóm template: 'exam' | 'lesson' | 'admin' | 'research' | 'personal' | 'business' */
+  category?: 'exam' | 'lesson' | 'admin' | 'research' | 'personal' | 'business' | 'student';
+  /** Đối tượng sử dụng: GV/HS/HC/Sinh viên/Doanh nhân/Tự do */
+  audience?: string;
+  /** Prompt mẫu để paste vào ChatGPT/Gemini/Claude → AI sinh nội dung
+   *  hoàn chỉnh theo định dạng LaTeX dựa trên template này. */
+  aiPrompt?: string;
+  /** Tags cho search filter */
+  tags?: string[];
 }
 
 export const LATEX_TEMPLATES: LatexTemplateOption[] = [
@@ -1008,6 +1020,863 @@ Trân trọng cảm ơn!
 
 \\section*{V. DẶN DÒ}
 Học bài + làm bài tập 3, 4, 5 trang 46 SGK. Đọc trước bài "Định lý Viète".
+
+\\end{document}
+`,
+  },
+
+  // ═══════════════════════════════════════════════════════════════
+  // V2 (2026-05-22): 6 templates MỚI cho văn bản phổ biến + AI prompts
+  // Các loại văn bản giáo viên/hành chính/sinh viên/cá nhân thường dùng,
+  // kèm prompt để paste vào ChatGPT/Gemini/Claude sinh nội dung tự động.
+  // ═══════════════════════════════════════════════════════════════
+  {
+    id: "don-xin-nghi-phep",
+    name: "📝 Đơn xin nghỉ phép (NĐ 30/2020)",
+    description: "Đơn xin nghỉ phép theo Nghị định 30 — đầy đủ Quốc hiệu, tiêu ngữ, lề chuẩn 2/2/3/2cm",
+    category: "admin",
+    audience: "GV / NV hành chính",
+    tags: ["đơn từ", "hành chính", "nghỉ phép"],
+    aiPrompt: `Hãy viết đơn xin nghỉ phép bằng LaTeX dùng template article tiếng Việt (babel vietnamese), tuân thủ Nghị định 30/2020/NĐ-CP.
+
+THÔNG TIN CỦA TÔI (thay đổi cho phù hợp):
+- Họ tên: [Tên đầy đủ]
+- Chức vụ: [VD: Giáo viên Toán]
+- Đơn vị: [VD: Tổ Toán – Tin, Trường THPT XYZ]
+- Lý do: [VD: ốm, đám cưới em ruột, hiếu hỉ...]
+- Thời gian: từ DD/MM/YYYY đến DD/MM/YYYY (tổng X ngày)
+- Người thay thế: [Tên đồng nghiệp đã sắp xếp dạy thay nếu là GV]
+
+YÊU CẦU:
+1. Quốc hiệu, Tiêu ngữ giữa trang
+2. Số:.../ĐXNP-[viết tắt đơn vị] (tự tạo)
+3. Tên đơn vị cấp trên — Đơn vị trực tiếp ở góc trái
+4. Địa danh + ngày tháng ở góc phải
+5. Tên đơn IN HOA in đậm căn giữa: "ĐƠN XIN NGHỈ PHÉP"
+6. Kính gửi: [BGH/Hiệu trưởng/Trưởng phòng]
+7. Phần thân ngắn gọn, lịch sự, có "Xin chân thành cảm ơn"
+8. Ký tên (chừa 3-5 dòng trống), Họ tên ghi rõ
+9. Dùng \\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm} và \\linespread{1.5}
+
+XUẤT RA: 1 đoạn code LaTeX hoàn chỉnh bắt đầu \\documentclass và kết thúc \\end{document}, KHÔNG kèm giải thích.`,
+    body: `\\documentclass[13pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+% Nghị định 30/2020/NĐ-CP — lề chuẩn 2/2/3/2cm
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
+\\setlength{\\parindent}{1.27cm}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+% Quốc hiệu — Tiêu ngữ
+\\begin{center}
+  \\textbf{CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM}\\\\
+  \\textbf{Độc lập -- Tự do -- Hạnh phúc}\\\\
+  \\rule{4cm}{0.4pt}
+\\end{center}
+
+% Số văn bản + địa danh
+\\noindent
+\\begin{minipage}[t]{0.5\\textwidth}
+\\textbf{TRƯỜNG THPT [TÊN TRƯỜNG]}\\\\
+\\textbf{TỔ [TÊN TỔ CHUYÊN MÔN]}\\\\
+\\textit{Số:} ......../ĐXNP-[VIẾT TẮT]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}
+\\raggedleft
+\\textit{[Địa danh], ngày .... tháng .... năm 20....}
+\\end{minipage}
+
+\\vspace{12pt}
+
+\\begin{center}
+  \\Large\\textbf{ĐƠN XIN NGHỈ PHÉP}
+\\end{center}
+
+\\vspace{6pt}
+\\noindent\\textbf{Kính gửi:} Ban Giám hiệu Trường THPT [Tên trường].
+
+\\medskip
+
+Tôi tên là: [Họ và tên đầy đủ]\\\\
+Chức vụ: [Giáo viên môn ...... / Nhân viên ......]\\\\
+Đơn vị công tác: [Tên tổ / phòng ban]
+
+\\medskip
+
+Nay tôi làm đơn này kính xin Ban Giám hiệu cho tôi được nghỉ phép từ ngày [DD/MM/YYYY] đến hết ngày [DD/MM/YYYY], tổng cộng [....] ngày.
+
+\\medskip
+
+\\textbf{Lý do:} [Nêu lý do ngắn gọn, lịch sự — ốm, việc gia đình hệ trọng, hiếu hỉ...]
+
+\\medskip
+
+Trong thời gian tôi nghỉ, tôi đã sắp xếp đồng chí [Tên đồng nghiệp] dạy thay các tiết của tôi (\\textit{nếu là GV}) hoặc bàn giao công việc cho đồng chí [Tên người nhận bàn giao] (\\textit{nếu là NV}).
+
+\\medskip
+
+Tôi xin cam đoan trở lại làm việc đúng thời hạn và hoàn thành tốt công việc được giao.
+
+Tôi xin chân thành cảm ơn!
+
+\\vspace{20pt}
+
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textit{Ý kiến của Tổ trưởng}\\\\[60pt]
+[Họ tên]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{Người làm đơn}\\\\
+\\textit{(Ký, ghi rõ họ tên)}\\\\[60pt]
+[HỌ TÊN ĐẦY ĐỦ]
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+  {
+    id: "bao-cao-skkn",
+    name: "🏆 Sáng kiến kinh nghiệm (SKKN)",
+    description: "Mẫu SKKN chuẩn cho GV — 5 phần: Lý do, Thực trạng, Giải pháp, Hiệu quả, Kết luận",
+    category: "research",
+    audience: "GV phổ thông",
+    tags: ["SKKN", "nghiên cứu", "GV"],
+    aiPrompt: `Hãy viết một Sáng kiến Kinh nghiệm (SKKN) hoàn chỉnh bằng LaTeX cho GV phổ thông Việt Nam, dùng template article tiếng Việt.
+
+CHỦ ĐỀ CỦA TÔI: [VD: "Sử dụng AI Claude/ChatGPT trong việc soạn đề trắc nghiệm Vật lí 11"]
+MÔN/KHỐI: [VD: Vật lí 11]
+ĐỐI TƯỢNG: [HS THPT khối 11 trường THPT XYZ, năm học 2025-2026]
+GV: [Họ tên, chức vụ]
+
+CẤU TRÚC YÊU CẦU (5 phần lớn, mỗi phần đánh số La Mã):
+I. ĐẶT VẤN ĐỀ
+   1.1. Lý do chọn đề tài
+   1.2. Mục đích và nhiệm vụ nghiên cứu
+   1.3. Đối tượng, phạm vi nghiên cứu
+   1.4. Phương pháp nghiên cứu
+
+II. THỰC TRẠNG VẤN ĐỀ
+   2.1. Khảo sát thực trạng (có số liệu cụ thể)
+   2.2. Nguyên nhân hạn chế
+
+III. GIẢI PHÁP THỰC HIỆN
+   3.1. Cơ sở lý luận
+   3.2. Mô tả giải pháp (chi tiết các bước, có hình minh hoạ nếu cần)
+   3.3. Quy trình áp dụng
+
+IV. HIỆU QUẢ ÁP DỤNG
+   4.1. Kết quả định lượng (bảng so sánh trước/sau với % cải tiến)
+   4.2. Kết quả định tính (phản hồi HS, đồng nghiệp)
+
+V. KẾT LUẬN VÀ KIẾN NGHỊ
+   5.1. Kết luận
+   5.2. Kiến nghị (cho BGH, Sở GD, đồng nghiệp)
+
+YÊU CẦU:
+- Lề: top=2cm,bottom=2cm,left=3cm,right=2cm (NĐ 30/2020)
+- Linespread 1.5, font 13pt, có \\tableofcontents
+- Có bảng (tabular) so sánh số liệu ở phần IV
+- Tài liệu tham khảo cuối bài (5-10 mục)
+- Tổng độ dài 15-25 trang
+
+XUẤT RA: code LaTeX hoàn chỉnh, KHÔNG kèm giải thích.`,
+    body: `\\documentclass[13pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb,siunitx}
+\\usepackage{geometry}
+\\usepackage{array,tabularx,booktabs}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
+\\setlength{\\parindent}{1.27cm}
+\\titleformat{\\section}{\\Large\\bfseries}{\\thesection.}{8pt}{}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{SỞ GD\\&ĐT [TỈNH/TP]}\\\\
+  \\textbf{TRƯỜNG THPT [TÊN TRƯỜNG]}\\\\[20pt]
+
+  {\\Huge\\textbf{SÁNG KIẾN KINH NGHIỆM}}\\\\[14pt]
+
+  {\\Large\\textbf{[TÊN ĐỀ TÀI SÁNG KIẾN — VIẾT IN HOA, BOLD]}}\\\\[40pt]
+
+  \\begin{tabular}{rl}
+    Tác giả: & [Họ và tên đầy đủ]\\\\[4pt]
+    Chức vụ: & [Giáo viên môn ......]\\\\[4pt]
+    Tổ: & [Tên tổ chuyên môn]\\\\[4pt]
+    Năm học: & 20.... -- 20....
+  \\end{tabular}
+\\end{center}
+
+\\vfill
+\\begin{center}
+  \\textit{[Tên địa phương], tháng .... năm 20....}
+\\end{center}
+
+\\newpage
+\\tableofcontents
+\\newpage
+
+\\section{ĐẶT VẤN ĐỀ}
+
+\\subsection*{1.1. Lý do chọn đề tài}
+[Nêu bối cảnh giáo dục hiện nay, vấn đề tồn tại, vì sao đề tài này cần thiết. Trích Nghị quyết 29-NQ/TW, chương trình GDPT 2018 nếu phù hợp.]
+
+\\subsection*{1.2. Mục đích và nhiệm vụ nghiên cứu}
+[Mục đích: 1-2 câu chính. Nhiệm vụ: 3-4 ý cụ thể.]
+
+\\subsection*{1.3. Đối tượng, phạm vi nghiên cứu}
+\\begin{itemize}[leftmargin=*]
+  \\item \\textbf{Đối tượng:} [HS lớp.... khối....]
+  \\item \\textbf{Phạm vi:} [Trường THPT ...., năm học 20....]
+\\end{itemize}
+
+\\subsection*{1.4. Phương pháp nghiên cứu}
+[Quan sát, phỏng vấn, thực nghiệm sư phạm, thống kê so sánh.]
+
+\\section{THỰC TRẠNG VẤN ĐỀ}
+
+\\subsection*{2.1. Khảo sát thực trạng}
+[Số liệu khảo sát ban đầu — bảng/biểu đồ. Trước khi áp dụng SKKN, kết quả HS như thế nào?]
+
+\\subsection*{2.2. Nguyên nhân hạn chế}
+\\begin{enumerate}[label=\\arabic*),leftmargin=*]
+  \\item [Nguyên nhân 1: ...]
+  \\item [Nguyên nhân 2: ...]
+  \\item [Nguyên nhân 3: ...]
+\\end{enumerate}
+
+\\section{GIẢI PHÁP THỰC HIỆN}
+
+\\subsection*{3.1. Cơ sở lý luận}
+[Lý thuyết nền tảng — Bloom's Taxonomy, dạy học tích cực, Differentiated Instruction...]
+
+\\subsection*{3.2. Mô tả giải pháp}
+[Mô tả chi tiết từng bước. Có thể chia thành 3-5 giải pháp con.]
+
+\\subsubsection*{Giải pháp 1: [Tên]}
+[Mô tả + cách làm]
+
+\\subsubsection*{Giải pháp 2: [Tên]}
+[Mô tả + cách làm]
+
+\\subsection*{3.3. Quy trình áp dụng}
+[Các bước triển khai trong 1 năm học.]
+
+\\section{HIỆU QUẢ ÁP DỤNG}
+
+\\subsection*{4.1. Kết quả định lượng}
+
+\\begin{table}[h]
+\\centering
+\\caption{So sánh kết quả trước và sau khi áp dụng SKKN}
+\\begin{tabularx}{\\linewidth}{X|c|c|c}
+\\toprule
+\\textbf{Tiêu chí} & \\textbf{Trước} & \\textbf{Sau} & \\textbf{\\% cải tiến}\\\\
+\\midrule
+HS Giỏi (\\%) & ... & ... & ...\\\\
+HS Khá (\\%) & ... & ... & ...\\\\
+HS TB (\\%)  & ... & ... & ...\\\\
+HS Yếu (\\%) & ... & ... & ...\\\\
+ĐTB lớp     & ... & ... & ...\\\\
+\\bottomrule
+\\end{tabularx}
+\\end{table}
+
+\\subsection*{4.2. Kết quả định tính}
+[Phản hồi HS qua khảo sát, ý kiến đồng nghiệp dự giờ, BGH đánh giá.]
+
+\\section{KẾT LUẬN VÀ KIẾN NGHỊ}
+
+\\subsection*{5.1. Kết luận}
+[Tóm tắt 3-4 ý chính SKKN đã giải quyết được vấn đề.]
+
+\\subsection*{5.2. Kiến nghị}
+\\begin{itemize}[leftmargin=*]
+  \\item \\textbf{Với BGH nhà trường:} [...]
+  \\item \\textbf{Với Sở GD\\&ĐT:} [...]
+  \\item \\textbf{Với đồng nghiệp:} [...]
+\\end{itemize}
+
+\\vspace{10pt}\\hrule\\vspace{8pt}
+
+\\section*{TÀI LIỆU THAM KHẢO}
+\\begin{enumerate}[label={[\\arabic*]}]
+  \\item Bộ Giáo dục và Đào tạo (2018). \\textit{Chương trình giáo dục phổ thông tổng thể}.
+  \\item [Tên tác giả] ([Năm]). \\textit{[Tên sách / bài báo]}. NXB / Tạp chí.
+  \\item ...
+\\end{enumerate}
+
+\\end{document}
+`,
+  },
+  {
+    id: "bien-ban-hop",
+    name: "📋 Biên bản họp (NĐ 30/2020)",
+    description: "Biên bản cuộc họp tổ/họp BGH/họp PH — chuẩn văn bản hành chính",
+    category: "admin",
+    audience: "GV / Thư ký",
+    tags: ["biên bản", "họp", "hành chính"],
+    aiPrompt: `Viết một Biên bản cuộc họp bằng LaTeX theo Nghị định 30/2020/NĐ-CP.
+
+THÔNG TIN CỤ THỂ:
+- Đơn vị: Trường THPT [Tên]
+- Tên cuộc họp: [VD: Họp tổ Toán-Tin tháng 11/2025]
+- Thời gian: [HH:MM ngày DD/MM/YYYY]
+- Địa điểm: [Phòng họp số .... hoặc Online qua Zoom/Meet]
+- Chủ trì: [Họ tên + chức vụ]
+- Thư ký: [Họ tên + chức vụ]
+- Thành phần tham dự: [Liệt kê N người + có giấy mời, vắng X người có lý do]
+
+NỘI DUNG CUỘC HỌP (cụ thể hoá theo chủ đề của tôi):
+[VD: 1. Tổng kết kết quả thi giữa kỳ I; 2. Triển khai kế hoạch ôn thi học sinh giỏi; 3. Bàn về việc áp dụng AI vào soạn đề]
+
+Mỗi nội dung cần có:
+- Người trình bày
+- Tóm tắt báo cáo
+- Ý kiến đóng góp của các thành viên (nêu ít nhất 3-4 ý kiến)
+- Kết luận của chủ trì
+
+CUỐI BIÊN BẢN:
+- Tổng kết các nhiệm vụ được giao (bảng: Người chịu trách nhiệm | Việc | Deadline)
+- Cuộc họp kết thúc lúc HH:MM cùng ngày
+- Chữ ký Chủ trì + Thư ký
+
+YÊU CẦU LATEX:
+- Lề chuẩn 2/2/3/2cm (NĐ 30)
+- Linespread 1.5
+- Có Quốc hiệu Tiêu ngữ trên cùng
+- Số biên bản: ..../BB-[viết tắt đơn vị]
+
+XUẤT: code LaTeX hoàn chỉnh không kèm giải thích.`,
+    body: `\\documentclass[13pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\usepackage{array,tabularx,booktabs}
+\\usepackage{enumitem}
+\\geometry{top=2cm,bottom=2cm,left=3cm,right=2cm}
+\\linespread{1.5}
+\\setlength{\\parindent}{1.27cm}
+
+\\begin{document}
+
+\\noindent
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{TRƯỜNG THPT [TÊN TRƯỜNG]}\\\\
+\\textbf{TỔ [TÊN TỔ]}\\\\
+\\rule{4cm}{0.4pt}\\\\
+\\textit{Số: ......./BB-[VIẾT TẮT]}
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{CỘNG HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM}\\\\
+\\textbf{Độc lập -- Tự do -- Hạnh phúc}\\\\
+\\rule{4cm}{0.4pt}\\\\
+\\textit{[Địa danh], ngày .... tháng .... năm 20....}
+\\end{minipage}
+
+\\vspace{18pt}
+
+\\begin{center}
+  \\Large\\textbf{BIÊN BẢN HỌP}\\\\[4pt]
+  \\large\\textit{[Tên cuộc họp]}
+\\end{center}
+
+\\vspace{6pt}
+
+\\noindent\\textbf{Thời gian:} ..... giờ ..... ngày ....../....../20.....
+
+\\noindent\\textbf{Địa điểm:} [Phòng họp / Online qua Zoom-Meet]
+
+\\noindent\\textbf{Chủ trì cuộc họp:} [Họ tên — Chức vụ]
+
+\\noindent\\textbf{Thư ký:} [Họ tên — Chức vụ]
+
+\\noindent\\textbf{Thành phần tham dự:}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item Có mặt: \\textbf{[N]} đồng chí (\\textit{có danh sách điểm danh kèm theo})
+  \\item Vắng mặt: \\textbf{[X]} đồng chí — \\textit{[có/không lý do]}
+\\end{itemize}
+
+\\vspace{8pt}
+
+\\section*{I. NỘI DUNG CUỘC HỌP}
+
+\\subsection*{1. [Nội dung 1]}
+\\textbf{Người trình bày:} [Họ tên]
+
+[Tóm tắt nội dung trình bày...]
+
+\\textbf{Ý kiến thảo luận:}
+\\begin{itemize}[leftmargin=*]
+  \\item Đ/c [Tên]: [Nội dung ý kiến]
+  \\item Đ/c [Tên]: [Nội dung ý kiến]
+\\end{itemize}
+
+\\textbf{Kết luận:} [Chủ trì kết luận về nội dung này]
+
+\\subsection*{2. [Nội dung 2]}
+[Tương tự như trên]
+
+\\section*{II. CÁC NHIỆM VỤ ĐƯỢC GIAO}
+
+\\begin{tabularx}{\\linewidth}{c|X|c|c}
+\\toprule
+\\textbf{TT} & \\textbf{Nội dung công việc} & \\textbf{Phụ trách} & \\textbf{Hạn}\\\\
+\\midrule
+1 & [Công việc 1] & [Tên] & [DD/MM]\\\\
+2 & [Công việc 2] & [Tên] & [DD/MM]\\\\
+3 & [Công việc 3] & [Tên] & [DD/MM]\\\\
+\\bottomrule
+\\end{tabularx}
+
+\\vspace{12pt}
+
+Cuộc họp kết thúc vào hồi ..... giờ ..... cùng ngày. Biên bản đã được đọc lại trước toàn thể thành viên dự họp và nhất trí thông qua.
+
+\\vspace{20pt}
+
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{THƯ KÝ}\\\\
+\\textit{(Ký, ghi rõ họ tên)}\\\\[60pt]
+[Họ tên]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{CHỦ TRÌ CUỘC HỌP}\\\\
+\\textit{(Ký, ghi rõ họ tên, đóng dấu nếu có)}\\\\[60pt]
+[Họ tên — Chức vụ]
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+  {
+    id: "cv-tieng-viet",
+    name: "👤 CV tiếng Việt — chuyên nghiệp",
+    description: "Sơ yếu lý lịch / CV — 1 cột, font Times, in trên A4 lề chuẩn",
+    category: "personal",
+    audience: "GV / SV / NV",
+    tags: ["CV", "xin việc", "cá nhân"],
+    aiPrompt: `Hãy viết một CV (Curriculum Vitae) tiếng Việt chuyên nghiệp bằng LaTeX cho tôi.
+
+THÔNG TIN BẢN THÂN:
+- Họ tên: [Tên đầy đủ]
+- Ngày sinh: DD/MM/YYYY
+- Địa chỉ: [Tỉnh/TP]
+- Điện thoại: 0xxxxxxxxx
+- Email: [email]
+- LinkedIn/GitHub: [nếu có]
+- Mục tiêu nghề nghiệp: [1-2 câu rõ ràng]
+
+HỌC VẤN: [Liệt kê 2-3 bậc học từ gần nhất, có GPA + chuyên ngành]
+
+KINH NGHIỆM LÀM VIỆC: [Liệt kê 3-5 công việc từ gần nhất, mỗi job 3-4 bullet thành tích đo đếm được — VD: "Tăng tỷ lệ đỗ ĐH của lớp từ 75\\% lên 92\\%"]
+
+KỸ NĂNG:
+- Chuyên môn: [VD: Soạn giáo án theo GDPT 2018, dùng AI trong dạy học]
+- Mềm: [Thuyết trình, làm việc nhóm, mentoring]
+- Ngoại ngữ: [Tiếng Anh IELTS X.X / TOEIC]
+- Tin học: [MS Office, Google Workspace, Claude AI, etc.]
+
+CHỨNG CHỈ: [Liệt kê 3-5 chứng chỉ liên quan]
+
+HOẠT ĐỘNG / THÀNH TÍCH: [Giải thưởng, dự án ngoại khoá]
+
+NGƯỜI THAM CHIẾU: [2 người, có sđt + email]
+
+YÊU CẦU LATEX:
+- Font Times New Roman (mathptmx), 11pt, A4
+- Lề: top=1.5cm, bottom=1.5cm, left=2cm, right=2cm (gọn hơn NĐ 30 vì CV)
+- Tên IN HOA căn giữa, size lớn (\\Huge); contact info căn giữa dưới
+- Mỗi section có gạch chân (\\hrule), tiêu đề IN HOA
+- Bullet point bằng \\item trong itemize
+- Không cần ảnh thẻ (sẽ paste sau)
+- Tổng 1-2 trang
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[11pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{mathptmx}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
+\\geometry{top=1.5cm,bottom=1.5cm,left=2cm,right=2cm}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{3pt}
+\\titleformat{\\section}{\\large\\bfseries\\MakeUppercase}{}{0pt}{}[\\titlerule]
+\\titlespacing{\\section}{0pt}{10pt}{6pt}
+\\renewcommand{\\labelitemi}{\\textbullet}
+
+\\begin{document}
+
+\\begin{center}
+  {\\Huge\\textbf{[HỌ VÀ TÊN ĐẦY ĐỦ]}}\\\\[6pt]
+  \\textit{[Chức danh/Mục tiêu — VD: Giáo viên Vật lí THPT]}\\\\[4pt]
+  📞 0xxxxxxxxx \\quad ✉ name@example.com \\quad 📍 [Tỉnh/TP] \\quad 🔗 linkedin.com/in/...
+\\end{center}
+
+\\section{MỤC TIÊU NGHỀ NGHIỆP}
+[1-2 câu súc tích — VD: "Trở thành GV Vật lí cốt cán trong 3-5 năm tới, ứng dụng AI vào dạy học giúp HS đạt kết quả tối ưu."]
+
+\\section{HỌC VẤN}
+\\textbf{[Tên Trường ĐH/CĐ]} \\hfill \\textit{20....~--~20....}\\\\
+[Khoa — Chuyên ngành] | GPA: [X.X/4.0 hoặc X.X/10]\\\\
+\\textit{Đề tài tốt nghiệp:} [Tên đề tài]
+
+\\medskip
+
+\\textbf{[Trường THPT]} \\hfill \\textit{20....~--~20....}\\\\
+HS giỏi 3 năm liền — Đạt giải [...] Olympic [...]
+
+\\section{KINH NGHIỆM LÀM VIỆC}
+
+\\textbf{[Tên Trường/Cơ quan]} \\hfill \\textit{[MM/YYYY -- nay]}\\\\
+\\textit{[Vị trí]}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item [Thành tích 1 — có số liệu, VD: "Dạy 6 lớp Vật lí 11, ĐTBm 7.8/10"]
+  \\item [Thành tích 2 — VD: "Hướng dẫn 5 HS đạt giải HSG cấp tỉnh môn Vật lí"]
+  \\item [Thành tích 3 — VD: "Soạn 200+ đề trắc nghiệm cho Ngân hàng câu hỏi tổ"]
+\\end{itemize}
+
+\\medskip
+
+\\textbf{[Cơ quan trước đó]} \\hfill \\textit{[MM/YYYY -- MM/YYYY]}\\\\
+\\textit{[Vị trí]}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item [Thành tích...]
+  \\item [Thành tích...]
+\\end{itemize}
+
+\\section{KỸ NĂNG}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item \\textbf{Chuyên môn:} [VD: GDPT 2018, ra đề trắc nghiệm 4-phần, chấm rubric, STEAM]
+  \\item \\textbf{Công cụ AI:} [Claude AI, ChatGPT, Gemini — dùng cho soạn đề/feedback]
+  \\item \\textbf{Phần mềm:} [MS Office, Google Workspace, LMS inphysic, Notion, LaTeX]
+  \\item \\textbf{Mềm:} Thuyết trình, mentoring đồng nghiệp, quản lý lớp, work-life balance
+  \\item \\textbf{Ngoại ngữ:} Tiếng Anh — [IELTS X.X / TOEIC XXX]
+\\end{itemize}
+
+\\section{CHỨNG CHỈ \\& KHOÁ HỌC}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item Chứng chỉ Tin học IC3 / MOS (20....)
+  \\item Chứng chỉ Bồi dưỡng GV theo CT GDPT 2018 (Bộ GD)
+  \\item [Tên khoá] — Coursera/edX (20....)
+\\end{itemize}
+
+\\section{HOẠT ĐỘNG \\& THÀNH TÍCH}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item [Giải thưởng / Bằng khen — kèm cấp + năm]
+  \\item [Báo cáo SKKN cấp Trường/Tỉnh — đề tài]
+  \\item [Hoạt động ngoại khoá — Câu lạc bộ HS, Đoàn]
+\\end{itemize}
+
+\\section{NGƯỜI THAM CHIẾU}
+\\begin{itemize}[leftmargin=*,nosep]
+  \\item \\textbf{[Họ tên]} — [Chức vụ] tại [Đơn vị] | ☎ 0xx... | ✉ ...@...
+  \\item \\textbf{[Họ tên]} — [Chức vụ] tại [Đơn vị] | ☎ 0xx... | ✉ ...@...
+\\end{itemize}
+
+\\end{document}
+`,
+  },
+  {
+    id: "ke-hoach-tuan",
+    name: "📅 Kế hoạch dạy học tuần",
+    description: "Bảng kế hoạch tuần: Thứ × Tiết × Lớp × Nội dung + ghi chú đồng nghiệp",
+    category: "lesson",
+    audience: "GV phổ thông",
+    tags: ["kế hoạch", "tuần", "lịch dạy"],
+    aiPrompt: `Tạo Kế hoạch dạy học TUẦN bằng LaTeX cho GV phổ thông Việt Nam.
+
+THÔNG TIN:
+- Họ tên GV: [...]
+- Môn dạy: [VD: Vật lí]
+- Tuần thứ: [VD: 12, từ DD/MM/YYYY đến DD/MM/YYYY]
+- Năm học: 2025-2026
+- Học kỳ: I/II
+
+DANH SÁCH LỚP TÔI PHỤ TRÁCH:
+- Lớp [11A1] — [Tổng X tiết/tuần]
+- Lớp [11A2] — [Tổng X tiết/tuần]
+- Lớp [12B1] — [Tổng X tiết/tuần]
+... (liệt kê tất cả)
+
+LỊCH DẠY TRONG TUẦN (theo thời khoá biểu): [VD:
+  Thứ 2: tiết 1 lớp 11A1, tiết 3 lớp 12B1
+  Thứ 3: tiết 2 lớp 11A2, tiết 5 lớp 11A1
+  ...]
+
+NỘI DUNG TỪNG TIẾT (theo PPCT):
+[VD:
+  Tiết 1 lớp 11A1 - Thứ 2: Bài 7 Định luật Ohm - Phần 1 lý thuyết
+  Tiết 3 lớp 12B1 - Thứ 2: Bài 12 Dao động điều hoà - Bài tập
+  ...]
+
+YÊU CẦU LATEX:
+- Bảng tabularx 5 cột: Thứ | Tiết | Lớp | Tên bài | Phương pháp/Phương tiện
+- Một bảng riêng cho mỗi thứ trong tuần
+- Có dòng cộng dồn: tổng tiết tuần, tiết lý thuyết, tiết bài tập, tiết kiểm tra
+- Phần ghi chú cuối: kế hoạch họp tổ, dự giờ, chấm bài
+- Cuối có chỗ ký Tổ trưởng + GV
+- Lề chuẩn NĐ 30 (3cm trái)
+- A4 ngang (\\usepackage{lscape} hoặc geometry landscape)
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[12pt,a4paper,landscape]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{geometry}
+\\usepackage{array,tabularx,booktabs,longtable}
+\\usepackage{xcolor}
+\\geometry{top=1.5cm,bottom=1.5cm,left=2cm,right=2cm,landscape}
+\\setlength{\\parindent}{0pt}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{KẾ HOẠCH DẠY HỌC TUẦN}\\\\
+  \\textit{Giáo viên: [Họ và tên] \\quad Môn: [Tên môn] \\quad Tuần [....] (từ [DD/MM] đến [DD/MM])}\\\\
+  \\textit{Năm học: 20....~--~20.... \\quad Học kỳ: [I/II]}
+\\end{center}
+
+\\vspace{6pt}
+
+\\begin{tabularx}{\\linewidth}{|c|c|c|X|X|X|}
+\\hline
+\\rowcolor{gray!20}
+\\textbf{Thứ} & \\textbf{Tiết} & \\textbf{Lớp} & \\textbf{Tên bài/Nội dung} & \\textbf{Phương pháp \\& phương tiện} & \\textbf{Ghi chú}\\\\
+\\hline
+\\multirow{3}{*}{\\textbf{Hai}}
+  & 1 & 11A1 & Bài [N]: [Tên bài]                           & Trực quan + Lab AnalogCircuit  & ----\\\\\\cline{2-6}
+  & 3 & 12B1 & Bài [N]: [Tên bài]                           & Bài tập + Slide                & ----\\\\\\cline{2-6}
+  & 5 & 11A2 & Ôn tập chương [N]                            & Kahoot quiz                    & ----\\\\
+\\hline
+\\multirow{2}{*}{\\textbf{Ba}}
+  & 2 & 11A1 & Bài [N+1]: [Tên]                             & Thí nghiệm ảo + Lab            & Dự giờ\\\\\\cline{2-6}
+  & 4 & 12B1 & Bài tập chương [N]                           & Giải đề trên Question Bank     & ----\\\\
+\\hline
+\\textbf{Tư}
+  & 1 & 11A2 & Bài [N]: [Tên]                                & Thảo luận nhóm                 & ----\\\\
+\\hline
+\\multirow{2}{*}{\\textbf{Năm}}
+  & 3 & 11A1 & Bài [N+1]: [Tên]                             & Giảng giải + ví dụ             & ----\\\\\\cline{2-6}
+  & 5 & 12B1 & Bài [N+2]: [Tên]                             & Bài tập + Video YouTube        & ----\\\\
+\\hline
+\\textbf{Sáu}
+  & 2 & 11A2 & Kiểm tra 15 phút (Phần I trắc nghiệm)         & QuestionBank + giấy             & Chấm cuối ngày\\\\
+\\hline
+\\textbf{Bảy}
+  & 1 & 12B1 & Ôn tập + chữa bài                            & Slide + bảng                   & Tự chọn\\\\
+\\hline
+\\end{tabularx}
+
+\\vspace{10pt}
+
+\\noindent\\textbf{TỔNG KẾT TUẦN:}
+\\begin{itemize}
+  \\item Tổng số tiết dạy: \\textbf{[X]} tiết (trong đó: lý thuyết [..], bài tập [..], kiểm tra [..])
+  \\item Số lớp phụ trách: \\textbf{[N]} lớp
+  \\item Bài kiểm tra/đánh giá: [...]
+  \\item Họp tổ chuyên môn: [Thứ ..., giờ ..., chủ đề ...]
+  \\item Dự giờ đồng nghiệp: [Thứ ..., tiết ..., GV ...]
+  \\item Khác: [...]
+\\end{itemize}
+
+\\vspace{16pt}
+
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textit{Duyệt của Tổ trưởng chuyên môn}\\\\[40pt]
+[Họ tên]
+\\end{minipage}%
+\\begin{minipage}[t]{0.5\\textwidth}
+\\centering
+\\textbf{Giáo viên lập kế hoạch}\\\\[40pt]
+[Họ tên]
+\\end{minipage}
+
+\\end{document}
+`,
+  },
+  {
+    id: "de-cuong-on-tap",
+    name: "📚 Đề cương ôn tập (HKI/HKII)",
+    description: "Tổng hợp lý thuyết + dạng bài + bài tập tự luyện cho HS ôn thi cuối kỳ",
+    category: "lesson",
+    audience: "GV phổ thông",
+    tags: ["đề cương", "ôn tập", "ôn thi"],
+    aiPrompt: `Soạn một Đề cương ôn tập bằng LaTeX cho HS THPT chuẩn bị thi cuối kỳ.
+
+THÔNG TIN:
+- Môn: [VD: Vật lí]
+- Khối: [VD: 11]
+- Học kỳ: [I/II]
+- Năm học: 2025-2026
+- Phạm vi nội dung: [Liệt kê các chương/bài có trong đề cương]
+- Cấu trúc đề kiểm tra cuối kỳ: [VD: 40 câu MCQ + 4 câu Đ/S + 6 câu trả lời ngắn + 4 câu tự luận, thời gian 90 phút, 10 điểm]
+
+NỘI DUNG ĐỀ CƯƠNG GỒM 3 PHẦN:
+
+PHẦN A. KIẾN THỨC TRỌNG TÂM
+Với MỖI chương/bài, liệt kê:
+- Các khái niệm cốt lõi (gạch đầu dòng, có công thức bằng MathJax/LaTeX)
+- Định luật/định lý quan trọng
+- Sơ đồ tư duy ngắn gọn (mô tả bằng text)
+
+PHẦN B. CÁC DẠNG BÀI TẬP THƯỜNG GẶP
+Với mỗi dạng:
+- Tên dạng (VD: Dạng 1 - Tính cường độ dòng điện trong mạch hỗn hợp)
+- Phương pháp giải (3-5 bước)
+- Bài tập mẫu có lời giải chi tiết
+- 2-3 bài tập tự luyện kèm đáp án ngắn
+
+PHẦN C. ĐỀ TỰ LUYỆN
+- 1 đề mẫu đầy đủ 4 phần như cấu trúc thật, có đáp án ở cuối
+
+YÊU CẦU LATEX:
+- Dùng amsmath, amssymb, siunitx cho công thức Vật lí
+- Có \\tableofcontents
+- Mỗi chương là một \\section, mỗi dạng bài là \\subsection
+- Đáp án để cuối tài liệu trong \\section*{ĐÁP ÁN}
+- Lề chuẩn 2/2/3/2cm, font 12pt, linespread 1.3
+- Tổng độ dài 15-30 trang
+- Có hộp tô màu (\\fbox hoặc tcolorbox) cho công thức quan trọng
+
+XUẤT: code LaTeX hoàn chỉnh.`,
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath,amssymb,siunitx}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{tcolorbox}
+\\geometry{top=2cm,bottom=2cm,left=2.5cm,right=2cm}
+\\linespread{1.3}
+\\setlength{\\parindent}{1.27cm}
+\\setlength{\\parskip}{4pt}
+
+\\begin{document}
+
+\\begin{center}
+  \\textbf{TRƯỜNG THPT [TÊN]}\\\\
+  \\textbf{TỔ [TÊN TỔ]}\\\\[14pt]
+  {\\Huge\\textbf{ĐỀ CƯƠNG ÔN TẬP CUỐI KỲ [I/II]}}\\\\[6pt]
+  {\\Large\\textbf{MÔN [TÊN MÔN] -- KHỐI [....]}}\\\\[4pt]
+  \\textit{Năm học 20....~--~20....}
+\\end{center}
+
+\\vspace{10pt}
+
+\\noindent\\textbf{Cấu trúc đề thi cuối kỳ:}
+\\begin{itemize}[nosep]
+  \\item Phần I (4,0 đ): [X] câu trắc nghiệm 4 lựa chọn
+  \\item Phần II (2,0 đ): [Y] câu trắc nghiệm Đúng/Sai 4 mệnh đề
+  \\item Phần III (2,0 đ): [Z] câu trả lời ngắn
+  \\item Phần IV (2,0 đ): [W] câu tự luận
+  \\item Thời gian: [....] phút
+\\end{itemize}
+
+\\tableofcontents
+\\newpage
+
+\\section{PHẦN A. KIẾN THỨC TRỌNG TÂM}
+
+\\subsection{Chương 1: [Tên chương]}
+
+\\begin{itemize}[leftmargin=*]
+  \\item Khái niệm 1: [Định nghĩa]
+  \\item Khái niệm 2: [Định nghĩa]
+\\end{itemize}
+
+\\textbf{Công thức cốt lõi:}
+\\begin{tcolorbox}[colback=blue!5,colframe=blue!50!black,title=Công thức]
+\\begin{align*}
+F &= ma \\\\
+W &= F \\cdot s \\cdot \\cos\\alpha \\\\
+E &= \\frac{1}{2}mv^2
+\\end{align*}
+\\end{tcolorbox}
+
+\\subsection{Chương 2: [Tên chương]}
+[Tương tự như chương 1...]
+
+\\section{PHẦN B. CÁC DẠNG BÀI TẬP}
+
+\\subsection{Dạng 1: [Tên dạng — VD: Tính cường độ dòng điện]}
+
+\\textbf{Phương pháp:}
+\\begin{enumerate}[leftmargin=*]
+  \\item Bước 1: [...]
+  \\item Bước 2: [...]
+  \\item Bước 3: [...]
+\\end{enumerate}
+
+\\textbf{Ví dụ minh hoạ:} Cho mạch điện có $\\xi = \\SI{12}{V}$, $r = \\SI{1}{\\ohm}$, $R = \\SI{5}{\\ohm}$. Tính cường độ dòng điện qua mạch.
+
+\\textit{Lời giải:}
+$$I = \\frac{\\xi}{R + r} = \\frac{12}{5 + 1} = \\SI{2}{A}$$
+
+\\textbf{Bài tập tự luyện:}
+\\begin{enumerate}[leftmargin=*]
+  \\item [Đề bài tự luyện 1...]  \\textit{(ĐS: ...)}
+  \\item [Đề bài tự luyện 2...]  \\textit{(ĐS: ...)}
+\\end{enumerate}
+
+\\subsection{Dạng 2: [Tên dạng]}
+[Tương tự...]
+
+\\section{PHẦN C. ĐỀ TỰ LUYỆN}
+
+\\subsection*{Đề số 1}
+
+\\textbf{Phần I.} Trắc nghiệm 4 lựa chọn (4,0 đ)
+\\begin{enumerate}[leftmargin=*,label=\\textbf{Câu \\arabic*.}]
+  \\item [Câu hỏi 1...]\\\\
+    A. ... \\quad B. ... \\quad C. ... \\quad D. ...
+  \\item [Câu hỏi 2...]
+\\end{enumerate}
+
+\\textbf{Phần II.} Trắc nghiệm Đúng/Sai (2,0 đ) \\\\
+\\textbf{Câu 1.} [Dẫn đề]
+\\begin{enumerate}[label=\\alph*),leftmargin=*]
+  \\item [Phát biểu a]
+  \\item [Phát biểu b]
+  \\item [Phát biểu c]
+  \\item [Phát biểu d]
+\\end{enumerate}
+
+\\textbf{Phần III.} Trả lời ngắn (2,0 đ)\\\\
+\\textbf{Câu 1.} [Đề bài...] Đáp số là bao nhiêu?
+
+\\textbf{Phần IV.} Tự luận (2,0 đ)\\\\
+\\textbf{Câu 1.} [Đề bài tự luận]
+
+\\vspace{20pt}\\hrule\\vspace{10pt}
+
+\\section*{ĐÁP ÁN ĐỀ TỰ LUYỆN SỐ 1}
+
+\\textbf{Phần I.} 1-A, 2-B, 3-C, ...
+
+\\textbf{Phần II.} Câu 1: aT, bF, cT, dF
+
+\\textbf{Phần III.} Câu 1: [đáp số]
+
+\\textbf{Phần IV.} Câu 1: [Lời giải chi tiết]
 
 \\end{document}
 `,
