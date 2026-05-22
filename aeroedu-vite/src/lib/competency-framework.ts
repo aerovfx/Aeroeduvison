@@ -170,7 +170,7 @@ export const PILLAR_LEVEL_DESCRIPTORS: Record<string, string> = {
   'self-direction:1':  'Nhớ và làm theo lịch học do GV đặt; báo cáo tiến độ khi được hỏi.',
   'self-direction:2':  'Tự lên lịch học theo deadline; chủ động hỏi khi gặp khó.',
   'self-direction:3':  'Tự đặt mục tiêu, đánh giá tiến độ, điều chỉnh kế hoạch khi cần.',
-  'self-direction:4':  'Hướng dẫn bạn khác lập kế hoạch; phản tư về cách học hiệu quả.',
+  'self-direction:4':  'Hướng dẫn bạn khác lập kế hoạch; tự nhìn lại và cải tiến cách học liên tục.',
   // ── Hợp tác ──
   'collaboration:1':   'Lắng nghe ý kiến nhóm; làm phần việc được giao.',
   'collaboration:2':   'Trình bày ý tưởng rõ ràng; phối hợp với 2-3 bạn hoàn thành nhiệm vụ.',

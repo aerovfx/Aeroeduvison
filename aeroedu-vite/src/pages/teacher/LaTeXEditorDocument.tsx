@@ -1381,7 +1381,7 @@ function PhanIVSheet({
                       width: 70, padding: '4px 8px',
                       border: '1px solid #cbd5e1', borderRadius: 6,
                       fontSize: 13, fontWeight: 700, textAlign: 'right',
-                      color: '#0f172a',
+                      background: '#ffffff', color: '#0f172a',
                     }}
                   />
                 </div>
@@ -1406,7 +1406,7 @@ function PhanIVSheet({
                   padding: '8px 10px',
                   border: '1px solid #fbbf24', borderRadius: 6,
                   fontSize: 13, fontFamily: 'inherit',
-                  color: '#0f172a', resize: 'vertical',
+                  background: '#ffffff', color: '#0f172a', resize: 'vertical',
                 }}
               />
             </div>
@@ -1461,7 +1461,10 @@ function PhanIIISheet({
                 padding: '8px 10px',
                 border: '1.5px solid #fca5a5', borderRadius: 6,
                 fontSize: 14, fontFamily: 'ui-monospace, monospace',
-                textAlign: 'center', fontWeight: 700, color: '#0f172a',
+                textAlign: 'center', fontWeight: 700,
+                // Fix contrast: ép bg trắng + chữ đen, tránh dark mode browser default
+                // làm input bg dark mà text vẫn dark → invisible (theo phản hồi user)
+                background: '#ffffff', color: '#0f172a',
               }}
             />
           </div>

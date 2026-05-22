@@ -35,7 +35,10 @@ interface SurveyData {
   accountType: AccountTypeSurvey
   profession: {
     primarySubject?: string
+    /** @deprecated dùng `educationLevels` array. Giữ field này để load survey cũ. */
     educationLevel?: EducationLevel
+    /** Cấp học có thể dạy — multi-select (GV thường dạy nhiều cấp THCS+THPT...) */
+    educationLevels?: EducationLevel[]
     yearsExperience?: number
     school?: string
     job?: string
@@ -119,7 +122,7 @@ const TEACHER_SKILLS: SkillItem[] = [
   // PN - Phát triển Nghề nghiệp (amber)
   { id: 'tpd-communication',  label: 'Giao tiếp với phụ huynh & HS',  description: 'Phản hồi tích cực, họp phụ huynh',          category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-mentoring',      label: 'Hỗ trợ & Mentoring đồng nghiệp', description: 'Chia sẻ kinh nghiệm, dự giờ',               category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
-  { id: 'tpd-reflection',     label: 'Phản tư chuyên nghiệp',           description: 'Tự đánh giá bài dạy, journal',              category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
+  { id: 'tpd-reflection',     label: 'Tự đánh giá & cải tiến bài giảng', description: 'Soi lại tiết dạy, ghi nhật ký, rút bài học cải tiến', category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-wellbeing',      label: 'Chăm sóc sức khỏe tâm lý',       description: 'Quản lý stress, phòng burnout',             category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-leadership',     label: 'Lãnh đạo nhóm & Tổ bộ môn',     description: 'Điều phối họp, mentoring GV mới',           category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
   { id: 'tpd-cpd-plan',       label: 'Lập kế hoạch phát triển cá nhân', description: 'IDP hàng năm, SMART goals',                category: 'Phát triển Nghề nghiệp', catColor: 'amber', icon: TrendingUp },
@@ -275,7 +278,10 @@ export default function CareerSurvey() {
       if (isParent) {
         return !!(p.job && p.industry && typeof p.childrenCount === 'number')
       }
-      return !!(p.primarySubject && p.educationLevel && typeof p.yearsExperience === 'number')
+      // V2 (2026-05-22): GV có thể dạy nhiều cấp → check educationLevels[] (mảng).
+      // Backward-compat: vẫn chấp nhận educationLevel cũ (string) nếu chưa migrate.
+      const hasLevel = (p.educationLevels && p.educationLevels.length > 0) || !!p.educationLevel
+      return !!(p.primarySubject && hasLevel && typeof p.yearsExperience === 'number')
     }
     if (step === 1) {
       // Yêu cầu rate ít nhất 50% skill list (để tránh skip toàn bộ)
@@ -639,30 +645,53 @@ function Step1Career({
             </select>
           </div>
 
-          {/* Cấp học */}
+          {/* Cấp học — multi-select (1 GV có thể dạy nhiều cấp) */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Cấp học <span className="text-muted-foreground font-normal">(tuỳ chọn)</span>
+              Cấp học bạn dạy
+              <span className="text-muted-foreground font-normal ml-1">
+                (có thể chọn nhiều cấp)
+              </span>
             </label>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {EDUCATION_LEVELS.map((l) => {
-                const sel = data.profession.educationLevel === l.value
+                // Merge: dùng educationLevels[] mới + fallback educationLevel cũ (single string)
+                const currentLevels = data.profession.educationLevels
+                  ?? (data.profession.educationLevel ? [data.profession.educationLevel] : [])
+                const sel = currentLevels.includes(l.value)
                 return (
                   <button
                     type="button"
                     key={l.value}
-                    onClick={() => updateProf({ educationLevel: l.value })}
+                    onClick={() => {
+                      const next = sel
+                        ? currentLevels.filter(v => v !== l.value)
+                        : [...currentLevels, l.value]
+                      // Cập nhật cả 2 field — educationLevels mới + educationLevel cũ
+                      // (= phần tử đầu của mảng) để backward-compat với code đọc legacy
+                      updateProf({
+                        educationLevels: next,
+                        educationLevel: next[0],
+                      })
+                    }}
                     className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
                       sel
                         ? 'bg-purple-500/20 border-purple-500/50 text-purple-200'
                         : 'bg-card border-border text-muted-foreground hover:border-purple-500/30'
                     }`}
                   >
-                    {l.label}
+                    {l.label} {sel && '✓'}
                   </button>
                 )
               })}
             </div>
+            {((data.profession.educationLevels?.length ?? 0) >= 2) && (
+              <p className="text-[11px] text-purple-300 mt-1.5">
+                ✓ Đã chọn {data.profession.educationLevels!.length} cấp —
+                gợi ý nội dung phù hợp cho cả {data.profession.educationLevels!.map(v =>
+                  EDUCATION_LEVELS.find(l => l.value === v)?.label).join(', ')}
+              </p>
+            )}
           </div>
 
           {/* Năm kinh nghiệm — TUỲ CHỌN */}
@@ -960,7 +989,10 @@ function Step4Confirm({
   const skillMap = useMemo(() => new Map(skillList.map(s => [s.id, s])), [skillList])
   const motivationLabel = MOTIVATION_OPTIONS.find(m => m.value === data.motivation)?.label || '—'
   const timeLabel = TIME_OPTIONS.find(t => t.value === data.weeklyTimeCommitment)?.label || '—'
-  const levelLabel = EDUCATION_LEVELS.find(l => l.value === data.profession.educationLevel)?.label
+  // V2: hiển thị multi-grade — list các cấp đã chọn, fallback về single cũ
+  const levelLabel = (data.profession.educationLevels && data.profession.educationLevels.length > 0)
+    ? data.profession.educationLevels.map(v => EDUCATION_LEVELS.find(l => l.value === v)?.label).filter(Boolean).join(', ')
+    : EDUCATION_LEVELS.find(l => l.value === data.profession.educationLevel)?.label
 
   return (
     <div>

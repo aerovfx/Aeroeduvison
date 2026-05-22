@@ -30960,6 +30960,17 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       const prof = {};
       if (typeof p.primarySubject === 'string')   prof.primarySubject   = p.primarySubject.slice(0, 80);
       if (typeof p.educationLevel === 'string')   prof.educationLevel   = p.educationLevel.slice(0, 30);
+      // V2 (2026-05-22): multi-grade support — GV có thể dạy nhiều cấp.
+      // Accept educationLevels array, lưu kèm legacy field educationLevel = phần tử đầu.
+      if (Array.isArray(p.educationLevels)) {
+        const valid = ['primary', 'middle', 'high', 'university', 'center'];
+        prof.educationLevels = p.educationLevels
+          .filter(v => typeof v === 'string' && valid.includes(v))
+          .slice(0, 5);
+        if (!prof.educationLevel && prof.educationLevels[0]) {
+          prof.educationLevel = prof.educationLevels[0];
+        }
+      }
       if (Number.isFinite(+p.yearsExperience))    prof.yearsExperience  = Math.min(60, Math.max(0, Math.floor(+p.yearsExperience)));
       if (typeof p.school === 'string')           prof.school           = p.school.slice(0, 200);
       if (typeof p.job === 'string')              prof.job              = p.job.slice(0, 120);

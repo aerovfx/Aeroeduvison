@@ -102,7 +102,7 @@ const TEACHER_TREE: SkillCategory[] = [
     skills: [
       { id: 'tpd-communication',   label: 'Giao tiếp với phụ huynh & HS',   description: 'Phản hồi tích cực, họp phụ huynh, xử lý khiếu nại' },
       { id: 'tpd-mentoring',       label: 'Hỗ trợ & Mentoring đồng nghiệp', description: 'Chia sẻ kinh nghiệm, dự giờ, phản hồi chuyên môn' },
-      { id: 'tpd-reflection',      label: 'Phản tư chuyên nghiệp',           description: 'Tự đánh giá bài dạy, ghi chép journal, cải tiến liên tục', tags: ['CPD'] },
+      { id: 'tpd-reflection',      label: 'Tự đánh giá & cải tiến bài giảng', description: 'Soi lại tiết dạy, ghi nhật ký, rút bài học cải tiến liên tục', tags: ['CPD'] },
       { id: 'tpd-wellbeing',       label: 'Chăm sóc sức khỏe tâm lý',       description: 'Quản lý stress, work-life balance, phòng tránh burnout' },
       { id: 'tpd-leadership',      label: 'Lãnh đạo nhóm & Tổ bộ môn',     description: 'Điều phối cuộc họp, lập kế hoạch tổ, mentoring GV mới' },
       { id: 'tpd-cpd-plan',        label: 'Lập kế hoạch phát triển cá nhân', description: 'IDP hàng năm, đặt mục tiêu SMART, theo dõi tiến độ', tags: ['CPD'] },

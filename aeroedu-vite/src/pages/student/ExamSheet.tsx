@@ -490,7 +490,7 @@ export default function ExamSheetPage() {
                       value={answers[q.id] || ''}
                       onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                       placeholder="Đáp số"
-                      className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-pink-400 text-slate-700 text-sm font-mono"
+                      className="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 focus:outline-none focus:border-pink-400 text-slate-900 placeholder:text-slate-400 text-sm font-mono bg-white"
                     />
                   </div>
                 ))}
