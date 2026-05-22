@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { AIVisionOverlay, type AnalysisResult } from '@/components/camera/AIVisionOverlay'
+import TeacherCameraQuickAdd from '@/components/camera/TeacherCameraQuickAdd'
+import CameraConfigModal from '@/components/camera/CameraConfigModal'
 import {
   EMOTION_CONFIG,
   EmotionType
@@ -484,6 +486,9 @@ export default function CameraManagement() {
   const [isSidebarOpen, setIsSidebarOpen]       = useState(true)
   const [searchQuery, setSearchQuery]           = useState('')
   const [sidebarTab, setSidebarTab]             = useState<'hardware' | 'student'>('hardware')
+  // V2 (2026-05-22): Quick Add camera với mode picker (class/home)
+  const [addModalOpen, setAddModalOpen]         = useState(false)
+  const [addModalPreset, setAddModalPreset]     = useState<{ name?: string; location?: string; locationType?: string } | null>(null)
   const [aiVisionActive, setAiVisionActive]     = useState<Record<string, boolean>>({})
   const [analysisData, setAnalysisData]         = useState<Record<string, AnalysisResult>>({})
   const [activeRecordings, setActiveRecordings] = useState<Record<string, boolean>>({})
@@ -755,6 +760,21 @@ export default function CameraManagement() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 8 }} className="custom-scrollbar">
+          {/* V2 (2026-05-22): Quick Add camera với mode picker (lớp vs nhà) */}
+          {sidebarTab === 'hardware' && (
+            <TeacherCameraQuickAdd
+              cameraCount={cameras.filter(c => c.kind !== 'student-webcam').length}
+              onAdd={(preset) => {
+                setAddModalPreset({
+                  name: preset.nameHint,
+                  location: preset.locationHint,
+                  locationType: preset.locationType,
+                })
+                setAddModalOpen(true)
+              }}
+            />
+          )}
+
           {/* Empty state: TEACHER chưa được admin grant camera nào */}
           {sidebarTab === 'hardware' && !permissionState.isAdmin && !permissionState.hasAny && cameras.length <= 1 && (
             <div style={{
@@ -1121,6 +1141,20 @@ export default function CameraManagement() {
           </div>
         </div>
       )}
+
+      {/* V2: Camera Config Modal mở khi user click 1 trong 2 mode card */}
+      <CameraConfigModal
+        open={addModalOpen}
+        camera={null}
+        initialPreset={addModalPreset}
+        onClose={() => { setAddModalOpen(false); setAddModalPreset(null) }}
+        onSaved={() => {
+          setAddModalOpen(false)
+          setAddModalPreset(null)
+          toast.success('Đã thêm camera. Đang refresh danh sách...')
+          fetchData()
+        }}
+      />
     </div>
   )
 }

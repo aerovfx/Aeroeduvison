@@ -44,9 +44,11 @@ interface Props {
   /** null = create mới; CameraAdmin = edit */
   camera: CameraAdmin | null
   onSaved: (cam: CameraAdmin) => void
+  /** V2 (2026-05-22): preset cho create mới — TeacherCameraQuickAdd pass mode */
+  initialPreset?: { name?: string; location?: string; locationType?: string } | null
 }
 
-export default function CameraConfigModal({ open, onClose, camera, onSaved }: Props) {
+export default function CameraConfigModal({ open, onClose, camera, onSaved, initialPreset }: Props) {
   const [tab, setTab] = useState<'basic' | 'auth' | 'stream' | 'location'>('basic')
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -77,11 +79,17 @@ export default function CameraConfigModal({ open, onClose, camera, onSaved }: Pr
         hasMotion: camera.hasMotion,
       })
     } else {
+      // Create new — pre-fill từ initialPreset (TeacherCameraQuickAdd pass mode)
       setForm({
-        name: '', ipAddress: '', brand: 'Hikvision',
+        name: initialPreset?.name || '',
+        ipAddress: '', brand: 'Hikvision',
         httpPort: 80, rtspPort: 554, onvifPort: 80,
+        location: initialPreset?.location || '',
+        locationType: initialPreset?.locationType || '',
         enabled: true, hasPTZ: false, hasAudio: false, hasMotion: false,
       })
+      // Nếu pre-fill location → jump tab Vị trí trước để GV thấy nó đã set sẵn
+      if (initialPreset?.locationType) setTab('basic')
     }
     setTab('basic')
     setTestResult(null)
