@@ -114,9 +114,13 @@ void auditedClient; // suppress unused warning — audit proxy used for side eff
 // Main — stdio transport
 // ─────────────────────────────────────────────────────────────────────────────
 async function main() {
-  const authStatus = apiClient.hasAuth()
-    ? `✓ JWT set (${apiClient.baseUrl})`
-    : "⚠  AEROEDU_JWT không có — tool calls sẽ fail";
+  const apiKey = process.env.AEROEDU_API_KEY;
+  const jwt = process.env.AEROEDU_JWT;
+  const authStatus = apiKey
+    ? `✓ API Key set — AERO-${apiKey.slice(5, 9)}•••• (${apiClient.baseUrl})`
+    : jwt
+      ? `✓ JWT set (${apiClient.baseUrl})`
+      : "⚠  AEROEDU_API_KEY chưa có — vào /teacher/api-keys tạo key";
 
   console.error(`[aeroedu-mcp v0.4.0] 24 tools | ${authStatus}`);
   console.error(`[aeroedu-mcp] Audit log: ~/.aeroedu-mcp/audit-YYYY-MM-DD.jsonl`);

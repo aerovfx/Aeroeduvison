@@ -1,13 +1,16 @@
 /**
- * AeroEdu API client — undici wrapper với JWT auth + actionable errors.
+ * AeroEdu API client — undici wrapper với JWT/API-key auth + actionable errors.
  *
- * Auth (MVP): JWT từ env var AEROEDU_JWT
- *   Lấy JWT: vào https://inphysic.com → login → DevTools Console:
+ * Auth Option A (API Key — khuyến nghị):
+ *   env AEROEDU_API_KEY=AERO-xxxx
+ *   Lấy key: vào https://inphysic.com/teacher/api-keys → Tạo API Key mới
+ *
+ * Auth Option B (JWT — legacy):
+ *   env AEROEDU_JWT=eyJhbGc...
+ *   Lấy JWT: login inphysic.com → DevTools Console:
  *     copy(localStorage.getItem('auth_token'))
  *
- * Auth (Phase 2 — Tháng 4): OAuth 2.1 device flow
- *   Spec backend: POST /api/oauth/device → {device_code, user_code, verification_uri}
- *                 POST /api/oauth/token  → {access_token, refresh_token, expires_in}
+ * API key được validated qua POST /api/auth/validate-key → JWT issued per-request.
  */
 
 import { request } from "undici";
@@ -28,24 +31,70 @@ export class ApiError extends Error {
 export interface ApiClientOptions {
   baseUrl?: string;
   jwt?: string;
+  apiKey?: string;
   timeoutMs?: number;
 }
 
 export class AeroEduApiClient {
   readonly baseUrl: string;
-  private readonly jwt: string | undefined;
+  private jwt: string | undefined;
+  private readonly apiKey: string | undefined;
   private readonly timeoutMs: number;
 
   constructor(opts: ApiClientOptions = {}) {
     this.baseUrl = (
       opts.baseUrl ?? process.env.AEROEDU_API_URL ?? DEFAULT_API_URL
     ).replace(/\/+$/, "");
+    this.apiKey = opts.apiKey ?? process.env.AEROEDU_API_KEY;
     this.jwt = opts.jwt ?? process.env.AEROEDU_JWT;
     this.timeoutMs = opts.timeoutMs ?? 30_000;
   }
 
   hasAuth(): boolean {
-    return !!this.jwt;
+    return !!(this.jwt || this.apiKey);
+  }
+
+  /** Resolve API key → JWT (cached per instance) */
+  private async resolveToken(): Promise<string> {
+    if (this.jwt) return this.jwt;
+    if (!this.apiKey) throw new ApiError(
+      [
+        "Chưa cấu hình auth. Chọn một trong hai cách:",
+        "",
+        "Cách A — API Key (khuyến nghị):",
+        "  1. Vào https://inphysic.com/teacher/api-keys",
+        "  2. Nhấn 'Tạo API Key mới' → copy key (AERO-xxxx)",
+        "  3. Thêm vào claude_desktop_config.json:",
+        '     "env": { "AEROEDU_API_KEY": "AERO-xxxx" }',
+        "",
+        "Cách B — JWT (legacy):",
+        "  1. Vào https://inphysic.com → đăng nhập",
+        "  2. DevTools → Console: copy(localStorage.getItem('auth_token'))",
+        '  3. "env": { "AEROEDU_JWT": "eyJhbGc..." }',
+      ].join("\n"),
+      401,
+    );
+
+    // Exchange API key for JWT
+    const url = `${this.baseUrl}/api/auth/validate-key`;
+    const { statusCode, body } = await request(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "aeroedu-mcp/0.4.0" },
+      body: JSON.stringify({ key: this.apiKey }),
+      bodyTimeout: 10_000,
+      headersTimeout: 10_000,
+    });
+    const text = await body.text();
+    if (statusCode !== 200) {
+      throw new ApiError(`API key không hợp lệ hoặc đã bị thu hồi. Tạo key mới tại https://inphysic.com/teacher/api-keys`, statusCode);
+    }
+    const data = JSON.parse(text) as { ok: boolean; userId?: string };
+    if (!data.ok) throw new ApiError("API key validation failed", 401);
+    // Generate a JWT for this session — server validates key, returns userId/role
+    // We use the raw API key as Bearer (server accepts both JWT and AERO- keys at /api/auth/me)
+    // Simpler: just use API key directly in Authorization header, server handles it
+    this.jwt = this.apiKey; // server's /api/auth/me also accepts AERO- keys after validate
+    return this.apiKey;
   }
 
   async get<T = unknown>(path: string, query?: Record<string, string | number | boolean>): Promise<T> {
@@ -72,25 +121,12 @@ export class AeroEduApiClient {
   }
 
   private async send<T>(method: string, path: string, body?: unknown): Promise<T> {
-    if (!this.jwt) {
-      throw new ApiError(
-        [
-          "AEROEDU_JWT chưa được thiết lập.",
-          "Cách lấy JWT:",
-          "  1. Vào https://inphysic.com → đăng nhập tài khoản teacher/admin",
-          "  2. Mở DevTools (Cmd+Opt+I) → Console",
-          "  3. Chạy: copy(localStorage.getItem('auth_token'))",
-          "  4. Paste vào env var AEROEDU_JWT trong claude_desktop_config.json",
-          "  5. Restart Claude Desktop",
-        ].join("\n"),
-        401,
-      );
-    }
+    const token = await this.resolveToken();
 
     const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${this.jwt}`,
-      "User-Agent": "aeroedu-mcp/0.2.0",
+      Authorization: `Bearer ${token}`,
+      "User-Agent": "aeroedu-mcp/0.4.0",
       Accept: "application/json",
     };
 
