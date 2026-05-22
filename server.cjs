@@ -30997,6 +30997,13 @@ Hãy soạn giáo án HOÀN CHỈNH, có citation [Nguồn #N] sau các câu tr�
       const out = { accountType: '', profession: {}, currentSkills: {}, developmentGoals: [], motivation: '', weeklyTimeCommitment: '' };
       const at = String(input.accountType || '').toUpperCase();
       if (['TEACHER', 'PARENT', 'ADMIN'].includes(at)) out.accountType = at;
+      // V2 (2026-05-22): User có thể bỏ qua survey — vẫn lưu để guard không
+      // redirect lại, KG sẽ ít data ban đầu nhưng tự phát triển qua hoạt động.
+      // Skipped survey vẫn cần có accountType valid.
+      if (input.skipped === true) {
+        out.skipped = true;
+        out.skippedAt = new Date().toISOString();
+      }
       // Profession block
       const p = input.profession && typeof input.profession === 'object' ? input.profession : {};
       const prof = {};

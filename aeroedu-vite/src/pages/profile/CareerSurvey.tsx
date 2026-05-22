@@ -294,6 +294,42 @@ export default function CareerSurvey() {
     return true
   }, [step, data, isParent, skillList.length])
 
+  // V2 (2026-05-22): Bỏ qua survey — lưu minimal payload với skipped flag
+  const handleSkip = async () => {
+    const ok = window.confirm(
+      'Bỏ qua khảo sát?\n\n' +
+      'Bộ não tri thức (KG) của bạn sẽ ÍT dữ liệu ban đầu — sẽ TỰ phát triển ' +
+      'dần qua các hoạt động học tập, tạo bài, làm bài,...\n\n' +
+      'Bạn có thể quay lại làm khảo sát bất cứ lúc nào ở mục Hồ sơ.'
+    )
+    if (!ok) return
+    setSubmitting(true)
+    try {
+      const payload = {
+        accountType: surveyAccountType,
+        skipped: true,
+        profession: { selectedCareers: [] },
+        currentSkills: {},
+        developmentGoals: [],
+        motivation: '',
+        weeklyTimeCommitment: '',
+      }
+      await api.post('/users/me/career-survey', payload)
+      try { localStorage.removeItem(DRAFT_KEY) } catch { /* ignore */ }
+      toast.success('Đã bỏ qua khảo sát · KG sẽ phát triển qua hoạt động của bạn')
+      const returnUrl = searchParams.get('return')
+      if (returnUrl) {
+        navigate(returnUrl, { replace: true })
+      } else {
+        navigate(accountType === 'ADMIN' ? '/admin/knowledge-graph' : '/teacher/knowledge-graph', { replace: true })
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } }
+      toast.error(e.response?.data?.error || 'Không bỏ qua được — thử lại')
+      setSubmitting(false)
+    }
+  }
+
   // ── Submit ───────────────────────────────────────────────────
   const handleSubmit = async () => {
     setSubmitting(true)
@@ -433,7 +469,7 @@ export default function CareerSurvey() {
         </div>
 
         {/* Nav buttons */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <button
             type="button"
             onClick={() => setStep((s) => (s > 0 ? ((s - 1) as 0 | 1 | 2 | 3) : s))}
@@ -443,6 +479,20 @@ export default function CareerSurvey() {
             <ArrowLeft className="w-4 h-4" />
             Quay lại
           </button>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* V2: Bỏ qua khảo sát — chỉ show khi không phải retake (đã làm rồi) */}
+            {!isRetake && (
+              <button
+                type="button"
+                onClick={handleSkip}
+                disabled={submitting}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-card border border-border text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Bỏ qua khảo sát — KG sẽ ít data ban đầu, tự phát triển qua hoạt động"
+              >
+                Bỏ qua
+              </button>
+            )}
 
           {step < 3 ? (
             <button
@@ -475,7 +525,16 @@ export default function CareerSurvey() {
                   : 'Hoàn thành khảo sát & Bắt đầu xây dựng skill'}
             </button>
           )}
+          </div>
         </div>
+
+        {/* Skip hint banner — chỉ show ở step 0 để đỡ rối UI */}
+        {step === 0 && !isRetake && (
+          <p className="text-[11.5px] text-muted-foreground text-center mt-3">
+            💡 Khảo sát giúp KG có dữ liệu phong phú ngay từ đầu.
+            Nếu bỏ qua, KG sẽ tự phát triển dần qua các hoạt động học/dạy của bạn.
+          </p>
+        )}
       </div>
     </div>
   )
