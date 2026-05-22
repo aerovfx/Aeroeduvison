@@ -2,9 +2,11 @@
 /**
  * @aeroedu/mcp-hub v0.2.0 — AeroEdu MCP Server
  *
- * 10 tools / 2 namespaces:
+ * 19 tools / 3 namespaces:
  *   aeroedu_course_* (5) — quản lý khoá học, chương, bài học, đề thi
  *   aeroedu_kg_*     (5) — Knowledge Graph: search, detail, path, visit, extract
+ *   aeroedu_block_*  (4) — Lesson blocks: video, pdf, quiz, lab
+ *   aeroedu_exam/question/student/report_* (5) — publish, question bank, students, analytics
  *
  * Transport:
  *   stdio  — Claude Desktop / Cursor local (mặc định)
@@ -33,6 +35,8 @@ import { AeroEduApiClient } from "./lib/api-client.js";
 import { writeAudit } from "./lib/audit.js";
 import { registerCourseTools } from "./tools/course.js";
 import { registerKgTools } from "./tools/kg.js";
+import { registerBlockTools } from "./tools/block.js";
+import { registerExamExtraTools } from "./tools/exam-extra.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Server setup
@@ -49,6 +53,8 @@ const apiClient = new AeroEduApiClient();
 // ─────────────────────────────────────────────────────────────────────────────
 registerCourseTools(server, apiClient);
 registerKgTools(server, apiClient);
+registerBlockTools(server, apiClient);
+registerExamExtraTools(server, apiClient);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Audit wrapper — patch server to log every tool call
@@ -110,7 +116,7 @@ async function main() {
     ? `✓ JWT set (${apiClient.baseUrl})`
     : "⚠  AEROEDU_JWT không có — tool calls sẽ fail";
 
-  console.error(`[aeroedu-mcp v0.2.0] 10 tools | ${authStatus}`);
+  console.error(`[aeroedu-mcp v0.3.0] 19 tools | ${authStatus}`);
   console.error(`[aeroedu-mcp] Audit log: ~/.aeroedu-mcp/audit-YYYY-MM-DD.jsonl`);
 
   const transport = new StdioServerTransport();
