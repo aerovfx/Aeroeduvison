@@ -5195,6 +5195,161 @@ app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
 app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
 
+// Lesson Plans CRUD (teacher-service offline) — bảng "LessonPlan" Node.js
+async function _ensureLessonPlanTable() {
+  const pool = _getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "LessonPlan" (
+      id              VARCHAR(36)  PRIMARY KEY,
+      teacher_id      VARCHAR(255) NOT NULL,
+      title           VARCHAR(500) NOT NULL DEFAULT 'Giáo án mới',
+      subject         VARCHAR(100),
+      grade           VARCHAR(50),
+      tags            JSONB        NOT NULL DEFAULT '[]'::jsonb,
+      content         TEXT         NOT NULL DEFAULT '',
+      content_json    JSONB,
+      word_count      INTEGER      NOT NULL DEFAULT 0,
+      is_archived     BOOLEAN      NOT NULL DEFAULT false,
+      format          VARCHAR(10)  NOT NULL DEFAULT 'html',
+      latex_project_id VARCHAR(36),
+      gcs_backup_url  TEXT,
+      gcs_backup_at   TIMESTAMPTZ,
+      last_saved_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
+}
+_ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
+
+function _lpAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+function _lpRow(r) {
+  return {
+    id: r.id,
+    title: r.title,
+    subject: r.subject,
+    grade: r.grade,
+    tags: r.tags || [],
+    wordCount: r.word_count || 0,
+    isArchived: !!r.is_archived,
+    format: r.format || 'html',
+    latexProjectId: r.latex_project_id,
+    gcsBackupUrl: r.gcs_backup_url,
+    gcsBackupAt: r.gcs_backup_at,
+    lastSavedAt: r.last_saved_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    contentPreview: r.content ? String(r.content).slice(0, 200) : '',
+  };
+}
+
+// GET /api/teacher/lesson-plans → { plans, count }
+app.get('/api/teacher/lesson-plans', async (req, res) => {
+  const decoded = _lpAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT id, title, subject, grade, tags, word_count, is_archived, format,
+             latex_project_id, gcs_backup_url, gcs_backup_at, last_saved_at,
+             created_at, updated_at, content
+      FROM "LessonPlan" WHERE teacher_id = $1 ORDER BY updated_at DESC
+    `, [decoded.sub]);
+    return res.json({ plans: rows.map(_lpRow), count: rows.length });
+  } catch (e) { console.error('[lesson-plans:list]', e.message); return res.status(500).json({ error: 'Lỗi tải danh sách giáo án' }); }
+});
+
+// GET /api/teacher/lesson-plans/:id
+app.get('/api/teacher/lesson-plans/:id', async (req, res) => {
+  const decoded = _lpAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM "LessonPlan" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+    const r = rows[0];
+    return res.json({ ..._lpRow(r), content: r.content || '', contentJson: r.content_json || null });
+  } catch (e) { console.error('[lesson-plans:get]', e.message); return res.status(500).json({ error: 'Lỗi tải giáo án' }); }
+});
+
+// POST /api/teacher/lesson-plans
+app.post('/api/teacher/lesson-plans', async (req, res) => {
+  const decoded = _lpAuth(req, res); if (!decoded) return;
+  try {
+    const { title = 'Giáo án mới', content = '', contentJson = null, subject = null, grade = null, tags = [] } = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const wordCount = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      INSERT INTO "LessonPlan"(id, teacher_id, title, subject, grade, tags, content, content_json, word_count)
+      VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8::jsonb,$9)
+      RETURNING *
+    `, [id, decoded.sub, String(title).slice(0, 500), subject, grade,
+        JSON.stringify(Array.isArray(tags) ? tags : []),
+        String(content), contentJson ? JSON.stringify(contentJson) : null, wordCount]);
+    const r = rows[0];
+    return res.json({ plan: { ..._lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+  } catch (e) { console.error('[lesson-plans:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo giáo án' }); }
+});
+
+// PATCH /api/teacher/lesson-plans/:id — auto-save
+app.patch('/api/teacher/lesson-plans/:id', async (req, res) => {
+  const decoded = _lpAuth(req, res); if (!decoded) return;
+  try {
+    const { title, content, contentJson, subject, grade, tags, isArchived } = req.body || {};
+    const updates = ['updated_at = NOW()', 'last_saved_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    if (title !== undefined)       { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
+    if (subject !== undefined)     { params.push(subject);                       updates.push(`subject = $${params.length}`); }
+    if (grade !== undefined)       { params.push(grade);                         updates.push(`grade = $${params.length}`); }
+    if (tags !== undefined)        { params.push(JSON.stringify(Array.isArray(tags) ? tags : [])); updates.push(`tags = $${params.length}::jsonb`); }
+    if (content !== undefined) {
+      const wc = String(content).replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length;
+      params.push(String(content));               updates.push(`content = $${params.length}`);
+      params.push(wc);                            updates.push(`word_count = $${params.length}`);
+    }
+    if (contentJson !== undefined) { params.push(contentJson ? JSON.stringify(contentJson) : null); updates.push(`content_json = $${params.length}::jsonb`); }
+    if (isArchived !== undefined)  { params.push(!!isArchived);                  updates.push(`is_archived = $${params.length}`); }
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `UPDATE "LessonPlan" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2 RETURNING *`,
+      params
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+    const r = rows[0];
+    return res.json({ plan: { ..._lpRow(r), content: r.content || '', contentJson: r.content_json || null } });
+  } catch (e) { console.error('[lesson-plans:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu giáo án' }); }
+});
+
+// DELETE /api/teacher/lesson-plans/:id
+app.delete('/api/teacher/lesson-plans/:id', async (req, res) => {
+  const decoded = _lpAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "LessonPlan" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy giáo án' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[lesson-plans:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá giáo án' }); }
+});
+
+// Stub endpoints (chưa implement GCS backup + from-latex)
+app.post('/api/teacher/lesson-plans/:id/backup', (_req, res) => res.status(501).json({ error: 'GCS backup chưa khả dụng (cần GCS bucket setup)' }));
+app.post('/api/teacher/lesson-plans/from-latex', (_req, res) => res.status(501).json({ error: 'Import từ LaTeX chưa khả dụng' }));
+app.get('/api/teacher/lesson-plans-gcs', (_req, res) => res.json({ snapshots: [], count: 0, bucket: '', prefix: '' }));
+app.delete('/api/teacher/lesson-plans-gcs/:filename', (_req, res) => res.status(501).json({ error: 'GCS delete chưa khả dụng' }));
+
 // Leaderboard realtime (aero-backend)
 app.get('/api/leaderboard/realtime', (_req, res) => res.json({ leaders: [], updatedAt: new Date().toISOString() }));
 
