@@ -4870,6 +4870,124 @@ app.post('/api/auth/validate-key', async (req, res) => {
   } catch (e) { console.error('[api-keys:validate]', e.message); return res.status(500).json({ error: 'Lỗi xác thực key' }); }
 });
 
+// ── Classes (GV tạo/xem/xoá lớp) — PHẢI trước catch-all /api proxy ────────
+// Rust aero-backend hiện không serve /api/classes (ECONNREFUSED 127.0.0.1:8090)
+// → handler Node.js trực tiếp với bảng "Class" trong DB chung.
+async function _ensureClassTable() {
+  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "Class" (
+      id              VARCHAR(36)  PRIMARY KEY,
+      teacher_id      VARCHAR(255) NOT NULL,
+      name            VARCHAR(200) NOT NULL,
+      grade           VARCHAR(50),
+      school_year     VARCHAR(20),
+      description     TEXT,
+      context_type    VARCHAR(20)  DEFAULT 'SCHOOL',
+      institution_name VARCHAR(200),
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_class_teacher ON "Class"(teacher_id)`);
+}
+_ensureClassTable().catch(e => console.error('[classes] migration error:', e.message));
+
+// Helper trả về user từ JWT
+function _classAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+// GET /api/classes → { classes: [...] }
+app.get('/api/classes', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(`
+      SELECT c.id, c.name, c.grade, c.school_year AS "schoolYear", c.description,
+             c.context_type, c.institution_name, c.created_at AS "createdAt",
+             COALESCE((SELECT COUNT(*) FROM "ClassStudent" cs WHERE cs.class_id = c.id), 0)::int AS "studentCount"
+      FROM "Class" c WHERE c.teacher_id = $1 ORDER BY c.created_at DESC
+    `, [decoded.sub]);
+    return res.json({ classes: rows });
+  } catch (e) {
+    // Bảng ClassStudent có thể chưa tồn tại — fallback query bỏ join
+    try {
+      const pool = getPool();
+      const { rows } = await pool.query(`
+        SELECT id, name, grade, school_year AS "schoolYear", description,
+               context_type, institution_name, created_at AS "createdAt",
+               0 AS "studentCount"
+        FROM "Class" WHERE teacher_id = $1 ORDER BY created_at DESC
+      `, [decoded.sub]);
+      return res.json({ classes: rows });
+    } catch (e2) {
+      console.error('[classes:list]', e2.message);
+      return res.status(500).json({ error: 'Lỗi lấy danh sách lớp' });
+    }
+  }
+});
+
+// POST /api/classes — body: { name, grade, schoolYear, description, context_type, institution_name }
+app.post('/api/classes', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const { name = '', grade = '', schoolYear = '', description = '',
+            context_type = 'SCHOOL', institution_name = '' } = req.body || {};
+    if (!String(name).trim()) return res.status(400).json({ error: 'Thiếu tên lớp' });
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = getPool();
+    await pool.query(`
+      INSERT INTO "Class"(id, teacher_id, name, grade, school_year, description, context_type, institution_name)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+    `, [id, decoded.sub, String(name).slice(0,200), String(grade).slice(0,50),
+        String(schoolYear).slice(0,20), String(description), String(context_type),
+        String(institution_name).slice(0,200)]);
+    return res.json({ ok: true, id, name, grade, schoolYear, description, context_type, institution_name, studentCount: 0, createdAt: new Date().toISOString() });
+  } catch (e) { console.error('[classes:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo lớp học' }); }
+});
+
+// DELETE /api/classes/:id
+app.delete('/api/classes/:id', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[classes:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá lớp' }); }
+});
+
+// PATCH /api/classes/:id
+app.patch('/api/classes/:id', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const { name, grade, schoolYear, description, context_type, institution_name } = req.body || {};
+    const updates = [];
+    const params = [req.params.id, decoded.sub];
+    if (name !== undefined)              { params.push(String(name).slice(0,200));            updates.push(`name = $${params.length}`); }
+    if (grade !== undefined)             { params.push(String(grade).slice(0,50));            updates.push(`grade = $${params.length}`); }
+    if (schoolYear !== undefined)        { params.push(String(schoolYear).slice(0,20));       updates.push(`school_year = $${params.length}`); }
+    if (description !== undefined)       { params.push(String(description));                  updates.push(`description = $${params.length}`); }
+    if (context_type !== undefined)      { params.push(String(context_type));                 updates.push(`context_type = $${params.length}`); }
+    if (institution_name !== undefined)  { params.push(String(institution_name).slice(0,200)); updates.push(`institution_name = $${params.length}`); }
+    if (!updates.length) return res.json({ ok: true });
+    const pool = getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
+      params
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[classes:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật lớp' }); }
+});
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 
