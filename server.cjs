@@ -5267,7 +5267,7 @@ if (USE_NODEJS_QUESTIONS) {
       ['topics',          "JSONB DEFAULT '[]'::jsonb"], ['status', "VARCHAR(30) DEFAULT 'Hoàn tất'"],
       ['created_at',      "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
     ]);
-    await _dropLegacyNotNull('ExamMatrix', ['teacherId','name','subject','grade','examType','duration','totalScore','totalQuestions','type','schoolYear','description','sections','topics','status','createdAt','updatedAt']);
+    await _dropLegacyNotNull('ExamMatrix', ['teacherId','userId','ownerId','name','subject','grade','examType','duration','durationMin','totalScore','totalPoints','totalQuestions','type','schoolYear','description','sections','topics','status','createdAt','updatedAt']);
     // Legacy sections/topics có thể TEXT/JSONB — đảm bảo JSONB
     for (const col of ['sections', 'topics']) {
       try { await pool.query(`ALTER TABLE "ExamMatrix" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); } catch {}
