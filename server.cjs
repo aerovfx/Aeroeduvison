@@ -6881,20 +6881,24 @@ function _examAuth(req, res) {
 app.get('/api/question-bank', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
-    const scope = req.query.scope || 'all';   // 'mine' | 'public' | 'all'
+    const scope = req.query.scope || 'all';
+    // CONSISTENT với POST /api/questions/batch: prefer userId/id over sub
+    // (vì JWT có thể có nhiều ID fields, phải match cùng logic để isOwner chuẩn)
+    const me = decoded.userId || decoded.id || decoded.sub;
+    // Tất cả ID có thể của user — match nếu teacher_id == bất kỳ một cái nào
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
     let where;
-    const params = [decoded.sub];
+    const params = [myIds];
     if (scope === 'mine') {
-      where = `teacher_id = $1`;
+      where = `teacher_id = ANY($1::text[])`;
     } else if (scope === 'public') {
-      where = `visibility = 'public' AND teacher_id != $1`;
+      where = `visibility = 'public' AND NOT (teacher_id = ANY($1::text[]))`;
     } else {
-      // 'all' = mình + public của người khác (default cho ngân hàng chung)
-      where = `teacher_id = $1 OR visibility = 'public'`;
+      where = `teacher_id = ANY($1::text[]) OR visibility = 'public'`;
     }
     const { rows } = await pool.query(
-      `SELECT *, (teacher_id = $1) AS is_owner FROM "Question"
+      `SELECT *, (teacher_id = ANY($1::text[])) AS is_owner FROM "Question"
        WHERE ${where} ORDER BY created_at DESC LIMIT 500`,
       params
     );
@@ -6903,7 +6907,7 @@ app.get('/api/question-bank', async (req, res) => {
       visibility: r.visibility || 'private',
       isOwner: !!r.is_owner,
     }));
-    return res.json({ questions, total: questions.length });
+    return res.json({ questions, total: questions.length, _debug: { me, myIds } });
   } catch (e) { console.error('[question-bank:list]', e.message); return res.json({ questions: [], total: 0 }); }
 });
 
