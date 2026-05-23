@@ -1903,7 +1903,7 @@ if (USE_NODEJS_QUESTIONS) {
                 difficulty, content, options, "correctAnswer", answer, explanation,
                 "learningObjectives", tags, "aiGenerated", "humanReviewed", status,
                 visibility, "createdAt", "updatedAt", "usageCount")
-             VALUES ($1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13,$14::jsonb,
+             VALUES ($1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13::jsonb,$14::jsonb,
                      false,false,$15,'private',$16,$16,0)
              ON CONFLICT (id) DO NOTHING`,
             [id, userId, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
@@ -1916,7 +1916,11 @@ if (USE_NODEJS_QUESTIONS) {
           inserted++;
         } catch (e) {
           failed++;
-          if (errors.length < 3) errors.push(`Q${inserted+failed}: ${e.message.slice(0, 100)}`);
+          // Log MỌI lỗi vào server logs (đầy đủ) để debug
+          if (failed <= 3) {
+            console.error(`[questions:batch] insert fail Q${inserted+failed}:`, e.message);
+          }
+          if (errors.length < 3) errors.push(`Q${inserted+failed}: ${e.message.slice(0, 150)}`);
         }
       }
 
