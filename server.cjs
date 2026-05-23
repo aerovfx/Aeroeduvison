@@ -2070,23 +2070,28 @@ if (USE_NODEJS_QUESTIONS) {
 
   app.post('/api/questions/batch', async (req, res) => {
     // Auth: lấy userId thực từ Bearer — ưu tiên decoded.userId/id, fallback sub
-    // Skip placeholder 'teacher-user' (JWT legacy/dev) — force user re-login
     const auth = req.headers.authorization || '';
     let userId = null;
+    let decodedDebug = null;
     if (auth.startsWith('Bearer ')) {
       try {
         const decoded = _akVerify(auth.slice(7));
+        decodedDebug = { sub: decoded.sub, userId: decoded.userId, id: decoded.id, email: decoded.email, role: decoded.role };
         userId = decoded.userId || decoded.id || decoded.sub;
-        if (userId === 'teacher-user' || userId === 'teacher' || userId === 'anon') {
-          // Placeholder sub từ legacy JWT — không phải user thật
-          return res.status(401).json({
-            success: false,
-            error: 'Phiên đăng nhập cũ. Vui lòng đăng xuất và đăng nhập lại để cập nhật quyền sở hữu câu hỏi.',
-          });
-        }
-      } catch {}
+      } catch (e) {
+        console.warn('[questions:batch] JWT verify failed:', e.message);
+      }
+    } else {
+      console.warn('[questions:batch] No Bearer header');
     }
-    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized — login lại' });
+    if (!userId) {
+      console.warn('[questions:batch] No userId from JWT, decoded=', decodedDebug);
+      return res.status(401).json({ success: false, error: 'Unauthorized — login lại' });
+    }
+    // Cho phép literal 'teacher-user' (legacy account) — không reject, chỉ log warning
+    if (userId === 'teacher-user' || userId === 'teacher' || userId === 'anon') {
+      console.warn('[questions:batch] WARN: legacy userId=', userId, '— consider re-login for clean ownership');
+    }
 
     try {
       const pool = getQPool();
