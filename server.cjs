@@ -5348,7 +5348,10 @@ if (USE_NODEJS_QUESTIONS) {
         `SELECT * FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
         [req.params.id, decoded.sub]);
       if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
-      return res.json({ matrix: mxRow(rows[0]) });
+      // ExamMatrixDetail page làm setMatrix(r.data) trực tiếp → trả root level
+      // ExamMatrixCreate (edit mode) cũng đọc r.data.id trực tiếp.
+      const m = mxRow(rows[0]);
+      return res.json({ ...m, matrix: m });  // root + nested để backward compat
     } catch (e) { console.error('[exam-matrix:get]', e.message); return res.status(500).json({ error: 'Lỗi tải ma trận' }); }
   });
 
