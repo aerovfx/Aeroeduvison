@@ -789,19 +789,30 @@ export function ImportModal({ isOpen, onClose, onSuccess }: ImportModalProps) {
 
     setSaving(true)
     try {
-      const res = await fetch("/api/questions/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questions: selected }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Import thất bại")
-      setSavedCount(selected.length)
-      onSuccess(selected.length)
+      // Dùng axios `api` instance để tự động thêm Authorization Bearer header
+      // (raw fetch không gửi Bearer → backend 401 Unauthorized)
+      const { api } = await import("@/services/api")
+      const { data } = await api.post<{
+        success: boolean; data?: { inserted: number; failed?: number; total: number; errors?: string[] }
+      }>("/questions/batch", { questions: selected })
+      const inserted = data.data?.inserted ?? selected.length
+      const failed = data.data?.failed ?? 0
+      setSavedCount(inserted)
+      onSuccess(inserted)
       setImportStep("complete")
-      toast.success(`Đã import ${selected.length} câu hỏi!`)
-    } catch (err: any) {
-      toast.error(err.message || "Không thể import câu hỏi")
+      toast.success(
+        failed > 0
+          ? `Đã import ${inserted}/${selected.length} câu (${failed} lỗi)`
+          : `Đã import ${inserted} câu hỏi!`,
+        { duration: 4000 }
+      )
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string }; status?: number }; message?: string }
+      if (e.response?.status === 401) {
+        toast.error("Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.")
+      } else {
+        toast.error(e.response?.data?.error || e.message || "Không thể import câu hỏi")
+      }
     } finally {
       setSaving(false)
     }
