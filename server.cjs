@@ -4919,10 +4919,10 @@ function _akVerify(token) {
   return _akJwt.verify(token, _akSecret(), { ignoreExpiration: true });
 }
 
-// Module-scope DB pool helper (_getPool() ở line 133 bị block-scoped trong
+// Module-scope DB pool helper (getPool() ở line 133 bị block-scoped trong
 // if(USE_NODEJS_AUTH){} với 'use strict' → không accessible từ đây).
 let _akPool = null;
-function __getPool() {
+function _getPool() {
   if (!_akPool) {
     const { Pool } = require('pg');
     const url = process.env.DATABASE_URL;
