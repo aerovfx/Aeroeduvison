@@ -55,6 +55,32 @@ interface ExamMatrix {
   createdAt: string
 }
 
+// ─── Sample matrices (Bộ GD&ĐT chuẩn) — hiển thị khi danh sách rỗng ─────────
+// Giáo viên xem cấu trúc mẫu trước khi tự tạo. Click "Nhân bản" để copy thành
+// ma trận riêng của mình.
+const SAMPLE_MATRICES: ExamMatrix[] = [
+  {
+    id: 'sample-vatli-10-hk2',
+    name: 'Ma trận đề kiểm tra cuối học kỳ II — Vật lí 10',
+    grade: 'Khối 10',
+    examType: 'Học kỳ',
+    type: 'Vật lí',
+    status: 'Mẫu',
+    totalQuestions: 28,
+    createdAt: '2025-04-15T08:00:00.000Z',
+  },
+  {
+    id: 'sample-toan-11-hk1',
+    name: 'Ma trận đề kiểm tra cuối học kỳ I — Toán 11',
+    grade: 'Khối 11',
+    examType: 'Học kỳ',
+    type: 'Toán',
+    status: 'Mẫu',
+    totalQuestions: 30,
+    createdAt: '2025-04-10T08:00:00.000Z',
+  },
+]
+
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
@@ -62,6 +88,7 @@ function StatusBadge({ status }: { status: string }) {
     'Đang xử lý':  { bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa' },
     'Hàng đợi':    { bg: 'rgba(148,163,184,0.15)', color: '#94a3b8' },
     'Lỗi':         { bg: 'rgba(239,68,68,0.15)',   color: '#f87171' },
+    'Mẫu':         { bg: 'rgba(168,85,247,0.15)',  color: '#c084fc' },
   }
   const c = cfg[status] || cfg['Hàng đợi']
   return (
@@ -500,9 +527,15 @@ export default function ExamMatrixPage() {
       if (selectedStatus !== 'Tất cả') params.append('status', selectedStatus)
       if (examTypeFilter !== 'Tất cả loại đề') params.append('examType', examTypeFilter)
       const res = await api.get(`/exam-matrices?${params}`)
-      setMatrices(res.data?.matrices || [])
+      const apiMatrices: ExamMatrix[] = res.data?.matrices || []
+      // Khi GV chưa tạo ma trận nào → hiện 2 mẫu chuẩn Bộ GD&ĐT để tham khảo
+      // (chỉ áp dụng khi không filter, để mẫu luôn hiển thị ở trạng thái mặc định)
+      const isDefault = selectedStatus === 'Tất cả' && examTypeFilter === 'Tất cả loại đề'
+      setMatrices(apiMatrices.length === 0 && isDefault ? SAMPLE_MATRICES : apiMatrices)
     } catch (e: any) {
-      toast.error(e.message || 'Không thể tải danh sách ma trận')
+      // Lỗi API → vẫn hiện mẫu để page không trống hoàn toàn
+      console.warn('[exam-matrix] API lỗi, fallback sang mẫu:', e?.message)
+      setMatrices(SAMPLE_MATRICES)
     } finally {
       setLoading(false)
     }
@@ -512,6 +545,11 @@ export default function ExamMatrixPage() {
 
   const handleDelete = async () => {
     if (!deleteDialog) return
+    if (deleteDialog.startsWith('sample-')) {
+      toast.error('Không thể xoá ma trận mẫu — chỉ để tham khảo')
+      setDeleteDialog(null)
+      return
+    }
     setDeleting(true)
     try {
       await api.delete(`/exam-matrices/${deleteDialog}`)
@@ -527,6 +565,14 @@ export default function ExamMatrixPage() {
   }
 
   const handleDuplicate = async (id: string) => {
+    if (id.startsWith('sample-')) {
+      // Mẫu → chuyển sang trang create với prefill từ tên mẫu
+      const sample = SAMPLE_MATRICES.find(s => s.id === id)
+      if (sample) {
+        navigate(`/teacher/exam-matrix/create?from=sample&name=${encodeURIComponent(sample.name)}&grade=${encodeURIComponent(sample.grade)}&subject=${encodeURIComponent(sample.type)}`)
+      }
+      return
+    }
     try {
       await api.post(`/exam-matrices/${id}/duplicate`)
       toast.success('Đã nhân bản ma trận')
