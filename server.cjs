@@ -1869,12 +1869,54 @@ if (USE_NODEJS_QUESTIONS) {
   // Insert questions với teacher_id = real user ID từ JWT (không phải literal 'teacher')
   // Cũng set vào cả "teacher_id" snake_case (handler mới) và "createdBy" camelCase (legacy)
   // để GET /api/question-bank?scope=mine WHERE teacher_id=$me match được.
-  app.post('/api/questions/batch', async (req, res) => {
-    // Auth: lấy userId thực từ Bearer
+  // POST /api/questions/claim-orphan — claim ownership các câu hỏi import bằng
+  // JWT cũ (teacher_id='teacher-user') cho user hiện tại. Chỉ áp dụng cho các
+  // câu được tạo trong 7 ngày gần nhất (avoid claim toàn bộ orphan DB).
+  app.post('/api/questions/claim-orphan', async (req, res) => {
     const auth = req.headers.authorization || '';
     let userId = null;
     if (auth.startsWith('Bearer ')) {
-      try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+      try {
+        const d = _akVerify(auth.slice(7));
+        userId = d.userId || d.id || d.sub;
+      } catch {}
+    }
+    if (!userId || userId === 'teacher-user') {
+      return res.status(401).json({ error: 'Cần đăng nhập với tài khoản thật (UUID)' });
+    }
+    try {
+      const pool = getQPool();
+      const { rowCount } = await pool.query(`
+        UPDATE "Question"
+        SET teacher_id = $1, "createdBy" = $1
+        WHERE teacher_id IN ('teacher-user', 'teacher')
+          AND "createdAt" >= NOW() - INTERVAL '7 days'
+      `, [userId]);
+      console.log(`[claim-orphan] user=${userId} claimed ${rowCount} questions`);
+      return res.json({ ok: true, claimed: rowCount });
+    } catch (e) {
+      console.error('[claim-orphan]', e.message);
+      return res.status(500).json({ error: 'Lỗi claim ownership' });
+    }
+  });
+
+  app.post('/api/questions/batch', async (req, res) => {
+    // Auth: lấy userId thực từ Bearer — ưu tiên decoded.userId/id, fallback sub
+    // Skip placeholder 'teacher-user' (JWT legacy/dev) — force user re-login
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try {
+        const decoded = _akVerify(auth.slice(7));
+        userId = decoded.userId || decoded.id || decoded.sub;
+        if (userId === 'teacher-user' || userId === 'teacher' || userId === 'anon') {
+          // Placeholder sub từ legacy JWT — không phải user thật
+          return res.status(401).json({
+            success: false,
+            error: 'Phiên đăng nhập cũ. Vui lòng đăng xuất và đăng nhập lại để cập nhật quyền sở hữu câu hỏi.',
+          });
+        }
+      } catch {}
     }
     if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized — login lại' });
 
