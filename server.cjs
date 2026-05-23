@@ -1533,6 +1533,174 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   } catch (e) { console.error('[teacher-exams:del]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
 });
 
+// ── Online Exam Room CRUD ─────────────────────────────────────
+// Phòng thi online thời gian thực — GV tạo, HS join bằng access code.
+;(() => {
+  async function _ensureOnlineRoomTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "OnlineExamRoom" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        teacher_id    VARCHAR(255) NOT NULL,
+        exam_id       VARCHAR(36),
+        name          VARCHAR(500) NOT NULL DEFAULT 'Phòng thi mới',
+        description   TEXT,
+        status        VARCHAR(20)  DEFAULT 'draft',
+        start_time    TIMESTAMPTZ,
+        end_time      TIMESTAMPTZ,
+        duration      INTEGER      DEFAULT 45,
+        access_code   VARCHAR(20),
+        is_public     BOOLEAN      DEFAULT false,
+        max_students  INTEGER,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('OnlineExamRoom', [
+      ['teacher_id', "VARCHAR(255)"], ['exam_id', "VARCHAR(36)"],
+      ['name', "VARCHAR(500)"], ['description', "TEXT"],
+      ['status', "VARCHAR(20) DEFAULT 'draft'"],
+      ['start_time', "TIMESTAMPTZ"], ['end_time', "TIMESTAMPTZ"],
+      ['duration', "INTEGER DEFAULT 45"], ['access_code', "VARCHAR(20)"],
+      ['is_public', "BOOLEAN DEFAULT false"], ['max_students', "INTEGER"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('OnlineExamRoom', ['teacherId','examId','name','description','status','startTime','endTime','duration','accessCode','isPublic','maxStudents','createdAt','updatedAt','userId','ownerId']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_room_teacher ON "OnlineExamRoom"(teacher_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_room_access_code ON "OnlineExamRoom"(access_code)`);
+  }
+  _ensureOnlineRoomTable().catch(e => console.error('[online-exam-room] migration:', e.message));
+
+  function roomAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  function roomRow(r) {
+    return {
+      id: r.id, name: r.name, description: r.description,
+      status: r.status || 'draft',
+      startTime: r.start_time, endTime: r.end_time,
+      duration: r.duration || 45,
+      accessCode: r.access_code, isPublic: !!r.is_public,
+      maxStudents: r.max_students,
+      examId: r.exam_id,
+      _count: { participants: 0, questions: 0 },
+    };
+  }
+
+  // GET /api/online-exam-room — list rooms GV tạo
+  app.get('/api/online-exam-room', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "OnlineExamRoom" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 100`,
+        [decoded.userId || decoded.id || decoded.sub]);
+      return res.json({ rooms: rows.map(roomRow), total: rows.length });
+    } catch (e) { console.error('[room:list]', e.message); return res.json({ rooms: [], total: 0 }); }
+  });
+
+  // POST /api/online-exam-room — tạo phòng
+  app.post('/api/online-exam-room', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const { randomUUID, randomBytes } = require('crypto');
+      const id = randomUUID();
+      const accessCode = (b.accessCode || randomBytes(3).toString('hex')).toUpperCase();
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "OnlineExamRoom"(id, teacher_id, exam_id, name, description, status,
+          start_time, end_time, duration, access_code, is_public, max_students)
+        VALUES ($1::text,$2::text,$3,$4::text,$5,$6::text,$7,$8,$9,$10::text,$11,$12)
+        RETURNING *`,
+        [id, userId, b.examId || null, String(b.name || 'Phòng thi mới').slice(0, 500),
+         b.description || null, b.status || 'draft',
+         b.startTime || null, b.endTime || null, Number(b.duration) || 45,
+         accessCode, !!b.isPublic, b.maxStudents || null]);
+      return res.json({ room: roomRow(rows[0]) });
+    } catch (e) { console.error('[room:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo phòng thi' }); }
+  });
+
+  // GET /api/online-exam-room/:id
+  app.get('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "OnlineExamRoom" WHERE id = $1`,
+        [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy phòng' });
+      return res.json({ room: roomRow(rows[0]) });
+    } catch (e) { console.error('[room:get]', e.message); return res.status(500).json({ error: 'Lỗi tải phòng' }); }
+  });
+
+  // PUT /api/online-exam-room/:id — update (status, etc)
+  app.put('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.id, userId];
+      const map = { name: 'name', description: 'description', status: 'status',
+                    examId: 'exam_id', startTime: 'start_time', endTime: 'end_time',
+                    duration: 'duration', isPublic: 'is_public', maxStudents: 'max_students' };
+      for (const [k, col] of Object.entries(map)) {
+        if (b[k] !== undefined) { params.push(b[k]); updates.push(`${col} = $${params.length}`); }
+      }
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "OnlineExamRoom" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
+        params);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy phòng (hoặc không phải chủ)' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[room:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật phòng' }); }
+  });
+
+  // DELETE /api/online-exam-room/:id
+  app.delete('/api/online-exam-room/:id', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "OnlineExamRoom" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, userId]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy phòng' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[room:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá phòng' }); }
+  });
+
+  // GET /api/online-exam-room/:id/schedule — schedule (stub empty)
+  app.get('/api/online-exam-room/:id/schedule', (_req, res) =>
+    res.json({ schedules: [], total: 0 }));
+
+  // POST /api/online-exam-room/join — HS/GV join bằng accessCode hoặc roomId
+  app.post('/api/online-exam-room/join', async (req, res) => {
+    const decoded = roomAuth(req, res); if (!decoded) return;
+    try {
+      const { accessCode, roomId } = req.body || {};
+      const pool = _getPool();
+      let row;
+      if (roomId) {
+        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE id = $1`, [roomId]);
+        row = r.rows[0];
+      } else if (accessCode) {
+        const r = await pool.query(`SELECT id FROM "OnlineExamRoom" WHERE access_code = $1`,
+          [String(accessCode).toUpperCase()]);
+        row = r.rows[0];
+      }
+      if (!row) return res.status(404).json({ error: 'Mã phòng không hợp lệ' });
+      return res.json({ ok: true, roomId: row.id });
+    } catch (e) { console.error('[room:join]', e.message); return res.status(500).json({ error: 'Lỗi join phòng' }); }
+  });
+})();
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
