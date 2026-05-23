@@ -1240,6 +1240,91 @@ app.post('/api/teachers/cpd', async (req, res) => {
   } catch (e) { console.error('[cpd:post]', e.message); return res.status(500).json({ error: 'Lỗi lưu CPD' }); }
 });
 
+// ── Teacher Exams CRUD — TRƯỚC proxy teacher-service ──
+// /api/teacher/exams* dùng cùng bảng "Exam" (đã có _ensureExamTables ở dưới).
+// Cần POST/upload-pdf/answer-key cho CreateExam page.
+
+// POST /api/teacher/exams — tạo đề thi mới (return { id } hoặc { exam: {id} })
+app.post('/api/teacher/exams', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = _getPool();
+    // Build description với metadata (subject, examType, passingScore, shuffle, sourceType)
+    const meta = JSON.stringify({
+      subject: b.subject, examType: b.examType,
+      passingScore: b.passingScore, shuffle: b.shuffle,
+      sourceType: b.sourceType, description: b.description || '',
+    });
+    const { rows } = await pool.query(`
+      INSERT INTO "Exam"(id, teacher_id, title, description, subject, grade, duration_min,
+                         total_points, status, settings)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
+      RETURNING id, title, status, created_at`,
+      [id, decoded.sub, String(b.title || 'Đề mới').slice(0, 500),
+       b.description || null, b.subject || null, b.grade || null,
+       Number(b.duration) || 45, Number(b.totalQuestions) || 0,
+       b.status || 'draft', meta]);
+    return res.json({ id: rows[0].id, exam: rows[0] });
+  } catch (e) { console.error('[teacher-exams:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo đề thi' }); }
+});
+
+// POST /api/teacher/exams/upload-pdf — stub 501 (cần GCS storage)
+app.post('/api/teacher/exams/upload-pdf', (_req, res) =>
+  res.status(501).json({ error: 'Upload PDF cần GCS bucket — đang phát triển' }));
+
+// POST /api/teacher/exams/:id/answer-key — lưu đáp án vào settings JSONB
+app.post('/api/teacher/exams/:id/answer-key', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const questions = Array.isArray(req.body?.questions) ? req.body.questions : [];
+    const pool = _getPool();
+    const { rowCount } = await pool.query(`
+      UPDATE "Exam"
+      SET settings = COALESCE(settings, '{}'::jsonb) || $1::jsonb,
+          updated_at = NOW()
+      WHERE id = $2 AND teacher_id = $3`,
+      [JSON.stringify({ answerKey: questions }), req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    return res.json({ ok: true, count: questions.length });
+  } catch (e) { console.error('[teacher-exams:answer-key]', e.message); return res.status(500).json({ error: 'Lỗi lưu đáp án' }); }
+});
+
+// PATCH /api/teacher/exams/:id — partial update
+app.patch('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const updates = ['updated_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    const map = { title: 'title', subject: 'subject', grade: 'grade',
+                  duration: 'duration_min', description: 'description', status: 'status' };
+    for (const [key, col] of Object.entries(map)) {
+      if (b[key] !== undefined) { params.push(b[key]); updates.push(`${col} = $${params.length}`); }
+    }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:patch]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// DELETE /api/teacher/exams/:id
+app.delete('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:del]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+});
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
