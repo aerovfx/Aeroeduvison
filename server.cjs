@@ -5684,6 +5684,11 @@ async function _ensureLessonPlanTable() {
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
+  // Legacy tags/content_json có thể TEXT[] hoặc TEXT — migrate sang JSONB
+  for (const col of ['tags', 'content_json']) {
+    try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); }
+    catch { /* skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
@@ -5850,6 +5855,14 @@ async function _ensureExamTables() {
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId']);
+  // Legacy Question.options từ Rust service là TEXT[] → quiz-publish handler
+  // JSON.stringify ra '["..."]' không khớp PG array literal '{...}' → 500.
+  // Migrate sang JSONB cho cả 2 cột options + tags.
+  for (const col of ['options', 'tags']) {
+    try {
+      await pool.query(`ALTER TABLE "Question" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`);
+    } catch { /* đã JSONB sẵn — skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
 
   // Exams
@@ -5879,7 +5892,25 @@ async function _ensureExamTables() {
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId']);
+  // Same fix cho Exam — legacy questionIds/settings có thể là array/text
+  for (const col of ['question_ids', 'settings']) {
+    try {
+      await pool.query(`ALTER TABLE "Exam" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`);
+    } catch { /* đã JSONB hoặc legacy column khác — skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_teacher ON "Exam"(teacher_id, created_at DESC)`);
+
+  // Add ExamQuestion + ExamQuestion legacy cleanup (cũng có "examId" camelCase NOT NULL)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "ExamQuestion" (
+      id           VARCHAR(36)  PRIMARY KEY,
+      "examId"     VARCHAR(36),
+      "questionId" VARCHAR(36),
+      "order"      INTEGER,
+      points       NUMERIC DEFAULT 1
+    )
+  `);
+  await _dropLegacyNotNull('ExamQuestion', ['examId','questionId','order','points','createdAt','updatedAt']);
 }
 _ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
 
