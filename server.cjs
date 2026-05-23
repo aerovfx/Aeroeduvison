@@ -1271,6 +1271,35 @@ app.post('/api/teacher/exams', async (req, res) => {
   } catch (e) { console.error('[teacher-exams:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo đề thi' }); }
 });
 
+// GET /api/teacher/exams/:id — detail
+app.get('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    const r = rows[0];
+    // Parse settings để lấy answerKey + metadata
+    const settings = r.settings || {};
+    return res.json({
+      exam: {
+        id: r.id, title: r.title, description: r.description,
+        subject: r.subject || settings.subject,
+        grade: r.grade, examType: settings.examType,
+        duration: r.duration_min, totalPoints: r.total_points,
+        totalQuestions: r.question_ids?.length || 0,
+        status: r.status, sourceType: settings.sourceType,
+        passingScore: settings.passingScore, shuffle: settings.shuffle,
+        questionIds: r.question_ids || [],
+        answerKey: settings.answerKey || [],
+        createdAt: r.created_at, updatedAt: r.updated_at,
+      },
+    });
+  } catch (e) { console.error('[teacher-exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
+});
+
 // POST /api/teacher/exams/upload-pdf — stub 501 (cần GCS storage)
 app.post('/api/teacher/exams/upload-pdf', (_req, res) =>
   res.status(501).json({ error: 'Upload PDF cần GCS bucket — đang phát triển' }));
