@@ -4945,8 +4945,194 @@ if (USE_NODEJS_QUESTIONS) {
   });
 }
 
+// ── Exam Matrix Node.js handlers — TRƯỚC proxy media-service (offline) ──
+// Bảng "ExamMatrix" persist matrix do GV tự tạo (manual) hoặc số hoá (PDF).
+// Module-scope IIFE để khai báo helpers + table migration mà không phụ thuộc scope.
+;(() => {
+  async function _ensureMatrixTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ExamMatrix" (
+        id              VARCHAR(36)  PRIMARY KEY,
+        teacher_id      VARCHAR(255) NOT NULL,
+        name            VARCHAR(500) NOT NULL DEFAULT 'Ma trận mới',
+        subject         VARCHAR(100),
+        grade           VARCHAR(50),
+        exam_type       VARCHAR(50),
+        duration_min    INTEGER      DEFAULT 45,
+        total_score     NUMERIC      DEFAULT 10,
+        total_questions INTEGER      DEFAULT 0,
+        type            VARCHAR(20)  DEFAULT 'manual',
+        school_year     VARCHAR(20),
+        description     TEXT,
+        sections        JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        topics          JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        status          VARCHAR(30)  DEFAULT 'Hoàn tất',
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('ExamMatrix', [
+      ['teacher_id',      "VARCHAR(255)"], ['name', "VARCHAR(500)"],
+      ['subject',         "VARCHAR(100)"], ['grade', "VARCHAR(50)"],
+      ['exam_type',       "VARCHAR(50)"], ['duration_min', "INTEGER DEFAULT 45"],
+      ['total_score',     "NUMERIC DEFAULT 10"], ['total_questions', "INTEGER DEFAULT 0"],
+      ['type',            "VARCHAR(20) DEFAULT 'manual'"], ['school_year', "VARCHAR(20)"],
+      ['description',     "TEXT"], ['sections', "JSONB DEFAULT '[]'::jsonb"],
+      ['topics',          "JSONB DEFAULT '[]'::jsonb"], ['status', "VARCHAR(30) DEFAULT 'Hoàn tất'"],
+      ['created_at',      "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('ExamMatrix', ['teacherId','name','subject','grade','examType','duration','totalScore','totalQuestions','type','schoolYear','description','sections','topics','status','createdAt','updatedAt']);
+    // Legacy sections/topics có thể TEXT/JSONB — đảm bảo JSONB
+    for (const col of ['sections', 'topics']) {
+      try { await pool.query(`ALTER TABLE "ExamMatrix" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); } catch {}
+    }
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_matrix_teacher ON "ExamMatrix"(teacher_id, created_at DESC)`);
+  }
+  _ensureMatrixTable().catch(e => console.error('[exam-matrix] migration:', e.message));
+
+  function mxAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  function mxRow(r) {
+    return {
+      id: r.id, name: r.name, grade: r.grade || '',
+      examType: r.exam_type || '', type: r.type || 'manual',
+      subject: r.subject || '', schoolYear: r.school_year || '',
+      description: r.description || '', duration: r.duration_min,
+      totalScore: Number(r.total_score) || 0, totalQuestions: r.total_questions || 0,
+      status: r.status || 'Hoàn tất',
+      sections: r.sections || [], topics: r.topics || [],
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    };
+  }
+
+  // GET /api/exam-matrices?status=...&examType=...
+  app.get('/api/exam-matrices', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const filters = ['teacher_id = $1']; const params = [decoded.sub];
+      const status = req.query.status;
+      if (status && status !== 'Tất cả') { params.push(status); filters.push(`status = $${params.length}`); }
+      const examType = req.query.examType;
+      if (examType && examType !== 'Tất cả loại đề') { params.push(examType); filters.push(`exam_type = $${params.length}`); }
+      const { rows } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE ${filters.join(' AND ')} ORDER BY created_at DESC LIMIT 200`,
+        params);
+      return res.json({ matrices: rows.map(mxRow), total: rows.length });
+    } catch (e) { console.error('[exam-matrix:list]', e.message); return res.json({ matrices: [], total: 0 }); }
+  });
+
+  // POST /api/exam-matrices
+  app.post('/api/exam-matrices', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        INSERT INTO "ExamMatrix"(id, teacher_id, name, subject, grade, exam_type, duration_min,
+                                 total_score, total_questions, type, school_year, description,
+                                 sections, topics, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,'Hoàn tất')
+        RETURNING *`,
+        [id, decoded.sub, String(b.name || 'Ma trận mới').slice(0, 500),
+         b.subject || null, b.grade || null, b.examType || null,
+         Number(b.duration) || 45, Number(b.totalScore) || 10,
+         Number(b.totalQuestions) || 0, b.type || 'manual',
+         b.schoolYear || null, b.description || null,
+         JSON.stringify(b.sections || []), JSON.stringify(b.topics || [])]);
+      const matrix = mxRow(rows[0]);
+      return res.json({ id, matrix });
+    } catch (e) { console.error('[exam-matrix:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo ma trận' }); }
+  });
+
+  // GET /api/exam-matrices/:id
+  app.get('/api/exam-matrices/:id', async (req, res) => {
+    if (req.params.id.startsWith('sample-')) return res.status(404).json({ error: 'Ma trận mẫu chỉ để tham khảo' });
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ matrix: mxRow(rows[0]) });
+    } catch (e) { console.error('[exam-matrix:get]', e.message); return res.status(500).json({ error: 'Lỗi tải ma trận' }); }
+  });
+
+  // PUT /api/exam-matrices/:id
+  app.put('/api/exam-matrices/:id', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const pool = _getPool();
+      const { rowCount } = await pool.query(`
+        UPDATE "ExamMatrix" SET name=$1, subject=$2, grade=$3, exam_type=$4, duration_min=$5,
+          total_score=$6, total_questions=$7, type=$8, school_year=$9, description=$10,
+          sections=$11::jsonb, topics=$12::jsonb, updated_at=NOW()
+        WHERE id=$13 AND teacher_id=$14`,
+        [String(b.name || '').slice(0,500), b.subject || null, b.grade || null,
+         b.examType || null, Number(b.duration) || 45, Number(b.totalScore) || 10,
+         Number(b.totalQuestions) || 0, b.type || 'manual', b.schoolYear || null,
+         b.description || null, JSON.stringify(b.sections || []),
+         JSON.stringify(b.topics || []), req.params.id, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[exam-matrix:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+  });
+
+  // DELETE /api/exam-matrices/:id
+  app.delete('/api/exam-matrices/:id', async (req, res) => {
+    if (req.params.id.startsWith('sample-')) return res.status(400).json({ error: 'Không xoá được mẫu' });
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[exam-matrix:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // POST /api/exam-matrices/:id/duplicate
+  app.post('/api/exam-matrices/:id/duplicate', async (req, res) => {
+    const decoded = mxAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows: src } = await pool.query(
+        `SELECT * FROM "ExamMatrix" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.id, decoded.sub]);
+      if (!src.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      const s = src[0];
+      const { randomUUID } = require('crypto');
+      const newId = randomUUID();
+      await pool.query(`
+        INSERT INTO "ExamMatrix"(id, teacher_id, name, subject, grade, exam_type, duration_min,
+          total_score, total_questions, type, school_year, description, sections, topics, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15)`,
+        [newId, decoded.sub, `${s.name} (bản sao)`, s.subject, s.grade, s.exam_type,
+         s.duration_min, s.total_score, s.total_questions, s.type, s.school_year,
+         s.description, JSON.stringify(s.sections || []), JSON.stringify(s.topics || []),
+         'Hoàn tất']);
+      return res.json({ id: newId });
+    } catch (e) { console.error('[exam-matrix:dup]', e.message); return res.status(500).json({ error: 'Lỗi nhân bản' }); }
+  });
+
+  // POST /api/exam-matrices/digitize — stub 501 (cần AI vision service)
+  app.post('/api/exam-matrices/digitize', (_req, res) =>
+    res.status(501).json({ error: 'Số hoá PDF cần media-service AI — đang phát triển' }));
+})();
+
 // ── media-service routes (only if MEDIA_SERVICE_URL is external) ──
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exam-matrices'));
+// Skip /api/exam-matrices — đã có Node.js handlers ở trên
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/media'));
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/documents'));
 if (!USE_NODEJS_QUESTIONS) {
@@ -5539,7 +5725,7 @@ app.post('/api/notifications/:id/read', (_req, res) => res.json({ ok: true }));
 app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true }));
 
 // Exam matrices list (media-service) — UI đã có SAMPLE_MATRICES fallback
-app.get('/api/exam-matrices', (_req, res) => res.json({ matrices: [], total: 0 }));
+// (exam-matrices CRUD moved above proxy — line ~4950)
 
 // Recommendation feed (reco-service)
 // Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
@@ -6232,9 +6418,7 @@ app.get('/api/media', (_req, res) => res.json({ media: [], total: 0 }));
 app.post('/api/media/upload', (_req, res) => res.status(501).json({ error: 'Media upload cần GCS — chưa khả dụng' }));
 
 // Exam matrix detail/actions (chưa implement)
-app.get('/api/exam-matrices/:id', (_req, res) => res.status(404).json({ error: 'Ma trận không tồn tại' }));
-app.post('/api/exam-matrices', (_req, res) => res.status(501).json({ error: 'Tạo matrix qua /teacher/exam-matrix/create' }));
-app.post('/api/exam-matrices/digitize', (_req, res) => res.status(501).json({ error: 'Số hoá cần media-service' }));
+// (exam-matrices CRUD moved above proxy — line ~4950)
 
 // XP / Gamification
 app.post('/api/exam-xp/award', (_req, res) => res.json(OK));
