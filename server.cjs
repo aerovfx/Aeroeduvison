@@ -5602,6 +5602,63 @@ app.post('/api/latex-projects/:id/versions/restore', (_req, res) => res.status(5
 app.post('/api/latex-projects/:id/collaborators', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
 app.delete('/api/latex-projects/:id/collaborators/:userId', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
 
+// POST /api/latex-projects/:id/to-pdf-exam — convert LaTeX project → Exam
+// Body: { phanIAnswers, phanIIAnswers, phanIIIAnswers, phanIVQuestions, public }
+// Tạo Exam mới, lưu answers vào settings.answerKey, return { examId, examTitle,
+// totalQuestions, sectionCounts: { phanI, phanII, phanIII, phanIV } }
+app.post('/api/latex-projects/:id/to-pdf-exam', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const phanI = Array.isArray(b.phanIAnswers) ? b.phanIAnswers : [];
+    const phanII = Array.isArray(b.phanIIAnswers) ? b.phanIIAnswers : [];
+    const phanIII = Array.isArray(b.phanIIIAnswers) ? b.phanIIIAnswers : [];
+    const phanIV = Array.isArray(b.phanIVQuestions) ? b.phanIVQuestions : [];
+    const sectionCounts = {
+      phanI: phanI.filter(Boolean).length,
+      phanII: phanII.filter(Boolean).length,
+      phanIII: phanIII.filter(Boolean).length,
+      phanIV: phanIV.length,
+    };
+    const totalQuestions = sectionCounts.phanI + sectionCounts.phanII +
+                           sectionCounts.phanIII + sectionCounts.phanIV;
+
+    const pool = _getPool();
+    // Load LatexProject để lấy title
+    const { rows: projects } = await pool.query(
+      `SELECT title, main_content FROM "LatexProject" WHERE id = $1 AND user_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!projects.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu LaTeX' });
+    const project = projects[0];
+
+    // Tạo Exam
+    const { randomUUID } = require('crypto');
+    const examId = randomUUID();
+    const examTitle = project.title || 'Đề thi từ LaTeX';
+    const settings = JSON.stringify({
+      sourceType: 'latex_import',
+      latexProjectId: req.params.id,
+      isPublic: !!b.public,
+      answerKey: {
+        phanI, phanII, phanIII, phanIV,
+      },
+      sectionCounts,
+    });
+    await pool.query(`
+      INSERT INTO "Exam"(id, teacher_id, title, description, status, settings)
+      VALUES ($1,$2,$3,$4,'published',$5::jsonb)`,
+      [examId, decoded.sub, examTitle,
+       `Đề tạo tự động từ tài liệu LaTeX (${totalQuestions} câu)`, settings]);
+
+    return res.json({
+      examId, examTitle, totalQuestions, sectionCounts,
+    });
+  } catch (e) {
+    console.error('[latex-to-exam]', e.message);
+    return res.status(500).json({ error: 'Lỗi tạo đề từ LaTeX' });
+  }
+});
+
 // POST /api/latex-projects/compile — biên dịch LaTeX → PDF qua tectonic
 // Docker image đã có tectonic ở /usr/local/bin/tectonic + cache /home/appuser/.cache/Tectonic
 app.post('/api/latex-projects/compile', async (req, res) => {
