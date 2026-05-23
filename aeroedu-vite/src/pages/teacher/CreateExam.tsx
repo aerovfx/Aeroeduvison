@@ -956,7 +956,7 @@ export default function CreateExamPage() {
 
   const [form, setForm] = useState<CreateExamForm>({
     title:          '',
-    subject:        'Vật lý',
+    subject:        'Vật lí',
     examType:       'Trắc nghiệm',
     duration:       45,
     description:    '',
@@ -1135,14 +1135,63 @@ export default function CreateExamPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Môn học">
                       <Select value={form.subject} onChange={v => set('subject', v)}>
-                        <option value="Vật lý">Vật lý</option>
-                        <option value="Toán học">Toán học</option>
-                        <option value="Hóa học">Hóa học</option>
-                        <option value="Văn học">Văn học</option>
-                        <option value="Tiếng Anh">Tiếng Anh</option>
-                        <option value="Sinh học">Sinh học</option>
-                        <option value="Lịch sử">Lịch sử</option>
-                        <option value="Địa lý">Địa lý</option>
+                        {/* Môn chính - đánh giá thường xuyên */}
+                        <optgroup label="── Môn cốt lõi ──">
+                          <option value="Toán">Toán</option>
+                          <option value="Ngữ văn">Ngữ văn</option>
+                          <option value="Tiếng Anh">Tiếng Anh (Ngoại ngữ 1)</option>
+                        </optgroup>
+                        {/* Khoa học tự nhiên */}
+                        <optgroup label="── Khoa học tự nhiên ──">
+                          <option value="Vật lí">Vật lí</option>
+                          <option value="Hóa học">Hóa học</option>
+                          <option value="Sinh học">Sinh học</option>
+                          <option value="Khoa học tự nhiên">Khoa học tự nhiên (THCS)</option>
+                        </optgroup>
+                        {/* Khoa học xã hội */}
+                        <optgroup label="── Khoa học xã hội ──">
+                          <option value="Lịch sử">Lịch sử</option>
+                          <option value="Địa lí">Địa lí</option>
+                          <option value="Lịch sử và Địa lí">Lịch sử và Địa lí (THCS)</option>
+                          <option value="Giáo dục Kinh tế và Pháp luật">Giáo dục Kinh tế và Pháp luật (THPT)</option>
+                          <option value="Giáo dục công dân">Giáo dục công dân (THCS)</option>
+                        </optgroup>
+                        {/* Công nghệ & Tin học */}
+                        <optgroup label="── Công nghệ & Tin học ──">
+                          <option value="Tin học">Tin học</option>
+                          <option value="Công nghệ">Công nghệ</option>
+                          <option value="Công nghệ - Nông nghiệp">Công nghệ - Nông nghiệp (THPT)</option>
+                          <option value="Công nghệ - Công nghiệp">Công nghệ - Công nghiệp (THPT)</option>
+                        </optgroup>
+                        {/* Nghệ thuật & Thể chất */}
+                        <optgroup label="── Nghệ thuật & Thể chất ──">
+                          <option value="Mĩ thuật">Mĩ thuật</option>
+                          <option value="Âm nhạc">Âm nhạc</option>
+                          <option value="Giáo dục thể chất">Giáo dục thể chất</option>
+                          <option value="Giáo dục quốc phòng và an ninh">GDQP-AN (THPT)</option>
+                        </optgroup>
+                        {/* Trải nghiệm */}
+                        <optgroup label="── Hoạt động ──">
+                          <option value="Hoạt động trải nghiệm, hướng nghiệp">Hoạt động TN-HN</option>
+                          <option value="Hoạt động trải nghiệm">Hoạt động trải nghiệm (Tiểu học)</option>
+                          <option value="Nội dung giáo dục địa phương">Nội dung giáo dục địa phương</option>
+                        </optgroup>
+                        {/* Ngoại ngữ 2 (chuyên ban) */}
+                        <optgroup label="── Ngoại ngữ 2 (tự chọn) ──">
+                          <option value="Tiếng Pháp">Tiếng Pháp</option>
+                          <option value="Tiếng Nhật">Tiếng Nhật</option>
+                          <option value="Tiếng Trung Quốc">Tiếng Trung Quốc</option>
+                          <option value="Tiếng Đức">Tiếng Đức</option>
+                          <option value="Tiếng Nga">Tiếng Nga</option>
+                          <option value="Tiếng Hàn">Tiếng Hàn</option>
+                        </optgroup>
+                        {/* Khác */}
+                        <optgroup label="── Khác ──">
+                          <option value="Tiếng dân tộc thiểu số">Tiếng dân tộc thiểu số</option>
+                          <option value="Đạo đức">Đạo đức (Tiểu học)</option>
+                          <option value="Tự nhiên và Xã hội">Tự nhiên và Xã hội (Tiểu học)</option>
+                          <option value="Khác">Môn khác / Tổng hợp</option>
+                        </optgroup>
                       </Select>
                     </Field>
                     <Field label="Loại đề thi">
