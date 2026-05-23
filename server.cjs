@@ -5709,7 +5709,7 @@ if (!USE_NODEJS_QUESTIONS) {
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/questions'));
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/question-bank'));
 }
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
+// app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));  // Disabled — Node.js handlers below at line ~7057
 
 // ── Shared module-scope DB pool — phải khai báo TRƯỚC mọi _ensure*Table()
 // (getPool() ở line 133 bị block-scoped trong if(USE_NODEJS_AUTH){} với
@@ -7320,6 +7320,89 @@ app.post('/api/exam-xp/award', (_req, res) => res.json(OK));
 app.get('/api/exam-xp/me', (_req, res) => res.json({
   totalXp: 0, examCount: 0, level: 1, nextLevelXp: 500, xpToNext: 500, history: [],
 }));
+
+// ── Grading Answer Keys CRUD ──
+// Bảng "AnswerKey" lưu đáp án mẫu cho chấm tự động (multiple choice, T/F, short)
+;(() => {
+  async function _ensureAnswerKeyTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AnswerKey" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        name        VARCHAR(500) NOT NULL DEFAULT 'Đáp án mới',
+        exam_id     VARCHAR(36),
+        data        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('AnswerKey', [
+      ['teacher_id', "VARCHAR(255)"], ['name', "VARCHAR(500)"],
+      ['exam_id', "VARCHAR(36)"], ['data', "JSONB DEFAULT '{}'::jsonb"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('AnswerKey', ['teacherId','name','examId','data','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_answerkey_teacher ON "AnswerKey"(teacher_id, created_at DESC)`);
+  }
+  _ensureAnswerKeyTable().catch(e => console.error('[answer-keys] migration:', e.message));
+
+  function akAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // GET /api/grading/answer-keys
+  app.get('/api/grading/answer-keys', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, name, exam_id AS "examId", data, created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "AnswerKey" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC LIMIT 100`,
+        [myIds]);
+      // Frontend shape: { keys: [{ ...data spread, dbId, name, examId, createdAt }] }
+      const keys = rows.map(r => ({ ...(r.data || {}), dbId: r.id, name: r.name, examId: r.examId, createdAt: r.createdAt }));
+      return res.json({ keys, total: keys.length });
+    } catch (e) { console.error('[answer-keys:list]', e.message); return res.json({ keys: [], total: 0 }); }
+  });
+
+  // POST /api/grading/answer-keys — body có name + data (any shape)
+  app.post('/api/grading/answer-keys', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const name = String(b.name || 'Đáp án mới').slice(0, 500);
+      const { name: _n, examId, ...data } = b;
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "AnswerKey"(id, teacher_id, name, exam_id, data)
+         VALUES ($1::text, $2::text, $3::text, $4, $5::jsonb)`,
+        [id, myId, name, examId || null, JSON.stringify(data)]);
+      return res.json({ ok: true, key: { id } });
+    } catch (e) { console.error('[answer-keys:create]', e.message); return res.status(500).json({ error: 'Lỗi lưu đáp án' }); }
+  });
+
+  // DELETE /api/grading/answer-keys/:id
+  app.delete('/api/grading/answer-keys/:id', async (req, res) => {
+    const decoded = akAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "AnswerKey" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy đáp án' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[answer-keys:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+})();
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
