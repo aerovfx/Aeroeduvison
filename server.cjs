@@ -4819,6 +4819,18 @@ async function _alterAddColumns(table, columns) {
   }
 }
 
+// Helper: DROP NOT NULL trên các cột legacy camelCase (từ Rust service).
+// Handler mới chỉ ghi snake_case → cột camelCase sẽ là NULL → vi phạm NOT NULL.
+// Cần drop NOT NULL để insert mới không fail.
+async function _dropLegacyNotNull(table, legacyCols) {
+  const pool = _getPool();
+  for (const col of legacyCols) {
+    try {
+      await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${col}" DROP NOT NULL`);
+    } catch { /* cột có thể không tồn tại — skip */ }
+  }
+}
+
 // ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
 // latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
@@ -4845,6 +4857,7 @@ async function _ensureLatexProjectTable() {
     ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('LatexProject', ['userId','title','mainContent','folderId','createdAt','updatedAt','ownerId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
 }
 _ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
@@ -5071,12 +5084,7 @@ async function _ensureClassTable() {
     ['institution_name', "VARCHAR(200)"],
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
-  // Drop NOT NULL trên các cột legacy camelCase từ Rust service
-  // (schoolYear, teacherId, ...) — handler mới chỉ ghi snake_case.
-  for (const col of ['schoolYear', 'teacherId', 'name', 'grade', 'description', 'createdAt', 'updatedAt']) {
-    try { await pool.query(`ALTER TABLE "Class" ALTER COLUMN "${col}" DROP NOT NULL`); }
-    catch { /* cột có thể không tồn tại — skip */ }
-  }
+  await _dropLegacyNotNull('Class', ['schoolYear','teacherId','name','grade','description','createdAt','updatedAt','contextType','institutionName']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_class_teacher ON "Class"(teacher_id)`);
 
   // ClassStudent bảng cho danh sách HS trong lớp (import từ Excel)
@@ -5101,6 +5109,7 @@ async function _ensureClassTable() {
     ['gioi_tinh',    "VARCHAR(20)"],
     ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('ClassStudent', ['classId','studentId','fullName','identifier','name','dob','gender','birthDate','createdAt','updatedAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_classstudent_class ON "ClassStudent"(class_id)`);
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_classstudent_madd ON "ClassStudent"(class_id, ma_dinh_danh) WHERE ma_dinh_danh IS NOT NULL AND ma_dinh_danh <> ''`);
 }
@@ -5324,6 +5333,7 @@ async function _ensurePageViewTable() {
     ['referrer',   "VARCHAR(500)"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('PageView', ['sessionId','userId','viewMs','createdAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_created ON "PageView"(created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_path ON "PageView"(path)`);
 }
@@ -5510,6 +5520,7 @@ async function _ensureLessonPlanTable() {
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
@@ -5675,6 +5686,7 @@ async function _ensureExamTables() {
     ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
 
   // Exams
@@ -5703,6 +5715,7 @@ async function _ensureExamTables() {
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_teacher ON "Exam"(teacher_id, created_at DESC)`);
 }
 _ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
