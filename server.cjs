@@ -5414,6 +5414,345 @@ app.delete('/api/teacher/lesson-plans-gcs/:filename', (_req, res) => res.status(
 // Leaderboard realtime (aero-backend)
 app.get('/api/leaderboard/realtime', (_req, res) => res.json({ leaders: [], updatedAt: new Date().toISOString() }));
 
+// ════════════════════════════════════════════════════════════
+// EXAMS + QUESTION BANK — Real CRUD (media-service offline)
+// ════════════════════════════════════════════════════════════
+async function _ensureExamTables() {
+  const pool = _getPool();
+  // Question Bank
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "Question" (
+      id           VARCHAR(36)  PRIMARY KEY,
+      teacher_id   VARCHAR(255) NOT NULL,
+      content      TEXT         NOT NULL,
+      type         VARCHAR(20)  NOT NULL DEFAULT 'multiple_choice',
+      subject      VARCHAR(100),
+      grade        VARCHAR(50),
+      chapter      VARCHAR(200),
+      difficulty   VARCHAR(20)  DEFAULT 'TH',
+      options      JSONB        DEFAULT '[]'::jsonb,
+      answer       TEXT,
+      explanation  TEXT,
+      tags         JSONB        DEFAULT '[]'::jsonb,
+      created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('Question', [
+    ['teacher_id', "VARCHAR(255)"], ['content', "TEXT"], ['type', "VARCHAR(20) DEFAULT 'multiple_choice'"],
+    ['subject', "VARCHAR(100)"], ['grade', "VARCHAR(50)"], ['chapter', "VARCHAR(200)"],
+    ['difficulty', "VARCHAR(20) DEFAULT 'TH'"], ['options', "JSONB DEFAULT '[]'::jsonb"],
+    ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
+    ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
+
+  // Exams
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "Exam" (
+      id           VARCHAR(36)  PRIMARY KEY,
+      teacher_id   VARCHAR(255) NOT NULL,
+      title        VARCHAR(500) NOT NULL DEFAULT 'Đề thi mới',
+      description  TEXT,
+      subject      VARCHAR(100),
+      grade        VARCHAR(50),
+      duration_min INTEGER      DEFAULT 45,
+      total_points NUMERIC      DEFAULT 10,
+      question_ids JSONB        DEFAULT '[]'::jsonb,
+      settings     JSONB        DEFAULT '{}'::jsonb,
+      status       VARCHAR(20)  DEFAULT 'draft',
+      created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('Exam', [
+    ['teacher_id', "VARCHAR(255)"], ['title', "VARCHAR(500) DEFAULT 'Đề thi mới'"],
+    ['description', "TEXT"], ['subject', "VARCHAR(100)"], ['grade', "VARCHAR(50)"],
+    ['duration_min', "INTEGER DEFAULT 45"], ['total_points', "NUMERIC DEFAULT 10"],
+    ['question_ids', "JSONB DEFAULT '[]'::jsonb"], ['settings', "JSONB DEFAULT '{}'::jsonb"],
+    ['status', "VARCHAR(20) DEFAULT 'draft'"],
+    ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_teacher ON "Exam"(teacher_id, created_at DESC)`);
+}
+_ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
+
+function _examAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+// ── Question Bank CRUD ──
+app.get('/api/question-bank', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM "Question" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 500`,
+      [decoded.sub]
+    );
+    return res.json({ questions: rows, total: rows.length });
+  } catch (e) { console.error('[question-bank:list]', e.message); return res.json({ questions: [], total: 0 }); }
+});
+
+app.post('/api/question-bank', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const { content = '', type = 'multiple_choice', subject = null, grade = null, chapter = null,
+            difficulty = 'TH', options = [], answer = '', explanation = '', tags = [] } = req.body || {};
+    if (!content.trim()) return res.status(400).json({ error: 'Thiếu nội dung câu hỏi' });
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, content, type, subject, grade, chapter, difficulty, options, answer, explanation, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb) RETURNING *`,
+      [id, decoded.sub, content, type, subject, grade, chapter, difficulty,
+       JSON.stringify(options || []), answer, explanation, JSON.stringify(tags || [])]
+    );
+    return res.json({ question: rows[0] });
+  } catch (e) { console.error('[question-bank:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo câu hỏi' }); }
+});
+
+app.patch('/api/question-bank/:id', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const fields = ['content', 'type', 'subject', 'grade', 'chapter', 'difficulty', 'answer', 'explanation'];
+    const jsonFields = ['options', 'tags'];
+    const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
+    for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
+    for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[question-bank:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+app.delete('/api/question-bank/:id', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "Question" WHERE id = $1 AND teacher_id = $2`, [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[question-bank:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+});
+
+// /api/questions stubs (taxonomy + fix-latex — không có DB)
+app.get('/api/questions/taxonomy', (_req, res) => res.json({
+  subjects: ['Toán', 'Vật lí', 'Hoá', 'Sinh', 'Văn', 'Sử', 'Địa', 'Tiếng Anh', 'GDCD', 'Tin học'],
+  grades: ['Khối 6','Khối 7','Khối 8','Khối 9','Khối 10','Khối 11','Khối 12'],
+  difficulties: ['NB','TH','VD','VDC'],
+  types: ['multiple_choice','true_false','essay','fill_blank'],
+}));
+app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.content || '', changes: [] }));
+
+// ── Exams CRUD ──
+app.get('/api/exams', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT id, title, description, subject, grade, duration_min, total_points, status, created_at, updated_at,
+              jsonb_array_length(question_ids) AS question_count
+       FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
+    return res.json({ exams: rows, total: rows.length });
+  } catch (e) { console.error('[exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
+});
+
+app.get('/api/teacher/exams', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
+    return res.json({ exams: rows, total: rows.length });
+  } catch (e) { console.error('[teacher-exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
+});
+
+app.post('/api/exams', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const { title = 'Đề thi mới', description = null, subject = null, grade = null,
+            duration_min = 45, total_points = 10, question_ids = [], settings = {} } = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `INSERT INTO "Exam"(id, teacher_id, title, description, subject, grade, duration_min, total_points, question_ids, settings)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb) RETURNING *`,
+      [id, decoded.sub, title, description, subject, grade, duration_min, total_points,
+       JSON.stringify(question_ids || []), JSON.stringify(settings || {})]
+    );
+    return res.json({ exam: rows[0] });
+  } catch (e) { console.error('[exams:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo đề' }); }
+});
+
+app.get('/api/exams/:id', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT * FROM "Exam" WHERE id = $1 AND teacher_id = $2`, [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    return res.json({ exam: rows[0] });
+  } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
+});
+
+app.patch('/api/exams/:id', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const fields = ['title','description','subject','grade','duration_min','total_points','status'];
+    const jsonFields = ['question_ids','settings'];
+    const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
+    for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
+    for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[exams:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+app.delete('/api/exams/:id', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "Exam" WHERE id = $1 AND teacher_id = $2`, [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[exams:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+});
+
+// /api/exams/generate-from-matrix — stub: tạo exam rỗng
+app.post('/api/exams/generate-from-matrix', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  try {
+    const { matrixId, title = 'Đề từ ma trận' } = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = _getPool();
+    await pool.query(
+      `INSERT INTO "Exam"(id, teacher_id, title, description, status) VALUES ($1,$2,$3,$4,'draft')`,
+      [id, decoded.sub, title, `Tạo từ ma trận ${matrixId || ''}`]);
+    return res.json({ exam: { id, title }, note: 'Generated stub — câu hỏi cần thêm thủ công' });
+  } catch (e) { return res.status(500).json({ error: 'Lỗi generate đề' }); }
+});
+
+// ════════════════════════════════════════════════════════════
+// STUBS — empty data cho mọi endpoint còn 503
+// ════════════════════════════════════════════════════════════
+const EMPTY_LIST = { items: [], total: 0, hasMore: false };
+const OK = { ok: true };
+
+// Teacher
+app.get('/api/teacher/analytics', (_req, res) => res.json({ stats: {}, charts: [], period: 'month' }));
+app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
+app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
+app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
+
+// Student
+app.get('/api/student/my-teachers', (_req, res) => res.json({ teachers: [], total: 0 }));
+app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, subjects: [], streak: 0 }));
+app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
+
+// Courses
+app.get('/api/courses', (_req, res) => res.json({ courses: [], total: 0 }));
+app.get('/api/courses/dashboard', (_req, res) => res.json({ enrolled: [], featured: [], my_progress: {} }));
+app.get('/api/instructor/courses', (_req, res) => res.json({ courses: [], total: 0 }));
+app.get('/api/learning/my-courses', (_req, res) => res.json({ courses: [], total: 0 }));
+app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
+app.get('/api/learning/purchase-history', (_req, res) => res.json({ orders: [], total: 0 }));
+
+// Agents (exam-prep stats)
+app.get('/api/agents/exam-prep/stats', (_req, res) => res.json({ total: 0, today: 0, streak: 0, accuracy: 0 }));
+app.get('/api/agents/exam-prep/topics', (_req, res) => res.json({ topics: [], total: 0 }));
+app.get('/api/agents/exam-prep/teacher_exams', (_req, res) => res.json({ exams: [], total: 0 }));
+app.get('/api/agents/exam-prep/community-stats', (_req, res) => res.json({ users: 0, sessions: 0 }));
+
+// Admin (additional stubs)
+app.get('/api/admin/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
+app.get('/api/admin/cameras/discover', (_req, res) => res.json({ discovered: [] }));
+app.get('/api/admin/insights/behavior', (_req, res) => res.json({ patterns: [] }));
+app.get('/api/admin/insights/recommendations', (_req, res) => res.json({ recommendations: [] }));
+app.get('/api/admin/insights/trending-exams', (_req, res) => res.json({ exams: [] }));
+app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics: [] }));
+app.get('/api/admin/users', (_req, res) => res.json({ users: [], total: 0 }));
+app.get('/api/admin/users/stats', (_req, res) => res.json({ total: 0, by_role: {} }));
+app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
+
+// Cameras
+app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
+
+// KG
+app.get('/api/kg/search', (req, res) => res.json({ nodes: [], edges: [], query: req.query.q || '' }));
+app.get('/api/kg/my-brain', (_req, res) => res.json({ nodes: [], edges: [] }));
+app.get('/api/kg/mastery/me', (_req, res) => res.json({ mastery: [] }));
+app.get('/api/kg/path/find', (_req, res) => res.json({ path: [] }));
+app.get('/api/kg/sources/lesson-plans', (_req, res) => res.json({ sources: [] }));
+app.post('/api/kg/extract', (_req, res) => res.json({ nodes: [], edges: [] }));
+app.post('/api/kg/seed', (_req, res) => res.json(OK));
+
+// Chat / Users / Profile
+app.get('/api/chat/rooms', (_req, res) => res.json({ rooms: [], total: 0 }));
+app.get('/api/chat/users/search', (_req, res) => res.json({ users: [] }));
+app.get('/api/users/search', (_req, res) => res.json({ users: [] }));
+app.get('/api/users/me/profile', (_req, res) => res.json({ profile: null }));
+app.get('/api/profile', (_req, res) => res.json({ profile: null }));
+app.patch('/api/users/me/profile', (_req, res) => res.json(OK));
+
+// Misc
+app.get('/api/categories', (_req, res) => res.json({ categories: [] }));
+app.get('/api/types', (_req, res) => res.json({ types: [] }));
+app.get('/api/achievements', (_req, res) => res.json({ achievements: [], total: 0 }));
+app.get('/api/transcript/history', (_req, res) => res.json({ transcripts: [], total: 0 }));
+app.get('/api/emotion', (_req, res) => res.json({ entries: [] }));
+app.get('/api/emotion/stats', (_req, res) => res.json({ stats: {} }));
+app.get('/api/assignments', (_req, res) => res.json({ assignments: [], total: 0 }));
+app.get('/api/assignments/recommended', (_req, res) => res.json({ recommendations: [] }));
+app.post('/api/assignments/from-exam', (_req, res) => res.status(501).json({ error: 'Chưa khả dụng' }));
+
+// Reco extras
+app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
+app.post('/api/reco/track', (_req, res) => res.json(OK));
+app.post('/api/notifications/read-all', (_req, res) => res.json(OK));
+
+// KeoCo (game)
+app.get('/api/keoco/lives', (_req, res) => res.json({ lives: 5, next_at: null }));
+app.get('/api/keoco/challenges', (_req, res) => res.json({ challenges: [] }));
+app.get('/api/keoco/sessions', (_req, res) => res.json({ sessions: [] }));
+app.get('/api/keoco/challenges/leaderboard', (_req, res) => res.json({ leaders: [] }));
+
+// Analytics
+app.get('/api/analytics/dashboard', (_req, res) => res.json({ stats: {} }));
+app.get('/api/analytics/activity', (_req, res) => res.json({ activities: [] }));
+app.get('/api/analytics/courses', (_req, res) => res.json({ courses: [] }));
+app.get('/api/analytics/students', (_req, res) => res.json({ students: [] }));
+
+// Documents + Media (media-service offline) — accept upload nhưng ko lưu thật
+app.get('/api/documents', (_req, res) => res.json({ documents: [], total: 0 }));
+app.post('/api/documents', (_req, res) => res.status(501).json({ error: 'Document upload cần GCS bucket — chưa khả dụng' }));
+app.get('/api/media', (_req, res) => res.json({ media: [], total: 0 }));
+app.post('/api/media/upload', (_req, res) => res.status(501).json({ error: 'Media upload cần GCS — chưa khả dụng' }));
+
+// Exam matrix detail/actions (chưa implement)
+app.get('/api/exam-matrices/:id', (_req, res) => res.status(404).json({ error: 'Ma trận không tồn tại' }));
+app.post('/api/exam-matrices', (_req, res) => res.status(501).json({ error: 'Tạo matrix qua /teacher/exam-matrix/create' }));
+app.post('/api/exam-matrices/digitize', (_req, res) => res.status(501).json({ error: 'Số hoá cần media-service' }));
+
+// XP / Gamification
+app.post('/api/exam-xp/award', (_req, res) => res.json(OK));
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 
