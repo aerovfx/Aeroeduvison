@@ -6932,22 +6932,97 @@ app.post('/api/question-bank', async (req, res) => {
 
 app.patch('/api/question-bank/:id', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
+  const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+  const myId = decoded.userId || decoded.id || decoded.sub;
   try {
+    const pool = _getPool();
+    // 1) Kiểm tra ownership
+    const { rows: existing } = await pool.query(
+      `SELECT * FROM "Question" WHERE id = $1`, [req.params.id]);
+    if (!existing.length) return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
+    const orig = existing[0];
+    const isOwner = myIds.includes(orig.teacher_id) || myIds.includes(orig.createdBy);
+
+    // 2) Build update payload từ req.body
     const fields = ['content', 'type', 'subject', 'grade', 'chapter', 'difficulty', 'answer', 'explanation'];
     const jsonFields = ['options', 'tags'];
-    const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
-    for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
-    for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
-    // Visibility toggle (chỉ owner mới đổi được)
-    if (req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility)) {
-      params.push(req.body.visibility); updates.push(`visibility = $${params.length}`);
+    const allowVisibility = req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility);
+
+    // 3a) Nếu IS OWNER → UPDATE in-place (logic cũ)
+    if (isOwner) {
+      const updates = ['updated_at = NOW()']; const params = [req.params.id];
+      for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
+      for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+      if (allowVisibility) { params.push(req.body.visibility); updates.push(`visibility = $${params.length}`); }
+      await pool.query(`UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1`, params);
+      return res.json({ ok: true, action: 'updated', id: req.params.id });
     }
-    const pool = _getPool();
-    const { rowCount } = await pool.query(
-      `UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa câu hỏi này' });
-    return res.json({ ok: true });
+
+    // 3b) Nếu NOT OWNER → CLONE câu hỏi với edit của user + teacher_id mới
+    // (visibility câu mới = 'private' default — user phải chủ động share lại)
+    const { randomUUID } = require('crypto');
+    const newId = randomUUID();
+    // Merge: original fields + user's overrides
+    const merged = {
+      content:     req.body.content     ?? orig.content,
+      type:        req.body.type        ?? orig.type,
+      subject:     req.body.subject     ?? orig.subject,
+      grade:       req.body.grade       ?? orig.grade,
+      chapter:     req.body.chapter     ?? orig.chapter,
+      difficulty:  req.body.difficulty  ?? orig.difficulty,
+      answer:      req.body.answer      ?? orig.answer,
+      explanation: req.body.explanation ?? orig.explanation,
+      options:     req.body.options     ?? orig.options,
+      tags:        req.body.tags        ?? orig.tags,
+    };
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, "createdBy", content, type, subject, grade,
+                              chapter, difficulty, options, answer, explanation, tags,
+                              visibility, status, "createdAt", "updatedAt")
+       VALUES ($1::text,$2::text,$2::text,$3::text,$4::text,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,
+               'private','active',NOW(),NOW())`,
+      [newId, myId, merged.content, merged.type, merged.subject, merged.grade,
+       merged.chapter, merged.difficulty, JSON.stringify(merged.options || []),
+       merged.answer, merged.explanation, JSON.stringify(merged.tags || [])]);
+    console.log(`[qb:clone-on-edit] user=${myId} cloned ${req.params.id} → ${newId}`);
+    return res.json({
+      ok: true,
+      action: 'cloned',
+      id: newId,
+      originalId: req.params.id,
+      message: 'Câu hỏi gốc của GV khác — đã tạo bản sao thuộc sở hữu của bạn để chỉnh sửa.',
+    });
   } catch (e) { console.error('[question-bank:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// POST /api/question-bank/:id/duplicate — explicit clone (không edit)
+// Tạo bản sao thuộc sở hữu của user hiện tại, visibility=private mặc định.
+app.post('/api/question-bank/:id/duplicate', async (req, res) => {
+  const decoded = _examAuth(req, res); if (!decoded) return;
+  const myId = decoded.userId || decoded.id || decoded.sub;
+  try {
+    const pool = _getPool();
+    // Cho phép duplicate câu của mình HOẶC câu public
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+    const { rows } = await pool.query(
+      `SELECT * FROM "Question" WHERE id = $1
+       AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
+      [req.params.id, myIds]);
+    if (!rows.length) return res.status(404).json({ error: 'Câu hỏi không tồn tại hoặc không công khai' });
+    const orig = rows[0];
+    const { randomUUID } = require('crypto');
+    const newId = randomUUID();
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, "createdBy", content, type, subject, grade,
+                              chapter, difficulty, options, answer, explanation, tags,
+                              visibility, status, "createdAt", "updatedAt")
+       VALUES ($1::text,$2::text,$2::text,$3::text,$4::text,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb,
+               'private','active',NOW(),NOW())`,
+      [newId, myId, orig.content, orig.type, orig.subject, orig.grade,
+       orig.chapter, orig.difficulty, JSON.stringify(orig.options || []),
+       orig.answer, orig.explanation, JSON.stringify(orig.tags || [])]);
+    return res.json({ ok: true, id: newId, originalId: req.params.id });
+  } catch (e) { console.error('[qb:dup]', e.message); return res.status(500).json({ error: 'Lỗi nhân bản' }); }
 });
 
 app.delete('/api/question-bank/:id', async (req, res) => {
