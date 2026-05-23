@@ -1275,12 +1275,13 @@ app.post('/api/teacher/exams', async (req, res) => {
 app.get('/api/teacher/exams/:id', async (req, res) => {
   const decoded = _kgAuth(req, res); if (!decoded) return;
   try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
-    // Cho phép xem đề của mình HOẶC public
+    // Cho phép xem đề của mình HOẶC public — match qua ANY của mọi user ID
     const { rows } = await pool.query(
-      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
-       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
-      [req.params.id, decoded.sub]);
+      `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public')`,
+      [req.params.id, myIds]);
     if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
     const r = rows[0];
     const settings = r.settings || {};
@@ -7047,22 +7048,24 @@ app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.c
 
 // ── Exams CRUD ──
 // /api/exams + /api/teacher/exams — list đề: của mình + public của người khác
+// Sử dụng ANY(myIds) để match mọi JWT field (userId/id/sub/email)
 function _examListWhere(scope) {
-  if (scope === 'mine') return `teacher_id = $1`;
-  if (scope === 'public') return `visibility = 'public' AND teacher_id != $1`;
-  return `teacher_id = $1 OR visibility = 'public'`;  // 'all' default
+  if (scope === 'mine') return `teacher_id = ANY($1::text[])`;
+  if (scope === 'public') return `visibility = 'public' AND NOT (teacher_id = ANY($1::text[]))`;
+  return `teacher_id = ANY($1::text[]) OR visibility = 'public'`;
 }
 app.get('/api/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
     const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
       `SELECT id, title, description, subject, grade, duration_min, total_points, status,
               visibility, teacher_id, created_at, updated_at,
               jsonb_array_length(question_ids) AS question_count,
-              (teacher_id = $1) AS is_owner
-       FROM "Exam" WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [decoded.sub]);
+              (teacher_id = ANY($1::text[])) AS is_owner
+       FROM "Exam" WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [myIds]);
     const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
     return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
@@ -7071,11 +7074,12 @@ app.get('/api/exams', async (req, res) => {
 app.get('/api/teacher/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const pool = _getPool();
     const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
-      `SELECT *, (teacher_id = $1) AS is_owner FROM "Exam"
-       WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [decoded.sub]);
+      `SELECT *, (teacher_id = ANY($1::text[])) AS is_owner FROM "Exam"
+       WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [myIds]);
     const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
     return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[teacher-exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
