@@ -1866,7 +1866,18 @@ if (USE_NODEJS_QUESTIONS) {
   });
 
   // ── POST /api/questions/batch  (bulk import) ───────────────
+  // Insert questions với teacher_id = real user ID từ JWT (không phải literal 'teacher')
+  // Cũng set vào cả "teacher_id" snake_case (handler mới) và "createdBy" camelCase (legacy)
+  // để GET /api/question-bank?scope=mine WHERE teacher_id=$me match được.
   app.post('/api/questions/batch', async (req, res) => {
+    // Auth: lấy userId thực từ Bearer
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+    }
+    if (!userId) return res.status(401).json({ success: false, error: 'Unauthorized — login lại' });
+
     try {
       const pool = getQPool();
       const { questions = [] } = req.body || {};
@@ -1876,28 +1887,44 @@ if (USE_NODEJS_QUESTIONS) {
 
       const now = new Date();
       let inserted = 0;
+      let failed = 0;
+      const errors = [];
       for (const q of questions) {
-        if (!q.content) continue;
+        if (!q.content) { failed++; continue; }
         const id = randomUUID();
         const tags = [...new Set([q.topic, q.subject, ...(q.tags || [])].filter(Boolean))];
-        await pool.query(
-          `INSERT INTO "Question"
-             (id, topic, subject, grade, "questionType", difficulty, content, options,
-              "correctAnswer", explanation, "learningObjectives", tags,
-              "aiGenerated", "humanReviewed", status, "createdBy", "createdAt", "updatedAt", "usageCount")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,false,false,$13,$14,$15,$16,0)
-           ON CONFLICT (id) DO NOTHING`,
-          [id, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
-           q.grade || 'Khối 12', q.questionType || 'MCQ', q.difficulty || 'MEDIUM',
-           q.content, q.options || [], q.correctAnswer || '', q.explanation || '',
-           q.learningObjectives || [], tags, q.status || 'Hoạt động',
-           'teacher', now, now]
-        ).catch(() => {});
-        inserted++;
+        const optionsJson = JSON.stringify(q.options || []);
+        const tagsJson = JSON.stringify(tags);
+        try {
+          // Try modern schema first (snake_case + JSONB + teacher_id + visibility)
+          await pool.query(
+            `INSERT INTO "Question"
+               (id, teacher_id, "createdBy", topic, subject, grade, "questionType", type,
+                difficulty, content, options, "correctAnswer", answer, explanation,
+                "learningObjectives", tags, "aiGenerated", "humanReviewed", status,
+                visibility, "createdAt", "updatedAt", "usageCount")
+             VALUES ($1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13,$14::jsonb,
+                     false,false,$15,'private',$16,$16,0)
+             ON CONFLICT (id) DO NOTHING`,
+            [id, userId, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
+             q.grade || 'Khối 12', q.questionType || 'MCQ', q.questionType || 'multiple_choice',
+             q.difficulty || 'MEDIUM', q.content, optionsJson,
+             q.correctAnswer || q.answer || '', q.explanation || '',
+             JSON.stringify(q.learningObjectives || []), tagsJson,
+             q.status || 'Hoạt động', now]
+          );
+          inserted++;
+        } catch (e) {
+          failed++;
+          if (errors.length < 3) errors.push(`Q${inserted+failed}: ${e.message.slice(0, 100)}`);
+        }
       }
 
-      console.log(`[questions:batch] ✅ ${inserted}/${questions.length} inserted`);
-      return res.json({ success: true, data: { inserted, total: questions.length } });
+      console.log(`[questions:batch] user=${userId} ✅ ${inserted}/${questions.length} inserted, ${failed} failed`);
+      return res.json({
+        success: true,
+        data: { inserted, failed, total: questions.length, errors: errors.length ? errors : undefined },
+      });
     } catch (err) {
       console.error('[questions:batch] ❌', err.message);
       return res.status(500).json({ success: false, error: err.message });
