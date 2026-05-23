@@ -1064,7 +1064,183 @@ function makeProxy(target, label, pathFilter) {
   });
 }
 
-// ── /api/teacher/* → teacher-service ───────────────────────
+// ── Teacher stubs — PHẢI trước proxy teacher-service (port 8106 offline) ──
+// Trả empty thay vì 503. Khi service được khôi phục, xoá các stub này.
+
+// /api/teacher/analytics — shape khớp AnalyticsData interface ở frontend
+// (có totalStudents, topPerformingStudents[], strugglingStudents[], v.v.)
+app.get('/api/teacher/analytics', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let teacherId = null;
+  if (auth.startsWith('Bearer ')) { try { teacherId = _akVerify(auth.slice(7)).sub; } catch {} }
+  const period = (req.query.period === 'week' || req.query.period === 'semester') ? req.query.period : 'month';
+  // Default empty shape — match AnalyticsData interface để page không crash
+  let totalStudents = 0;
+  if (teacherId) {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT COUNT(DISTINCT cs.id)::int AS n
+        FROM "ClassStudent" cs
+        JOIN "Class" c ON c.id = cs.class_id
+        WHERE c.teacher_id = $1
+      `, [teacherId]);
+      totalStudents = rows[0]?.n || 0;
+    } catch { /* bảng có thể chưa có data */ }
+  }
+  return res.json({
+    period,
+    meta: { fromClassStudent: totalStudents, fromTeacherStudentLink: 0, uniqueStudents: totalStudents, gradedSheets: 0 },
+    totalStudents,
+    averageScore: 0,
+    completionRate: 0,
+    engagementScore: 0,
+    topPerformingStudents: [],
+    strugglingStudents: [],
+    subjectPerformance: [],
+    weeklyProgress: [],
+  });
+});
+app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
+app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
+app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
+app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
+app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+
+// ── Career Survey + Teacher CPD (Knowledge Graph) — DB-backed
+// /api/users/me/career-survey GET/POST — khảo sát nghề nghiệp GV/PH/HS
+// /api/teachers/cpd          GET/POST — Continuing Professional Development log
+// Cần persistence để GV không mất tiến độ khi reload trang.
+
+async function _ensureKGTables() {
+  const pool = _getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "UserCareerSurvey" (
+      user_id     VARCHAR(255) PRIMARY KEY,
+      data        JSONB        NOT NULL DEFAULT '{}'::jsonb,
+      completed   BOOLEAN      NOT NULL DEFAULT false,
+      updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('UserCareerSurvey', [
+    ['data',       "JSONB DEFAULT '{}'::jsonb"],
+    ['completed',  "BOOLEAN DEFAULT false"],
+    ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await _dropLegacyNotNull('UserCareerSurvey', ['userId','data','completed','createdAt','updatedAt']);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "TeacherCPD" (
+      user_id     VARCHAR(255) PRIMARY KEY,
+      progress    JSONB        NOT NULL DEFAULT '{}'::jsonb,
+      cpd_log     JSONB        NOT NULL DEFAULT '[]'::jsonb,
+      lat         NUMERIC,
+      lon         NUMERIC,
+      province    VARCHAR(100),
+      updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('TeacherCPD', [
+    ['progress',   "JSONB DEFAULT '{}'::jsonb"],
+    ['cpd_log',    "JSONB DEFAULT '[]'::jsonb"],
+    ['lat',        "NUMERIC"],
+    ['lon',        "NUMERIC"],
+    ['province',   "VARCHAR(100)"],
+    ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await _dropLegacyNotNull('TeacherCPD', ['userId','progress','cpdLog','lat','lon','province','createdAt','updatedAt']);
+}
+_ensureKGTables().catch(e => console.error('[kg] migration error:', e.message));
+
+function _kgAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+// GET /api/users/me/career-survey → { completed, data }
+app.get('/api/users/me/career-survey', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT data, completed FROM "UserCareerSurvey" WHERE user_id = $1`,
+      [decoded.sub]);
+    if (!rows.length) return res.json({ completed: false, data: null });
+    return res.json({ completed: rows[0].completed, data: rows[0].data });
+  } catch (e) { console.error('[career-survey:get]', e.message); return res.json({ completed: false, data: null }); }
+});
+
+// POST /api/users/me/career-survey { ...SurveyData } — upsert
+app.post('/api/users/me/career-survey', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const data = req.body || {};
+    const completed = !data.skipped;
+    const pool = _getPool();
+    await pool.query(`
+      INSERT INTO "UserCareerSurvey"(user_id, data, completed, updated_at)
+      VALUES ($1, $2::jsonb, $3, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        data = EXCLUDED.data, completed = EXCLUDED.completed, updated_at = NOW()
+    `, [decoded.sub, JSON.stringify(data), completed]);
+    return res.json({ ok: true, completed });
+  } catch (e) { console.error('[career-survey:post]', e.message); return res.status(500).json({ error: 'Lỗi lưu khảo sát' }); }
+});
+
+// GET /api/teachers/cpd → { progress, cpdLog, lat, lon, province }
+app.get('/api/teachers/cpd', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT progress, cpd_log, lat, lon, province FROM "TeacherCPD" WHERE user_id = $1`,
+      [decoded.sub]);
+    if (!rows.length) return res.json({ progress: {}, cpdLog: [], lat: null, lon: null, province: null });
+    const r = rows[0];
+    return res.json({ progress: r.progress || {}, cpdLog: r.cpd_log || [], lat: r.lat, lon: r.lon, province: r.province });
+  } catch (e) { console.error('[cpd:get]', e.message); return res.json({ progress: {}, cpdLog: [] }); }
+});
+
+// POST /api/teachers/cpd { progress, cpdLog?, lat?, lon?, province? } — upsert
+app.post('/api/teachers/cpd', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const { progress = {}, cpdLog = null, lat = null, lon = null, province = null } = req.body || {};
+    const pool = _getPool();
+    if (cpdLog !== null) {
+      await pool.query(`
+        INSERT INTO "TeacherCPD"(user_id, progress, cpd_log, lat, lon, province, updated_at)
+        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          progress = EXCLUDED.progress, cpd_log = EXCLUDED.cpd_log,
+          lat = COALESCE(EXCLUDED.lat, "TeacherCPD".lat),
+          lon = COALESCE(EXCLUDED.lon, "TeacherCPD".lon),
+          province = COALESCE(EXCLUDED.province, "TeacherCPD".province),
+          updated_at = NOW()
+      `, [decoded.sub, JSON.stringify(progress), JSON.stringify(cpdLog), lat, lon, province]);
+    } else {
+      await pool.query(`
+        INSERT INTO "TeacherCPD"(user_id, progress, lat, lon, province, updated_at)
+        VALUES ($1, $2::jsonb, $3, $4, $5, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          progress = EXCLUDED.progress,
+          lat = COALESCE(EXCLUDED.lat, "TeacherCPD".lat),
+          lon = COALESCE(EXCLUDED.lon, "TeacherCPD".lon),
+          province = COALESCE(EXCLUDED.province, "TeacherCPD".province),
+          updated_at = NOW()
+      `, [decoded.sub, JSON.stringify(progress), lat, lon, province]);
+    }
+    return res.json({ ok: true });
+  } catch (e) { console.error('[cpd:post]', e.message); return res.status(500).json({ error: 'Lỗi lưu CPD' }); }
+});
+
+// ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
 // ══════════════════════════════════════════════════════════════
@@ -4806,6 +4982,18 @@ async function _alterAddColumns(table, columns) {
   }
 }
 
+// Helper: DROP NOT NULL trên các cột legacy camelCase (từ Rust service).
+// Handler mới chỉ ghi snake_case → cột camelCase sẽ là NULL → vi phạm NOT NULL.
+// Cần drop NOT NULL để insert mới không fail.
+async function _dropLegacyNotNull(table, legacyCols) {
+  const pool = _getPool();
+  for (const col of legacyCols) {
+    try {
+      await pool.query(`ALTER TABLE "${table}" ALTER COLUMN "${col}" DROP NOT NULL`);
+    } catch { /* cột có thể không tồn tại — skip */ }
+  }
+}
+
 // ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
 // latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
@@ -4832,6 +5020,7 @@ async function _ensureLatexProjectTable() {
     ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('LatexProject', ['userId','title','mainContent','folderId','createdAt','updatedAt','ownerId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
 }
 _ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
@@ -5058,7 +5247,34 @@ async function _ensureClassTable() {
     ['institution_name', "VARCHAR(200)"],
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('Class', ['schoolYear','teacherId','name','grade','description','createdAt','updatedAt','contextType','institutionName']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_class_teacher ON "Class"(teacher_id)`);
+
+  // ClassStudent bảng cho danh sách HS trong lớp (import từ Excel)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "ClassStudent" (
+      id              VARCHAR(36)  PRIMARY KEY,
+      class_id        VARCHAR(36)  NOT NULL,
+      stt             INTEGER,
+      ho_ten          VARCHAR(200) NOT NULL,
+      ma_dinh_danh    VARCHAR(50),
+      ngay_sinh       VARCHAR(20),
+      gioi_tinh       VARCHAR(20),
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('ClassStudent', [
+    ['class_id',     "VARCHAR(36)"],
+    ['stt',          "INTEGER"],
+    ['ho_ten',       "VARCHAR(200)"],
+    ['ma_dinh_danh', "VARCHAR(50)"],
+    ['ngay_sinh',    "VARCHAR(20)"],
+    ['gioi_tinh',    "VARCHAR(20)"],
+    ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await _dropLegacyNotNull('ClassStudent', ['classId','studentId','fullName','identifier','name','dob','gender','birthDate','createdAt','updatedAt']);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_classstudent_class ON "ClassStudent"(class_id)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_classstudent_madd ON "ClassStudent"(class_id, ma_dinh_danh) WHERE ma_dinh_danh IS NOT NULL AND ma_dinh_danh <> ''`);
 }
 _ensureClassTable().catch(e => console.error('[classes] migration error:', e.message));
 
@@ -5158,6 +5374,104 @@ app.patch('/api/classes/:id', async (req, res) => {
   } catch (e) { console.error('[classes:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật lớp' }); }
 });
 
+// GET /api/classes/:id/students → { students: [...] }
+app.get('/api/classes/:id/students', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    // Verify lớp thuộc teacher
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    const { rows } = await pool.query(
+      `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
+              ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh", created_at AS "createdAt"
+       FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+      [req.params.id]);
+    return res.json({ students: rows, total: rows.length });
+  } catch (e) { console.error('[classes:students:list]', e.message); return res.status(500).json({ error: 'Lỗi tải DS học sinh' }); }
+});
+
+// POST /api/classes/:id/students/import — bulk insert/update từ Excel
+// Body: { students: [{ stt, hoTen, ngaySinh, gioiTinh, maDinhDanh }, ...] }
+// Returns: { success, message, results: { inserted, updated, skipped, total }, errors }
+app.post('/api/classes/:id/students/import', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  const classId = req.params.id;
+  const studentsIn = Array.isArray(req.body?.students) ? req.body.students : [];
+  if (!studentsIn.length) return res.status(400).json({ error: 'Danh sách HS rỗng' });
+  try {
+    const pool = _getPool();
+    const { rowCount: ok } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [classId, decoded.sub]);
+    if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
+
+    const { randomUUID } = require('crypto');
+    let inserted = 0, updated = 0, skipped = 0;
+    const errors = [];
+    for (const s of studentsIn) {
+      const hoTen = String(s.hoTen || '').trim();
+      const maDD = String(s.maDinhDanh || '').trim();
+      const stt = s.stt ? Number(s.stt) : null;
+      const ngaySinh = String(s.ngaySinh || '').trim();
+      const gioiTinh = String(s.gioiTinh || '').trim();
+      if (!hoTen) { skipped++; if (errors.length < 3) errors.push(`Bỏ qua HS dòng ${stt || '?'}: thiếu họ tên`); continue; }
+      try {
+        if (maDD) {
+          // Có mã định danh → upsert theo (class_id, ma_dinh_danh)
+          const upd = await pool.query(
+            `UPDATE "ClassStudent" SET stt = $1, ho_ten = $2, ngay_sinh = $3, gioi_tinh = $4
+             WHERE class_id = $5 AND ma_dinh_danh = $6 RETURNING id`,
+            [stt, hoTen.slice(0,200), ngaySinh.slice(0,20), gioiTinh.slice(0,20), classId, maDD.slice(0,50)]);
+          if (upd.rowCount) { updated++; }
+          else {
+            await pool.query(
+              `INSERT INTO "ClassStudent"(id, class_id, stt, ho_ten, ma_dinh_danh, ngay_sinh, gioi_tinh)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              [randomUUID(), classId, stt, hoTen.slice(0,200), maDD.slice(0,50), ngaySinh.slice(0,20), gioiTinh.slice(0,20)]);
+            inserted++;
+          }
+        } else {
+          // Không có mã → chỉ insert
+          await pool.query(
+            `INSERT INTO "ClassStudent"(id, class_id, stt, ho_ten, ngay_sinh, gioi_tinh)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [randomUUID(), classId, stt, hoTen.slice(0,200), ngaySinh.slice(0,20), gioiTinh.slice(0,20)]);
+          inserted++;
+        }
+      } catch (e) {
+        skipped++;
+        if (errors.length < 3) errors.push(`Dòng ${stt || '?'}: ${e.message.slice(0,100)}`);
+      }
+    }
+    return res.json({
+      success: true,
+      message: `Import xong: ${inserted} thêm mới + ${updated} cập nhật + ${skipped} bỏ qua`,
+      results: { inserted, updated, skipped, total: studentsIn.length },
+      errors,
+    });
+  } catch (e) { console.error('[classes:students:import]', e.message); return res.status(500).json({ error: 'Lỗi import học sinh' }); }
+});
+
+// DELETE /api/classes/:id/students/:studentId
+app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount: ok } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    const { rowCount } = await pool.query(
+      `DELETE FROM "ClassStudent" WHERE id = $1 AND class_id = $2`,
+      [req.params.studentId, req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: 'HS không tồn tại' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[classes:students:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá HS' }); }
+});
+
 // ── Analytics pageview — PHẢI trước catch-all /api proxy ────────
 // Rust aero-backend không serve /api/analytics/pageview → 503 spam console
 // mỗi route change. Handler nhẹ: insert vào "PageView" (best-effort) + 204.
@@ -5182,6 +5496,7 @@ async function _ensurePageViewTable() {
     ['referrer',   "VARCHAR(500)"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('PageView', ['sessionId','userId','viewMs','createdAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_created ON "PageView"(created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_path ON "PageView"(path)`);
 }
@@ -5227,9 +5542,97 @@ app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true 
 app.get('/api/exam-matrices', (_req, res) => res.json({ matrices: [], total: 0 }));
 
 // Recommendation feed (reco-service)
-app.get('/api/reco/feed', (req, res) => {
+// Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
+// Items dựa trên dữ liệu thực của GV trong bảng "Exam", "LessonPlan", "Class"
+app.get('/api/reco/feed', async (req, res) => {
   const audience = req.query.audience || 'student';
-  res.json({ items: [], audience, total: 0, hasMore: false });
+  const limit = Math.min(Number(req.query.limit) || 30, 100);
+  const auth = req.headers.authorization || '';
+  let teacherId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { teacherId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
+  }
+  // Student audience — chưa có signals, trả empty
+  if (audience !== 'teacher' || !teacherId) {
+    return res.json({ audience, count: 0, items: [], sources: [], isColdStart: true });
+  }
+  try {
+    const pool = _getPool();
+    const items = [];
+    // 1) content_gap — Exam draft chưa có câu hỏi
+    const { rows: draftExams } = await pool.query(`
+      SELECT id, title, subject, grade, jsonb_array_length(question_ids) AS qcount, created_at
+      FROM "Exam" WHERE teacher_id = $1 AND (status = 'draft' OR status IS NULL)
+      ORDER BY created_at DESC LIMIT 5
+    `, [teacherId]);
+    for (const e of draftExams) {
+      if (e.qcount < 5) {
+        items.push({
+          type: 'content_gap',
+          id: `exam-${e.id}`,
+          title: `Đề "${e.title}" còn trống`,
+          subtitle: `${e.qcount} câu — Khối ${e.grade || '?'} ${e.subject ? '· ' + e.subject : ''}`,
+          description: 'Đề thi đang ở trạng thái nháp với ít câu hỏi. Bấm để thêm câu từ Ngân hàng.',
+          score: 0.8 - (e.qcount * 0.1),
+          source: 'exam-draft',
+          link: `/teacher/exams`,
+          cta: 'Mở đề',
+          reasons: ['🎯 Còn trống', '✏️ Cần thêm câu hỏi'],
+        });
+      }
+    }
+    // 2) content_gap — LessonPlan ngắn (<200 từ)
+    const { rows: shortPlans } = await pool.query(`
+      SELECT id, title, subject, grade, word_count, updated_at
+      FROM "LessonPlan" WHERE teacher_id = $1 AND word_count < 200 AND is_archived = false
+      ORDER BY updated_at DESC LIMIT 5
+    `, [teacherId]);
+    for (const p of shortPlans) {
+      items.push({
+        type: 'content_gap',
+        id: `plan-${p.id}`,
+        title: `Giáo án "${p.title}" còn ngắn`,
+        subtitle: `${p.word_count} từ ${p.grade ? '· Khối ' + p.grade : ''} ${p.subject ? '· ' + p.subject : ''}`,
+        description: 'Giáo án có dưới 200 từ — cần bổ sung mục tiêu, hoạt động, đánh giá.',
+        score: 0.7,
+        source: 'lesson-plan-short',
+        link: `/teacher/lesson-plans`,
+        cta: 'Hoàn thiện',
+        reasons: ['📝 Cần mở rộng nội dung'],
+      });
+    }
+    // 3) class_trending_weak — Class không có exam gắn (proxy của "lớp chưa khảo sát")
+    const { rows: classes } = await pool.query(`
+      SELECT id, name, grade FROM "Class" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 10
+    `, [teacherId]);
+    if (classes.length === 0) {
+      items.push({
+        type: 'class_trending_weak',
+        id: 'no-class',
+        title: 'Chưa tạo lớp nào',
+        subtitle: 'Tạo lớp đầu tiên để bắt đầu',
+        description: 'Sprint AI sẽ phân tích điểm yếu lớp khi bạn có HS làm bài.',
+        score: 1.0,
+        source: 'setup',
+        link: '/teacher/classes',
+        cta: 'Tạo lớp',
+        reasons: ['👋 Bắt đầu tại đây'],
+      });
+    }
+    // 4) student_needs_help — chưa có signals từ HS → skip
+    // 5) student_self_path — chưa có KG mastery → skip
+
+    return res.json({
+      audience: 'teacher',
+      count: items.length,
+      items: items.slice(0, limit),
+      sources: ['exam-draft','lesson-plan-short','setup'],
+      isColdStart: items.length < 3,
+    });
+  } catch (e) {
+    console.error('[reco/feed:teacher]', e.message);
+    return res.json({ audience: 'teacher', count: 0, items: [], sources: [], isColdStart: true });
+  }
 });
 app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 
@@ -5280,6 +5683,7 @@ async function _ensureLessonPlanTable() {
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
@@ -5445,6 +5849,7 @@ async function _ensureExamTables() {
     ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
 
   // Exams
@@ -5473,6 +5878,7 @@ async function _ensureExamTables() {
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_exam_teacher ON "Exam"(teacher_id, created_at DESC)`);
 }
 _ensureExamTables().catch(e => console.error('[exams] migration error:', e.message));
@@ -5664,15 +6070,26 @@ app.get('/api/teacher/analytics', async (req, res) => {
   if (teacherId) {
     try {
       const pool = _getPool();
-      const { rows } = await pool.query(`SELECT COUNT(DISTINCT cs.id)::int AS n FROM "ClassStudent" cs JOIN "Class" c ON c.id = cs.class_id WHERE c.teacher_id = $1`, [teacherId]);
+      const { rows } = await pool.query(`
+        SELECT COUNT(DISTINCT cs.id)::int AS n
+        FROM "ClassStudent" cs
+        JOIN "Class" c ON c.id = cs.class_id
+        WHERE c.teacher_id = $1
+      `, [teacherId]);
       totalStudents = rows[0]?.n || 0;
-    } catch {}
+    } catch { /* skip */ }
   }
   return res.json({
     period,
     meta: { fromClassStudent: totalStudents, fromTeacherStudentLink: 0, uniqueStudents: totalStudents, gradedSheets: 0 },
-    totalStudents, averageScore: 0, completionRate: 0, engagementScore: 0,
-    topPerformingStudents: [], strugglingStudents: [], subjectPerformance: [], weeklyProgress: [],
+    totalStudents,
+    averageScore: 0,
+    completionRate: 0,
+    engagementScore: 0,
+    topPerformingStudents: [],
+    strugglingStudents: [],
+    subjectPerformance: [],
+    weeklyProgress: [],
   });
 });
 app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
