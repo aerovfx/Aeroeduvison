@@ -5276,6 +5276,14 @@ if (USE_NODEJS_QUESTIONS) {
       ['created_at',      "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
     ]);
     await _dropLegacyNotNull('ExamMatrix', ['teacherId','userId','ownerId','name','subject','grade','examType','duration','durationMin','totalScore','totalPoints','totalQuestions','type','schoolYear','description','sections','topics','status','createdAt','updatedAt']);
+    await _backfillSnakeFromCamel('ExamMatrix', [
+      ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+      ['exam_type',    ['examType']],
+      ['duration_min', ['duration', 'durationMin']],
+      ['total_score',  ['totalScore']],
+      ['total_questions', ['totalQuestions']],
+      ['school_year',  ['schoolYear']],
+    ]);
     // Legacy sections/topics có thể TEXT/JSONB — đảm bảo JSONB
     for (const col of ['sections', 'topics']) {
       try { await pool.query(`ALTER TABLE "ExamMatrix" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); } catch {}
@@ -5476,6 +5484,30 @@ async function _dropLegacyNotNull(table, legacyCols) {
   }
 }
 
+// Helper: BACKFILL data từ cột camelCase legacy sang cột snake_case mới
+// VD: UPDATE "Question" SET teacher_id = COALESCE(teacher_id, "teacherId", "userId", "createdBy")
+// Critical để data của GV cũ (tạo trên Rust service) vẫn truy cập được qua handler mới.
+async function _backfillSnakeFromCamel(table, mappings) {
+  const pool = _getPool();
+  for (const [snakeCol, camelCols] of mappings) {
+    try {
+      const coalesceArgs = [snakeCol, ...camelCols.map(c => `"${c}"`)].join(', ');
+      const { rowCount } = await pool.query(
+        `UPDATE "${table}" SET ${snakeCol} = COALESCE(${coalesceArgs})
+         WHERE ${snakeCol} IS NULL AND (${camelCols.map(c => `"${c}" IS NOT NULL`).join(' OR ')})`
+      );
+      if (rowCount > 0) {
+        console.log(`[backfill] ${table}.${snakeCol}: copied ${rowCount} rows from legacy ${camelCols.join('/')}`);
+      }
+    } catch (e) {
+      // Có thể fail nếu cột legacy không tồn tại — silent skip
+      if (!e.message.includes('does not exist')) {
+        console.warn(`[backfill] ${table}.${snakeCol}:`, e.message.slice(0, 100));
+      }
+    }
+  }
+}
+
 // ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
 // latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
@@ -5504,6 +5536,12 @@ async function _ensureLatexProjectTable() {
     ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LatexProject', ['userId','title','mainContent','folderId','createdAt','updatedAt','ownerId']);
+  // BACKFILL: legacy camelCase columns (userId/ownerId) → user_id mới
+  await _backfillSnakeFromCamel('LatexProject', [
+    ['user_id',      ['userId', 'ownerId', 'createdBy']],
+    ['title',        ['title']],   // tên cột giống — chỉ COALESCE để no-op nếu NULL
+    ['main_content', ['mainContent', 'content']],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_visibility ON "LatexProject"(visibility)`);
 }
@@ -6317,6 +6355,10 @@ async function _ensureLessonPlanTable() {
     ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LessonPlan', ['teacherId','title','subject','grade','tags','content','contentJson','wordCount','isArchived','format','latexProjectId','gcsBackupUrl','gcsBackupAt','lastSavedAt','createdAt','updatedAt']);
+  await _backfillSnakeFromCamel('LessonPlan', [
+    ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+    ['word_count',   ['wordCount']],
+  ]);
   // Legacy tags/content_json có thể TEXT[] hoặc TEXT — migrate sang JSONB
   for (const col of ['tags', 'content_json']) {
     try { await pool.query(`ALTER TABLE "LessonPlan" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`); }
@@ -6489,6 +6531,13 @@ async function _ensureExamTables() {
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId','topic','questionType','correctAnswer','qualityScore','usageCount','aiGenerated','humanReviewed','status','createdBy']);
+  // BACKFILL critical: GV cũ tạo Question trên Rust service với teacherId/createdBy/authorId
+  // → handler mới query WHERE teacher_id=$me → empty → GV tưởng mất data
+  await _backfillSnakeFromCamel('Question', [
+    ['teacher_id', ['teacherId', 'createdBy', 'authorId', 'ownerId', 'userId']],
+    ['type',       ['type', 'questionType']],
+    ['answer',     ['answer', 'correctAnswer']],
+  ]);
   // Legacy Question.options từ Rust service là TEXT[] → quiz-publish handler
   // JSON.stringify ra '["..."]' không khớp PG array literal '{...}' → 500.
   // Migrate sang JSONB cho cả 2 cột options + tags.
@@ -6527,6 +6576,12 @@ async function _ensureExamTables() {
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId','examType','duration','totalScore','totalQuestions','passingScore','shuffle','sourceType','userId']);
+  // BACKFILL: legacy GV data sang teacher_id
+  await _backfillSnakeFromCamel('Exam', [
+    ['teacher_id',   ['teacherId', 'userId', 'createdBy', 'ownerId']],
+    ['duration_min', ['duration', 'durationMin']],
+    ['total_points', ['totalScore', 'totalPoints']],
+  ]);
   // Same fix cho Exam — legacy questionIds/settings có thể là array/text
   for (const col of ['question_ids', 'settings']) {
     try {
