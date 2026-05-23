@@ -1,0 +1,17 @@
+# Hotfix Dockerfile — chỉ overlay server.cjs + lib lên image đã build sẵn
+# Dùng khi chỉ thay đổi backend (server.cjs / lib/*) — KHÔNG cần rebuild Vite (~3-5 phút).
+#
+# Usage:
+#   ./deploy-hotfix.sh   (script tự build + push + deploy)
+#
+# Nếu thay đổi src frontend (aeroedu-vite/) → DÙNG deploy-cloudbuild.sh (full build).
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Chỉ overlay server.cjs + lib (giữ nguyên dist/, node_modules, tectonic cache).
+# Không cần chạy npm install vì base image đã có đủ dependencies.
+COPY --chown=appuser:appuser server.cjs /app/server.cjs
+COPY --chown=appuser:appuser lib /app/lib
+
+# Giữ nguyên CMD và USER từ base image.
