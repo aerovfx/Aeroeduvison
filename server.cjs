@@ -1300,6 +1300,144 @@ app.get('/api/teacher/exams/:id', async (req, res) => {
   } catch (e) { console.error('[teacher-exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
 });
 
+// PUT /api/teacher/exams/:id — full update (alias của PATCH cho frontend)
+app.put('/api/teacher/exams/:id', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const b = req.body || {};
+    const updates = ['updated_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    const map = { title: 'title', subject: 'subject', grade: 'grade',
+                  duration: 'duration_min', description: 'description', status: 'status' };
+    for (const [key, col] of Object.entries(map)) {
+      if (b[key] !== undefined) { params.push(b[key]); updates.push(`${col} = $${params.length}`); }
+    }
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:put]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+});
+
+// POST /api/teacher/exams/:id/publish — đổi status + isPublic
+app.post('/api/teacher/exams/:id/publish', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const status = req.body?.status || 'published';
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET status = $1, updated_at = NOW() WHERE id = $2 AND teacher_id = $3`,
+      [status, req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true, status });
+  } catch (e) { console.error('[teacher-exams:publish]', e.message); return res.status(500).json({ error: 'Lỗi publish' }); }
+});
+
+// POST /api/teacher/exams/:id/questions/attach — gắn nhiều câu hỏi từ QB
+app.post('/api/teacher/exams/:id/questions/attach', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const ids = Array.isArray(req.body?.questionIds) ? req.body.questionIds
+              : Array.isArray(req.body?.ids) ? req.body.ids : [];
+    if (!ids.length) return res.status(400).json({ error: 'Thiếu questionIds[]' });
+    const pool = _getPool();
+    // Append unique IDs vào Exam.question_ids JSONB
+    const { rows } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    const cur = Array.isArray(rows[0].question_ids) ? rows[0].question_ids : [];
+    const merged = Array.from(new Set([...cur, ...ids.map(String)]));
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(merged), req.params.id]);
+    return res.json({ ok: true, attached: merged.length - cur.length, total: merged.length });
+  } catch (e) { console.error('[teacher-exams:attach]', e.message); return res.status(500).json({ error: 'Lỗi gắn câu hỏi' }); }
+});
+
+// DELETE /api/teacher/exams/:id/questions/:qid — gỡ câu hỏi khỏi đề
+app.delete('/api/teacher/exams/:id/questions/:qid', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    const cur = Array.isArray(rows[0].question_ids) ? rows[0].question_ids : [];
+    const next = cur.filter(x => String(x) !== String(req.params.qid));
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(next), req.params.id]);
+    return res.json({ ok: true, total: next.length });
+  } catch (e) { console.error('[teacher-exams:detach]', e.message); return res.status(500).json({ error: 'Lỗi gỡ câu hỏi' }); }
+});
+
+// POST /api/teacher/exams/:id/questions/reorder — sắp xếp lại
+app.post('/api/teacher/exams/:id/questions/reorder', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const ids = Array.isArray(req.body?.questionIds) ? req.body.questionIds : [];
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW()
+       WHERE id = $2 AND teacher_id = $3`,
+      [JSON.stringify(ids), req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:reorder]', e.message); return res.status(500).json({ error: 'Lỗi sắp xếp' }); }
+});
+
+// PATCH /api/teacher/exams/:id/questions/:qid — update points (lưu vào settings.pointsMap)
+app.patch('/api/teacher/exams/:id/questions/:qid', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const points = Number(req.body?.points);
+    if (!Number.isFinite(points)) return res.status(400).json({ error: 'Points phải là số' });
+    const pool = _getPool();
+    const { rowCount } = await pool.query(`
+      UPDATE "Exam"
+      SET settings = jsonb_set(COALESCE(settings, '{}'::jsonb), $1, to_jsonb($2::numeric)),
+          updated_at = NOW()
+      WHERE id = $3 AND teacher_id = $4`,
+      [`{pointsMap,${req.params.qid}}`, points, req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[teacher-exams:points]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật điểm' }); }
+});
+
+// POST /api/teacher/exams/:id/questions — tạo câu hỏi mới TRONG đề (insert + attach)
+app.post('/api/teacher/exams/:id/questions', async (req, res) => {
+  const decoded = _kgAuth(req, res); if (!decoded) return;
+  try {
+    const q = req.body || {};
+    const { randomUUID } = require('crypto');
+    const qid = randomUUID();
+    const pool = _getPool();
+    // Verify exam ownership
+    const { rows: exams } = await pool.query(
+      `SELECT question_ids FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!exams.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    // Insert question
+    await pool.query(
+      `INSERT INTO "Question"(id, teacher_id, content, type, subject, grade, difficulty, options, answer, explanation, tags)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)`,
+      [qid, decoded.sub, q.content || '', q.type || 'multiple_choice',
+       q.subject || null, q.grade || null, q.difficulty || 'TH',
+       JSON.stringify(q.options || []), q.answer || q.correctAnswer || '',
+       q.explanation || null, JSON.stringify(q.tags || [])]);
+    // Attach to exam
+    const cur = Array.isArray(exams[0].question_ids) ? exams[0].question_ids : [];
+    const merged = [...cur, qid];
+    await pool.query(
+      `UPDATE "Exam" SET question_ids = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+      [JSON.stringify(merged), req.params.id]);
+    return res.json({ ok: true, question: { id: qid } });
+  } catch (e) { console.error('[teacher-exams:newq]', e.message); return res.status(500).json({ error: 'Lỗi tạo câu hỏi' }); }
+});
+
 // POST /api/teacher/exams/upload-pdf — stub 501 (cần GCS storage)
 app.post('/api/teacher/exams/upload-pdf', (_req, res) =>
   res.status(501).json({ error: 'Upload PDF cần GCS bucket — đang phát triển' }));
