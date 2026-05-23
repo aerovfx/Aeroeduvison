@@ -5738,7 +5738,24 @@ app.get('/api/types', (_req, res) => res.json({ types: [] }));
 app.get('/api/achievements', (_req, res) => res.json({ achievements: [], total: 0 }));
 app.get('/api/transcript/history', (_req, res) => res.json({ transcripts: [], total: 0 }));
 app.get('/api/emotion', (_req, res) => res.json({ entries: [] }));
-app.get('/api/emotion/stats', (_req, res) => res.json({ stats: {} }));
+// /api/emotion/stats — shape khớp EmotionStatsResponse interface ở EmotionMap.tsx
+app.get('/api/emotion/stats', (req, res) => {
+  const groupBy = (req.query.groupBy === 'day') ? 'day' : 'hour';
+  const from = req.query.from || new Date(Date.now() - 24*60*60*1000).toISOString();
+  const to   = req.query.to   || new Date().toISOString();
+  return res.json({
+    success: true,
+    groupBy,
+    buckets: [],
+    summary: {
+      from, to,
+      totalSamples: 0,
+      avgConfidence: 0,
+      emotionDistribution: {},
+      dominantEmotion: null,
+    },
+  });
+});
 app.get('/api/assignments', (_req, res) => res.json({ assignments: [], total: 0 }));
 app.get('/api/assignments/recommended', (_req, res) => res.json({ recommendations: [] }));
 app.post('/api/assignments/from-exam', (_req, res) => res.status(501).json({ error: 'Chưa khả dụng' }));
