@@ -5602,6 +5602,73 @@ app.post('/api/latex-projects/:id/versions/restore', (_req, res) => res.status(5
 app.post('/api/latex-projects/:id/collaborators', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
 app.delete('/api/latex-projects/:id/collaborators/:userId', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
 
+// POST /api/latex-projects/compile — biên dịch LaTeX → PDF qua tectonic
+// Docker image đã có tectonic ở /usr/local/bin/tectonic + cache /home/appuser/.cache/Tectonic
+app.post('/api/latex-projects/compile', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { content = '', projectId = null } = req.body || {};
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Thiếu nội dung LaTeX' });
+    }
+    const { randomUUID } = require('crypto');
+    const fs = require('fs');
+    const path = require('path');
+    const { exec } = require('child_process');
+    const { promisify } = require('util');
+    const execAsync = promisify(exec);
+
+    // Tmp dir riêng cho mỗi compile để tránh race
+    const sessionId = randomUUID();
+    const tmpDir = `/tmp/latex-${sessionId}`;
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const texFile = path.join(tmpDir, 'main.tex');
+    fs.writeFileSync(texFile, content, 'utf-8');
+
+    let pdfBuffer = null;
+    let logOutput = '';
+    try {
+      const { stdout, stderr } = await execAsync(
+        `tectonic --outdir "${tmpDir}" "${texFile}"`,
+        { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 }
+      );
+      logOutput = `${stdout}\n${stderr}`;
+      const pdfPath = path.join(tmpDir, 'main.pdf');
+      if (fs.existsSync(pdfPath)) {
+        pdfBuffer = fs.readFileSync(pdfPath);
+      }
+    } catch (err) {
+      logOutput = (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + err.message;
+    } finally {
+      // Cleanup tmp dir (best-effort)
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    }
+
+    if (!pdfBuffer) {
+      return res.status(422).json({
+        error: 'Biên dịch LaTeX thất bại',
+        log: logOutput.slice(-3000),  // last 3KB của log để debug
+      });
+    }
+    // Optional: update LatexProject.updated_at + main_content nếu projectId given
+    if (projectId) {
+      try {
+        const pool = _getPool();
+        await pool.query(
+          `UPDATE "LatexProject" SET main_content = $1, updated_at = NOW()
+           WHERE id = $2 AND user_id = $3`,
+          [content, projectId, decoded.sub]);
+      } catch { /* silent */ }
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', String(pdfBuffer.length));
+    return res.end(pdfBuffer);
+  } catch (e) {
+    console.error('[latex-compile]', e.message);
+    return res.status(500).json({ error: 'Lỗi server khi biên dịch' });
+  }
+});
+
 // (Proxy cũ disable — latex-service offline. Có thể bật lại khi service up)
 // app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
 
@@ -6710,6 +6777,10 @@ app.post('/api/media/upload', (_req, res) => res.status(501).json({ error: 'Medi
 
 // XP / Gamification
 app.post('/api/exam-xp/award', (_req, res) => res.json(OK));
+// /api/exam-xp/me — XP của user hiện tại (shape XpMe)
+app.get('/api/exam-xp/me', (_req, res) => res.json({
+  totalXp: 0, examCount: 0, level: 1, nextLevelXp: 500, xpToNext: 500, history: [],
+}));
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
