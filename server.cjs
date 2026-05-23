@@ -4988,6 +4988,53 @@ app.patch('/api/classes/:id', async (req, res) => {
   } catch (e) { console.error('[classes:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật lớp' }); }
 });
 
+// ── Analytics pageview — PHẢI trước catch-all /api proxy ────────
+// Rust aero-backend không serve /api/analytics/pageview → 503 spam console
+// mỗi route change. Handler nhẹ: insert vào "PageView" (best-effort) + 204.
+async function _ensurePageViewTable() {
+  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "PageView" (
+      id          BIGSERIAL    PRIMARY KEY,
+      path        VARCHAR(500) NOT NULL,
+      session_id  VARCHAR(60),
+      user_id     VARCHAR(255),
+      view_ms     INTEGER,
+      referrer    VARCHAR(500),
+      created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_created ON "PageView"(created_at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_path ON "PageView"(path)`);
+}
+_ensurePageViewTable().catch(e => console.error('[pageview] migration error:', e.message));
+
+app.post('/api/analytics/pageview', async (req, res) => {
+  // 204 trước khi insert — fire-and-forget, không block UX
+  res.status(204).end();
+  try {
+    const { path = '', sessionId = null, viewMs = null, referrer = null } = req.body || {};
+    if (!path) return;
+    // Optional auth: nếu có Bearer token hợp lệ → log user_id
+    let userId = null;
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous OK */ }
+    }
+    const pool = getPool();
+    await pool.query(
+      `INSERT INTO "PageView"(path, session_id, user_id, view_ms, referrer)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [String(path).slice(0,500), sessionId ? String(sessionId).slice(0,60) : null,
+       userId, typeof viewMs === 'number' ? Math.max(0, Math.min(viewMs, 86_400_000)) : null,
+       referrer ? String(referrer).slice(0,500) : null]
+    );
+  } catch (e) {
+    // Best-effort — không log mỗi request để tránh spam log
+    if (Math.random() < 0.01) console.warn('[pageview]', e.message);
+  }
+});
+
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
 
