@@ -1276,10 +1276,12 @@ app.get('/api/teacher/exams/:id', async (req, res) => {
   const decoded = _kgAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    // Cho phép xem đề của mình HOẶC public
     const { rows } = await pool.query(
-      `SELECT * FROM "Exam" WHERE id = $1 AND teacher_id = $2`,
+      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
       [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
     const r = rows[0];
     const settings = r.settings || {};
     const qIds = Array.isArray(r.question_ids) ? r.question_ids : [];
@@ -1326,6 +1328,9 @@ app.get('/api/teacher/exams/:id', async (req, res) => {
         passingScore: settings.passingScore, shuffle: settings.shuffle,
         questionIds: qIds,
         answerKey: settings.answerKey || [],
+        visibility: r.visibility || 'private',
+        isOwner: !!r.is_owner,
+        teacherId: r.teacher_id,
         createdAt: r.created_at, updatedAt: r.updated_at,
       },
       questions,
@@ -1345,10 +1350,13 @@ app.put('/api/teacher/exams/:id', async (req, res) => {
     for (const [key, col] of Object.entries(map)) {
       if (b[key] !== undefined) { params.push(b[key]); updates.push(`${col} = $${params.length}`); }
     }
+    if (b.visibility !== undefined && ['private','public'].includes(b.visibility)) {
+      params.push(b.visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa' });
     return res.json({ ok: true });
   } catch (e) { console.error('[teacher-exams:put]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
 });
@@ -5491,11 +5499,13 @@ async function _ensureLatexProjectTable() {
     ['title',        "VARCHAR(500) DEFAULT 'Tài liệu LaTeX mới'"],
     ['main_content', "TEXT DEFAULT ''"],
     ['folder_id',    "VARCHAR(36)"],
+    ['visibility',   "VARCHAR(20) DEFAULT 'private'"],
     ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
     ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('LatexProject', ['userId','title','mainContent','folderId','createdAt','updatedAt','ownerId']);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_visibility ON "LatexProject"(visibility)`);
 }
 _ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
 
@@ -5521,12 +5531,27 @@ function _latexRowToProject(r) {
 app.get('/api/latex-projects', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
+    const scope = req.query.scope || 'mine';  // 'mine' | 'public' | 'all'
     const pool = _getPool();
+    let where;
+    const params = [decoded.sub];
+    if (scope === 'public') {
+      where = `visibility = 'public' AND user_id != $1`;
+    } else if (scope === 'all') {
+      where = `user_id = $1 OR visibility = 'public'`;
+    } else {
+      where = `user_id = $1`;
+    }
     const { rows } = await pool.query(`
-      SELECT id, title, folder_id, created_at, updated_at, ''::text AS main_content
-      FROM "LatexProject" WHERE user_id = $1 ORDER BY updated_at DESC
-    `, [decoded.sub]);
-    const data = rows.map(_latexRowToProject);
+      SELECT id, title, folder_id, visibility, user_id, created_at, updated_at, ''::text AS main_content,
+             (user_id = $1) AS is_owner
+      FROM "LatexProject" WHERE ${where} ORDER BY updated_at DESC LIMIT 200
+    `, params);
+    const data = rows.map(r => ({
+      ..._latexRowToProject(r),
+      visibility: r.visibility || 'private',
+      isOwner: !!r.is_owner,
+    }));
     return res.json({ success: true, data, count: data.length });
   } catch (e) { console.error('[latex-projects:list]', e.message); return res.status(500).json({ error: 'Lỗi tải danh sách' }); }
 });
@@ -5553,30 +5578,40 @@ app.get('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    // Cho phép xem tài liệu của mình HOẶC public của người khác
     const { rows } = await pool.query(`
-      SELECT id, title, main_content, folder_id, created_at, updated_at
-      FROM "LatexProject" WHERE id = $1 AND user_id = $2
+      SELECT id, title, main_content, folder_id, visibility, user_id,
+             created_at, updated_at, (user_id = $2) AS is_owner
+      FROM "LatexProject"
+      WHERE id = $1 AND (user_id = $2 OR visibility = 'public')
     `, [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
-    return res.json({ success: true, data: _latexRowToProject(rows[0]) });
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu (hoặc không có quyền truy cập)' });
+    return res.json({ success: true, data: {
+      ..._latexRowToProject(rows[0]),
+      visibility: rows[0].visibility || 'private',
+      isOwner: !!rows[0].is_owner,
+    }});
   } catch (e) { console.error('[latex-projects:get]', e.message); return res.status(500).json({ error: 'Lỗi tải tài liệu' }); }
 });
 
-// PUT /api/latex-projects/:id { title?, mainContent? }
+// PUT /api/latex-projects/:id { title?, mainContent?, visibility? } — chỉ owner
 app.put('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
-    const { title, mainContent } = req.body || {};
+    const { title, mainContent, visibility } = req.body || {};
     const updates = ['updated_at = NOW()'];
     const params = [req.params.id, decoded.sub];
     if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
     if (mainContent !== undefined)  { params.push(String(mainContent));          updates.push(`main_content = $${params.length}`); }
+    if (visibility !== undefined && ['private','public'].includes(visibility)) {
+      params.push(visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "LatexProject" SET ${updates.join(', ')} WHERE id = $1 AND user_id = $2`,
       params
     );
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa' });
     return res.json({ success: true });
   } catch (e) { console.error('[latex-projects:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu tài liệu' }); }
 });
@@ -6450,6 +6485,7 @@ async function _ensureExamTables() {
     ['subject', "VARCHAR(100)"], ['grade', "VARCHAR(50)"], ['chapter', "VARCHAR(200)"],
     ['difficulty', "VARCHAR(20) DEFAULT 'TH'"], ['options', "JSONB DEFAULT '[]'::jsonb"],
     ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
+    ['visibility', "VARCHAR(20) DEFAULT 'private'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId','topic','questionType','correctAnswer','qualityScore','usageCount','aiGenerated','humanReviewed','status','createdBy']);
@@ -6487,6 +6523,7 @@ async function _ensureExamTables() {
     ['duration_min', "INTEGER DEFAULT 45"], ['total_points', "NUMERIC DEFAULT 10"],
     ['question_ids', "JSONB DEFAULT '[]'::jsonb"], ['settings', "JSONB DEFAULT '{}'::jsonb"],
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
+    ['visibility', "VARCHAR(20) DEFAULT 'private'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
   await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId','examType','duration','totalScore','totalQuestions','passingScore','shuffle','sourceType','userId']);
@@ -6520,15 +6557,33 @@ function _examAuth(req, res) {
 }
 
 // ── Question Bank CRUD ──
+// Visibility: 'private' (default) — chỉ GV tạo xem; 'public' — mọi GV xem & sử dụng
 app.get('/api/question-bank', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
+    const scope = req.query.scope || 'all';   // 'mine' | 'public' | 'all'
     const pool = _getPool();
+    let where;
+    const params = [decoded.sub];
+    if (scope === 'mine') {
+      where = `teacher_id = $1`;
+    } else if (scope === 'public') {
+      where = `visibility = 'public' AND teacher_id != $1`;
+    } else {
+      // 'all' = mình + public của người khác (default cho ngân hàng chung)
+      where = `teacher_id = $1 OR visibility = 'public'`;
+    }
     const { rows } = await pool.query(
-      `SELECT * FROM "Question" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 500`,
-      [decoded.sub]
+      `SELECT *, (teacher_id = $1) AS is_owner FROM "Question"
+       WHERE ${where} ORDER BY created_at DESC LIMIT 500`,
+      params
     );
-    return res.json({ questions: rows, total: rows.length });
+    const questions = rows.map(r => ({
+      ...r,
+      visibility: r.visibility || 'private',
+      isOwner: !!r.is_owner,
+    }));
+    return res.json({ questions, total: questions.length });
   } catch (e) { console.error('[question-bank:list]', e.message); return res.json({ questions: [], total: 0 }); }
 });
 
@@ -6559,10 +6614,14 @@ app.patch('/api/question-bank/:id', async (req, res) => {
     const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
     for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
     for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+    // Visibility toggle (chỉ owner mới đổi được)
+    if (req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility)) {
+      params.push(req.body.visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "Question" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy câu hỏi' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa câu hỏi này' });
     return res.json({ ok: true });
   } catch (e) { console.error('[question-bank:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
 });
@@ -6588,15 +6647,25 @@ app.get('/api/questions/taxonomy', (_req, res) => res.json({
 app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.content || '', changes: [] }));
 
 // ── Exams CRUD ──
+// /api/exams + /api/teacher/exams — list đề: của mình + public của người khác
+function _examListWhere(scope) {
+  if (scope === 'mine') return `teacher_id = $1`;
+  if (scope === 'public') return `visibility = 'public' AND teacher_id != $1`;
+  return `teacher_id = $1 OR visibility = 'public'`;  // 'all' default
+}
 app.get('/api/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
-      `SELECT id, title, description, subject, grade, duration_min, total_points, status, created_at, updated_at,
-              jsonb_array_length(question_ids) AS question_count
-       FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
-    return res.json({ exams: rows, total: rows.length });
+      `SELECT id, title, description, subject, grade, duration_min, total_points, status,
+              visibility, teacher_id, created_at, updated_at,
+              jsonb_array_length(question_ids) AS question_count,
+              (teacher_id = $1) AS is_owner
+       FROM "Exam" WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [decoded.sub]);
+    const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
+    return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
 });
 
@@ -6604,9 +6673,12 @@ app.get('/api/teacher/exams', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    const where = _examListWhere(req.query.scope || 'mine');
     const { rows } = await pool.query(
-      `SELECT * FROM "Exam" WHERE teacher_id = $1 ORDER BY created_at DESC`, [decoded.sub]);
-    return res.json({ exams: rows, total: rows.length });
+      `SELECT *, (teacher_id = $1) AS is_owner FROM "Exam"
+       WHERE ${where} ORDER BY created_at DESC LIMIT 500`, [decoded.sub]);
+    const exams = rows.map(r => ({ ...r, visibility: r.visibility || 'private', isOwner: !!r.is_owner }));
+    return res.json({ exams, total: exams.length });
   } catch (e) { console.error('[teacher-exams:list]', e.message); return res.json({ exams: [], total: 0 }); }
 });
 
@@ -6632,10 +6704,14 @@ app.get('/api/exams/:id', async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    // Cho phép xem đề của mình HOẶC public
     const { rows } = await pool.query(
-      `SELECT * FROM "Exam" WHERE id = $1 AND teacher_id = $2`, [req.params.id, decoded.sub]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
-    return res.json({ exam: rows[0] });
+      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
+      [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+    const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
+    return res.json({ exam });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
 });
 
@@ -6647,10 +6723,13 @@ app.patch('/api/exams/:id', async (req, res) => {
     const updates = ['updated_at = NOW()']; const params = [req.params.id, decoded.sub];
     for (const f of fields) if (req.body[f] !== undefined) { params.push(req.body[f]); updates.push(`${f} = $${params.length}`); }
     for (const f of jsonFields) if (req.body[f] !== undefined) { params.push(JSON.stringify(req.body[f])); updates.push(`${f} = $${params.length}::jsonb`); }
+    if (req.body.visibility !== undefined && ['private','public'].includes(req.body.visibility)) {
+      params.push(req.body.visibility); updates.push(`visibility = $${params.length}`);
+    }
     const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "Exam" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`, params);
-    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+    if (!rowCount) return res.status(403).json({ error: 'Bạn không phải chủ sở hữu — không thể sửa đề này' });
     return res.json({ ok: true });
   } catch (e) { console.error('[exams:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
 });
