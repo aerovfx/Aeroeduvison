@@ -4779,10 +4779,132 @@ if (!USE_NODEJS_QUESTIONS) {
 }
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
-// ── /api/latex-projects/* → Rust latex-service (pixiai-latex) ──
-// Direct proxy, bypass aero-backend. latex-service tự xử lý DB + JWT + gọi Anthropic.
-// Phải đăng ký TRƯỚC catch-all aero-backend proxy bên dưới.
-app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
+// ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
+// latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
+// trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
+// có thể disable đoạn này và unbơ proxy bên dưới.
+async function _ensureLatexProjectTable() {
+  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "LatexProject" (
+      id            VARCHAR(36)  PRIMARY KEY,
+      user_id       VARCHAR(255) NOT NULL,
+      title         VARCHAR(500) NOT NULL DEFAULT 'Tài liệu LaTeX mới',
+      main_content  TEXT         NOT NULL DEFAULT '',
+      folder_id     VARCHAR(36),
+      created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
+}
+_ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
+
+function _latexAuth(req, res) {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+  try { return _akVerify(auth.slice(7)); }
+  catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+}
+
+function _latexRowToProject(r) {
+  return {
+    id: r.id,
+    title: r.title,
+    mainContent: r.main_content,
+    folderId: r.folder_id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+// GET /api/latex-projects → { success, data: [...], count }
+app.get('/api/latex-projects', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(`
+      SELECT id, title, folder_id, created_at, updated_at, ''::text AS main_content
+      FROM "LatexProject" WHERE user_id = $1 ORDER BY updated_at DESC
+    `, [decoded.sub]);
+    const data = rows.map(_latexRowToProject);
+    return res.json({ success: true, data, count: data.length });
+  } catch (e) { console.error('[latex-projects:list]', e.message); return res.status(500).json({ error: 'Lỗi tải danh sách' }); }
+});
+
+// POST /api/latex-projects { title? } → { success, data: { id, ... } }
+app.post('/api/latex-projects', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { title = 'Tài liệu LaTeX mới' } = req.body || {};
+    const { randomUUID } = require('crypto');
+    const id = randomUUID();
+    const pool = getPool();
+    const { rows } = await pool.query(`
+      INSERT INTO "LatexProject"(id, user_id, title, main_content)
+      VALUES ($1,$2,$3,'')
+      RETURNING id, title, folder_id, created_at, updated_at, main_content
+    `, [id, decoded.sub, String(title).slice(0, 500)]);
+    return res.json({ success: true, data: _latexRowToProject(rows[0]) });
+  } catch (e) { console.error('[latex-projects:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo tài liệu' }); }
+});
+
+// GET /api/latex-projects/:id → { success, data: { id, title, mainContent, ... } }
+app.get('/api/latex-projects/:id', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const pool = getPool();
+    const { rows } = await pool.query(`
+      SELECT id, title, main_content, folder_id, created_at, updated_at
+      FROM "LatexProject" WHERE id = $1 AND user_id = $2
+    `, [req.params.id, decoded.sub]);
+    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    return res.json({ success: true, data: _latexRowToProject(rows[0]) });
+  } catch (e) { console.error('[latex-projects:get]', e.message); return res.status(500).json({ error: 'Lỗi tải tài liệu' }); }
+});
+
+// PUT /api/latex-projects/:id { title?, mainContent? }
+app.put('/api/latex-projects/:id', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const { title, mainContent } = req.body || {};
+    const updates = ['updated_at = NOW()'];
+    const params = [req.params.id, decoded.sub];
+    if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
+    if (mainContent !== undefined)  { params.push(String(mainContent));          updates.push(`main_content = $${params.length}`); }
+    const pool = getPool();
+    const { rowCount } = await pool.query(
+      `UPDATE "LatexProject" SET ${updates.join(', ')} WHERE id = $1 AND user_id = $2`,
+      params
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    return res.json({ success: true });
+  } catch (e) { console.error('[latex-projects:update]', e.message); return res.status(500).json({ error: 'Lỗi lưu tài liệu' }); }
+});
+
+// DELETE /api/latex-projects/:id
+app.delete('/api/latex-projects/:id', async (req, res) => {
+  const decoded = _latexAuth(req, res); if (!decoded) return;
+  try {
+    const pool = getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "LatexProject" WHERE id = $1 AND user_id = $2`,
+      [req.params.id, decoded.sub]
+    );
+    if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy tài liệu' });
+    return res.json({ success: true });
+  } catch (e) { console.error('[latex-projects:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá tài liệu' }); }
+});
+
+// Versions + collaborators stubs (chưa implement) — trả 200 empty để UI không crash
+app.get('/api/latex-projects/:id/versions', (_req, res) => res.json({ success: true, data: [] }));
+app.get('/api/latex-projects/:id/collaborators', (_req, res) => res.json({ success: true, data: [] }));
+app.post('/api/latex-projects/:id/versions/restore', (_req, res) => res.status(501).json({ error: 'Versions chưa khả dụng' }));
+app.post('/api/latex-projects/:id/collaborators', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
+app.delete('/api/latex-projects/:id/collaborators/:userId', (_req, res) => res.status(501).json({ error: 'Collaborators chưa khả dụng' }));
+
+// (Proxy cũ disable — latex-service offline. Có thể bật lại khi service up)
+// app.use(makeProxy(LATEX_SERVICE_URL, 'latex-service', '/api/latex-projects'));
 
 // ── API Keys (MCP) — PHẢI trước catch-all /api proxy ────────
 // Xử lý /api/user/api-keys và /api/auth/validate-key tại đây (Node.js).
