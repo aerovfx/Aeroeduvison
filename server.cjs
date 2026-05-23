@@ -6590,10 +6590,10 @@ async function _ensureExamTables() {
   ]);
   // Legacy Question.options từ Rust service là TEXT[] → quiz-publish handler
   // JSON.stringify ra '["..."]' không khớp PG array literal '{...}' → 500.
-  // Migrate sang JSONB cho cả 2 cột options + tags.
-  for (const col of ['options', 'tags']) {
+  // Migrate sang JSONB cho options + tags + learningObjectives.
+  for (const col of ['options', 'tags', 'learningObjectives']) {
     try {
-      await pool.query(`ALTER TABLE "Question" ALTER COLUMN ${col} TYPE JSONB USING to_jsonb(${col})`);
+      await pool.query(`ALTER TABLE "Question" ALTER COLUMN "${col}" TYPE JSONB USING to_jsonb("${col}")`);
     } catch { /* đã JSONB sẵn — skip */ }
   }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_question_teacher ON "Question"(teacher_id, created_at DESC)`);
