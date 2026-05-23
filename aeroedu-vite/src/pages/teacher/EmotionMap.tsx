@@ -379,6 +379,67 @@ export default function TeacherEmotionMapPage() {
       {/* ── Main Content ─────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-6 py-6">
 
+        {/* Setup Guide Banner — hiển thị khi chưa có dữ liệu cảm xúc */}
+        {!loadingStats && (!summary || summary.totalSamples === 0) && (
+          <div
+            className="mb-6 rounded-xl border overflow-hidden"
+            style={{ borderColor: D.border, background: D.card }}
+          >
+            <div className="px-5 py-4 border-b flex items-center gap-2"
+              style={{ borderColor: D.border, background: `linear-gradient(90deg, rgba(139,92,246,0.08), rgba(236,72,153,0.08))` }}>
+              <Sparkles className="w-5 h-5" style={{ color: '#a78bfa' }} />
+              <h3 className="text-base font-bold" style={{ color: D.text }}>Hướng dẫn kích hoạt theo dõi cảm xúc</h3>
+            </div>
+            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Step 1 */}
+              <div className="rounded-lg p-4 border" style={{ borderColor: D.border, background: D.card2 }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #8b5cf6, #a78bfa)' }}>1</span>
+                  <h4 className="font-semibold text-sm" style={{ color: D.text }}>Cấp quyền camera</h4>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: D.muted }}>
+                  Vào <a href="/teacher/camera-management" className="underline" style={{ color: '#a78bfa' }}>Quản lý camera</a> →
+                  Thêm camera lớp/cá nhân → cho phép trình duyệt truy cập webcam.
+                </p>
+              </div>
+              {/* Step 2 */}
+              <div className="rounded-lg p-4 border" style={{ borderColor: D.border, background: D.card2 }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #ec4899, #f472b6)' }}>2</span>
+                  <h4 className="font-semibold text-sm" style={{ color: D.text }}>Bật AI Vision Tracker</h4>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: D.muted }}>
+                  Trong tiết học, khởi động Vision Tracker (góc trên-phải camera) → AI sẽ phân tích
+                  17 biểu cảm trên khuôn mặt HS theo thời gian thực.
+                </p>
+              </div>
+              {/* Step 3 */}
+              <div className="rounded-lg p-4 border" style={{ borderColor: D.border, background: D.card2 }}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                    style={{ background: 'linear-gradient(135deg, #06b6d4, #22d3ee)' }}>3</span>
+                  <h4 className="font-semibold text-sm" style={{ color: D.text }}>Xem thống kê</h4>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: D.muted }}>
+                  Dữ liệu cảm xúc tự động ghi vào bảng này. Lọc theo 24h/7 ngày/30 ngày để
+                  phát hiện HS căng thẳng/buồn ngủ/chán nản và can thiệp sớm.
+                </p>
+              </div>
+            </div>
+            {/* Privacy notice */}
+            <div className="px-5 py-3 border-t flex items-start gap-2" style={{ borderColor: D.border, background: D.card2 }}>
+              <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: D.muted2 }} />
+              <p className="text-[11px] leading-relaxed" style={{ color: D.muted }}>
+                <strong>Bảo mật:</strong> AI Vision chỉ trích xuất biểu cảm (vui/buồn/tập trung), KHÔNG
+                lưu ảnh/video gốc. Tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân.
+                HS có thể tắt camera bất kỳ lúc nào.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Time Range Selector */}
         <div
           className="rounded-xl border p-4 mb-6"
