@@ -4784,7 +4784,7 @@ app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
 // có thể disable đoạn này và unbơ proxy bên dưới.
 async function _ensureLatexProjectTable() {
-  const pool = getPool();
+  const pool = _getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "LatexProject" (
       id            VARCHAR(36)  PRIMARY KEY,
@@ -4822,7 +4822,7 @@ function _latexRowToProject(r) {
 app.get('/api/latex-projects', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(`
       SELECT id, title, folder_id, created_at, updated_at, ''::text AS main_content
       FROM "LatexProject" WHERE user_id = $1 ORDER BY updated_at DESC
@@ -4839,7 +4839,7 @@ app.post('/api/latex-projects', async (req, res) => {
     const { title = 'Tài liệu LaTeX mới' } = req.body || {};
     const { randomUUID } = require('crypto');
     const id = randomUUID();
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(`
       INSERT INTO "LatexProject"(id, user_id, title, main_content)
       VALUES ($1,$2,$3,'')
@@ -4853,7 +4853,7 @@ app.post('/api/latex-projects', async (req, res) => {
 app.get('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(`
       SELECT id, title, main_content, folder_id, created_at, updated_at
       FROM "LatexProject" WHERE id = $1 AND user_id = $2
@@ -4872,7 +4872,7 @@ app.put('/api/latex-projects/:id', async (req, res) => {
     const params = [req.params.id, decoded.sub];
     if (title !== undefined)        { params.push(String(title).slice(0, 500));  updates.push(`title = $${params.length}`); }
     if (mainContent !== undefined)  { params.push(String(mainContent));          updates.push(`main_content = $${params.length}`); }
-    const pool = getPool();
+    const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "LatexProject" SET ${updates.join(', ')} WHERE id = $1 AND user_id = $2`,
       params
@@ -4886,7 +4886,7 @@ app.put('/api/latex-projects/:id', async (req, res) => {
 app.delete('/api/latex-projects/:id', async (req, res) => {
   const decoded = _latexAuth(req, res); if (!decoded) return;
   try {
-    const pool = getPool();
+    const pool = _getPool();
     const { rowCount } = await pool.query(
       `DELETE FROM "LatexProject" WHERE id = $1 AND user_id = $2`,
       [req.params.id, decoded.sub]
@@ -4919,6 +4919,19 @@ function _akVerify(token) {
   return _akJwt.verify(token, _akSecret(), { ignoreExpiration: true });
 }
 
+// Module-scope DB pool helper (_getPool() ở line 133 bị block-scoped trong
+// if(USE_NODEJS_AUTH){} với 'use strict' → không accessible từ đây).
+let _akPool = null;
+function __getPool() {
+  if (!_akPool) {
+    const { Pool } = require('pg');
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL không được set');
+    _akPool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+  }
+  return _akPool;
+}
+
 app.post('/api/user/api-keys', async (req, res) => {
   try {
     const auth = req.headers.authorization || '';
@@ -4931,7 +4944,7 @@ app.post('/api/user/api-keys', async (req, res) => {
     const prefix = rawKey.slice(0, 12);
     const hash = await _akBcrypt.hash(rawKey, 10);
     const id = randomUUID();
-    const pool = getPool();
+    const pool = _getPool();
     await pool.query(
       `INSERT INTO user_api_keys(id, user_id, key_prefix, key_hash, name) VALUES($1,$2,$3,$4,$5)`,
       [id, decoded.sub, prefix, hash, String(name).slice(0, 200)]
@@ -4946,7 +4959,7 @@ app.get('/api/user/api-keys', async (req, res) => {
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
     let decoded;
     try { decoded = _akVerify(auth.slice(7)); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(
       `SELECT id, key_prefix, name, created_at, last_used_at, revoked FROM user_api_keys WHERE user_id=$1 ORDER BY created_at DESC`,
       [decoded.sub]
@@ -4961,7 +4974,7 @@ app.delete('/api/user/api-keys/:id', async (req, res) => {
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
     let decoded;
     try { decoded = _akVerify(auth.slice(7)); } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
-    const pool = getPool();
+    const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE user_api_keys SET revoked=true WHERE id=$1 AND user_id=$2`,
       [req.params.id, decoded.sub]
@@ -4976,7 +4989,7 @@ app.post('/api/auth/validate-key', async (req, res) => {
     const { key } = req.body || {};
     if (!key || !String(key).startsWith('AERO-')) return res.status(401).json({ ok: false, error: 'Invalid key format' });
     const prefix = String(key).slice(0, 12);
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(
       `SELECT k.*, u.role, u.name, u.email FROM user_api_keys k JOIN "User" u ON u.id=k.user_id WHERE k.key_prefix=$1 AND k.revoked=false`,
       [prefix]
@@ -4996,7 +5009,7 @@ app.post('/api/auth/validate-key', async (req, res) => {
 // Rust aero-backend hiện không serve /api/classes (ECONNREFUSED 127.0.0.1:8090)
 // → handler Node.js trực tiếp với bảng "Class" trong DB chung.
 async function _ensureClassTable() {
-  const pool = getPool();
+  const pool = _getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "Class" (
       id              VARCHAR(36)  PRIMARY KEY,
@@ -5026,7 +5039,7 @@ function _classAuth(req, res) {
 app.get('/api/classes', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
-    const pool = getPool();
+    const pool = _getPool();
     const { rows } = await pool.query(`
       SELECT c.id, c.name, c.grade, c.school_year AS "schoolYear", c.description,
              c.context_type, c.institution_name, c.created_at AS "createdAt",
@@ -5037,7 +5050,7 @@ app.get('/api/classes', async (req, res) => {
   } catch (e) {
     // Bảng ClassStudent có thể chưa tồn tại — fallback query bỏ join
     try {
-      const pool = getPool();
+      const pool = _getPool();
       const { rows } = await pool.query(`
         SELECT id, name, grade, school_year AS "schoolYear", description,
                context_type, institution_name, created_at AS "createdAt",
@@ -5061,7 +5074,7 @@ app.post('/api/classes', async (req, res) => {
     if (!String(name).trim()) return res.status(400).json({ error: 'Thiếu tên lớp' });
     const { randomUUID } = require('crypto');
     const id = randomUUID();
-    const pool = getPool();
+    const pool = _getPool();
     await pool.query(`
       INSERT INTO "Class"(id, teacher_id, name, grade, school_year, description, context_type, institution_name)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -5076,7 +5089,7 @@ app.post('/api/classes', async (req, res) => {
 app.delete('/api/classes/:id', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
-    const pool = getPool();
+    const pool = _getPool();
     const { rowCount } = await pool.query(
       `DELETE FROM "Class" WHERE id = $1 AND teacher_id = $2`,
       [req.params.id, decoded.sub]
@@ -5100,7 +5113,7 @@ app.patch('/api/classes/:id', async (req, res) => {
     if (context_type !== undefined)      { params.push(String(context_type));                 updates.push(`context_type = $${params.length}`); }
     if (institution_name !== undefined)  { params.push(String(institution_name).slice(0,200)); updates.push(`institution_name = $${params.length}`); }
     if (!updates.length) return res.json({ ok: true });
-    const pool = getPool();
+    const pool = _getPool();
     const { rowCount } = await pool.query(
       `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
       params
@@ -5114,7 +5127,7 @@ app.patch('/api/classes/:id', async (req, res) => {
 // Rust aero-backend không serve /api/analytics/pageview → 503 spam console
 // mỗi route change. Handler nhẹ: insert vào "PageView" (best-effort) + 204.
 async function _ensurePageViewTable() {
-  const pool = getPool();
+  const pool = _getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS "PageView" (
       id          BIGSERIAL    PRIMARY KEY,
@@ -5143,7 +5156,7 @@ app.post('/api/analytics/pageview', async (req, res) => {
     if (auth.startsWith('Bearer ')) {
       try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous OK */ }
     }
-    const pool = getPool();
+    const pool = _getPool();
     await pool.query(
       `INSERT INTO "PageView"(path, session_id, user_id, view_ms, referrer)
        VALUES ($1,$2,$3,$4,$5)`,
@@ -5156,6 +5169,34 @@ app.post('/api/analytics/pageview', async (req, res) => {
     if (Math.random() < 0.01) console.warn('[pageview]', e.message);
   }
 });
+
+// ── Stub handlers cho Rust microservices offline ──────────
+// (aero-backend, teacher-service, reco-service đều ECONNREFUSED)
+// Trả empty payload thay vì 503 → UI hiện empty state, không lỗi đỏ.
+// Xoá các stub này khi service được khôi phục.
+
+// Notifications (aero-backend)
+app.get('/api/notifications', (_req, res) => res.json({ notifications: [], unread: 0, total: 0 }));
+app.post('/api/notifications/:id/read', (_req, res) => res.json({ ok: true }));
+app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true }));
+
+// Exam matrices list (media-service) — UI đã có SAMPLE_MATRICES fallback
+app.get('/api/exam-matrices', (_req, res) => res.json({ matrices: [], total: 0 }));
+
+// Recommendation feed (reco-service)
+app.get('/api/reco/feed', (req, res) => {
+  const audience = req.query.audience || 'student';
+  res.json({ items: [], audience, total: 0, hasMore: false });
+});
+app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
+
+// Teacher service (port 8106)
+app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
+app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+
+// Leaderboard realtime (aero-backend)
+app.get('/api/leaderboard/realtime', (_req, res) => res.json({ leaders: [], updatedAt: new Date().toISOString() }));
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));
@@ -5179,7 +5220,7 @@ app.use('/socket.io', createProxyMiddleware({
 // Only store bcrypt hash of the full key; return plaintext only on creation.
 
 async function ensureApiKeysTable() {
-  const pool = getPool();
+  const pool = _getPool();
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_api_keys (
       id            VARCHAR(36) PRIMARY KEY,
