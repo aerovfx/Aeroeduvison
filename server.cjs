@@ -6125,7 +6125,7 @@ async function _ensureExamTables() {
     ['answer', "TEXT"], ['explanation', "TEXT"], ['tags', "JSONB DEFAULT '[]'::jsonb"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
-  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId']);
+  await _dropLegacyNotNull('Question', ['teacherId','content','type','subject','grade','chapter','difficulty','options','answer','explanation','tags','createdAt','updatedAt','ownerId','authorId','topic','questionType','correctAnswer','qualityScore','usageCount','aiGenerated','humanReviewed','status','createdBy']);
   // Legacy Question.options từ Rust service là TEXT[] → quiz-publish handler
   // JSON.stringify ra '["..."]' không khớp PG array literal '{...}' → 500.
   // Migrate sang JSONB cho cả 2 cột options + tags.
@@ -6162,7 +6162,7 @@ async function _ensureExamTables() {
     ['status', "VARCHAR(20) DEFAULT 'draft'"],
     ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
-  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId']);
+  await _dropLegacyNotNull('Exam', ['teacherId','title','description','subject','grade','durationMin','totalPoints','questionIds','settings','status','createdAt','updatedAt','ownerId','examType','duration','totalScore','totalQuestions','passingScore','shuffle','sourceType','userId']);
   // Same fix cho Exam — legacy questionIds/settings có thể là array/text
   for (const col of ['question_ids', 'settings']) {
     try {
