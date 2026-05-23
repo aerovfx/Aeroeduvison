@@ -1064,7 +1064,20 @@ function makeProxy(target, label, pathFilter) {
   });
 }
 
-// ── /api/teacher/* → teacher-service ───────────────────────
+// ── Teacher stubs — PHẢI trước proxy teacher-service (port 8106 offline) ──
+// Trả empty thay vì 503. Khi service được khôi phục, xoá các stub này.
+app.get('/api/teacher/analytics', (_req, res) => res.json({ stats: {}, charts: [], period: 'month' }));
+app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
+app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
+app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
+app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
+app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
+app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
+app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+
+// ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
 // ══════════════════════════════════════════════════════════════
@@ -5058,7 +5071,38 @@ async function _ensureClassTable() {
     ['institution_name', "VARCHAR(200)"],
     ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
   ]);
+  // Drop NOT NULL trên các cột legacy camelCase từ Rust service
+  // (schoolYear, teacherId, ...) — handler mới chỉ ghi snake_case.
+  for (const col of ['schoolYear', 'teacherId', 'name', 'grade', 'description', 'createdAt', 'updatedAt']) {
+    try { await pool.query(`ALTER TABLE "Class" ALTER COLUMN "${col}" DROP NOT NULL`); }
+    catch { /* cột có thể không tồn tại — skip */ }
+  }
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_class_teacher ON "Class"(teacher_id)`);
+
+  // ClassStudent bảng cho danh sách HS trong lớp (import từ Excel)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS "ClassStudent" (
+      id              VARCHAR(36)  PRIMARY KEY,
+      class_id        VARCHAR(36)  NOT NULL,
+      stt             INTEGER,
+      ho_ten          VARCHAR(200) NOT NULL,
+      ma_dinh_danh    VARCHAR(50),
+      ngay_sinh       VARCHAR(20),
+      gioi_tinh       VARCHAR(20),
+      created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    )
+  `);
+  await _alterAddColumns('ClassStudent', [
+    ['class_id',     "VARCHAR(36)"],
+    ['stt',          "INTEGER"],
+    ['ho_ten',       "VARCHAR(200)"],
+    ['ma_dinh_danh', "VARCHAR(50)"],
+    ['ngay_sinh',    "VARCHAR(20)"],
+    ['gioi_tinh',    "VARCHAR(20)"],
+    ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_classstudent_class ON "ClassStudent"(class_id)`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_classstudent_madd ON "ClassStudent"(class_id, ma_dinh_danh) WHERE ma_dinh_danh IS NOT NULL AND ma_dinh_danh <> ''`);
 }
 _ensureClassTable().catch(e => console.error('[classes] migration error:', e.message));
 
@@ -5158,6 +5202,104 @@ app.patch('/api/classes/:id', async (req, res) => {
   } catch (e) { console.error('[classes:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật lớp' }); }
 });
 
+// GET /api/classes/:id/students → { students: [...] }
+app.get('/api/classes/:id/students', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    // Verify lớp thuộc teacher
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    const { rows } = await pool.query(
+      `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
+              ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh", created_at AS "createdAt"
+       FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+      [req.params.id]);
+    return res.json({ students: rows, total: rows.length });
+  } catch (e) { console.error('[classes:students:list]', e.message); return res.status(500).json({ error: 'Lỗi tải DS học sinh' }); }
+});
+
+// POST /api/classes/:id/students/import — bulk insert/update từ Excel
+// Body: { students: [{ stt, hoTen, ngaySinh, gioiTinh, maDinhDanh }, ...] }
+// Returns: { success, message, results: { inserted, updated, skipped, total }, errors }
+app.post('/api/classes/:id/students/import', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  const classId = req.params.id;
+  const studentsIn = Array.isArray(req.body?.students) ? req.body.students : [];
+  if (!studentsIn.length) return res.status(400).json({ error: 'Danh sách HS rỗng' });
+  try {
+    const pool = _getPool();
+    const { rowCount: ok } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [classId, decoded.sub]);
+    if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
+
+    const { randomUUID } = require('crypto');
+    let inserted = 0, updated = 0, skipped = 0;
+    const errors = [];
+    for (const s of studentsIn) {
+      const hoTen = String(s.hoTen || '').trim();
+      const maDD = String(s.maDinhDanh || '').trim();
+      const stt = s.stt ? Number(s.stt) : null;
+      const ngaySinh = String(s.ngaySinh || '').trim();
+      const gioiTinh = String(s.gioiTinh || '').trim();
+      if (!hoTen) { skipped++; if (errors.length < 3) errors.push(`Bỏ qua HS dòng ${stt || '?'}: thiếu họ tên`); continue; }
+      try {
+        if (maDD) {
+          // Có mã định danh → upsert theo (class_id, ma_dinh_danh)
+          const upd = await pool.query(
+            `UPDATE "ClassStudent" SET stt = $1, ho_ten = $2, ngay_sinh = $3, gioi_tinh = $4
+             WHERE class_id = $5 AND ma_dinh_danh = $6 RETURNING id`,
+            [stt, hoTen.slice(0,200), ngaySinh.slice(0,20), gioiTinh.slice(0,20), classId, maDD.slice(0,50)]);
+          if (upd.rowCount) { updated++; }
+          else {
+            await pool.query(
+              `INSERT INTO "ClassStudent"(id, class_id, stt, ho_ten, ma_dinh_danh, ngay_sinh, gioi_tinh)
+               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+              [randomUUID(), classId, stt, hoTen.slice(0,200), maDD.slice(0,50), ngaySinh.slice(0,20), gioiTinh.slice(0,20)]);
+            inserted++;
+          }
+        } else {
+          // Không có mã → chỉ insert
+          await pool.query(
+            `INSERT INTO "ClassStudent"(id, class_id, stt, ho_ten, ngay_sinh, gioi_tinh)
+             VALUES ($1,$2,$3,$4,$5,$6)`,
+            [randomUUID(), classId, stt, hoTen.slice(0,200), ngaySinh.slice(0,20), gioiTinh.slice(0,20)]);
+          inserted++;
+        }
+      } catch (e) {
+        skipped++;
+        if (errors.length < 3) errors.push(`Dòng ${stt || '?'}: ${e.message.slice(0,100)}`);
+      }
+    }
+    return res.json({
+      success: true,
+      message: `Import xong: ${inserted} thêm mới + ${updated} cập nhật + ${skipped} bỏ qua`,
+      results: { inserted, updated, skipped, total: studentsIn.length },
+      errors,
+    });
+  } catch (e) { console.error('[classes:students:import]', e.message); return res.status(500).json({ error: 'Lỗi import học sinh' }); }
+});
+
+// DELETE /api/classes/:id/students/:studentId
+app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
+  const decoded = _classAuth(req, res); if (!decoded) return;
+  try {
+    const pool = _getPool();
+    const { rowCount: ok } = await pool.query(
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+      [req.params.id, decoded.sub]);
+    if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
+    const { rowCount } = await pool.query(
+      `DELETE FROM "ClassStudent" WHERE id = $1 AND class_id = $2`,
+      [req.params.studentId, req.params.id]);
+    if (!rowCount) return res.status(404).json({ error: 'HS không tồn tại' });
+    return res.json({ ok: true });
+  } catch (e) { console.error('[classes:students:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá HS' }); }
+});
+
 // ── Analytics pageview — PHẢI trước catch-all /api proxy ────────
 // Rust aero-backend không serve /api/analytics/pageview → 503 spam console
 // mỗi route change. Handler nhẹ: insert vào "PageView" (best-effort) + 204.
@@ -5227,9 +5369,97 @@ app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true 
 app.get('/api/exam-matrices', (_req, res) => res.json({ matrices: [], total: 0 }));
 
 // Recommendation feed (reco-service)
-app.get('/api/reco/feed', (req, res) => {
+// Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
+// Items dựa trên dữ liệu thực của GV trong bảng "Exam", "LessonPlan", "Class"
+app.get('/api/reco/feed', async (req, res) => {
   const audience = req.query.audience || 'student';
-  res.json({ items: [], audience, total: 0, hasMore: false });
+  const limit = Math.min(Number(req.query.limit) || 30, 100);
+  const auth = req.headers.authorization || '';
+  let teacherId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { teacherId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
+  }
+  // Student audience — chưa có signals, trả empty
+  if (audience !== 'teacher' || !teacherId) {
+    return res.json({ audience, count: 0, items: [], sources: [], isColdStart: true });
+  }
+  try {
+    const pool = _getPool();
+    const items = [];
+    // 1) content_gap — Exam draft chưa có câu hỏi
+    const { rows: draftExams } = await pool.query(`
+      SELECT id, title, subject, grade, jsonb_array_length(question_ids) AS qcount, created_at
+      FROM "Exam" WHERE teacher_id = $1 AND (status = 'draft' OR status IS NULL)
+      ORDER BY created_at DESC LIMIT 5
+    `, [teacherId]);
+    for (const e of draftExams) {
+      if (e.qcount < 5) {
+        items.push({
+          type: 'content_gap',
+          id: `exam-${e.id}`,
+          title: `Đề "${e.title}" còn trống`,
+          subtitle: `${e.qcount} câu — Khối ${e.grade || '?'} ${e.subject ? '· ' + e.subject : ''}`,
+          description: 'Đề thi đang ở trạng thái nháp với ít câu hỏi. Bấm để thêm câu từ Ngân hàng.',
+          score: 0.8 - (e.qcount * 0.1),
+          source: 'exam-draft',
+          link: `/teacher/exams`,
+          cta: 'Mở đề',
+          reasons: ['🎯 Còn trống', '✏️ Cần thêm câu hỏi'],
+        });
+      }
+    }
+    // 2) content_gap — LessonPlan ngắn (<200 từ)
+    const { rows: shortPlans } = await pool.query(`
+      SELECT id, title, subject, grade, word_count, updated_at
+      FROM "LessonPlan" WHERE teacher_id = $1 AND word_count < 200 AND is_archived = false
+      ORDER BY updated_at DESC LIMIT 5
+    `, [teacherId]);
+    for (const p of shortPlans) {
+      items.push({
+        type: 'content_gap',
+        id: `plan-${p.id}`,
+        title: `Giáo án "${p.title}" còn ngắn`,
+        subtitle: `${p.word_count} từ ${p.grade ? '· Khối ' + p.grade : ''} ${p.subject ? '· ' + p.subject : ''}`,
+        description: 'Giáo án có dưới 200 từ — cần bổ sung mục tiêu, hoạt động, đánh giá.',
+        score: 0.7,
+        source: 'lesson-plan-short',
+        link: `/teacher/lesson-plans`,
+        cta: 'Hoàn thiện',
+        reasons: ['📝 Cần mở rộng nội dung'],
+      });
+    }
+    // 3) class_trending_weak — Class không có exam gắn (proxy của "lớp chưa khảo sát")
+    const { rows: classes } = await pool.query(`
+      SELECT id, name, grade FROM "Class" WHERE teacher_id = $1 ORDER BY created_at DESC LIMIT 10
+    `, [teacherId]);
+    if (classes.length === 0) {
+      items.push({
+        type: 'class_trending_weak',
+        id: 'no-class',
+        title: 'Chưa tạo lớp nào',
+        subtitle: 'Tạo lớp đầu tiên để bắt đầu',
+        description: 'Sprint AI sẽ phân tích điểm yếu lớp khi bạn có HS làm bài.',
+        score: 1.0,
+        source: 'setup',
+        link: '/teacher/classes',
+        cta: 'Tạo lớp',
+        reasons: ['👋 Bắt đầu tại đây'],
+      });
+    }
+    // 4) student_needs_help — chưa có signals từ HS → skip
+    // 5) student_self_path — chưa có KG mastery → skip
+
+    return res.json({
+      audience: 'teacher',
+      count: items.length,
+      items: items.slice(0, limit),
+      sources: ['exam-draft','lesson-plan-short','setup'],
+      isColdStart: items.length < 3,
+    });
+  } catch (e) {
+    console.error('[reco/feed:teacher]', e.message);
+    return res.json({ audience: 'teacher', count: 0, items: [], sources: [], isColdStart: true });
+  }
 });
 app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 
