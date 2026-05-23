@@ -1271,7 +1271,7 @@ app.post('/api/teacher/exams', async (req, res) => {
   } catch (e) { console.error('[teacher-exams:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo đề thi' }); }
 });
 
-// GET /api/teacher/exams/:id — detail
+// GET /api/teacher/exams/:id — detail + hydrate questions
 app.get('/api/teacher/exams/:id', async (req, res) => {
   const decoded = _kgAuth(req, res); if (!decoded) return;
   try {
@@ -1281,21 +1281,54 @@ app.get('/api/teacher/exams/:id', async (req, res) => {
       [req.params.id, decoded.sub]);
     if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề' });
     const r = rows[0];
-    // Parse settings để lấy answerKey + metadata
     const settings = r.settings || {};
+    const qIds = Array.isArray(r.question_ids) ? r.question_ids : [];
+    const pointsMap = settings.pointsMap || {};
+
+    // Hydrate question rows + giữ thứ tự theo qIds
+    let questions = [];
+    if (qIds.length > 0) {
+      const { rows: qRows } = await pool.query(
+        `SELECT id, content, type, subject, grade, chapter, difficulty,
+                options, answer, explanation, tags, created_at, updated_at
+         FROM "Question" WHERE id = ANY($1::text[])`,
+        [qIds.map(String)]);
+      const byId = new Map(qRows.map(q => [q.id, q]));
+      questions = qIds.map((qid, idx) => {
+        const q = byId.get(String(qid));
+        if (!q) return null;
+        return {
+          id: q.id, order: idx + 1,
+          points: Number(pointsMap[q.id]) || 1,
+          content: q.content || '',
+          questionType: q.type || 'multiple_choice',
+          type: q.type || 'multiple_choice',
+          subject: q.subject, grade: q.grade, chapter: q.chapter,
+          difficulty: q.difficulty,
+          options: q.options || [],
+          correctAnswer: q.answer || '',
+          answer: q.answer || '',
+          explanation: q.explanation || null,
+          tags: q.tags || [],
+          createdAt: q.created_at, updatedAt: q.updated_at,
+        };
+      }).filter(Boolean);
+    }
+
     return res.json({
       exam: {
         id: r.id, title: r.title, description: r.description,
         subject: r.subject || settings.subject,
         grade: r.grade, examType: settings.examType,
         duration: r.duration_min, totalPoints: r.total_points,
-        totalQuestions: r.question_ids?.length || 0,
+        totalQuestions: qIds.length,
         status: r.status, sourceType: settings.sourceType,
         passingScore: settings.passingScore, shuffle: settings.shuffle,
-        questionIds: r.question_ids || [],
+        questionIds: qIds,
         answerKey: settings.answerKey || [],
         createdAt: r.created_at, updatedAt: r.updated_at,
       },
+      questions,
     });
   } catch (e) { console.error('[teacher-exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
 });
