@@ -34,6 +34,9 @@ RUN npm config set fetch-timeout 600000 && \
 COPY aeroedu-vite/ .
 ENV NODE_ENV=production
 ENV VITE_APP_VERSION=cloud-run
+# Bump Node heap to 6GB — Vite bundle (~5000 modules sau khi merge worktree)
+# vượt mặc định 4GB → JavaScript heap out of memory.
+ENV NODE_OPTIONS=--max-old-space-size=6144
 # Promote build args to ENV so Vite picks them up during `npm run build`
 ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
 ENV VITE_API_URL=${VITE_API_URL}
