@@ -4779,6 +4779,33 @@ if (!USE_NODEJS_QUESTIONS) {
 }
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/exams'));
 
+// ── Shared module-scope DB pool — phải khai báo TRƯỚC mọi _ensure*Table()
+// (getPool() ở line 133 bị block-scoped trong if(USE_NODEJS_AUTH){} với
+// 'use strict' → không accessible từ đây). Dùng var để không TDZ.
+var _akPool = null;
+function _getPool() {
+  if (!_akPool) {
+    const { Pool } = require('pg');
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error('DATABASE_URL không được set');
+    _akPool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
+  }
+  return _akPool;
+}
+
+// Helper: ALTER TABLE ADD COLUMN IF NOT EXISTS (PostgreSQL native từ 9.6)
+// — dùng cho lazy schema migration khi bảng đã tồn tại với schema cũ.
+async function _alterAddColumns(table, columns) {
+  const pool = _getPool();
+  for (const [col, type] of columns) {
+    try {
+      await pool.query(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+    } catch (e) {
+      console.warn(`[migration] ${table}.${col}:`, e.message);
+    }
+  }
+}
+
 // ── /api/latex-projects/* → Node.js handlers (latex-service offline) ──
 // latex-service Rust (port 8109) ECONNREFUSED → fallback Node.js CRUD trực tiếp
 // trên bảng "LatexProject" trong DB chung. Khi nào latex-service được khôi phục,
@@ -4796,6 +4823,15 @@ async function _ensureLatexProjectTable() {
       updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
+  // Migrate old schema (Rust service) → đảm bảo cột cần thiết tồn tại
+  await _alterAddColumns('LatexProject', [
+    ['user_id',      "VARCHAR(255)"],
+    ['title',        "VARCHAR(500) DEFAULT 'Tài liệu LaTeX mới'"],
+    ['main_content', "TEXT DEFAULT ''"],
+    ['folder_id',    "VARCHAR(36)"],
+    ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_latex_user ON "LatexProject"(user_id)`);
 }
 _ensureLatexProjectTable().catch(e => console.error('[latex-projects] migration error:', e.message));
@@ -4919,18 +4955,7 @@ function _akVerify(token) {
   return _akJwt.verify(token, _akSecret(), { ignoreExpiration: true });
 }
 
-// Module-scope DB pool helper (getPool() ở line 133 bị block-scoped trong
-// if(USE_NODEJS_AUTH){} với 'use strict' → không accessible từ đây).
-let _akPool = null;
-function _getPool() {
-  if (!_akPool) {
-    const { Pool } = require('pg');
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error('DATABASE_URL không được set');
-    _akPool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 5000 });
-  }
-  return _akPool;
-}
+// (_getPool helper đã được khai báo ở đầu file — TRƯỚC _ensureLatexProjectTable)
 
 app.post('/api/user/api-keys', async (req, res) => {
   try {
@@ -5023,6 +5048,16 @@ async function _ensureClassTable() {
       created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
+  await _alterAddColumns('Class', [
+    ['teacher_id',       "VARCHAR(255)"],
+    ['name',             "VARCHAR(200)"],
+    ['grade',            "VARCHAR(50)"],
+    ['school_year',      "VARCHAR(20)"],
+    ['description',      "TEXT"],
+    ['context_type',     "VARCHAR(20) DEFAULT 'SCHOOL'"],
+    ['institution_name', "VARCHAR(200)"],
+    ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_class_teacher ON "Class"(teacher_id)`);
 }
 _ensureClassTable().catch(e => console.error('[classes] migration error:', e.message));
@@ -5139,6 +5174,14 @@ async function _ensurePageViewTable() {
       created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
+  await _alterAddColumns('PageView', [
+    ['path',       "VARCHAR(500)"],
+    ['session_id', "VARCHAR(60)"],
+    ['user_id',    "VARCHAR(255)"],
+    ['view_ms',    "INTEGER"],
+    ['referrer',   "VARCHAR(500)"],
+    ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_created ON "PageView"(created_at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_pageview_path ON "PageView"(path)`);
 }
@@ -5219,6 +5262,24 @@ async function _ensureLessonPlanTable() {
       updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
     )
   `);
+  await _alterAddColumns('LessonPlan', [
+    ['teacher_id',       "VARCHAR(255)"],
+    ['title',            "VARCHAR(500) DEFAULT 'Giáo án mới'"],
+    ['subject',          "VARCHAR(100)"],
+    ['grade',            "VARCHAR(50)"],
+    ['tags',             "JSONB DEFAULT '[]'::jsonb"],
+    ['content',          "TEXT DEFAULT ''"],
+    ['content_json',     "JSONB"],
+    ['word_count',       "INTEGER DEFAULT 0"],
+    ['is_archived',      "BOOLEAN DEFAULT false"],
+    ['format',           "VARCHAR(10) DEFAULT 'html'"],
+    ['latex_project_id', "VARCHAR(36)"],
+    ['gcs_backup_url',   "TEXT"],
+    ['gcs_backup_at',    "TIMESTAMPTZ"],
+    ['last_saved_at',    "TIMESTAMPTZ DEFAULT NOW()"],
+    ['created_at',       "TIMESTAMPTZ DEFAULT NOW()"],
+    ['updated_at',       "TIMESTAMPTZ DEFAULT NOW()"],
+  ]);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lessonplan_teacher ON "LessonPlan"(teacher_id, updated_at DESC)`);
 }
 _ensureLessonPlanTable().catch(e => console.error('[lesson-plans] migration error:', e.message));
