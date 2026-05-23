@@ -3146,6 +3146,172 @@ XUẤT: code LaTeX hoàn chỉnh.`,
   },
 );
 
+// ─── Mẫu đề Ngữ văn THPT 2025 (Đọc hiểu + Viết) ─────────────
+LATEX_TEMPLATES.push(
+  {
+    id: "de-nguvan-thpt-2025",
+    name: "📖 Đề Ngữ văn THPT 2025 — Đọc hiểu + Viết",
+    description: "I. Đọc hiểu (4đ, 5 câu) · II. Viết NLXH 200 chữ + NLVH 600 chữ (6đ) · khung văn bản · cấu trúc Bộ GD 2025",
+    category: 'exam',
+    audience: 'GV Ngữ văn THPT',
+    tags: ['ngữ văn', 'literature', 'thpt', 'đọc hiểu', 'nghị luận', 'tốt nghiệp', '2025'],
+    aiPrompt: `Bạn là chuyên gia ra đề Ngữ văn THPT theo định hướng chương trình 2018 + cấu trúc đề tốt nghiệp 2025.
+
+NHIỆM VỤ: viết ĐỀ THI NGỮ VĂN hoàn chỉnh bằng LaTeX dùng template này:
+- Văn bản đọc hiểu: 250-400 từ, thể loại [truyện ngắn / thơ / tản văn / ký]
+- Phần I (4,0đ): 5 câu Đọc hiểu (0.75 + 0.75 + 1.0 + 0.75 + 0.75)
+- Phần II (6,0đ):
+  · Câu 1 (2,0đ): NLXH viết đoạn 200 chữ phân tích nhân vật/chi tiết trong văn bản
+  · Câu 2 (4,0đ): NLVH viết bài 600 chữ với chủ đề kết nối văn bản với thực tiễn
+
+THÔNG TIN CỦA TÔI:
+- Khối/Lớp: [12]
+- Tác giả/Tác phẩm chính: [...]
+- Chủ đề tư tưởng: [vd: lòng yêu nước / tình bạn / tuổi trẻ / ...]
+- Mức độ: [Tham khảo / Chính thức / Học kỳ / Giữa kỳ]
+- Thời gian: [120 phút]
+
+YÊU CẦU LATEX:
+1. Output ONLY mã LaTeX, KHÔNG markdown, KHÔNG giải thích
+2. Giữ nguyên \\documentclass + \\usepackage block
+3. Văn bản đọc hiểu bọc trong \\begin{vbandochieu}...\\end{vbandochieu}
+4. Mỗi câu hỏi dùng \\begin{cauhoi}{X,X điểm}...\\end{cauhoi}
+5. Tiêu đề phần dùng \\section*{\\MakeUppercase{I. ĐỌC HIỂU} (4,0 điểm)}
+6. \\textit{...} cho trích dẫn, \\textbf{...} cho ý chính
+7. Cuối đề: dòng "Thí sinh không được sử dụng tài liệu"`,
+    body: `\\documentclass[12pt,a4paper]{article}
+\\usepackage[utf8]{inputenc}
+\\usepackage[vietnamese]{babel}
+\\usepackage{amsmath}
+\\usepackage{amssymb}
+\\usepackage{geometry}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
+\\usepackage{indentfirst}
+\\usepackage{xcolor}
+\\usepackage{framed}
+\\usepackage{setspace}
+
+\\geometry{top=2.5cm,bottom=2.5cm,left=3cm,right=2cm}
+\\setlength{\\parindent}{1cm}
+\\setlength{\\parskip}{6pt}
+\\onehalfspacing
+
+% Định dạng tiêu đề
+\\titleformat{\\section}
+{\\normalfont\\Large\\bfseries\\centering}
+{}{0pt}{}
+\\titleformat{\\subsection}
+{\\normalfont\\large\\bfseries}{}{0pt}{}
+
+% Khung cho văn bản đọc hiểu
+\\newenvironment{vbandochieu}
+{\\begin{center}\\begin{minipage}{0.92\\textwidth}\\fboxsep=10pt\\colorbox{gray!10}{\\begin{minipage}{\\dimexpr\\textwidth-20pt\\relax}}}
+{\\end{minipage}\\end{minipage}\\end{center}}
+
+% Môi trường câu hỏi
+\\newcounter{cauhoi}
+\\newenvironment{cauhoi}[1]
+{\\stepcounter{cauhoi}\\noindent\\textbf{Câu \\arabic{cauhoi}. #1}\\par}
+{\\medskip}
+
+\\begin{document}
+
+\\begin{center}
+\\textbf{BỘ GIÁO DỤC VÀ ĐÀO TẠO}\\\\
+\\textbf{ĐỀ THI THAM KHẢO}\\\\
+\\vspace{0.2cm}
+\\rule{0.3\\textwidth}{0.5pt}\\\\
+\\Large\\textbf{KỲ THI TỐT NGHIỆP TRUNG HỌC PHỔ THÔNG NĂM 2025}\\\\
+\\large\\textbf{Bài thi: NGỮ VĂN}\\\\
+\\normalsize Thời gian làm bài: 120 phút, không kể thời gian phát đề\\\\
+\\rule{0.3\\textwidth}{0.5pt}
+\\end{center}
+
+\\vspace{0.5cm}
+
+\\textbf{Họ, tên thí sinh:} \\hrulefill\\\\
+\\textbf{Số báo danh:} \\hrulefill
+
+\\vspace{0.5cm}
+
+\\section*{\\MakeUppercase{I. ĐỌC HIỂU} (4,0 điểm)}
+
+\\begin{vbandochieu}
+\\textbf{Đọc văn bản sau:}
+
+\\emph{(Tóm tắt bối cảnh cần thiết cho việc đọc hiểu - nếu có)} \\\\
+
+\\textbf{NHỮNG VÙNG TRỜI KHÁC NHAU}
+
+(Nguyễn Minh Châu)
+
+Một đêm, Lê và Sơn đứng bên nhau rất lâu trên cái gò đất xung quanh ì àm tiếng sấm và tiếng nước lũ đỏ về. Trước mặt hai người chỉ huy, những pháo thủ của đại đội pháo cũ gặp nhau trên mảnh đất miền Tây Quảng Bình đang từ biệt nhau. Đại đội pháo của họ như một gốc cây đã lớn, nhựa cây ứ đầy tỏa ra thành hai nhánh.
+
+Đại đội của Lê đã dàn xe pháo sẵn sàng trên mặt đê theo đội hình hành quân. Lê ngừng lên ngắm một lần cuối vùng trời quê hương mình, nói với Sơn:
+
+-- Mấy hôm nay ngày nào chúng cũng cho máy bay trinh sát...
+
+-- Cậu cứ yên tâm. Chúng mình sẽ bảo vệ cái đập nước và vùng trời quê hương của cậu bằng mọi giá...
+
+-- Tớ rất tin... Tớ rất tin cậu!
+
+Sau ba năm sống với nhau từ ngày hai người còn ngồi trên hai chiếc ghế sắt của một khẩu 37 cũ kỹ, lần này Lê và Sơn mỗi người nhận một nhiệm vụ. Họ chia nhau tấm giát nằm, vài tấm áo sặc mùi thuốc đạn và chia nhau bầu trời Tổ quốc trên đầu. Tận trong những ý nghĩ sâu kín nhất của Lê, anh đã coi Sơn như một đồng chí thân thiết nhất trong đời lính -- "Đi nhá!". Họ bắt tay nhau, từ biệt nhau chỉ có hai tiếng ấy.
+
+(Trích \\textit{Những vùng trời khác nhau}, Nguyễn Minh Châu)
+\\end{vbandochieu}
+
+\\vspace{0.3cm}
+
+\\begin{cauhoi}{0,75 điểm}
+Xác định ngôi kể được sử dụng trong văn bản.
+\\end{cauhoi}
+
+\\begin{cauhoi}{0,75 điểm}
+Trong văn bản, quê hương của Lê và quê hương của Sơn gắn với hai dòng sông nào?
+\\end{cauhoi}
+
+\\begin{cauhoi}{1,0 điểm}
+Phân tích tác dụng của biện pháp tu từ so sánh trong câu văn sau: \\textit{"Đại đội pháo của họ như một gốc cây đã lớn, nhựa cây ấy đã tạo ra thành hai nhánh."}
+\\end{cauhoi}
+
+\\begin{cauhoi}{0,75 điểm}
+Nêu vai trò của chi tiết: \\textit{"Họ chia nhau tấm giát nằm, vài tấm áo sặc mùi thuốc đạn và chia nhau bầu trời Tổ quốc trên đầu"} trong việc thể hiện nội dung văn bản.
+\\end{cauhoi}
+
+\\begin{cauhoi}{0,75 điểm}
+Hai ngữ liệu sau đây có sự tương đồng nào về ý nghĩa?
+
+- \\textit{"Họ đi qua cầu Bùng, cầu Hổ, Hàm Rồng và Nam Định, Phủ Lý, để lại phía sau rất xa những đèo Ngang, Quán Hàu, Bãi Hà... Những vùng trời họ đã để lại một nửa tâm hồn ở đây."} (Nguyễn Minh Châu, \\textit{Những vùng trời khác nhau})
+
+- \\textit{"Khi ta ở, chỉ là nơi đất ở / Khi ta đi, đất đã hóa tâm hồn!"} (Chế Lan Viên, \\textit{Tiếng hát con tàu})
+\\end{cauhoi}
+
+\\vspace{0.5cm}
+
+\\section*{\\MakeUppercase{II. VIẾT} (6,0 điểm)}
+
+\\begin{cauhoi}{2,0 điểm}
+Anh/Chị hãy viết đoạn văn nghị luận (khoảng 200 chữ) phân tích tình cảm của Lê dành cho Sơn trong văn bản ở phần Đọc hiểu.
+\\end{cauhoi}
+
+\\begin{cauhoi}{4,0 điểm}
+Từ kết quả đọc hiểu văn bản \\textit{Những vùng trời khác nhau} và những hiểu biết về bối cảnh đất nước đang có nhiều thay đổi lớn lao, anh/chị hãy viết bài văn nghị luận (khoảng 600 chữ) với chủ đề: \\textbf{vùng trời quê hương nào cũng là bầu trời Tổ quốc}.
+\\end{cauhoi}
+
+\\vspace{1cm}
+
+\\begin{center}
+\\rule{0.5\\textwidth}{0.5pt}\\\\
+\\textit{--- Thí sinh không được sử dụng tài liệu ---}\\\\
+\\textit{--- Giám thị không giải thích gì thêm ---}
+\\end{center}
+
+\\end{document}
+`,
+  },
+);
+
 export function getTemplateById(id: string): LatexTemplateOption | undefined {
   return LATEX_TEMPLATES.find((t) => t.id === id);
 }
