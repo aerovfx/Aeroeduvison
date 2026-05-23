@@ -1897,21 +1897,40 @@ if (USE_NODEJS_QUESTIONS) {
         const tagsJson = JSON.stringify(tags);
         try {
           // Try modern schema first (snake_case + JSONB + teacher_id + visibility)
+          // NOTE: cast $::text rõ ràng và KHÔNG reuse $N giữa nhiều cột để
+          // tránh "inconsistent types deduced for parameter" (PG strict).
+          const correctAns = q.correctAnswer || q.answer || '';
           await pool.query(
             `INSERT INTO "Question"
                (id, teacher_id, "createdBy", topic, subject, grade, "questionType", type,
                 difficulty, content, options, "correctAnswer", answer, explanation,
                 "learningObjectives", tags, "aiGenerated", "humanReviewed", status,
                 visibility, "createdAt", "updatedAt", "usageCount")
-             VALUES ($1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$11,$12,$13::jsonb,$14::jsonb,
-                     false,false,$15,'private',$16,$16,0)
+             VALUES ($1::text,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,$8::text,
+                     $9::text,$10::text,$11::jsonb,$12::text,$13::text,$14::text,
+                     $15::jsonb,$16::jsonb,false,false,$17::text,'private',$18,$19,0)
              ON CONFLICT (id) DO NOTHING`,
-            [id, userId, q.topic || q.subject || 'Chung', q.subject || 'Vật lý',
-             q.grade || 'Khối 12', q.questionType || 'MCQ', q.questionType || 'multiple_choice',
-             q.difficulty || 'MEDIUM', q.content, optionsJson,
-             q.correctAnswer || q.answer || '', q.explanation || '',
-             JSON.stringify(q.learningObjectives || []), tagsJson,
-             q.status || 'Hoạt động', now]
+            [
+              id,                                              // $1  id
+              userId,                                          // $2  teacher_id
+              userId,                                          // $3  createdBy
+              q.topic || q.subject || 'Chung',                 // $4  topic
+              q.subject || 'Vật lý',                           // $5  subject
+              q.grade || 'Khối 12',                            // $6  grade
+              q.questionType || 'MCQ',                         // $7  questionType (camelCase)
+              q.questionType || 'multiple_choice',             // $8  type (snake)
+              q.difficulty || 'MEDIUM',                        // $9
+              q.content,                                       // $10
+              optionsJson,                                     // $11 jsonb
+              correctAns,                                      // $12 correctAnswer
+              correctAns,                                      // $13 answer
+              q.explanation || '',                             // $14
+              JSON.stringify(q.learningObjectives || []),      // $15 jsonb
+              tagsJson,                                        // $16 jsonb
+              q.status || 'Hoạt động',                         // $17 status
+              now,                                             // $18 createdAt
+              now,                                             // $19 updatedAt
+            ]
           );
           inserted++;
         } catch (e) {
