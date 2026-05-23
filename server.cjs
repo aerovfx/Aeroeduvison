@@ -5653,7 +5653,28 @@ const EMPTY_LIST = { items: [], total: 0, hasMore: false };
 const OK = { ok: true };
 
 // Teacher
-app.get('/api/teacher/analytics', (_req, res) => res.json({ stats: {}, charts: [], period: 'month' }));
+// /api/teacher/analytics — shape khớp AnalyticsData interface ở frontend
+// (có totalStudents, topPerformingStudents[], strugglingStudents[], v.v.)
+app.get('/api/teacher/analytics', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let teacherId = null;
+  if (auth.startsWith('Bearer ')) { try { teacherId = _akVerify(auth.slice(7)).sub; } catch {} }
+  const period = (req.query.period === 'week' || req.query.period === 'semester') ? req.query.period : 'month';
+  let totalStudents = 0;
+  if (teacherId) {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`SELECT COUNT(DISTINCT cs.id)::int AS n FROM "ClassStudent" cs JOIN "Class" c ON c.id = cs.class_id WHERE c.teacher_id = $1`, [teacherId]);
+      totalStudents = rows[0]?.n || 0;
+    } catch {}
+  }
+  return res.json({
+    period,
+    meta: { fromClassStudent: totalStudents, fromTeacherStudentLink: 0, uniqueStudents: totalStudents, gradedSheets: 0 },
+    totalStudents, averageScore: 0, completionRate: 0, engagementScore: 0,
+    topPerformingStudents: [], strugglingStudents: [], subjectPerformance: [], weeklyProgress: [],
+  });
+});
 app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
 app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
