@@ -777,7 +777,7 @@ function makeProxy(target, label, pathFilter) {
   // ── POST /api/teacher/quiz-extract ─────────────────────────
   // Bắt đầu pipeline Wayground: PDF → fal.ai → JSON câu hỏi.
   // KHÔNG yêu cầu DATABASE_URL — extractor stateless để dev nhanh.
-  app.post('/api/teacher/quiz-extract', async (req, res) => {
+  app.post('/api/teacher/quiz-extract', require('./lib/gating.cjs').requireFeature('quiz_extract'), async (req, res) => {
     const t0 = Date.now();
     try {
       // Auth optional ở dev: cho phép gọi không cần token nếu ALLOW_QUIZ_ANON=1.
@@ -3298,7 +3298,8 @@ if (USE_NODEJS_QUESTIONS) {
     return collapsed.slice(-10); // keep last ~10 turns
   }
 
-  app.post('/api/ai-tutor/chat', async (req, res) => {
+  const _aiGating = require('./lib/gating.cjs');
+  app.post('/api/ai-tutor/chat', _aiGating.requireFeature('ai_tutor'), async (req, res) => {
     const startedAt = Date.now();
     try {
       const body = req.body || {};
@@ -4014,7 +4015,7 @@ if (USE_NODEJS_QUESTIONS) {
   // POST /api/agents/exam-prep  { action: 'create' | 'create_from_exam'
   //   | 'create_from_matrix' | 'submit' }
   // ══════════════════════════════════════════════════════════════
-  app.post('/api/agents/exam-prep', async (req, res) => {
+  app.post('/api/agents/exam-prep', require('./lib/gating.cjs').requireFeature('ai_examprep'), async (req, res) => {
     try {
       const user = getUserFromReqEP(req);
       if (!user || !user.id) return res.status(401).json({ success: false, error: 'unauthorized' });
@@ -8604,8 +8605,8 @@ app.delete('/api/exams/:id', async (req, res) => {
   } catch (e) { console.error('[exams:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
 });
 
-// /api/exams/generate-from-matrix — stub: tạo exam rỗng
-app.post('/api/exams/generate-from-matrix', async (req, res) => {
+// /api/exams/generate-from-matrix — tạo exam từ ma trận (AI quiz_generate)
+app.post('/api/exams/generate-from-matrix', require('./lib/gating.cjs').requireFeature('quiz_generate'), async (req, res) => {
   const decoded = _examAuth(req, res); if (!decoded) return;
   try {
     const { matrixId, title = 'Đề từ ma trận' } = req.body || {};
