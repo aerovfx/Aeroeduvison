@@ -474,7 +474,7 @@ export function AppRouter() {
               <Route path="/student/ai-tutor"                 element={<StudentAiTutorPage />} />
               <Route path="/student/career"                   element={<StudentCareerPage />} />
               <Route path="/student/exam-prep"                element={<StudentExamPrepPage />} />
-              <Route path="/student/exam/:id"                 element={<PageFallback />} />
+              <Route path="/student/exam/:examId"             element={<ExamModesPage />} />
               <Route path="/student/exams"                    element={<StudentExamsPage />} />
               <Route path="/student/for-you"                  element={<ForYouPage />} />
               <Route path="/student/daily"                    element={<StudentDailyPage />} />
