@@ -8091,15 +8091,238 @@ app.post('/api/notifications/mark-all-read', (_req, res) => res.json({ ok: true 
 // Recommendation feed (reco-service)
 // Sprint AI feed — real DB query cho teacher (RsFeedItem shape):
 // Items dựa trên dữ liệu thực của GV trong bảng "Exam", "LessonPlan", "Class"
+// ── Phoenix-style multi-source retrieval — STUDENT For-You feed ──
+// Lấy candidates từ 5 sources, mỗi source contribute independently:
+//   1. enrolled-lessons  — Course HS đã enrol (Purchase table)
+//   2. exam-pending      — Exam được assigned, chưa làm
+//   3. weak-topics-kg    — KgNode mastery thấp (UserKgMastery)
+//   4. teacher-recs      — LearningPath + AssignmentTarget cho HS
+//   5. ai-suggested      — Phù hợp UserProfile.reco_prefs (subject/grade)
+// → trả về để Mixer scoring (Phase 2) rank theo weighted formula.
+async function _studentFeedPhoenix(studentId, prefs, limit) {
+  const pool = _getPool();
+  const myIds = [studentId];
+  const all = [];
+
+  // SOURCE 1: enrolled lessons (Course đã mua)
+  try {
+    const { rows } = await pool.query(`
+      SELECT c.id, c.title, c.description, c.image, c."imageUrl", cat.name AS category
+      FROM "Purchase" p
+      JOIN "Course" c ON c.id = p."courseId"
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      WHERE p."userId" = ANY($1::text[])
+      ORDER BY p."createdAt" DESC LIMIT 20
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const c of rows) {
+      all.push({
+        type: 'lesson', source: 'enrolled-lessons',
+        id: `course-${c.id}`,
+        title: c.title,
+        subtitle: c.category || 'Khóa học',
+        description: (c.description || '').slice(0, 200),
+        image: c.image || c.imageUrl,
+        link: `/courses/${c.id}`,
+        cta: 'Tiếp tục học',
+        signals: { _source_weight: 1.0 },  // weighted bằng Mixer
+        reasons: ['📚 Đang học'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 2: exam pending (assignments + exam matrix chưa làm)
+  try {
+    const { rows } = await pool.query(`
+      SELECT a.id, a.title, a.description, a.subject, a.difficulty, a.due_date, a.qr_token
+      FROM "AssignmentTarget" at
+      JOIN assignments a ON a.id = at.assignment_id
+      WHERE at.type = 'student' AND at.target_id = ANY($1::text[])
+        AND a.status IN ('pending', 'published')
+        AND (a.due_date IS NULL OR a.due_date > NOW())
+      ORDER BY a.due_date ASC NULLS LAST LIMIT 15
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const a of rows) {
+      const hoursToDue = a.due_date ? (new Date(a.due_date).getTime() - Date.now()) / 3600000 : null;
+      const urgent = hoursToDue !== null && hoursToDue < 24;
+      all.push({
+        type: 'exam', source: 'exam-pending',
+        id: `asgn-${a.id}`,
+        title: `${urgent ? '⚠ Hạn gấp: ' : ''}${a.title}`,
+        subtitle: `${a.subject || 'Bài tập'} · ${a.difficulty || 'TB'}`,
+        description: (a.description || '').slice(0, 200),
+        link: a.qr_token ? `/a/${a.qr_token}` : `/student/assignments/${a.id}`,
+        cta: 'Làm bài',
+        signals: { _source_weight: urgent ? 1.5 : 1.2, due_date: a.due_date },
+        reasons: urgent ? ['⏰ Hạn gấp < 24h', '📝 Bài tập GV giao'] : ['📝 Bài tập GV giao'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 3: weak topics từ KG (lazy table — nếu chưa có thì skip)
+  try {
+    const { rows } = await pool.query(`
+      SELECT n.id, n.name AS title, n.subject, m.mastery_score
+      FROM "UserKgMastery" m
+      JOIN "KgNode" n ON n.id = m.node_id
+      WHERE m.user_id = ANY($1::text[]) AND m.mastery_score < 0.5
+      ORDER BY m.mastery_score ASC LIMIT 10
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const t of rows) {
+      const gap = Math.round((1 - (t.mastery_score || 0)) * 100);
+      all.push({
+        type: 'topic', source: 'weak-topics-kg',
+        id: `kg-${t.id}`,
+        title: t.title,
+        subtitle: `${t.subject || 'Kiến thức'} · Cần cải thiện`,
+        description: `Mức thành thạo hiện tại ${Math.round((t.mastery_score || 0) * 100)}%. Ôn lại sẽ giúp bạn vững hơn.`,
+        link: `/student/knowledge-graph?focus=${t.id}`,
+        cta: 'Ôn lại',
+        signals: { _source_weight: 1.3, mastery_score: t.mastery_score, gap_pct: gap },
+        reasons: [`📉 Yếu ${gap}%`, '🎯 KG khuyến nghị'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 4: teacher's recommendations (Learning Path đã gán)
+  try {
+    const { rows } = await pool.query(`
+      SELECT lp.id, lp.name AS title, lp.description, lp.subject, lp.difficulty,
+             jsonb_array_length(lp.modules) AS module_count, lpa.created_at AS "assignedAt"
+      FROM "LearningPathAssignment" lpa
+      JOIN "LearningPath" lp ON lp.id = lpa.path_id
+      WHERE lpa.student_id = ANY($1::text[])
+      ORDER BY lpa.created_at DESC LIMIT 10
+    `, [myIds]).catch(() => ({ rows: [] }));
+    for (const p of rows) {
+      all.push({
+        type: 'path', source: 'teacher-recs',
+        id: `path-${p.id}`,
+        title: p.title,
+        subtitle: `${p.subject || 'Lộ trình'} · ${p.module_count || 0} module · ${p.difficulty || 'TB'}`,
+        description: (p.description || '').slice(0, 200),
+        link: `/student/learning-paths/${p.id}`,
+        cta: 'Bắt đầu',
+        signals: { _source_weight: 1.4, assignedAt: p.assignedAt },
+        reasons: ['👨‍🏫 GV gợi ý', '📚 Lộ trình cá nhân'],
+      });
+    }
+  } catch { /* silent */ }
+
+  // SOURCE 5: AI-suggested (theo reco_prefs: subject + grade)
+  try {
+    const subject = prefs?.subject;
+    const grade = prefs?.grade;
+    if (subject || grade) {
+      const params = [];
+      let where = '1=1';
+      if (subject) { params.push(subject); where += ` AND q.subject = $${params.length}`; }
+      if (grade)   { params.push(grade);   where += ` AND q.grade   = $${params.length}`; }
+      const { rows } = await pool.query(`
+        SELECT DISTINCT ON (e.id) e.id, e.title, e.subject, e.grade, e.duration
+        FROM "Exam" e
+        JOIN "Question" q ON q.id = ANY(e.question_ids)
+        WHERE ${where} AND (e.visibility = 'public' OR e.status = 'published')
+        ORDER BY e.id DESC, e.created_at DESC LIMIT 8
+      `, params).catch(() => ({ rows: [] }));
+      for (const e of rows) {
+        all.push({
+          type: 'ai-exam', source: 'ai-suggested',
+          id: `aiexam-${e.id}`,
+          title: e.title,
+          subtitle: `${e.subject || ''} ${e.grade ? '· Khối ' + e.grade : ''} ${e.duration ? '· ' + e.duration + 'p' : ''}`.trim(),
+          description: 'Đề phù hợp môn/khối bạn quan tâm.',
+          link: `/student/exam-prep?examId=${e.id}`,
+          cta: 'Luyện',
+          signals: { _source_weight: 0.9 },  // priority thấp hơn — chỉ enrich
+          reasons: ['🤖 AI gợi ý', `🎯 ${subject || grade}`],
+        });
+      }
+    }
+  } catch { /* silent */ }
+
+  return all.slice(0, limit * 2);  // trả 2x limit để Mixer rank
+}
+
+// ── Mixer scoring — weighted formula áp dụng X Phoenix pattern ──
+// weighted_score =
+//   0.30 * mastery_gap   (cần học nhất — KG yếu)
+//   0.25 * teacher_pref  (GV đã gợi ý cho HS này)
+//   0.20 * engagement    (tương tác trước đây tốt)
+//   0.15 * freshness     (mới gán / mới publish)
+//   0.10 * social        (HS cùng lớp đã làm)
+function _mixerScore(item) {
+  const s = item.signals || {};
+  // 1. Mastery gap: weak topics càng yếu càng score cao
+  const masteryGap = s.gap_pct ? Math.min(1, s.gap_pct / 100) : 0;
+  // 2. Teacher preference: source teacher-recs, exam-pending
+  const teacherPref = ['teacher-recs', 'exam-pending'].includes(item.source) ? 1 : 0;
+  // 3. Engagement: dùng _source_weight làm proxy
+  const engagement = Math.min(1, (s._source_weight || 1) / 1.5);
+  // 4. Freshness: mới gán < 7 ngày = 1, > 30 ngày = 0
+  let freshness = 0.5;
+  const ts = s.due_date || s.assignedAt;
+  if (ts) {
+    const days = (Date.now() - new Date(ts).getTime()) / 86400000;
+    freshness = days < 0 ? 1 : Math.max(0, 1 - days / 30);
+  }
+  // 5. Social: chưa wire — default 0.3 (skip)
+  const social = 0.3;
+  return Math.round((
+    0.30 * masteryGap +
+    0.25 * teacherPref +
+    0.20 * engagement +
+    0.15 * freshness +
+    0.10 * social
+  ) * 1000) / 1000;
+}
+
 app.get('/api/reco/feed', async (req, res) => {
   const audience = req.query.audience || 'student';
   const limit = Math.min(Number(req.query.limit) || 30, 100);
   const auth = req.headers.authorization || '';
-  let teacherId = null;
+  let userId = null;
   if (auth.startsWith('Bearer ')) {
-    try { teacherId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
+    try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous */ }
   }
-  // Student audience — chưa có signals, trả empty
+
+  // STUDENT audience — Phoenix 5 sources + Mixer scoring
+  if (audience === 'student') {
+    if (!userId) {
+      return res.json({ audience: 'student', count: 0, items: [], sources: [], isColdStart: true });
+    }
+    try {
+      const pool = _getPool();
+      // Load user prefs
+      const { rows: prefRows } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      const prefs = prefRows[0]?.reco_prefs || null;
+
+      const candidates = await _studentFeedPhoenix(userId, prefs, limit);
+      // Mixer scoring
+      const scored = candidates.map(c => ({ ...c, score: _mixerScore(c) }));
+      // Sort by score DESC, dedupe by id
+      const seen = new Set();
+      const ranked = scored
+        .sort((a, b) => b.score - a.score)
+        .filter(c => seen.has(c.id) ? false : (seen.add(c.id), true))
+        .slice(0, limit);
+      const sources = [...new Set(scored.map(c => c.source))];
+      return res.json({
+        audience: 'student',
+        count: ranked.length,
+        items: ranked,
+        sources,
+        isColdStart: ranked.length === 0 || !prefs,
+      });
+    } catch (e) {
+      console.error('[reco/feed:student]', e.message);
+      return res.json({ audience: 'student', count: 0, items: [], sources: [], isColdStart: true });
+    }
+  }
+
+  // TEACHER audience (giữ logic cũ)
+  let teacherId = userId;
   if (audience !== 'teacher' || !teacherId) {
     return res.json({ audience, count: 0, items: [], sources: [], isColdStart: true });
   }
