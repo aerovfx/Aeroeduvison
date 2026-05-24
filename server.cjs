@@ -2253,6 +2253,11 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ── Stub student-cams (camera webcam HS làm bài) — TRƯỚC proxy ──
+// Endpoint thực sẽ join với ExamSubmission + WebcamSession table.
+// Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.
+app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], count: 0 }));
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
@@ -8443,6 +8448,13 @@ app.get('/api/exam-xp/me', (_req, res) => res.json({
     } catch (e) { console.error('[answer-keys:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
   });
 })();
+
+// ── Stubs cho IoT/Camera (chưa có service thực) — tránh 503 spam ──
+app.get('/api/iot/classroom/:id', (_req, res) => res.status(404).json({ error: 'IoT service offline — dùng mock data' }));
+app.get('/api/camera/recording', (_req, res) => res.json({ recordings: [], total: 0 }));
+app.post('/api/camera/recording', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
+app.post('/api/camera/recording/:id/stop', (_req, res) => res.status(501).json({ success: false, error: 'Recording service chưa khả dụng' }));
+app.get('/api/camera/file/:filename', (_req, res) => res.status(404).json({ error: 'File không tồn tại — demo MP4 chưa upload GCS' }));
 
 // ── /api/* → Rust aero-backend gateway ─────────────────────
 app.use(makeProxy(BACKEND_URL, 'aero-backend', '/api'));

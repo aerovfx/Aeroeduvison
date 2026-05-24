@@ -4,6 +4,7 @@ import {
   Activity, RefreshCw, AlertCircle, CheckCircle,
   Cpu, Zap, Gauge, MapPin, Info, Users, Video
 } from 'lucide-react'
+import { api } from '@/services/api'
 
 // ── Dark palette ──
 const D = {
@@ -151,12 +152,12 @@ export default function EnvironmentMonitoring() {
 
   async function fetchClasses() {
     try {
-      const res = await fetch('/api/classes')
-      if (res.ok) {
-        const data = await res.json()
-        const cls = data.classes || []
+      // Dùng axios api (auto-inject Bearer token), không phải bare fetch()
+      const res = await api.get<{ classes: Array<{ id: string; name: string }> }>('/classes')
+      const cls = res.data?.classes || []
+      if (cls.length > 0) {
         setClasses(cls)
-        if (cls.length > 0) setSelectedClass(cls[0].id)
+        setSelectedClass(cls[0].id)
       } else { useMockClasses() }
     } catch { useMockClasses() }
   }
@@ -169,9 +170,10 @@ export default function EnvironmentMonitoring() {
   async function fetchEnvData() {
     try {
       setLoading(true)
-      const res = await fetch(`/api/iot/classroom/${selectedClass}`)
-      if (res.ok) setEnvData(await res.json())
-      else         setEnvData(mockEnvData(selectedClass))
+      // IoT endpoint hiện chưa có handler thực — fallback mock data im lặng
+      const res = await api.get<ClassroomEnvironment>(`/iot/classroom/${selectedClass}`).catch(() => null)
+      if (res?.data) setEnvData(res.data)
+      else           setEnvData(mockEnvData(selectedClass))
     } catch { setEnvData(mockEnvData(selectedClass)) }
     finally { setLoading(false) }
   }

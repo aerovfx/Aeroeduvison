@@ -510,14 +510,11 @@ export default function CameraManagement() {
   async function fetchData() {
     try {
       setLoading(true)
-      // Class map để lookup className theo classId
-      const classRes = await fetch('/api/classes')
+      // Class map để lookup className theo classId — dùng axios api (Bearer token)
+      const classRes = await api.get<{ classes: any[] }>('/classes').catch(() => null)
       const classMap: Record<string, string> = {}
-      if (classRes.ok) {
-        const cd = await classRes.json()
-        const cls = cd.classes || []
-        cls.forEach((c: any) => { classMap[c.id] = c.name })
-      }
+      const cls = classRes?.data?.classes || []
+      cls.forEach((c: any) => { classMap[c.id] = c.name })
       // Demo camera (AI analysis sample) — luôn có cho test
       const demoCamera: CameraItem = {
         id: 'cam_demo', name: 'AI Demo Analysis',
@@ -620,39 +617,38 @@ export default function CameraManagement() {
 
   async function loadRecordings() {
     try {
-      const res = await fetch('/api/camera/recording?limit=100')
-      if (res.ok) {
-        const data = await res.json()
+      // Endpoint recording chưa có handler thực — silent fail, dùng empty array
+      const r = await api.get<{ recordings: Recording[] }>('/camera/recording?limit=100').catch(() => null)
+      const data = r?.data
+      if (data) {
         setRecordings(data.recordings || [])
         const active: Record<string, boolean> = {}
-        data.recordings?.forEach((r: Recording) => { if (r.status === 'recording') active[r.cameraId] = true })
+        data.recordings?.forEach((rec: Recording) => { if (rec.status === 'recording') active[rec.cameraId] = true })
         setActiveRecordings(active)
       }
-    } catch (e) { console.error('Error loading recordings:', e) }
+    } catch (e) { /* silent */ }
   }
 
   async function handleStartRecording(camera: CameraItem) {
     try {
       setRecordingLoading(true)
-      const res = await fetch('/api/camera/recording', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cameraId: camera.id, cameraName: camera.name, rtspUrl: camera.rtspUrl, classId: camera.classId }),
+      const r = await api.post<{ success: boolean; error?: string }>('/camera/recording', {
+        cameraId: camera.id, cameraName: camera.name,
+        rtspUrl: camera.rtspUrl, classId: camera.classId,
       })
-      const result = await res.json()
-      if (result.success) { setActiveRecordings(prev => ({ ...prev, [camera.id]: true })); loadRecordings() }
-      else alert('Không thể bắt đầu ghi hình: ' + (result.error || 'Lỗi không xác định'))
-    } catch (e: any) { alert('Lỗi: ' + (e.message || 'Không thể bắt đầu ghi hình')) }
+      if (r.data?.success) { setActiveRecordings(prev => ({ ...prev, [camera.id]: true })); loadRecordings() }
+      else alert('Không thể bắt đầu ghi hình: ' + (r.data?.error || 'Lỗi không xác định'))
+    } catch (e: any) { alert('Lỗi: ' + (e?.response?.data?.error || e.message || 'Không thể bắt đầu ghi hình')) }
     finally { setRecordingLoading(false) }
   }
 
   async function handleStopRecording(cameraId: string, recordingId: string) {
     try {
       setRecordingLoading(true)
-      const res    = await fetch(`/api/camera/recording/${recordingId}/stop`, { method: 'POST' })
-      const result = await res.json()
-      if (result.success) { setActiveRecordings(prev => ({ ...prev, [cameraId]: false })); loadRecordings() }
-      else alert('Không thể dừng ghi hình: ' + (result.error || 'Lỗi không xác định'))
-    } catch (e: any) { alert('Lỗi: ' + (e.message || 'Không thể dừng ghi hình')) }
+      const r = await api.post<{ success: boolean; error?: string }>(`/camera/recording/${recordingId}/stop`, {})
+      if (r.data?.success) { setActiveRecordings(prev => ({ ...prev, [cameraId]: false })); loadRecordings() }
+      else alert('Không thể dừng ghi hình: ' + (r.data?.error || 'Lỗi không xác định'))
+    } catch (e: any) { alert('Lỗi: ' + (e?.response?.data?.error || e.message || 'Không thể dừng ghi hình')) }
     finally { setRecordingLoading(false) }
   }
 
