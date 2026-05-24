@@ -9061,6 +9061,124 @@ app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics:
 app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
 app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
 
+// ── Admin Operations — probe services + resources ──
+app.get('/api/admin/operations/services-health', async (_req, res) => {
+  const now = new Date().toISOString();
+  const services = [];
+
+  // 1. Postgres (Neon)
+  const dbStart = Date.now();
+  try {
+    await _getPool().query('SELECT 1');
+    services.push({ name: 'PostgreSQL (Neon)', icon: 'database', status: 'up', latencyMs: Date.now() - dbStart, lastCheck: now });
+  } catch (e) {
+    services.push({ name: 'PostgreSQL (Neon)', icon: 'database', status: 'down', error: e.message, lastCheck: now });
+  }
+
+  // 2. GCS bucket — chỉ check env có set không
+  services.push({
+    name: 'GCS Bucket (media)', icon: 'cloud',
+    status: process.env.GCS_BUCKET_MEDIA || process.env.GOOGLE_CLOUD_PROJECT_ID ? 'up' : 'degraded',
+    note: process.env.GCS_BUCKET_MEDIA || 'aeroedu-media-extreme-lattice-491123-p2',
+    lastCheck: now,
+  });
+
+  // 3. AI Provider — Anthropic Claude
+  services.push({
+    name: 'Anthropic Claude', icon: 'sparkles',
+    status: process.env.ANTHROPIC_API_KEY ? 'up' : 'down',
+    note: process.env.ANTHROPIC_MODEL || 'claude-opus-4-6',
+    lastCheck: now,
+  });
+
+  // 4. AI Provider — DeepSeek (mới)
+  const dsActive = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase() === 'deepseek';
+  services.push({
+    name: 'DeepSeek', icon: 'zap',
+    status: process.env.DEEPSEEK_API_KEY ? (dsActive ? 'up' : 'degraded') : 'down',
+    note: dsActive ? 'Active provider' : (process.env.DEEPSEEK_API_KEY ? 'Configured (fallback)' : 'No key'),
+    lastCheck: now,
+  });
+
+  // 5. Telegram bot
+  services.push({
+    name: 'Telegram Bot', icon: 'bot',
+    status: process.env.TELEGRAM_BOT_TOKEN ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 6. SMTP
+  services.push({
+    name: 'SMTP Email', icon: 'mail',
+    status: process.env.SMTP_PASS ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 7. fal.ai
+  services.push({
+    name: 'fal.ai', icon: 'sparkles',
+    status: process.env.FAL_API_KEY ? 'up' : 'down',
+    lastCheck: now,
+  });
+
+  // 8. Redis cache (optional)
+  services.push({
+    name: 'Redis Cache', icon: 'server',
+    status: (process.env.REDIS_URL || process.env.REDIS_HOST) ? 'up' : 'degraded',
+    note: (process.env.REDIS_URL || process.env.REDIS_HOST) ? 'Cache active' : 'No cache — DB direct',
+    lastCheck: now,
+  });
+
+  const up = services.filter(s => s.status === 'up').length;
+  const down = services.filter(s => s.status === 'down').length;
+  const degraded = services.filter(s => s.status === 'degraded').length;
+  const uptimeS = process.uptime();
+  const upH = Math.floor(uptimeS / 3600);
+  const upM = Math.floor((uptimeS % 3600) / 60);
+
+  return res.json({
+    services,
+    summary: { up, down, degraded, total: services.length, uptime: `${upH}h ${upM}m` },
+    updatedAt: now,
+  });
+});
+
+app.get('/api/admin/operations/system-resources', (_req, res) => {
+  const os = require('os');
+  const mem = process.memoryUsage();
+  const sysTotal = os.totalmem();
+  const sysFree = os.freemem();
+  return res.json({
+    cpu: {
+      loadavg: os.loadavg(),
+      cores: os.cpus()?.length || 1,
+      percent: Math.min(100, Math.round((os.loadavg()[0] / (os.cpus()?.length || 1)) * 100)),
+    },
+    memory: {
+      rss: mem.rss, heapUsed: mem.heapUsed, heapTotal: mem.heapTotal, external: mem.external,
+      sysTotal, sysFree, sysUsedPercent: Math.round(((sysTotal - sysFree) / sysTotal) * 100),
+      heapPercent: Math.round((mem.heapUsed / mem.heapTotal) * 100),
+    },
+    process: {
+      uptime: process.uptime(), pid: process.pid, nodeVersion: process.version,
+      platform: process.platform, arch: process.arch, hostname: os.hostname(),
+    },
+    updatedAt: new Date().toISOString(),
+  });
+});
+
+app.get('/api/admin/operations/security-events', (_req, res) => res.json({
+  events: [],
+  summary: { totalLast24h: 0, totalAll: 0, byType: {}, bySeverity: {} },
+}));
+
+app.get('/api/admin/operations/crawler-attempts', (_req, res) => res.json({
+  events: [],
+  summary: { total: 0, last24h: 0, uniqueIps: 0, honeypotHits: 0, blockedByUa: 0 },
+  topUserAgents: [],
+  updatedAt: new Date().toISOString(),
+}));
+
 // ── Admin Analytics — query PageView table (real data where possible) ──
 app.get('/api/admin/analytics/overview', async (_req, res) => {
   try {
