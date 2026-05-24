@@ -103,6 +103,11 @@ const PixelOdyssey       = lazy(() => import('@/pages/labs/PixelOdyssey'))
 const GamesIndexPage     = lazy(() => import('@/pages/games/GamesIndex'))
 const BuffaloRunnerPage  = lazy(() => import('@/pages/games/BuffaloRunnerPage'))
 const ArduinoEmulator    = lazy(() => import('@/pages/labs/ArduinoEmulator'))
+// IoT sub-pages — deep-link cho assignment "lắp ráp / nghiên cứu mạch"
+const CircuitBuilder     = lazy(() => import('@/pages/labs/CircuitBuilder'))
+const CircuitPresets     = lazy(() => import('@/pages/labs/CircuitPresets'))
+const CustomWokwiBoard   = lazy(() => import('@/pages/labs/CustomWokwiBoard'))
+const SemiconductorLab   = lazy(() => import('@/pages/labs/SemiconductorLab'))
 const PhysicsMotion      = lazy(() => import('@/pages/labs/PhysicsMotion'))
 const FluidDynamicsLab   = lazy(() => import('@/pages/labs/FluidDynamics'))
 const LabNextJsFallback  = lazy(() => import('@/pages/labs/NextJsFallback'))
@@ -342,8 +347,15 @@ export function AppRouter() {
             <Route path="/dashboard/competition"           element={<PageFallback />} />
             <Route path="/dashboard/competition/:id"       element={<PageFallback />} />
             <Route path="/dashboard/contacts"              element={<ContactsPage />} />
-            <Route path="/dashboard/iot-lab"               element={<IoTLab />} />
-            <Route path="/dashboard/iot-lab/emulator"      element={<ArduinoEmulator />} />
+            <Route path="/dashboard/iot-lab"                       element={<IoTLab />} />
+            <Route path="/dashboard/iot-lab/emulator"              element={<ArduinoEmulator />} />
+            {/* ── Deep-link routes cho assignment "lắp ráp / nghiên cứu mạch" ── */}
+            <Route path="/dashboard/iot-lab/circuit-builder"       element={<CircuitBuilder />} />
+            <Route path="/dashboard/iot-lab/circuit-presets"       element={<CircuitPresets />} />
+            <Route path="/dashboard/iot-lab/custom-board"          element={<CustomWokwiBoard />} />
+            <Route path="/dashboard/iot-lab/semiconductor"         element={<SemiconductorLab />} />
+            <Route path="/dashboard/iot-lab/circuit-simulator"     element={<CircuitSimulator />} />
+            <Route path="/dashboard/iot-lab/digital-logic"         element={<DigitalLogicLab />} />
             <Route path="/dashboard/graph-lab"             element={<GraphLab />} />
             <Route path="/dashboard/labtwin/labs/graph-lab" element={<GraphLab />} />
             <Route path="/dashboard/learning"              element={<PageFallback />} />
