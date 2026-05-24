@@ -9657,6 +9657,100 @@ app.get('/api/courses/:id', async (req, res) => {
   } catch (e) { console.error('[courses:get]', e.message); return res.status(500).json({ error: e.message }); }
 });
 
+// ── /api/learning/course/:id/* — CoursePlayer endpoints ──
+// Khác /api/courses (REST) — /learning/course là alias dùng cho student player UI
+app.get('/api/learning/course/:id', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(
+      `SELECT id, title, description, "imageUrl" FROM "Course" WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    ).catch(() => ({ rows: [] }));
+    if (!rows.length) return res.status(404).json({ error: 'Course không tồn tại' });
+    const c = rows[0];
+    // Optional: pdfBookUrl + extras từ Course data JSONB nếu có
+    return res.json({
+      id: c.id, title: c.title, description: c.description, imageUrl: c.imageUrl,
+      pdfBookUrl: null,  // TODO wire khi có cột
+      extras: { exams: [], assignments: [], labs: [], aura: [], games: [] },
+    });
+  } catch (e) { console.error('[learning:course:info]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/learning/course/:id/videos', async (req, res) => {
+  try {
+    const pool = _getPool();
+    // Map từ Chapter (có videoUrl) → CourseVideo shape
+    const { rows } = await pool.query(`
+      SELECT id, "courseId", title, description, "videoUrl", position,
+             "isFree" AS "isPreview", "createdAt"
+      FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true
+      ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    const videos = rows.filter(r => r.videoUrl).map(r => ({
+      id: r.id, courseId: r.courseId, title: r.title,
+      description: r.description, videoUrl: r.videoUrl,
+      position: r.position, duration: null, isCompleted: false,
+      isPreview: !!r.isPreview, groupName: null, thumbUrl: null,
+      createdAt: r.createdAt,
+    }));
+    return res.json(videos);
+  } catch (e) { console.error('[learning:videos]', e.message); return res.json([]); }
+});
+
+app.get('/api/learning/course/:id/curriculum', async (req, res) => {
+  try {
+    const pool = _getPool();
+    // Lazy migrate Lesson + LessonBlock tables nếu cần
+    const { rows: chapters } = await pool.query(`
+      SELECT id, title, description, position, "isPublished", "isFree"
+      FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true
+      ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    if (!chapters.length) return res.json({ chapters: [] });
+    // Load lessons + blocks per chapter (graceful nếu table chưa có)
+    const chapterIds = chapters.map(c => c.id);
+    const [lessons, blocks] = await Promise.all([
+      pool.query(`
+        SELECT id, "chapterId", title, description, duration, type, position
+        FROM "Lesson" WHERE "chapterId" = ANY($1::text[]) ORDER BY position ASC
+      `, [chapterIds]).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT id, "lessonId", type, title, content, metadata, position
+        FROM "LessonBlock" WHERE "lessonId" IN (
+          SELECT id FROM "Lesson" WHERE "chapterId" = ANY($1::text[])
+        ) ORDER BY position ASC
+      `, [chapterIds]).catch(() => ({ rows: [] })),
+    ]);
+    const blocksByLesson = {};
+    for (const b of blocks.rows) (blocksByLesson[b.lessonId] = blocksByLesson[b.lessonId] || []).push(b);
+    const lessonsByChapter = {};
+    for (const l of lessons.rows) {
+      (lessonsByChapter[l.chapterId] = lessonsByChapter[l.chapterId] || []).push({
+        ...l, blocks: blocksByLesson[l.id] || [],
+      });
+    }
+    const result = chapters.map(c => ({
+      ...c, duration: null, lessons: lessonsByChapter[c.id] || [],
+    }));
+    return res.json({ chapters: result });
+  } catch (e) { console.error('[learning:curriculum]', e.message); return res.json({ chapters: [] }); }
+});
+
+app.get('/api/learning/course/:id/assets', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT id, "courseId", title, url AS "fileUrl",
+             "fileType", "fileSize", "createdAt"
+      FROM "Attachment" WHERE "courseId" = $1 ORDER BY "createdAt" DESC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    return res.json(rows);
+  } catch (e) { return res.json([]); }
+});
+
+app.get('/api/learning/course/:id/reviews', (_req, res) => res.json([]));
+
 // /api/courses/:id/progress — progress của user hiện tại
 app.get('/api/courses/:id/progress', async (req, res) => {
   const auth = req.headers.authorization || '';
