@@ -8849,6 +8849,108 @@ app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics:
 app.get('/api/admin/users', (_req, res) => res.json({ users: [], total: 0 }));
 app.get('/api/admin/users/stats', (_req, res) => res.json({ total: 0, by_role: {} }));
 app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
+app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
+
+// ── Admin Analytics — query PageView table (real data where possible) ──
+app.get('/api/admin/analytics/overview', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const [t, d, r] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS today,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day')::int AS week,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 day')::int AS month,
+          COUNT(*)::int AS all_time,
+          COUNT(DISTINCT session_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS sessions_today,
+          COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL)::int AS users_today,
+          COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day' AND user_id IS NOT NULL)::int AS users_week,
+          COALESCE(AVG(view_ms), 0)::int AS avg_view_ms
+        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day'`),
+      pool.query(`
+        SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS views
+        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '7 day'
+        GROUP BY 1 ORDER BY 1`),
+      pool.query(`
+        SELECT COALESCE(u.role, 'GUEST') AS role, COUNT(*)::int AS views
+        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.created_at >= NOW() - INTERVAL '7 day' GROUP BY 1`),
+    ]);
+    const row = t.rows[0] || {};
+    return res.json({
+      totals: { today: row.today || 0, week: row.week || 0, month: row.month || 0, all_time: row.all_time || 0 },
+      uniques: { sessions_today: row.sessions_today || 0, users_today: row.users_today || 0, users_week: row.users_week || 0 },
+      avgViewMs: row.avg_view_ms || 0,
+      daily: d.rows,
+      byRole: r.rows,
+    });
+  } catch (e) {
+    console.error('[admin:overview]', e.message);
+    return res.json({ totals: { today: 0, week: 0, month: 0, all_time: 0 }, uniques: { sessions_today: 0, users_today: 0, users_week: 0 }, avgViewMs: 0, daily: [], byRole: [] });
+  }
+});
+
+app.get('/api/admin/analytics/routes', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const days = Math.min(Number(req.query.days) || 7, 90);
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const { rows } = await pool.query(`
+      SELECT path,
+             COUNT(*)::int AS views,
+             COUNT(DISTINCT session_id)::int AS "uniqueSessions",
+             COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS "uniqueUsers",
+             COALESCE(AVG(view_ms), 0)::int AS "avgViewMs",
+             0 AS bounces, 0::float AS "bounceRate",
+             MAX(created_at)::text AS "lastView"
+      FROM "PageView"
+      WHERE created_at >= NOW() - INTERVAL '${days} day'
+      GROUP BY path ORDER BY views DESC LIMIT $1`, [limit]);
+    return res.json({ routes: rows });
+  } catch (e) {
+    console.error('[admin:routes]', e.message);
+    return res.json({ routes: [] });
+  }
+});
+
+app.get('/api/admin/analytics/realtime', async (_req, res) => {
+  try {
+    const pool = _getPool();
+    const [active, recent] = await Promise.all([
+      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active FROM "PageView" WHERE created_at >= NOW() - INTERVAL '5 minute'`),
+      pool.query(`
+        SELECT pv.path, u.role AS "userRole", pv.created_at AS "createdAt"
+        FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        ORDER BY pv.created_at DESC LIMIT 20`),
+    ]);
+    return res.json({ activeNow: active.rows[0]?.active || 0, recent: recent.rows });
+  } catch (e) {
+    console.error('[admin:realtime]', e.message);
+    return res.json({ activeNow: 0, recent: [] });
+  }
+});
+
+app.get('/api/admin/analytics/funnel', (_req, res) => res.json({
+  stages: [
+    { name: 'Trang chủ',       count: 0, drop: null, rate: 100 },
+    { name: 'Đăng ký',         count: 0, drop: 0,    rate: 0 },
+    { name: 'Vào dashboard',   count: 0, drop: 0,    rate: 0 },
+    { name: 'Mua gói',         count: 0, drop: 0,    rate: 0 },
+  ],
+  totalUsers: 0,
+}));
+
+app.get('/api/admin/analytics/source-mix', (_req, res) => res.json({
+  inNetwork:  { totalViews: 0, totalSessions: 0, breakdown: [] },
+  outNetwork: { totalViews: 0, totalSessions: 0, breakdown: [] },
+  ratio: { inNetwork: 0, outNetwork: 0 },
+}));
+
+app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
+  metric: String(req.query.metric || 'engagement'),
+  buckets: [],
+  total: 0,
+}));
 
 // Cameras
 app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
