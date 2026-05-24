@@ -9571,42 +9571,95 @@ app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], tota
 app.get('/api/courses', (_req, res) => res.json({ courses: [], total: 0 }));
 app.get('/api/courses/dashboard', (_req, res) => res.json({ enrolled: [], featured: [], my_progress: {} }));
 app.get('/api/instructor/courses', (_req, res) => res.json({ courses: [], total: 0 }));
-// Real /api/learning/my-courses — danh sách Course HS đã enrol (Purchase table)
+// Real /api/learning/my-courses — Multi-source enrollment list
+// 3 nguồn HS có thể truy cập course:
+//   1. PURCHASED   — Purchase table (HS đã mua)
+//   2. FROM_TEACHER — Course tạo bởi GV mà HS đã connect (TSL approved)
+//                    HS "có truyền cảm hứng" từ GV → cần xem khoá GV làm
+//   3. FREE        — Course publish + price=0 (open access)
+// Dedupe theo courseId, sort theo recency.
 // FE expects Enrollment[] array trực tiếp, không wrap object.
 app.get('/api/learning/my-courses', async (req, res) => {
   const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Bearer ')) return res.json([]);  // FE expects array, không 401
+  if (!auth.startsWith('Bearer ')) return res.json([]);
   let userId = null;
   try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.json([]); }
   if (!userId) return res.json([]);
   try {
     const pool = _getPool();
-    const { rows } = await pool.query(`
-      SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
-             c.price, c."userId" AS "instructorId",
-             cat.name AS "categoryName",
-             p."createdAt" AS "enrolledAt",
-             u.name AS "instructorName", u.image AS "instructorImage"
-      FROM "Purchase" p
-      JOIN "Course" c ON c.id = p."courseId"
-      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
-      LEFT JOIN "User" u ON u.id = c."userId"
-      WHERE p."userId" = $1
-      ORDER BY p."createdAt" DESC LIMIT 100
-    `, [userId]).catch(() => ({ rows: [] }));
-    // Map về shape Enrollment FE expect
-    const enrollments = rows.map(r => ({
-      id: r.courseId,
-      courseId: r.courseId,
-      title: r.title,
-      description: r.description || '',
-      image: r.image || r.imageUrl || null,
-      price: Number(r.price) || 0,
-      category: r.categoryName || null,
-      instructor: r.instructorName ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage } : null,
-      enrolledAt: r.enrolledAt,
-      progress: 0,  // wire khi có LessonHistory aggregate
-    }));
+    const [purchased, fromTeachers, free] = await Promise.all([
+      // SOURCE 1: Purchase enrollment
+      pool.query(`
+        SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               p."createdAt" AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'purchased' AS source
+        FROM "Purchase" p
+        JOIN "Course" c ON c.id = p."courseId"
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE p."userId" = $1
+        ORDER BY p."createdAt" DESC LIMIT 100
+      `, [userId]).catch(() => ({ rows: [] })),
+
+      // SOURCE 2: Courses created by GV mà HS đã connect (TSL approved)
+      pool.query(`
+        SELECT DISTINCT ON (c.id)
+               c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               tsl.created_at AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'from-teacher' AS source
+        FROM "TeacherStudentLink" tsl
+        JOIN "Course" c ON c."userId" = tsl.teacher_id AND c."isPublished" = true
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE tsl.status = 'approved' AND tsl.student_id = $1
+        ORDER BY c.id, tsl.created_at DESC LIMIT 100
+      `, [userId]).catch(() => ({ rows: [] })),
+
+      // SOURCE 3: Free courses (price = 0, published)
+      pool.query(`
+        SELECT c.id AS "courseId", c.title, c.description, c.image, c."imageUrl",
+               c.price, c."userId" AS "instructorId", c."createdAt" AS "courseCreatedAt",
+               cat.name AS "categoryName",
+               c."createdAt" AS "enrolledAt",
+               u.name AS "instructorName", u.image AS "instructorImage",
+               'free' AS source
+        FROM "Course" c
+        LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+        LEFT JOIN "User" u ON u.id = c."userId"
+        WHERE c."isPublished" = true AND (c.price IS NULL OR c.price = 0)
+        ORDER BY c."createdAt" DESC LIMIT 30
+      `).catch(() => ({ rows: [] })),
+    ]);
+
+    // Dedupe theo courseId — ưu tiên purchased > from-teacher > free
+    const byId = new Map();
+    for (const r of [...purchased.rows, ...fromTeachers.rows, ...free.rows]) {
+      if (!byId.has(r.courseId)) byId.set(r.courseId, r);
+    }
+    const all = Array.from(byId.values());
+
+    // Map về shape Enrollment FE expect + sort by enrolledAt DESC
+    const enrollments = all
+      .sort((a, b) => new Date(b.enrolledAt).getTime() - new Date(a.enrolledAt).getTime())
+      .map(r => ({
+        id: r.courseId,
+        courseId: r.courseId,
+        title: r.title,
+        description: r.description || '',
+        image: r.image || r.imageUrl || null,
+        price: Number(r.price) || 0,
+        category: r.categoryName || null,
+        instructor: r.instructorName ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage } : null,
+        enrolledAt: r.enrolledAt,
+        progress: 0,  // TODO: wire LessonHistory aggregate khi có table
+        source: r.source,  // bonus: FE có thể badge "Đã mua" / "Từ GV" / "Miễn phí"
+      }));
     return res.json(enrollments);
   } catch (e) { console.error('[learning:my-courses]', e.message); return res.json([]); }
 });
