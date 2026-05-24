@@ -8183,6 +8183,75 @@ app.get('/api/reco/feed', async (req, res) => {
 });
 app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 
+// ── RS-Phase 10: Onboarding preferences (cold-start) ──
+// Lưu user prefs cho For-You feed personalization: subject/grade/interestedTopics.
+// Persist trong "UserProfile.data" JSONB → user_id PK.
+;(() => {
+  async function _ensureRecoPrefsCol() {
+    const pool = _getPool();
+    try { await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS reco_prefs JSONB`); } catch {}
+  }
+  _ensureRecoPrefsCol().catch(() => {});
+
+  function _recoAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ success: false, error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ success: false, error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // GET /api/reco/onboarding/prefs
+  app.get('/api/reco/onboarding/prefs', async (req, res) => {
+    const decoded = _recoAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1 LIMIT 1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      return res.json({ success: true, prefs: rows[0]?.reco_prefs || null });
+    } catch (e) { console.error('[reco:onboarding:get]', e.message); return res.json({ success: true, prefs: null }); }
+  });
+
+  // PUT /api/reco/onboarding/prefs — partial upsert
+  app.put('/api/reco/onboarding/prefs', async (req, res) => {
+    const decoded = _recoAuth(req, res); if (!decoded) return;
+    try {
+      const userId = decoded.userId || decoded.id || decoded.sub;
+      const patch = req.body || {};
+      const pool = _getPool();
+      // Merge với prefs cũ
+      const { rows: existing } = await pool.query(
+        `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+      ).catch(() => ({ rows: [] }));
+      const current = existing[0]?.reco_prefs || {};
+      const next = {
+        ...current, ...patch,
+        completedAt: patch.skipped ? null : (patch.completedAt || new Date().toISOString()),
+      };
+      await pool.query(`
+        INSERT INTO "UserProfile"(user_id, reco_prefs, updated_at)
+        VALUES ($1, $2::jsonb, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET reco_prefs = EXCLUDED.reco_prefs, updated_at = NOW()
+      `, [userId, JSON.stringify(next)]);
+      return res.json({ success: true, prefs: next });
+    } catch (e) { console.error('[reco:onboarding:put]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/onboarding/subjects — danh sách môn + khối cho UI onboarding
+  app.get('/api/reco/onboarding/subjects', (_req, res) => {
+    res.json({
+      success: true,
+      subjects: [
+        'Toán học', 'Vật lí', 'Hoá học', 'Sinh học',
+        'Ngữ văn', 'Tiếng Anh', 'Lịch sử', 'Địa lí',
+        'Tin học', 'Công nghệ', 'GDCD', 'Mĩ thuật', 'Âm nhạc', 'Thể dục',
+      ],
+      grades: ['6','7','8','9','10','11','12'],
+    });
+  });
+})();
+
 // Teacher service (port 8106)
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
@@ -8821,7 +8890,34 @@ app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [],
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 
 // Student
-app.get('/api/student/my-teachers', (_req, res) => res.json({ teachers: [], total: 0 }));
+// Real /api/student/my-teachers — HS đã kết nối GV qua TSL (status=approved)
+app.get('/api/student/my-teachers', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  try {
+    const pool = _getPool();
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+    const { rows } = await pool.query(`
+      SELECT tsl.id AS "linkId", tsl.created_at AS "linkedAt",
+             u.id, u.name, u.email, u.image, u.role
+      FROM "TeacherStudentLink" tsl
+      LEFT JOIN "User" u ON u.id = tsl.teacher_id
+      WHERE tsl.status = 'approved' AND tsl.student_id = ANY($1::text[])
+      ORDER BY tsl.created_at DESC LIMIT 200
+    `, [myIds]).catch(() => ({ rows: [] }));
+    const teachers = rows.map(r => ({
+      id: r.id, linkId: r.linkId,
+      name: r.name || r.email || `GV ${(r.id || '').slice(0, 8)}`,
+      email: r.email || '', image: r.image || null,
+      role: r.role || 'TEACHER',
+      linkedAt: r.linkedAt,
+    }));
+    return res.json({ teachers, total: teachers.length });
+  } catch (e) { console.error('[student:my-teachers]', e.message); return res.json({ teachers: [], total: 0 }); }
+});
 app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, subjects: [], streak: 0 }));
 app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
 
