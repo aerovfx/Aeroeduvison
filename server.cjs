@@ -2603,23 +2603,57 @@ app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], cou
 })();
 
 // ── /api/teachers/all — TRƯỚC proxy /api/teacher (string prefix sẽ match cả 's') ──
+// Shape match TeacherProfile ở MyTeachers.tsx — FE crash nếu cpd.milestone undefined.
 app.get('/api/teachers/all', async (req, res) => {
   try {
     const pool = _getPool();
+    let viewerId = null;
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      try { viewerId = _akVerify(auth.slice(7)).sub; } catch {}
+    }
     const { rows } = await pool.query(`
-      SELECT u.id, u.name, u.email, u.image, u.role, u."createdAt",
+      SELECT u.id, u.name, u.email, u.image, u.role, u."createdAt" AS "joinedAt",
+             up.bio, up.data AS profile_data,
              (SELECT COUNT(*)::int FROM "Class" WHERE teacher_id = u.id) AS "classCount",
-             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount"
+             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount",
+             (SELECT EXISTS(SELECT 1 FROM "TeacherStudentLink" WHERE teacher_id = u.id AND student_id = $1 AND status = 'approved')) AS "isConnected"
       FROM "User" u
+      LEFT JOIN "UserProfile" up ON up.user_id = u.id
       WHERE u.role IN ('TEACHER', 'ADMIN') AND COALESCE(u.banned, false) = false
       ORDER BY u."createdAt" DESC LIMIT 200
-    `).catch(() => ({ rows: [] }));
-    const teachers = rows.map(r => ({
-      id: r.id, name: r.name || (r.email ? r.email.split('@')[0] : 'GV'),
-      email: r.email, image: r.image, role: r.role,
-      classCount: r.classCount || 0, studentCount: r.studentCount || 0,
-      createdAt: r.createdAt, cpdSummary: null,
-    }));
+    `, [viewerId || '']).catch(() => ({ rows: [] }));
+
+    const teachers = rows.map(r => {
+      const pd = r.profile_data || {};
+      return {
+        id: r.id,
+        name: r.name || (r.email ? r.email.split('@')[0] : 'GV'),
+        // PII: chỉ expose email nếu đã connected (FE comment: "null nếu HS chưa kết nối")
+        email: r.isConnected ? r.email : null,
+        image: r.image,
+        bio: r.bio || null,
+        phone: r.isConnected ? (pd.phone || null) : null,
+        website: pd.website || null,
+        joinedAt: r.joinedAt,
+        lat: typeof pd.lat === 'number' ? pd.lat : null,
+        lon: typeof pd.lon === 'number' ? pd.lon : null,
+        province: pd.province || null,
+        isConnected: !!r.isConnected,
+        // cpd object FULL với defaults — KHÔNG để null vì FE access .milestone trực tiếp
+        cpd: {
+          avgScore: 0,
+          skillCount: 0,
+          expertCount: 0,
+          proficientCount: 0,
+          milestone: null,
+          updatedAt: null,
+        },
+        // bonus fields
+        classCount: r.classCount || 0,
+        studentCount: r.studentCount || 0,
+      };
+    });
     return res.json({ teachers, total: teachers.length });
   } catch (e) { console.error('[teachers:all]', e.message); return res.json({ teachers: [], total: 0 }); }
 });
@@ -4207,7 +4241,31 @@ if (USE_NODEJS_QUESTIONS) {
         });
       }
 
-      return res.status(400).json({ success: false, error: 'invalid_action' });
+      // community-stats — aggregate cho card "Cộng đồng đang luyện"
+      if (action === 'community-stats') {
+        try {
+          const { rows } = await pool.query(`
+            SELECT
+              COUNT(DISTINCT "studentId")::int AS users,
+              COUNT(*) FILTER (WHERE completed)::int AS sessions,
+              COUNT(*) FILTER (WHERE completed AND "completedAt" >= NOW() - INTERVAL '1 day')::int AS today,
+              COUNT(*) FILTER (WHERE completed AND "completedAt" >= NOW() - INTERVAL '7 day')::int AS week,
+              COALESCE(AVG(percentage) FILTER (WHERE completed), 0)::int AS avg_score
+            FROM "PracticeExam"
+          `);
+          const r = rows[0] || {};
+          return res.json({
+            success: true,
+            users: r.users || 0,
+            sessions: r.sessions || 0,
+            today: r.today || 0,
+            week: r.week || 0,
+            avgScore: r.avg_score || 0,
+          });
+        } catch { return res.json({ success: true, users: 0, sessions: 0, today: 0, week: 0, avgScore: 0 }); }
+      }
+
+      return res.status(400).json({ success: false, error: 'invalid_action', received: action });
     } catch (err) {
       console.error('[exam-prep:GET] ❌', err.message);
       return res.status(500).json({ success: false, error: 'internal', message: err.message });
