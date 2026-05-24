@@ -1853,7 +1853,11 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       ['direction', "VARCHAR(20) DEFAULT 'teacher_invites'"], ['message', "TEXT"],
       ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
     ]);
-    await _dropLegacyNotNull('TeacherStudentLink', ['teacherId','studentId','studentEmail','status','direction','message','createdAt','updatedAt']);
+    await _dropLegacyNotNull('TeacherStudentLink', [
+      'teacherId','studentId','studentEmail','status','direction','message',
+      'createdAt','updatedAt','initiatedBy','initiatorId','approvedAt','rejectedAt',
+      'requesterId','recipientId','linkType','grade','subject','classId',
+    ]);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_teacher ON "TeacherStudentLink"(teacher_id, status)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_student ON "TeacherStudentLink"(student_id, status)`);
 
