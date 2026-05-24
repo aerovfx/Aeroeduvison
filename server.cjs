@@ -9808,6 +9808,77 @@ app.get('/api/student/exam-rooms', async (req, res) => {
   }
 });
 
+// GET /api/student/exam-rooms/leaderboard — global top HS theo điểm
+// Nguồn data: PracticeExam table (đã có từ commit grade endpoint).
+// Top 20 HS sort theo avg percentage 30 ngày gần nhất.
+app.get('/api/student/exam-rooms/leaderboard', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  const days = Math.min(Number(req.query.days) || 30, 90);
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT
+        pe."studentId" AS user_id,
+        u.name, u.image,
+        COUNT(*)::int AS exam_count,
+        ROUND(AVG(pe.percentage)::numeric, 1)::float AS avg_score,
+        MAX(pe.percentage)::int AS best_score,
+        MAX(pe."completedAt") AS last_at
+      FROM "PracticeExam" pe
+      LEFT JOIN "User" u ON u.id = pe."studentId"
+      WHERE pe.completed = true
+        AND pe."completedAt" >= NOW() - INTERVAL '${days} day'
+      GROUP BY pe."studentId", u.name, u.image
+      HAVING COUNT(*) >= 1
+      ORDER BY avg_score DESC, exam_count DESC LIMIT 20
+    `).catch(() => ({ rows: [] }));
+    const leaderboard = rows.map((r, idx) => ({
+      rank: idx + 1,
+      userId: r.user_id,
+      name: r.name || `HS ${(r.user_id || '').slice(0, 6)}`,
+      avatar: r.image,
+      avgScore: Number(r.avg_score) || 0,
+      bestScore: r.best_score || 0,
+      examCount: r.exam_count || 0,
+      lastAt: r.last_at,
+      isMe: r.user_id === userId,
+    }));
+    // Find my rank if not in top 20
+    let myEntry = leaderboard.find(e => e.isMe);
+    if (!myEntry && userId) {
+      const { rows: meRows } = await pool.query(`
+        SELECT
+          ROUND(AVG(percentage)::numeric, 1)::float AS avg_score,
+          COUNT(*)::int AS exam_count,
+          (SELECT COUNT(DISTINCT "studentId")::int + 1 FROM "PracticeExam"
+           WHERE completed AND "completedAt" >= NOW() - INTERVAL '${days} day'
+             AND "studentId" != $1
+             AND (SELECT AVG(percentage) FROM "PracticeExam" pe2 WHERE pe2."studentId" = "PracticeExam"."studentId" AND completed) >
+                 (SELECT AVG(percentage) FROM "PracticeExam" pe3 WHERE pe3."studentId" = $1 AND completed)
+          ) AS my_rank
+        FROM "PracticeExam"
+        WHERE "studentId" = $1 AND completed AND "completedAt" >= NOW() - INTERVAL '${days} day'
+      `, [userId]).catch(() => ({ rows: [] }));
+      if (meRows.length && meRows[0].exam_count > 0) {
+        myEntry = {
+          rank: meRows[0].my_rank || 999,
+          userId, name: 'Bạn', avatar: null,
+          avgScore: Number(meRows[0].avg_score) || 0,
+          bestScore: 0, examCount: meRows[0].exam_count, isMe: true,
+        };
+      }
+    }
+    return res.json({ leaderboard, myEntry: myEntry || null, period: `last_${days}d`, total: leaderboard.length });
+  } catch (e) {
+    console.error('[exam-rooms:leaderboard]', e.message);
+    return res.json({ leaderboard: [], myEntry: null, total: 0 });
+  }
+});
+
 // POST /api/student/exam-rooms/:id/join — HS join phòng thi
 app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
   const auth = req.headers.authorization || '';
