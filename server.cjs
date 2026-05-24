@@ -1144,7 +1144,74 @@ app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [],
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
-app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+
+// /api/teacher/roster — merge ClassStudent (PII-safe, no maDinhDanh) + TSL-approved
+// Shape: { students: RosterStudent[] } — match FE LearningPathBuilder
+app.get('/api/teacher/roster', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+
+  try {
+    const pool = _getPool();
+    const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
+
+    // 1. HS từ Class → ClassStudent
+    const { rows: classStuds } = await pool.query(`
+      SELECT cs.id, cs.ho_ten AS "hoTen", cs.stt,
+             c.id AS "classId", c.name AS "className"
+      FROM "Class" c
+      JOIN "ClassStudent" cs ON cs.class_id = c.id
+      WHERE c.teacher_id = ANY($1::text[])
+      ORDER BY c.name, cs.stt NULLS LAST, cs.ho_ten
+      LIMIT 2000
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    // 2. HS đã kết nối TSL (approved)
+    const { rows: tslStuds } = await pool.query(`
+      SELECT tsl.student_id AS id, tsl.student_email AS "studentEmail",
+             u.name, u.email, u.image
+      FROM "TeacherStudentLink" tsl
+      LEFT JOIN "User" u ON u.id = tsl.student_id
+      WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
+      LIMIT 1000
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    const byId = new Map();
+    for (const r of classStuds) {
+      if (!r.id) continue;
+      const cur = byId.get(r.id) || {
+        id: r.id, userId: null, name: r.hoTen || `HS ${r.stt || '?'}`,
+        email: '', avatar: null, classNames: [], isLinked: false,
+      };
+      if (r.className && !cur.classNames.includes(r.className)) cur.classNames.push(r.className);
+      byId.set(r.id, cur);
+    }
+    for (const r of tslStuds) {
+      const id = r.id || `email:${r.studentEmail || ''}`;
+      if (!id || id === 'email:') continue;
+      const cur = byId.get(id) || {
+        id, userId: r.id || null,
+        name: r.name || r.email || r.studentEmail || `HS ${String(id).slice(0, 8)}`,
+        email: r.email || r.studentEmail || '',
+        avatar: r.image || null, classNames: [], isLinked: true,
+      };
+      cur.isLinked = true;
+      if (r.name && cur.name.startsWith('HS ')) cur.name = r.name;
+      if (r.email && !cur.email) cur.email = r.email;
+      if (r.image && !cur.avatar) cur.avatar = r.image;
+      byId.set(id, cur);
+    }
+    const students = Array.from(byId.values())
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'));
+    return res.json({ students, total: students.length });
+  } catch (e) {
+    console.error('[teacher:roster]', e.message);
+    return res.json({ students: [], total: 0 });
+  }
+});
 
 // ── Career Survey + Teacher CPD (Knowledge Graph) — DB-backed
 // /api/users/me/career-survey GET/POST — khảo sát nghề nghiệp GV/PH/HS
@@ -8119,7 +8186,7 @@ app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
 // Teacher service (port 8106)
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
 app.get('/api/teacher/leaderboard', (_req, res) => res.json({ teachers: [], total: 0 }));
-app.get('/api/teacher/roster', (_req, res) => res.json({ roster: [], total: 0 }));
+// (real /api/teacher/roster handler ở line ~1150 — không cần stub này)
 
 // Lesson Plans CRUD (teacher-service offline) — bảng "LessonPlan" Node.js
 async function _ensureLessonPlanTable() {
