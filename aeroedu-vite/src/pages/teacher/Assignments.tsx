@@ -541,8 +541,14 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
     if (classId === DIRECT_CLASS_ID) return  // virtual class, students đã load
     if (students.some(s => s.classId === classId)) return  // already loaded
     try {
-      const r = await api.get<{ students: Array<{ id: string; name: string; mssv: string | null }> }>(`/classes/${classId}/students`)
-      const enriched = (r.data?.students || []).map(s => ({ ...s, classId }))
+      // BE trả ho_ten AS hoTen + ma_dinh_danh AS maDinhDanh — map về name/mssv
+      const r = await api.get<{ students: Array<{ id: string; hoTen?: string; name?: string; maDinhDanh?: string | null; mssv?: string | null; stt?: number }> }>(`/classes/${classId}/students`)
+      const enriched = (r.data?.students || []).map(s => ({
+        id: s.id,
+        name: s.hoTen || s.name || `HS ${s.stt || '?'}`,
+        mssv: s.maDinhDanh ?? s.mssv ?? null,
+        classId,
+      }))
       setStudents(prev => [...prev, ...enriched])
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
