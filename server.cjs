@@ -6958,29 +6958,35 @@ function _classAuth(req, res) {
   try { return _akVerify(auth.slice(7)); }
   catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
 }
+// Helper: dedupe tất cả JWT fields → match teacher_id qua ANY array
+// Sửa bug: GV tạo lớp ngày trước với decoded.userId, hôm sau login lại
+// JWT trả decoded.sub khác id → "Bạn chưa có lớp nào" mặc dù có lớp.
+const _classIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
 
 // GET /api/classes → { classes: [...] }
 app.get('/api/classes', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
+    const myIds = _classIds(decoded);
     const { rows } = await pool.query(`
       SELECT c.id, c.name, c.grade, c.school_year AS "schoolYear", c.description,
              c.context_type, c.institution_name, c.created_at AS "createdAt",
              COALESCE((SELECT COUNT(*) FROM "ClassStudent" cs WHERE cs.class_id = c.id), 0)::int AS "studentCount"
-      FROM "Class" c WHERE c.teacher_id = $1 ORDER BY c.created_at DESC
-    `, [decoded.sub]);
+      FROM "Class" c WHERE c.teacher_id = ANY($1::text[]) ORDER BY c.created_at DESC
+    `, [myIds]);
     return res.json({ classes: rows });
   } catch (e) {
     // Bảng ClassStudent có thể chưa tồn tại — fallback query bỏ join
     try {
       const pool = _getPool();
+      const myIds = _classIds(decoded);
       const { rows } = await pool.query(`
         SELECT id, name, grade, school_year AS "schoolYear", description,
                context_type, institution_name, created_at AS "createdAt",
                0 AS "studentCount"
-        FROM "Class" WHERE teacher_id = $1 ORDER BY created_at DESC
-      `, [decoded.sub]);
+        FROM "Class" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC
+      `, [myIds]);
       return res.json({ classes: rows });
     } catch (e2) {
       console.error('[classes:list]', e2.message);
@@ -7015,8 +7021,8 @@ app.delete('/api/classes/:id', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount } = await pool.query(
-      `DELETE FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]
+      `DELETE FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]
     );
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
     return res.json({ ok: true });
@@ -7029,7 +7035,7 @@ app.patch('/api/classes/:id', async (req, res) => {
   try {
     const { name, grade, schoolYear, description, context_type, institution_name } = req.body || {};
     const updates = [];
-    const params = [req.params.id, decoded.sub];
+    const params = [req.params.id, _classIds(decoded)];
     if (name !== undefined)              { params.push(String(name).slice(0,200));            updates.push(`name = $${params.length}`); }
     if (grade !== undefined)             { params.push(String(grade).slice(0,50));            updates.push(`grade = $${params.length}`); }
     if (schoolYear !== undefined)        { params.push(String(schoolYear).slice(0,20));       updates.push(`school_year = $${params.length}`); }
@@ -7039,7 +7045,7 @@ app.patch('/api/classes/:id', async (req, res) => {
     if (!updates.length) return res.json({ ok: true });
     const pool = _getPool();
     const { rowCount } = await pool.query(
-      `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = $2`,
+      `UPDATE "Class" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[])`,
       params
     );
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
@@ -7052,10 +7058,10 @@ app.get('/api/classes/:id/students', async (req, res) => {
   const decoded = _classAuth(req, res); if (!decoded) return;
   try {
     const pool = _getPool();
-    // Verify lớp thuộc teacher
+    // Verify lớp thuộc teacher (match qua mọi JWT id field)
     const { rowCount } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]);
     if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
     const { rows } = await pool.query(
       `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
@@ -7077,8 +7083,8 @@ app.post('/api/classes/:id/students/import', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount: ok } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [classId, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [classId, _classIds(decoded)]);
     if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
 
     const { randomUUID } = require('crypto');
@@ -7134,8 +7140,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
   try {
     const pool = _getPool();
     const { rowCount: ok } = await pool.query(
-      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-      [req.params.id, decoded.sub]);
+      `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+      [req.params.id, _classIds(decoded)]);
     if (!ok) return res.status(404).json({ error: 'Lớp không tồn tại' });
     const { rowCount } = await pool.query(
       `DELETE FROM "ClassStudent" WHERE id = $1 AND class_id = $2`,
@@ -7213,8 +7219,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
       const pool = _getPool();
       // Verify lớp thuộc GV
       const { rowCount } = await pool.query(
-        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-        [req.params.classId, decoded.sub]);
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
       if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
       const { rows } = await pool.query(
         `SELECT subject FROM "ClassSubject" WHERE class_id = $1 ORDER BY subject`,
@@ -7232,8 +7238,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
       if (subject.length > 100) return res.status(400).json({ error: 'Tên môn quá dài (max 100 ký tự)' });
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-        [req.params.classId, decoded.sub]);
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
       if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại hoặc không thuộc quyền của bạn' });
       const { randomUUID } = require('crypto');
       try {
@@ -7254,8 +7260,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
     try {
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-        [req.params.classId, decoded.sub]);
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.classId, _classIds(decoded)]);
       if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
       const subject = decodeURIComponent(req.params.subject);
       await pool.query(`DELETE FROM "Gradebook" WHERE class_id = $1 AND subject = $2`, [req.params.classId, subject]);
@@ -7272,8 +7278,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
       if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-        [classId, decoded.sub]);
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _classIds(decoded)]);
       if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
       const [studs, grds] = await Promise.all([
         pool.query(
@@ -7310,8 +7316,8 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
       if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows phải là array' });
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
-        [classId, decoded.sub]);
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [classId, _classIds(decoded)]);
       if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
       const { randomUUID } = require('crypto');
       const clamp = v => {

@@ -17,8 +17,9 @@
 **Tracking trạng thái** (cập nhật mỗi lần commit/deploy):
 - Last deployed commit: `957561f` (revision pixiai-00385-sah, 2026-05-22 — Free pedagogy course + plan Đậu Lém + AI prompts LaTeX + Question Bank ownership + Career Survey skip + Soft skills KG + Fix curriculum blocks)
 - Last deployed commit: `6f00a99` (revision pixiai-00386-rix, 2026-05-22 — MCP v0.2: 10 tools SDK v1.x, KG tools + audit log)
+- Last deployed commit: `6d4f356` (revision pixiai-00464-moq, 2026-05-24 — HOTFIX TSL: 13 handlers + 2 bảng cho /teacher/student-requests)
 - Last deployed commit: `cdd769f` (revision pixiai-00389-qob, 2026-05-22 — HOTFIX api-keys routes trước catch-all proxy)
-- Commits since last deploy: `0/5`
+- Commits since last deploy: `4/5` (5348209 asgn targets/from-exam + 5b98f8d gradebook + 98b7c8a courses POST/PATCH + fce4beb auto-save)
 - Prev: `96bf34c` — API Keys dashboard (GV/PH/Admin) + backend + MCP AERO-key auth
 - Prev: `fbfd6b7` — MCP v0.4: DaVinci Resolve 5 tools (Python bridge arm64)
 - Prev: `e63cf4b` — MCP v0.3: +9 tools (block/exam-publish/question/student/report) → 19 tools

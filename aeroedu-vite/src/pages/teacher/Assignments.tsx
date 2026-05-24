@@ -499,14 +499,37 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
   const [submitting, setSubmitting] = useState(false)
   const [tab, setTab] = useState<'class' | 'student'>('class')
 
-  // Load classes + existing targets
+  // Virtual class id cho HS đã kết nối trực tiếp (không thuộc lớp nào)
+  // — phục vụ mode trung tâm/gia sư cá nhân.
+  const DIRECT_CLASS_ID = '__direct_link__'
+
+  // Load classes + TSL students (đã kết nối) + existing targets
   useEffect(() => {
     Promise.all([
       api.get<{ classes: Array<{ id: string; name: string; grade: string; studentCount: number }> }>('/classes'),
+      api.get<{ students: Array<{ id: string; name: string; email: string }>; total: number }>('/teacher/my-students').catch(() => ({ data: { students: [], total: 0 } })),
       assignmentsService.listTargets(assignmentId),
     ])
-      .then(([cRes, tRes]) => {
-        setClasses(cRes.data?.classes || [])
+      .then(([cRes, sRes, tRes]) => {
+        const formalClasses = cRes.data?.classes || []
+        const directStudents = sRes.data?.students || []
+        // Thêm virtual class "HS đã kết nối" nếu có HS TSL approved
+        const classes = directStudents.length > 0
+          ? [...formalClasses, {
+              id: DIRECT_CLASS_ID,
+              name: '🔗 HS đã kết nối trực tiếp',
+              grade: 'Trung tâm / Gia sư',
+              studentCount: directStudents.length,
+            }]
+          : formalClasses
+        setClasses(classes)
+        // Pre-populate students cho virtual class (không cần expand)
+        if (directStudents.length > 0) {
+          setStudents(directStudents.map(s => ({
+            id: s.id, name: s.name || s.email,
+            mssv: null, classId: DIRECT_CLASS_ID,
+          })))
+        }
         setExistingTargets(tRes.targets || [])
       })
       .catch(() => {})
@@ -515,6 +538,7 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
 
   // When user expands a class → fetch its students for individual picking
   const expandClass = async (classId: string) => {
+    if (classId === DIRECT_CLASS_ID) return  // virtual class, students đã load
     if (students.some(s => s.classId === classId)) return  // already loaded
     try {
       const r = await api.get<{ students: Array<{ id: string; name: string; mssv: string | null }> }>(`/classes/${classId}/students`)
@@ -533,9 +557,21 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
     }
     setSubmitting(true)
     try {
+      // Nếu user tick "HS đã kết nối trực tiếp" → expand thành tất cả student
+      // (virtual class ID không hợp lệ ở BE).
+      const realClassIds: string[] = []
+      const directStudentIds: string[] = []
+      pickedClasses.forEach(cid => {
+        if (cid === DIRECT_CLASS_ID) {
+          students.filter(s => s.classId === DIRECT_CLASS_ID).forEach(s => directStudentIds.push(s.id))
+        } else {
+          realClassIds.push(cid)
+        }
+      })
+      const allStudentIds = Array.from(new Set([...Array.from(pickedStudents), ...directStudentIds]))
       const result = await assignmentsService.assignTo(assignmentId, {
-        classIds:   Array.from(pickedClasses),
-        studentIds: Array.from(pickedStudents),
+        classIds:   realClassIds,
+        studentIds: allStudentIds,
       })
       const msgParts = []
       if (result.added > 0)    msgParts.push(`Giao bài cho ${result.added} mục tiêu`)
@@ -630,8 +666,10 @@ function AssignToModal({ assignmentId, onClose }: { assignmentId: string; onClos
               <Loader2 className="animate-spin" style={{ width: 18, height: 18 }} />
             </div>
           ) : classes.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: D.muted, fontSize: 13 }}>
-              Bạn chưa có lớp nào. Tạo lớp tại <a href="/teacher/classes" style={{ color: D.blue }}>/teacher/classes</a> trước.
+            <div style={{ padding: 32, textAlign: 'center', color: D.muted, fontSize: 13, lineHeight: 1.7 }}>
+              Bạn chưa có lớp nào và chưa có HS nào kết nối.<br/>
+              • Tạo lớp tại <a href="/teacher/classes" style={{ color: D.blue }}>/teacher/classes</a><br/>
+              • Hoặc kết nối HS trực tiếp (trung tâm / gia sư) tại <a href="/teacher/student-requests" style={{ color: D.blue }}>/teacher/student-requests</a>
             </div>
           ) : tab === 'class' ? (
             <div style={{ display: 'grid', gap: 6 }}>
