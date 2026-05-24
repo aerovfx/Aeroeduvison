@@ -9467,19 +9467,33 @@ app.get('/api/exams/:id', async (req, res) => {
       const byId = new Map(qRows.map(q => [q.id, q]));
       questions = qIds.map(id => byId.get(id)).filter(Boolean);
     }
-    // FALLBACK: nếu exam có 0 question (GV tạo đề trống), pull theo subject từ description
-    if (questions.length === 0 && examRow.subject) {
-      try {
-        const { rows: qRows } = await pool.query(`
-          SELECT id, content, type, difficulty, options, answer AS correct, explanation,
-                 subject, grade, chapter
-          FROM "Question"
-          WHERE subject = $1 AND COALESCE(status, '') != 'archived'
-          ORDER BY RANDOM() LIMIT 20
-        `, [examRow.subject]);
-        questions = qRows;
-        if (questions.length > 0) questionsSource = 'fallback_by_subject';
-      } catch { /* skip */ }
+    // FALLBACK: nếu exam có 0 question, pull theo subject — subject có thể
+    // trong examRow.subject HOẶC examRow.description JSON {"subject":"..."}
+    if (questions.length === 0) {
+      let subj = examRow.subject;
+      if (!subj && examRow.description) {
+        try {
+          const parsed = typeof examRow.description === 'string'
+            ? JSON.parse(examRow.description) : examRow.description;
+          subj = parsed?.subject || null;
+        } catch { /* not JSON, treat as plain text — skip */ }
+      }
+      // Normalize variants: Vật lý → Vật lí (TT 32/2018)
+      if (subj === 'Vật lý' || subj === 'Vat ly') subj = 'Vật lí';
+      if (subj === 'Hóa học') subj = 'Hoá học';
+      if (subj) {
+        try {
+          const { rows: qRows } = await pool.query(`
+            SELECT id, content, type, difficulty, options, answer AS correct, explanation,
+                   subject, grade, chapter
+            FROM "Question"
+            WHERE subject IN ($1, $2) AND COALESCE(status, '') != 'archived'
+            ORDER BY RANDOM() LIMIT 20
+          `, [subj, subj === 'Vật lí' ? 'Vật lý' : subj]);  // match cả 2 chính tả
+          questions = qRows;
+          if (questions.length > 0) questionsSource = 'fallback_by_subject';
+        } catch { /* skip */ }
+      }
     }
     return res.json({ exam, questions, questionsSource, note: questions.length === 0 ? 'Đề này chưa có câu hỏi nào. Liên hệ GV để bổ sung.' : null });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
