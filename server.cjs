@@ -6793,10 +6793,117 @@ if (USE_NODEJS_QUESTIONS) {
     res.status(501).json({ error: 'Số hoá PDF cần media-service AI — đang phát triển' }));
 })();
 
+// ── Document Digitization (/teacher/document-digitization) ──
+// TRƯỚC proxy media-service — media-service offline → đăng ký Node.js handlers.
+;(() => {
+  async function _ensureDocTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Document" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        teacher_id    VARCHAR(255) NOT NULL,
+        filename      VARCHAR(500) NOT NULL,
+        display_name  VARCHAR(500),
+        gcs_url       TEXT,
+        gcs_path      VARCHAR(1000),
+        mime_type     VARCHAR(100),
+        size_bytes    BIGINT,
+        status        VARCHAR(50)  DEFAULT 'pending',
+        page_count    INTEGER,
+        ocr_text      TEXT,
+        metadata      JSONB,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('Document', [
+      ['teacher_id',   "VARCHAR(255)"],
+      ['filename',     "VARCHAR(500)"],
+      ['display_name', "VARCHAR(500)"],
+      ['gcs_url',      "TEXT"],
+      ['gcs_path',     "VARCHAR(1000)"],
+      ['mime_type',    "VARCHAR(100)"],
+      ['size_bytes',   "BIGINT"],
+      ['status',       "VARCHAR(50) DEFAULT 'pending'"],
+      ['page_count',   "INTEGER"],
+      ['ocr_text',     "TEXT"],
+      ['metadata',     "JSONB"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('Document', ['teacherId','filename','displayName','gcsUrl','gcsPath','mimeType','sizeBytes','status','pageCount','ocrText','metadata','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_doc_teacher ON "Document"(teacher_id, created_at DESC)`);
+  }
+  _ensureDocTable().catch(e => console.error('[documents] migration:', e.message));
+
+  function _docAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _docIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET /api/documents?status=
+  app.get('/api/documents', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _docIds(decoded);
+      const params = [myIds];
+      let where = `teacher_id = ANY($1::text[])`;
+      if (req.query.status && req.query.status !== 'Tất cả') {
+        params.push(req.query.status);
+        where += ` AND status = $${params.length}`;
+      }
+      const { rows } = await pool.query(
+        `SELECT id, filename, display_name AS "displayName", gcs_url AS "gcsUrl",
+                mime_type AS "mimeType", size_bytes AS "sizeBytes", status,
+                page_count AS "pageCount", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "Document" WHERE ${where} ORDER BY created_at DESC LIMIT 200`,
+        params);
+      return res.json({ documents: rows, total: rows.length });
+    } catch (e) { console.error('[doc:list]', e.message); return res.json({ documents: [], total: 0 }); }
+  });
+
+  // DELETE /api/documents/:id
+  app.delete('/api/documents/:id', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "Document" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _docIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Tài liệu không tồn tại' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[doc:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá tài liệu' }); }
+  });
+
+  // POST /api/documents — tạo metadata sau khi upload GCS xong (FE call sau VideoUploader-style)
+  app.post('/api/documents', async (req, res) => {
+    const decoded = _docAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { filename, displayName, gcsUrl, gcsPath, mimeType, sizeBytes } = req.body || {};
+      if (!filename) return res.status(400).json({ error: 'Thiếu filename' });
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(
+        `INSERT INTO "Document"(id, teacher_id, filename, display_name, gcs_url, gcs_path,
+                                mime_type, size_bytes, status)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'uploaded')`,
+        [id, myId, String(filename).slice(0,500),
+         displayName || filename, gcsUrl || null, gcsPath || null,
+         mimeType || null, sizeBytes || null]);
+      return res.json({ ok: true, id });
+    } catch (e) { console.error('[doc:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo tài liệu' }); }
+  });
+})();
+
 // ── media-service routes (only if MEDIA_SERVICE_URL is external) ──
-// Skip /api/exam-matrices — đã có Node.js handlers ở trên
+// Skip /api/exam-matrices + /api/documents — đã có Node.js handlers ở trên
 app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/media'));
-app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/documents'));
 if (!USE_NODEJS_QUESTIONS) {
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/questions'));
   app.use(makeProxy(MEDIA_SERVICE_URL, 'media-service', '/api/question-bank'));
