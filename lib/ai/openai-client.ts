@@ -5,59 +5,121 @@
  * Thay thế Ollama (local LLM) + Qdrant (vector DB) bằng cloud AI API.
  *
  * Priority order (tự động chọn):
- *   1. OPENROUTER_API_KEY  → OpenRouter (proxy tới GPT-4o, Claude, Gemini...)
- *   2. OPENAI_API_KEY      → OpenAI trực tiếp
+ *   - AI_PREFERRED_PROVIDER=deepseek + DEEPSEEK_API_KEY  → DeepSeek (cheap, chat-only)
+ *   - AI_PREFERRED_PROVIDER=openrouter|openai|fal        → forced provider
+ *   - Auto fallback chain:
+ *       1. OPENROUTER_API_KEY  → OpenRouter (proxy tới GPT-4o, Claude, Gemini...)
+ *       2. OPENAI_API_KEY      → OpenAI trực tiếp
+ *       3. DEEPSEEK_API_KEY    → DeepSeek (chỉ chat, KHÔNG có vision/embedding)
  *
  * Env vars:
- *   OPENROUTER_API_KEY      — OpenRouter key (sk-or-v1-...)   ← ưu tiên
- *   OPENAI_API_KEY          — OpenAI key (sk-...)             ← fallback
+ *   AI_PREFERRED_PROVIDER   — auto|openrouter|openai|deepseek|fal (default: auto)
+ *   OPENROUTER_API_KEY      — OpenRouter key (sk-or-v1-...)
+ *   OPENAI_API_KEY          — OpenAI key (sk-...)
+ *   DEEPSEEK_API_KEY        — DeepSeek key (sk-...)  https://platform.deepseek.com
  *   OPENAI_BASE_URL         — optional custom base (Azure, proxy...)
  *   OPENAI_DEFAULT_MODEL    — chat model   (default: gpt-4o-mini via OpenRouter)
  *   OPENAI_VISION_MODEL     — vision model (default: gpt-4o   via OpenRouter)
  *   OPENAI_EMBEDDING_MODEL  — embed model  (default: text-embedding-3-small)
  *
  * OpenRouter base URL: https://openrouter.ai/api/v1
- * OpenRouter models:   openai/gpt-4o-mini, openai/gpt-4o, etc.
+ * DeepSeek  base URL:  https://api.deepseek.com/v1
+ *
+ * ⚠ DeepSeek caveats:
+ *   - KHÔNG support vision → vision tự fallback OpenAI/OpenRouter
+ *   - KHÔNG support embeddings → embedding tự fallback OpenAI
+ *   - Models: deepseek-chat, deepseek-reasoner
  */
 
 import OpenAI from 'openai';
 
-// ── OpenAI-compatible client (supports OpenRouter) ────────────────────────────
+// ── OpenAI-compatible client (supports OpenRouter / DeepSeek) ─────────────────
 
 let _client: OpenAI | null = null;
+let _embedClient: OpenAI | null = null;
+let _visionClient: OpenAI | null = null;
+
+function pref(): string {
+  return (process.env.AI_PREFERRED_PROVIDER || 'auto').toLowerCase();
+}
+
+function buildDeepSeekClient(): OpenAI | null {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) return null;
+  return new OpenAI({
+    apiKey: key,
+    baseURL: 'https://api.deepseek.com/v1',
+    maxRetries: 2,
+    timeout: 60_000,
+  });
+}
+
+function buildOpenRouterClient(): OpenAI | null {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return null;
+  return new OpenAI({
+    apiKey: key,
+    baseURL: 'https://openrouter.ai/api/v1',
+    defaultHeaders: { 'HTTP-Referer': 'https://aeroedu.vn', 'X-Title': 'AeroEduVision' },
+    maxRetries: 2,
+    timeout: 60_000,
+  });
+}
+
+function buildOpenAIDirectClient(): OpenAI | null {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+  return new OpenAI({
+    apiKey: key,
+    baseURL: process.env.OPENAI_BASE_URL || undefined,
+    maxRetries: 2,
+    timeout: 60_000,
+  });
+}
 
 function buildClient(): OpenAI {
-  // 1. Try OpenRouter
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
-  if (openrouterKey) {
-    return new OpenAI({
-      apiKey: openrouterKey,
-      baseURL: 'https://openrouter.ai/api/v1',
-      defaultHeaders: {
-        'HTTP-Referer': 'https://aeroedu.vn',
-        'X-Title': 'AeroEduVision',
-      },
-      maxRetries: 2,
-      timeout: 60_000,
-    });
+  const p = pref();
+  // Explicit preference wins
+  if (p === 'deepseek') {
+    const c = buildDeepSeekClient();
+    if (c) return c;
+    console.warn('[AI] AI_PREFERRED_PROVIDER=deepseek but DEEPSEEK_API_KEY missing — falling back to auto');
+  }
+  if (p === 'openrouter') {
+    const c = buildOpenRouterClient();
+    if (c) return c;
+  }
+  if (p === 'openai') {
+    const c = buildOpenAIDirectClient();
+    if (c) return c;
   }
 
-  // 2. Try OpenAI directly
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    return new OpenAI({
-      apiKey: openaiKey,
-      baseURL: process.env.OPENAI_BASE_URL || undefined,
-      maxRetries: 2,
-      timeout: 60_000,
-    });
-  }
+  // Auto fallback chain (OpenRouter > OpenAI > DeepSeek)
+  return buildOpenRouterClient()
+    || buildOpenAIDirectClient()
+    || buildDeepSeekClient()
+    || (() => { throw new Error(
+      '[AI] No API key found. Set OPENROUTER_API_KEY, OPENAI_API_KEY, or DEEPSEEK_API_KEY in Cloud Run env vars.'
+    ); })();
+}
 
-  throw new Error(
-    '[AI] No API key found. Set OPENROUTER_API_KEY or OPENAI_API_KEY in Cloud Run env vars.\n' +
-    '  → gcloud run services update edu --region=asia-southeast1 \\\n' +
-    '      --set-env-vars="OPENROUTER_API_KEY=sk-or-v1-..."'
-  );
+/** Client riêng cho VISION — DeepSeek không support vision, force OpenRouter/OpenAI */
+function buildVisionClient(): OpenAI {
+  return buildOpenRouterClient()
+    || buildOpenAIDirectClient()
+    || (() => { throw new Error('[AI vision] Cần OPENROUTER_API_KEY hoặc OPENAI_API_KEY — DeepSeek không support vision'); })();
+}
+
+/** Client riêng cho EMBEDDING — DeepSeek/OpenRouter không support embedding, force OpenAI */
+function buildEmbeddingClient(): OpenAI {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('[AI embedding] Cần OPENAI_API_KEY — DeepSeek/OpenRouter không support embedding');
+  return new OpenAI({
+    apiKey: key,
+    baseURL: process.env.OPENAI_BASE_URL || undefined,
+    maxRetries: 2,
+    timeout: 60_000,
+  });
 }
 
 export function getOpenAIClient(): OpenAI {
@@ -66,12 +128,16 @@ export function getOpenAIClient(): OpenAI {
 }
 
 // Expose which provider is active (for logging)
-export function getActiveProvider(): 'openrouter' | 'openai' | 'fal' | 'none' {
-  // shouldUseFal() chưa định nghĩa ở scope này, copy logic ngắn:
-  const pref = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
-  if (pref === 'fal' && process.env.FAL_API_KEY) return 'fal';
+export function getActiveProvider(): 'openrouter' | 'openai' | 'deepseek' | 'fal' | 'none' {
+  const p = pref();
+  if (p === 'fal' && process.env.FAL_API_KEY) return 'fal';
+  if (p === 'deepseek' && process.env.DEEPSEEK_API_KEY) return 'deepseek';
+  if (p === 'openrouter' && process.env.OPENROUTER_API_KEY) return 'openrouter';
+  if (p === 'openai' && process.env.OPENAI_API_KEY) return 'openai';
+  // Auto
   if (process.env.OPENROUTER_API_KEY) return 'openrouter';
   if (process.env.OPENAI_API_KEY) return 'openai';
+  if (process.env.DEEPSEEK_API_KEY) return 'deepseek';
   if (process.env.FAL_API_KEY) return 'fal';
   return 'none';
 }
@@ -80,9 +146,21 @@ export function getActiveProvider(): 'openrouter' | 'openai' | 'fal' | 'none' {
 
 // When using OpenRouter, prefix with "openai/" for GPT models
 // or use other providers like "anthropic/claude-3-5-sonnet", etc.
+// When using DeepSeek, use "deepseek-chat" or "deepseek-reasoner"
+export function getDefaultChatModel(): string {
+  if (process.env.OPENAI_DEFAULT_MODEL) return process.env.OPENAI_DEFAULT_MODEL;
+  const active = getActiveProvider();
+  if (active === 'deepseek') return process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+  if (active === 'openrouter') return 'openai/gpt-4o-mini';
+  return 'gpt-4o-mini';
+}
+
+// Backwards-compat const (đọc env tại import time — caller mới nên dùng getDefaultChatModel())
 export const DEFAULT_CHAT_MODEL =
   process.env.OPENAI_DEFAULT_MODEL ||
-  (process.env.OPENROUTER_API_KEY ? 'openai/gpt-4o-mini' : 'gpt-4o-mini');
+  (process.env.DEEPSEEK_API_KEY && !process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY
+    ? (process.env.DEEPSEEK_MODEL || 'deepseek-chat')
+    : (process.env.OPENROUTER_API_KEY ? 'openai/gpt-4o-mini' : 'gpt-4o-mini'));
 
 export const DEFAULT_VISION_MODEL =
   process.env.OPENAI_VISION_MODEL ||
@@ -135,8 +213,9 @@ export async function chatCompletion(
   }
 
   const client = getOpenAIClient();
+  const model = opts?.model ?? getDefaultChatModel();
   const response = await client.chat.completions.create({
-    model: opts?.model ?? DEFAULT_CHAT_MODEL,
+    model,
     messages,
     temperature: opts?.temperature ?? 0.3,
     max_tokens: opts?.maxTokens ?? 2048,
@@ -186,8 +265,9 @@ export async function visionCompletion(
     return res.content;
   }
 
-  const client = getOpenAIClient();
-  const response = await client.chat.completions.create({
+  // Vision dùng client riêng vì DeepSeek không support vision
+  if (!_visionClient) _visionClient = buildVisionClient();
+  const response = await _visionClient.chat.completions.create({
     model: opts?.model ?? DEFAULT_VISION_MODEL,
     messages: [
       {
@@ -213,10 +293,9 @@ export async function visionCompletion(
 // ── Text embedding ─────────────────────────────────────────────────────────────
 
 export async function getEmbedding(text: string): Promise<number[]> {
-  const client = getOpenAIClient();
-  // Note: OpenRouter does NOT support embeddings — use OpenAI directly if needed
-  // If only OpenRouter key is set, this will fail gracefully in simple-rag.ts
-  const response = await client.embeddings.create({
+  // Embedding dùng client riêng — DeepSeek/OpenRouter không support, force OpenAI
+  if (!_embedClient) _embedClient = buildEmbeddingClient();
+  const response = await _embedClient.embeddings.create({
     model: EMBEDDING_MODEL,
     input: text.slice(0, 8000),
   });

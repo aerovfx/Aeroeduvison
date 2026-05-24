@@ -3310,6 +3310,64 @@ if (USE_NODEJS_QUESTIONS) {
         return res.status(400).json({ error: 'message_required', reply: 'Câu hỏi không được để trống.' });
       }
 
+      // Ensure the final message from the user is the new query. If history
+      // already ends with the current user message we don't duplicate it.
+      const messages = [...history];
+      const lastMsg = messages[messages.length - 1];
+      if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== message) {
+        messages.push({ role: 'user', content: message });
+      }
+
+      // ── Provider routing: deepseek HOẶC Anthropic ──
+      // AI_PREFERRED_PROVIDER=deepseek → DeepSeek (OpenAI-compatible)
+      // Default → Anthropic Claude (như cũ)
+      const prefProvider = (process.env.AI_PREFERRED_PROVIDER || '').toLowerCase();
+      const useDeepseek = (prefProvider === 'deepseek' && process.env.DEEPSEEK_API_KEY) ||
+                          (!process.env.ANTHROPIC_API_KEY && process.env.DEEPSEEK_API_KEY);
+
+      if (useDeepseek) {
+        try {
+          const dsModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+          const dsMessages = [
+            { role: 'system', content: buildSystemPrompt(subject) },
+            ...messages,
+          ];
+          const dsResp = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: dsModel,
+              messages: dsMessages,
+              max_tokens: AI_TUTOR_MAX_TOKENS,
+              temperature: 0.5,
+            }),
+          });
+          if (!dsResp.ok) {
+            const errText = await dsResp.text().catch(() => '');
+            throw new Error(`DeepSeek HTTP ${dsResp.status}: ${errText.slice(0, 200)}`);
+          }
+          const dsJson = await dsResp.json();
+          const reply = (dsJson.choices?.[0]?.message?.content || '').trim()
+            || 'Xin lỗi, tôi chưa tạo được câu trả lời. Bạn thử đặt lại câu hỏi nhé.';
+          const latencyMs = Date.now() - startedAt;
+          console.log(`[ai-tutor] ok provider=deepseek model=${dsModel} subject="${subject}" latency=${latencyMs}ms tokens=${dsJson.usage?.completion_tokens || '?'}`);
+          return res.json({ reply, model: dsModel, usage: dsJson.usage || null, provider: 'deepseek' });
+        } catch (e) {
+          console.error('[ai-tutor:deepseek]', e.message);
+          // Fall through to Anthropic if Anthropic key tồn tại
+          if (!process.env.ANTHROPIC_API_KEY) {
+            return res.status(503).json({
+              error: 'ai_unavailable',
+              reply: 'Dịch vụ AI hiện chưa sẵn sàng (DeepSeek lỗi, Anthropic chưa cấu hình).',
+            });
+          }
+        }
+      }
+
+      // ── Anthropic Claude (default) ──
       let client;
       try {
         client = getAnthropic();
@@ -3319,14 +3377,6 @@ if (USE_NODEJS_QUESTIONS) {
           error: 'ai_unavailable',
           reply: 'Dịch vụ AI hiện chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.',
         });
-      }
-
-      // Ensure the final message from the user is the new query. If history
-      // already ends with the current user message we don't duplicate it.
-      const messages = [...history];
-      const lastMsg = messages[messages.length - 1];
-      if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== message) {
-        messages.push({ role: 'user', content: message });
       }
 
       const completion = await client.messages.create({
@@ -3348,12 +3398,13 @@ if (USE_NODEJS_QUESTIONS) {
       reply = reply.trim() || 'Xin lỗi, tôi chưa tạo được câu trả lời. Bạn thử đặt lại câu hỏi nhé.';
 
       const latencyMs = Date.now() - startedAt;
-      console.log(`[ai-tutor] ok model=${AI_TUTOR_MODEL} subject="${subject}" latency=${latencyMs}ms tokens=${completion.usage ? completion.usage.output_tokens : '?'}`);
+      console.log(`[ai-tutor] ok provider=anthropic model=${AI_TUTOR_MODEL} subject="${subject}" latency=${latencyMs}ms tokens=${completion.usage ? completion.usage.output_tokens : '?'}`);
 
       return res.json({
         reply,
         model: completion.model || AI_TUTOR_MODEL,
         usage: completion.usage || null,
+        provider: 'anthropic',
       });
     } catch (err) {
       const status = err && err.status ? err.status : 500;
