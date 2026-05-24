@@ -2602,7 +2602,31 @@ app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], cou
   });
 })();
 
+// ── /api/teachers/all — TRƯỚC proxy /api/teacher (string prefix sẽ match cả 's') ──
+app.get('/api/teachers/all', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT u.id, u.name, u.email, u.image, u.role, u."createdAt",
+             (SELECT COUNT(*)::int FROM "Class" WHERE teacher_id = u.id) AS "classCount",
+             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount"
+      FROM "User" u
+      WHERE u.role IN ('TEACHER', 'ADMIN') AND COALESCE(u.banned, false) = false
+      ORDER BY u."createdAt" DESC LIMIT 200
+    `).catch(() => ({ rows: [] }));
+    const teachers = rows.map(r => ({
+      id: r.id, name: r.name || (r.email ? r.email.split('@')[0] : 'GV'),
+      email: r.email, image: r.image, role: r.role,
+      classCount: r.classCount || 0, studentCount: r.studentCount || 0,
+      createdAt: r.createdAt, cpdSummary: null,
+    }));
+    return res.json({ teachers, total: teachers.length });
+  } catch (e) { console.error('[teachers:all]', e.message); return res.json({ teachers: [], total: 0 }); }
+});
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
+// LƯU Ý: pathFilter '/api/teacher' là string prefix match → cả /api/teachers/...
+// cũng bị catch. Mọi /api/teachers/* handler PHẢI đăng ký TRƯỚC line này.
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
 // ══════════════════════════════════════════════════════════════
@@ -9472,31 +9496,7 @@ app.get('/api/learning/my-courses', async (req, res) => {
   } catch (e) { console.error('[learning:my-courses]', e.message); return res.json([]); }
 });
 
-// Real /api/teachers/all — DS GV cho HS discover (MyTeachers page)
-// Shape: { teachers: [{ id, name, email, image, role, cpdSummary, classCount }] }
-app.get('/api/teachers/all', async (req, res) => {
-  try {
-    const pool = _getPool();
-    const { rows } = await pool.query(`
-      SELECT u.id, u.name, u.email, u.image, u.role,
-             u."createdAt",
-             (SELECT COUNT(*)::int FROM "Class" WHERE teacher_id = u.id) AS "classCount",
-             (SELECT COUNT(*)::int FROM "TeacherStudentLink" WHERE teacher_id = u.id AND status = 'approved') AS "studentCount"
-      FROM "User" u
-      WHERE u.role IN ('TEACHER', 'ADMIN') AND COALESCE(u.banned, false) = false
-      ORDER BY u."createdAt" DESC LIMIT 200
-    `).catch(() => ({ rows: [] }));
-    const teachers = rows.map(r => ({
-      id: r.id, name: r.name || r.email?.split('@')[0] || 'GV',
-      email: r.email, image: r.image, role: r.role,
-      classCount: r.classCount || 0,
-      studentCount: r.studentCount || 0,
-      createdAt: r.createdAt,
-      cpdSummary: null,  // TODO: aggregate từ TeacherCPD
-    }));
-    return res.json({ teachers, total: teachers.length });
-  } catch (e) { console.error('[teachers:all]', e.message); return res.json({ teachers: [], total: 0 }); }
-});
+// (real /api/teachers/all handler moved TRƯỚC proxy line 2606 — dead code)
 app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
 app.get('/api/learning/purchase-history', (_req, res) => res.json({ orders: [], total: 0 }));
 
