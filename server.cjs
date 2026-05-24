@@ -9242,30 +9242,36 @@ app.get('/api/admin/operations/crawler-attempts', (_req, res) => res.json({
   updatedAt: new Date().toISOString(),
 }));
 
-// ── Admin Analytics — query PageView table (real data where possible) ──
+// ── Admin Analytics — query PageView table (real data, filter session_id NOT NULL) ──
+// Lọc historical noise (rows cũ insert từ Rust service không có session_id/user_id)
+// để stats phản ánh đúng user thật. FE_ANALYTICS_INCLUDE_NULL=1 để xem cả 2.
+const _ANALYTICS_NULL_FILTER = process.env.FE_ANALYTICS_INCLUDE_NULL === '1'
+  ? '' : 'AND session_id IS NOT NULL';
+
 app.get('/api/admin/analytics/overview', async (_req, res) => {
   try {
     const pool = _getPool();
     const [t, d, r] = await Promise.all([
       pool.query(`
         SELECT
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS today,
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day')::int AS week,
-          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 day')::int AS month,
-          COUNT(*)::int AS all_time,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day' ${_ANALYTICS_NULL_FILTER})::int AS today,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER})::int AS week,
+          COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 day' ${_ANALYTICS_NULL_FILTER})::int AS month,
+          COUNT(*) FILTER (WHERE 1=1 ${_ANALYTICS_NULL_FILTER})::int AS all_time,
           COUNT(DISTINCT session_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS sessions_today,
           COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL)::int AS users_today,
           COUNT(DISTINCT user_id) FILTER (WHERE created_at >= NOW() - INTERVAL '7 day' AND user_id IS NOT NULL)::int AS users_week,
-          COALESCE(AVG(view_ms), 0)::int AS avg_view_ms
+          COALESCE(AVG(view_ms) FILTER (WHERE view_ms IS NOT NULL AND view_ms > 0), 0)::int AS avg_view_ms
         FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day'`),
       pool.query(`
         SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') AS day, COUNT(*)::int AS views
-        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '7 day'
+        FROM "PageView" WHERE created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER}
         GROUP BY 1 ORDER BY 1`),
       pool.query(`
         SELECT COALESCE(u.role, 'GUEST') AS role, COUNT(*)::int AS views
         FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
-        WHERE pv.created_at >= NOW() - INTERVAL '7 day' GROUP BY 1`),
+        WHERE pv.created_at >= NOW() - INTERVAL '7 day' ${_ANALYTICS_NULL_FILTER}
+        GROUP BY 1`),
     ]);
     const row = t.rows[0] || {};
     return res.json({
@@ -9291,11 +9297,11 @@ app.get('/api/admin/analytics/routes', async (req, res) => {
              COUNT(*)::int AS views,
              COUNT(DISTINCT session_id)::int AS "uniqueSessions",
              COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS "uniqueUsers",
-             COALESCE(AVG(view_ms), 0)::int AS "avgViewMs",
+             COALESCE(AVG(view_ms) FILTER (WHERE view_ms IS NOT NULL AND view_ms > 0), 0)::int AS "avgViewMs",
              0 AS bounces, 0::float AS "bounceRate",
              MAX(created_at)::text AS "lastView"
       FROM "PageView"
-      WHERE created_at >= NOW() - INTERVAL '${days} day'
+      WHERE created_at >= NOW() - INTERVAL '${days} day' ${_ANALYTICS_NULL_FILTER}
       GROUP BY path ORDER BY views DESC LIMIT $1`, [limit]);
     return res.json({ routes: rows });
   } catch (e) {
@@ -9308,10 +9314,13 @@ app.get('/api/admin/analytics/realtime', async (_req, res) => {
   try {
     const pool = _getPool();
     const [active, recent] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active FROM "PageView" WHERE created_at >= NOW() - INTERVAL '5 minute'`),
+      pool.query(`SELECT COUNT(DISTINCT session_id)::int AS active
+                  FROM "PageView"
+                  WHERE created_at >= NOW() - INTERVAL '5 minute' AND session_id IS NOT NULL`),
       pool.query(`
         SELECT pv.path, u.role AS "userRole", pv.created_at AS "createdAt"
         FROM "PageView" pv LEFT JOIN "User" u ON u.id = pv.user_id
+        WHERE pv.session_id IS NOT NULL
         ORDER BY pv.created_at DESC LIMIT 20`),
     ]);
     return res.json({ activeNow: active.rows[0]?.active || 0, recent: recent.rows });
@@ -9321,15 +9330,65 @@ app.get('/api/admin/analytics/realtime', async (_req, res) => {
   }
 });
 
-app.get('/api/admin/analytics/funnel', (_req, res) => res.json({
-  stages: [
-    { name: 'Trang chủ',       count: 0, drop: null, rate: 100 },
-    { name: 'Đăng ký',         count: 0, drop: 0,    rate: 0 },
-    { name: 'Vào dashboard',   count: 0, drop: 0,    rate: 0 },
-    { name: 'Mua gói',         count: 0, drop: 0,    rate: 0 },
-  ],
-  totalUsers: 0,
-}));
+// REAL funnel: Landing → Login → Dashboard → Exam-prep / Course / Game
+// Tính trên DISTINCT session_id để biết user journey.
+app.get('/api/admin/analytics/funnel', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const days = Math.min(Number(req.query.days) || 7, 30);
+    const stages = [
+      { name: 'Landing (/)',        patterns: ["= '/'", "LIKE '/?%'"] },
+      { name: 'Đăng ký / Login',    patterns: ["LIKE '/auth/%'"] },
+      { name: 'Dashboard',          patterns: ["LIKE '/dashboard%'", "LIKE '/teacher%'", "LIKE '/student%'"] },
+      { name: 'Exam Prep / Game',   patterns: ["LIKE '/student/exam-prep%'", "LIKE '/student/games%'", "LIKE '/dashboard/iot-lab%'"] },
+      { name: 'Mua gói',            patterns: ["LIKE '/payment%'", "LIKE '/activate%'"] },
+    ];
+    const counts = [];
+    for (const s of stages) {
+      const orClause = s.patterns.map(p => `path ${p}`).join(' OR ');
+      const { rows } = await pool.query(
+        `SELECT COUNT(DISTINCT session_id)::int AS c
+         FROM "PageView"
+         WHERE created_at >= NOW() - INTERVAL '${days} day'
+         AND session_id IS NOT NULL
+         AND (${orClause})`);
+      counts.push({ name: s.name, count: rows[0]?.c || 0 });
+    }
+    const total = counts[0]?.count || 0;
+    const result = counts.map((s, i) => ({
+      name: s.name,
+      count: s.count,
+      drop: i === 0 ? null : Math.max(0, counts[i - 1].count - s.count),
+      rate: total > 0 ? Math.round((s.count / total) * 100) : 0,
+    }));
+    return res.json({ stages: result, totalUsers: total });
+  } catch (e) {
+    console.error('[admin:funnel]', e.message);
+    return res.json({ stages: [], totalUsers: 0 });
+  }
+});
+
+// DELETE rows session_id NULL — admin only, dùng để cleanup historical noise
+app.delete('/api/admin/analytics/cleanup-null', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let decoded;
+  try { decoded = _akVerify(auth.slice(7)); }
+  catch { return res.status(401).json({ error: 'Invalid token' }); }
+  if (decoded.role !== 'ADMIN' && process.env.DISABLE_ADMIN_GATE !== '1') {
+    return res.status(403).json({ error: 'Admin only' });
+  }
+  try {
+    const pool = _getPool();
+    const { rowCount } = await pool.query(
+      `DELETE FROM "PageView" WHERE session_id IS NULL AND view_ms IS NULL`);
+    console.log(`[analytics:cleanup-null] deleted ${rowCount} rows`);
+    return res.json({ deleted: rowCount });
+  } catch (e) {
+    console.error('[admin:cleanup-null]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 app.get('/api/admin/analytics/source-mix', (_req, res) => res.json({
   inNetwork:  { totalViews: 0, totalSessions: 0, breakdown: [] },

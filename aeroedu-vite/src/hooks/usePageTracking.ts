@@ -34,21 +34,26 @@ function getSessionId(): string {
 function sendBeacon(payload: Record<string, unknown>) {
   try {
     const body = JSON.stringify(payload)
-    // Prefer sendBeacon (survives page unload) — fall back to fetch
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' })
-      navigator.sendBeacon(ENDPOINT_BEACON, blob)
-    } else {
-      // axios chứa Authorization header tự động — quan trọng để biết role
-      // nhưng sendBeacon không gửi header tuỳ chỉnh được. Dùng fetch keepalive.
-      fetch(ENDPOINT_BEACON, {
-        method: 'POST',
-        body,
-        headers: { 'Content-Type': 'application/json' },
-        keepalive: true,
-        credentials: 'include',
-      }).catch(() => {})
-    }
+    const token = sessionStorage.getItem('aeroedu_access_token')
+    // Ưu tiên fetch keepalive: hỗ trợ Authorization header → BE biết user role.
+    // sendBeacon không gửi headers tuỳ chỉnh được nên user_id luôn null khi
+    // exit qua beacon — đó là lý do analytics thấy 0 unique users trước đây.
+    fetch(ENDPOINT_BEACON, {
+      method: 'POST',
+      body,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      keepalive: true,
+      credentials: 'include',
+    }).catch(() => {
+      // Last-resort fallback: sendBeacon (sống qua page unload nhưng anonymous)
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' })
+        navigator.sendBeacon(ENDPOINT_BEACON, blob)
+      }
+    })
   } catch { /* never throw */ }
 }
 
