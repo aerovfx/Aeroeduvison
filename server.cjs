@@ -10348,7 +10348,139 @@ app.get('/api/learning/my-courses', async (req, res) => {
 });
 
 // (real /api/teachers/all handler moved TRƯỚC proxy line 2606 — dead code)
-app.get('/api/learning/wishlist', (_req, res) => res.json({ items: [], total: 0 }));
+// ── /api/learning/wishlist ────────────────────────────────────────────────
+// Crash trên /student/wishlist với "i.map is not a function" — stub cũ
+// return { items, total } object nhưng FE expect WishlistItem[] array.
+// Schema:
+//   "Wishlist" (id PK, user_id, course_id, created_at) UNIQUE(user_id, course_id)
+// Endpoints:
+//   GET    /api/learning/wishlist                  → WishlistItem[]
+//   POST   /api/learning/wishlist/:courseId        → { ok: true, id }
+//   DELETE /api/learning/wishlist/:courseId        → { ok: true }
+let _wishlistTableReady = false;
+async function _ensureWishlistTable() {
+  if (_wishlistTableReady) return;
+  const pool = _getPool();
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Wishlist" (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        course_id TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_wishlist_user_course ON "Wishlist"(user_id, course_id);
+      CREATE INDEX IF NOT EXISTS idx_wishlist_user ON "Wishlist"(user_id);
+    `);
+    _wishlistTableReady = true;
+  } catch (e) {
+    console.error('[wishlist:ensure-table]', e.message);
+  }
+}
+
+app.get('/api/learning/wishlist', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.json([]);
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.json([]); }
+  if (!userId) return res.json([]);
+  try {
+    await _ensureWishlistTable();
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT w.id, w.user_id AS "userId", w.course_id AS "courseId", w.created_at AS "createdAt",
+             c.id AS "cid", c.title, c.description, c.image, c."imageUrl",
+             c.price, c."userId" AS "instructorId",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Wishlist" w
+      JOIN "Course" c ON c.id = w.course_id
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE w.user_id = $1
+      ORDER BY w.created_at DESC
+      LIMIT 200
+    `, [userId]).catch(() => ({ rows: [] }));
+
+    if (rows.length === 0) return res.json([]);
+
+    // Batch count chapters per course (proxy "lessons" count)
+    const courseIds = rows.map(r => r.cid);
+    const { rows: chapRows } = await pool.query(
+      `SELECT "courseId", COUNT(*)::int AS n FROM "Chapter"
+       WHERE "courseId" = ANY($1::text[]) GROUP BY "courseId"`,
+      [courseIds]
+    ).catch(() => ({ rows: [] }));
+    const lessonsByCourse = Object.fromEntries(chapRows.map(r => [r.courseId, r.n]));
+
+    const items = rows.map(r => ({
+      id: r.id,
+      userId: r.userId,
+      courseId: r.courseId,
+      createdAt: r.createdAt,
+      course: {
+        id: r.cid,
+        title: r.title,
+        description: r.description || '',
+        image: r.image || r.imageUrl || null,
+        imageUrl: r.imageUrl || r.image || null,
+        slug: r.cid,
+        regularPrice: Number(r.price) || 0,
+        beforePrice: 0,
+        lessons: lessonsByCourse[r.cid] || 0,
+        price: Number(r.price) || 0,
+        user: r.instructorName
+          ? { id: r.instructorId, name: r.instructorName, image: r.instructorImage }
+          : { id: r.instructorId, name: 'AeroEduVision', image: null },
+      },
+    }));
+    return res.json(items);
+  } catch (e) {
+    console.error('[learning:wishlist]', e.message);
+    return res.json([]);
+  }
+});
+
+app.post('/api/learning/wishlist/:courseId', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  if (!userId) return res.status(401).json({ error: 'Token không hợp lệ' });
+  const { courseId } = req.params;
+  if (!courseId) return res.status(400).json({ error: 'Thiếu courseId' });
+  try {
+    await _ensureWishlistTable();
+    const pool = _getPool();
+    const id = 'wl_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    await pool.query(`
+      INSERT INTO "Wishlist"(id, user_id, course_id, created_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (user_id, course_id) DO NOTHING
+    `, [id, userId, courseId]);
+    return res.json({ ok: true, id });
+  } catch (e) {
+    console.error('[learning:wishlist:add]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/api/learning/wishlist/:courseId', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let userId = null;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  if (!userId) return res.status(401).json({ error: 'Token không hợp lệ' });
+  const { courseId } = req.params;
+  if (!courseId) return res.status(400).json({ error: 'Thiếu courseId' });
+  try {
+    await _ensureWishlistTable();
+    const pool = _getPool();
+    await pool.query(`DELETE FROM "Wishlist" WHERE user_id = $1 AND course_id = $2`, [userId, courseId]);
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error('[learning:wishlist:remove]', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 // ── /api/learning/purchase-history ─────────────────────────────────────────
 // FE expects Enrollment[] array trực tiếp (KHÔNG wrap object).
