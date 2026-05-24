@@ -8302,10 +8302,48 @@ app.post('/api/kg/seed', (_req, res) => res.json(OK));
 // Chat / Users / Profile
 app.get('/api/chat/rooms', (_req, res) => res.json({ rooms: [], total: 0 }));
 app.get('/api/chat/users/search', (_req, res) => res.json({ users: [] }));
-app.get('/api/users/search', (_req, res) => res.json({ users: [] }));
+// (real /api/users/search handler ở TSL block ~line 1940)
 app.get('/api/users/me/profile', (_req, res) => res.json({ profile: null }));
 app.get('/api/profile', (_req, res) => res.json({ profile: null }));
 app.patch('/api/users/me/profile', (_req, res) => res.json(OK));
+
+// GET /api/users/:userId/profile — public profile (PublicProfile.tsx)
+app.get('/api/users/:userId/profile', async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    // Literal placeholder "teacher-user" → 404 gracefully (không proxy aero-backend)
+    if (userId === 'teacher-user' || userId === 'student-user' || userId === 'me') {
+      return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    }
+    const pool = _getPool();
+    // Lookup theo id HOẶC email HOẶC slug-like name
+    const { rows: users } = await pool.query(
+      `SELECT id, name, email, image, role, "createdAt"
+       FROM "User"
+       WHERE id = $1 OR LOWER(email) = LOWER($1) OR LOWER(name) = LOWER($1)
+       LIMIT 1`, [userId]);
+    if (!users.length) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+    const u = users[0];
+    // Load profile decoration nếu có
+    let profile = null;
+    try {
+      const { rows: profs } = await pool.query(
+        `SELECT bio, banner_style AS "bannerStyle", banner_image_url AS "bannerImageUrl",
+                avatar_frame AS "avatarFrame", theme_color AS "themeColor",
+                skills, socials, showcase, visibility,
+                updated_at AS "updatedAt"
+         FROM "UserProfile" WHERE user_id = $1 LIMIT 1`, [u.id]);
+      if (profs[0]) profile = { id: u.id, userId: u.id, ...profs[0] };
+    } catch { /* UserProfile table có thể chưa tồn tại */ }
+    return res.json({
+      user: { id: u.id, name: u.name, image: u.image, role: u.role || 'STUDENT', createdAt: u.createdAt },
+      profile, stats: null, achievements: [],
+    });
+  } catch (e) {
+    console.error('[users:profile]', e.message);
+    return res.status(500).json({ error: 'Lỗi tải hồ sơ' });
+  }
+});
 
 // Misc
 app.get('/api/categories', (_req, res) => res.json({ categories: [] }));
