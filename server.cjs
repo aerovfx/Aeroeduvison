@@ -1737,6 +1737,304 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   });
 })();
 
+// ── Teacher-Student Link (kết nối GV-HS) — TRƯỚC proxy teacher-service ──
+;(() => {
+  async function _ensureTSLTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "TeacherStudentLink" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        student_id  VARCHAR(255),
+        student_email VARCHAR(255),
+        status      VARCHAR(20)  DEFAULT 'pending',
+        direction   VARCHAR(20)  DEFAULT 'teacher_invites',
+        message     TEXT,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('TeacherStudentLink', [
+      ['teacher_id', "VARCHAR(255)"], ['student_id', "VARCHAR(255)"],
+      ['student_email', "VARCHAR(255)"], ['status', "VARCHAR(20) DEFAULT 'pending'"],
+      ['direction', "VARCHAR(20) DEFAULT 'teacher_invites'"], ['message', "TEXT"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('TeacherStudentLink', ['teacherId','studentId','studentEmail','status','direction','message','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_teacher ON "TeacherStudentLink"(teacher_id, status)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_tsl_student ON "TeacherStudentLink"(student_id, status)`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "TeacherInviteLink" (
+        token       VARCHAR(64)  PRIMARY KEY,
+        teacher_id  VARCHAR(255) NOT NULL,
+        label       VARCHAR(200),
+        max_uses    INTEGER,
+        used_count  INTEGER      DEFAULT 0,
+        expires_at  TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('TeacherInviteLink', [
+      ['teacher_id', "VARCHAR(255)"], ['label', "VARCHAR(200)"],
+      ['max_uses', "INTEGER"], ['used_count', "INTEGER DEFAULT 0"],
+      ['expires_at', "TIMESTAMPTZ"], ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('TeacherInviteLink', ['teacherId','label','maxUses','usedCount','expiresAt','createdAt']);
+  }
+  _ensureTSLTable().catch(e => console.error('[tsl] migration:', e.message));
+
+  function tslAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET /api/teacher-student-link/pending → { incoming, outgoing }
+  app.get('/api/teacher-student-link/pending', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows: incoming } = await pool.query(
+        `SELECT * FROM "TeacherStudentLink"
+         WHERE status = 'pending' AND direction = 'student_requests' AND teacher_id = ANY($1::text[])
+         ORDER BY created_at DESC`, [myIds]);
+      const { rows: outgoing } = await pool.query(
+        `SELECT * FROM "TeacherStudentLink"
+         WHERE status = 'pending' AND direction = 'teacher_invites' AND teacher_id = ANY($1::text[])
+         ORDER BY created_at DESC`, [myIds]);
+      return res.json({ incoming, outgoing });
+    } catch (e) { console.error('[tsl:pending]', e.message); return res.json({ incoming: [], outgoing: [] }); }
+  });
+
+  // GET /api/teacher/my-students — list HS đã approved
+  app.get('/api/teacher/my-students', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT tsl.id AS link_id, tsl.student_id, tsl.student_email, tsl.created_at,
+               u.name, u.email, u.image, u.role
+        FROM "TeacherStudentLink" tsl
+        LEFT JOIN "User" u ON u.id = tsl.student_id
+        WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
+        ORDER BY tsl.created_at DESC LIMIT 500`, [myIds]);
+      const students = rows.map(r => ({
+        id: r.student_id, linkId: r.link_id, email: r.email || r.student_email,
+        name: r.name || (r.student_email ? r.student_email.split('@')[0] : '(Chưa tên)'),
+        image: r.image, role: r.role || 'STUDENT', linkedAt: r.created_at,
+      }));
+      return res.json({ students, total: students.length });
+    } catch (e) { console.error('[tsl:my-students]', e.message); return res.json({ students: [], total: 0 }); }
+  });
+
+  // POST /api/teacher-student-link/request — HS request kết nối với GV (email)
+  app.post('/api/teacher-student-link/request', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { teacherEmail, message } = req.body || {};
+      if (!teacherEmail) return res.status(400).json({ error: 'Thiếu teacherEmail' });
+      const pool = _getPool();
+      const { rows: teachers } = await pool.query(
+        `SELECT id FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+        [String(teacherEmail).toLowerCase().trim()]);
+      if (!teachers.length) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction, message)
+        VALUES ($1, $2, $3, 'pending', 'student_requests', $4)`,
+        [linkId, teachers[0].id, myId, message || null]);
+      return res.json({ ok: true, linkId });
+    } catch (e) { console.error('[tsl:request]', e.message); return res.status(500).json({ error: 'Lỗi gửi yêu cầu' }); }
+  });
+
+  // POST /api/teacher-student-link/invite — GV mời HS (email)
+  app.post('/api/teacher-student-link/invite', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { studentEmail, message } = req.body || {};
+      if (!studentEmail) return res.status(400).json({ error: 'Thiếu studentEmail' });
+      const pool = _getPool();
+      const { rows: students } = await pool.query(
+        `SELECT id FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
+        [String(studentEmail).toLowerCase().trim()]);
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, student_email, status, direction, message)
+        VALUES ($1, $2, $3, $4, 'pending', 'teacher_invites', $5)`,
+        [linkId, myId, students[0]?.id || null, String(studentEmail).toLowerCase().trim(), message || null]);
+      return res.json({ ok: true, linkId });
+    } catch (e) { console.error('[tsl:invite]', e.message); return res.status(500).json({ error: 'Lỗi mời HS' }); }
+  });
+
+  // POST /api/teacher-student-link/:id/approve
+  app.post('/api/teacher-student-link/:id/approve', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "TeacherStudentLink" SET status = 'approved', updated_at = NOW()
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:approve]', e.message); return res.status(500).json({ error: 'Lỗi duyệt' }); }
+  });
+
+  // POST /api/teacher-student-link/:id/reject
+  app.post('/api/teacher-student-link/:id/reject', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "TeacherStudentLink" SET status = 'rejected', updated_at = NOW()
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:reject]', e.message); return res.status(500).json({ error: 'Lỗi từ chối' }); }
+  });
+
+  // DELETE /api/teacher-student-link/:id — unlink
+  app.delete('/api/teacher-student-link/:id', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "TeacherStudentLink"
+         WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
+        [req.params.id, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá' }); }
+  });
+
+  // GET /api/users/search?q=...&role=STUDENT
+  app.get('/api/users/search', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const q = String(req.query.q || '').trim();
+      const role = req.query.role;
+      if (q.length < 2) return res.json({ users: [] });
+      const pool = _getPool();
+      const params = [`%${q.toLowerCase()}%`];
+      let where = `(LOWER(email) LIKE $1 OR LOWER(name) LIKE $1)`;
+      if (role) { params.push(role); where += ` AND role = $${params.length}`; }
+      const { rows } = await pool.query(
+        `SELECT id, email, name, role, image FROM "User" WHERE ${where} LIMIT 20`, params);
+      return res.json({ users: rows });
+    } catch (e) { console.error('[users:search]', e.message); return res.json({ users: [] }); }
+  });
+
+  // ── Invite Link ────────────────────────────────────
+  // POST /api/teacher-student-link/invite-link/create
+  app.post('/api/teacher-student-link/invite-link/create', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const { label, maxUses, expiresInDays } = req.body || {};
+      const { randomBytes } = require('crypto');
+      const token = randomBytes(16).toString('hex');
+      const expiresAt = expiresInDays ? new Date(Date.now() + Number(expiresInDays) * 86400_000) : null;
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "TeacherInviteLink"(token, teacher_id, label, max_uses, expires_at)
+        VALUES ($1, $2, $3, $4, $5)`,
+        [token, myId, label || null, maxUses ? Number(maxUses) : null, expiresAt]);
+      const url = `https://inphysic.com/teacher-invite/${token}`;
+      return res.json({ token, url, label: label || null, maxUses: maxUses || null, expiresAt });
+    } catch (e) { console.error('[tsl:link-create]', e.message); return res.status(500).json({ error: 'Lỗi tạo link mời' }); }
+  });
+
+  // GET /api/teacher-student-link/invite-link/list
+  app.get('/api/teacher-student-link/invite-link/list', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT token, label, max_uses AS "maxUses", used_count AS "usedCount",
+                expires_at AS "expiresAt", created_at AS "createdAt"
+         FROM "TeacherInviteLink" WHERE teacher_id = ANY($1::text[]) ORDER BY created_at DESC LIMIT 50`,
+        [myIds]);
+      const links = rows.map(r => ({ ...r, url: `https://inphysic.com/teacher-invite/${r.token}` }));
+      return res.json({ links });
+    } catch (e) { console.error('[tsl:link-list]', e.message); return res.json({ links: [] }); }
+  });
+
+  // DELETE /api/teacher-student-link/invite-link/:token
+  app.delete('/api/teacher-student-link/invite-link/:token', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    try {
+      const myIds = _ids(decoded);
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "TeacherInviteLink" WHERE token = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.token, myIds]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[tsl:link-delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá link' }); }
+  });
+
+  // GET /api/teacher-student-link/invite-link/:token/info — public, không cần auth
+  app.get('/api/teacher-student-link/invite-link/:token/info', async (req, res) => {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT til.label, til.max_uses AS "maxUses", til.used_count AS "usedCount",
+               til.expires_at AS "expiresAt", u.name AS "teacherName", u.email AS "teacherEmail", u.image AS "teacherImage"
+        FROM "TeacherInviteLink" til
+        LEFT JOIN "User" u ON u.id = til.teacher_id
+        WHERE til.token = $1`, [req.params.token]);
+      if (!rows.length) return res.status(404).json({ error: 'Link không hợp lệ' });
+      const r = rows[0];
+      const expired = r.expiresAt && new Date(r.expiresAt) < new Date();
+      const full = r.maxUses && r.usedCount >= r.maxUses;
+      if (expired) return res.status(410).json({ error: 'Link đã hết hạn' });
+      if (full) return res.status(410).json({ error: 'Link đã đạt giới hạn sử dụng' });
+      return res.json({
+        teacher: { name: r.teacherName, email: r.teacherEmail, image: r.teacherImage },
+        label: r.label, maxUses: r.maxUses, usedCount: r.usedCount, expiresAt: r.expiresAt,
+      });
+    } catch (e) { console.error('[tsl:link-info]', e.message); return res.status(500).json({ error: 'Lỗi tải link' }); }
+  });
+
+  // POST /api/teacher-student-link/invite-link/:token/join
+  app.post('/api/teacher-student-link/invite-link/:token/join', async (req, res) => {
+    const decoded = tslAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      const { rows: links } = await pool.query(
+        `SELECT * FROM "TeacherInviteLink" WHERE token = $1`, [req.params.token]);
+      if (!links.length) return res.status(404).json({ error: 'Link không hợp lệ' });
+      const link = links[0];
+      if (link.expires_at && new Date(link.expires_at) < new Date()) return res.status(410).json({ error: 'Link đã hết hạn' });
+      if (link.max_uses && link.used_count >= link.max_uses) return res.status(410).json({ error: 'Link đã đạt giới hạn' });
+      // Tạo link approved ngay (HS click vào → tự động kết nối)
+      const { randomUUID } = require('crypto');
+      const linkId = randomUUID();
+      await pool.query(`
+        INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction)
+        VALUES ($1, $2, $3, 'approved', 'student_requests')`,
+        [linkId, link.teacher_id, myId]);
+      await pool.query(`UPDATE "TeacherInviteLink" SET used_count = used_count + 1 WHERE token = $1`, [req.params.token]);
+      return res.json({ ok: true, status: 'approved', linkId, message: 'Đã kết nối thành công với GV.' });
+    } catch (e) { console.error('[tsl:link-join]', e.message); return res.status(500).json({ error: 'Lỗi kết nối' }); }
+  });
+})();
+
 // ── Lesson Plans CRUD — TRƯỚC proxy teacher-service ──
 // Bảng "LessonPlan" được migrate ở section riêng (line ~6582).
 // Handlers ở đây để Express match trước proxy /api/teacher/*.
