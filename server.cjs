@@ -10425,13 +10425,103 @@ app.get('/api/admin/analytics/score-distribution', (req, res) => res.json({
 app.get('/api/cameras', (_req, res) => res.json({ cameras: [], total: 0 }));
 
 // KG
-app.get('/api/kg/search', (req, res) => res.json({ nodes: [], edges: [], query: req.query.q || '' }));
-app.get('/api/kg/my-brain', (_req, res) => res.json({ nodes: [], edges: [] }));
-app.get('/api/kg/mastery/me', (_req, res) => res.json({ mastery: [] }));
-app.get('/api/kg/path/find', (_req, res) => res.json({ path: [] }));
-app.get('/api/kg/sources/lesson-plans', (_req, res) => res.json({ sources: [] }));
-app.post('/api/kg/extract', (_req, res) => res.json({ nodes: [], edges: [] }));
-app.post('/api/kg/seed', (_req, res) => res.json(OK));
+// ── /api/kg/* Knowledge Graph stubs với shape match FE interface ──
+// Tránh ErrorBoundary crash khi page truy cập field undefined.
+
+app.get('/api/kg/search', (req, res) => res.json({
+  success: true, items: [], query: String(req.query.q || ''),
+}));
+
+app.get('/api/kg/node/:id', (req, res) => res.json({
+  success: true,
+  node: { id: req.params.id, label: req.params.id, type: 'topic', description: null },
+  neighbors: [], edges: [], notes: [], comments: [],
+}));
+
+app.get('/api/kg/expand/:id', (req, res) => res.json({
+  success: true,
+  rootId: req.params.id,
+  nodes: [], edges: [], depth: Number(req.query.depth) || 1,
+}));
+
+app.get('/api/kg/my-brain', (_req, res) => res.json({
+  success: true,
+  mastery: { total: 0, mastered: 0, learning: 0, weak: 0, avgScore: 0 },
+  notes: { total: 0, shared: 0 },
+  comments: { total: 0, totalUpvotes: 0 },
+  suggestions: { total: 0, approved: 0 },
+}));
+
+app.get('/api/kg/mastery/me', (_req, res) => res.json({
+  success: true, mastery: {}, count: 0,
+}));
+
+app.get('/api/kg/mastery/weak', (_req, res) => res.json({
+  success: true, items: [], count: 0,
+}));
+
+app.post('/api/kg/mastery/upsert', (_req, res) => res.json({
+  success: true, upserted: 0, total: 0,
+}));
+
+app.post('/api/kg/path/find', (_req, res) => res.json({
+  success: true, path: [], totalDuration: 0, totalXP: 0, found: false,
+}));
+
+app.post('/api/kg/path/save-as-learning-path', (_req, res) => res.json({
+  success: true, learningPathId: null, message: 'Chưa implement',
+}));
+
+app.get('/api/kg/sources/lesson-plans', (_req, res) => res.json({
+  success: true, items: [],
+}));
+
+app.post('/api/kg/extract', (_req, res) => res.json({
+  success: true, nodes: [], edges: [], extracted: 0,
+}));
+
+app.get('/api/kg/seed', (_req, res) => res.json({
+  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
+  message: 'KG seed endpoint chưa kết nối Rust backend',
+}));
+app.post('/api/kg/seed', (_req, res) => res.json({
+  success: true, nodeCount: 0, edgeCount: 0, edgeInserted: 0,
+  message: 'KG seed endpoint chưa kết nối Rust backend',
+}));
+
+app.post('/api/kg/link-similarity', (_req, res) => res.json({
+  success: true, linked: 0, scanned: 0, threshold: 0.7, tookMs: 0,
+}));
+
+// Notes (per node)
+app.get('/api/kg/nodes/:id/note', (_req, res) => res.json({ success: true, note: null }));
+app.put('/api/kg/nodes/:id/note', (_req, res) => res.json({ success: true, deleted: false }));
+
+// Comments + shared notes
+app.get('/api/kg/nodes/:id/comments', (_req, res) => res.json({
+  success: true, comments: [], sharedNotes: [],
+}));
+app.post('/api/kg/nodes/:id/comments', (_req, res) => res.json({ success: true, id: '' }));
+app.post('/api/kg/comments/:id/upvote', (_req, res) => res.json({ success: true, action: 'added' }));
+app.delete('/api/kg/comments/:id', (_req, res) => res.json({ success: true }));
+
+// Suggestions (collaborative editing)
+app.get('/api/kg/suggestions', (_req, res) => res.json({ success: true, suggestions: [], total: 0 }));
+app.post('/api/kg/suggestions', (_req, res) => res.json({ success: true, id: '', message: 'Đề xuất đã ghi nhận' }));
+app.post('/api/kg/suggestions/:id/upvote', (_req, res) => res.json({ success: true, upvotes: 0 }));
+
+// Brain v2 Phoenix-style smart recommendation
+app.post('/api/kg/brain/recommend', (req, res) => res.json({
+  success: true,
+  audience: req.body?.audience || 'student',
+  focus: req.body?.focus || 'next-to-learn',
+  count: 0, items: [],
+  pipeline: { hydrateMs: 0, sourceMs: 0, enrichMs: 0, filterMs: 0, scoreMs: 0, totalMs: 0 },
+  stats: { candidatesCollected: 0, afterFilter: 0, finalSelected: 0, recentVisitsLoaded: 0, masteryNodesLoaded: 0 },
+}));
+
+// Visits tracking
+app.post('/api/kg/visits', (_req, res) => res.json({ success: true }));
 
 // Chat / Users / Profile
 app.get('/api/chat/rooms', (_req, res) => res.json({ rooms: [], total: 0 }));
