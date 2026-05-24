@@ -3128,6 +3128,92 @@ if (USE_NODEJS_QUESTIONS) {
     }
   });
 
+  // ── POST /api/questions/fix-latex — bulk scan + auto-fix LaTeX lỗi phổ biến ──
+  // Body: { limit?: number=500, subject?: string }
+  // Response: { data: { scanned, fixed } }
+  function _fixLatexString(s) {
+    if (typeof s !== 'string' || !s) return { out: s, changed: false };
+    let out = s;
+    // 1. Smart quotes → straight (LaTeX nuốt curly quotes)
+    out = out.replace(/[‘’]/g, "'").replace(/[“”]/g, '"');
+    // 2. Unicode minus / en-dash / em-dash → ASCII -
+    out = out.replace(/[−–—]/g, '-');
+    // 3. Common typo: \fra{...}{...} → \frac, \frqc → \frac
+    out = out.replace(/\\fra(?=[^c])/g, '\\frac').replace(/\\frqc\b/g, '\\frac');
+    // 4. \sqrtX → \sqrt{X} (single char or {...})
+    out = out.replace(/\\sqrt(\d)/g, '\\sqrt{$1}');
+    // 5. Bare ^ / _ ở math mode follow by 2+ chars chưa có {} → wrap
+    //    VD: x^23 → x^{23}, x_ab → x_{ab}. Chỉ apply khi đã nằm trong $...$
+    //    (đơn giản: apply cho dollar segments)
+    out = out.replace(/(\$[^$]*\$)/g, (seg) => {
+      return seg
+        .replace(/([a-zA-Z\d])\^([a-zA-Z0-9]{2,})/g, '$1^{$2}')
+        .replace(/([a-zA-Z\d])_([a-zA-Z0-9]{2,})/g, '$1_{$2}');
+    });
+    // 6. Mathit triple-dot ⋯ ⋅ ⋮ → \cdots / \cdot / \vdots
+    out = out.replace(/⋯/g, '\\cdots').replace(/⋅/g, '\\cdot').replace(/⋮/g, '\\vdots');
+    // 7. Degree symbol ° → ^{\circ} khi nằm sau số trong math
+    out = out.replace(/(\$[^$]*\$)/g, (seg) => seg.replace(/(\d)°/g, '$1^{\\circ}'));
+    // 8. Greek letters viết tắt: \pi (giữ nguyên), nhưng \Pi typo Pi → \Pi
+    //    (skip — quá rủi ro false-positive)
+    // 9. Multiple spaces → single (chỉ ngoài math segments)
+    out = out.replace(/  +/g, ' ');
+    return { out, changed: out !== s };
+  }
+
+  app.post('/api/questions/fix-latex', async (req, res) => {
+    try {
+      const pool = getQPool();
+      const limit = Math.min(Number(req.body?.limit) || 500, 5000);
+      const subject = req.body?.subject ? String(req.body.subject) : null;
+
+      const params = [];
+      let where = '1=1';
+      if (subject) { params.push(subject); where += ` AND subject = $${params.length}`; }
+      params.push(limit);
+      const { rows } = await pool.query(
+        `SELECT id, content, explanation, options FROM "Question"
+         WHERE ${where} ORDER BY "createdAt" DESC LIMIT $${params.length}`,
+        params);
+
+      let scanned = 0, fixed = 0;
+      for (const r of rows) {
+        scanned++;
+        const c = _fixLatexString(r.content || '');
+        const e = _fixLatexString(r.explanation || '');
+        let optionsChanged = false;
+        let nextOptions = r.options;
+        if (Array.isArray(r.options)) {
+          const out = r.options.map(o => {
+            if (typeof o === 'string') {
+              const f = _fixLatexString(o);
+              if (f.changed) optionsChanged = true;
+              return f.out;
+            } else if (o && typeof o === 'object' && typeof o.text === 'string') {
+              const f = _fixLatexString(o.text);
+              if (f.changed) optionsChanged = true;
+              return { ...o, text: f.out };
+            }
+            return o;
+          });
+          if (optionsChanged) nextOptions = out;
+        }
+        if (c.changed || e.changed || optionsChanged) {
+          await pool.query(
+            `UPDATE "Question" SET content = $1, explanation = $2, options = $3::jsonb, "updatedAt" = NOW()
+             WHERE id = $4`,
+            [c.out, e.out, JSON.stringify(nextOptions || []), r.id]);
+          fixed++;
+        }
+      }
+      console.log(`[questions:fix-latex] scanned=${scanned} fixed=${fixed} subject=${subject || 'all'}`);
+      return res.json({ data: { scanned, fixed } });
+    } catch (err) {
+      console.error('[questions:fix-latex] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── GET /api/questions (& /api/question-bank alias) ────────
   app.get('/api/questions', handleListQuestions);
   app.get('/api/question-bank', handleListQuestions);
@@ -8501,7 +8587,7 @@ app.get('/api/questions/taxonomy', (_req, res) => res.json({
   difficulties: ['NB','TH','VD','VDC'],
   types: ['multiple_choice','true_false','essay','fill_blank'],
 }));
-app.post('/api/questions/fix-latex', (req, res) => res.json({ fixed: req.body?.content || '', changes: [] }));
+// (real handler at line ~3130 inside USE_NODEJS_QUESTIONS block — bulk scan + update Question table)
 
 // ── Exams CRUD ──
 // /api/exams + /api/teacher/exams — list đề: của mình + public của người khác
