@@ -1925,25 +1925,53 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     } catch (e) { console.error('[tsl:my-students]', e.message); return res.json({ students: [], total: 0 }); }
   });
 
-  // POST /api/teacher-student-link/request — HS request kết nối với GV (email)
+  // POST /api/teacher-student-link/request — HS request kết nối GV
+  // Chấp nhận teacherId HOẶC teacherEmail (FE MyTeachers card click gửi teacherId)
   app.post('/api/teacher-student-link/request', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     const myId = decoded.userId || decoded.id || decoded.sub;
     try {
-      const { teacherEmail, message } = req.body || {};
-      if (!teacherEmail) return res.status(400).json({ error: 'Thiếu teacherEmail' });
+      const { teacherId, teacherEmail, message } = req.body || {};
+      if (!teacherId && !teacherEmail) {
+        return res.status(400).json({ error: 'Thiếu teacherId hoặc teacherEmail' });
+      }
       const pool = _getPool();
-      const { rows: teachers } = await pool.query(
-        `SELECT id FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
-        [String(teacherEmail).toLowerCase().trim()]);
-      if (!teachers.length) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      // Resolve teacher từ id HOẶC email
+      let teacherRow = null;
+      if (teacherId) {
+        const { rows } = await pool.query(
+          `SELECT id, name, email FROM "User" WHERE id = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+          [String(teacherId)]);
+        teacherRow = rows[0] || null;
+      }
+      if (!teacherRow && teacherEmail) {
+        const { rows } = await pool.query(
+          `SELECT id, name, email FROM "User" WHERE LOWER(email) = $1 AND role IN ('TEACHER','ADMIN') LIMIT 1`,
+          [String(teacherEmail).toLowerCase().trim()]);
+        teacherRow = rows[0] || null;
+      }
+      if (!teacherRow) return res.status(404).json({ error: 'Không tìm thấy GV' });
+      // Self-link check
+      if (teacherRow.id === myId) {
+        return res.status(400).json({ error: 'Không thể kết nối với chính mình' });
+      }
+      // Check duplicate pending request
+      const { rows: existing } = await pool.query(`
+        SELECT id, status FROM "TeacherStudentLink"
+        WHERE teacher_id = $1 AND student_id = $2 AND status IN ('pending', 'approved')
+        LIMIT 1
+      `, [teacherRow.id, myId]);
+      if (existing[0]) {
+        const msg = existing[0].status === 'approved' ? 'Đã kết nối với GV này' : 'Đã gửi yêu cầu trước đó (đang chờ duyệt)';
+        return res.status(409).json({ error: msg, linkId: existing[0].id });
+      }
       const { randomUUID } = require('crypto');
       const linkId = randomUUID();
       await pool.query(`
         INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, status, direction, message)
         VALUES ($1, $2, $3, 'pending', 'student_requests', $4)`,
-        [linkId, teachers[0].id, myId, message || null]);
-      return res.json({ ok: true, linkId });
+        [linkId, teacherRow.id, myId, message || null]);
+      return res.json({ ok: true, linkId, teacherName: teacherRow.name });
     } catch (e) { console.error('[tsl:request]', e.message); return res.status(500).json({ error: 'Lỗi gửi yêu cầu' }); }
   });
 
@@ -1952,18 +1980,47 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     const myId = decoded.userId || decoded.id || decoded.sub;
     try {
-      const { studentEmail, message } = req.body || {};
-      if (!studentEmail) return res.status(400).json({ error: 'Thiếu studentEmail' });
+      const { studentId, studentEmail, message } = req.body || {};
+      if (!studentId && !studentEmail) {
+        return res.status(400).json({ error: 'Thiếu studentId hoặc studentEmail' });
+      }
       const pool = _getPool();
-      const { rows: students } = await pool.query(
-        `SELECT id FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
-        [String(studentEmail).toLowerCase().trim()]);
+      // Resolve student từ id HOẶC email
+      let studentRow = null;
+      if (studentId) {
+        const { rows } = await pool.query(
+          `SELECT id, email FROM "User" WHERE id = $1 LIMIT 1`, [String(studentId)]);
+        studentRow = rows[0] || null;
+      }
+      if (!studentRow && studentEmail) {
+        const { rows } = await pool.query(
+          `SELECT id, email FROM "User" WHERE LOWER(email) = $1 LIMIT 1`,
+          [String(studentEmail).toLowerCase().trim()]);
+        studentRow = rows[0] || null;
+      }
+      const finalStudentId = studentRow?.id || null;
+      const finalStudentEmail = studentRow?.email || (studentEmail ? String(studentEmail).toLowerCase().trim() : null);
+      // Self-invite check
+      if (finalStudentId === myId) {
+        return res.status(400).json({ error: 'Không thể mời chính mình' });
+      }
+      // Check duplicate (chỉ check khi có studentId để khớp PK)
+      if (finalStudentId) {
+        const { rows: existing } = await pool.query(`
+          SELECT id, status FROM "TeacherStudentLink"
+          WHERE teacher_id = $1 AND student_id = $2 AND status IN ('pending', 'approved') LIMIT 1
+        `, [myId, finalStudentId]);
+        if (existing[0]) {
+          const msg = existing[0].status === 'approved' ? 'HS đã kết nối' : 'Đã mời HS này (đang chờ)';
+          return res.status(409).json({ error: msg, linkId: existing[0].id });
+        }
+      }
       const { randomUUID } = require('crypto');
       const linkId = randomUUID();
       await pool.query(`
         INSERT INTO "TeacherStudentLink"(id, teacher_id, student_id, student_email, status, direction, message)
         VALUES ($1, $2, $3, $4, 'pending', 'teacher_invites', $5)`,
-        [linkId, myId, students[0]?.id || null, String(studentEmail).toLowerCase().trim(), message || null]);
+        [linkId, myId, finalStudentId, finalStudentEmail, message || null]);
       return res.json({ ok: true, linkId });
     } catch (e) { console.error('[tsl:invite]', e.message); return res.status(500).json({ error: 'Lỗi mời HS' }); }
   });
