@@ -518,7 +518,7 @@ export default function CameraManagement() {
       // Demo camera (AI analysis sample) — luôn có cho test
       const demoCamera: CameraItem = {
         id: 'cam_demo', name: 'AI Demo Analysis',
-        rtspUrl: '/api/camera/file/20260316003128604.MP4',
+        rtspUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
         brand: 'AeroAI', location: 'Lab 101', locationType: 'lab',
         className: 'Lớp 11A2', status: 'online', studentCount: 40,
         kind: 'hardware',
@@ -603,7 +603,7 @@ export default function CameraManagement() {
 
   function loadMockData() {
     const mock: CameraItem[] = [
-      { id: 'cam_demo',  name: 'AI Demo Analysis', rtspUrl: '/api/camera/file/20260316003128604.MP4', brand: 'AeroAI',    location: 'Lab 101',      locationType: 'lab',       className: 'Lớp 11A2', status: 'online', studentCount: 40 },
+      { id: 'cam_demo',  name: 'AI Demo Analysis', rtspUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', brand: 'AeroAI',    location: 'Lab 101',      locationType: 'lab',       className: 'Lớp 11A2', status: 'online', studentCount: 40 },
       { id: 'cam_1',     name: 'Camera 9A1 - P1',  rtspUrl: '...',                                     brand: 'Dahua',     location: 'Phòng 201',    locationType: 'classroom', className: 'Lớp 9A1',  status: 'online', studentCount: 35 },
       { id: 'cam_2',     name: 'Camera 9A1 - P2',  rtspUrl: '...',                                     brand: 'Dahua',     location: 'Phòng 201',    locationType: 'classroom', className: 'Lớp 9A1',  status: 'online', studentCount: 35 },
       { id: 'cam_3',     name: 'Camera 10B2',       rtspUrl: '...',                                     brand: 'HikVision', location: 'Phòng 301',    locationType: 'classroom', className: 'Lớp 10B2', status: 'online', studentCount: 32 },
