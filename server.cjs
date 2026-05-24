@@ -6969,6 +6969,206 @@ app.delete('/api/classes/:id/students/:studentId', async (req, res) => {
   } catch (e) { console.error('[classes:students:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá HS' }); }
 });
 
+// ── Class Subjects + Gradebook (TT58/TT22 Bộ GD&ĐT) ──────────────
+;(() => {
+  async function _ensureGradebookTables() {
+    const pool = _getPool();
+    // Môn học của 1 lớp (subject list per class)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "ClassSubject" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        class_id    VARCHAR(36)  NOT NULL,
+        teacher_id  VARCHAR(255) NOT NULL,
+        subject     VARCHAR(100) NOT NULL,
+        created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('ClassSubject', [
+      ['class_id',   "VARCHAR(36)"],
+      ['teacher_id', "VARCHAR(255)"],
+      ['subject',    "VARCHAR(100)"],
+      ['created_at', "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('ClassSubject', ['classId','teacherId','subject','createdAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_classsubj_class ON "ClassSubject"(class_id)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_classsubj ON "ClassSubject"(class_id, subject)`);
+
+    // Bảng điểm: 1 row mỗi (class, subject, semester, student)
+    // ddgtx: JSONB array điểm thường xuyên; ddggk/ddgck: điểm giữa kì/cuối kì
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "Gradebook" (
+        id            VARCHAR(36)  PRIMARY KEY,
+        class_id      VARCHAR(36)  NOT NULL,
+        subject       VARCHAR(100) NOT NULL,
+        semester      VARCHAR(10)  NOT NULL,
+        student_id    VARCHAR(36)  NOT NULL,
+        ddgtx         JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        ddggk         NUMERIC(4,2),
+        ddgck         NUMERIC(4,2),
+        note_progress TEXT,
+        note_record   TEXT,
+        created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('Gradebook', [
+      ['class_id',     "VARCHAR(36)"],
+      ['subject',      "VARCHAR(100)"],
+      ['semester',     "VARCHAR(10)"],
+      ['student_id',   "VARCHAR(36)"],
+      ['ddgtx',        "JSONB DEFAULT '[]'::jsonb"],
+      ['ddggk',        "NUMERIC(4,2)"],
+      ['ddgck',        "NUMERIC(4,2)"],
+      ['note_progress',"TEXT"],
+      ['note_record',  "TEXT"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('Gradebook', ['classId','subject','semester','studentId','ddgtx','ddggk','ddgck','noteProgress','noteRecord','createdAt','updatedAt']);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_gradebook ON "Gradebook"(class_id, subject, semester, student_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_gradebook_class ON "Gradebook"(class_id, subject, semester)`);
+  }
+  _ensureGradebookTables().catch(e => console.error('[gradebook] migration:', e.message));
+
+  // GET /api/classes/:classId/subjects → { subjects: string[] }
+  app.get('/api/classes/:classId/subjects', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      // Verify lớp thuộc GV
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.classId, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const { rows } = await pool.query(
+        `SELECT subject FROM "ClassSubject" WHERE class_id = $1 ORDER BY subject`,
+        [req.params.classId]);
+      return res.json({ subjects: rows.map(r => r.subject) });
+    } catch (e) { console.error('[gb:subjects:list]', e.message); return res.json({ subjects: [] }); }
+  });
+
+  // POST /api/classes/:classId/subjects — body: { subject }
+  app.post('/api/classes/:classId/subjects', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const subject = String(req.body?.subject || '').trim();
+      if (!subject) return res.status(400).json({ error: 'Thiếu tên môn' });
+      if (subject.length > 100) return res.status(400).json({ error: 'Tên môn quá dài (max 100 ký tự)' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.classId, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại hoặc không thuộc quyền của bạn' });
+      const { randomUUID } = require('crypto');
+      try {
+        await pool.query(
+          `INSERT INTO "ClassSubject"(id, class_id, teacher_id, subject) VALUES ($1,$2,$3,$4)`,
+          [randomUUID(), req.params.classId, decoded.sub, subject]);
+      } catch (e) {
+        if (e.code === '23505') return res.status(409).json({ error: `Môn "${subject}" đã tồn tại trong lớp này` });
+        throw e;
+      }
+      return res.json({ ok: true, subject });
+    } catch (e) { console.error('[gb:subjects:add]', e.message); return res.status(500).json({ error: 'Lỗi thêm môn' }); }
+  });
+
+  // DELETE /api/classes/:classId/subjects/:subject — gỡ môn (kèm điểm)
+  app.delete('/api/classes/:classId/subjects/:subject', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+        [req.params.classId, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const subject = decodeURIComponent(req.params.subject);
+      await pool.query(`DELETE FROM "Gradebook" WHERE class_id = $1 AND subject = $2`, [req.params.classId, subject]);
+      await pool.query(`DELETE FROM "ClassSubject" WHERE class_id = $1 AND subject = $2`, [req.params.classId, subject]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[gb:subjects:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá môn' }); }
+  });
+
+  // GET /api/teacher/gradebook?classId=&subject=&semester=
+  app.get('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester } = req.query;
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+        [classId, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const [studs, grds] = await Promise.all([
+        pool.query(
+          `SELECT id, stt, ho_ten AS "hoTen", ma_dinh_danh AS "maDinhDanh",
+                  ngay_sinh AS "ngaySinh", gioi_tinh AS "gioiTinh"
+           FROM "ClassStudent" WHERE class_id = $1 ORDER BY stt NULLS LAST, ho_ten`,
+          [classId]),
+        pool.query(
+          `SELECT student_id AS "studentId", ddgtx, ddggk, ddgck,
+                  note_progress AS "noteProgress", note_record AS "noteRecord"
+           FROM "Gradebook" WHERE class_id = $1 AND subject = $2 AND semester = $3`,
+          [classId, subject, semester]),
+      ]);
+      const grades = {};
+      for (const g of grds.rows) {
+        grades[g.studentId] = {
+          ddgtx: Array.isArray(g.ddgtx) ? g.ddgtx.map(v => v == null ? null : Number(v)) : [],
+          ddggk: g.ddggk == null ? null : Number(g.ddggk),
+          ddgck: g.ddgck == null ? null : Number(g.ddgck),
+          noteProgress: g.noteProgress || '',
+          noteRecord:   g.noteRecord   || '',
+        };
+      }
+      return res.json({ students: studs.rows, grades });
+    } catch (e) { console.error('[gb:get]', e.message); return res.status(500).json({ error: 'Lỗi tải sổ điểm' }); }
+  });
+
+  // POST /api/teacher/gradebook — body: { classId, subject, semester, rows: [...] }
+  app.post('/api/teacher/gradebook', async (req, res) => {
+    const decoded = _classAuth(req, res); if (!decoded) return;
+    try {
+      const { classId, subject, semester, rows = [] } = req.body || {};
+      if (!classId || !subject || !semester) return res.status(400).json({ error: 'Thiếu classId/subject/semester' });
+      if (!Array.isArray(rows)) return res.status(400).json({ error: 'rows phải là array' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "Class" WHERE id = $1 AND teacher_id = $2`,
+        [classId, decoded.sub]);
+      if (!rowCount) return res.status(404).json({ error: 'Lớp không tồn tại' });
+      const { randomUUID } = require('crypto');
+      const clamp = v => {
+        if (v == null || v === '') return null;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return null;
+        return Math.max(0, Math.min(10, Math.round(n * 100) / 100));
+      };
+      let saved = 0;
+      for (const r of rows) {
+        if (!r?.studentId) continue;
+        const ddgtx = Array.isArray(r.ddgtx) ? r.ddgtx.map(clamp) : [];
+        const ddggk = clamp(r.ddggk);
+        const ddgck = clamp(r.ddgck);
+        const noteP = r.noteProgress != null ? String(r.noteProgress) : null;
+        const noteR = r.noteRecord   != null ? String(r.noteRecord)   : null;
+        await pool.query(`
+          INSERT INTO "Gradebook"(id, class_id, subject, semester, student_id,
+                                  ddgtx, ddggk, ddgck, note_progress, note_record, updated_at)
+          VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,NOW())
+          ON CONFLICT (class_id, subject, semester, student_id) DO UPDATE
+            SET ddgtx = EXCLUDED.ddgtx, ddggk = EXCLUDED.ddggk, ddgck = EXCLUDED.ddgck,
+                note_progress = EXCLUDED.note_progress, note_record = EXCLUDED.note_record,
+                updated_at = NOW()
+        `, [randomUUID(), classId, subject, semester, r.studentId,
+            JSON.stringify(ddgtx), ddggk, ddgck, noteP, noteR]);
+        saved++;
+      }
+      return res.json({ ok: true, saved });
+    } catch (e) { console.error('[gb:save]', e.message); return res.status(500).json({ error: 'Lỗi lưu sổ điểm' }); }
+  });
+})();
+
 // ── Analytics pageview — PHẢI trước catch-all /api proxy ────────
 // Rust aero-backend không serve /api/analytics/pageview → 503 spam console
 // mỗi route change. Handler nhẹ: insert vào "PageView" (best-effort) + 204.
