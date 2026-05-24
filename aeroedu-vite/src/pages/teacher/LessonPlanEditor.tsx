@@ -42,12 +42,23 @@ export default function LessonPlanEditor() {
   const [backupAt, setBackupAt] = useState<string | null>(null)
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedContent = useRef('')
+  // Snapshot of last successfully-saved fields → tránh save thừa khi không có diff
+  const lastSaved = useRef({ title: '', content: '', subject: '', grade: '' })
+  // Guard chống concurrent saves + tránh fire ngay khi load xong
+  const savingRef = useRef(false)
+  const hydratedRef = useRef(false)
+  // Latest field values cho closure trong timer (tránh stale state)
+  const latestRef = useRef({ title: '', content: '', subject: '', grade: '' })
+  latestRef.current = { title, content, subject, grade }
+  // Error suppression: nếu 401, dừng auto-save spam
+  const authFailedRef = useRef(false)
 
   // Load plan
   useEffect(() => {
     if (!id) return
     setLoading(true)
+    hydratedRef.current = false
+    authFailedRef.current = false
     lessonPlanService.get(id)
       .then(p => {
         setPlan(p)
@@ -57,7 +68,14 @@ export default function LessonPlanEditor() {
         setContent(p.content || '')
         setBackupUrl(p.gcsBackupUrl)
         setBackupAt(p.gcsBackupAt)
-        lastSavedContent.current = p.content || ''
+        lastSaved.current = {
+          title: p.title,
+          content: p.content || '',
+          subject: p.subject || '',
+          grade: p.grade || '',
+        }
+        // Đánh dấu hydrated SAU 1 tick để effect đầu (do setState batch) không trigger save
+        setTimeout(() => { hydratedRef.current = true }, 50)
       })
       .catch(e => {
         if (e?.response?.status === 404) setNotFound(true)
@@ -66,50 +84,83 @@ export default function LessonPlanEditor() {
       .finally(() => setLoading(false))
   }, [id])
 
-  // Auto-save: debounce 2s sau mỗi thay đổi
-  const triggerAutoSave = useCallback(() => {
-    if (!id) return
-    setSaved(false)
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      saveTimer.current = null
-      setSaving(true)
-      try {
-        const updated = await lessonPlanService.update(id, {
-          title: title.trim() || 'Giáo án mới',
-          content,
-          subject: subject || undefined,
-          grade: grade || undefined,
-        })
-        setPlan(updated)
-        lastSavedContent.current = content
-        setSaved(true)
-      } catch (e: any) {
-        toast.error(e?.response?.data?.error || 'Lỗi auto-save')
-      } finally { setSaving(false) }
-    }, 2000)
-  }, [id, title, content, subject, grade])
-
-  useEffect(() => {
-    if (loading || !plan) return
-    triggerAutoSave()
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
-  }, [title, content, subject, grade, loading, plan, triggerAutoSave])
-
-  const handleSaveNow = async () => {
-    if (!id) return
-    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+  // Hàm save chung (skip nếu không có diff hoặc đang save)
+  const doSave = useCallback(async (showToast: boolean) => {
+    if (!id) return false
+    if (savingRef.current) return false
+    const cur = latestRef.current
+    const sv = lastSaved.current
+    const nothingChanged =
+      cur.title.trim() === sv.title.trim() &&
+      cur.content === sv.content &&
+      (cur.subject || '') === (sv.subject || '') &&
+      (cur.grade || '') === (sv.grade || '')
+    if (nothingChanged) {
+      setSaved(true)
+      if (showToast) toast.success('Đã lưu')
+      return true
+    }
+    savingRef.current = true
     setSaving(true)
     try {
-      await lessonPlanService.update(id, {
-        title: title.trim() || 'Giáo án mới',
-        content, subject: subject || undefined, grade: grade || undefined,
+      const updated = await lessonPlanService.update(id, {
+        title: cur.title.trim() || 'Giáo án mới',
+        content: cur.content,
+        subject: cur.subject || undefined,
+        grade: cur.grade || undefined,
       })
+      // ⚠ KHÔNG setPlan để tránh loop deps; chỉ đồng bộ snapshot
+      lastSaved.current = {
+        title: updated.title,
+        content: cur.content,
+        subject: cur.subject,
+        grade: cur.grade,
+      }
       setSaved(true)
-      toast.success('Đã lưu')
+      authFailedRef.current = false
+      if (showToast) toast.success('Đã lưu')
+      return true
     } catch (e: any) {
-      toast.error(e?.response?.data?.error || 'Lỗi lưu')
-    } finally { setSaving(false) }
+      const status = e?.response?.status
+      if (status === 401 || status === 403) {
+        if (!authFailedRef.current) {
+          authFailedRef.current = true
+          toast.error('Phiên đăng nhập hết hạn — vui lòng đăng nhập lại để tiếp tục lưu')
+        }
+      } else if (showToast || !authFailedRef.current) {
+        toast.error(e?.response?.data?.error || (showToast ? 'Lỗi lưu' : 'Lỗi auto-save'))
+      }
+      return false
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
+  }, [id])
+
+  // Auto-save: debounce 2s sau mỗi thay đổi (chỉ trigger khi đã hydrated)
+  useEffect(() => {
+    if (loading || !hydratedRef.current) return
+    if (authFailedRef.current) return  // không spam khi token hỏng
+    const cur = { title, content, subject, grade }
+    const sv = lastSaved.current
+    const changed =
+      cur.title.trim() !== sv.title.trim() ||
+      cur.content !== sv.content ||
+      (cur.subject || '') !== (sv.subject || '') ||
+      (cur.grade || '') !== (sv.grade || '')
+    if (!changed) return
+    setSaved(false)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null
+      doSave(false)
+    }, 2000)
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  }, [title, content, subject, grade, loading, doSave])
+
+  const handleSaveNow = async () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    await doSave(true)
   }
 
   const handleDownloadWord = () => {
