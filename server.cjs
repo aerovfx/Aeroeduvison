@@ -4583,7 +4583,14 @@ if (USE_NODEJS_QUESTIONS) {
       ['teacher_id',    "VARCHAR(255)"],
       ['created_at',    "TIMESTAMPTZ DEFAULT NOW()"],
     ]);
-    await _dropLegacyNotNull('AssignmentTarget', ['assignmentId','type','targetId','label','teacherId','createdAt']);
+    await _dropLegacyNotNull('AssignmentTarget', ['assignmentId','type','targetType','targetId','label','teacherId','createdAt']);
+    // Backfill nếu Rust service đã có legacy camelCase rows
+    await _backfillSnakeFromCamel('AssignmentTarget', [
+      ['assignment_id', ['assignmentId']],
+      ['type',          ['targetType']],
+      ['target_id',     ['targetId']],
+      ['teacher_id',    ['teacherId']],
+    ]);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_asgn_target ON "AssignmentTarget"(assignment_id, type, target_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_asgn_target_asgn ON "AssignmentTarget"(assignment_id)`);
   }
