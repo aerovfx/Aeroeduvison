@@ -990,9 +990,35 @@ function makeProxy(target, label, pathFilter) {
     } catch { return null; }
   }
 
+  // ── onDigestBind handler — wire khi user click deep-link Telegram ──
+  async function onDigestBind({ chatId, userId, fromUser }) {
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, name, email FROM "User" WHERE id = $1`, [userId]
+      );
+      if (!rows.length) return { ok: false, error: 'Tài khoản không tồn tại' };
+      const u = rows[0];
+      // Upsert telegram_chat_id + auto-enable telegram channel
+      await pool.query(`
+        INSERT INTO "UserProfile"(user_id, telegram_chat_id, digest_channels, updated_at)
+        VALUES ($1, $2, $3::jsonb, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET
+          telegram_chat_id = EXCLUDED.telegram_chat_id,
+          digest_channels = COALESCE("UserProfile".digest_channels, '{}'::jsonb) || EXCLUDED.digest_channels,
+          updated_at = NOW()
+      `, [userId, String(chatId), JSON.stringify({ telegram: true })]);
+      console.log(`[telegram:digest-bind] user=${userId} chat=${chatId} from=${fromUser?.username || '?'}`);
+      return { ok: true, userName: u.name, email: u.email };
+    } catch (e) {
+      console.error('[telegram:digest-bind]', e.message);
+      return { ok: false, error: e.message };
+    }
+  }
+
   // Long polling worker (chỉ cần khi không setWebhook)
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_USE_WEBHOOK !== 'true') {
-    tg.startPolling({ onCallback: onAdminCallback });
+    tg.startPolling({ onCallback: onAdminCallback, onDigestBind });
   }
 
   app.get('/api/payment/plans', (_req, res) => {
@@ -1090,7 +1116,7 @@ function makeProxy(target, label, pathFilter) {
         const got = req.headers['x-telegram-bot-api-secret-token'];
         if (got !== secret) return res.status(401).json({ error: 'bad secret' });
       }
-      await tg.handleUpdate(req.body, { onCallback: onAdminCallback });
+      await tg.handleUpdate(req.body, { onCallback: onAdminCallback, onDigestBind });
       res.json({ ok: true });
     } catch (err) {
       console.error('[telegram:webhook] ❌', err.message);
@@ -10335,6 +10361,266 @@ app.get('/api/emotion/stats', (req, res) => {
 
 // Reco extras
 app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
+// ── RS-Phase 8 Phase 4: Daily digest qua Telegram ──
+// Push 5-10 reco items mỗi ngày qua channels: in-app + email + telegram
+// Idempotent 1/day per user. Pull từ /api/reco/feed pipeline đã có.
+;(() => {
+  async function _ensureDigestTables() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "DigestNotification" (
+          id          BIGSERIAL    PRIMARY KEY,
+          user_id     VARCHAR(255) NOT NULL,
+          sent_date   DATE         NOT NULL,
+          channels    JSONB,
+          deliveries  JSONB,
+          items_count INTEGER,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_digest_user_day ON "DigestNotification"(user_id, sent_date)`);
+      // Add digest fields vào UserProfile (channels + telegram link)
+      for (const sql of [
+        `ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS digest_channels JSONB`,
+        `ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(50)`,
+      ]) { try { await pool.query(sql); } catch {} }
+    } catch (e) { console.warn('[digest] migration:', e.message); }
+  }
+  _ensureDigestTables().catch(() => {});
+
+  function _digestAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ success: false, error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ success: false, error: 'Token không hợp lệ' }); return null; }
+  }
+
+  // Format reco items thành HTML message cho Telegram
+  function _formatDigestForTelegram(items, userName) {
+    const top = items.slice(0, 5);
+    const lines = [
+      `📚 <b>Bản tin AeroEdu cho ${userName || 'bạn'}</b>`,
+      `<i>${new Date().toLocaleDateString('vi-VN')}</i>`,
+      '',
+      'Hôm nay học gì? AI gợi ý:',
+      '',
+    ];
+    top.forEach((it, i) => {
+      const url = `https://inphysic.com${it.link || '/student/for-you'}`;
+      lines.push(`<b>${i + 1}. ${escapeHtml(it.title)}</b>`);
+      if (it.subtitle) lines.push(`   ${escapeHtml(it.subtitle)}`);
+      lines.push(`   🔗 <a href="${url}">${it.cta || 'Mở'}</a>`);
+      lines.push('');
+    });
+    lines.push('━━━━━━━━━━━━');
+    lines.push(`<a href="https://inphysic.com/student/for-you">Xem đầy đủ For You ↗</a>`);
+    return lines.join('\n');
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[<>&]/g, c => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;' })[c]);
+  }
+
+  // Pull feed items cho user (reuse _studentFeedPhoenix + _mixerScore)
+  async function _buildDigestItems(userId) {
+    const pool = _getPool();
+    const { rows: prefRows } = await pool.query(
+      `SELECT reco_prefs FROM "UserProfile" WHERE user_id = $1`, [userId]
+    ).catch(() => ({ rows: [] }));
+    const prefs = prefRows[0]?.reco_prefs || null;
+    const candidates = await _studentFeedPhoenix(userId, prefs, 10);
+    return candidates
+      .map(c => ({ ...c, score: _mixerScore(c) }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }
+
+  // Send digest cho 1 user qua channels được enable
+  async function _sendDigest(userId, opts = {}) {
+    const pool = _getPool();
+    const today = new Date().toISOString().slice(0, 10);
+    // Idempotency check (unless bypass)
+    if (!opts.bypassIdempotency) {
+      const { rows: existing } = await pool.query(
+        `SELECT id, channels FROM "DigestNotification" WHERE user_id = $1 AND sent_date = $2`,
+        [userId, today]
+      ).catch(() => ({ rows: [] }));
+      if (existing.length > 0) {
+        return { sent: false, reason: 'already_sent_today', existingId: existing[0].id };
+      }
+    }
+    // Load user + prefs
+    const { rows: userRows } = await pool.query(`
+      SELECT u.id, u.name, u.email, up.digest_channels, up.telegram_chat_id
+      FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+      WHERE u.id = $1
+    `, [userId]);
+    if (!userRows.length) return { sent: false, reason: 'user_not_found' };
+    const u = userRows[0];
+    const channels = u.digest_channels || { inApp: true, email: false, telegram: false };
+    // Build items
+    const items = await _buildDigestItems(userId);
+    if (items.length === 0) return { sent: false, reason: 'no_items' };
+
+    const deliveries = { inApp: false, email: false, telegram: false };
+
+    // Channel 1: in-app notification (always — record event)
+    if (channels.inApp !== false) {
+      deliveries.inApp = true;  // mark as queued — UI poll
+    }
+
+    // Channel 2: Email (SMTP) — placeholder, sẽ wire nếu có SMTP
+    if (channels.email && u.email) {
+      deliveries.email = false;  // chưa implement, đánh dấu skip
+    }
+
+    // Channel 3: Telegram
+    if (channels.telegram && u.telegram_chat_id && process.env.TELEGRAM_BOT_TOKEN) {
+      try {
+        const tg = require('./lib/telegram-bot.cjs');
+        const text = _formatDigestForTelegram(items, u.name);
+        const result = await tg.tgCall ? tg.tgCall('sendMessage', {
+          chat_id: u.telegram_chat_id,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+        }) : null;
+        deliveries.telegram = !!result;
+      } catch (e) {
+        console.error('[digest:telegram]', e.message);
+        deliveries.telegram = false;
+      }
+    }
+
+    // Record notification
+    const { rows: ins } = await pool.query(`
+      INSERT INTO "DigestNotification"(user_id, sent_date, channels, deliveries, items_count)
+      VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+      ON CONFLICT (user_id, sent_date) DO UPDATE SET deliveries = EXCLUDED.deliveries, items_count = EXCLUDED.items_count
+      RETURNING id
+    `, [userId, today, JSON.stringify(channels), JSON.stringify(deliveries), items.length]);
+
+    return {
+      sent: true,
+      notificationId: ins[0]?.id,
+      itemsCount: items.length,
+      channels,
+      deliveries,
+    };
+  }
+
+  // POST /api/reco/digest/me — send digest cho user hiện tại
+  app.post('/api/reco/digest/me', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const r = await _sendDigest(userId);
+      return res.json({ success: true, ...r });
+    } catch (e) { console.error('[digest:me]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/test — bypass idempotency cho test
+  app.post('/api/reco/digest/test', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const r = await _sendDigest(userId, { bypassIdempotency: true });
+      return res.json({ success: true, ...r });
+    } catch (e) { console.error('[digest:test]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/digest/preferences
+  app.get('/api/reco/digest/preferences', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      const { rows: u } = await pool.query(`
+        SELECT u.email, up.digest_channels, up.telegram_chat_id,
+               (SELECT created_at FROM "DigestNotification" WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) AS last_sent_at,
+               (SELECT items_count FROM "DigestNotification" WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) AS last_sent_items_count
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.id = $1
+      `, [userId]);
+      const row = u[0] || {};
+      const botName = process.env.TELEGRAM_BOT_NAME || 'AeroEduBot';
+      return res.json({
+        success: true,
+        channels: row.digest_channels || { inApp: true, email: false, telegram: false },
+        emailOnAccount: row.email || null,
+        telegramLinked: !!row.telegram_chat_id,
+        telegramChatIdPreview: row.telegram_chat_id ? `…${String(row.telegram_chat_id).slice(-4)}` : null,
+        telegramDeepLink: `https://t.me/${botName}?start=digest_${encodeURIComponent(userId)}`,
+        lastSentAt: row.last_sent_at,
+        lastSentItemsCount: row.last_sent_items_count,
+      });
+    } catch (e) { console.error('[digest:prefs:get]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // PUT /api/reco/digest/preferences
+  app.put('/api/reco/digest/preferences', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const patch = req.body || {};
+      const pool = _getPool();
+      const { rows: cur } = await pool.query(`SELECT digest_channels FROM "UserProfile" WHERE user_id = $1`, [userId])
+        .catch(() => ({ rows: [] }));
+      const current = cur[0]?.digest_channels || { inApp: true, email: false, telegram: false };
+      const next = { ...current, ...patch };
+      await pool.query(`
+        INSERT INTO "UserProfile"(user_id, digest_channels, updated_at)
+        VALUES ($1, $2::jsonb, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET digest_channels = EXCLUDED.digest_channels, updated_at = NOW()
+      `, [userId, JSON.stringify(next)]);
+      return res.json({ success: true, channels: next });
+    } catch (e) { console.error('[digest:prefs:put]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/telegram/unlink
+  app.post('/api/reco/digest/telegram/unlink', async (req, res) => {
+    const decoded = _digestAuth(req, res); if (!decoded) return;
+    const userId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const pool = _getPool();
+      await pool.query(
+        `UPDATE "UserProfile" SET telegram_chat_id = NULL, updated_at = NOW() WHERE user_id = $1`,
+        [userId]
+      );
+      return res.json({ success: true });
+    } catch (e) { console.error('[digest:tg:unlink]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/digest/cron — admin trigger gửi digest cho TẤT CẢ user opted-in
+  // Cloud Scheduler hoặc external cron call endpoint này mỗi 8h sáng
+  // Auth: header x-cron-secret = env CRON_SECRET
+  app.post('/api/reco/digest/cron', async (req, res) => {
+    const secret = req.headers['x-cron-secret'] || '';
+    if (secret !== (process.env.CRON_SECRET || 'change-me-cron-secret')) {
+      return res.status(401).json({ success: false, error: 'Invalid cron secret' });
+    }
+    try {
+      const pool = _getPool();
+      // List user opted-in (channels.telegram = true HOẶC channels.inApp = true)
+      const { rows: users } = await pool.query(`
+        SELECT u.id FROM "User" u JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.role IN ('STUDENT', 'TEACHER') AND up.digest_channels IS NOT NULL
+        AND (up.digest_channels->>'telegram' = 'true' OR up.digest_channels->>'inApp' = 'true')
+        LIMIT 1000
+      `);
+      let sent = 0, skipped = 0, failed = 0;
+      for (const u of users) {
+        try {
+          const r = await _sendDigest(u.id);
+          if (r.sent) sent++; else skipped++;
+        } catch { failed++; }
+      }
+      console.log(`[digest:cron] processed=${users.length} sent=${sent} skipped=${skipped} failed=${failed}`);
+      return res.json({ success: true, processed: users.length, sent, skipped, failed });
+    } catch (e) { console.error('[digest:cron]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+})();
+
 // Real /api/reco/track — log engagement event vào RsExperimentEvent
 // để metrics calculation theo variant của user.
 app.post('/api/reco/track', async (req, res) => {
