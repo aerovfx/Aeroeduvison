@@ -8914,28 +8914,41 @@ app.get('/api/admin/insights/behavior', async (_req, res) => {
 });
 
 // /api/admin/insights/trending-topics — top subjects 7d theo Question table
+// Normalize subject theo TT 32/2018 BGD: gộp "Vật lý"/"Vật Lý" → "Vật lí" v.v.
+const _NORMALIZE_SUBJECT = (s) => {
+  if (!s) return s;
+  const n = String(s).trim();
+  const map = {
+    'Vật lý': 'Vật lí', 'Vật Lý': 'Vật lí', 'vật lý': 'Vật lí', 'Vat ly': 'Vật lí', 'vat ly': 'Vật lí',
+    'Hóa học': 'Hoá học', 'Hóa Học': 'Hoá học', 'hóa học': 'Hoá học', 'Hoa hoc': 'Hoá học',
+    'Tiếng anh': 'Tiếng Anh', 'tiếng anh': 'Tiếng Anh', 'TIẾNG ANH': 'Tiếng Anh', 'tieng anh': 'Tiếng Anh',
+    'Toán': 'Toán học', 'toán': 'Toán học', 'Toan': 'Toán học', 'toan': 'Toán học',
+  };
+  return map[n] || n;
+};
+
 app.get('/api/admin/insights/trending-topics', async (_req, res) => {
   try {
     const pool = _getPool();
     const { rows } = await pool.query(`
-      SELECT q.subject,
-             COUNT(DISTINCT q.id)::int AS exam_count,
-             0::int AS attempts,
-             0::int AS unique_students,
-             0::float AS avg_attempts_per_student,
-             0::float AS growth_pct
+      SELECT q.subject, COUNT(DISTINCT q.id)::int AS exam_count
       FROM "Question" q
       WHERE q.subject IS NOT NULL AND q."createdAt" >= NOW() - INTERVAL '7 day'
-      GROUP BY q.subject ORDER BY exam_count DESC LIMIT 10`);
-    const topics = rows.map(r => ({
-      subject: r.subject,
-      attempts: r.attempts,
-      uniqueStudents: r.unique_students,
-      examCount: r.exam_count,
-      avgAttemptsPerStudent: r.avg_attempts_per_student,
-      growthPct: r.growth_pct,
-      trend: r.growth_pct > 5 ? 'up' : r.growth_pct < -5 ? 'down' : 'stable',
-    }));
+      GROUP BY q.subject ORDER BY exam_count DESC LIMIT 20`);
+    // Gộp duplicates theo normalized name (Vật lý + Vật lí → 1 môn)
+    const merged = {};
+    for (const r of rows) {
+      const norm = _NORMALIZE_SUBJECT(r.subject);
+      merged[norm] = (merged[norm] || 0) + r.exam_count;
+    }
+    const topics = Object.entries(merged)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([subject, count]) => ({
+        subject, examCount: count,
+        attempts: 0, uniqueStudents: 0,
+        avgAttemptsPerStudent: 0, growthPct: 0, trend: 'stable',
+      }));
     return res.json({ topics });
   } catch (e) { console.error('[insights:topics]', e.message); return res.json({ topics: [] }); }
 });
@@ -8960,22 +8973,24 @@ app.get('/api/admin/insights/trending-exams', async (_req, res) => {
   } catch (e) { console.error('[insights:exams]', e.message); return res.json({ exams: [] }); }
 });
 
-// /api/admin/insights/recommendations — rule-based từ behavior data
+// /api/admin/insights/recommendations — rule-based từ behavior data (defensive)
 app.get('/api/admin/insights/recommendations', async (_req, res) => {
+  const recommendations = [];
+  const pool = _getPool();
+
+  // Rule 1: bounce rate > 60% → UX warning
   try {
-    const pool = _getPool();
-    const recommendations = [];
-    // Rule 1: bounce rate > 60% → UX warning
-    const { rows: br } = await pool.query(`
+    const r = await pool.query(`
       WITH sess AS (
         SELECT session_id, COUNT(*) AS pv FROM "PageView"
         WHERE created_at >= NOW() - INTERVAL '7 day' AND session_id IS NOT NULL
         GROUP BY 1
       )
-      SELECT ROUND(SUM(CASE WHEN pv = 1 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 0)::int AS rate
-      FROM sess`);
-    const bounceRate = br.rows[0]?.rate || 0;
-    if (bounceRate > 60) {
+      SELECT ROUND(SUM(CASE WHEN pv = 1 THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(*), 0) * 100, 0)::int AS rate,
+             COUNT(*)::int AS total_sessions FROM sess`);
+    const row = (r?.rows || [])[0] || {};
+    const bounceRate = row.rate || 0;
+    if (bounceRate > 60 && (row.total_sessions || 0) > 5) {
       recommendations.push({
         priority: 'high', category: 'ux', icon: 'alert',
         title: `Bounce rate cao: ${bounceRate}%`,
@@ -8983,13 +8998,16 @@ app.get('/api/admin/insights/recommendations', async (_req, res) => {
         action: 'Rà soát Landing + Login flow, A/B test CTA chính',
       });
     }
-    // Rule 2: DAU/MAU < 20% → engagement weak
-    const [{ rows: d }, { rows: m }] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL`),
-      pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day' AND user_id IS NOT NULL`),
-    ]);
-    const stickiness = m[0]?.c > 0 ? Math.round((d[0]?.c / m[0]?.c) * 100) : 0;
-    if (stickiness < 20 && m[0]?.c > 10) {
+  } catch (e) { console.warn('[reco:rule1]', e.message); }
+
+  // Rule 2: DAU/MAU < 20% → engagement weak
+  try {
+    const d = await pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '1 day' AND user_id IS NOT NULL`);
+    const m = await pool.query(`SELECT COUNT(DISTINCT user_id)::int AS c FROM "PageView" WHERE created_at >= NOW() - INTERVAL '30 day' AND user_id IS NOT NULL`);
+    const dc = ((d?.rows || [])[0] || {}).c || 0;
+    const mc = ((m?.rows || [])[0] || {}).c || 0;
+    const stickiness = mc > 0 ? Math.round((dc / mc) * 100) : 0;
+    if (stickiness < 20 && mc > 10) {
       recommendations.push({
         priority: 'high', category: 'engagement', icon: 'users',
         title: `Stickiness thấp: ${stickiness}%`,
@@ -8997,33 +9015,69 @@ app.get('/api/admin/insights/recommendations', async (_req, res) => {
         action: 'Wire push notification daily reminder + email digest cá nhân hoá',
       });
     }
-    // Rule 3: Subject imbalance — nếu 1 môn chiếm > 50% question
-    const { rows: subj } = await pool.query(`
+  } catch (e) { console.warn('[reco:rule2]', e.message); }
+
+  // Rule 3: Subject imbalance — gộp normalize "Vật lý"="Vật lí" rồi tính top%
+  try {
+    const r = await pool.query(`
       SELECT subject, COUNT(*)::int AS n FROM "Question" WHERE subject IS NOT NULL
-      GROUP BY subject ORDER BY n DESC LIMIT 5`);
-    if (subj.length > 0) {
-      const total = subj.reduce((s, r) => s + r.n, 0);
-      const topPct = total > 0 ? Math.round((subj[0].n / total) * 100) : 0;
+      GROUP BY subject ORDER BY n DESC LIMIT 20`);
+    const rows = r?.rows || [];
+    if (rows.length > 0) {
+      const merged = {};
+      for (const x of rows) {
+        const norm = _NORMALIZE_SUBJECT(x.subject);
+        merged[norm] = (merged[norm] || 0) + x.n;
+      }
+      const sorted = Object.entries(merged).sort((a, b) => b[1] - a[1]);
+      const total = sorted.reduce((s, [, n]) => s + n, 0);
+      const [topSubject, topN] = sorted[0] || ['', 0];
+      const topPct = total > 0 ? Math.round((topN / total) * 100) : 0;
       if (topPct > 50) {
         recommendations.push({
           priority: 'medium', category: 'content', icon: 'book',
-          title: `Lệch môn: ${subj[0].subject} chiếm ${topPct}% câu hỏi`,
-          insight: `Question Bank dồn vào 1 môn — môn khác thiếu nội dung`,
+          title: `Lệch môn: ${topSubject} chiếm ${topPct}% câu hỏi`,
+          insight: `Question Bank dồn vào ${topSubject} (${topN}/${total} câu). Các môn khác thiếu nội dung.`,
           action: 'Khuyến khích GV import đề từ PDF (Wayground) hoặc generate AI cho môn yếu',
         });
       }
     }
-    // Rule 4: nếu chưa có recommendation nào → 1 generic
-    if (recommendations.length === 0) {
+  } catch (e) { console.warn('[reco:rule3]', e.message); }
+
+  // Rule 4: Subject naming duplicates (data quality) — Vật lý vs Vật lí, etc.
+  try {
+    const r = await pool.query(`SELECT DISTINCT subject FROM "Question" WHERE subject IS NOT NULL`);
+    const subjects = (r?.rows || []).map(x => x.subject);
+    const dups = {};
+    for (const s of subjects) {
+      const norm = _NORMALIZE_SUBJECT(s);
+      if (norm !== s) {
+        dups[norm] = dups[norm] || [];
+        if (!dups[norm].includes(s)) dups[norm].push(s);
+      }
+    }
+    const dupList = Object.entries(dups).filter(([, vs]) => vs.length > 0);
+    if (dupList.length > 0) {
+      const samples = dupList.slice(0, 3).map(([norm, vs]) => `"${vs.join('"+"')}" → "${norm}"`).join(', ');
       recommendations.push({
-        priority: 'low', category: 'engagement', icon: 'check',
-        title: 'Mọi chỉ số trong ngưỡng tốt',
-        insight: 'Bounce, stickiness, content distribution đều ổn. Tiếp tục theo dõi.',
-        action: 'Refresh sau 24h để xem trend',
+        priority: 'medium', category: 'content', icon: 'alert',
+        title: `${dupList.length} môn bị trùng tên khác chính tả`,
+        insight: `Phát hiện môn lưu khác chuẩn TT 32/2018: ${samples}`,
+        action: 'Run migration UPDATE "Question" SET subject = "Vật lí" WHERE subject IN (...) để gộp',
       });
     }
-    return res.json({ recommendations });
-  } catch (e) { console.error('[insights:recommendations]', e.message); return res.json({ recommendations: [] }); }
+  } catch (e) { console.warn('[reco:rule4]', e.message); }
+
+  // Rule 5: Fallback nếu chưa có rec nào
+  if (recommendations.length === 0) {
+    recommendations.push({
+      priority: 'low', category: 'engagement', icon: 'check',
+      title: 'Mọi chỉ số trong ngưỡng tốt',
+      insight: 'Bounce, stickiness, content distribution đều ổn. Tiếp tục theo dõi.',
+      action: 'Refresh sau 24h để xem trend',
+    });
+  }
+  return res.json({ recommendations });
 });
 
 // /api/admin/overview — KPI cards cho Dashboard
