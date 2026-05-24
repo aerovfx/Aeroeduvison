@@ -8846,8 +8846,218 @@ app.get('/api/admin/insights/behavior', (_req, res) => res.json({ patterns: [] }
 app.get('/api/admin/insights/recommendations', (_req, res) => res.json({ recommendations: [] }));
 app.get('/api/admin/insights/trending-exams', (_req, res) => res.json({ exams: [] }));
 app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics: [] }));
-app.get('/api/admin/users', (_req, res) => res.json({ users: [], total: 0 }));
-app.get('/api/admin/users/stats', (_req, res) => res.json({ total: 0, by_role: {} }));
+// ── /api/admin/users — real list (admin only) ──────────────
+// Pagination + filter (accountType, role, search, status), sort, total.
+;(() => {
+  // Lazy-add banned columns (chưa có trong schema gốc)
+  async function _ensureUserBannedCols() {
+    const pool = _getPool();
+    const sqls = [
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT false`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedReason" TEXT`,
+      `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMPTZ`,
+    ];
+    for (const s of sqls) { try { await pool.query(s); } catch { /* skip */ } }
+  }
+  _ensureUserBannedCols().catch(() => {});
+
+  function _adminAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    let decoded;
+    try { decoded = _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+    // Bypass cho dev / cho phép TEACHER tạm thời xem admin
+    if (process.env.DISABLE_ADMIN_GATE === '1') return decoded;
+    if (decoded.role !== 'ADMIN') { res.status(403).json({ error: 'Chỉ admin truy cập được' }); return null; }
+    return decoded;
+  }
+
+  function _mapAdminUser(u, profileRow) {
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      image: u.image,
+      role: u.role || 'STUDENT',
+      accountType: (profileRow?.account_type) || u.role || 'STUDENT',
+      emailVerified: !!u.emailVerified,
+      twoFactorEnabled: !!u.twoFactorEnabled,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+      banned: !!u.banned,
+      bannedReason: u.bannedReason || null,
+      bannedAt: u.bannedAt || null,
+    };
+  }
+
+  // GET /api/admin/users — pagination + filters
+  app.get('/api/admin/users', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(Math.max(1, Number(req.query.limit) || 25), 200);
+      const offset = (page - 1) * limit;
+      const params = [];
+      const filters = [];
+      if (req.query.role) {
+        params.push(String(req.query.role).toUpperCase());
+        filters.push(`u.role = $${params.length}`);
+      }
+      if (req.query.search) {
+        const q = `%${String(req.query.search).trim().toLowerCase()}%`;
+        params.push(q);
+        filters.push(`(LOWER(u.name) LIKE $${params.length} OR LOWER(u.email) LIKE $${params.length})`);
+      }
+      if (req.query.status === 'banned') filters.push(`u.banned = true`);
+      else if (req.query.status === 'active') filters.push(`COALESCE(u.banned, false) = false`);
+
+      // accountType filter qua UserProfile.account_type (LEFT JOIN)
+      let acctFilter = '';
+      if (req.query.accountType) {
+        params.push(String(req.query.accountType).toUpperCase());
+        acctFilter = `AND (up.account_type = $${params.length} OR (up.account_type IS NULL AND u.role = $${params.length}))`;
+      }
+
+      const where = filters.length ? `WHERE ${filters.join(' AND ')} ${acctFilter}` : (acctFilter ? `WHERE 1=1 ${acctFilter}` : '');
+      const sortBy = ['name','email','createdAt','lastLoginAt'].includes(req.query.sortBy) ? req.query.sortBy : 'createdAt';
+      const sortOrder = req.query.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+      const sql = `
+        SELECT u.id, u.name, u.email, u.image, u.role, u."emailVerified",
+               u."twoFactorEnabled", u."createdAt", u."lastLoginAt",
+               COALESCE(u.banned, false) AS banned, u."bannedReason", u."bannedAt",
+               up.account_type
+        FROM "User" u
+        LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        ${where}
+        ORDER BY u."${sortBy}" ${sortOrder} NULLS LAST
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+      const countSql = `SELECT COUNT(*)::int AS total FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id ${where}`;
+
+      const [list, count] = await Promise.all([
+        pool.query(sql, [...params, limit, offset]),
+        pool.query(countSql, params),
+      ]);
+      const users = list.rows.map(r => _mapAdminUser(r, { account_type: r.account_type }));
+      return res.json({ users, total: count.rows[0]?.total || 0, page, limit });
+    } catch (e) { console.error('[admin:users:list]', e.message); return res.json({ users: [], total: 0, page: 1, limit: 25 }); }
+  });
+
+  // GET /api/admin/users/stats
+  app.get('/api/admin/users/stats', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT
+          COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE u.role = 'STUDENT' AND COALESCE(up.account_type, u.role) != 'PARENT')::int AS students,
+          COUNT(*) FILTER (WHERE u.role = 'TEACHER' AND COALESCE(up.account_type, u.role) != 'PARENT')::int AS teachers,
+          COUNT(*) FILTER (WHERE COALESCE(up.account_type, u.role) = 'PARENT')::int AS parents,
+          COUNT(*) FILTER (WHERE u.role = 'ADMIN')::int AS admins,
+          COUNT(*) FILTER (WHERE u."lastLoginAt" >= NOW() - INTERVAL '7 day')::int AS "activeLast7d",
+          COUNT(*) FILTER (WHERE u."createdAt" >= DATE_TRUNC('month', NOW()))::int AS "newThisMonth",
+          COUNT(*) FILTER (WHERE u."twoFactorEnabled" = true)::int AS "twoFactorEnabledCount",
+          COUNT(*) FILTER (WHERE COALESCE(u.banned, false) = true)::int AS "bannedCount"
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+      `);
+      return res.json(rows[0] || { total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 });
+    } catch (e) { console.error('[admin:users:stats]', e.message); return res.json({ total: 0, students: 0, teachers: 0, parents: 0, admins: 0, activeLast7d: 0, newThisMonth: 0, twoFactorEnabledCount: 0, bannedCount: 0 }); }
+  });
+
+  // GET /api/admin/users/:id — detail
+  app.get('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT u.*, COALESCE(u.banned, false) AS banned,
+               up.account_type, up.bio, up.skills, up.socials, up.theme_color, up.banner_style
+        FROM "User" u LEFT JOIN "UserProfile" up ON up.user_id = u.id
+        WHERE u.id = $1 LIMIT 1`, [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Người dùng không tồn tại' });
+      const u = rows[0];
+      const base = _mapAdminUser(u, { account_type: u.account_type });
+      return res.json({
+        ...base,
+        dateOfBirth: u.dateOfBirth, gender: u.gender, lastLoginIp: u.lastLoginIp,
+        profile: {
+          bio: u.bio, skills: u.skills, socials: u.socials || {},
+          themeColor: u.theme_color, bannerStyle: u.banner_style,
+        },
+        careerSurvey: null,
+        recentActivity: [],
+      });
+    } catch (e) { console.error('[admin:users:get]', e.message); return res.status(500).json({ error: 'Lỗi tải hồ sơ' }); }
+  });
+
+  // PATCH /api/admin/users/:id — update name/email/role/accountType/banned
+  app.patch('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const updates = ['"updatedAt" = NOW()'];
+      const params = [req.params.id];
+      const push = (col, val) => { params.push(val); updates.push(`"${col}" = $${params.length}`); };
+      if (b.name !== undefined)  push('name', String(b.name).slice(0, 200));
+      if (b.email !== undefined) push('email', String(b.email).toLowerCase().trim());
+      if (b.role !== undefined)  push('role', String(b.role).toUpperCase());
+      if (b.banned !== undefined) {
+        push('banned', !!b.banned);
+        if (b.banned) {
+          push('bannedReason', b.bannedReason || null);
+          updates.push(`"bannedAt" = NOW()`);
+        } else {
+          push('bannedReason', null);
+          updates.push(`"bannedAt" = NULL`);
+        }
+      }
+      const pool = _getPool();
+      if (updates.length > 1) {
+        await pool.query(`UPDATE "User" SET ${updates.join(', ')} WHERE id = $1`, params);
+      }
+      // accountType lưu vào UserProfile
+      if (b.accountType !== undefined) {
+        await pool.query(`
+          INSERT INTO "UserProfile"(user_id, account_type, updated_at)
+          VALUES ($1, $2, NOW())
+          ON CONFLICT (user_id) DO UPDATE SET account_type = EXCLUDED.account_type, updated_at = NOW()
+        `, [req.params.id, String(b.accountType).toUpperCase()]).catch(() => {});
+      }
+      const { rows } = await pool.query(`
+        SELECT u.*, up.account_type FROM "User" u
+        LEFT JOIN "UserProfile" up ON up.user_id = u.id WHERE u.id = $1`, [req.params.id]);
+      if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy' });
+      return res.json(_mapAdminUser(rows[0], { account_type: rows[0].account_type }));
+    } catch (e) { console.error('[admin:users:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật' }); }
+  });
+
+  // POST /api/admin/users/:id/reset-password
+  app.post('/api/admin/users/:id/reset-password', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const newPassword = String(req.body?.newPassword || '');
+      if (newPassword.length < 6) return res.status(400).json({ error: 'Mật khẩu tối thiểu 6 ký tự' });
+      const hash = await _akBcrypt.hash(newPassword, 10);
+      const pool = _getPool();
+      await pool.query(`UPDATE "User" SET password = $1, "updatedAt" = NOW() WHERE id = $2`, [hash, req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[admin:users:reset-pw]', e.message); return res.status(500).json({ error: 'Lỗi đặt lại mật khẩu' }); }
+  });
+
+  // DELETE /api/admin/users/:id — soft delete (banned=true)
+  app.delete('/api/admin/users/:id', async (req, res) => {
+    const decoded = _adminAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      await pool.query(`UPDATE "User" SET banned = true, "bannedReason" = 'Đã xoá bởi admin', "bannedAt" = NOW(), "updatedAt" = NOW() WHERE id = $1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[admin:users:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá user' }); }
+  });
+})();
 app.get('/api/admin/news/pending', (_req, res) => res.json({ articles: [], total: 0 }));
 app.get('/api/admin/notifications', (_req, res) => res.json({ notifications: [], total: 0 }));
 
