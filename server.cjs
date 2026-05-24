@@ -8250,29 +8250,25 @@ async function _studentFeedPhoenix(studentId, prefs, limit) {
 //   0.20 * engagement    (tương tác trước đây tốt)
 //   0.15 * freshness     (mới gán / mới publish)
 //   0.10 * social        (HS cùng lớp đã làm)
-function _mixerScore(item) {
+function _mixerScore(item, weights) {
   const s = item.signals || {};
-  // 1. Mastery gap: weak topics càng yếu càng score cao
+  const w = weights || { mastery: 0.30, teacher: 0.25, engagement: 0.20, freshness: 0.15, social: 0.10 };
   const masteryGap = s.gap_pct ? Math.min(1, s.gap_pct / 100) : 0;
-  // 2. Teacher preference: source teacher-recs, exam-pending
   const teacherPref = ['teacher-recs', 'exam-pending'].includes(item.source) ? 1 : 0;
-  // 3. Engagement: dùng _source_weight làm proxy
   const engagement = Math.min(1, (s._source_weight || 1) / 1.5);
-  // 4. Freshness: mới gán < 7 ngày = 1, > 30 ngày = 0
   let freshness = 0.5;
   const ts = s.due_date || s.assignedAt;
   if (ts) {
     const days = (Date.now() - new Date(ts).getTime()) / 86400000;
     freshness = days < 0 ? 1 : Math.max(0, 1 - days / 30);
   }
-  // 5. Social: chưa wire — default 0.3 (skip)
   const social = 0.3;
   return Math.round((
-    0.30 * masteryGap +
-    0.25 * teacherPref +
-    0.20 * engagement +
-    0.15 * freshness +
-    0.10 * social
+    w.mastery * masteryGap +
+    w.teacher * teacherPref +
+    w.engagement * engagement +
+    w.freshness * freshness +
+    w.social * social
   ) * 1000) / 1000;
 }
 
@@ -8299,21 +8295,44 @@ app.get('/api/reco/feed', async (req, res) => {
       const prefs = prefRows[0]?.reco_prefs || null;
 
       const candidates = await _studentFeedPhoenix(userId, prefs, limit);
+      // A/B variant lookup — experiment "mixer_weights" controls scoring formula
+      const variants = global.__rsGetUserVariants ? await global.__rsGetUserVariants(userId) : {};
+      const mixerVariant = variants.mixer_weights;  // vd: 'control' | 'teacher_heavy' | 'mastery_heavy'
+      const weightPresets = {
+        control:        { mastery: 0.30, teacher: 0.25, engagement: 0.20, freshness: 0.15, social: 0.10 },
+        teacher_heavy:  { mastery: 0.20, teacher: 0.40, engagement: 0.20, freshness: 0.10, social: 0.10 },
+        mastery_heavy:  { mastery: 0.45, teacher: 0.20, engagement: 0.15, freshness: 0.10, social: 0.10 },
+        freshness_heavy:{ mastery: 0.20, teacher: 0.20, engagement: 0.20, freshness: 0.30, social: 0.10 },
+      };
+      const weights = weightPresets[mixerVariant] || weightPresets.control;
       // Mixer scoring
-      const scored = candidates.map(c => ({ ...c, score: _mixerScore(c) }));
-      // Sort by score DESC, dedupe by id
+      const scored = candidates.map(c => ({ ...c, score: _mixerScore(c, weights) }));
       const seen = new Set();
       const ranked = scored
         .sort((a, b) => b.score - a.score)
         .filter(c => seen.has(c.id) ? false : (seen.add(c.id), true))
         .slice(0, limit);
       const sources = [...new Set(scored.map(c => c.source))];
+
+      // Track A/B view event (best-effort, async)
+      if (mixerVariant && ranked.length > 0) {
+        try {
+          const pool = _getPool();
+          pool.query(
+            `INSERT INTO "RsExperimentEvent"(exp_name, variant_key, user_id, action, metadata)
+             VALUES ('mixer_weights', $1, $2, 'view', $3::jsonb)`,
+            [mixerVariant, userId, JSON.stringify({ count: ranked.length, sources })]
+          ).catch(() => {});
+        } catch { /* silent */ }
+      }
+
       return res.json({
         audience: 'student',
         count: ranked.length,
         items: ranked,
         sources,
         isColdStart: ranked.length === 0 || !prefs,
+        _variant: mixerVariant || 'control',
       });
     } catch (e) {
       console.error('[reco/feed:student]', e.message);
@@ -8405,6 +8424,230 @@ app.get('/api/reco/feed', async (req, res) => {
   }
 });
 app.post('/api/reco/feedback', (_req, res) => res.json({ ok: true }));
+
+// ── RS-Phase 9: A/B Testing framework — production wire ──
+// Tables: RsExperiment (def), RsExperimentAssign (user→variant), RsExperimentEvent (tracking)
+// Endpoints: CRUD experiments + getVariant() + metrics aggregation
+;(() => {
+  async function _ensureExpTables() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperiment" (
+          id          VARCHAR(36)  PRIMARY KEY,
+          name        VARCHAR(100) UNIQUE NOT NULL,
+          description TEXT,
+          variants    JSONB        NOT NULL DEFAULT '[]'::jsonb,
+          allocation  JSONB        NOT NULL DEFAULT '{}'::jsonb,
+          status      VARCHAR(20)  DEFAULT 'draft',
+          start_at    TIMESTAMPTZ,
+          end_at      TIMESTAMPTZ,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperimentAssign" (
+          user_id     VARCHAR(255) NOT NULL,
+          exp_name    VARCHAR(100) NOT NULL,
+          variant_key VARCHAR(50)  NOT NULL,
+          assigned_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (user_id, exp_name)
+        )
+      `);
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "RsExperimentEvent" (
+          id          BIGSERIAL    PRIMARY KEY,
+          exp_name    VARCHAR(100) NOT NULL,
+          variant_key VARCHAR(50)  NOT NULL,
+          user_id     VARCHAR(255),
+          action      VARCHAR(50)  NOT NULL,
+          item_id     VARCHAR(255),
+          metadata    JSONB,
+          created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_rsexpevt_name ON "RsExperimentEvent"(exp_name, variant_key, created_at DESC)`);
+    } catch (e) { console.warn('[rs-exp] migration:', e.message); }
+  }
+  _ensureExpTables().catch(() => {});
+
+  // Hash-based deterministic bucket: user X always lands variant Y for exp E
+  // bucket = hash(userId + expName) % 100 → cumulative variant ranges
+  function _hashBucket(userId, expName) {
+    const { createHash } = require('crypto');
+    const h = createHash('sha256').update(`${userId}::${expName}`).digest('hex');
+    // First 8 hex = 32-bit int
+    return parseInt(h.slice(0, 8), 16) % 100;
+  }
+
+  function _assignVariant(experiment, userId) {
+    const alloc = experiment.allocation || {};
+    const variants = experiment.variants || [];
+    if (variants.length === 0) return null;
+    const bucket = _hashBucket(userId, experiment.name);
+    let cum = 0;
+    for (const v of variants) {
+      cum += Number(alloc[v.key] || 0);
+      if (bucket < cum) return v.key;
+    }
+    return variants[0].key;  // fallback đầu tiên
+  }
+
+  // Cached active experiments (reload mỗi 60s để pickup config mới)
+  let _activeExpsCache = null;
+  let _activeExpsCacheAt = 0;
+  async function _getActiveExperiments() {
+    if (Date.now() - _activeExpsCacheAt < 60_000 && _activeExpsCache) return _activeExpsCache;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT name, variants, allocation FROM "RsExperiment" WHERE status = 'active'`
+      );
+      _activeExpsCache = rows.map(r => ({
+        name: r.name,
+        variants: typeof r.variants === 'string' ? JSON.parse(r.variants) : r.variants,
+        allocation: typeof r.allocation === 'string' ? JSON.parse(r.allocation) : r.allocation,
+      }));
+      _activeExpsCacheAt = Date.now();
+    } catch { _activeExpsCache = []; }
+    return _activeExpsCache;
+  }
+
+  // Public: get all variant assignments cho user (cache in DB)
+  async function _getUserVariants(userId) {
+    if (!userId) return {};
+    const exps = await _getActiveExperiments();
+    if (!exps.length) return {};
+    const pool = _getPool();
+    const assigned = {};
+    for (const exp of exps) {
+      // Check cache
+      try {
+        const { rows } = await pool.query(
+          `SELECT variant_key FROM "RsExperimentAssign" WHERE user_id = $1 AND exp_name = $2`,
+          [userId, exp.name]
+        );
+        if (rows.length > 0) {
+          assigned[exp.name] = rows[0].variant_key;
+          continue;
+        }
+        // Assign new
+        const variant = _assignVariant(exp, userId);
+        if (variant) {
+          await pool.query(
+            `INSERT INTO "RsExperimentAssign"(user_id, exp_name, variant_key) VALUES ($1,$2,$3)
+             ON CONFLICT (user_id, exp_name) DO NOTHING`,
+            [userId, exp.name, variant]
+          );
+          assigned[exp.name] = variant;
+        }
+      } catch (e) { /* skip exp on error */ }
+    }
+    return assigned;
+  }
+  global.__rsGetUserVariants = _getUserVariants;  // expose cho feed handler
+
+  // Admin gate qua header x-admin-token (đơn giản cho dashboard)
+  const ADMIN_TOKEN = process.env.RS_ADMIN_TOKEN || process.env.JWT_SECRET || 'dev-admin-token';
+  function _adminGate(req, res) {
+    const token = req.headers['x-admin-token'] || '';
+    if (token !== ADMIN_TOKEN && process.env.DISABLE_ADMIN_GATE !== '1') {
+      res.status(401).json({ success: false, error: 'Invalid admin token' });
+      return false;
+    }
+    return true;
+  }
+
+  // GET /api/reco/experiments
+  app.get('/api/reco/experiments', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT * FROM "RsExperiment" ORDER BY created_at DESC LIMIT 100`
+      );
+      return res.json({ success: true, experiments: rows });
+    } catch (e) { console.error('[rs-exp:list]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // POST /api/reco/experiments — create
+  app.post('/api/reco/experiments', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const { name, description, variants, allocation, status = 'draft', start_at, end_at } = req.body || {};
+      if (!name || !Array.isArray(variants) || variants.length < 2) {
+        return res.status(400).json({ success: false, error: 'Cần name + 2+ variants' });
+      }
+      const { randomUUID } = require('crypto');
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "RsExperiment"(id, name, description, variants, allocation, status, start_at, end_at)
+        VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8)
+      `, [randomUUID(), name, description || null, JSON.stringify(variants),
+          JSON.stringify(allocation || {}), status, start_at, end_at]);
+      _activeExpsCacheAt = 0;  // invalidate cache
+      return res.json({ success: true });
+    } catch (e) {
+      if (e.code === '23505') return res.status(409).json({ success: false, error: `Experiment "${req.body?.name}" đã tồn tại` });
+      console.error('[rs-exp:create]', e.message); return res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // PUT /api/reco/experiments/:name — update status/allocation
+  app.put('/api/reco/experiments/:name', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const { status, allocation, end_at } = req.body || {};
+      const updates = [];
+      const params = [req.params.name];
+      if (status !== undefined) { params.push(status); updates.push(`status = $${params.length}`); }
+      if (allocation !== undefined) { params.push(JSON.stringify(allocation)); updates.push(`allocation = $${params.length}::jsonb`); }
+      if (end_at !== undefined) { params.push(end_at); updates.push(`end_at = $${params.length}`); }
+      if (!updates.length) return res.json({ success: true });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "RsExperiment" SET ${updates.join(', ')} WHERE name = $1`, params
+      );
+      if (!rowCount) return res.status(404).json({ success: false, error: 'Không tìm thấy' });
+      _activeExpsCacheAt = 0;
+      return res.json({ success: true });
+    } catch (e) { console.error('[rs-exp:update]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+
+  // GET /api/reco/experiments/:name/metrics
+  app.get('/api/reco/experiments/:name/metrics', async (req, res) => {
+    if (!_adminGate(req, res)) return;
+    try {
+      const pool = _getPool();
+      const { rows } = await pool.query(`
+        SELECT variant_key,
+               COUNT(*)::int AS total_actions,
+               COUNT(*) FILTER (WHERE action = 'view')::int AS views,
+               COUNT(*) FILTER (WHERE action = 'click')::int AS clicks,
+               COUNT(*) FILTER (WHERE action = 'complete')::int AS completes,
+               COUNT(*) FILTER (WHERE action = 'pass')::int AS passes,
+               COUNT(*) FILTER (WHERE action = 'skip')::int AS skips,
+               COUNT(*) FILTER (WHERE action = 'not_interested')::int AS notInter
+        FROM "RsExperimentEvent" WHERE exp_name = $1
+        GROUP BY variant_key ORDER BY variant_key
+      `, [req.params.name]);
+      const variants = rows.map(r => ({
+        key: r.variant_key,
+        totalActions: r.total_actions,
+        byAction: { view: r.views, click: r.clicks, complete: r.completes, pass: r.passes, skip: r.skips, not_interested: r.notInter },
+        metrics: {
+          views: r.views, clicks: r.clicks, completes: r.completes, passes: r.passes,
+          skips: r.skips, notInter: r.notInter,
+          ctr: r.views > 0 ? Math.round((r.clicks / r.views) * 10000) / 100 : 0,
+          completion: r.clicks > 0 ? Math.round((r.completes / r.clicks) * 10000) / 100 : 0,
+          pass_rate: r.completes > 0 ? Math.round((r.passes / r.completes) * 10000) / 100 : 0,
+          negative_rate: r.total_actions > 0 ? Math.round(((r.skips + r.notInter) / r.total_actions) * 10000) / 100 : 0,
+        },
+      }));
+      return res.json({ success: true, variants });
+    } catch (e) { console.error('[rs-exp:metrics]', e.message); return res.status(500).json({ success: false, error: e.message }); }
+  });
+})();
 
 // ── RS-Phase 10: Onboarding preferences (cold-start) ──
 // Lưu user prefs cho For-You feed personalization: subject/grade/interestedTopics.
@@ -10092,7 +10335,32 @@ app.get('/api/emotion/stats', (req, res) => {
 
 // Reco extras
 app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
-app.post('/api/reco/track', (_req, res) => res.json(OK));
+// Real /api/reco/track — log engagement event vào RsExperimentEvent
+// để metrics calculation theo variant của user.
+app.post('/api/reco/track', async (req, res) => {
+  res.json({ success: true, id: '' });  // fire-and-forget UX
+  try {
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) {
+      try { userId = _akVerify(auth.slice(7)).sub; } catch { /* anonymous OK */ }
+    }
+    if (!userId) return;
+    const { action, targetType, targetId, metadata = {} } = req.body || {};
+    if (!action || !targetId) return;
+    // Lookup variant của user cho mixer_weights experiment
+    const variants = global.__rsGetUserVariants ? await global.__rsGetUserVariants(userId) : {};
+    const variant = variants.mixer_weights;
+    if (!variant) return;  // user không trong experiment → skip
+    const pool = _getPool();
+    await pool.query(
+      `INSERT INTO "RsExperimentEvent"(exp_name, variant_key, user_id, action, item_id, metadata)
+       VALUES ('mixer_weights', $1, $2, $3, $4, $5::jsonb)`,
+      [variant, userId, String(action).slice(0, 50),
+       String(targetId).slice(0, 255), JSON.stringify({ targetType, ...metadata })]
+    );
+  } catch (e) { /* silent */ }
+});
 app.post('/api/notifications/read-all', (_req, res) => res.json(OK));
 
 // KeoCo (game)
