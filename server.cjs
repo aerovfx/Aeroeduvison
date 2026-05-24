@@ -4558,6 +4558,182 @@ if (USE_NODEJS_QUESTIONS) {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// ASSIGNMENTS extras — /from-exam + /:id/targets (kết nối GV→lớp/HS)
+// Phải nằm SAU block assignments chính (để table sẵn) + TRƯỚC catch-all
+// ════════════════════════════════════════════════════════════════════════
+;(() => {
+  async function _ensureAsgnTargetTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "AssignmentTarget" (
+        id              VARCHAR(36)  PRIMARY KEY,
+        assignment_id   VARCHAR(255) NOT NULL,
+        type            VARCHAR(20)  NOT NULL,
+        target_id       VARCHAR(255) NOT NULL,
+        label           VARCHAR(255),
+        teacher_id      VARCHAR(255) NOT NULL,
+        created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('AssignmentTarget', [
+      ['assignment_id', "VARCHAR(255)"],
+      ['type',          "VARCHAR(20)"],
+      ['target_id',     "VARCHAR(255)"],
+      ['label',         "VARCHAR(255)"],
+      ['teacher_id',    "VARCHAR(255)"],
+      ['created_at',    "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('AssignmentTarget', ['assignmentId','type','targetId','label','teacherId','createdAt']);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_asgn_target ON "AssignmentTarget"(assignment_id, type, target_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_asgn_target_asgn ON "AssignmentTarget"(assignment_id)`);
+  }
+  _ensureAsgnTargetTable().catch(e => console.error('[assignment-targets] migration:', e.message));
+
+  function _asgnAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // Verify GV sở hữu assignment
+  async function _ownsAsgn(assignmentId, decoded) {
+    const pool = _getPool();
+    const myIds = _ids(decoded);
+    const { rowCount } = await pool.query(
+      `SELECT 1 FROM assignments WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR user_id = ANY($2::text[]))`,
+      [assignmentId, myIds]);
+    return rowCount > 0;
+  }
+
+  // POST /api/assignments/from-exam — tạo assignment từ Exam có sẵn
+  app.post('/api/assignments/from-exam', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      const { examId, title: titleOverride, description, dueDate, duration } = req.body || {};
+      if (!examId) return res.status(400).json({ error: 'Thiếu examId' });
+      const pool = _getPool();
+      const myIds = _ids(decoded);
+      // Load Exam (chấp nhận cả snake_case lẫn camelCase legacy)
+      const { rows: exams } = await pool.query(
+        `SELECT * FROM "Exam" WHERE id = $1 LIMIT 1`, [examId]);
+      if (!exams.length) return res.status(404).json({ error: 'Không tìm thấy đề thi' });
+      const exam = exams[0];
+      const examOwner = exam.teacher_id || exam.teacherId || exam.user_id || exam.userId;
+      if (examOwner && !myIds.includes(examOwner)) {
+        // Cho phép nếu exam public
+        const isPublic = exam.visibility === 'public' || exam.is_public === true || exam.isPublic === true;
+        if (!isPublic) return res.status(403).json({ error: 'Đề thi không thuộc quyền của bạn' });
+      }
+      const { randomBytes } = require('crypto');
+      const id = 'asgn_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+      const qrToken = randomBytes(18).toString('base64url');
+      const title = String(titleOverride || exam.title || 'Bài tập').slice(0, 500);
+      const subj = exam.subject || 'Chung';
+      const desc = String(description || exam.description || '').slice(0, 5000);
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const dur = Number(duration) || Number(exam.duration) || Number(exam.duration_minutes) || 45;
+      const due = dueDate ? new Date(dueDate) : null;
+      await pool.query(
+        `INSERT INTO assignments
+           (id, title, description, subject, assignment_type, status, difficulty,
+            duration, xp_reward, user_id, teacher_id, qr_token, max_score, due_date,
+            content, tags, ai_generated)
+         VALUES ($1,$2,$3,$4,'quiz','published','medium',$5,150,$6,$6,$7,10,$8,$9,$10,false)`,
+        [id, title, desc, subj, dur, myId, qrToken, due,
+         JSON.stringify({ examId, source: 'from-exam' }),
+         JSON.stringify(['từ-đề-thi'])]);
+      const proto = (req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      return res.status(201).json({
+        id, title, description: desc, subject: subj, type: 'quiz', status: 'published',
+        difficulty: 'medium', duration: dur, xpReward: 150, maxScore: 10,
+        teacherId: myId, qrToken, scanUrl: `${proto}://${host}/a/${qrToken}`,
+        dueDate: due ? due.toISOString() : null, content: '', tags: ['từ-đề-thi'],
+        assignedAt: new Date().toISOString(), aiGenerated: false,
+      });
+    } catch (e) { console.error('[asgn:from-exam]', e.message); return res.status(500).json({ error: 'Lỗi tạo bài tập từ đề thi' }); }
+  });
+
+  // GET /api/assignments/:id/targets → { targets: [...] }
+  app.get('/api/assignments/:id/targets', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const pool = _getPool();
+      const { rows } = await pool.query(
+        `SELECT id, type, target_id AS "targetId", label, created_at AS "createdAt"
+         FROM "AssignmentTarget" WHERE assignment_id = $1 ORDER BY created_at DESC`,
+        [req.params.id]);
+      return res.json({ targets: rows });
+    } catch (e) { console.error('[asgn:targets:list]', e.message); return res.json({ targets: [] }); }
+  });
+
+  // POST /api/assignments/:id/targets — body: { classIds?: [], studentIds?: [] }
+  app.post('/api/assignments/:id/targets', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const myId = decoded.userId || decoded.id || decoded.sub;
+      const { classIds = [], studentIds = [] } = req.body || {};
+      const pool = _getPool();
+      const { randomUUID } = require('crypto');
+      let added = 0;
+      // Insert class targets — lookup label từ Class table
+      for (const cid of classIds) {
+        if (!cid) continue;
+        const { rows: cls } = await pool.query(`SELECT name, grade FROM "Class" WHERE id = $1`, [cid]);
+        const label = cls[0] ? `${cls[0].name}${cls[0].grade ? ' (Khối ' + cls[0].grade + ')' : ''}` : `Lớp ${cid.slice(0,8)}`;
+        try {
+          await pool.query(
+            `INSERT INTO "AssignmentTarget"(id, assignment_id, type, target_id, label, teacher_id)
+             VALUES ($1,$2,'class',$3,$4,$5)`,
+            [randomUUID(), req.params.id, cid, label, myId]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; /* dup skip */ }
+      }
+      // Insert student targets — lookup label từ ClassStudent hoặc User
+      for (const sid of studentIds) {
+        if (!sid) continue;
+        let label = `HS ${sid.slice(0,8)}`;
+        try {
+          const { rows: u } = await pool.query(`SELECT ho_ten FROM "ClassStudent" WHERE id = $1 LIMIT 1`, [sid]);
+          if (u[0]?.ho_ten) label = u[0].ho_ten;
+          else {
+            const { rows: u2 } = await pool.query(`SELECT name, email FROM "User" WHERE id = $1 LIMIT 1`, [sid]);
+            if (u2[0]) label = u2[0].name || u2[0].email || label;
+          }
+        } catch { /* ignore lookup err */ }
+        try {
+          await pool.query(
+            `INSERT INTO "AssignmentTarget"(id, assignment_id, type, target_id, label, teacher_id)
+             VALUES ($1,$2,'student',$3,$4,$5)`,
+            [randomUUID(), req.params.id, sid, label, myId]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      // TODO: notification cho HS — hiện chưa wire vào notifications table
+      return res.json({ ok: true, added, notified: 0 });
+    } catch (e) { console.error('[asgn:targets:add]', e.message); return res.status(500).json({ error: 'Lỗi giao bài' }); }
+  });
+
+  // DELETE /api/assignments/:id/targets/:type/:targetId
+  app.delete('/api/assignments/:id/targets/:type/:targetId', async (req, res) => {
+    const decoded = _asgnAuth(req, res); if (!decoded) return;
+    try {
+      if (!(await _ownsAsgn(req.params.id, decoded))) return res.status(403).json({ error: 'Không có quyền' });
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `DELETE FROM "AssignmentTarget" WHERE assignment_id = $1 AND type = $2 AND target_id = $3`,
+        [req.params.id, req.params.type, decodeURIComponent(req.params.targetId)]);
+      if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy target' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[asgn:targets:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá target' }); }
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════════════
 // KÉO CO KIẾN THỨC — Knowledge Tug-of-War
 //   /api/keoco/*   teacher CRUD + public scan/join/answer + 1v1 challenge
 // Two modes:
@@ -8044,9 +8220,7 @@ app.get('/api/emotion/stats', (req, res) => {
     },
   });
 });
-app.get('/api/assignments', (_req, res) => res.json({ assignments: [], total: 0 }));
-app.get('/api/assignments/recommended', (_req, res) => res.json({ recommendations: [] }));
-app.post('/api/assignments/from-exam', (_req, res) => res.status(501).json({ error: 'Chưa khả dụng' }));
+// (real handlers at line ~4145 + IIFE ~4560 cover /api/assignments + /from-exam + /:id/targets)
 
 // Reco extras
 app.get('/api/reco/history', (_req, res) => res.json({ history: [], total: 0 }));
