@@ -9696,6 +9696,150 @@ app.get('/api/student/my-teachers', async (req, res) => {
 app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, subjects: [], streak: 0 }));
 app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
 
+// ── /api/student/exam-rooms — HS thấy phòng thi public + đã join ──
+// Shape match StudentExamRoom interface ở pages/student/Exams.tsx
+app.get('/api/student/exam-rooms', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  try {
+    const pool = _getPool();
+    // Lazy migrate RoomParticipant table (HS join phòng → record)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "RoomParticipant" (
+        id          VARCHAR(36)  PRIMARY KEY,
+        room_id     VARCHAR(36)  NOT NULL,
+        user_id     VARCHAR(255) NOT NULL,
+        score       NUMERIC(5,2),
+        joined_at   TIMESTAMPTZ  DEFAULT NOW(),
+        submitted_at TIMESTAMPTZ,
+        completed   BOOLEAN      DEFAULT false,
+        UNIQUE (room_id, user_id)
+      )
+    `).catch(() => {});
+
+    // Load rooms: public OR HS đã join
+    const myIds = userId ? [userId] : [''];
+    const { rows: rooms } = await pool.query(`
+      SELECT r.id, r.name, r.description, r.status, r.start_time AS "startTime",
+             r.end_time AS "endTime", r.duration, r.is_public AS "isPublic",
+             r.max_students AS "maxStudents", r.teacher_id, r.exam_id,
+             u.name AS "teacherName",
+             e.title AS "examTitle"
+      FROM "OnlineExamRoom" r
+      LEFT JOIN "User" u ON u.id = r.teacher_id
+      LEFT JOIN "Exam" e ON e.id = r.exam_id
+      WHERE r.is_public = true
+         OR EXISTS (SELECT 1 FROM "RoomParticipant" WHERE room_id = r.id AND user_id = ANY($1::text[]))
+      ORDER BY r.start_time DESC NULLS LAST LIMIT 100
+    `, [myIds]).catch(() => ({ rows: [] }));
+
+    if (!rooms.length) return res.json({ rooms: [], count: 0 });
+
+    const roomIds = rooms.map(r => r.id);
+    // Batch load participants + counts
+    const [participants, examQCount] = await Promise.all([
+      pool.query(`
+        SELECT room_id, user_id, score, joined_at, submitted_at, completed
+        FROM "RoomParticipant" WHERE room_id = ANY($1::text[])
+      `, [roomIds]).catch(() => ({ rows: [] })),
+      pool.query(`
+        SELECT id, COALESCE(jsonb_array_length(question_ids), 0)::int AS qcount
+        FROM "Exam" WHERE id = ANY($1::text[])
+      `, [rooms.filter(r => r.exam_id).map(r => r.exam_id)]).catch(() => ({ rows: [] })),
+    ]);
+
+    const qcountByExam = {};
+    for (const r of examQCount.rows) qcountByExam[r.id] = r.qcount;
+
+    const partsByRoom = {};
+    for (const p of participants.rows) {
+      (partsByRoom[p.room_id] = partsByRoom[p.room_id] || []).push(p);
+    }
+
+    // Build leaderboard names — batch query User
+    const allUserIds = [...new Set(participants.rows.map(p => p.user_id))];
+    const usersById = {};
+    if (allUserIds.length) {
+      const { rows: us } = await pool.query(
+        `SELECT id, name FROM "User" WHERE id = ANY($1::text[])`, [allUserIds]
+      ).catch(() => ({ rows: [] }));
+      for (const u of us) usersById[u.id] = u.name;
+    }
+
+    const result = rooms.map(r => {
+      const parts = partsByRoom[r.id] || [];
+      // Leaderboard: sort by score DESC, top 10
+      const ranked = parts
+        .filter(p => p.score != null)
+        .sort((a, b) => Number(b.score) - Number(a.score))
+        .slice(0, 10)
+        .map((p, idx) => ({
+          userId: p.user_id,
+          name: usersById[p.user_id] || `HS ${p.user_id.slice(0, 6)}`,
+          score: Number(p.score),
+          rank: idx + 1,
+          submittedAt: p.submitted_at,
+          isMe: p.user_id === userId,
+        }));
+      const myPart = userId ? parts.find(p => p.user_id === userId) : null;
+      return {
+        id: r.id, name: r.name, description: r.description,
+        status: r.status, startTime: r.startTime, endTime: r.endTime,
+        duration: r.duration, isPublic: r.isPublic, maxStudents: r.maxStudents,
+        Teacher: r.teacher_id ? { id: r.teacher_id, name: r.teacherName || 'GV' } : null,
+        Exam: r.exam_id ? { id: r.exam_id, title: r.examTitle || 'Đề thi', examType: 'standard' } : null,
+        _count: { participants: parts.length, questions: qcountByExam[r.exam_id] || 0 },
+        myParticipant: myPart ? {
+          score: myPart.score != null ? Number(myPart.score) : null,
+          joinedAt: myPart.joined_at, submittedAt: myPart.submitted_at,
+          completed: !!myPart.completed,
+        } : null,
+        leaderboard: ranked,
+      };
+    });
+
+    return res.json({ rooms: result, count: result.length });
+  } catch (e) {
+    console.error('[student:exam-rooms]', e.message);
+    return res.json({ rooms: [], count: 0 });
+  }
+});
+
+// POST /api/student/exam-rooms/:id/join — HS join phòng thi
+app.post('/api/student/exam-rooms/:id/join', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
+  let userId;
+  try { userId = _akVerify(auth.slice(7)).sub; } catch { return res.status(401).json({ error: 'Token không hợp lệ' }); }
+  try {
+    const pool = _getPool();
+    const { accessCode } = req.body || {};
+    const { rows } = await pool.query(
+      `SELECT id, access_code, is_public, max_students,
+              (SELECT COUNT(*) FROM "RoomParticipant" WHERE room_id = $1) AS current_count
+       FROM "OnlineExamRoom" WHERE id = $1`, [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Phòng thi không tồn tại' });
+    const room = rows[0];
+    if (!room.is_public && room.access_code && accessCode !== room.access_code) {
+      return res.status(403).json({ error: 'Mã phòng không đúng' });
+    }
+    if (room.max_students && Number(room.current_count) >= room.max_students) {
+      return res.status(409).json({ error: 'Phòng đã đầy' });
+    }
+    const { randomUUID } = require('crypto');
+    await pool.query(`
+      INSERT INTO "RoomParticipant"(id, room_id, user_id, joined_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (room_id, user_id) DO NOTHING
+    `, [randomUUID(), req.params.id, userId]);
+    return res.json({ ok: true, roomId: req.params.id });
+  } catch (e) { console.error('[student:room:join]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
 // Courses
 // /api/courses — list catalog (FE thường gọi paginated)
 app.get('/api/courses', async (req, res) => {
