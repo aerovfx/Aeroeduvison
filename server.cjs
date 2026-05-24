@@ -8861,6 +8861,69 @@ app.get('/api/admin/insights/trending-topics', (_req, res) => res.json({ topics:
   }
   _ensureUserBannedCols().catch(() => {});
 
+  // Lazy migrate UserProfile — table có thể đã tồn tại từ Rust service / Prisma
+  // với schema camelCase ("userId") thay vì snake_case (user_id). Query JOIN
+  // up.user_id sẽ fail với column does not exist → fix:
+  //   1. CREATE TABLE IF NOT EXISTS (no-op nếu đã có)
+  //   2. ADD COLUMN IF NOT EXISTS cho snake_case columns
+  //   3. BACKFILL user_id ← "userId" (Prisma camelCase) nếu cột legacy có
+  async function _ensureUserProfileSchema() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "UserProfile" (
+          user_id      VARCHAR(255) PRIMARY KEY,
+          account_type VARCHAR(20),
+          bio          TEXT,
+          banner_style VARCHAR(50),
+          banner_image_url TEXT,
+          avatar_frame VARCHAR(50),
+          theme_color  VARCHAR(50),
+          skills       JSONB,
+          socials      JSONB,
+          showcase     JSONB,
+          visibility   JSONB,
+          data         JSONB DEFAULT '{}'::jsonb,
+          updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      const cols = [
+        ['user_id', "VARCHAR(255)"],
+        ['account_type', "VARCHAR(20)"],
+        ['bio', "TEXT"],
+        ['banner_style', "VARCHAR(50)"],
+        ['banner_image_url', "TEXT"],
+        ['avatar_frame', "VARCHAR(50)"],
+        ['theme_color', "VARCHAR(50)"],
+        ['skills', "JSONB"],
+        ['socials', "JSONB"],
+        ['showcase', "JSONB"],
+        ['visibility', "JSONB"],
+        ['data', "JSONB DEFAULT '{}'::jsonb"],
+        ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+      ];
+      for (const [c, t] of cols) {
+        try { await pool.query(`ALTER TABLE "UserProfile" ADD COLUMN IF NOT EXISTS ${c} ${t}`); }
+        catch (e) { /* skip */ }
+      }
+      // Backfill user_id từ legacy camelCase "userId" nếu có
+      try {
+        const { rowCount } = await pool.query(
+          `UPDATE "UserProfile" SET user_id = "userId" WHERE user_id IS NULL AND "userId" IS NOT NULL`
+        );
+        if (rowCount > 0) console.log(`[userprofile] backfilled user_id từ "userId" cho ${rowCount} rows`);
+      } catch (e) { /* "userId" column không tồn tại — OK */ }
+      // Drop NOT NULL cho camelCase legacy cols nếu có
+      for (const c of ['userId', 'accountType', 'createdAt', 'updatedAt']) {
+        try { await pool.query(`ALTER TABLE "UserProfile" ALTER COLUMN "${c}" DROP NOT NULL`); }
+        catch { /* skip */ }
+      }
+    } catch (e) {
+      console.warn('[userprofile] migration warn:', e.message);
+    }
+  }
+  _ensureUserProfileSchema().catch(() => {});
+
   function _adminAuth(req, res) {
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
