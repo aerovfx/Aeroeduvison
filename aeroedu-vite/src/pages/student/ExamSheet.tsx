@@ -307,17 +307,21 @@ export default function ExamSheetPage() {
 
   // ─── Exam taking view ────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50">
+    // Force light theme cho exam — luôn dùng nền sáng để dễ đọc đề/giấy làm bài,
+    // dù user đang dùng dark mode toàn site. Inline style override .dark CSS global.
+    <div className="min-h-screen" style={{ background: '#f1f5f9', color: '#0f172a' }}>
       <MusicToggle />
-      {/* Top header */}
-      <div className="sticky top-0 z-20 bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
+      {/* Top header — force light bg */}
+      <div className="sticky top-0 z-20 border-b px-4 py-3 flex items-center justify-between gap-3"
+        style={{ background: '#ffffff', borderBottomColor: '#e2e8f0' }}>
         <button onClick={() => { if (confirm('Thoát bài thi?')) navigate(-1) }}
-          className="flex items-center gap-1 text-slate-600 hover:text-slate-900 text-sm font-medium">
+          className="flex items-center gap-1 text-sm font-medium"
+          style={{ color: '#475569' }}>
           <ArrowLeft className="w-4 h-4" /> Thoát
         </button>
         <div className="text-center min-w-0 flex-1">
-          <p className="text-slate-700 font-bold text-sm md:text-base truncate">{exam.title}</p>
-          <p className="text-slate-400 text-[11px]">
+          <p className="font-bold text-sm md:text-base truncate" style={{ color: '#0f172a' }}>{exam.title}</p>
+          <p className="text-[11px]" style={{ color: '#64748b' }}>
             {exam.subject || 'Vật lí'} · Lớp {exam.grade || '11'} · {exam.totalQuestions} câu · {exam.duration} phút
           </p>
         </div>
@@ -419,16 +423,26 @@ export default function ExamSheetPage() {
             </>
           ) : (
             questions.map((q, idx) => (
-              <div key={q.id} className="bg-white rounded-xl border border-slate-200 p-4 md:p-5 shadow-sm">
+              // Inline styles override global .dark .bg-white để giấy làm bài luôn
+              // trắng + chữ đen contrast cao, dù user dùng dark theme toàn site.
+              <div key={q.id}
+                className="rounded-xl border p-4 md:p-5 shadow-sm"
+                style={{
+                  background: '#ffffff',
+                  borderColor: '#cbd5e1',
+                  color: '#0f172a',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 0 0 1px rgba(15,23,42,0.04)',
+                }}
+              >
                 <div className="flex items-start gap-2 mb-2">
-                  <span className="font-bold text-slate-700">Câu {idx + 1}.</span>
-                  <MathText as="span" className="text-slate-800 leading-relaxed">{q.content}</MathText>
+                  <span className="font-bold" style={{ color: '#0f172a' }}>Câu {idx + 1}.</span>
+                  <MathText as="span" className="leading-relaxed" style={{ color: '#1e293b' }}>{q.content}</MathText>
                 </div>
                 {q.options?.length > 0 && (
                   <div className="ml-6 space-y-1.5 mt-2">
                     {q.options.map((opt, i) => (
-                      <div key={i} className="flex items-start gap-2 text-slate-700 text-[15px]">
-                        <span className="font-semibold text-slate-500 shrink-0">{LETTERS[i]}.</span>
+                      <div key={i} className="flex items-start gap-2 text-[15px]" style={{ color: '#1e293b' }}>
+                        <span className="font-semibold shrink-0" style={{ color: '#475569' }}>{LETTERS[i]}.</span>
                         <MathText as="span">{opt.replace(/^[A-D]\.\s*/, '')}</MathText>
                       </div>
                     ))}
@@ -452,7 +466,7 @@ export default function ExamSheetPage() {
 
           {/* PHẦN I: Trắc nghiệm A/B/C/D */}
           {sections.phanI.length > 0 && (
-            <div className="bg-pink-50 border-2 border-pink-200 rounded-2xl p-4">
+            <div className="rounded-2xl p-4" style={{ background: '#fdf2f8', border: '2px solid #fbcfe8' }}>
               <h3 className="text-center text-blue-700 font-black text-sm tracking-widest mb-3">PHẦN I</h3>
               <PhanIBubbles
                 questions={sections.phanI}
@@ -464,7 +478,7 @@ export default function ExamSheetPage() {
 
           {/* PHẦN II: Đúng/Sai */}
           {sections.phanII.length > 0 && (
-            <div className="bg-pink-50 border-2 border-pink-200 rounded-2xl p-4">
+            <div className="rounded-2xl p-4" style={{ background: '#fdf2f8', border: '2px solid #fbcfe8' }}>
               <h3 className="text-center text-blue-700 font-black text-sm tracking-widest mb-3">PHẦN II</h3>
               <div className="grid grid-cols-2 gap-2">
                 {sections.phanII.map((q, i) => (
@@ -479,7 +493,7 @@ export default function ExamSheetPage() {
 
           {/* PHẦN III: Trả lời ngắn */}
           {sections.phanIII.length > 0 && (
-            <div className="bg-pink-50 border-2 border-pink-200 rounded-2xl p-4">
+            <div className="rounded-2xl p-4" style={{ background: '#fdf2f8', border: '2px solid #fbcfe8' }}>
               <h3 className="text-center text-blue-700 font-black text-sm tracking-widest mb-3">PHẦN III</h3>
               <div className="space-y-2">
                 {sections.phanIII.map((q, i) => (
