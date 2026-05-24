@@ -9433,14 +9433,21 @@ app.post('/api/exams', async (req, res) => {
 });
 
 app.get('/api/exams/:id', async (req, res) => {
-  const decoded = _examAuth(req, res); if (!decoded) return;
+  // Optional auth: anonymous user xem được exam public (cho HS luyện thi
+  // mà không cần đăng nhập), authenticated user xem được đề của mình.
+  const auth = req.headers.authorization || '';
+  let decoded = null;
+  if (auth.startsWith('Bearer ')) {
+    try { decoded = _akVerify(auth.slice(7)); } catch { /* ignore */ }
+  }
   try {
     const pool = _getPool();
-    // Cho phép xem đề của mình HOẶC public
+    const myIds = decoded ? [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))] : [];
+    // Match owner qua ANY myIds (đồng nhất với pattern khác), HOẶC visibility=public
     const { rows } = await pool.query(
-      `SELECT *, (teacher_id = $2) AS is_owner FROM "Exam"
-       WHERE id = $1 AND (teacher_id = $2 OR visibility = 'public')`,
-      [req.params.id, decoded.sub]);
+      `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
+       WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public' OR status = 'published')`,
+      [req.params.id, myIds.length ? myIds : ['__none__']]);
     if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
     const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
     return res.json({ exam });
