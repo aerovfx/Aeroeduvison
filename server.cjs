@@ -10572,6 +10572,129 @@ app.get('/api/users/:userId/profile', async (req, res) => {
 // Misc
 app.get('/api/categories', (_req, res) => res.json({ categories: [] }));
 app.get('/api/types', (_req, res) => res.json({ types: [] }));
+// ── /api/achievements/me — REAL achievements computed từ user activity ──
+// 14 achievement types, mỗi cái rule riêng dựa trên DB tables.
+app.get('/api/achievements/me', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) {
+    try { userId = _akVerify(auth.slice(7)).sub; } catch {}
+  }
+  if (!userId) return res.json({ achievements: [], total: 0, earnedCount: 0 });
+
+  try {
+    const pool = _getPool();
+
+    // Collect signals từ DB cùng lúc
+    const [
+      enrollCount, learningEvents, examStats, exam100Streak,
+      practiceCount, dayStreak, pageviewHours, xp1day,
+    ] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM "Purchase" WHERE "userId" = $1`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS n FROM "LessonHistory" WHERE "userId" = $1`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`
+        SELECT COUNT(*)::int AS total,
+               COUNT(*) FILTER (WHERE percentage = 100)::int AS perfect,
+               COUNT(*) FILTER (WHERE percentage >= 80)::int AS high
+        FROM "PracticeExam" WHERE "studentId" = $1 AND completed`, [userId]).catch(() => ({ rows: [{ total: 0, perfect: 0, high: 0 }] })),
+      pool.query(`
+        SELECT COUNT(*) FILTER (WHERE percentage = 100)::int AS recent_100
+        FROM (SELECT percentage FROM "PracticeExam" WHERE "studentId" = $1 AND completed
+              ORDER BY "completedAt" DESC LIMIT 5) t`, [userId]).catch(() => ({ rows: [{ recent_100: 0 }] })),
+      pool.query(`SELECT COUNT(*)::int AS n FROM "PracticeExam" WHERE "studentId" = $1 AND completed AND "completedAt" >= NOW() - INTERVAL '1 day'`, [userId]).catch(() => ({ rows: [{ n: 0 }] })),
+      pool.query(`
+        WITH days AS (
+          SELECT DISTINCT DATE(created_at) AS d FROM "PageView"
+          WHERE user_id = $1 ORDER BY d DESC LIMIT 60
+        ),
+        gaps AS (
+          SELECT d, d - (ROW_NUMBER() OVER (ORDER BY d DESC))::int AS grp FROM days
+        )
+        SELECT MAX(COUNT(*))::int AS streak FROM gaps GROUP BY grp`, [userId])
+        .catch(() => ({ rows: [{ streak: 0 }] })),
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM created_at) >= 22 OR EXTRACT(HOUR FROM created_at) < 4)::int AS night,
+          COUNT(*) FILTER (WHERE EXTRACT(HOUR FROM created_at) >= 4 AND EXTRACT(HOUR FROM created_at) < 6)::int AS early
+        FROM "PageView" WHERE user_id = $1 AND created_at >= NOW() - INTERVAL '90 day'`, [userId]).catch(() => ({ rows: [{ night: 0, early: 0 }] })),
+      pool.query(`
+        SELECT COALESCE(SUM(xp_reward), 0)::int AS xp FROM "LessonHistory"
+        WHERE "userId" = $1 AND occurred_at >= NOW() - INTERVAL '1 day'`, [userId]).catch(() => ({ rows: [{ xp: 0 }] })),
+    ]);
+
+    const enrolls = enrollCount.rows[0]?.n || 0;
+    const lessons = learningEvents.rows[0]?.n || 0;
+    const examTotal = examStats.rows[0]?.total || 0;
+    const examPerfect = examStats.rows[0]?.perfect || 0;
+    const recent100 = exam100Streak.rows[0]?.recent_100 || 0;
+    const practiceToday = practiceCount.rows[0]?.n || 0;
+    const streak = dayStreak.rows[0]?.streak || 0;
+    const nightHours = pageviewHours.rows[0]?.night || 0;
+    const earlyHours = pageviewHours.rows[0]?.early || 0;
+    const xpToday = xp1day.rows[0]?.xp || 0;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const ach = [
+      { id: 1, title: 'First Steps', description: 'Hoàn thành bài học đầu tiên', icon: '👶',
+        category: 'learning', xp: 50, rarity: 'common',
+        earned: lessons >= 1, progress: Math.min(100, lessons * 100) },
+      { id: 2, title: 'Math Master', description: 'Hoàn thành 50 bài học Toán', icon: '🧮',
+        category: 'learning', xp: 200, rarity: 'rare',
+        earned: lessons >= 50, progress: Math.min(100, Math.round(lessons / 50 * 100)) },
+      { id: 3, title: 'Physics Explorer', description: 'Hoàn thành 25 bài học Vật lí', icon: '⚛️',
+        category: 'learning', xp: 150, rarity: 'uncommon',
+        earned: lessons >= 25, progress: Math.min(100, Math.round(lessons / 25 * 100)) },
+      { id: 4, title: 'Chemistry Wizard', description: 'Hoàn thành 100 bài học Hoá học', icon: '🧪',
+        category: 'learning', xp: 500, rarity: 'epic',
+        earned: lessons >= 100, progress: Math.min(100, Math.round(lessons / 100 * 100)) },
+      { id: 5, title: 'Week Warrior', description: 'Học liên tục 7 ngày', icon: '🔥',
+        category: 'streak', xp: 100, rarity: 'uncommon',
+        earned: streak >= 7, progress: Math.min(100, Math.round(streak / 7 * 100)) },
+      { id: 6, title: 'Month Master', description: 'Học liên tục 30 ngày', icon: '📅',
+        category: 'streak', xp: 1000, rarity: 'legendary',
+        earned: streak >= 30, progress: Math.min(100, Math.round(streak / 30 * 100)) },
+      { id: 7, title: 'Speed Demon', description: 'Hoàn thành 10 bài luyện trong 1 ngày', icon: '⚡',
+        category: 'skill', xp: 300, rarity: 'rare',
+        earned: practiceToday >= 10, progress: Math.min(100, practiceToday * 10) },
+      { id: 8, title: 'Perfectionist', description: 'Đạt 100% cho 5 bài luyện liên tiếp', icon: '🎯',
+        category: 'skill', xp: 400, rarity: 'epic',
+        earned: recent100 >= 5, progress: Math.min(100, recent100 * 20) },
+      { id: 9, title: 'AI Explorer', description: 'Hoàn thành bài luyện đầu tiên', icon: '🤖',
+        category: 'skill', xp: 100, rarity: 'uncommon',
+        earned: examTotal >= 1, progress: Math.min(100, examTotal * 100) },
+      { id: 10, title: 'Helper', description: 'Giúp đỡ 5 bạn học khác', icon: '🤝',
+        category: 'social', xp: 250, rarity: 'rare',
+        earned: false, progress: 0 },
+      { id: 11, title: 'Mentor', description: 'Hướng dẫn 10 bạn học mới', icon: '👨‍🏫',
+        category: 'social', xp: 500, rarity: 'epic',
+        earned: false, progress: 0 },
+      { id: 12, title: 'Night Owl', description: 'Học sau 10 giờ tối', icon: '🦉',
+        category: 'special', xp: 75, rarity: 'uncommon',
+        earned: nightHours >= 1, progress: nightHours >= 1 ? 100 : 0 },
+      { id: 13, title: 'Early Bird', description: 'Học trước 6 giờ sáng', icon: '🐦',
+        category: 'special', xp: 100, rarity: 'rare',
+        earned: earlyHours >= 1, progress: earlyHours >= 1 ? 100 : 0 },
+      { id: 14, title: 'Century Club', description: 'Đạt 1000 XP trong 1 ngày', icon: '💯',
+        category: 'special', xp: 1000, rarity: 'legendary',
+        earned: xpToday >= 1000, progress: Math.min(100, Math.round(xpToday / 10)) },
+    ].map(a => ({ ...a, earnedDate: a.earned ? today : null }));
+
+    const earnedCount = ach.filter(a => a.earned).length;
+    return res.json({
+      achievements: ach,
+      total: ach.length,
+      earnedCount,
+      totalXP: ach.filter(a => a.earned).reduce((s, a) => s + a.xp, 0),
+      completionRate: Math.round((earnedCount / ach.length) * 100),
+      signals: { enrolls, lessons, examTotal, examPerfect, recent100, practiceToday, streak, nightHours, earlyHours, xpToday },
+    });
+  } catch (e) {
+    console.error('[achievements:me]', e.message);
+    return res.json({ achievements: [], total: 0, earnedCount: 0 });
+  }
+});
+
+// Backwards-compat stub (page cũ)
 app.get('/api/achievements', (_req, res) => res.json({ achievements: [], total: 0 }));
 app.get('/api/transcript/history', (_req, res) => res.json({ transcripts: [], total: 0 }));
 app.get('/api/emotion', (_req, res) => res.json({ entries: [] }));

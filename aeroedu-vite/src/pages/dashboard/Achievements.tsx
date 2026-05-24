@@ -1,9 +1,12 @@
 /**
- * Achievements — clone chính xác từ
- * app/(dashboard)/(routes)/dashboard/achievements/page.tsx
+ * Achievements — wire real data từ /api/achievements/me
+ * BE compute earned/progress dựa trên Purchase + LessonHistory + PracticeExam
+ * + PageView (night/early hours, day streak) + xp_reward sum.
  */
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Trophy, Star, Target, Zap, Brain, Crown } from 'lucide-react'
+import { api } from '@/services/api'
 
 const categories = [
   { id: 'all',      name: 'Tất cả',    icon: Trophy },
@@ -14,21 +17,36 @@ const categories = [
   { id: 'special',  name: 'Đặc biệt',  icon: Brain },
 ]
 
-const achievements = [
-  { id: 1,  title: 'First Steps',        description: 'Hoàn thành bài học đầu tiên',                       icon: '👶', category: 'learning', earned: true,  earnedDate: '2025-01-10', xp: 50,   rarity: 'common',    progress: undefined },
-  { id: 2,  title: 'Math Master',        description: 'Hoàn thành 50 bài học Toán',                        icon: '🧮', category: 'learning', earned: true,  earnedDate: '2025-01-15', xp: 200,  rarity: 'rare',      progress: undefined },
-  { id: 3,  title: 'Physics Explorer',   description: 'Hoàn thành 25 bài học Vật lý',                      icon: '⚛️', category: 'learning', earned: true,  earnedDate: '2025-01-12', xp: 150,  rarity: 'uncommon',  progress: undefined },
-  { id: 4,  title: 'Chemistry Wizard',   description: 'Hoàn thành 100 bài học Hóa học',                    icon: '🧪', category: 'learning', earned: false, earnedDate: undefined,    xp: 500,  rarity: 'epic',      progress: 75 },
-  { id: 5,  title: 'Week Warrior',       description: 'Học liên tục 7 ngày',                               icon: '🔥', category: 'streak',   earned: true,  earnedDate: '2025-01-16', xp: 100,  rarity: 'uncommon',  progress: undefined },
-  { id: 6,  title: 'Month Master',       description: 'Học liên tục 30 ngày',                              icon: '📅', category: 'streak',   earned: false, earnedDate: undefined,    xp: 1000, rarity: 'legendary', progress: 23 },
-  { id: 7,  title: 'Speed Demon',        description: 'Hoàn thành 10 bài học trong 1 ngày',                icon: '⚡', category: 'skill',    earned: true,  earnedDate: '2025-01-14', xp: 300,  rarity: 'rare',      progress: undefined },
-  { id: 8,  title: 'Perfectionist',      description: 'Đạt 100% accuracy cho 5 bài học liên tiếp',        icon: '🎯', category: 'skill',    earned: false, earnedDate: undefined,    xp: 400,  rarity: 'epic',      progress: 3 },
-  { id: 9,  title: 'AI Explorer',        description: 'Hoàn thành bài học AI/ML đầu tiên',                 icon: '🤖', category: 'skill',    earned: true,  earnedDate: '2025-01-11', xp: 100,  rarity: 'uncommon',  progress: undefined },
-  { id: 10, title: 'Helper',             description: 'Giúp đỡ 5 bạn học khác',                           icon: '🤝', category: 'social',   earned: false, earnedDate: undefined,    xp: 250,  rarity: 'rare',      progress: 2 },
-  { id: 11, title: 'Mentor',             description: 'Hướng dẫn 10 bạn học mới',                         icon: '👨‍🏫', category: 'social',   earned: false, earnedDate: undefined,    xp: 500,  rarity: 'epic',      progress: 0 },
-  { id: 12, title: 'Night Owl',          description: 'Học sau 10 giờ tối',                                icon: '🦉', category: 'special',  earned: true,  earnedDate: '2025-01-13', xp: 75,   rarity: 'uncommon',  progress: undefined },
-  { id: 13, title: 'Early Bird',         description: 'Học trước 6 giờ sáng',                              icon: '🐦', category: 'special',  earned: false, earnedDate: undefined,    xp: 100,  rarity: 'rare',      progress: 0 },
-  { id: 14, title: 'Century Club',       description: 'Đạt 1000 XP trong 1 ngày',                          icon: '💯', category: 'special',  earned: false, earnedDate: undefined,    xp: 1000, rarity: 'legendary', progress: 0 },
+interface Achievement {
+  id: number
+  title: string
+  description: string
+  icon: string
+  category: string
+  earned: boolean
+  earnedDate?: string | null
+  xp: number
+  rarity: string
+  progress?: number
+}
+
+interface AchievementsResponse {
+  achievements: Achievement[]
+  total: number
+  earnedCount: number
+  totalXP: number
+  completionRate: number
+  signals?: {
+    streak?: number
+    xpToday?: number
+  }
+}
+
+// Fallback nếu BE chưa wire (page vẫn render)
+const FALLBACK_ACHIEVEMENTS: Achievement[] = [
+  { id: 1,  title: 'First Steps',      description: 'Hoàn thành bài học đầu tiên',          icon: '👶',   category: 'learning', earned: false, xp: 50,   rarity: 'common',    progress: 0 },
+  { id: 5,  title: 'Week Warrior',     description: 'Học liên tục 7 ngày',                  icon: '🔥',   category: 'streak',   earned: false, xp: 100,  rarity: 'uncommon',  progress: 0 },
+  { id: 9,  title: 'AI Explorer',      description: 'Hoàn thành bài luyện đầu tiên',        icon: '🤖',   category: 'skill',    earned: false, xp: 100,  rarity: 'uncommon',  progress: 0 },
 ]
 
 function getRarityStyle(rarity: string) {
@@ -67,13 +85,26 @@ function getRarityText(rarity: string) {
 export default function AchievementsPage() {
   const [selectedCategory, setSelectedCategory] = useState('all')
 
+  // Real data từ BE
+  const { data, isLoading } = useQuery<AchievementsResponse>({
+    queryKey: ['achievements-me'],
+    queryFn: () => api.get<AchievementsResponse>('/achievements/me').then(r => r.data),
+    staleTime: 60_000,  // cache 1 phút
+    retry: 1,
+  })
+
+  const achievements = data?.achievements?.length ? data.achievements : FALLBACK_ACHIEVEMENTS
+  const earnedCount = data?.earnedCount ?? achievements.filter(a => a.earned).length
+  const totalCount = data?.total ?? achievements.length
+  const completionRate = data?.completionRate ?? Math.round((earnedCount / totalCount) * 100)
+  const totalXPEarned = data?.totalXP ?? achievements.filter(a => a.earned).reduce((s, a) => s + a.xp, 0)
+  const currentStreak = data?.signals?.streak ?? 0
+  const xpToday = data?.signals?.xpToday ?? 0
+  const userLevel = Math.max(1, Math.floor(totalXPEarned / 250))
+
   const filteredAchievements = selectedCategory === 'all'
     ? achievements
     : achievements.filter(a => a.category === selectedCategory)
-
-  const earnedCount = achievements.filter(a => a.earned).length
-  const totalCount = achievements.length
-  const completionRate = Math.round((earnedCount / totalCount) * 100)
 
   return (
     <div className="min-h-screen">
@@ -94,13 +125,13 @@ export default function AchievementsPage() {
           </div>
         </div>
 
-        {/* Stats Overview */}
+        {/* Stats Overview — REAL data */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[
-            { label: 'Total XP',       value: '2,450',  icon: Zap,    color: 'from-[hsl(280,75%,55%)] to-[hsl(320,70%,55%)]', glow: 'rgba(160,80,255,0.15)' },
-            { label: 'Current Streak', value: '7 days', icon: Target, color: 'from-[hsl(25,85%,50%)] to-[hsl(0,80%,55%)]',   glow: 'rgba(230,120,50,0.15)' },
-            { label: 'Rank',           value: '#15',    icon: Crown,  color: 'from-[hsl(210,90%,55%)] to-[hsl(245,85%,60%)]', glow: 'rgba(60,130,255,0.15)' },
-            { label: 'Level',          value: '12',     icon: Star,   color: 'from-[hsl(175,80%,45%)] to-[hsl(160,70%,45%)]', glow: 'rgba(0,210,180,0.15)' },
+            { label: 'Tổng XP',          value: totalXPEarned.toLocaleString('vi-VN'),  icon: Zap,    color: 'from-[hsl(280,75%,55%)] to-[hsl(320,70%,55%)]', glow: 'rgba(160,80,255,0.15)' },
+            { label: 'Streak hiện tại',  value: `${currentStreak} ngày`,                icon: Target, color: 'from-[hsl(25,85%,50%)] to-[hsl(0,80%,55%)]',   glow: 'rgba(230,120,50,0.15)' },
+            { label: 'XP hôm nay',       value: xpToday.toLocaleString('vi-VN'),        icon: Crown,  color: 'from-[hsl(210,90%,55%)] to-[hsl(245,85%,60%)]', glow: 'rgba(60,130,255,0.15)' },
+            { label: 'Cấp độ',           value: String(userLevel),                       icon: Star,   color: 'from-[hsl(175,80%,45%)] to-[hsl(160,70%,45%)]', glow: 'rgba(0,210,180,0.15)' },
           ].map(({ label, value, icon: Icon, color, glow }) => (
             <div
               key={label}
