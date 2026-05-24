@@ -611,8 +611,10 @@ export default function CourseEditor() {
       }
       setBasicData(data)
       setStep(1)
-    } catch {
-      toast.error('Lỗi lưu, thử lại nhé.')
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e?.message || 'Lỗi lưu, thử lại nhé.'
+      toast.error(msg)
+      console.error('[course-save]', e?.response?.status, msg, e)
     } finally {
       setSaving(false)
     }
@@ -628,8 +630,10 @@ export default function CourseEditor() {
       }
       setContentData(data)
       setStep(2)
-    } catch {
-      toast.error('Lỗi lưu, thử lại nhé.')
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e?.message || 'Lỗi lưu, thử lại nhé.'
+      toast.error(msg)
+      console.error('[course-save]', e?.response?.status, msg, e)
     } finally {
       setSaving(false)
     }

@@ -2321,6 +2321,108 @@ app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
     }
   });
 
+  // ── POST /api/instructor/courses — tạo khoá học ───────────
+  app.post('/api/instructor/courses', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const b = req.body || {};
+      const title = String(b.title || '').trim();
+      if (!title) return res.status(400).json({ error: 'Thiếu tiêu đề khoá học' });
+
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = getIPool();
+
+      // Verify categoryId exists, else null (tránh FK violation)
+      let categoryId = b.categoryId || null;
+      if (categoryId) {
+        const { rowCount } = await pool.query(`SELECT 1 FROM "Category" WHERE id = $1`, [categoryId]);
+        if (!rowCount) categoryId = null;
+      }
+
+      const description = b.overview != null ? String(b.overview) : null;
+      const imageUrl    = b.image    != null ? String(b.image)    : null;
+      const price       = b.regularPrice != null ? Number(b.regularPrice) : 0;
+
+      const { rows } = await pool.query(
+        `INSERT INTO "Course" (id, "userId", "schoolId", title, description, "imageUrl",
+                               price, "isPublished", "categoryId", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'default-school', $3, $4, $5, $6, false, $7, NOW(), NOW())
+         RETURNING *`,
+        [id, userId, title.slice(0, 500), description, imageUrl, price, categoryId]
+      );
+
+      const row = rows[0];
+      const [chapRows, purchRows, userRow, catRow] = await Promise.all([
+        pool.query(`SELECT id, "isPublished" AS ispublished FROM "Chapter" WHERE "courseId" = $1`, [id]),
+        pool.query(`SELECT id FROM "Purchase" WHERE "courseId" = $1`, [id]),
+        pool.query(`SELECT name, image FROM "User" WHERE id = $1`, [userId]),
+        categoryId ? pool.query(`SELECT id, name FROM "Category" WHERE id = $1`, [categoryId]) : Promise.resolve({ rows: [] }),
+      ]);
+      const fullRow = {
+        ...row,
+        userName: userRow.rows[0]?.name || null,
+        userImage: userRow.rows[0]?.image || null,
+      };
+      console.log(`[instructor:create] ✅ Course ${id} for user ${userId}`);
+      return res.status(201).json(mapCourse(fullRow, catRow.rows[0] || null, purchRows.rows, chapRows.rows));
+    } catch (err) {
+      console.error('[instructor:create] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PATCH /api/instructor/courses/:id — cập nhật khoá học ──
+  app.patch('/api/instructor/courses/:id', async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const b = req.body || {};
+      const updates = ['"updatedAt" = NOW()'];
+      const params = [req.params.id, userId];
+      const push = (col, val) => { params.push(val); updates.push(`"${col}" = $${params.length}`); };
+
+      if (b.title       !== undefined) push('title',       String(b.title).slice(0, 500));
+      if (b.overview    !== undefined) push('description', b.overview != null ? String(b.overview) : null);
+      if (b.image       !== undefined) push('imageUrl',    b.image    != null ? String(b.image)    : null);
+      if (b.regularPrice !== undefined) push('price',      b.regularPrice != null ? Number(b.regularPrice) : 0);
+      if (b.categoryId  !== undefined) {
+        let cid = b.categoryId || null;
+        if (cid) {
+          const pool = getIPool();
+          const { rowCount } = await pool.query(`SELECT 1 FROM "Category" WHERE id = $1`, [cid]);
+          if (!rowCount) cid = null;
+        }
+        push('categoryId', cid);
+      }
+
+      const pool = getIPool();
+      const { rows } = await pool.query(
+        `UPDATE "Course" SET ${updates.join(', ')}
+         WHERE id = $1 AND "userId" = $2 RETURNING *`,
+        params
+      );
+      if (!rows[0]) return res.status(404).json({ error: 'Không tìm thấy khoá học' });
+
+      const row = rows[0];
+      const [chapRows, purchRows, userRow, catRow] = await Promise.all([
+        pool.query(`SELECT id, "isPublished" AS ispublished FROM "Chapter" WHERE "courseId" = $1`, [row.id]),
+        pool.query(`SELECT id FROM "Purchase" WHERE "courseId" = $1`, [row.id]),
+        pool.query(`SELECT name, image FROM "User" WHERE id = $1`, [userId]),
+        row.categoryId ? pool.query(`SELECT id, name FROM "Category" WHERE id = $1`, [row.categoryId]) : Promise.resolve({ rows: [] }),
+      ]);
+      const fullRow = { ...row, userName: userRow.rows[0]?.name || null, userImage: userRow.rows[0]?.image || null };
+      console.log(`[instructor:patch] ✅ Course ${row.id}`);
+      return res.json(mapCourse(fullRow, catRow.rows[0] || null, purchRows.rows, chapRows.rows));
+    } catch (err) {
+      console.error('[instructor:patch] ❌', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── DELETE /api/instructor/courses/:id ────────────────────
   app.delete('/api/instructor/courses/:id', async (req, res) => {
     try {
