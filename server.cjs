@@ -469,12 +469,26 @@ if (USE_NODEJS_AUTH) {
   });
 
   // ── POST /api/auth/register ───────────────────────────────
+  // Body: { email, password, name, role?: STUDENT|TEACHER, accountType?: STUDENT|TEACHER|PARENT }
+  // role là enum DB (STUDENT/TEACHER); accountType là UI sub-type (PARENT chia chung TEACHER role).
   app.post('/api/auth/register', async (req, res) => {
     try {
-      const { email, password, name } = req.body || {};
+      const { email, password, name, role: roleInput, accountType: acctInput } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email và mật khẩu không được để trống' });
       }
+
+      // Validate role — chỉ chấp nhận STUDENT hoặc TEACHER (ADMIN không tự đăng ký được)
+      const allowedRoles = ['STUDENT', 'TEACHER'];
+      const role = allowedRoles.includes(String(roleInput).toUpperCase())
+        ? String(roleInput).toUpperCase()
+        : 'STUDENT';  // default fallback
+
+      // Validate accountType — UI sub-type lưu vào UserProfile.account_type
+      const allowedAcct = ['STUDENT', 'TEACHER', 'PARENT'];
+      const accountType = allowedAcct.includes(String(acctInput).toUpperCase())
+        ? String(acctInput).toUpperCase()
+        : role;  // fallback theo role
 
       const pool = getPool();
       const existing = await pool.query(
@@ -496,16 +510,37 @@ if (USE_NODEJS_AUTH) {
           id, email, name, password, role, image,
           "emailVerified", "twoFactorEnabled", "failedLoginAttempts",
           "createdAt", "updatedAt"
-        ) VALUES ($1,$2,$3,$4,'STUDENT',NULL,NULL,false,0,$5,$6)`,
-        [id, email.toLowerCase().trim(), displayName, hash, now, now]
+        ) VALUES ($1,$2,$3,$4,$5,NULL,NULL,false,0,$6,$7)`,
+        [id, email.toLowerCase().trim(), displayName, hash, role, now, now]
       );
+
+      // Lưu accountType vào UserProfile để PARENT bền qua thiết bị
+      // (best-effort: bảng có thể chưa tồn tại — bọc try-catch)
+      try {
+        await pool.query(`
+          CREATE TABLE IF NOT EXISTS "UserProfile" (
+            user_id      VARCHAR(255) PRIMARY KEY,
+            account_type VARCHAR(20),
+            data         JSONB DEFAULT '{}'::jsonb,
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        await pool.query(
+          `INSERT INTO "UserProfile"(user_id, account_type, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO UPDATE SET account_type = EXCLUDED.account_type, updated_at = NOW()`,
+          [id, accountType]
+        );
+      } catch (e) {
+        console.warn('[auth:register] UserProfile save failed:', e.message);
+      }
 
       const { rows } = await pool.query('SELECT * FROM "User" WHERE id = $1', [id]);
       const user = rows[0];
       const token = issueToken(user);
-      console.log(`[auth:register] ✅ ${user.email}`);
+      console.log(`[auth:register] ✅ ${user.email} role=${role} accountType=${accountType}`);
       return res.status(201).json({
-        user: publicUser(user),
+        user: { ...publicUser(user), accountType },
         tokens: { accessToken: token, refreshToken: '' },
       });
     } catch (err) {
