@@ -1165,7 +1165,7 @@ app.get('/api/teacher/analytics', async (req, res) => {
 app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
 app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
-app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
+// REMOVED stub /api/teacher/my-students — shadow real handler line ~1911 (TSL)
 app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 app.get('/api/teacher/students', (_req, res) => res.json({ students: [], total: 0 }));
@@ -1852,6 +1852,7 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       ['student_email', "VARCHAR(255)"], ['status', "VARCHAR(20) DEFAULT 'pending'"],
       ['direction', "VARCHAR(20) DEFAULT 'teacher_invites'"], ['message', "TEXT"],
       ['created_at', "TIMESTAMPTZ DEFAULT NOW()"], ['updated_at', "TIMESTAMPTZ DEFAULT NOW()"],
+      ['approved_at', "TIMESTAMPTZ"], ['rejected_at', "TIMESTAMPTZ"],
     ]);
     await _dropLegacyNotNull('TeacherStudentLink', [
       'teacherId','studentId','studentEmail','status','direction','message',
@@ -1890,40 +1891,115 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
   const _ids = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
 
   // GET /api/teacher-student-link/pending → { incoming, outgoing }
+  // Enrich với JOIN User để FE có otherName/otherEmail/otherImage hiển thị
+  // (FE TeacherStudentLink interface expect các field này, không có → render rỗng)
+  //
+  // Vai trò teacher/student dùng để xác định ai là "other":
+  //   GV ở /teacher/student-requests → "other" = student (JOIN student_id)
+  //   HS ở /student/my-teachers      → "other" = teacher (JOIN teacher_id)
+  // Endpoint này serve cả 2 vai trò: filter teacher_id = myIds (GV) hoặc
+  // student_id = myIds (HS) tuỳ direction.
   app.get('/api/teacher-student-link/pending', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     try {
       const myIds = _ids(decoded);
       const pool = _getPool();
-      const { rows: incoming } = await pool.query(
-        `SELECT * FROM "TeacherStudentLink"
-         WHERE status = 'pending' AND direction = 'student_requests' AND teacher_id = ANY($1::text[])
-         ORDER BY created_at DESC`, [myIds]);
-      const { rows: outgoing } = await pool.query(
-        `SELECT * FROM "TeacherStudentLink"
-         WHERE status = 'pending' AND direction = 'teacher_invites' AND teacher_id = ANY($1::text[])
-         ORDER BY created_at DESC`, [myIds]);
+      // Incoming: yêu cầu chờ tôi (myIds) duyệt
+      //   - GV: student_requests + teacher_id = myIds (HS yêu cầu vào lớp)
+      //   - HS: teacher_invites + student_id = myIds (GV mời HS)
+      const { rows: incoming } = await pool.query(`
+        SELECT tsl.id, tsl.teacher_id AS "teacherId", tsl.student_id AS "studentId",
+               tsl.status, tsl.direction, tsl.message,
+               tsl.created_at AS "createdAt",
+               tsl.approved_at AS "approvedAt", tsl.rejected_at AS "rejectedAt",
+               CASE tsl.direction
+                 WHEN 'student_requests' THEN 'student'
+                 WHEN 'teacher_invites'  THEN 'teacher'
+                 ELSE 'auto'
+               END AS "initiatedBy",
+               COALESCE(us.email, tsl.student_email) AS "otherEmail",
+               us.name AS "otherName", us.image AS "otherImage"
+        FROM "TeacherStudentLink" tsl
+        LEFT JOIN "User" us ON us.id = tsl.student_id
+        LEFT JOIN "User" ut ON ut.id = tsl.teacher_id
+        WHERE tsl.status = 'pending' AND (
+          (tsl.direction = 'student_requests' AND tsl.teacher_id = ANY($1::text[]))
+          OR (tsl.direction = 'teacher_invites' AND tsl.student_id = ANY($1::text[]))
+        )
+        ORDER BY tsl.created_at DESC
+      `, [myIds]).catch(() => ({ rows: [] }));
+
+      // Outgoing: yêu cầu TÔI đã gửi đang chờ đối phương duyệt
+      //   - GV: teacher_invites + teacher_id = myIds (GV mời HS, HS chưa duyệt)
+      //   - HS: student_requests + student_id = myIds (HS xin GV, GV chưa duyệt)
+      const { rows: outgoing } = await pool.query(`
+        SELECT tsl.id, tsl.teacher_id AS "teacherId", tsl.student_id AS "studentId",
+               tsl.status, tsl.direction, tsl.message,
+               tsl.created_at AS "createdAt",
+               tsl.approved_at AS "approvedAt", tsl.rejected_at AS "rejectedAt",
+               CASE tsl.direction
+                 WHEN 'student_requests' THEN 'student'
+                 WHEN 'teacher_invites'  THEN 'teacher'
+                 ELSE 'auto'
+               END AS "initiatedBy",
+               -- otherEmail/Name tuỳ vai trò:
+               CASE
+                 WHEN tsl.direction = 'teacher_invites' THEN COALESCE(us.email, tsl.student_email)
+                 ELSE ut.email
+               END AS "otherEmail",
+               CASE
+                 WHEN tsl.direction = 'teacher_invites' THEN us.name
+                 ELSE ut.name
+               END AS "otherName",
+               CASE
+                 WHEN tsl.direction = 'teacher_invites' THEN us.image
+                 ELSE ut.image
+               END AS "otherImage"
+        FROM "TeacherStudentLink" tsl
+        LEFT JOIN "User" us ON us.id = tsl.student_id
+        LEFT JOIN "User" ut ON ut.id = tsl.teacher_id
+        WHERE tsl.status = 'pending' AND (
+          (tsl.direction = 'teacher_invites' AND tsl.teacher_id = ANY($1::text[]))
+          OR (tsl.direction = 'student_requests' AND tsl.student_id = ANY($1::text[]))
+        )
+        ORDER BY tsl.created_at DESC
+      `, [myIds]).catch(() => ({ rows: [] }));
+
       return res.json({ incoming, outgoing });
-    } catch (e) { console.error('[tsl:pending]', e.message); return res.json({ incoming: [], outgoing: [] }); }
+    } catch (e) {
+      console.error('[tsl:pending]', e.message);
+      return res.json({ incoming: [], outgoing: [] });
+    }
   });
 
   // GET /api/teacher/my-students — list HS đã approved
+  // Shape LinkedUser (teacherStudentLink.service.ts):
+  //   { linkId, initiatedBy, approvedAt, id, email, name, image }
   app.get('/api/teacher/my-students', async (req, res) => {
     const decoded = tslAuth(req, res); if (!decoded) return;
     try {
       const myIds = _ids(decoded);
       const pool = _getPool();
       const { rows } = await pool.query(`
-        SELECT tsl.id AS link_id, tsl.student_id, tsl.student_email, tsl.created_at,
+        SELECT tsl.id AS link_id, tsl.student_id, tsl.student_email,
+               tsl.created_at, tsl.approved_at, tsl.direction,
                u.name, u.email, u.image, u.role
         FROM "TeacherStudentLink" tsl
         LEFT JOIN "User" u ON u.id = tsl.student_id
         WHERE tsl.status = 'approved' AND tsl.teacher_id = ANY($1::text[])
-        ORDER BY tsl.created_at DESC LIMIT 500`, [myIds]);
+        ORDER BY tsl.approved_at DESC NULLS LAST, tsl.created_at DESC LIMIT 500`, [myIds]);
       const students = rows.map(r => ({
-        id: r.student_id, linkId: r.link_id, email: r.email || r.student_email,
+        id: r.student_id,
+        linkId: r.link_id,
+        email: r.email || r.student_email,
         name: r.name || (r.student_email ? r.student_email.split('@')[0] : '(Chưa tên)'),
-        image: r.image, role: r.role || 'STUDENT', linkedAt: r.created_at,
+        image: r.image,
+        role: r.role || 'STUDENT',
+        initiatedBy: r.direction === 'student_requests' ? 'student'
+                    : r.direction === 'teacher_invites' ? 'teacher'
+                    : 'auto',
+        approvedAt: r.approved_at || r.created_at,
+        linkedAt: r.approved_at || r.created_at,
       }));
       return res.json({ students, total: students.length });
     } catch (e) { console.error('[tsl:my-students]', e.message); return res.json({ students: [], total: 0 }); }
@@ -2036,7 +2112,8 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const myIds = _ids(decoded);
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `UPDATE "TeacherStudentLink" SET status = 'approved', updated_at = NOW()
+        `UPDATE "TeacherStudentLink"
+         SET status = 'approved', approved_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
         [req.params.id, myIds]);
       if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
@@ -2051,7 +2128,8 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
       const myIds = _ids(decoded);
       const pool = _getPool();
       const { rowCount } = await pool.query(
-        `UPDATE "TeacherStudentLink" SET status = 'rejected', updated_at = NOW()
+        `UPDATE "TeacherStudentLink"
+         SET status = 'rejected', rejected_at = NOW(), updated_at = NOW()
          WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR student_id = ANY($2::text[]))`,
         [req.params.id, myIds]);
       if (!rowCount) return res.status(404).json({ error: 'Không tìm thấy' });
@@ -9660,7 +9738,7 @@ app.get('/api/teacher/analytics', async (req, res) => {
 app.get('/api/teacher/dashboard', (_req, res) => res.json({ classes: 0, students: 0, exams: 0, pending_grading: 0 }));
 app.get('/api/teacher/modules', (_req, res) => res.json({ modules: [], total: 0 }));
 app.get('/api/teacher/modules/public', (_req, res) => res.json({ modules: [], total: 0 }));
-app.get('/api/teacher/my-students', (_req, res) => res.json({ students: [], total: 0 }));
+// REMOVED stub /api/teacher/my-students — shadow real handler ~line 1911
 app.get('/api/teacher/student-requests', (_req, res) => res.json({ requests: [], total: 0 }));
 app.get('/api/teacher/sprints', (_req, res) => res.json({ sprints: [], total: 0 }));
 
@@ -9677,18 +9755,23 @@ app.get('/api/student/my-teachers', async (req, res) => {
     const myIds = [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))];
     const { rows } = await pool.query(`
       SELECT tsl.id AS "linkId", tsl.created_at AS "linkedAt",
+             tsl.approved_at AS "approvedAt", tsl.direction,
              u.id, u.name, u.email, u.image, u.role
       FROM "TeacherStudentLink" tsl
       LEFT JOIN "User" u ON u.id = tsl.teacher_id
       WHERE tsl.status = 'approved' AND tsl.student_id = ANY($1::text[])
-      ORDER BY tsl.created_at DESC LIMIT 200
+      ORDER BY tsl.approved_at DESC NULLS LAST, tsl.created_at DESC LIMIT 200
     `, [myIds]).catch(() => ({ rows: [] }));
     const teachers = rows.map(r => ({
       id: r.id, linkId: r.linkId,
       name: r.name || r.email || `GV ${(r.id || '').slice(0, 8)}`,
       email: r.email || '', image: r.image || null,
       role: r.role || 'TEACHER',
-      linkedAt: r.linkedAt,
+      initiatedBy: r.direction === 'student_requests' ? 'student'
+                  : r.direction === 'teacher_invites' ? 'teacher'
+                  : 'auto',
+      approvedAt: r.approvedAt || r.linkedAt,
+      linkedAt: r.approvedAt || r.linkedAt,
     }));
     return res.json({ teachers, total: teachers.length });
   } catch (e) { console.error('[student:my-teachers]', e.message); return res.json({ teachers: [], total: 0 }); }
