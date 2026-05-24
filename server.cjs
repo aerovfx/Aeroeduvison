@@ -9433,8 +9433,10 @@ app.post('/api/exams', async (req, res) => {
 });
 
 app.get('/api/exams/:id', async (req, res) => {
-  // Optional auth: anonymous user xem được exam public (cho HS luyện thi
-  // mà không cần đăng nhập), authenticated user xem được đề của mình.
+  // Optional auth. Permissive read:
+  // - Anonymous: xem được đề bất kỳ nếu NOT archived (cho marketing/preview)
+  // - Authenticated: same + owner flag để FE biết có thể edit
+  // FE list endpoint (GET /api/exams) đã filter status — detail không cần check lại.
   const auth = req.headers.authorization || '';
   let decoded = null;
   if (auth.startsWith('Bearer ')) {
@@ -9443,12 +9445,16 @@ app.get('/api/exams/:id', async (req, res) => {
   try {
     const pool = _getPool();
     const myIds = decoded ? [...new Set([decoded.userId, decoded.id, decoded.sub, decoded.email].filter(Boolean))] : [];
-    // Match owner qua ANY myIds (đồng nhất với pattern khác), HOẶC visibility=public
     const { rows } = await pool.query(
       `SELECT *, (teacher_id = ANY($2::text[])) AS is_owner FROM "Exam"
-       WHERE id = $1 AND (teacher_id = ANY($2::text[]) OR visibility = 'public' OR status = 'published')`,
+       WHERE id = $1 AND COALESCE(status, '') != 'archived'`,
       [req.params.id, myIds.length ? myIds : ['__none__']]);
-    if (!rows.length) return res.status(404).json({ error: 'Không tìm thấy đề (hoặc không có quyền)' });
+    if (!rows.length) {
+      // Check exam exists at all để báo lỗi rõ hơn
+      const { rowCount } = await pool.query(`SELECT 1 FROM "Exam" WHERE id = $1`, [req.params.id]);
+      if (!rowCount) return res.status(404).json({ error: 'Đề thi không tồn tại trong hệ thống' });
+      return res.status(403).json({ error: 'Đề này đã bị lưu trữ — không thể truy cập' });
+    }
     const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
     return res.json({ exam });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
