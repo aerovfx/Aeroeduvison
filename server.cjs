@@ -9433,10 +9433,7 @@ app.post('/api/exams', async (req, res) => {
 });
 
 app.get('/api/exams/:id', async (req, res) => {
-  // Optional auth. Permissive read:
-  // - Anonymous: xem được đề bất kỳ nếu NOT archived (cho marketing/preview)
-  // - Authenticated: same + owner flag để FE biết có thể edit
-  // FE list endpoint (GET /api/exams) đã filter status — detail không cần check lại.
+  // Optional auth — anonymous xem đề preview, authenticated thấy isOwner.
   const auth = req.headers.authorization || '';
   let decoded = null;
   if (auth.startsWith('Bearer ')) {
@@ -9450,14 +9447,101 @@ app.get('/api/exams/:id', async (req, res) => {
        WHERE id = $1 AND COALESCE(status, '') != 'archived'`,
       [req.params.id, myIds.length ? myIds : ['__none__']]);
     if (!rows.length) {
-      // Check exam exists at all để báo lỗi rõ hơn
       const { rowCount } = await pool.query(`SELECT 1 FROM "Exam" WHERE id = $1`, [req.params.id]);
       if (!rowCount) return res.status(404).json({ error: 'Đề thi không tồn tại trong hệ thống' });
       return res.status(403).json({ error: 'Đề này đã bị lưu trữ — không thể truy cập' });
     }
-    const exam = { ...rows[0], visibility: rows[0].visibility || 'private', isOwner: !!rows[0].is_owner };
-    return res.json({ exam });
+    const examRow = rows[0];
+    const exam = { ...examRow, visibility: examRow.visibility || 'private', isOwner: !!examRow.is_owner };
+    // Hydrate questions từ question_ids
+    let questions = [];
+    const qIds = Array.isArray(examRow.question_ids) ? examRow.question_ids
+                 : (examRow.question_ids ? JSON.parse(examRow.question_ids) : []);
+    if (qIds && qIds.length > 0) {
+      const { rows: qRows } = await pool.query(
+        `SELECT id, content, type, difficulty, options, correct, explanation,
+                subject, chapter, lesson, topic, "imageUrl"
+         FROM "Question" WHERE id = ANY($1::text[])`, [qIds]
+      ).catch(() => ({ rows: [] }));
+      // Preserve order theo question_ids
+      const byId = new Map(qRows.map(q => [q.id, q]));
+      questions = qIds.map(id => byId.get(id)).filter(Boolean);
+    }
+    return res.json({ exam, questions });
   } catch (e) { console.error('[exams:get]', e.message); return res.status(500).json({ error: 'Lỗi tải đề' }); }
+});
+
+// POST /api/exams/:id/grade — HS submit answers, BE calculate score + save PracticeExam
+app.post('/api/exams/:id/grade', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let decoded = null;
+  if (auth.startsWith('Bearer ')) {
+    try { decoded = _akVerify(auth.slice(7)); } catch {}
+  }
+  try {
+    const { answers = {}, timeSpent = 0 } = req.body || {};
+    const pool = _getPool();
+    // Load exam + questions
+    const { rows: examRows } = await pool.query(
+      `SELECT id, title, question_ids, total_points FROM "Exam" WHERE id = $1`,
+      [req.params.id]);
+    if (!examRows.length) return res.status(404).json({ error: 'Đề thi không tồn tại' });
+    const examRow = examRows[0];
+    const qIds = Array.isArray(examRow.question_ids) ? examRow.question_ids
+                 : (examRow.question_ids ? JSON.parse(examRow.question_ids) : []);
+    if (!qIds.length) return res.status(400).json({ error: 'Đề chưa có câu hỏi' });
+    const { rows: questions } = await pool.query(
+      `SELECT id, type, options, correct FROM "Question" WHERE id = ANY($1::text[])`, [qIds]);
+
+    // Grade
+    let correct = 0;
+    const breakdown = [];
+    for (const q of questions) {
+      const userAns = answers[q.id];
+      const correctAns = q.correct;
+      let isCorrect = false;
+      if (userAns != null && correctAns != null) {
+        // Multiple choice: compare string/index
+        if (Array.isArray(correctAns)) {
+          isCorrect = Array.isArray(userAns) &&
+            userAns.length === correctAns.length &&
+            userAns.every(a => correctAns.includes(a));
+        } else {
+          isCorrect = String(userAns).trim() === String(correctAns).trim();
+        }
+      }
+      if (isCorrect) correct++;
+      breakdown.push({ questionId: q.id, isCorrect, userAnswer: userAns, correctAnswer: correctAns });
+    }
+    const total = questions.length;
+    const percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const score = examRow.total_points ? Math.round((correct / total) * examRow.total_points) : correct;
+
+    // Save PracticeExam record (graceful nếu table chưa có)
+    const userId = decoded?.userId || decoded?.id || decoded?.sub;
+    if (userId) {
+      try {
+        const { randomUUID } = require('crypto');
+        await pool.query(`
+          INSERT INTO "PracticeExam"(id, "studentId", "examId", "examTitle",
+            "totalQuestions", "correctCount", percentage, score, "timeSpentSec",
+            breakdown, completed, "completedAt", "createdAt")
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,true,NOW(),NOW())
+        `, [randomUUID(), userId, examRow.id, examRow.title,
+            total, correct, percentage, score, Math.floor(timeSpent),
+            JSON.stringify(breakdown)]);
+      } catch { /* table may not exist */ }
+    }
+
+    return res.json({
+      success: true,
+      total, correct, wrong: total - correct,
+      percentage, score,
+      passed: percentage >= 50,
+      breakdown,
+      timeSpent: Math.floor(timeSpent),
+    });
+  } catch (e) { console.error('[exams:grade]', e.message); return res.status(500).json({ error: 'Lỗi chấm bài' }); }
 });
 
 app.patch('/api/exams/:id', async (req, res) => {
