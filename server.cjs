@@ -9572,8 +9572,119 @@ app.get('/api/student/progress-overview', (_req, res) => res.json({ overall: 0, 
 app.get('/api/student/learning-paths', (_req, res) => res.json({ paths: [], total: 0 }));
 
 // Courses
-app.get('/api/courses', (_req, res) => res.json({ courses: [], total: 0 }));
-app.get('/api/courses/dashboard', (_req, res) => res.json({ enrolled: [], featured: [], my_progress: {} }));
+// /api/courses — list catalog (FE thường gọi paginated)
+app.get('/api/courses', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const { rows } = await pool.query(`
+      SELECT c.id, c."userId", c.title, c.description, c."imageUrl",
+             c.price, c."isPublished", c."categoryId", c."createdAt", c."updatedAt",
+             cat.name AS "categoryName",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Course" c
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE c."isPublished" = true
+      ORDER BY c."createdAt" DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]).catch(() => ({ rows: [] }));
+    const courses = rows.map(r => ({
+      id: r.id, userId: r.userId, title: r.title, description: r.description,
+      imageUrl: r.imageUrl, price: Number(r.price) || 0,
+      isPublished: !!r.isPublished, categoryId: r.categoryId,
+      category: r.categoryName ? { id: r.categoryId, name: r.categoryName } : null,
+      chapters: [], createdAt: r.createdAt, updatedAt: r.updatedAt,
+      instructor: r.instructorName ? { name: r.instructorName, image: r.instructorImage } : null,
+    }));
+    return res.json({ courses, total: courses.length });
+  } catch (e) { console.error('[courses:list]', e.message); return res.json({ courses: [], total: 0 }); }
+});
+
+// /api/courses/dashboard — enrolled + featured + my_progress
+app.get('/api/courses/dashboard', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+  try {
+    const pool = _getPool();
+    const [enrolled, featured] = await Promise.all([
+      userId ? pool.query(`
+        SELECT c.id, c.title, c."imageUrl", c.price
+        FROM "Purchase" p JOIN "Course" c ON c.id = p."courseId"
+        WHERE p."userId" = $1 ORDER BY p."createdAt" DESC LIMIT 10
+      `, [userId]).catch(() => ({ rows: [] })) : Promise.resolve({ rows: [] }),
+      pool.query(`SELECT id, title, "imageUrl", price FROM "Course" WHERE "isPublished" = true ORDER BY "createdAt" DESC LIMIT 8`).catch(() => ({ rows: [] })),
+    ]);
+    return res.json({
+      enrolled: enrolled.rows,
+      featured: featured.rows,
+      my_progress: {},
+    });
+  } catch (e) { return res.json({ enrolled: [], featured: [], my_progress: {} }); }
+});
+
+// /api/courses/:id — course detail với chapters
+app.get('/api/courses/:id', async (req, res) => {
+  try {
+    const pool = _getPool();
+    const { rows } = await pool.query(`
+      SELECT c.*, cat.name AS "categoryName",
+             u.name AS "instructorName", u.image AS "instructorImage"
+      FROM "Course" c
+      LEFT JOIN "Category" cat ON cat.id = c."categoryId"
+      LEFT JOIN "User" u ON u.id = c."userId"
+      WHERE c.id = $1 LIMIT 1
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    if (!rows.length) return res.status(404).json({ error: 'Course không tồn tại' });
+    const c = rows[0];
+    // Load chapters
+    const { rows: chapters } = await pool.query(`
+      SELECT id, title, description, "videoUrl", position, "isPublished", "isFree",
+             "courseId", "createdAt", "updatedAt"
+      FROM "Chapter" WHERE "courseId" = $1 ORDER BY position ASC
+    `, [req.params.id]).catch(() => ({ rows: [] }));
+    return res.json({
+      id: c.id, userId: c.userId, title: c.title, description: c.description,
+      imageUrl: c.imageUrl, price: Number(c.price) || 0,
+      isPublished: !!c.isPublished, categoryId: c.categoryId,
+      category: c.categoryName ? { id: c.categoryId, name: c.categoryName } : null,
+      chapters: chapters.map(ch => ({ ...ch, userProgress: [] })),
+      createdAt: c.createdAt, updatedAt: c.updatedAt,
+      instructor: c.instructorName ? { name: c.instructorName, image: c.instructorImage } : null,
+    });
+  } catch (e) { console.error('[courses:get]', e.message); return res.status(500).json({ error: e.message }); }
+});
+
+// /api/courses/:id/progress — progress của user hiện tại
+app.get('/api/courses/:id/progress', async (req, res) => {
+  const auth = req.headers.authorization || '';
+  let userId = null;
+  if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+  if (!userId) return res.json({ progress: 0, completedChapters: 0, totalChapters: 0, lastChapter: null });
+  try {
+    const pool = _getPool();
+    // Count chapters + completed
+    const [chap, prog] = await Promise.all([
+      pool.query(`SELECT COUNT(*)::int AS n FROM "Chapter" WHERE "courseId" = $1 AND "isPublished" = true`, [req.params.id]),
+      pool.query(`
+        SELECT COUNT(*)::int AS n, MAX(up."updatedAt") AS last_update
+        FROM "UserProgress" up
+        JOIN "Chapter" ch ON ch.id = up."chapterId"
+        WHERE up."userId" = $1 AND up."isCompleted" = true AND ch."courseId" = $2
+      `, [userId, req.params.id]).catch(() => ({ rows: [{ n: 0, last_update: null }] })),
+    ]);
+    const total = chap.rows[0]?.n || 0;
+    const done = prog.rows[0]?.n || 0;
+    return res.json({
+      progress: total > 0 ? Math.round((done / total) * 100) : 0,
+      completedChapters: done,
+      totalChapters: total,
+      lastUpdate: prog.rows[0]?.last_update || null,
+    });
+  } catch (e) { console.error('[courses:progress]', e.message); return res.json({ progress: 0, completedChapters: 0, totalChapters: 0 }); }
+});
 app.get('/api/instructor/courses', (_req, res) => res.json({ courses: [], total: 0 }));
 // Real /api/learning/my-courses — Multi-source enrollment list
 // 3 nguồn HS có thể truy cập course:
