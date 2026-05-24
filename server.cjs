@@ -9808,6 +9808,140 @@ app.get('/api/student/exam-rooms', async (req, res) => {
   }
 });
 
+// ── /api/personality-test — Career test (MBTI + Holland) ──
+;(() => {
+  async function _ensurePersonalityTable() {
+    const pool = _getPool();
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS "PersonalityTest" (
+          id              VARCHAR(36)  PRIMARY KEY,
+          user_id         VARCHAR(255),
+          user_name       VARCHAR(200),
+          user_year       INTEGER,
+          mbti_type       VARCHAR(10),
+          mbti_name       VARCHAR(100),
+          mbti_scores     JSONB,
+          holland_code    VARCHAR(10),
+          holland_scores  JSONB,
+          careers         JSONB,
+          created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+        )
+      `);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_personality_user ON "PersonalityTest"(user_id)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_personality_mbti ON "PersonalityTest"(mbti_type)`);
+    } catch {}
+  }
+  _ensurePersonalityTable().catch(() => {});
+
+  // POST /api/personality-test — save kết quả
+  app.post('/api/personality-test', async (req, res) => {
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+    try {
+      const b = req.body || {};
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "PersonalityTest"(id, user_id, user_name, user_year,
+          mbti_type, mbti_name, mbti_scores, holland_code, holland_scores, careers)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9::jsonb,$10::jsonb)
+      `, [id, userId, b.userName || null, b.userYearOfBirth || null,
+          b.mbtiType, b.personalityName, JSON.stringify(b.mbtiScores || {}),
+          b.hollandCode, JSON.stringify(b.hollandScores || {}),
+          JSON.stringify(b.careers || [])]);
+      return res.json({ success: true, id });
+    } catch (e) { console.error('[personality:save]', e.message); return res.json({ success: false, id: null }); }
+  });
+
+  // GET /api/personality-test?action=history | community-stats
+  app.get('/api/personality-test', async (req, res) => {
+    const action = String(req.query.action || '').toLowerCase();
+    const auth = req.headers.authorization || '';
+    let userId = null;
+    if (auth.startsWith('Bearer ')) { try { userId = _akVerify(auth.slice(7)).sub; } catch {} }
+
+    const MBTI_NAMES = {
+      INTJ: 'Nhà chiến lược', INTP: 'Nhà tư tưởng', ENTJ: 'Tổng tư lệnh', ENTP: 'Người tranh luận',
+      INFJ: 'Người che chở', INFP: 'Người trung gian', ENFJ: 'Nhà sư phạm', ENFP: 'Nhà vận động',
+      ISTJ: 'Nhà kỹ trị', ISFJ: 'Người bảo vệ', ESTJ: 'Nhà điều hành', ESFJ: 'Lãnh sự',
+      ISTP: 'Nghệ nhân', ISFP: 'Nghệ sĩ', ESTP: 'Doanh nhân', ESFP: 'Người trình diễn',
+    };
+    const HOLLAND_LABELS = {
+      R: 'Realistic (Thực tế)', I: 'Investigative (Nghiên cứu)', A: 'Artistic (Nghệ thuật)',
+      S: 'Social (Xã hội)', E: 'Enterprising (Lãnh đạo)', C: 'Conventional (Quy củ)',
+    };
+
+    try {
+      const pool = _getPool();
+      if (action === 'history') {
+        if (!userId) return res.json({ success: true, data: [] });
+        const { rows } = await pool.query(`
+          SELECT id, user_name AS "userName", user_year AS "userYearOfBirth",
+                 mbti_type AS "mbtiType", mbti_name AS "personalityName",
+                 mbti_scores AS "mbtiScores", holland_code AS "hollandCode",
+                 holland_scores AS "hollandScores", careers,
+                 created_at AS "createdAt"
+          FROM "PersonalityTest" WHERE user_id = $1
+          ORDER BY created_at DESC LIMIT 50
+        `, [userId]).catch(() => ({ rows: [] }));
+        return res.json({ success: true, data: rows });
+      }
+      // community-stats — aggregate toàn bộ
+      const [totals, mbtiDist, hollandDist, topCareers, lastAt] = await Promise.all([
+        pool.query(`
+          SELECT COUNT(*)::int AS attempts,
+                 COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS users
+          FROM "PersonalityTest"`).catch(() => ({ rows: [{ attempts: 0, users: 0 }] })),
+        pool.query(`
+          SELECT mbti_type AS type, COUNT(*)::int AS count FROM "PersonalityTest"
+          WHERE mbti_type IS NOT NULL GROUP BY mbti_type ORDER BY count DESC LIMIT 16
+        `).catch(() => ({ rows: [] })),
+        pool.query(`
+          SELECT SUBSTRING(holland_code FROM i FOR 1) AS letter, COUNT(*)::int AS count
+          FROM "PersonalityTest", generate_series(1, 6) AS i
+          WHERE holland_code IS NOT NULL AND LENGTH(holland_code) >= i
+          GROUP BY letter ORDER BY count DESC LIMIT 6
+        `).catch(() => ({ rows: [] })),
+        pool.query(`
+          SELECT career, COUNT(*)::int AS count
+          FROM "PersonalityTest", jsonb_array_elements_text(careers) AS career
+          WHERE careers IS NOT NULL GROUP BY career ORDER BY count DESC LIMIT 10
+        `).catch(() => ({ rows: [] })),
+        pool.query(`SELECT MAX(created_at) AS at FROM "PersonalityTest"`).catch(() => ({ rows: [{ at: null }] })),
+      ]);
+      const totalAttempts = totals.rows[0]?.attempts || 0;
+      const totalUsers = totals.rows[0]?.users || 0;
+      const mbti = mbtiDist.rows.map(r => ({
+        type: r.type, name: MBTI_NAMES[r.type] || r.type,
+        count: r.count, percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+      }));
+      const holland = hollandDist.rows
+        .filter(r => ['R','I','A','S','E','C'].includes(r.letter))
+        .map(r => ({
+          code: r.letter, label: HOLLAND_LABELS[r.letter] || r.letter,
+          count: r.count, percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+        }));
+      const careers = topCareers.rows.map(r => ({
+        name: r.career, count: r.count,
+        percentage: totalAttempts > 0 ? Math.round((r.count / totalAttempts) * 100) : 0,
+      }));
+      return res.json({
+        success: true,
+        data: {
+          totalAttempts, totalUsers,
+          updatedAt: lastAt.rows[0]?.at || null,
+          mbtiDistribution: mbti,
+          hollandDistribution: holland,
+          topCareers: careers,
+        }
+      });
+    } catch (e) { console.error('[personality:get]', e.message); return res.json({ success: false, data: null }); }
+  });
+})();
+
 // GET /api/student/exam-rooms/leaderboard — global top HS theo điểm
 // Nguồn data: PracticeExam table (đã có từ commit grade endpoint).
 // Top 20 HS sort theo avg percentage 30 ngày gần nhất.
