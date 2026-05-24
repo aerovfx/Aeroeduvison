@@ -2258,6 +2258,196 @@ app.delete('/api/teacher/exams/:id', async (req, res) => {
 // Tạm trả empty để CameraManagement.tsx không 503 mỗi 10s.
 app.get('/api/teacher/student-cams', (_req, res) => res.json({ sessions: [], count: 0 }));
 
+// ── Learning Paths (LearningPathBuilder.tsx) — TRƯỚC proxy ──
+;(() => {
+  async function _ensureLPTable() {
+    const pool = _getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "LearningPath" (
+        id           VARCHAR(36)  PRIMARY KEY,
+        teacher_id   VARCHAR(255) NOT NULL,
+        name         VARCHAR(500) NOT NULL,
+        description  TEXT,
+        subject      VARCHAR(100),
+        difficulty   VARCHAR(20),
+        modules      JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        competencies JSONB        NOT NULL DEFAULT '[]'::jsonb,
+        path_rubric  JSONB,
+        created_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+        updated_at   TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('LearningPath', [
+      ['teacher_id',   "VARCHAR(255)"],
+      ['name',         "VARCHAR(500)"],
+      ['description',  "TEXT"],
+      ['subject',      "VARCHAR(100)"],
+      ['difficulty',   "VARCHAR(20)"],
+      ['modules',      "JSONB DEFAULT '[]'::jsonb"],
+      ['competencies', "JSONB DEFAULT '[]'::jsonb"],
+      ['path_rubric',  "JSONB"],
+      ['created_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+      ['updated_at',   "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('LearningPath', ['teacherId','name','description','subject','difficulty','modules','competencies','pathRubric','createdAt','updatedAt']);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_lp_teacher ON "LearningPath"(teacher_id, updated_at DESC)`);
+
+    // Assignment 1-N: 1 path → nhiều HS
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "LearningPathAssignment" (
+        id             VARCHAR(36)  PRIMARY KEY,
+        path_id        VARCHAR(36)  NOT NULL,
+        student_id     VARCHAR(255) NOT NULL,
+        student_name   VARCHAR(255),
+        student_email  VARCHAR(255),
+        created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      )
+    `);
+    await _alterAddColumns('LearningPathAssignment', [
+      ['path_id',       "VARCHAR(36)"],
+      ['student_id',    "VARCHAR(255)"],
+      ['student_name',  "VARCHAR(255)"],
+      ['student_email', "VARCHAR(255)"],
+      ['created_at',    "TIMESTAMPTZ DEFAULT NOW()"],
+    ]);
+    await _dropLegacyNotNull('LearningPathAssignment', ['pathId','studentId','studentName','studentEmail','createdAt']);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_lp_assign ON "LearningPathAssignment"(path_id, student_id)`);
+  }
+  _ensureLPTable().catch(e => console.error('[learning-paths] migration:', e.message));
+
+  function _lpAuth(req, res) {
+    const auth = req.headers.authorization || '';
+    if (!auth.startsWith('Bearer ')) { res.status(401).json({ error: 'Unauthorized' }); return null; }
+    try { return _akVerify(auth.slice(7)); }
+    catch { res.status(401).json({ error: 'Token không hợp lệ' }); return null; }
+  }
+  const _lpIds = (d) => [...new Set([d.userId, d.id, d.sub, d.email].filter(Boolean))];
+
+  // GET list
+  app.get('/api/teacher/learning-paths', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const myIds = _lpIds(decoded);
+      const { rows: paths } = await pool.query(
+        `SELECT id, name, description, subject, difficulty, modules, competencies,
+                path_rubric AS "pathRubric", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM "LearningPath" WHERE teacher_id = ANY($1::text[]) ORDER BY updated_at DESC LIMIT 200`,
+        [myIds]);
+      if (!paths.length) return res.json({ paths: [] });
+      const ids = paths.map(p => p.id);
+      const { rows: assigns } = await pool.query(
+        `SELECT id, path_id AS "pathId", student_id AS "studentId",
+                student_name AS "studentName", student_email AS "studentEmail"
+         FROM "LearningPathAssignment" WHERE path_id = ANY($1::text[])`, [ids]);
+      const byPath = {};
+      for (const a of assigns) (byPath[a.pathId] = byPath[a.pathId] || []).push(a);
+      const result = paths.map(p => ({ ...p, assignments: byPath[p.id] || [] }));
+      return res.json({ paths: result });
+    } catch (e) { console.error('[lp:list]', e.message); return res.json({ paths: [] }); }
+  });
+
+  // POST create
+  app.post('/api/teacher/learning-paths', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    const myId = decoded.userId || decoded.id || decoded.sub;
+    try {
+      const b = req.body || {};
+      if (!String(b.name || '').trim()) return res.status(400).json({ error: 'Thiếu tên path' });
+      const { randomUUID } = require('crypto');
+      const id = randomUUID();
+      const pool = _getPool();
+      await pool.query(`
+        INSERT INTO "LearningPath"(id, teacher_id, name, description, subject, difficulty,
+                                   modules, competencies, path_rubric)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)
+      `, [id, myId, String(b.name).slice(0,500), b.description || null,
+          b.subject || null, b.difficulty || null,
+          JSON.stringify(Array.isArray(b.modules) ? b.modules : []),
+          JSON.stringify(Array.isArray(b.competencies) ? b.competencies : []),
+          b.pathRubric ? JSON.stringify(b.pathRubric) : null]);
+      // assignTo HS
+      const assignTo = Array.isArray(b.assignTo) ? b.assignTo : [];
+      for (const a of assignTo) {
+        if (!a?.studentId) continue;
+        try {
+          await pool.query(
+            `INSERT INTO "LearningPathAssignment"(id, path_id, student_id, student_name, student_email)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [randomUUID(), id, a.studentId, a.studentName || null, a.studentEmail || null]);
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      return res.json({ ok: true, id });
+    } catch (e) { console.error('[lp:create]', e.message); return res.status(500).json({ error: 'Lỗi tạo path' }); }
+  });
+
+  // PATCH update
+  app.patch('/api/teacher/learning-paths/:id', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const b = req.body || {};
+      const updates = ['updated_at = NOW()'];
+      const params = [req.params.id, _lpIds(decoded)];
+      const push = (col, val, cast = '') => { params.push(val); updates.push(`${col} = $${params.length}${cast}`); };
+      if (b.name        !== undefined) push('name',        String(b.name).slice(0,500));
+      if (b.description !== undefined) push('description', b.description || null);
+      if (b.subject     !== undefined) push('subject',     b.subject || null);
+      if (b.difficulty  !== undefined) push('difficulty',  b.difficulty || null);
+      if (b.modules      !== undefined) push('modules',      JSON.stringify(Array.isArray(b.modules) ? b.modules : []), '::jsonb');
+      if (b.competencies !== undefined) push('competencies', JSON.stringify(Array.isArray(b.competencies) ? b.competencies : []), '::jsonb');
+      if (b.pathRubric   !== undefined) push('path_rubric',  b.pathRubric ? JSON.stringify(b.pathRubric) : null, '::jsonb');
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `UPDATE "LearningPath" SET ${updates.join(', ')} WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        params);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại hoặc không có quyền' });
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:update]', e.message); return res.status(500).json({ error: 'Lỗi cập nhật path' }); }
+  });
+
+  // DELETE
+  app.delete('/api/teacher/learning-paths/:id', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      // Verify owner
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "LearningPath" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _lpIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại' });
+      await pool.query(`DELETE FROM "LearningPathAssignment" WHERE path_id = $1`, [req.params.id]);
+      await pool.query(`DELETE FROM "LearningPath" WHERE id = $1`, [req.params.id]);
+      return res.json({ ok: true });
+    } catch (e) { console.error('[lp:delete]', e.message); return res.status(500).json({ error: 'Lỗi xoá path' }); }
+  });
+
+  // POST assign — body: { students: [{ studentId, studentName, studentEmail }, ...] }
+  app.post('/api/teacher/learning-paths/:id/assign', async (req, res) => {
+    const decoded = _lpAuth(req, res); if (!decoded) return;
+    try {
+      const pool = _getPool();
+      const { rowCount } = await pool.query(
+        `SELECT 1 FROM "LearningPath" WHERE id = $1 AND teacher_id = ANY($2::text[])`,
+        [req.params.id, _lpIds(decoded)]);
+      if (!rowCount) return res.status(404).json({ error: 'Path không tồn tại' });
+      const list = Array.isArray(req.body?.students) ? req.body.students : [];
+      const { randomUUID } = require('crypto');
+      let added = 0;
+      for (const a of list) {
+        if (!a?.studentId) continue;
+        try {
+          await pool.query(
+            `INSERT INTO "LearningPathAssignment"(id, path_id, student_id, student_name, student_email)
+             VALUES ($1,$2,$3,$4,$5)`,
+            [randomUUID(), req.params.id, a.studentId, a.studentName || null, a.studentEmail || null]);
+          added++;
+        } catch (e) { if (e.code !== '23505') throw e; }
+      }
+      return res.json({ ok: true, added });
+    } catch (e) { console.error('[lp:assign]', e.message); return res.status(500).json({ error: 'Lỗi gán HS' }); }
+  });
+})();
+
 // ── /api/teacher/* → teacher-service (sẽ chỉ chạy cho paths chưa có stub) ──
 app.use(makeProxy(TEACHER_SERVICE_URL, 'teacher-service', '/api/teacher'));
 
